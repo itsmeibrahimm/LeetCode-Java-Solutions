@@ -1,0 +1,10 @@
+env:
+  ENVIRONMENT: local
+web:
+  repository: payment
+  tag: localbuild
+  secretRef:
+    awsCredentialsEnabled: false
+  runtime:
+    containerEnabled: false
+    path: /srv/runtime/current

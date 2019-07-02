@@ -1,0 +1,8 @@
+service_runtime_config:
+  example_service_runtime_config: "this is a runtime config"
+
+service_env:
+  SERVICE_TEAM_EMAIL: "payments-team@doordash.com"
+  SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
+  REPORT_ENABLED: false
+  SERVICE_URI: "http://payment-web.prod.svc.cluster.local"

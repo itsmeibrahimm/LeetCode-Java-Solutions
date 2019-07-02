@@ -1,0 +1,34 @@
+env:
+  ENVIRONMENT: local
+replicaCount: 1
+web:
+  repository: ddartifacts-docker.jfrog.io/doordash/payment
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  secretRef:
+    awsCredentialsEnabled: true
+  readinessProbe:
+    path: /health
+  runtime:
+    containerEnabled: true
+    path: /srv/runtime
+nginx:
+  repository: nginx
+  tag: 1.17.0
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+service:
+  type: ClusterIP
+  protocol: TCP
+  port: 80
+  targetPort: 80

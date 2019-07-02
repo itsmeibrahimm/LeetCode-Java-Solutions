@@ -1,0 +1,11 @@
+######################################################################################
+# Please use this Dockerfile to add any custom command e.g. copy directories,        #
+# define environment variables, etc.                                                 #
+#                                                                                    #
+# Please refer to the following doc for instructions about how to modify your        #
+# Dockerfile.custom:                                                                 #
+#                                                                                    #
+# https://github.com/doordash/doordash-pulse/blob/master/README.md#custom-dockerfile #
+#                                                                                    #
+#                                                                                    #
+######################################################################################
