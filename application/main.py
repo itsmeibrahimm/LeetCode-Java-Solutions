@@ -15,7 +15,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger("root")
 
 runtime = Runtime(location="/srv/runtime/current",
-                  namespace="payment")
+                  namespace="payment-service")
 
 
 def create_app():

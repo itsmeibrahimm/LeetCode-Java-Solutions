@@ -1,7 +1,7 @@
 env:
   ENVIRONMENT: local
 web:
-  repository: payment
+  repository: payment-service
   tag: localbuild
   secretRef:
     awsCredentialsEnabled: false

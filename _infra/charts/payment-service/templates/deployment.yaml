@@ -24,7 +24,7 @@ spec:
     spec:
       volumes:
       - name: runtime-volume
-        {{- template "payment.volumes.runtime" . }}
+        {{- template "payment-service.volumes.runtime" . }}
       - name: flask-sock
         emptyDir: {}
       - name: nginx-conf
@@ -65,4 +65,4 @@ spec:
             subPath: nginx.conf
           - name: flask-app-conf
             mountPath: /etc/nginx/conf.d
-      {{- template "payment.containers.runtime" . }}
+      {{- template "payment-service.containers.runtime" . }}

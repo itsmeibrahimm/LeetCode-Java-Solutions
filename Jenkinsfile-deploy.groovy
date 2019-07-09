@@ -5,7 +5,7 @@ import org.doordash.JenkinsDd
 
 // -----------------------------------------------------------------------------------
 //
-// CD pipeline for payment
+// CD pipeline for payment-service
 //
 // The following params are automatically provided by the callback gateway as inputs
 // to the Jenkins pipeline that starts this job.

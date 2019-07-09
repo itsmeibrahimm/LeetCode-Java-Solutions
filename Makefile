@@ -2,7 +2,7 @@ DOCKER_IMAGE_URL=ddartifacts-docker.jfrog.io/doordash/$(SERVICE_NAME)
 LOCAL_CHART=_infra/charts/$(SERVICE_NAME)
 LOCAL_TAG=localbuild
 LOCAL_RUNTIME_PATH=local-runtime
-SERVICE_NAME=payment
+SERVICE_NAME=payment-service
 SHA=$(shell git rev-parse HEAD)
 
 ifeq ($(SECRETS),)

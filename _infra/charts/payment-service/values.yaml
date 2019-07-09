@@ -2,7 +2,7 @@ env:
   ENVIRONMENT: local
 replicaCount: 1
 web:
-  repository: ddartifacts-docker.jfrog.io/doordash/payment
+  repository: ddartifacts-docker.jfrog.io/doordash/payment-service
   resources:
     requests:
       cpu: 100m

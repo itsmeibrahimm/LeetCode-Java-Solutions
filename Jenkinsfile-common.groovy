@@ -24,7 +24,7 @@ sha = params["SHA"]
  * Returns the service name which is useful for builds and deployments.
  */
 def getServiceName() {
-  return 'payment'
+  return 'payment-service'
 }
 
 

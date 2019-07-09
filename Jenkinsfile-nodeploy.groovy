@@ -4,7 +4,7 @@
 // The following params are automatically provided by the callback gateway as inputs
 // to the Jenkins pipeline that starts this job.
 //
-// CI pipeline for payment
+// CI pipeline for payment-service
 //
 // params["SHA"]                    - Sha used to start the pipeline
 // params["BRANCH_NAME"]            - Name of GitHub branch the SHA is associated with

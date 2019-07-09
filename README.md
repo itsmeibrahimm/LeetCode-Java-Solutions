@@ -11,17 +11,17 @@ The repo was created through python-flask-service-template [link to specific SHA
 
 # Table of contents
 
-- [Architecture and Tech Stack](https://github.com/doordash/payment#architecture-and-tech-stack)
-- [Development](https://github.com/doordash/payment#development)
-  - [Setup Local Environment](https://github.com/doordash/payment#setup-local-environment)
-  - [Run Tests](https://github.com/doordash/payment#run-tests)
-  - [Local Deploy](https://github.com/doordash/payment#local-deploy)
-      - [Flask](https://github.com/doordash/payment#flask)
-  - [Update Dependencies](https://github.com/doordash/payment#update-dependencies)
+- [Architecture and Tech Stack](https://github.com/doordash/payment-service#architecture-and-tech-stack)
+- [Development](https://github.com/doordash/payment-service#development)
+  - [Setup Local Environment](https://github.com/doordash/payment-service#setup-local-environment)
+  - [Run Tests](https://github.com/doordash/payment-service#run-tests)
+  - [Local Deploy](https://github.com/doordash/payment-service#local-deploy)
+      - [Flask](https://github.com/doordash/payment-service#flask)
+  - [Update Dependencies](https://github.com/doordash/payment-service#update-dependencies)
 
 # Architecture and Tech Stack
 
-The `payment` is a Kubernetes pod with at least two containers:
+The `payment-service` is a Kubernetes pod with at least two containers:
 
 - the `web` container, which runs a `flask` app behind a `uwsgi` web server
 - the `nginx` sidecar, which shares a `socket` with the `web` container to perform reverse proxying and queuing
@@ -120,7 +120,7 @@ ENVIRONMENT=local pipenv run python -m application.main
 
 ## Update Dependencies
 
-The `payment` uses `pipenv` to ensure deterministic builds.
+The `payment-service` uses `pipenv` to ensure deterministic builds.
 To update a dependency, you can do the following:
 
 ```bash
