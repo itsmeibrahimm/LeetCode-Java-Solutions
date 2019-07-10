@@ -43,10 +43,10 @@ for dbname in "${maindb_copies[@]}"; do
 createdb --username=root --template=base_db ${dbname}
 psql --username=root -d ${dbname} -f /tmp/db-schemas/maindb_dump.sql
 
-# Grant table CRUD access to db user. 
+# Grant table CRUD access to db user.
 # Two grant statements cover payout and payin table separately for readibility.
 psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
-    GRANT INSERT, SELECT, UPDATE, DELETE ON 
+    GRANT INSERT, SELECT, UPDATE, DELETE ON
         managed_account_transfer,
         marqeta_card,
         marqeta_card_ownership,
@@ -59,7 +59,7 @@ psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
         stripe_transfer,
         transfer
     TO ${payout_db_user};
-    
+
     GRANT INSERT, SELECT, UPDATE, DELETE ON
         consumer,
         consumer_charge,

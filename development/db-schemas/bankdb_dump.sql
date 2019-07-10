@@ -1111,4 +1111,3 @@ ALTER TABLE ONLY transfer_transactions
 --
 -- PostgreSQL database dump complete
 --
-

@@ -14,8 +14,7 @@ from werkzeug.utils import find_modules, import_string
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger("root")
 
-runtime = Runtime(location="/srv/runtime/current",
-                  namespace="payment-service")
+runtime = Runtime(location="/srv/runtime/current", namespace="payment-service")
 
 
 def create_app():
@@ -28,28 +27,30 @@ def create_app():
     # Configs should be in the "conf" folder, in files named after
     # the environment.
     #  The Class inside should be the environment name, capital-case
-    app.config.from_object(f"application.conf.{environment}."
-                           f"{environment.capitalize()}")
+    app.config.from_object(
+        f"application.conf.{environment}." f"{environment.capitalize()}"
+    )
 
     app.ninox = None
-    if app.config['NINOX_ENABLED']:
+    if app.config["NINOX_ENABLED"]:
         app.ninox = NinoxLoader(app=app, config_section=environment)
 
     app.logger.info(app.config)
 
-    register_blueprints(app, module='application')
+    register_blueprints(app, module="application")
     register_cli(app)
 
     return app
 
 
-def register_blueprints(app, module=None, blueprint_module='blueprints',
-                        blueprint_obj_name='bp'):
+def register_blueprints(
+    app, module=None, blueprint_module="blueprints", blueprint_obj_name="bp"
+):
     """Register all blueprint modules
 
     Reference: Armin Ronacher, "Flask for Fun and for Profit" PyBay 2016.
     """
-    blueprint_path = (module or app.import_name) + '.' + blueprint_module
+    blueprint_path = (module or app.import_name) + "." + blueprint_module
     for name in find_modules(blueprint_path, True):
         mod = import_string(name)
         if hasattr(mod, blueprint_obj_name):
@@ -58,7 +59,7 @@ def register_blueprints(app, module=None, blueprint_module='blueprints',
 
 
 def register_cli(app):
-    @app.cli.command('version')
+    @app.cli.command("version")
     def version_command():
         print("unknown")
 

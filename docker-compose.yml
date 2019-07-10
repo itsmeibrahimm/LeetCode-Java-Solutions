@@ -1,12 +1,12 @@
-version: '3'
+version: "3"
 services:
   web:
     build:
-      context: '.'
+      context: "."
       args:
-        - ARTIFACTORY_USERNAME
-        - ARTIFACTORY_PASSWORD
-        - FURY_TOKEN
+        - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
     environment:
       ENVIRONMENT: local
       FLASK_APP: "application.main:create_app()"
@@ -22,4 +22,3 @@ services:
     ##
     # command: "uwsgi --ini /etc/uwsgi/uwsgi_compose.ini"
     command: "python3 -m flask run -h 0.0.0.0 -p 80"
-    

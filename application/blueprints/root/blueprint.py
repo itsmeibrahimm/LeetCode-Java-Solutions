@@ -4,7 +4,7 @@ from flask import Blueprint, request
 
 from application.blueprints.root.compute import compute_random_inclusive
 
-bp = Blueprint('root', __name__, url_prefix='/')
+bp = Blueprint("root", __name__, url_prefix="/")
 
 
 @bp.route("/")

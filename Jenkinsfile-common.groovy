@@ -1,4 +1,7 @@
 @Library('common-pipelines@v10.0.109') _
+
+import java.util.Arrays
+
 // -----------------------------------------------------------------------------------
 // The following params are automatically provided by the callback gateway as inputs
 // to the Jenkins pipeline that starts this job.
@@ -52,9 +55,9 @@ def getDockerImageUrl() {
  * <li>doorctl = Path in order to execute doorctl from within the Makefile
  * <li>SHA = GitHub SHA
  * <li>CACHE_FROM = url:tag of recent Docker image to speed up subsequent builds that use the --cache-from option
- * <li>ARTIFACTORY_USERNAME = Artifactory Username to install Python packages
- * <li>ARTIFACTORY_PASSWORD = Artifactory Password to install Python packages
- * <li>FURY_TOKEN = Gemfury Token to install Python packages
+ * <li>env.ARTIFACTORY_USERNAME = Artifactory Username to install Python packages
+ * <li>env.ARTIFACTORY_PASSWORD = Artifactory Password to install Python packages
+ * <li>env.FURY_TOKEN = Gemfury Token to install Python packages
  * </ul>
  */
 def buildTagPush(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName) {
@@ -95,8 +98,7 @@ def buildTagPush(Map optArgs = [:], String gitUrl, String sha, String branch, St
               | branch=${branch} \\
               | doorctl=${doorctlPath} \\
               | SHA=${sha} \\
-              | CACHE_FROM=${cacheFromValue} \\
-              | FURY_TOKEN=${FURY_TOKEN}
+              | CACHE_FROM=${cacheFromValue}
               |""".stripMargin()
       }
     }, gitUrl, sha, "Docker Build Tag Push", "${BUILD_URL}testReport")
@@ -109,17 +111,13 @@ def buildTagPush(Map optArgs = [:], String gitUrl, String sha, String branch, St
 def runCIcontainer(String serviceName, String sha) {
   def dockerImageUrl = getDockerImageUrl()
   github.doClosureWithStatus({
-    withCredentials([
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
-      string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
-    ]) {
-      sh """|#!/bin/bash
-            |set -eox
-            |docker rm ${serviceName}-ci || true
-            |FURY_TOKEN=${FURY_TOKEN} docker run -d --name ${serviceName}-ci ${dockerImageUrl}:${sha} tail -f /dev/null
-            |""".stripMargin()
-    }
+    sh """|#!/bin/bash
+          |set -eox
+          |docker rm ${serviceName}-ci || true
+          |make run-ci-container \\
+          |    CI_BASE_IMAGE="${dockerImageUrl}:${sha}" \\
+          |    CI_CONTAINER_NAME="${serviceName}-ci"
+          |""".stripMargin()
   }, gitUrl, sha, "Unit Tests", "${BUILD_URL}testReport")
 }
 
@@ -139,24 +137,19 @@ def loadJunit(fileName) {
  * Run Unit Tests on the CI container and archive the report
  */
 def runTests(String serviceName) {
+  def outputFile = "pytest.xml"
   github.doClosureWithStatus({
-    withCredentials([
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
-      string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
-    ]) {
-      try {
-        sh """|#!/bin/bash
-              |set -eox
-              |FURY_TOKEN=${FURY_TOKEN} docker exec ${serviceName}-ci tox -e py37
-              |""".stripMargin()
-      } finally {
-        sh """|#!/bin/bash
-              |set -eox
-              |docker cp ${serviceName}-ci:/home/app/pytest-report.xml pytest.xml
-              |""".stripMargin()
-        loadJunit("pytest.xml")
-      }
+    try {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker exec ${serviceName}-ci make test-unit PYTEST_ADDOPTS="--junitxml ${outputFile}"
+            |""".stripMargin()
+    } finally {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker cp ${serviceName}-ci:/home/app/${outputFile} ${outputFile}
+            |""".stripMargin()
+      loadJunit(outputFile)
     }
   }, gitUrl, sha, "Unit Tests", "${BUILD_URL}testReport")
 }
@@ -166,24 +159,19 @@ def runTests(String serviceName) {
  * Run the linter on the CI container and archive the report
  */
 def runLinter(String serviceName) {
+  def outputFile = "flake8.xml"
   github.doClosureWithStatus({
-    withCredentials([
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
-      string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
-    ]) {
-      try {
-        sh """|#!/bin/bash
-              |set -eox
-              |FURY_TOKEN=${FURY_TOKEN} docker exec ${serviceName}-ci tox -e lint
-              |""".stripMargin()
-      } finally {
-        sh """|#!/bin/bash
-              |set -eox
-              |docker cp ${serviceName}-ci:/home/app/flake8-report.xml flake8.xml
-              |""".stripMargin()
-        loadJunit("flake8.xml")
-      }
+    try {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker exec ${serviceName}-ci make test-lint FLAKE8_ADDOPTS="--format junit-xml --output-file=${outputFile}"
+            |""".stripMargin()
+    } finally {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker cp ${serviceName}-ci:/home/app/${outputFile} ${outputFile}
+            |""".stripMargin()
+      loadJunit(outputFile)
     }
   }, gitUrl, sha, "Linting", "${BUILD_URL}testReport")
 }
@@ -192,27 +180,98 @@ def runLinter(String serviceName) {
 /**
  * Run the static type checker on the CI container and archive the report
  */
-def runMypy(String serviceName) {
+def runTyping(String serviceName) {
+  def outputFile = "mypy.xml"
   github.doClosureWithStatus({
-    withCredentials([
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
-      string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
-    ]) {
-      try {
-        sh """|#!/bin/bash
-              |set -eox
-              |FURY_TOKEN=${FURY_TOKEN} docker exec ${serviceName}-ci tox -e mypy
-              |""".stripMargin()
-      } finally {
-        sh """|#!/bin/bash
-              |set -eox
-              |docker cp ${serviceName}-ci:/home/app/mypy-report.xml mypy.xml
-              |""".stripMargin()
-        loadJunit("mypy.xml")
-      }
+    try {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker exec ${serviceName}-ci make test-typing MYPY_ADDOPTS="--junit-xml ${outputFile}"
+            |""".stripMargin()
+    } finally {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker cp ${serviceName}-ci:/home/app/${outputFile} ${outputFile}
+            |""".stripMargin()
+      loadJunit(outputFile)
     }
   }, gitUrl, sha, "Typing", "${BUILD_URL}testReport")
+}
+
+def commentHooksFailed(serviceName) {
+  def maxFiles = 9
+  try {
+    def filesList = Arrays.asList(sh(
+      script: """|#!/bin/bash
+                 |set +ex
+                 |docker exec ${serviceName}-ci git diff --name-only
+                 |""".stripMargin(),
+      returnStdout: true
+    ).split(/\n/))
+    def changeSummary = sh(
+      script: """|#!/bin/bash
+                 |set +ex
+                 |docker exec ${serviceName}-ci git diff --shortstat
+                 |""".stripMargin(),
+      returnStdout: true
+    ).trim()
+    if (filesList.size() > maxFiles) {
+      filesList = filesList.take(maxFiles) + ["..."]
+    }
+    def placeholder = """|```
+                         |${filesList.join("\n")}
+                         |${changeSummary}
+                         |```""".stripMargin()
+
+    github.commentOnPrBySha(
+      gitUrl, sha,
+      """|:x: Looks like you missed running some pre-commit hooks on your PR.
+         |
+         |Please ensure pre-commit hooks are set up properly
+         |(see [README.md](../blob/${sha}/README.md#setup-local-environment)),
+         |and run pre-commit hooks on all files to fix them in place,
+         |`pre-commit run --all-files`:
+         |
+         |SUMMARY-PLACEHOLDER
+         |
+         |Then, create and push a commit with those changes so pre-commit hooks pass in CI.
+         |""" \
+          .stripMargin() \
+          .split(/\n{2,}/) \
+          .collect { it.replace("\n", " ") } \
+          .join("\n\n") \
+          .replace("SUMMARY-PLACEHOLDER", placeholder)
+    )
+  } catch (e) {
+    println "Failed commenting on ${gitUrl}:${sha} that pre-commit hooks failed"
+  }
+}
+
+
+/**
+ * Run the pre-commit checks (excluding mypy/flake8)
+ */
+def runHooks(String serviceName) {
+  github.doClosureWithStatus({
+    try {
+      sh """|#!/bin/bash
+            |set -eoxo pipefail
+            |docker exec ${serviceName}-ci git reset --hard
+            |docker exec ${serviceName}-ci make test-install-hooks PRE_COMMIT_HOME=/home/app
+            |docker exec ${serviceName}-ci make test-hooks PRE_COMMIT_HOME=/home/app SKIP=flake8,mypy HOOKS_ADDOPTS="--show-diff-on-failure"
+            |""".stripMargin()
+    } catch (e) {
+      commentHooksFailed(serviceName)
+      throw e
+    } finally {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker exec ${serviceName}-ci touch pre-commit.log
+            |docker cp ${serviceName}-ci:/home/app/pre-commit.log pre-commit-error.log
+            |""".stripMargin()
+      archiveArtifacts artifacts: "pre-commit-error.log"
+    }
+  }, gitUrl, sha, "Hooks", "${BUILD_URL}console")
 }
 
 

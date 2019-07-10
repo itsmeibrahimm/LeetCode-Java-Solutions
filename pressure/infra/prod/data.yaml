@@ -1,0 +1,9 @@
+service_env:
+  SERVICE_TEAM_EMAIL: "payments-team@doordash.com"
+  SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
+  WAVEFRONT_ENABLED: true
+
+users: "1000"
+hatch_rate: "100"
+run_time: "10m"
+target_host: "http://payment-service-web.prod.svc.cluster.local"

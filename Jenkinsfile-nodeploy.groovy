@@ -64,7 +64,14 @@ pipeline {
     stage('Typing') {
       steps {
         script {
-          common.runMypy(common.getServiceName())
+          common.runTyping(common.getServiceName())
+        }
+      }
+    }
+    stage('Hooks') {
+      steps {
+        script {
+          common.runHooks(common.getServiceName())
         }
       }
     }

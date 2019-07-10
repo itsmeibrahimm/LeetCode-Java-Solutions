@@ -1,0 +1,21 @@
+version: "3.2"
+services:
+  web:
+    # output image name for docker-compose build
+    image: "${CI_IMAGE_NAME:?CI_IMAGE_NAME. Please specify the docker image name for the build.}"
+    # container name for docker-compose run
+    container_name: "${CI_CONTAINER_NAME:?CI_CONTAINER_NAME. Please specify a container name.}"
+    build:
+      context: .
+      dockerfile: Dockerfile-ci
+      args:
+        # base image for Dockerfile-ci (should be the production image for this pipeline)
+        - CI_BASE_IMAGE=${CI_BASE_IMAGE:?CI_BASE_IMAGE. Please specify the docker base image.}
+    volumes:
+      - type: bind
+        source: ./.git
+        target: /home/app/.git-ro
+        read_only: true
+    # initialize git repository (so pre-commit hooks can run in CI)
+    # don't exit until stopped
+    command: "bash -c 'cp -r /home/app/.git-ro /home/app/.git; tail -f /dev/null'"

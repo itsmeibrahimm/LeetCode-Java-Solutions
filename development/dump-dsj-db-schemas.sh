@@ -6,7 +6,7 @@
 #     ├── db-schemas
 #     │   ├── bankdb_dump.sql ---> bankDB schema
 #     │   └── maindb_dump.sql ---> mainDB schema
-#     ├── ... 
+#     ├── ...
 
 PROJECT_DIR=$(git rev-parse --show-toplevel)/..
 ORIGINAL_DIR=$(pwd)

@@ -22,7 +22,7 @@ $ dd-toolbox doorstep-django snap-to-schema
 This script will start doorstep-django.postgres container and dump out maindb/bankdb schemas to your local payment repo directory.
 ```bash
 $ cd PATH/TO/PAYMENT/PROJECT
-$ ./development/dump-dsj-db-schemas.sh 
+$ ./development/dump-dsj-db-schemas.sh
 ```
 
 ### 3. Validate updated payment-dsj db schema
@@ -62,4 +62,3 @@ payment-service/development/
 | transfer                  |                   |
 #### Bank DB
 All tables ONLY depended by Payout.
-

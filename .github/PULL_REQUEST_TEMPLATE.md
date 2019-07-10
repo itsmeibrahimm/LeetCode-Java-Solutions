@@ -23,7 +23,7 @@
 - [Design doc](<Replace with design doc link>)
 
 ## How Has This Been Tested?
-Please describe the tests that you ran to verify your changes. 
+Please describe the tests that you ran to verify your changes.
 - [ ] Unit tests
 - [ ] Integration tests
 - [ ] E2E tests

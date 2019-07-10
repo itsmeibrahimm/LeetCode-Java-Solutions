@@ -8,6 +8,16 @@ name = "gemfury"
 url = "https://pypi.fury.io/${FURY_TOKEN}/doordash/"
 verify_ssl= false
 
+[[source]]
+name = "artifactory-test"
+url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local-test/simple/"
+verify_ssl= false
+
+[[source]]
+name = "artifactory"
+url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/"
+verify_ssl= false
+
 [dev-packages]
 coverage = "*"
 flake8 = "*"
@@ -19,15 +29,14 @@ pytest = "*"
 pytest-html = "*"
 pytest-mock = "*"
 pytest-xdist = "*"
-tox-pipenv = "*"
-tox = "<3.8.0"  # 3.8 is incompatible with tox-pipenv
 black = "==19.3b0"  # You have to lock pre-releases
+pre-commit = "*"
 
 [packages]
 flask = ">=1.0.3"
 uwsgi = ">=2.0.18"
-doordash-python-lib = {version=">=0.10.2", index="gemfury"}
-ninox = {version="*", index="gemfury", extras=["py3", "CLI"]}
+doordash-python-lib = {version = ">=0.10.2",index = "gemfury"}
+ninox = {version = "*",index = "gemfury",extras = ["py3", "CLI"]}
 
 [requires]
 python_version = "3.7"
