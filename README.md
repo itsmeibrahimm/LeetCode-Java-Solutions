@@ -11,16 +11,16 @@ The repo was created through python-flask-service-template [link to specific SHA
 
 # Table of contents
 
-- [Architecture and Tech Stack](https://github.com/doordash/payment-service#architecture-and-tech-stack)
-- [Development](https://github.com/doordash/payment-service#development)
-  - [Setup Local Environment](https://github.com/doordash/payment-service#setup-local-environment)
-  - [Run Tests](https://github.com/doordash/payment-service#run-tests)
-  - [Local Deploy](https://github.com/doordash/payment-service#local-deploy)
-    - [Flask](https://github.com/doordash/payment-service#flask)
-    - [docker-compose](https://github.com/doordash/payment-service#docker-compose)
-    - [Kubernetes](https://github.com/doordash/payment-service#kubernetes)
-  - [Update Dependencies](https://github.com/doordash/payment-service#update-dependencies)
-  - [Make commands reference](https://github.com/doordash/payment-service#make-commands-reference)
+- [Architecture and Tech Stack](#architecture-and-tech-stack)
+- [Development](#development)
+  - [Setup Local Environment](#setup-local-environment)
+  - [Run Tests](#run-tests)
+  - [Local Deploy](#local-deploy)
+    - [Flask](#flask)
+    - [docker-compose](#docker-compose)
+    - [Kubernetes](#kubernetes)
+  - [Update Dependencies](#update-dependencies)
+  - [Make commands reference](#make-commands-reference)
 
 # Architecture and Tech Stack
 

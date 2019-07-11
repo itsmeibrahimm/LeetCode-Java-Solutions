@@ -16,6 +16,8 @@ spec:
       app: web
   template:
     metadata:
+      annotations:
+        iam.amazonaws.com/role: {{ .Values.aws_iam_role | default "none" }}
       labels:
         service: {{ .Chart.Name }}
         app: web
