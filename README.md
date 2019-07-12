@@ -65,6 +65,10 @@ To setup your local dev environment, please clone your repo, `cd` into it and fo
 
 ```bash
 brew install kubernetes-helm
+
+# If your local k8s cluster complains `connection refused`, try to do the following:
+#  - remove k8s config for this local cluster in your ~/.kube/config
+#  - increase your local docker setting to have 4G swap space (Preferences -> Advanced)
 helm init
 ```
 
