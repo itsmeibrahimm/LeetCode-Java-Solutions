@@ -5,11 +5,12 @@ import logging
 import os
 import sys
 
-# related third party imports
 from doordash_lib.runtime import Runtime
 from flask import Flask
 from ninox.interface.flask.secret_marker import NinoxLoader
 from werkzeug.utils import find_modules, import_string
+
+# related third party imports
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger("root")
@@ -20,23 +21,7 @@ runtime = Runtime(location="/srv/runtime/current", namespace="payment-service")
 def create_app():
     app = Flask(__name__)
 
-    environment = os.getenv("ENVIRONMENT", "").lower()
-    if not environment:
-        raise Exception("No ENVIRONMENT in env. Not Supported")
-
-    # Configs should be in the "conf" folder, in files named after
-    # the environment.
-    #  The Class inside should be the environment name, capital-case
-    app.config.from_object(
-        f"application.conf.{environment}." f"{environment.capitalize()}"
-    )
-
-    app.ninox = None
-    if app.config["NINOX_ENABLED"]:
-        app.ninox = NinoxLoader(app=app, config_section=environment)
-
-    app.logger.info(app.config)
-
+    _initialize_app_config(app)
     register_blueprints(app, module="application")
     register_cli(app)
 
@@ -62,6 +47,22 @@ def register_cli(app):
     @app.cli.command("version")
     def version_command():
         print("unknown")
+
+
+def _initialize_app_config(app: Flask):
+    environment = os.getenv("ENVIRONMENT", "").lower()
+    if not environment:
+        raise Exception("No ENVIRONMENT in env. Not Supported")
+
+    # Configs should be in the "conf" folder, in files named after
+    # the environment.
+    #  The Class inside should be the environment name, capital-case
+    app.config.from_object(f"application.conf.{environment}." f"{environment.upper()}")
+
+    app.logger.info(f"initialized application configs (without secrets)= {app.config}")
+
+    if app.config["NINOX_ENABLED"]:
+        app.ninox = NinoxLoader(app=app, config_section=environment)
 
 
 if __name__ == "__main__":

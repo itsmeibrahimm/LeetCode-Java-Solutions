@@ -5,11 +5,11 @@ web:
   repository: ddartifacts-docker.jfrog.io/doordash/payment-service
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 500m
+      memory: 1024Mi
     limits:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 500m
+      memory: 1024Mi
   secretRef:
     awsCredentialsEnabled: true
   readinessProbe:

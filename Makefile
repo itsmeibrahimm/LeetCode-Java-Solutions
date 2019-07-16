@@ -49,25 +49,13 @@ tag:
 push:
 	$(doorctl) push --repourl $(DOCKER_IMAGE_URL) --localimage $(SERVICE_NAME):$(LOCAL_TAG) --sha $(SHA) --branch $(branch)
 
-.PHONY: local-deploy
-local-deploy:
-	helm upgrade $(SERVICE_NAME) $(LOCAL_CHART) -i -f $(LOCAL_CHART)/values-local.yaml --set web.runtime.hostPath=$(LOCAL_RUNTIME_PATH)
+.PHONY: local-docker-server
+local-docker-server:
+	docker-compose -f docker-compose.yml up --force-recreate --build -d web
 
-.PHONY: local-status
-local-status:
-	helm status $(SERVICE_NAME)
-
-.PHONY: local-bash
-local-bash:
-	kubectl exec -it `kubectl get pods -l service=$(SERVICE_NAME) -o jsonpath="{.items[0].metadata.name}"` --container=web bash
-
-.PHONY: local-clean
-local-clean:
-	helm delete --purge $(SERVICE_NAME)
-
-.PHONY: local-tail
-local-tail:
-	kubectl get pods -l service=$(SERVICE_NAME) -o jsonpath="{.items[0].metadata.name}" | xargs kubectl logs -f --container=web --tail=10
+.PHONY: local-server
+local-server:
+	env $$(grep -v '^#' ./development/local.env | xargs -0) pipenv run python -m flask run -h 0.0.0.0 -p $(or $(PORT), 8081)
 
 .PHONY: test
 test: test-unit test-lint test-typing
@@ -91,3 +79,25 @@ test-install-hooks:
 .PHONY: test-hooks
 test-hooks:
 	pre-commit run --all-files $(HOOKS_ADDOPTS)
+
+# Following are make targets are only needed if you want to develop based on to local k8s deployment
+
+.PHONY: local-deploy
+local-deploy:
+	helm upgrade $(SERVICE_NAME) $(LOCAL_CHART) -i -f $(LOCAL_CHART)/values-local.yaml --set web.runtime.hostPath=$(LOCAL_RUNTIME_PATH)
+
+.PHONY: local-status
+local-status:
+	helm status $(SERVICE_NAME)
+
+.PHONY: local-bash
+local-bash:
+	kubectl exec -it `kubectl get pods -l service=$(SERVICE_NAME) -o jsonpath="{.items[0].metadata.name}"` --container=web bash
+
+.PHONY: local-clean
+local-clean:
+	helm delete --purge $(SERVICE_NAME)
+
+.PHONY: local-tail
+local-tail:
+	kubectl get pods -l service=$(SERVICE_NAME) -o jsonpath="{.items[0].metadata.name}" | xargs kubectl logs -f --container=web --tail=10

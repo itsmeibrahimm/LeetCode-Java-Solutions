@@ -2,4 +2,5 @@ service_env:
   SERVICE_TEAM_EMAIL: "payments-team@doordash.com"
   SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
   REPORT_ENABLED: false
-  SERVICE_URI: "http://localhost:8001/api/v1/namespaces/default/services/payment-service-web:80/proxy"
+  SERVICE_URI: "http://localhost:8081"
+  SERVICE_NAME: "payment-service"

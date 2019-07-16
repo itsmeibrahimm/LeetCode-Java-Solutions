@@ -10,7 +10,7 @@ services:
     environment:
       ENVIRONMENT: local
       FLASK_APP: "application.main:create_app()"
-      FLASK_DEBUG: 1
+      FLASK_ENV: development
     volumes:
       - $PWD/application:/home/app/application
       - ${RUNTIME_PATH:-./local-runtime}/data:/srv/runtime/current/data

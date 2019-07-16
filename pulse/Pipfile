@@ -1,0 +1,70 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[[source]]
+name = "gemfury"
+url = "https://pypi.fury.io/${FURY_TOKEN}/doordash/"
+verify_ssl= false
+
+[[source]]
+name = "artifactory-test"
+url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local-test/simple/"
+verify_ssl= false
+
+[[source]]
+name = "artifactory"
+url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/"
+verify_ssl= false
+
+[dev-packages]
+
+[packages]
+doordash-pulse = "==2.1.8"
+apipkg = "==1.5"
+atomicwrites = "==1.3.0"
+attrs = "==19.1.0"
+boto3 = "==1.9.188"
+botocore = "==1.12.188"
+certifi = "==2019.6.16"
+chardet = "==3.0.4"
+click = "==7.0"
+decorator = "==4.4.0"
+docutils = "==0.14"
+doordash-secret = "==0.0.30"
+execnet = "==1.6.0"
+future = "==0.17.1"
+googleapis-common-protos = "==1.6.0"
+grpcio-tools = "==1.22.0"
+grpcio = "==1.22.0"
+idna = "==2.8"
+importlib-metadata = "==0.18"
+jmespath = "==0.9.4"
+junitparser = "==1.3.2"
+more-itertools = "==7.1.0"
+platform-services-protobuf = "==0.2.15"
+pluggy = "==0.12.0"
+protobuf = "==3.9.0"
+py = "==1.8.0"
+pyparsing = "==2.4.0"
+pypd = "==1.1.0"
+pytest-forked = "==1.0.2"
+pytest-html = "==1.21.1"
+pytest-metadata = "==1.8.0"
+pytest-mock = "==1.10.4"
+pytest-xdist = "==1.29.0"
+pytest = "==5.0.1"
+python-dateutil = "==2.8.0"
+requests = "==2.22.0"
+s3transfer = "==0.2.1"
+six = "==1.12.0"
+slackclient = "==1.3.1"
+urllib3 = "==1.25.3"
+wcwidth = "==0.1.7"
+zipp = "==0.5.2"
+PyYAML = "==5.1.1"
+websocket_client = "==0.54.0"
+
+[requires]
+python_version = "3.6"
