@@ -1,5 +1,7 @@
 env:
   ENVIRONMENT: local
+  AWS_METADATA_SERVICE_TIMEOUT: 30
+  AWS_METADATA_SERVICE_NUM_ATTEMPTS: 5
 replicaCount: 1
 web:
   repository: ddartifacts-docker.jfrog.io/doordash/payment-service

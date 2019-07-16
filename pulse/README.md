@@ -21,6 +21,7 @@ in an actual client perspective.
     $ PIPENV_NO_INHERIT=true pipenv install -r requirements.txt# create virtual env and ignore existing virtual env in payment-service parent dir
     $ pipenv shell # activate virtual env
       # Assuming local server running at localhost:8081 , can be changed with "SERVICE_URI" in data.yml
+    $ pip install doordash-pulse
     $ pulse --data-file=$(pipenv --venv)/infra/local/data.yaml --data-file=infra/local/data.yaml
     ```
 ## Update dependencies
