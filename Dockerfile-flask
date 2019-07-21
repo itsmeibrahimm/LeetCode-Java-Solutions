@@ -17,7 +17,7 @@ ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 ENV PY_IGNORE_IMPORTMISMATCH=1
 
-WORKDIR /home
+WORKDIR /home/app
 
 COPY \
   Makefile \
@@ -29,17 +29,19 @@ COPY \
 
 RUN apt-get update -y && \
   apt-get install -y -qq --no-install-recommends \
-    build-essential \
-    python-dev \
-    procps \
-    vim \
-    curl && \
+  build-essential \
+  python-dev \
+  procps \
+  vim \
+  curl && \
   python -m pip install --upgrade pip setuptools pipenv && \
   pipenv install --ignore-pipfile --deploy --system && \
   apt-get clean && \
   rm -rf /root/.cache
 
-COPY _infra/web/gunicorn_conf.py /home/
-COPY app /home/app
+COPY _infra/web/uwsgi*.ini /etc/uwsgi/
+COPY ninox.ini .
 
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-c", "./gunicorn_conf.py", "app.main:app"]
+COPY application /home/app/application
+
+CMD ["uwsgi", "--ini", "/etc/uwsgi/uwsgi.ini"]

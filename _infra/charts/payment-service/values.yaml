@@ -19,16 +19,6 @@ web:
   runtime:
     containerEnabled: true
     path: /srv/runtime
-nginx:
-  repository: nginx
-  tag: 1.17.0
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
 service:
   type: ClusterIP
   protocol: TCP

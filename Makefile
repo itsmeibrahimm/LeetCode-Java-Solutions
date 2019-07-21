@@ -55,14 +55,14 @@ local-docker-server:
 
 .PHONY: local-server
 local-server:
-	env $$(grep -v '^#' ./development/local.env | xargs -0) pipenv run python -m flask run -h 0.0.0.0 -p $(or $(PORT), 8081)
+	env $$(grep -v '^#' ./development/local.env | xargs -0) pipenv run uvicorn app.main:app --reload --host 0.0.0.0 --port $(or $(PORT), 8000)
 
 .PHONY: test
 test: test-unit test-lint test-typing
 
 .PHONY: test-unit
 test-unit:
-	python runtests.py application/
+	python runtests.py app/
 
 .PHONY: test-lint
 test-lint:
@@ -70,7 +70,7 @@ test-lint:
 
 .PHONY: test-typing
 test-typing:
-	python -m mypy -p application $(MYPY_ADDOPTS)
+	python -m mypy -p app $(MYPY_ADDOPTS)
 
 .PHONY: test-install-hooks
 test-install-hooks:

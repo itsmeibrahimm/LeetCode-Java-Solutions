@@ -27,44 +27,19 @@ spec:
       volumes:
       - name: runtime-volume
         {{- template "payment-service.volumes.runtime" . }}
-      - name: flask-sock
-        emptyDir: {}
-      - name: nginx-conf
-        configMap:
-          name: {{ .Chart.Name }}-nginx-conf
-      - name: flask-app-conf
-        configMap:
-          name: {{ .Chart.Name }}-flask-app-conf
       containers:
       - name: web
         image: "{{ .Values.web.repository }}:{{ .Values.web.tag }}"
         imagePullPolicy: {{ .Values.web.pullPolicy | default "IfNotPresent" }}
         resources:
           {{- toYaml .Values.web.resources | nindent 10 }}
+        ports:
+          - containerPort: 80
         volumeMounts:
-          - name: flask-sock
-            mountPath: /var/run/
           - name: runtime-volume
             mountPath: {{ .Values.web.runtime.path }}
             readOnly: true
         envFrom:
         - configMapRef:
             name: {{ .Chart.Name }}-environment
-      - name: nginx
-        image: "{{ .Values.nginx.repository }}:{{ .Values.nginx.tag }}"
-        imagePullPolicy: {{ .Values.nginx.pullPolicy | default "IfNotPresent" }}
-        command: ["nginx"]
-        args: ["-c", "/etc/nginx/nginx.conf"]
-        resources:
-          {{- toYaml .Values.nginx.resources | nindent 10 }}
-        ports:
-          - containerPort: 80
-        volumeMounts:
-          - name: flask-sock
-            mountPath: /var/run/
-          - name: nginx-conf
-            mountPath: /etc/nginx/nginx.conf
-            subPath: nginx.conf
-          - name: flask-app-conf
-            mountPath: /etc/nginx/conf.d
       {{- template "payment-service.containers.runtime" . }}

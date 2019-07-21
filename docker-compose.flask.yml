@@ -1,0 +1,24 @@
+version: "3"
+services:
+  web:
+    build:
+      context: "."
+      args:
+        - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+    environment:
+      ENVIRONMENT: local
+      FLASK_APP: "application.main:create_app()"
+      FLASK_ENV: development
+    volumes:
+      - $PWD/application:/home/app/application
+      - ${RUNTIME_PATH:-./local-runtime}/data:/srv/runtime/current/data
+    ports:
+      - "5000:80"
+    ##
+    # uWSGI: Run as it would in production
+    # python: Run with auto-reload (faster development)
+    ##
+    # command: "uwsgi --ini /etc/uwsgi/uwsgi_compose.ini"
+    command: "python3 -m flask run -h 0.0.0.0 -p 80"

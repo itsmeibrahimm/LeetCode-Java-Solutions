@@ -14,8 +14,8 @@ services:
     volumes:
       - type: bind
         source: ./.git
-        target: /home/app/.git-ro
+        target: /home/.git-ro
         read_only: true
     # initialize git repository (so pre-commit hooks can run in CI)
     # don't exit until stopped
-    command: "bash -c 'cp -r /home/app/.git-ro /home/app/.git; tail -f /dev/null'"
+    command: "bash -c 'cp -r /home/.git-ro /home/.git; tail -f /dev/null'"

@@ -19,25 +19,28 @@ url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog
 verify_ssl= false
 
 [dev-packages]
-coverage = "*"
-flake8 = "*"
-flake8-formatter-junit-xml = "*"
-pepper8 = "*"
-junit-xml = "*"
-mypy = "*"
-pytest = "*"
-pytest-html = "*"
-pytest-mock = "*"
-pytest-xdist = "*"
+coverage = "==4.5.3"
+flake8 = "==3.7.8"
+flake8-formatter-junit-xml = "==0.0.6"
+pepper8 = "==1.1.1"
+junit-xml = "==1.8"
+mypy = "==0.720"
+pytest = "==5.0.1"
+pytest-html = "==1.21.1"
+pytest-mock = "==1.10.4"
+pytest-xdist = "==1.29.0"
 black = "==19.3b0"  # You have to lock pre-releases
-pre-commit = "*"
+pre-commit = "==1.17.0"
 
 [packages]
-attrs = ">=19.1.0"
-flask = ">=1.0.3"
-uwsgi = ">=2.0.18"
-doordash-python-lib = {version = ">=0.10.2",index = "gemfury"}
-ninox = {version = "*",index = "gemfury",extras = ["py3", "CLI"]}
+attrs = "==19.1.0"
+flask = "==1.1.1"
+uwsgi = "==2.0.18"
+doordash-python-lib = {version = "==0.10.2",index = "gemfury"}
+ninox = {version = "==20190625",index = "gemfury",extras = ["py3", "CLI"]}
+fastapi = "==0.33.0"
+uvicorn = "==0.8.4"
+gunicorn = "==19.9.0"
 
 [requires]
 python_version = "3.7"

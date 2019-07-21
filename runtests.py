@@ -8,7 +8,7 @@ import argparse
 import pytest
 
 
-DEFAULT_ARGS = ["--junitxml", "pytest-report.xml", "application/"]
+DEFAULT_ARGS = ["--junitxml", "pytest-report.xml", "app/"]
 
 
 def main():

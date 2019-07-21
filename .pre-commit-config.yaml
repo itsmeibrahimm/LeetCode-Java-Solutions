@@ -13,8 +13,14 @@ repos:
     rev: v0.710
     hooks:
       - id: mypy
-        name: mypy (application)
+        name: mypy (app)
         exclude: "^(pulse|pressure)/"
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.710
+    hooks:
+      - id: mypy
+        name: mypy (app)
+        exclude: "^(app|pulse|pressure)/"
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v0.710
     hooks:

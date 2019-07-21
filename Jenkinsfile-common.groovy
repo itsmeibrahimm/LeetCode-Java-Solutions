@@ -147,7 +147,7 @@ def runTests(String serviceName) {
     } finally {
       sh """|#!/bin/bash
             |set -eox
-            |docker cp ${serviceName}-ci:/home/app/${outputFile} ${outputFile}
+            |docker cp ${serviceName}-ci:/home/${outputFile} ${outputFile}
             |""".stripMargin()
       loadJunit(outputFile)
     }
@@ -169,7 +169,7 @@ def runLinter(String serviceName) {
     } finally {
       sh """|#!/bin/bash
             |set -eox
-            |docker cp ${serviceName}-ci:/home/app/${outputFile} ${outputFile}
+            |docker cp ${serviceName}-ci:/home/${outputFile} ${outputFile}
             |""".stripMargin()
       loadJunit(outputFile)
     }
@@ -191,7 +191,7 @@ def runTyping(String serviceName) {
     } finally {
       sh """|#!/bin/bash
             |set -eox
-            |docker cp ${serviceName}-ci:/home/app/${outputFile} ${outputFile}
+            |docker cp ${serviceName}-ci:/home/${outputFile} ${outputFile}
             |""".stripMargin()
       loadJunit(outputFile)
     }
@@ -257,8 +257,8 @@ def runHooks(String serviceName) {
       sh """|#!/bin/bash
             |set -eoxo pipefail
             |docker exec ${serviceName}-ci git reset --hard
-            |docker exec ${serviceName}-ci make test-install-hooks PRE_COMMIT_HOME=/home/app
-            |docker exec ${serviceName}-ci make test-hooks PRE_COMMIT_HOME=/home/app SKIP=flake8,mypy HOOKS_ADDOPTS="--show-diff-on-failure"
+            |docker exec ${serviceName}-ci make test-install-hooks PRE_COMMIT_HOME=/home
+            |docker exec ${serviceName}-ci make test-hooks PRE_COMMIT_HOME=/home SKIP=flake8,mypy HOOKS_ADDOPTS="--show-diff-on-failure"
             |""".stripMargin()
     } catch (e) {
       commentHooksFailed(serviceName)
@@ -267,7 +267,7 @@ def runHooks(String serviceName) {
       sh """|#!/bin/bash
             |set -eox
             |docker exec ${serviceName}-ci touch pre-commit.log
-            |docker cp ${serviceName}-ci:/home/app/pre-commit.log pre-commit-error.log
+            |docker cp ${serviceName}-ci:/home/pre-commit.log pre-commit-error.log
             |""".stripMargin()
       archiveArtifacts artifacts: "pre-commit-error.log"
     }

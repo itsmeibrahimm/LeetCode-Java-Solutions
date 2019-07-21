@@ -34,6 +34,7 @@ psql --username=root -d ${dbname} -f /tmp/db-schemas/bankdb_dump.sql
 # Only grant access of bank DB for $payout_db_user
 psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
     GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${payout_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payout_db_user};
 EOSQL
 echo "Initialized ${dbname}"
 done
@@ -71,6 +72,9 @@ psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
         stripe_dispute,
         stripe_recipient
     TO ${payin_db_user};
+
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payin_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payout_db_user};
 EOSQL
 echo "Initialized ${dbname}"
 done
