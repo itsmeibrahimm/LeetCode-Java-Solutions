@@ -4,6 +4,7 @@ import logging
 
 from fastapi import FastAPI
 from gino import Gino
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .api.accounts_router import create_accounts_router
 from .config import PayoutAppConfig
@@ -30,6 +31,7 @@ accounts_router = create_accounts_router(
 app.include_router(router=accounts_router, prefix="/accounts")
 
 
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=5))
 async def on_startup(config: PayoutAppConfig):
     await maindb_connection.set_bind(config.PAYOUT_MAINDB_URL)
     await bankdb_connection.set_bind(config.PAYOUT_BANKDB_URL)

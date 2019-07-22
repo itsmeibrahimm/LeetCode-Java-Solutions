@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI
 from gino import Gino
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .config import PayinAppConfig
 
@@ -22,6 +23,7 @@ async def get_refunds():
     return {"app": "Pay-In: Charges, Refunds, etc"}
 
 
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=5))
 async def on_startup(config: PayinAppConfig):
     await maindb_connection.set_bind(config.PAYIN_MAINDB_URL)
     logger.info("********** payin application started **********")
