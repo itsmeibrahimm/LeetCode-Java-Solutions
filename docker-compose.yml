@@ -7,9 +7,17 @@ services:
         - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
         - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
         - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+    container_name: payment.web
     volumes:
       - $PWD/app:/home/app
     ports:
-      - "8000:80"
-    command: "uvicorn app.main:app --host 0.0.0.0 --port 80 --reload"
+      - ${WEB_PORT:-8001}:80
+    environment:
+      - ENVIRONMENT=local
+      - PAYOUT_MAINDB_URL=postgresql://payout_user@payment.dsj-postgres/maindb_${PROFILE:-dev}
+      - PAYOUT_BANKDB_URL=postgresql://payout_user@payment.dsj-postgres/bankdb_${PROFILE:-dev}
+      - PAYIN_MAINDB_URL=postgresql://payin_user@payment.dsj-postgres/maindb_${PROFILE:-dev}
+    command: "uvicorn app.main:app --host 0.0.0.0 --port 80 --reload --lifespan on"
     tty: true
+    depends_on:
+      - payment.dsj-postgres

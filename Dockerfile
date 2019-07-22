@@ -29,11 +29,11 @@ COPY \
 
 RUN apt-get update -y && \
   apt-get install -y -qq --no-install-recommends \
-    build-essential \
-    python-dev \
-    procps \
-    vim \
-    curl && \
+  build-essential \
+  python-dev \
+  procps \
+  vim \
+  curl && \
   python -m pip install --upgrade pip setuptools pipenv && \
   pipenv install --ignore-pipfile --deploy --system && \
   apt-get clean && \

@@ -51,11 +51,11 @@ push:
 
 .PHONY: local-docker-server
 local-docker-server:
-	docker-compose -f docker-compose.yml up --force-recreate --build -d web
+	docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml up --build -d web
 
 .PHONY: local-server
 local-server:
-	env $$(grep -v '^#' ./development/local.env | xargs -0) pipenv run uvicorn app.main:app --reload --host 0.0.0.0 --port $(or $(PORT), 8000)
+	./development/start_local_server.sh
 
 .PHONY: test
 test: test-unit test-lint test-typing

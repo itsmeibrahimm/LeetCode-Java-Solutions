@@ -8,7 +8,7 @@ services:
       - POSTGRES_USER=root
       - POSTGRES_DB=base_db
     ports:
-      - 5435:5432
+      - ${DSJ_DB_PORT:-5435}:5432
 #    Un comment following line to log db statements for debugging
 #    command: postgres -c log_statement=all
     volumes:
