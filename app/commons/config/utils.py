@@ -1,15 +1,17 @@
 import os
-from typing import Mapping
+from typing import Callable, Mapping
 
 from .app_config import AppConfig
-from .local import LOCAL
-from .prod import PROD
-from .staging import STAGING
+from .local import create_app_config as LOCAL
+from .prod import create_app_config as PROD
+from .staging import create_app_config as STAGING
+from .testing import create_app_config as TESTING
 
-_CONFIG_MAP: Mapping[str, AppConfig] = {
+_CONFIG_MAP: Mapping[str, Callable[..., AppConfig]] = {
     "prod": PROD,
     "staging": STAGING,
     "local": LOCAL,
+    "testing": TESTING,
 }
 
 
@@ -17,7 +19,7 @@ def _get_app_config_by_environment() -> AppConfig:
     environment = os.getenv("ENVIRONMENT", None)
     assert environment is not None, (
         "ENVIRONMENT is not set through environment variable, "
-        "valid ENVIRONMENT includes [prod, staging, local]"
+        "valid ENVIRONMENT includes [prod, staging, local, testing]"
     )
 
     config_key = environment.lower()
@@ -25,7 +27,8 @@ def _get_app_config_by_environment() -> AppConfig:
         config_key in _CONFIG_MAP
     ), f"Cannot find AppConfig specified by environment={config_key}"
 
-    return _CONFIG_MAP[config_key]
+    config_creator = _CONFIG_MAP[config_key]
+    return config_creator()
 
 
 def init_app_config() -> AppConfig:
