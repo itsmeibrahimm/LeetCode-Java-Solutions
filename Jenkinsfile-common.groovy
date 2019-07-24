@@ -89,7 +89,7 @@ def buildTagPush(Map optArgs = [:], String gitUrl, String sha, String branch, St
     github.doClosureWithStatus({
       withCredentials([
         string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
-        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS_URLENCODED', variable: 'ARTIFACTORY_PASSWORD'),
         string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
       ]) {
         sh """|#!/bin/bash
