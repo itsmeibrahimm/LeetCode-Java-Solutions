@@ -4,9 +4,10 @@ import logging
 
 from fastapi import FastAPI
 
-from .commons.config.utils import init_app_config
-from .payin import payin
-from .payout import payout
+from app.commons.config.utils import init_app_config
+from app.payin import payin
+from app.payout import payout
+from app.example_v1.app import example_v1
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ app = FastAPI()
 app_config = init_app_config()
 app.debug = app_config.DEBUG
 
+app.mount(example_v1.openapi_prefix, example_v1)
 app.mount(payout.app.openapi_prefix, payout.app)
 app.mount(payin.app.openapi_prefix, payin.app)
 
