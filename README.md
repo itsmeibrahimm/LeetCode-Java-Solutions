@@ -134,7 +134,7 @@ Any code changes will lead to a service reload and therefore be reflected in rea
 ```bash
 make local-docker-server
 ```
-- Similarly as `local-server`, ./application directory is binded as a volume under web docker container.
+- Similarly as `local-server`, ./app directory is binded as a volume under web docker container.
 Therefore live reload is also available here.
 - Confirming server is up running in docker:
     ```bash
