@@ -108,3 +108,7 @@ venv.bak/
 
 # jetbrain ide
 .idea/
+
+# Visual Studio Code ide
+.vscode
+*.code-workspace
