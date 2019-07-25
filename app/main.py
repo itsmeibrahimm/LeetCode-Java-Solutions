@@ -1,16 +1,22 @@
+import os
 from typing import Any, Awaitable, Callable, cast
 
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import AppContext, get_app_context
 from app.commons.context.req_context import get_req_context
-from app.commons.config.utils import init_app_config
-from app.payin import payin
-from app.payout import payout
 from app.example_v1.app import example_v1
 from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
+from app.payin import payin
+from app.payout import payout
+
+if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
+    from development import debug
+
+    debug.bootstrap_debugger()
 
 app_config = init_app_config()
 app_context = get_app_context(app_config)

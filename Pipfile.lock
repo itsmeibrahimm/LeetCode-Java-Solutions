@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f46bbdb37e85565aae3a6946cd8ab61b60dfa8cbc052fa919ff327fb491a3a60"
+            "sha256": "ac1d94df57b69dbf3d783e08b3e8f5cdba88db0ee87d30a5f1bfab5e5994ce45"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -267,7 +267,6 @@
             "hashes": [
                 "sha256:e00cbd7ba01ff748e494248183abc6e153f49181169d8a3d41bb49132ca01dfc"
             ],
-            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.0.13"
         },
         "idna": {
@@ -505,7 +504,6 @@
                 "sha256:c48692bf4587ce281d641087658eca275a5ad3b63c78297bbded96570ae9ce8f",
                 "sha256:fefc3b2b947c99737c348887db2c32e539160dcbeb7af9aa6b53db7a283538fe"
             ],
-            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.12.2"
         },
         "uwsgi": {
@@ -829,6 +827,13 @@
                 "sha256:e40a936c9a450ad81df37f549d676d127b1b66000a6c500caa2b085bc0ca976c"
             ],
             "version": "==2.5.0"
+        },
+        "pydevd-pycharm": {
+            "hashes": [
+                "sha256:927cd215528db3670c7c888d3b270aadeb068aec1e4eee904c2b8ec0646fc1b8"
+            ],
+            "index": "pypi",
+            "version": "==192.5728.105"
         },
         "pyflakes": {
             "hashes": [

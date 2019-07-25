@@ -3,16 +3,16 @@
 """
 Quick/dirty wrapper script to run py.test tests
 """
-import sys
 import argparse
-import pytest
+import os
+import sys
 
+import pytest
 
 DEFAULT_ARGS = ["--junitxml", "pytest-report.xml", "app/"]
 
 
 def main():
-
     parser = argparse.ArgumentParser(add_help=False)
     args, pytest_args = parser.parse_known_args()
 
@@ -26,4 +26,9 @@ def main():
 
 
 if __name__ == "__main__":
+    if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
+        from development import debug
+
+        debug.bootstrap_debugger()
+
     main()
