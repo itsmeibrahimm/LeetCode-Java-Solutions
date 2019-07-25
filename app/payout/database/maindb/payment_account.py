@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import attr
 from gino import Gino
 from sqlalchemy import Boolean, Column, DateTime, Integer, Table, Text

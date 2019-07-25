@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Any, List, Optional
 from uuid import UUID
 
@@ -19,7 +18,7 @@ class ExampleModel(BaseModel):
     optional: Optional[str] = None
     array: List[Any]
     enum: ExampleEnum = ExampleEnum.FOO
-    nested: Optional[ExampleModel]
+    nested: Optional["ExampleModel"]
 
 
 # https://pydantic-docs.helpmanual.io/#self-referencing-models

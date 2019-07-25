@@ -22,8 +22,8 @@ async def create_item(item: ExampleModel) -> ExampleResponse[int]:
     return resp
 
 
-@router.get("/items/{itemId}", response_model=ExampleResponse[ExampleModel])
-async def get_item(itemId: int) -> ExampleResponse[ExampleModel]:
+@router.get("/items/{item_id}", response_model=ExampleResponse[ExampleModel])
+async def get_item(item_id: int) -> ExampleResponse[ExampleModel]:
     result = ExampleModel(
         string="example string",
         number=10,
@@ -43,8 +43,8 @@ async def get_item(itemId: int) -> ExampleResponse[ExampleModel]:
     return resp
 
 
-@router.delete("/items/{itemId}", response_model=ExampleResponse[bool])
-async def delete_item(itemId: int) -> ExampleResponse[bool]:
+@router.delete("/items/{item_id}", response_model=ExampleResponse[bool])
+async def delete_item(item_id: int) -> ExampleResponse[bool]:
     result = False
 
     status = ExampleStatus(status=404, code="Not Found", retryable=False)
