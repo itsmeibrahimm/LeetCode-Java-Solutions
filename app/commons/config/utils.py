@@ -1,21 +1,23 @@
 import os
 from typing import Callable, Mapping
 
-from .app_config import AppConfig
-from .local import create_app_config as LOCAL
-from .prod import create_app_config as PROD
-from .staging import create_app_config as STAGING
-from .testing import create_app_config as TESTING
+from ninox.interface.helper import Helper
+
+from app.commons.config.app_config import AppConfig, Secret
+from app.commons.config.local import create_app_config as LOCAL
+from app.commons.config.prod import create_app_config as PROD
+from app.commons.config.staging import create_app_config as STAGING
+from app.commons.config.testing import create_app_config as TEST
 
 _CONFIG_MAP: Mapping[str, Callable[..., AppConfig]] = {
     "prod": PROD,
     "staging": STAGING,
     "local": LOCAL,
-    "testing": TESTING,
+    "testing": TEST,
 }
 
 
-def _get_app_config_by_environment() -> AppConfig:
+def init_app_config() -> AppConfig:
     environment = os.getenv("ENVIRONMENT", None)
     assert environment is not None, (
         "ENVIRONMENT is not set through environment variable, "
@@ -27,10 +29,35 @@ def _get_app_config_by_environment() -> AppConfig:
         config_key in _CONFIG_MAP
     ), f"Cannot find AppConfig specified by environment={config_key}"
 
-    config_creator = _CONFIG_MAP[config_key]
-    return config_creator()
+    assert (
+        environment in _CONFIG_MAP
+    ), f"Cannot find AppConfig specified by environment={environment}"
 
+    app_config = _CONFIG_MAP[environment]()
 
-def init_app_config() -> AppConfig:
-    # TODO: add secrets loading code here
-    return _get_app_config_by_environment()
+    if app_config.NINOX_ENABLED:
+        ninox = Helper(config_section=environment)
+        if ninox.disabled:
+            # Ninox helper internally set itself to disabled when init fails without raising exception.
+            # We should fail fast here to prevent unknown service state at runtime.
+            raise Helper.DisabledError("Ninox initialization failed")
+
+        for key in dir(app_config):
+            config = app_config.__getattribute__(key)
+            if isinstance(config, Secret):
+                try:
+                    secret = str(ninox.get(config.name, version=config.version))
+                except Helper.SecretNotFoundError:
+                    raise Helper.SecretNotFoundError(
+                        f"config name={config.name} is not found"
+                    )
+                config.value = secret
+    else:
+        # When working with Ninox disabled, should also make sure all "secrets" are actually configured
+        for key in dir(app_config):
+            config = app_config.__getattribute__(key)
+            if isinstance(config, Secret):
+                if config.value is None:
+                    raise KeyError(f"config name={config.name} is not defined")
+
+    return app_config

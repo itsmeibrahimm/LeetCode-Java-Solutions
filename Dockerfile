@@ -25,7 +25,8 @@ COPY \
   mypy.ini \
   runtests.py \
   Pipfile \
-  Pipfile.lock ./
+  Pipfile.lock \
+  ninox.ini ./
 
 RUN apt-get update -y && \
   apt-get install -y -qq --no-install-recommends \

@@ -1,12 +1,11 @@
 from typing_extensions import Protocol
 
-import attr
+from app.commons.config.app_config import Secret
 
 
-@attr.s(frozen=True, auto_attribs=True)
 class PayoutAppConfig(Protocol):
     DEBUG: bool
 
     # DB connections
-    PAYOUT_MAINDB_URL: str
-    PAYOUT_BANKDB_URL: str
+    PAYOUT_MAINDB_URL: Secret
+    PAYOUT_BANKDB_URL: Secret

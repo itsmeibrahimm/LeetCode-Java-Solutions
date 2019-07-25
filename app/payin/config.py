@@ -1,8 +1,7 @@
-import attr
 from typing_extensions import Protocol
 
+from app.commons.config.app_config import Secret
 
-@attr.s(frozen=True, auto_attribs=True)
+
 class PayinAppConfig(Protocol):
-
-    PAYIN_MAINDB_URL: str
+    PAYIN_MAINDB_URL: Secret

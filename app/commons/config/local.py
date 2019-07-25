@@ -1,6 +1,4 @@
-import os
-
-from .app_config import AppConfig
+from app.commons.config.app_config import AppConfig, Secret
 
 """
 Configurations loaded to Flask App.config dictionary when ENVIRONMENT=local
@@ -12,8 +10,8 @@ def create_app_config() -> AppConfig:
         DEBUG=True,
         NINOX_ENABLED=False,
         # Secret configurations start here
-        TEST_SECRET=os.environ.get("TEST_SECRET", "local_test_secret"),
-        PAYIN_MAINDB_URL=os.environ["PAYIN_MAINDB_URL"],
-        PAYOUT_MAINDB_URL=os.environ["PAYOUT_MAINDB_URL"],
-        PAYOUT_BANKDB_URL=os.environ["PAYOUT_BANKDB_URL"],
+        TEST_SECRET=Secret(name="TEST_SECRET", value="local_test_secret"),
+        PAYIN_MAINDB_URL=Secret.from_env("PAYIN_MAINDB_URL"),
+        PAYOUT_MAINDB_URL=Secret.from_env("PAYOUT_MAINDB_URL"),
+        PAYOUT_BANKDB_URL=Secret.from_env("PAYOUT_BANKDB_URL"),
     )

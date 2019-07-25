@@ -33,8 +33,8 @@ app.include_router(router=accounts_router, prefix="/accounts")
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=5))
 async def on_startup(config: PayoutAppConfig):
-    await maindb_connection.set_bind(config.PAYOUT_MAINDB_URL)
-    await bankdb_connection.set_bind(config.PAYOUT_BANKDB_URL)
+    await maindb_connection.set_bind(config.PAYOUT_MAINDB_URL.value)
+    await bankdb_connection.set_bind(config.PAYOUT_BANKDB_URL.value)
     logger.info("********** payout application started **********")
 
 

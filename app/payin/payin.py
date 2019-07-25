@@ -25,7 +25,7 @@ async def get_refunds():
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=5))
 async def on_startup(config: PayinAppConfig):
-    await maindb_connection.set_bind(config.PAYIN_MAINDB_URL)
+    await maindb_connection.set_bind(config.PAYIN_MAINDB_URL.value)
     logger.info("********** payin application started **********")
 
 
