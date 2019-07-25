@@ -31,6 +31,7 @@ pytest-mock = "==1.10.4"
 pytest-xdist = "==1.29.0"
 black = "==19.3b0"  # You have to lock pre-releases
 pre-commit = "==1.17.0"
+pytest-asyncio = "==0.10.0"
 
 [packages]
 attrs = "==19.1.0"
