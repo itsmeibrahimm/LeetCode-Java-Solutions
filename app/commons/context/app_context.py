@@ -9,24 +9,12 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.logger import root_logger
 
 
-@dataclass
+@dataclass(frozen=True)
 class AppContext:
-    _initialized = False
     log: BoundLogger
     payout_maindb_master: Gino
     payout_bankdb_master: Gino
     payin_maindb_master: Gino
-
-    async def init(self, config: AppConfig):
-        assert not self._initialized, "already initialized"
-
-        self._initialized = True
-
-        await gather(
-            self.payout_maindb_master.set_bind(config.PAYOUT_MAINDB_URL.value),
-            self.payout_bankdb_master.set_bind(config.PAYOUT_BANKDB_URL.value),
-            self.payin_maindb_master.set_bind(config.PAYIN_MAINDB_URL.value),
-        )
 
     async def close(self):
         await gather(
@@ -36,23 +24,41 @@ class AppContext:
         )
 
 
-async def set_context_for_app(app: FastAPI, config: AppConfig) -> AppContext:
-    assert "context" not in app.extra, "app context is already set"
+async def create_app_context(config: AppConfig) -> AppContext:
+    try:
+        payout_maindb_master = await Gino(config.PAYOUT_MAINDB_URL.value)
+    except Exception:
+        root_logger.exception("failed to connect to payout main db")
+
+    try:
+        payout_bankdb_master = await Gino(config.PAYOUT_BANKDB_URL.value)
+    except Exception:
+        root_logger.exception("failed to connect to payout bank db")
+
+    try:
+        payin_maindb_master = await Gino(config.PAYIN_MAINDB_URL.value)
+    except Exception:
+        root_logger.exception("failed to connect to payin main db")
+
     context = AppContext(
         log=root_logger,
-        payout_maindb_master=Gino(),
-        payout_bankdb_master=Gino(),
-        payin_maindb_master=Gino(),
+        payout_maindb_master=payout_maindb_master,
+        payout_bankdb_master=payout_bankdb_master,
+        payin_maindb_master=payin_maindb_master,
     )
+
     context.log.debug("app context created")
 
-    await context.init(config)
-
-    app.extra["context"] = cast(Any, context)
     return context
+
+
+def set_context_for_app(app: FastAPI, context: AppContext):
+    assert "context" not in app.extra, "app context is already set"
+    app.extra["context"] = cast(Any, context)
 
 
 def get_context_from_app(app: FastAPI) -> AppContext:
     context = app.extra.get("context")
+    assert context is not None, "app context is set"
     assert isinstance(context, AppContext), "app context has correct type"
     return cast(AppContext, context)

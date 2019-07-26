@@ -3,7 +3,12 @@ import os
 from fastapi import FastAPI
 
 from app.commons.config.utils import init_app_config
-from app.commons.context.app_context import get_context_from_app, set_context_for_app
+from app.commons.context.app_context import (
+    create_app_context,
+    get_context_from_app,
+    set_context_for_app,
+)
+from app.commons.context.logger import root_logger
 from app.example_v1.app import example_v1
 from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
 from app.middleware.req_context import ReqContextMiddleware
@@ -34,7 +39,12 @@ async def get_health():
 
 @app.on_event("startup")
 async def startup():
-    context = await set_context_for_app(app, config)
+    try:
+        context = await create_app_context(config)
+        set_context_for_app(app, context)
+    except Exception:
+        root_logger.exception("failed to create application context")
+        raise
 
     payout_app = create_payout_app(context)
     app.mount(payout_app.openapi_prefix, payout_app)

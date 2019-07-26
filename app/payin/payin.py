@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 
-from app.commons.context.app_context import AppContext
+from app.commons.context.app_context import AppContext, set_context_for_app
 
 
 def create_payin_app(context: AppContext) -> FastAPI:
     # Declare sub app
     app = FastAPI(openapi_prefix="/payin", description="Payin service")
+    set_context_for_app(app, context)
 
     @app.get("/charges")
     async def get_charges():
