@@ -20,6 +20,7 @@ The repo was created through python-flask-service-template [link to specific SHA
     - [Running server with docker](#running-flask-server-in-docker-compose)
   - [Update Dependencies](#update-dependencies)
   - [Work with secret](#work-with-secret)
+  - [Live debugging](#live-debugging)
   - [(Optional) Local k8s setup](#optional-k8s-environment)
   - [Make commands reference](#make-commands-reference)
 
@@ -192,8 +193,30 @@ otherwise please ask one of payment team member to add you in.
      'session': Session(region_name='us-west-2'),
      'table': 'ninox-payment-service-staging'}
     ```
-6. Ninox secret CRUD and integration
-    // TODO: fill in this section after current changes checked in.
+6. Ninox secret create, update, retrieve from cli
+    1. As a payment engineer, I want to create or update secret
+        ```bash
+        cd PAYMENT_REPO
+        ninox -s [staging_user | prod_user] [create | update] <secret_name_all_lower_case>
+        ```
+        Note: as of 07/25/2019 Ninox cli hasn't support `ls` for user role yet.
+
+    2. As a payment engineer, I want to see if the secret is created / updated as expected.
+
+        **Really not a good practice!!**, but if you really want you need to login to one of the staging or prod payment-service-web pod and do:
+        ```bash
+        ninox -s [staging | prod] get <secret_name_all_lower_case>
+        ```
+        Note: Once we have a better way to validate, will update.
+
+### Live debugging
+#### Pycharm
+1. Setup your pycharm remote debugger `debug-server` to listen to **localhost:9001** as following:
+        ![Configure debug-server](./development/pycharm-debug-server-config.png)
+2. Start up your debugger from menu as `Run` -> `Debug...` -> `debug-server`
+3. Same remote debugger can be used to live debug one of local server and test
+    1. For local-server: `make local-server DEBUGGER=enabled`
+    2. For tests: `make test-unit DEBUGGER=enabled`
 
 ### (Optional) k8s environment
 
