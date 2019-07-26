@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict
 from typing_extensions import final
 
 
@@ -48,6 +48,7 @@ class AppConfig:
 
     DEBUG: bool
     NINOX_ENABLED: bool
+    METRICS_CONFIG: Dict[str, str]
 
     # Secret configurations start here
     TEST_SECRET: Secret
