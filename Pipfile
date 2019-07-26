@@ -9,13 +9,8 @@ url = "https://pypi.fury.io/${FURY_TOKEN}/doordash/"
 verify_ssl= false
 
 [[source]]
-name = "artifactory-test"
-url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local-test/simple/"
-verify_ssl= false
-
-[[source]]
 name = "artifactory"
-url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/"
+url = "${ARTIFACTORY_URL:-https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/}"
 verify_ssl= false
 
 [dev-packages]
