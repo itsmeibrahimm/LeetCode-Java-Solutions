@@ -16,16 +16,14 @@ bankdb_connection = Gino()
 
 # Init data repositories
 payout_repositories = PayoutRepositories(
-    maindb_connection=maindb_connection, bankdb_connection=maindb_connection
+    _maindb_connection=maindb_connection, _bankdb_connection=maindb_connection
 )
 
 # Declare sub app
 app = FastAPI(openapi_prefix="/payout", description="Payout service")
 
 # Mount api
-accounts_router = create_accounts_router(
-    payout_accounts=payout_repositories.payout_accounts
-)
+accounts_router = create_accounts_router(repositories=payout_repositories)
 app.include_router(router=accounts_router, prefix="/accounts")
 
 

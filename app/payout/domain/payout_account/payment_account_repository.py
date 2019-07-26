@@ -1,32 +1,30 @@
-import logging
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Any, Optional
 
-import attr
-from gino import Gino
+from gino import Gino, GinoConnection
 
-from app.commons.utils.attr_extensions import no_init_attrib
+from app.commons.utils.dataclass_extensions import no_init_field
 from app.payout.database.maindb.payment_account import PaymentAccountTable
 from app.payout.domain.payout_account.models import PayoutAccount
 
 
-@attr.s(auto_attribs=True)
+@dataclass
 class PayoutAccountRepository:
     _gino: Gino
-    _table: PaymentAccountTable = no_init_attrib()
+    _table: PaymentAccountTable = no_init_field()
 
-    logger = logging.getLogger(__name__)
-
-    def __attrs_post_init__(self):
+    def __post_init__(self):
         self._table = PaymentAccountTable(self._gino)
 
     async def get_payout_account_by_id(
         self, payment_account_id: int
     ) -> Optional[PayoutAccount]:
-        row = (
-            await self._table.table.select()
-            .where(self._table.id == payment_account_id)
-            .gino.first()
-        )
+        stmt = self._table.table.select().where(self._table.id == payment_account_id)
+        async with self._gino.acquire() as connection:  # type: GinoConnection
+            row = await connection.first(stmt)
+
         return self._deserialize_to_payout_account(row) if row else None
 
     async def create_payout_account(self, to_create: PayoutAccount) -> PayoutAccount:
@@ -44,12 +42,14 @@ class PayoutAccountRepository:
             self._table.account_id: to_create.account_id,
         }
 
-        row = (
-            await self._table.table.insert()
+        stmt = (
+            self._table.table.insert()
             .values(data)
             .returning(*self._table.table.columns.values())
-            .gino.first()
         )
+
+        async with self._gino.acquire() as connection:  # type: GinoConnection
+            row = await connection.first(stmt)
 
         return self._deserialize_to_payout_account(row)
 

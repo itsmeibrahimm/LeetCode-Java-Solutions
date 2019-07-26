@@ -1,11 +1,13 @@
+from dataclasses import dataclass
 from typing import List
 
-import attr
 from gino import Gino
 from sqlalchemy import Column, Table
 
+from app.commons.utils.dataclass_extensions import no_init_field
 
-@attr.s(frozen=True, auto_attribs=True)
+
+@dataclass(frozen=True)
 class TableDefinition:
     """
     Customized wrapper around SqlAlchemy Table object so that we can statically refer to column names and add more
@@ -13,12 +15,12 @@ class TableDefinition:
     """
 
     gino: Gino
-    table: Table = attr.ib(init=False)
-    name: str = attr.ib(init=False)
+    table: Table = no_init_field()
+    name: str = no_init_field()
 
-    def __attrs_post_init__(self):
+    def __post_init__(self):
         """
-        Utilize attrs post init hook to load any instance attribute
+        Utilize dataclass post init hook to load any instance attribute
         with sqlalchemy.Column type as a column of delegate Table
         """
         columns: List[Column] = []

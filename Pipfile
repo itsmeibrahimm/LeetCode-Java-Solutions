@@ -30,7 +30,6 @@ pytest-asyncio = "==0.10.0"
 pydevd-pycharm = "~=192.5728.105"
 
 [packages]
-attrs = "==19.1.0"
 flask = "==1.1.1"
 uwsgi = "==2.0.18"
 doordash-python-lib = {version = "==0.10.2",index = "gemfury"}

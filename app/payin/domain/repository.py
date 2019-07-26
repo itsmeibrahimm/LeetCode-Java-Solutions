@@ -1,7 +1,8 @@
-import attr
+from dataclasses import dataclass
+
 from gino import Gino
 
 
-@attr.s(auto_attribs=True)
+@dataclass
 class PayinRepositories:
     _maindb_connection: Gino
