@@ -1,40 +1,23 @@
-import logging
-
 from fastapi import FastAPI
-from gino import Gino
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from .api.accounts_router import create_accounts_router
-from .config import PayoutAppConfig
-from .domain.repository import PayoutRepositories
+from app.commons.context.app_context import AppContext
 
-logger = logging.getLogger(__name__)
-
-# Declare db connection engines
-maindb_connection = Gino()
-bankdb_connection = Gino()
-
-# Init data repositories
-payout_repositories = PayoutRepositories(
-    _maindb_connection=maindb_connection, _bankdb_connection=maindb_connection
-)
-
-# Declare sub app
-app = FastAPI(openapi_prefix="/payout", description="Payout service")
-
-# Mount api
-accounts_router = create_accounts_router(repositories=payout_repositories)
-app.include_router(router=accounts_router, prefix="/accounts")
+from app.payout.api.accounts_router import create_accounts_router
+from app.payout.domain.repository import PayoutRepositories
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=5))
-async def on_startup(config: PayoutAppConfig):
-    await maindb_connection.set_bind(config.PAYOUT_MAINDB_URL.value)
-    await bankdb_connection.set_bind(config.PAYOUT_BANKDB_URL.value)
-    logger.info("********** payout application started **********")
+def create_payout_app(context: AppContext) -> FastAPI:
+    # Declare sub app
+    app = FastAPI(openapi_prefix="/payout", description="Payout service")
 
+    # Init data repositories
+    payout_repositories = PayoutRepositories(
+        _maindb_connection=context.payout_maindb_master,
+        _bankdb_connection=context.payout_bankdb_master,
+    )
 
-async def on_shutdown():
-    await maindb_connection.pop_bind().close()
-    await bankdb_connection.pop_bind().close()
-    logger.info("********** payout application shutting down **********")
+    # Mount api
+    accounts_router = create_accounts_router(payout_repositories)
+    app.include_router(router=accounts_router, prefix="/accounts")
+
+    return app
