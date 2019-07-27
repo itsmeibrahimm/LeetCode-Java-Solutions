@@ -25,15 +25,15 @@ async def main():
             await wait_for(check_dependency(app_config), timeout=timeout)
             break  # startup successful
         except asyncio.TimeoutError as e:
-            print(...)
+            print(str(e))
             last_error = e
         except Exception as e:
-            print(...)
+            print(str(e))
             last_error = e
         await asyncio.sleep(interval_sec)
     else:
         # too many tries
-        raise Exception("something is wrong") from last_error
+        raise Exception("Failed checking connection to dependencies") from last_error
 
 
 if __name__ == "__main__":
