@@ -3,7 +3,7 @@ from app.commons.config.app_config import AppConfig, Secret
 
 def create_app_config() -> AppConfig:
     """
-    Production configurations which will be loaded to Flask App.config dictionary at when application is created.
+    Create AppConfig for prod environment
     """
     return AppConfig(
         DEBUG=False,

@@ -30,7 +30,7 @@ build-ci-container:
 	CI_IMAGE_NAME="$(SERVICE_NAME):$(CI_TAG)" \
 	CI_BASE_IMAGE="$(CI_BASE_IMAGE)" \
 	CI_CONTAINER_NAME="$(CI_CONTAINER_NAME)" \
-	docker-compose -f docker-compose.ci.yml build \
+	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml build \
 	--build-arg CI_BASE_IMAGE="${CI_BASE_IMAGE}"
 
 .PHONY: run-ci-container
@@ -39,7 +39,7 @@ run-ci-container: build-ci-container
 	CI_IMAGE_NAME="$(SERVICE_NAME):$(CI_TAG)" \
 	CI_BASE_IMAGE="$(CI_BASE_IMAGE)" \
 	CI_CONTAINER_NAME="$(CI_CONTAINER_NAME)" \
-	docker-compose -f docker-compose.ci.yml up -d --force-recreate
+	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate web-ci
 
 .PHONY: tag
 tag:
@@ -51,17 +51,21 @@ push:
 
 .PHONY: local-docker-server
 local-docker-server:
-	docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml up --build -d web
+	WEB_PORT=8001 docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml up --build -d web
 
 .PHONY: local-server
-local-server:
-	./development/start_local_server.sh
+local-server: local-dependency
+	./development/start-local-server.sh -e local -p 8000
+
+.PHONY: local-dependency
+local-dependency:
+	docker-compose -f docker-compose.nodeploy.yml up -d
 
 .PHONY: test
-test: test-unit test-lint test-typing
+test: test-lint test-typing local-dependency test-unit
 
 .PHONY: test-unit
-test-unit:
+test-unit: wait-test-dependency
 	python runtests.py app/
 
 .PHONY: test-lint
@@ -79,6 +83,10 @@ test-install-hooks:
 .PHONY: test-hooks
 test-hooks:
 	pre-commit run --all-files $(HOOKS_ADDOPTS)
+
+.PHONY: wait-test-dependency
+wait-test-dependency:
+	ENVIRONMENT=testing python -m development.waitdependencies
 
 # Following are make targets are only needed if you want to develop based on to local k8s deployment
 

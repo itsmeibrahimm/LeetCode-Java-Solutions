@@ -1,4 +1,4 @@
-version: "3"
+version: "3.2"
 services:
   web:
     build:
@@ -10,14 +10,12 @@ services:
     container_name: payment.web
     volumes:
       - $PWD/app:/home/app
+      - $PWD/development:/home/development
     ports:
-      - ${WEB_PORT:-8001}:80
+      - ${WEB_PORT:?Please specify WEB_PORT}:${WEB_PORT}
     environment:
-      - ENVIRONMENT=local
-      - PAYOUT_MAINDB_URL=postgresql://payout_user@payment.dsj-postgres/maindb_${PROFILE:-dev}
-      - PAYOUT_BANKDB_URL=postgresql://payout_user@payment.dsj-postgres/bankdb_${PROFILE:-dev}
-      - PAYIN_MAINDB_URL=postgresql://payin_user@payment.dsj-postgres/maindb_${PROFILE:-dev}
-    command: "uvicorn app.main:app --host 0.0.0.0 --port 80 --reload --lifespan on"
+      - DSJ_DB_ENDPOINT=payment.dsj-postgres
+    command: "./development/start-local-server.sh -e local -p ${WEB_PORT}"
     tty: true
     depends_on:
       - payment.dsj-postgres

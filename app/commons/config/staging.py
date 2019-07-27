@@ -3,7 +3,7 @@ from app.commons.config.app_config import AppConfig, Secret
 
 def create_app_config() -> AppConfig:
     """
-    Configurations loaded to Flask App.config dictionary when ENVIRONMENT=staging
+    Create AppConfig for staging environment
     """
     return AppConfig(
         DEBUG=False,

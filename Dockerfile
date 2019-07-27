@@ -42,5 +42,6 @@ RUN apt-get update -y && \
 
 COPY _infra/web/gunicorn_conf.py /home/
 COPY app /home/app
+COPY development /home/development
 
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-c", "./gunicorn_conf.py", "app.main:app"]

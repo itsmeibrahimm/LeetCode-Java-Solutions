@@ -7,13 +7,13 @@ from app.commons.config.app_config import AppConfig, Secret
 from app.commons.config.local import create_app_config as LOCAL
 from app.commons.config.prod import create_app_config as PROD
 from app.commons.config.staging import create_app_config as STAGING
-from app.commons.config.testing import create_app_config as TEST
+from app.commons.config.testing import create_app_config as TESTING
 
 _CONFIG_MAP: Mapping[str, Callable[..., AppConfig]] = {
     "prod": PROD,
     "staging": STAGING,
     "local": LOCAL,
-    "testing": TEST,
+    "testing": TESTING,
 }
 
 

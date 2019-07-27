@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from typing_extensions import final
 
 
@@ -15,6 +16,9 @@ class Secret:
     version: Optional[int] = None
     value: Optional[str] = None
 
+    def __post_init__(self):
+        assert self.name.islower(), "name of secret should always be lower cased"
+
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}-{self.name}-Ver[{self.version}]('**********')"
@@ -26,8 +30,8 @@ class Secret:
         )
 
     @classmethod
-    def from_env(cls, name: str, default: str = None):
-        value = os.getenv(name, default)
+    def from_env(cls, name: str, env: str, default: str = None):
+        value = os.getenv(env, default)
         if value is None:
             raise KeyError(f"Environment variable={name} not defined")
         return cls(name=name, version=None, value=value)

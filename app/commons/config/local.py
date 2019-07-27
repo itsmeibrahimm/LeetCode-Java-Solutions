@@ -1,18 +1,31 @@
-from app.commons.config.app_config import AppConfig, Secret
+import os
 
-"""
-Configurations loaded to Flask App.config dictionary when ENVIRONMENT=local
-"""
+from app.commons.config.app_config import AppConfig, Secret
 
 
 def create_app_config() -> AppConfig:
+    """
+    Create AppConfig for local environment
+    """
+    # allow db endpoint (host:port) be overridden in docker compose
+    dsj_db_endpoint: str = os.getenv("DSJ_DB_ENDPOINT", "localhost:5435")
+
     return AppConfig(
         DEBUG=True,
         NINOX_ENABLED=False,
         METRICS_CONFIG={"service_name": "payment-service", "cluster": "local"},
         # Secret configurations start here
-        TEST_SECRET=Secret(name="TEST_SECRET", value="local_test_secret"),
-        PAYIN_MAINDB_URL=Secret.from_env("PAYIN_MAINDB_URL"),
-        PAYOUT_MAINDB_URL=Secret.from_env("PAYOUT_MAINDB_URL"),
-        PAYOUT_BANKDB_URL=Secret.from_env("PAYOUT_BANKDB_URL"),
+        TEST_SECRET=Secret(name="test_secret", value="hello_world_secret"),
+        PAYIN_MAINDB_URL=Secret(
+            name="payin_maindb_url",
+            value=f"postgresql://payin_user@{dsj_db_endpoint}/maindb_dev",
+        ),
+        PAYOUT_MAINDB_URL=Secret(
+            name="payout_maindb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
+        ),
+        PAYOUT_BANKDB_URL=Secret(
+            name="payout_bankdb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/bankdb_dev",
+        ),
     )

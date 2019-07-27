@@ -1,10 +1,12 @@
 version: "3.2"
 services:
-  web:
+  web-ci:
     # output image name for docker-compose build
     image: "${CI_IMAGE_NAME:?CI_IMAGE_NAME. Please specify the docker image name for the build.}"
     # container name for docker-compose run
     container_name: "${CI_CONTAINER_NAME:?CI_CONTAINER_NAME. Please specify a container name.}"
+    environment:
+      - DSJ_DB_ENDPOINT=payment.dsj-postgres
     build:
       context: .
       dockerfile: Dockerfile-ci
@@ -19,3 +21,5 @@ services:
     # initialize git repository (so pre-commit hooks can run in CI)
     # don't exit until stopped
     command: "bash -c 'cp -r /home/.git-ro /home/.git; tail -f /dev/null'"
+    depends_on:
+      - payment.dsj-postgres

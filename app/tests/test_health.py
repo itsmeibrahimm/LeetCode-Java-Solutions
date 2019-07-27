@@ -1,12 +1,12 @@
+from typing import Any, cast
+
 import pytest
 import pytest_mock
 from gino import Gino
-from typing import Any, cast
-
 from starlette.testclient import TestClient
-from app.main import app
 
 from app.commons.context.app_context import AppContext
+from app.main import app
 
 
 @pytest.fixture(autouse=True)

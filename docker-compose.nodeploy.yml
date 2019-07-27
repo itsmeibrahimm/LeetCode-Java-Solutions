@@ -1,4 +1,4 @@
-version: '3'
+version: "3.2"
 
 services:
   payment.dsj-postgres:
@@ -8,9 +8,9 @@ services:
       - POSTGRES_USER=root
       - POSTGRES_DB=base_db
     ports:
-      - ${DSJ_DB_PORT:-5435}:5432
-#    Un comment following line to log db statements for debugging
-#    command: postgres -c log_statement=all
+      - 5435:5432
+    #    Un comment following line to log db statements for debugging
+    #    command: postgres -c log_statement=all
     volumes:
       - $HOME/.mountedvolumes/payout.dsj-postgres/var/lib/postgresql:/var/lib/postgresql
       - ./development/db-schemas:/tmp/db-schemas

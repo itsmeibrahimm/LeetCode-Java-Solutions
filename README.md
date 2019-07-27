@@ -16,8 +16,8 @@ The repo was created through python-flask-service-template [link to specific SHA
 - [Development](#development)
   - [Environment Setup](#environment-setup)
   - [Development Guide](#development-guide)
-    - [Running server locally](#running-flask-server-locally)
-    - [Running server with docker](#running-flask-server-in-docker-compose)
+    - [Running server locally](#running-server-locally)
+    - [Running server with docker](#running-server-in-docker-compose)
   - [Update Dependencies](#update-dependencies)
   - [Work with secret](#work-with-secret)
   - [Live debugging](#live-debugging)
@@ -110,11 +110,12 @@ The following technologies/frameworks are used across the entire stack:
     ```
 
 ## Development guide
-### Running Flask server locally
+### Running server locally
 ```bash
+pipenv shell
 make local-server
 ```
-- Local Flask service will be running in development and debug mode.
+- Local service will be running in development and debug mode.
 Any code changes will lead to a service reload and therefore be reflected in real-time.
 - Confirming local server is up running:
     ```bash
@@ -131,7 +132,7 @@ Any code changes will lead to a service reload and therefore be reflected in rea
     make test-lint # runs linter only
     make test-hooks # runs pre-commit hooks only
     ```
-### Running Flask server in docker-compose
+### Running server in docker-compose
 ```bash
 make local-docker-server
 ```
