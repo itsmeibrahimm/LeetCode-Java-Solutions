@@ -76,8 +76,7 @@ The following technologies/frameworks are used across the entire stack:
     brew install pyenv pipenv
     brew upgrade pyenv pipenv
     # install all dependencies needed for development, including the ones installed with the --dev argument.
-    # --ignore-pipfile tells Pipenv to ignore the Pipfile for installation and use what’s in the Pipfile.lock
-    pipenv install --dev --ignore-pipfile
+    make sync-pipenv
     ```
 2. After step #1, a python virtual envionment should be created.
     1. To find where does environment locate, run `$ pipenv --venv`
@@ -150,7 +149,7 @@ To add or update a dependency, you can do the following:
 1. Add or update dependency in `Pipefile` via your text editor
 2. Run following command to update `Pipefile.lock` and install from updated lock file
     ```bash
-    pipenv update --dev
+    make update-pipenv
     ```
 3. After you are done, remember to open a PR to checkin the changes!
 

@@ -10,7 +10,7 @@ verify_ssl= false
 
 [[source]]
 name = "artifactory"
-url = "${ARTIFACTORY_URL:-https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/}"
+url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/"
 verify_ssl= false
 
 [dev-packages]

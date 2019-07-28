@@ -35,9 +35,12 @@ RUN apt-get update -y && \
   procps \
   vim \
   curl && \
-  python -m pip install --upgrade pip setuptools pipenv && \
-  pipenv install --ignore-pipfile --deploy --system && \
-  apt-get clean && \
+  python -m pip install --upgrade pip setuptools pipenv
+
+RUN env ARTIFACTORY_USERNAME=$(echo ${ARTIFACTORY_USERNAME} | sed "s|@|%40|g") \
+  pipenv install --ignore-pipfile --deploy --system
+
+RUN apt-get clean && \
   rm -rf /root/.cache
 
 COPY _infra/web/gunicorn_conf.py /home/

@@ -7,6 +7,7 @@ CI_TAG=cibuild
 LOCAL_RUNTIME_PATH=local-runtime
 SERVICE_NAME=payment-service
 SHA=$(shell git rev-parse HEAD)
+ENCODED_ARTIFACTORY_USERNAME=$${ARTIFACTORY_USERNAME/@/%40}
 
 ifeq ($(SECRETS),)
   SECRETS=env.SECRETS=none
@@ -48,6 +49,20 @@ tag:
 .PHONY: push
 push:
 	$(doorctl) push --repourl $(DOCKER_IMAGE_URL) --localimage $(SERVICE_NAME):$(LOCAL_TAG) --sha $(SHA) --branch $(branch)
+
+.PHONY: sync-pipenv
+sync-pipenv:
+	env \
+	ARTIFACTORY_USERNAME="$(ENCODED_ARTIFACTORY_USERNAME)" \
+	ARTIFACTORY_PASSWORD="$${ARTIFACTORY_PASSWORD}" \
+	pipenv sync --dev
+
+.PHONY: update-pipenv
+update-pipenv:
+	env \
+	ARTIFACTORY_USERNAME="$(ENCODED_ARTIFACTORY_USERNAME)" \
+	ARTIFACTORY_PASSWORD="$${ARTIFACTORY_PASSWORD}" \
+	pipenv update --dev
 
 .PHONY: local-docker-server
 local-docker-server:
