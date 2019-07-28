@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f6c0b142faf1631128e39c06d1f4945241e884131d3765b4bfc66bbbe286f533"
+            "sha256": "a007baf0cb87f33c74dd0ea62d87ac1b88dcf1d9919d593f70d602390ebcf7fe"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -84,10 +84,10 @@
         },
         "botostubs": {
             "hashes": [
-                "sha256:2f166e912d069a2ee755f85a160bdb6471b6d7312c258d823d7a96daa31987d1",
-                "sha256:93fa16fb8f9829b87a941c003ab15bad5e9a11874793f507130d8e900ea30c83"
+                "sha256:34639244c90a784523f4616945e59a859f395be20fd3745b7dab3a6fbdca567e",
+                "sha256:e035952e149d7bd23837c0777141ae95087bd65bb1d21b249f7fd43204b7a752"
             ],
-            "version": "==0.10.1.9.195"
+            "version": "==0.10.1.9.197"
         },
         "bunch": {
             "hashes": [
@@ -261,6 +261,7 @@
             "hashes": [
                 "sha256:e00cbd7ba01ff748e494248183abc6e153f49181169d8a3d41bb49132ca01dfc"
             ],
+            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.0.13"
         },
         "idna": {
@@ -447,6 +448,7 @@
                 "sha256:11e007a8a2aa0323f5a921e9e6a2d7e4e67d9877e85773fba9ba6419025cbeb4",
                 "sha256:9cf5292fcd0f598c671cfc1e0d7d1a7f13bb8085e9a590f48c010551dc6c4b31"
             ],
+            "index": "pypi",
             "version": "==2.22.0"
         },
         "s3transfer": {
@@ -488,6 +490,14 @@
                 "sha256:e3e6db4c246f7c59003e51c9720a51a7f39a396541cb9b147ff4b14d15b5dd1f"
             ],
             "version": "==3.3.0"
+        },
+        "stripe": {
+            "hashes": [
+                "sha256:29973329de6939d50f1db4660430eef2a7edc2dcd0f57cd086a5c4a9cb3940b8",
+                "sha256:51f7fbc3e0391ad4c1a0d0e6663dc14ec4ebc57bc01dfab0ecaa6cdecd6beabb"
+            ],
+            "index": "pypi",
+            "version": "==2.32.1"
         },
         "structlog": {
             "hashes": [
@@ -548,6 +558,7 @@
                 "sha256:c48692bf4587ce281d641087658eca275a5ad3b63c78297bbded96570ae9ce8f",
                 "sha256:fefc3b2b947c99737c348887db2c32e539160dcbeb7af9aa6b53db7a283538fe"
             ],
+            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.12.2"
         },
         "uwsgi": {

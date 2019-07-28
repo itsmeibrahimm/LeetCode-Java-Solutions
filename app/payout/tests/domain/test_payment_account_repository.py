@@ -1,6 +1,5 @@
 import pytest
 from gino import Gino
-
 from app.payout.domain.payout_account.models import PayoutAccount
 from app.payout.domain.payout_account.payment_account_repository import (
     PayoutAccountRepository,

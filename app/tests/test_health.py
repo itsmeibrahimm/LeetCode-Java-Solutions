@@ -10,7 +10,7 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
-def client(mocker: pytest_mock.MockFixture,):
+def client(mocker: pytest_mock.MockFixture):
     logger = mocker.Mock()
     payout_maindb_master = Gino()
     payout_bankdb_master = Gino()

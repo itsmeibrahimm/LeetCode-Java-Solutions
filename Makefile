@@ -77,11 +77,15 @@ local-dependency:
 	docker-compose -f docker-compose.nodeploy.yml up -d
 
 .PHONY: test
-test: test-lint test-typing local-dependency test-unit
+test: test-lint test-typing local-dependency test-unit test-external
 
 .PHONY: test-unit
 test-unit: wait-test-dependency
-	python runtests.py app/
+	python runtests.py -k "not external" app/
+
+.PHONY: test-external
+test-external:
+	python runtests.py -k "external" app/
 
 .PHONY: test-lint
 test-lint:
