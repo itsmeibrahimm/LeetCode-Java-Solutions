@@ -15,12 +15,14 @@ class AppContext:
     payout_maindb_master: Gino
     payout_bankdb_master: Gino
     payin_maindb_master: Gino
+    payin_paymentdb_master: Gino
 
     async def close(self):
         await gather(
             self.payout_maindb_master.pop_bind().close(),
             self.payout_bankdb_master.pop_bind().close(),
             self.payin_maindb_master.pop_bind().close(),
+            self.payin_paymentdb_master.pop_bind().close(),
         )
 
 
@@ -40,11 +42,17 @@ async def create_app_context(config: AppConfig) -> AppContext:
     except Exception:
         root_logger.exception("failed to connect to payin main db")
 
+    try:
+        payin_paymentdb_master = await Gino(config.PAYIN_MAINDB_URL.value)
+    except Exception:
+        root_logger.exception("failed to connect to payin payment db")
+
     context = AppContext(
         log=root_logger,
         payout_maindb_master=payout_maindb_master,
         payout_bankdb_master=payout_bankdb_master,
         payin_maindb_master=payin_maindb_master,
+        payin_paymentdb_master=payin_paymentdb_master,
     )
 
     context.log.debug("app context created")

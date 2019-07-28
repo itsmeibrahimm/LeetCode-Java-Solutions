@@ -15,10 +15,15 @@ def client(mocker: pytest_mock.MockFixture):
     payout_maindb_master = Gino()
     payout_bankdb_master = Gino()
     payin_maindb_master = Gino()
+    payin_paymentdb_master = Gino()
 
     # fake context
     context = AppContext(
-        logger, payout_maindb_master, payout_bankdb_master, payin_maindb_master
+        logger,
+        payout_maindb_master,
+        payout_bankdb_master,
+        payin_maindb_master,
+        payin_paymentdb_master,
     )
     app.extra["context"] = cast(Any, context)
 
