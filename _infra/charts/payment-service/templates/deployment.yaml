@@ -27,6 +27,12 @@ spec:
       volumes:
       - name: runtime-volume
         {{- template "payment-service.volumes.runtime" . }}
+      - name: tmpfs
+        # Use a tmpfs mount to prevent heartbeat blocking event loop for EBS volumes
+        # http://docs.gunicorn.org/en/stable/faq.html#how-do-i-avoid-gunicorn-excessively-blocking-in-os-fchmod
+        # https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
+        emptyDir:
+          medium: Memory
       containers:
       - name: web
         image: "{{ .Values.web.repository }}:{{ .Values.web.tag }}"
@@ -39,6 +45,8 @@ spec:
           - name: runtime-volume
             mountPath: {{ .Values.web.runtime.path }}
             readOnly: true
+          - name: tmpfs
+            mountPath: /tmpfs
         envFrom:
         - configMapRef:
             name: {{ .Chart.Name }}-environment
