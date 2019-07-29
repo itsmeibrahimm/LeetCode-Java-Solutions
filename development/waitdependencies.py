@@ -18,7 +18,7 @@ async def main():
 
     retries = 20
     interval_sec = 5.0
-    timeout = 0.1
+    timeout = 5
     last_error = None
     for i in range(retries, 0, -1):
         try:
