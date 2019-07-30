@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from gino import Gino, GinoConnection
 
@@ -46,6 +46,53 @@ class StripeCustomerRepository:
             row = await connection.first(stmt)
 
         return self._to_stripe_customer(row)
+
+    async def update_stripe_customer(
+        self, primary_id: int, default_source: str
+    ) -> StripeCustomer:
+        data = {self._table.id: primary_id, self._table.default_source: default_source}
+        stmt = (
+            self._table.table.update()
+            .values(data)
+            .returning(*self._table.table.columns.values())
+        )
+        async with self._gino.acquire() as connection:  # type: GinoConnection
+            row = await connection.first(stmt)
+        return self._to_stripe_customer(row)
+
+    async def update_stripe_customer_by_stripe_id(
+        self, stripe_customer_id: str, default_source: str
+    ) -> StripeCustomer:
+        data = {
+            self._table.stripe_id: stripe_customer_id,
+            self._table.default_source: default_source,
+        }
+        stmt = (
+            self._table.table.update()
+            .values(data)
+            .returning(*self._table.table.columns.values())
+        )
+        async with self._gino.acquire() as connection:  # type: GinoConnection
+            row = await connection.first(stmt)
+        return self._to_stripe_customer(row)
+
+    async def get_stripe_customer_by_id(
+        self, primary_id: int
+    ) -> Optional[StripeCustomer]:
+        stmt = self._table.table.select().where(self._table.id == primary_id)
+        async with self._gino.acquire() as connection:  # type: GinoConnection
+            row = await connection.first(stmt)
+        return self._to_stripe_customer(row) if row else None
+
+    async def get_stripe_customer_by_stripe_customer_id(
+        self, stripe_customer_id: str
+    ) -> Optional[StripeCustomer]:
+        stmt = self._table.table.select().where(
+            self._table.stripe_id == stripe_customer_id
+        )
+        async with self._gino.acquire() as connection:  # type: GinoConnection
+            row = await connection.first(stmt)
+        return self._to_stripe_customer(row) if row else None
 
     def _to_stripe_customer(self, row: Any) -> StripeCustomer:
         return StripeCustomer(

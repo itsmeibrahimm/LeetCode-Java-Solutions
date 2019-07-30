@@ -5,6 +5,10 @@ from app.commons.context.app_context import AppContext, set_context_for_app
 from app.payin.api.payer.v1.api import router as payer_router
 from app.payin.repository.repository import PayinRepositories
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 payin_repositories: PayinRepositories
 
 

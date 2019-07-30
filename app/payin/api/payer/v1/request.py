@@ -13,3 +13,11 @@ class CreatePayerRequest(BaseModel):
 
 # https://pydantic-docs.helpmanual.io/#self-referencing-models
 CreatePayerRequest.update_forward_refs()
+
+
+class UpdatePayerRequest(BaseModel):
+    default_payment_method_id: str
+
+
+# https://pydantic-docs.helpmanual.io/#self-referencing-models
+UpdatePayerRequest.update_forward_refs()

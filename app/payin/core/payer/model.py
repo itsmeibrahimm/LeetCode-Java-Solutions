@@ -26,7 +26,7 @@ class Payer:
     deleted_at: Optional[datetime] = None
     payer_type: Optional[PayerType] = None
     country: Optional[str] = None
-    dd_payer_id: Optional[int] = None
+    dd_payer_id: Optional[str] = None
     description: Optional[str] = None
     payment_gateway_provider_customers: Optional[
         List[PaymentGatewayProviderCustomer]

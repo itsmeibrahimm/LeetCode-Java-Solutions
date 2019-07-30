@@ -26,23 +26,11 @@ class PgpCustomerRepository:
         pgp_resource_id: str,
         payer_id: str,
         account_balance: int,
-        currency: str,
+        currency: Optional[str] = None,
         default_payment_method: Optional[str] = None,
         legacy_default_card: Optional[str] = None,
         legacy_default_source: Optional[str] = None,
     ) -> PgpCustomer:
-        data = {
-            self._table.id: id,
-            self._table.pgp_code: pgp_code,
-            self._table.pgp_resource_id: pgp_resource_id,
-            self._table.payer_id: payer_id,
-            self._table.currency: currency,
-            self._table.account_balance: account_balance,
-            self._table.default_payment_method: default_payment_method,
-            self._table.legacy_default_card: legacy_default_card,
-            self._table.legacy_default_source: legacy_default_source,
-        }
-
         if True:
             return self._to_mock_pgp_customer(
                 id,
@@ -55,6 +43,18 @@ class PgpCustomerRepository:
                 legacy_default_source,
             )
         else:
+            data = {
+                self._table.id: id,
+                self._table.pgp_code: pgp_code,
+                self._table.pgp_resource_id: pgp_resource_id,
+                self._table.payer_id: payer_id,
+                self._table.account_balance: account_balance,
+                self._table.default_payment_method: default_payment_method,
+                self._table.legacy_default_card: legacy_default_card,
+                self._table.legacy_default_source: legacy_default_source,
+            }
+            if currency:
+                data.update({self._table.currency: currency})
             stmt = (
                 self._table.table.insert()
                 .values(data)
@@ -65,6 +65,57 @@ class PgpCustomerRepository:
                 row = await connection.first(stmt)
 
             return self._to_pgp_customer(row)
+
+    async def update_pgp_customer_default_payment_method(
+        self, pgp_customer_id: str, default_payment_method_id: str
+    ) -> PgpCustomer:
+        if True:
+            return self._to_mock_pgp_customer(
+                id=pgp_customer_id,
+                pgp_code="stripe",
+                pgp_resource_id="mock_cus_abc",
+                payer_id="mock_payer_id",
+                currency="US",
+                default_payment_method=default_payment_method_id,
+                legacy_default_source=default_payment_method_id,
+            )
+        else:
+            data = {
+                self._table.id: pgp_customer_id,
+                self._table.default_source: default_payment_method_id,
+                self._table.default_payment_method: default_payment_method_id,
+            }
+            stmt = (
+                self._table.table.update()
+                .values(data)
+                .returning(*self._table.table.columns.values())
+            )
+            async with self._gino.acquire() as connection:  # type: GinoConnection
+                row = await connection.first(stmt)
+            return self._to_pgp_customer(row)
+
+    async def get_pgp_customer_by_payer_id_and_pgp_code(
+        self, payer_id: str, pgp_code: str
+    ) -> Optional[PgpCustomer]:
+        # FIXME: remove when payment db credential is setup
+        if True:
+            return self._to_mock_pgp_customer(
+                id="mock_pgcu_abc",
+                pgp_code=pgp_code,
+                pgp_resource_id="mock_cus_abc",
+                payer_id=payer_id,
+                currency="US",
+                default_payment_method="mock_default_payment_method",
+                legacy_default_card="mock_legacy_default_card",
+                legacy_default_source="mock_legacy_default_source",
+            )
+        else:
+            stmt = self._table.table.select().where(
+                self._table.payer_id == payer_id, self._table.pgp_code == pgp_code
+            )
+            async with self._gino.acquire() as connection:  # type: GinoConnection
+                row = await connection.first(stmt)
+            return self._to_payer(row) if row else None
 
     def _to_pgp_customer(self, row: Any) -> PgpCustomer:
         return PgpCustomer(
@@ -88,7 +139,7 @@ class PgpCustomerRepository:
         pgp_code: str,
         pgp_resource_id: str,
         payer_id: str,
-        currency: str,
+        currency: Optional[str],
         default_payment_method: Optional[str] = None,
         legacy_default_card: Optional[str] = None,
         legacy_default_source: Optional[str] = None,

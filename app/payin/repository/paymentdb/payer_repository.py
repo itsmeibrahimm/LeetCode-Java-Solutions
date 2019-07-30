@@ -24,22 +24,12 @@ class PayerRepository:
         self,
         payer_id: str,
         payer_type: str,
-        dd_payer_id: int,
         legacy_stripe_customer_id: str,
         country: str,
-        account_balance: int,
-        description: str,
+        account_balance: Optional[int] = None,
+        description: Optional[str] = None,
+        dd_payer_id: Optional[str] = None,
     ) -> Payer:
-        data = {
-            self._table.id: payer_id,
-            self._table.payer_type: payer_type,
-            self._table.dd_payer_id: dd_payer_id,
-            self._table.legacy_stripe_customer_id: legacy_stripe_customer_id,
-            self._table.country: country,
-            self._table.account_balance: account_balance,
-            self._table.description: description,
-        }
-
         # FIXME: remove when payment db credential is setup
         if True:
             return self._to_mock_payer(
@@ -52,6 +42,18 @@ class PayerRepository:
                 description=description,
             )
         else:
+            data = {
+                self._table.id: payer_id,
+                self._table.payer_type: payer_type,
+                self._table.legacy_stripe_customer_id: legacy_stripe_customer_id,
+                self._table.country: country,
+            }
+            if account_balance:
+                data.update({self._table.account_balance: account_balance})
+            if description:
+                data.update({self._table.description: description})
+            if dd_payer_id:
+                data.update({self._table.dd_payer_id: dd_payer_id})
             stmt = (
                 self._table.table.insert()
                 .values(data)
@@ -62,15 +64,45 @@ class PayerRepository:
                 row = await connection.first(stmt)
             return self._to_payer(row)
 
-    async def get_payer_by_owner_id_and_owner_type(
-        self, owner_id: int, owner_type: str
+    async def get_payer_by_id(self, payer_id: str) -> Optional[Payer]:
+        stmt = self._table.table.select().where(self._table.id == payer_id)
+        # FIXME: remove when payment db credential is setup
+        if True:
+            return self._to_mock_payer(
+                payer_id=payer_id,
+                payer_type="drive",
+                dd_payer_id="1234",
+                legacy_stripe_customer_id="mock_legacy_stripe_customer_id",
+                country="mock_country",
+                account_balance=0,
+                description="mock_description",
+            )
+        else:
+            async with self._gino.acquire() as connection:  # type: GinoConnection
+                row = await connection.first(stmt)
+            return self._to_payer(row) if row else None
+
+    async def get_payer_by_stripe_customer_id(
+        self, stripe_customer_id: str
     ) -> Optional[Payer]:
         stmt = self._table.table.select().where(
-            self._table.dd_payer_id == owner_id, self._table.payer_type == owner_type
+            self._table.legacy_stripe_customer_id == stripe_customer_id
         )
-        async with self._gino.acquire() as connection:  # type: GinoConnection
-            row = await connection.first(stmt)
-        return self._to_payer(row) if row else None
+        # FIXME: remove when payment db credential is setup
+        if True:
+            return self._to_mock_payer(
+                payer_id="mock_payer_id",
+                payer_type="drive",
+                dd_payer_id="1234",
+                legacy_stripe_customer_id=stripe_customer_id,
+                country="mock_US",
+                account_balance=0,
+                description="mock_description",
+            )
+        else:
+            async with self._gino.acquire() as connection:  # type: GinoConnection
+                row = await connection.first(stmt)
+            return self._to_payer(row) if row else None
 
     def _to_payer(self, row: Any) -> Payer:
         return Payer(
@@ -97,11 +129,11 @@ class PayerRepository:
         self,
         payer_id: str,
         payer_type: str,
-        dd_payer_id: int,
         legacy_stripe_customer_id: str,
         country: str,
-        account_balance: int,
-        description: str,
+        dd_payer_id: Optional[str],
+        account_balance: Optional[int],
+        description: Optional[str],
     ):
         return Payer(
             payer_id=payer_id,
@@ -114,7 +146,6 @@ class PayerRepository:
                 )
             ],
             country=country,
-            # account_balance=account_balance,
             description=description,
             created_at=datetime.now(),
             updated_at=datetime.now(),

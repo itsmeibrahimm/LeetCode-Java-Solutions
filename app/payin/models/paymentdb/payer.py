@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Integer, Text, BigInteger, JSON
+from sqlalchemy import Column, DateTime, Text, BigInteger, JSON
 from typing_extensions import final
 
 from app.commons.database.table import TableDefinition
@@ -13,7 +13,7 @@ class PayerTable(TableDefinition):
     name: str = no_init_field("payer")
     id: Column = no_init_field(Column("id", Text, primary_key=True))
     payer_type: Column = no_init_field(Column("payer_type", Text))
-    dd_payer_id: Column = no_init_field(Column("dd_payer_id", Integer))
+    dd_payer_id: Column = no_init_field(Column("dd_payer_id", Text))
     legacy_stripe_customer_id: Column = no_init_field(
         Column("legacy_stripe_customer_id", Text)
     )
