@@ -1,9 +1,11 @@
-
 | **This README is currently under construction, please keep in mind the content could be dramtically changed before this message is removed.** |
-| --- |
+| --------------------------------------------------------------------------------------------------------------------------------------------- |
+
 
 # Payment services mono repo
+
 This repo contains micros services including:
+
 - Payout service (WIP)
 - Payin service (WIP)
 
@@ -23,7 +25,6 @@ The repo was created through python-flask-service-template [link to specific SHA
   - [Live debugging](#live-debugging)
   - [(Optional) Local k8s setup](#optional-k8s-environment)
   - [Make commands reference](#make-commands-reference)
-
 
 # Architecture and Tech Stack
 
@@ -56,183 +57,213 @@ The following technologies/frameworks are used across the entire stack:
 - **Jenkins/Groovy** for CICD
 
 # Deployment
+
 - [CD pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-deploy.groovy/)
 - [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
 
 # Development
 
 ## Environment Setup
+
 ### Repository credentials
+
 1. Make sure you have followed [New eng setup guide](https://github.com/doordash/doordash-eng-wiki/blob/master/docs/New-Engineer-Setup-Guide.md#25-configure-doorstep-django) to properly setup your PIP install indices by envionment variables `ARTIFACTORY_URL`,`ARTIFACTORY_USERNAME`,`ARTIFACTORY_PASSWORD` and `PIP_EXTRA_INDEX_URL`
 2. After step #1, also include `FURY_TOKEN` in your `~/.bash_profile` by running:
-    ```bash
-    echo "export FURY_TOKEN=$(echo $PIP_EXTRA_INDEX_URL | sed -E -e 's/.*\/([^/]+)@repo.fury.io\/doordash.*/\1/')" >> ~/.bash_profile
-    source ~/.bash_profile
-    ```
+   ```bash
+   echo "export FURY_TOKEN=$(echo $PIP_EXTRA_INDEX_URL | sed -E -e 's/.*\/([^/]+)@repo.fury.io\/doordash.*/\1/')" >> ~/.bash_profile
+   source ~/.bash_profile
+   ```
+
 ### Python environment
+
 1. Install python specified in `Pipefile.lock` (v3.7) through [pyenv](https://github.com/pyenv/pyenv) and [pipenv](https://github.com/pypa/pipenv) into a newly created python virtual environment.
 
-    ```bash
-    brew install pyenv pipenv
-    brew upgrade pyenv pipenv
-    # install all dependencies needed for development, including the ones installed with the --dev argument.
-    make sync-pipenv
-    ```
+   ```bash
+   brew install pyenv pipenv
+   brew upgrade pyenv pipenv
+   # install all dependencies needed for development, including the ones installed with the --dev argument.
+   make sync-pipenv
+   ```
+
 2. After step #1, a python virtual envionment should be created.
-    1. To find where does environment locate, run `$ pipenv --venv`
-    2. To start a sub-shell within create python virtual environment, run:
-       ```bash
-       pipenv shell
-       # Try `pipenv shell --fancy` if you want to preserve your customized shell configuration from ~/.bashrc
-       ```
-    3. To go back to your original shell and deactivate python virtual env, simply run `$ exit`
+
+   1. To find where does environment locate, run `$ pipenv --venv`
+   2. To start a sub-shell within create python virtual environment, run:
+      ```bash
+      pipenv shell
+      # Try `pipenv shell --fancy` if you want to preserve your customized shell configuration from ~/.bashrc
+      ```
+   3. To go back to your original shell and deactivate python virtual env, simply run `$ exit`
 
 3. To test if everything works, you can try:
-    1. Activate python virtual env: `$ pipenv shell`
-    2. running unit tests, linter and mypy: `$ make test`
+   1. Activate python virtual env: `$ pipenv shell`
+   2. running unit tests, linter and mypy: `$ make test`
 
 ### Pre-commit hook
+
 1. Install `pre-commit` and initialize the pre-commit hooks; these will run before every commit
 
-    ```bash
-    brew install pre-commit
-    pre-commit install
-    ```
+   ```bash
+   brew install pre-commit
+   pre-commit install
+   ```
+
 2. Run Pre-Commit Hooks
 
-    If you want to manually run all pre-commit hooks on a repository, run `pre-commit run --all-files`. To run individual hooks use `pre-commit run <hook_id>`.
+   If you want to manually run all pre-commit hooks on a repository, run `pre-commit run --all-files`. To run individual hooks use `pre-commit run <hook_id>`.
 
-    Pre-commit `<hook_id>` are defined in `.pre-commit-config.yaml`. Example commands:
-    ```bash
-    pre-commit run --all-files
-    pre-commit run black --all-files
-    ```
+   Pre-commit `<hook_id>` are defined in `.pre-commit-config.yaml`. Example commands:
+
+   ```bash
+   pre-commit run --all-files
+   pre-commit run black --all-files
+   ```
 
 ## Development guide
+
 ### Running server locally
+
 ```bash
 pipenv shell
 make local-server
 ```
+
 - Local service will be running in development and debug mode.
-Any code changes will lead to a service reload and therefore be reflected in real-time.
+  Any code changes will lead to a service reload and therefore be reflected in real-time.
 - Confirming local server is up running:
-    ```bash
-    curl localhost:8081/health/ # port is defined in Makefile::local-server
-    ```
+  ```bash
+  curl localhost:8081/health/ # port is defined in Makefile::local-server
+  ```
 
 #### Running tests in local environment
+
 1. Activate python virtual env: `$ pipenv shell`
 2. Available test targets:
-    ```bash
-    make test # runs unit tests, linter, mypy (not pre-commit hooks)
-    make test-unit # runs unit tests only
-    make test-typing # runs mypy only
-    make test-lint # runs linter only
-    make test-hooks # runs pre-commit hooks only
-    ```
+   ```bash
+   make test # runs unit tests, linter, mypy (not pre-commit hooks)
+   make test-unit # runs unit tests only
+   make test-typing # runs mypy only
+   make test-lint # runs linter only
+   make test-hooks # runs pre-commit hooks only
+   ```
+
 ### Running server in docker-compose
+
 ```bash
 make local-docker-server
 ```
+
 - Similarly as `local-server`, ./app directory is binded as a volume under web docker container.
-Therefore live reload is also available here.
+  Therefore live reload is also available here.
 - Confirming server is up running in docker:
-    ```bash
-    curl localhost:5000/health/ # docker port mapping defined in docker-compose.yml web container
-    ```
+  ```bash
+  curl localhost:5000/health/ # docker port mapping defined in docker-compose.yml web container
+  ```
 
 ### Update Dependencies
+
 The `payment-service` uses `pipenv` to ensure deterministic builds.
 To add or update a dependency, you can do the following:
 
 1. Add or update dependency in `Pipefile` via your text editor
 2. Run following command to update `Pipefile.lock` and install from updated lock file
-    ```bash
-    make update-pipenv
-    ```
+   ```bash
+   make update-pipenv
+   ```
 3. After you are done, remember to open a PR to checkin the changes!
 
 ### Work with secret
+
 Payment-service integrated with [Ninox](https://github.com/doordash/ninox/tree/master/ninox)
 as source of all secret configurations, such as DB credentials and Stripe private keys.
 
 #### Setup Ninox access locally
+
 1. Make sure you are in google group [eng-payment@](https://groups.google.com/a/doordash.com/forum/?hl=en#!forum/eng-payment),
-otherwise please ask one of payment team member to add you in.
+   otherwise please ask one of payment team member to add you in.
 2. Fetch `okta-prod-payment-eng-user` Okta-aws profile via:
-    ```bash
-    okta-aws init
-    ```
-    In case, you don't have `okta-aws` cli installed, follow [here](https://github.com/doordash/doordash-eng-wiki/blob/master/docs/New-Engineer-Setup-Guide.md#21-install-aws-cli)
+   ```bash
+   okta-aws init
+   ```
+   In case, you don't have `okta-aws` cli installed, follow [here](https://github.com/doordash/doordash-eng-wiki/blob/master/docs/New-Engineer-Setup-Guide.md#21-install-aws-cli)
 3. Verify you have successfully fetched aws profile by:
-    ```bash
-    grep okta-prod-payment-eng-user ~/.aws/credentials
-    # Expected output>> [okta-prod-payment-eng-user]
-    ```
+   ```bash
+   grep okta-prod-payment-eng-user ~/.aws/credentials
+   # Expected output>> [okta-prod-payment-eng-user]
+   ```
 4. Install Ninox:
-    ```bash
-    brew install Ninox
-    ```
+   ```bash
+   brew install Ninox
+   ```
    If fails, ensure you have tapped into [doordash homebrew taps](https://github.com/doordash/homebrew-tap#setup)
 5. Verify Ninox user role working:
-    ```bash
-    cd YOUR_PAYMENT_SERVICE_REPO
-    ninox -s staging_user config
-    ```
-    You should see output similar to following without errors:
-    ```bash
-    Loading team staging_user
-    {'backend': 'dbd',
-     'ignore_entropy_check': False,
-     'kms_key_alias': 'alias/ninox/payment-service',
-     'prefix': '/ninox/payment-service/',
-     'profile': 'okta-prod-payment-eng-user',
-     'region': 'us-west-2',
-     'role': 'arn:aws:iam::016116557778:role/ninox_payment-service_xacct_user_staging',
-     'session': Session(region_name='us-west-2'),
-     'table': 'ninox-payment-service-staging'}
-    ```
+   ```bash
+   cd YOUR_PAYMENT_SERVICE_REPO
+   ninox -s staging_user config
+   ```
+   You should see output similar to following without errors:
+   ```bash
+   Loading team staging_user
+   {'backend': 'dbd',
+    'ignore_entropy_check': False,
+    'kms_key_alias': 'alias/ninox/payment-service',
+    'prefix': '/ninox/payment-service/',
+    'profile': 'okta-prod-payment-eng-user',
+    'region': 'us-west-2',
+    'role': 'arn:aws:iam::016116557778:role/ninox_payment-service_xacct_user_staging',
+    'session': Session(region_name='us-west-2'),
+    'table': 'ninox-payment-service-staging'}
+   ```
 6. Ninox secret create, update, retrieve from cli
-    1. As a payment engineer, I want to create or update secret
-        ```bash
-        cd PAYMENT_REPO
-        ninox -s [staging_user | prod_user] [create | update] <secret_name_all_lower_case>
-        ```
-        Note: as of 07/25/2019 Ninox cli hasn't support `ls` for user role yet.
 
-    2. As a payment engineer, I want to see if the secret is created / updated as expected.
+   1. As a payment engineer, I want to create or update secret
 
-        **Really not a good practice!!**, but if you really want you need to login to one of the staging or prod payment-service-web pod and do:
-        ```bash
-        ninox -s [staging | prod] get <secret_name_all_lower_case>
-        ```
-        Note: Once we have a better way to validate, will update.
+      ```bash
+      cd PAYMENT_REPO
+      ninox -s [staging_user | prod_user] [create | update] <secret_name_all_lower_case>
+      ```
+
+      Note: as of 07/25/2019 Ninox cli hasn't support `ls` for user role yet.
+
+   2. As a payment engineer, I want to see if the secret is created / updated as expected.
+
+      **Really not a good practice!!**, but if you really want you need to login to one of the staging or prod payment-service-web pod and do:
+
+      ```bash
+      ninox -s [staging | prod] get <secret_name_all_lower_case>
+      ```
+
+      Note: Once we have a better way to validate, will update.
 
 ### Live debugging
+
 #### Pycharm
+
 1. Setup your pycharm remote debugger `debug-server` to listen to **localhost:9001** as following:
-        ![Configure debug-server](./development/pycharm-debug-server-config.png)
+   ![Configure debug-server](./development/pycharm-debug-server-config.png)
 2. Start up your debugger from menu as `Run` -> `Debug...` -> `debug-server`
 3. Same remote debugger can be used to live debug one of local server and test
-    1. For local-server: `make local-server DEBUGGER=enabled`
-    2. For tests: `make test-unit DEBUGGER=enabled`
+   1. For local-server: `make local-server DEBUGGER=enabled`
+   2. For tests: `make test-unit DEBUGGER=enabled`
 
 ### (Optional) k8s environment
 
 #### Setup
+
 1. Install [docker for Mac](https://docs.docker.com/docker-for-mac/install/) and enable the local Kubernetes cluster by
-  clicking on Docker whale icon > `Preferences...` > `Kubernetes` > `Enable Kubernetes`
+   clicking on Docker whale icon > `Preferences...` > `Kubernetes` > `Enable Kubernetes`
 2. Configure Kubernetes to use your local context: `kubectl config use-context docker-for-desktop`
 3. Install and initialize helm:
-    ```bash
-    brew install kubernetes-helm
 
-    # If your local k8s cluster complains `connection refused`, try to do the following:
-    #  - remove k8s config for this local cluster in your ~/.kube/config
-    #  - increase your local docker setting to have 4G swap space (Preferences -> Advanced)
-    helm init
-    ```
+   ```bash
+   brew install kubernetes-helm
+
+   # If your local k8s cluster complains `connection refused`, try to do the following:
+   #  - remove k8s config for this local cluster in your ~/.kube/config
+   #  - increase your local docker setting to have 4G swap space (Preferences -> Advanced)
+   helm init
+   ```
+
 4. Try to build and deploy your service on local Kubernetes: `make build local-deploy`
 
 #### Running service in local k8s cluster
@@ -242,10 +273,9 @@ otherwise please ask one of payment team member to add you in.
 3. Deploy locally: `make local-deploy`
 4. Start the proxy: `kubectl proxy`
 5. Query the service APIs using a REST client (e.g. `curl`):
-    ```bash
-    curl http://localhost:8001/api/v1/namespaces/default/services/payment-service-web:80/proxy/health
-    ```
-
+   ```bash
+   curl http://localhost:8001/api/v1/namespaces/default/services/payment-service-web:80/proxy/health
+   ```
 
 ## Make commands reference
 
@@ -270,6 +300,10 @@ make test # runs unit tests, linter, mypy (not pre-commit hooks)
 
 make test-unit # runs unit tests only
 
+make test-integration # runs integration tests (incl. database tests) only
+
+make test-external # runs external tests only (ie. that talk to an external dependency)
+
 make test-typing # runs mypy only
 
 make test-lint # runs linter only
@@ -280,6 +314,7 @@ make test-hooks # runs pre-commit hooks only
 ```
 
 Also here are `make` targets if you like to deploy service to local k8s cluster
+
 ```bash
 make local-deploy # uses helm to deploy the service on the local Kubernetes cluster
 

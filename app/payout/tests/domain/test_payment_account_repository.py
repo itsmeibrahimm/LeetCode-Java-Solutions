@@ -7,7 +7,7 @@ from app.payout.domain.payout_account.payment_account_repository import (
 
 
 class TestPaymentAccountRepository:
-    pytestmark = pytest.mark.asyncio
+    pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
     async def test_create(self, payout_maindb: Gino):
         repo = PayoutAccountRepository(payout_maindb)

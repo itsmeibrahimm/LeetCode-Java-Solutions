@@ -136,8 +136,8 @@ def loadJunit(fileName) {
 /**
  * Run Unit Tests on the CI container and archive the report
  */
-def runTests(String serviceName) {
-  def outputFile = "pytest.xml"
+def runUnitTests(String serviceName) {
+  def outputFile = "pytest-unit.xml"
   github.doClosureWithStatus({
     try {
       sh """|#!/bin/bash
@@ -152,6 +152,29 @@ def runTests(String serviceName) {
       loadJunit(outputFile)
     }
   }, gitUrl, sha, "Unit Tests", "${BUILD_URL}testReport")
+}
+
+
+
+/**
+ * Run Integration Tests on the CI container and archive the report
+ */
+def runIntegrationTests(String serviceName) {
+  def outputFile = "pytest-integration.xml"
+  github.doClosureWithStatus({
+    try {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker exec ${serviceName}-ci make test-integration PYTEST_ADDOPTS="--junitxml ${outputFile}"
+            |""".stripMargin()
+    } finally {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker cp ${serviceName}-ci:/home/${outputFile} ${outputFile}
+            |""".stripMargin()
+      loadJunit(outputFile)
+    }
+  }, gitUrl, sha, "Integration Tests", "${BUILD_URL}testReport")
 }
 
 

@@ -1,9 +1,58 @@
+from dataclasses import dataclass
+from typing import Any
 import os
 import pytest
 from gino import Gino
 from app.commons.config.app_config import AppConfig
 
 os.environ["ENVIRONMENT"] = "testing"
+
+
+@dataclass(frozen=True)
+class StripeAPISettings:
+    stripe: Any
+    api_base: str
+    verify_ssl_certs: bool
+
+    @classmethod
+    def init_from_stripe(cls, stripe):
+        return cls(
+            stripe=stripe,
+            api_base=stripe.api_base,
+            verify_ssl_certs=stripe.verify_ssl_certs,
+        )
+
+    def disable_outbound(self):
+        self.stripe.api_base = "http://localhost"
+        self.stripe.verify_ssl_certs = False
+
+    def enable_mock(self):
+        self.stripe.api_base = os.environ.get(
+            "STRIPE_API_BASE", "http://localhost:12111"
+        )
+        self.stripe.verify_ssl_certs = False
+
+    def enable_outbound(self):
+        self.restore()
+
+    def restore(self):
+        self.stripe.api_base = self.api_base
+        self.stripe.verify_ssl_certs = self.verify_ssl_certs
+
+
+@pytest.fixture(autouse=True)
+def stripe_api():
+    """
+    disallow stripe access from tests, unless specifically enabled
+    """
+    import stripe
+
+    api_settings = StripeAPISettings.init_from_stripe(stripe)
+    # disable outbound access by pointing to localhost
+    api_settings.disable_outbound()
+    yield api_settings
+    # restore default api settings
+    api_settings.restore()
 
 
 @pytest.fixture

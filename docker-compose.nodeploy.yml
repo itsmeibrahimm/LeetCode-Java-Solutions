@@ -1,6 +1,9 @@
 version: "3.2"
 
 services:
+  web-ci:
+    environment:
+      - STRIPE_API_BASE=http://payment.stripe-mock:12111
   payment.dsj-postgres:
     image: 611706558220.dkr.ecr.us-west-2.amazonaws.com/doordash/doorstep-django.postgres:9.6
     container_name: payment.dsj-postgres
@@ -22,5 +25,5 @@ services:
       context: .
       dockerfile: ./development/Dockerfile-stripe-mock
     ports:
-      - 12111 # http
-      - 12112 # https
+      - 12111:12111 # http
+      - 12112:12111 # https

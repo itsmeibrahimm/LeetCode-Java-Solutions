@@ -40,7 +40,7 @@ run-ci-container: build-ci-container
 	CI_IMAGE_NAME="$(SERVICE_NAME):$(CI_TAG)" \
 	CI_BASE_IMAGE="$(CI_BASE_IMAGE)" \
 	CI_CONTAINER_NAME="$(CI_CONTAINER_NAME)" \
-	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate web-ci
+	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate
 
 .PHONY: tag
 tag:
@@ -64,6 +64,16 @@ update-pipenv:
 	ARTIFACTORY_PASSWORD="$${ARTIFACTORY_PASSWORD}" \
 	pipenv update --dev
 
+.dockerignore: .gitignore
+	# skip comments (lines starting with #)
+	# and directories (lines ending with /)
+	# add **/ prefix to all files so they're ignored by docker
+	# no matter where they are located
+	sed -E '/(^#|\/$$)/! s/(.+)/**\/\1/g' .gitignore | tee .dockerignore
+
+.PHONY: dockerignore
+dockerignore: .dockerignore
+
 .PHONY: local-docker-server
 local-docker-server:
 	WEB_PORT=8001 docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml up --build -d web
@@ -77,15 +87,19 @@ local-dependency:
 	docker-compose -f docker-compose.nodeploy.yml up -d
 
 .PHONY: test
-test: test-lint test-typing local-dependency test-unit test-external
+test: test-lint test-typing local-dependency test-unit test-external test-integration
 
 .PHONY: test-unit
-test-unit: wait-test-dependency
-	python runtests.py -k "not external" app/
+test-unit:
+	python runtests.py -m "not external and not integration" app/
+
+.PHONY: test-integration
+test-integration: wait-test-dependency
+	python runtests.py -m "integration" app/
 
 .PHONY: test-external
 test-external:
-	python runtests.py -k "external" app/
+	python runtests.py -m "external" app/
 
 .PHONY: test-lint
 test-lint:

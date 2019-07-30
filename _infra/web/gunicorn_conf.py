@@ -1,5 +1,6 @@
 loglevel = "info"
-workers = 1
+workers = 2
 bind = "0.0.0.0:80"
 keepalive = 120
 errorlog = "-"
+proc_name = "payment-service"

@@ -50,7 +50,14 @@ pipeline {
     stage('Unit Tests') {
       steps {
         script {
-          common.runTests(common.getServiceName())
+          common.runUnitTests(common.getServiceName())
+        }
+      }
+    }
+    stage('Integration Tests') {
+      steps {
+        script {
+          common.runIntegrationTests(common.getServiceName())
         }
       }
     }

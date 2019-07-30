@@ -1,5 +1,4 @@
 import pytest
-import stripe
 from app.commons.providers.stripe import (
     StripeClient,
     StripeTestClient,
@@ -8,37 +7,44 @@ from app.commons.providers.stripe import (
 from app.commons.providers import stripe_models as models
 
 
-@pytest.fixture
-def stripe_mock():
-    """
-    for mock stripe, change the URL
-    """
-    api_url = stripe.api_base
-    stripe.api_base = "http://localhost:12111"
-    yield
-    stripe.api_base = api_url
-
-
 pytestmark = [
+    # mark all these tests as stripe tests
+    pytest.mark.stripe,
+    # allow all tests to be run against the stripe mock (as integration tests)
+    # and against the real stripe (as external tests)
     pytest.mark.parametrize(
         "mode",
         [
-            # execute these tests using the mock stripe
-            pytest.param("mock", marks=[pytest.mark.usefixtures("stripe_mock")]),
-            # and again using the real stripe (external provider)
+            # the `mock` tests are integration tests against the stripe-mock
+            pytest.param("mock", marks=[pytest.mark.integration]),
+            # the `external` tests are integration tests against the real stripe test account
             pytest.param("external", marks=[pytest.mark.external]),
         ],
-    )
+    ),
 ]
 
 
 class TestStripeClient:
     @pytest.fixture
-    def stripe(self):
+    def stripe(self, request, stripe_api):
+        # allow external tests to directly call stripe
+        if "external" in request.keywords:
+            stripe_api.enable_outbound()
+        # allow integration tests to call the stripe mock
+        elif "integration" in request.keywords:
+            stripe_api.enable_mock()
+
         return StripeClient("sk_test_4eC39HqLyjWDarjtT1zdp7dc", "US")
 
     @pytest.fixture
-    def stripe_test(self):
+    def stripe_test(self, request, stripe_api):
+        # allow external tests to directly call stripe
+        if "external" in request.keywords:
+            stripe_api.enable_outbound()
+        # allow integration tests to call the stripe mock
+        elif "integration" in request.keywords:
+            stripe_api.enable_mock()
+
         return StripeTestClient("sk_test_4eC39HqLyjWDarjtT1zdp7dc", "US")
 
     @pytest.mark.skip(reason="requires connected account key")
@@ -69,7 +75,14 @@ class TestStripePool:
     ]
 
     @pytest.fixture
-    def stripe_pool(self):
+    def stripe_pool(self, request, stripe_api):
+        # allow external tests to directly call stripe
+        if "external" in request.keywords:
+            stripe_api.enable_outbound()
+        # allow integration tests to call the stripe mock
+        elif "integration" in request.keywords:
+            stripe_api.enable_mock()
+
         return StripePoolHelper(
             max_workers=5, api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
         )

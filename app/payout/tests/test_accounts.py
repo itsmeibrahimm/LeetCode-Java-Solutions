@@ -5,6 +5,8 @@ from app.main import app
 
 
 class TestAccounts:
+    pytestmark = [pytest.mark.integration]
+
     @pytest.fixture(autouse=True, scope="class")
     def client(self):
         with TestClient(app) as client:
