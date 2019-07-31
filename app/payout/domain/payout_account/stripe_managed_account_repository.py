@@ -6,7 +6,9 @@ from typing import Any, Optional
 from gino import Gino, GinoConnection
 
 from app.commons.utils.dataclass_extensions import no_init_field
-from app.payout.database.maindb.stripe_managed_account import StripeManagedAccountTable
+from app.payout.repository.maindb.model.stripe_managed_account import (
+    StripeManagedAccountTable,
+)
 from app.payout.domain.payout_account.models import StripeManagedAccount
 
 

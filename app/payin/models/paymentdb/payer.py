@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from sqlalchemy import Column, DateTime, Text, BigInteger, JSON
 from typing_extensions import final
 
-from app.commons.database.table import TableDefinition
+from app.commons.database.model import TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
 
 

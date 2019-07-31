@@ -6,7 +6,7 @@ from typing import Any, Optional
 from gino import Gino, GinoConnection
 
 from app.commons.utils.dataclass_extensions import no_init_field
-from app.payout.database.maindb.payment_account import PaymentAccountTable
+from app.payout.repository.maindb.model.payment_account import PaymentAccountTable
 from app.payout.domain.payout_account.models import PayoutAccount
 
 

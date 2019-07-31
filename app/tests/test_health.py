@@ -2,7 +2,6 @@ from typing import Any, cast
 
 import pytest
 import pytest_mock
-from gino import Gino
 from starlette.testclient import TestClient
 
 from app.commons.context.app_context import AppContext
@@ -14,10 +13,11 @@ from app.main import app
 @pytest.fixture(autouse=True)
 def client(mocker: pytest_mock.MockFixture):
     logger = mocker.Mock()
-    payout_maindb_master = Gino()
-    payout_bankdb_master = Gino()
-    payin_maindb_master = Gino()
-    payin_paymentdb_master = Gino()
+    payout_maindb_master = mocker.Mock()
+    payout_bankdb_master = mocker.Mock()
+    payin_maindb_master = mocker.Mock()
+    payin_paymentdb_master = mocker.Mock()
+    payout_maindb = mocker.Mock()
 
     # fake context
     context = AppContext(
@@ -34,6 +34,7 @@ def client(mocker: pytest_mock.MockFixture):
                 )
             ],
         ),
+        payout_maindb=payout_maindb,
     )
     app.extra["context"] = cast(Any, context)
 

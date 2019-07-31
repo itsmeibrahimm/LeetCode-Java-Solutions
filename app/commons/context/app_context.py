@@ -10,6 +10,7 @@ from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe_client import StripeClientPool
 from app.commons.providers.stripe_models import StripeClientSettings
 from app.commons.context.logger import root_logger
+from app.commons.database.model import Database
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class AppContext:
     payin_maindb_master: Gino
     payin_paymentdb_master: Gino
     stripe: StripeClientPool
+    payout_maindb: Database
 
     async def close(self):
         try:
@@ -71,6 +73,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         payin_maindb_master=payin_maindb_master,
         payin_paymentdb_master=payin_paymentdb_master,
         stripe=stripe,
+        payout_maindb=Database(_master=payout_maindb_master),
     )
 
     context.log.debug("app context created")
