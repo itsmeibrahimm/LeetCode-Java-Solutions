@@ -239,10 +239,11 @@ as source of all secret configurations, such as DB credentials and Stripe privat
 
 #### Pycharm
 
-1. Setup your pycharm remote debugger `debug-server` to listen to **localhost:9001** as following:
+1. Setup your pycharm remote debugger by `Run` -> `Edit Configurations` -> `+` -> `Python Remote Debug`
+2. Name it as `debug-server` and listen to **localhost:9001** as following:
    ![Configure debug-server](./development/pycharm-debug-server-config.png)
-2. Start up your debugger from menu as `Run` -> `Debug...` -> `debug-server`
-3. Same remote debugger can be used to live debug one of local server and test
+3. Start up your debugger from menu as `Run` -> `Debug...` -> `debug-server`
+4. Same remote debugger can be used to live debug one of local server and test
    1. For local-server: `make local-server DEBUGGER=enabled`
    2. For tests: `make test-unit DEBUGGER=enabled`
 
