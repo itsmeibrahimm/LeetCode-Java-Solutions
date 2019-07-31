@@ -84,7 +84,7 @@ local-server: local-dependency
 
 .PHONY: local-dependency
 local-dependency:
-	docker-compose -f docker-compose.nodeploy.yml up -d
+	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock
 
 .PHONY: test
 test: test-lint test-typing local-dependency test-unit test-external test-integration

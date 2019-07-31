@@ -6,6 +6,8 @@ from gino import Gino
 from starlette.testclient import TestClient
 
 from app.commons.context.app_context import AppContext
+from app.commons.providers.stripe_client import StripeClientPool
+from app.commons.providers import stripe_models as models
 from app.main import app
 
 
@@ -19,11 +21,19 @@ def client(mocker: pytest_mock.MockFixture):
 
     # fake context
     context = AppContext(
-        logger,
-        payout_maindb_master,
-        payout_bankdb_master,
-        payin_maindb_master,
-        payin_paymentdb_master,
+        log=logger,
+        payout_maindb_master=payout_maindb_master,
+        payout_bankdb_master=payout_bankdb_master,
+        payin_maindb_master=payin_maindb_master,
+        payin_paymentdb_master=payin_paymentdb_master,
+        stripe=StripeClientPool(
+            max_workers=5,
+            settings_list=[
+                models.StripeClientSettings(
+                    api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
+                )
+            ],
+        ),
     )
     app.extra["context"] = cast(Any, context)
 

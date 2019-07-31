@@ -11,7 +11,12 @@ os.environ["ENVIRONMENT"] = "testing"
 @dataclass(frozen=True)
 class StripeAPISettings:
     stripe: Any
+    # see: https://github.com/stripe/stripe-python/blob/master/tests/conftest.py
+    # for a list of settings to reset between tests
     api_base: str
+    api_key: str
+    client_id: str
+    default_http_client: Any
     verify_ssl_certs: bool
 
     @classmethod
@@ -19,6 +24,9 @@ class StripeAPISettings:
         return cls(
             stripe=stripe,
             api_base=stripe.api_base,
+            api_key=stripe.api_key,
+            client_id=stripe.client_id,
+            default_http_client=stripe.default_http_client,
             verify_ssl_certs=stripe.verify_ssl_certs,
         )
 
@@ -37,6 +45,9 @@ class StripeAPISettings:
 
     def restore(self):
         self.stripe.api_base = self.api_base
+        self.stripe.api_key = self.api_key
+        self.stripe.client_id = self.stripe.client_id
+        self.stripe.default_http_client = self.default_http_client
         self.stripe.verify_ssl_certs = self.verify_ssl_certs
 
 

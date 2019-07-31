@@ -7,6 +7,7 @@ services:
     container_name: "${CI_CONTAINER_NAME:?CI_CONTAINER_NAME. Please specify a container name.}"
     environment:
       - DSJ_DB_ENDPOINT=payment.dsj-postgres
+      - STRIPE_API_BASE=http://payment.stripe-mock:12111
     build:
       context: .
       dockerfile: Dockerfile-ci

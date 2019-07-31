@@ -12,6 +12,9 @@ class ThreadPoolHelper:
     def __init__(self, max_workers: Optional[int] = None, loop=None):
         self.executor = futures.ThreadPoolExecutor(max_workers, self.prefix)
 
+    def shutdown(self, wait=True):
+        self.executor.shutdown(wait=wait)
+
     async def submit(self, fn, *args, **kwargs):
         """
         Submit a function for execution in the ThreadPoolExecutor, and `await` the result

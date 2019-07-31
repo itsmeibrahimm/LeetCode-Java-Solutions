@@ -28,4 +28,10 @@ def create_app_config() -> AppConfig:
             name="payout_bankdb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/bankdb_test",
         ),
+        STRIPE_US_SECRET_KEY=Secret(
+            name="stripe_us_secret_key", value="sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
+        ),
+        STRIPE_US_PUBLIC_KEY=Secret(
+            name="stripe_us_public_key", value="pk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
+        ),
     )

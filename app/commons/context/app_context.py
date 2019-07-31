@@ -1,4 +1,5 @@
 from asyncio import gather
+
 from dataclasses import dataclass
 from fastapi import FastAPI
 from gino import Gino
@@ -6,6 +7,8 @@ from structlog import BoundLogger
 from typing import Any, cast
 
 from app.commons.config.app_config import AppConfig
+from app.commons.providers.stripe_client import StripeClientPool
+from app.commons.providers.stripe_models import StripeClientSettings
 from app.commons.context.logger import root_logger
 
 
@@ -16,14 +19,19 @@ class AppContext:
     payout_bankdb_master: Gino
     payin_maindb_master: Gino
     payin_paymentdb_master: Gino
+    stripe: StripeClientPool
 
     async def close(self):
-        await gather(
-            self.payout_maindb_master.pop_bind().close(),
-            self.payout_bankdb_master.pop_bind().close(),
-            self.payin_maindb_master.pop_bind().close(),
-            self.payin_paymentdb_master.pop_bind().close(),
-        )
+        try:
+            # shutdown the threadpool
+            self.stripe.shutdown(wait=False)
+        finally:
+            await gather(
+                self.payout_maindb_master.pop_bind().close(),
+                self.payout_bankdb_master.pop_bind().close(),
+                self.payin_maindb_master.pop_bind().close(),
+                self.payin_paymentdb_master.pop_bind().close(),
+            )
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
@@ -47,12 +55,22 @@ async def create_app_context(config: AppConfig) -> AppContext:
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
 
+    stripe = StripeClientPool(
+        settings_list=[
+            StripeClientSettings(
+                api_key=config.STRIPE_US_SECRET_KEY.value, country="US"
+            )
+        ],
+        max_workers=config.STRIPE_MAX_WORKERS,
+    )
+
     context = AppContext(
         log=root_logger,
         payout_maindb_master=payout_maindb_master,
         payout_bankdb_master=payout_bankdb_master,
         payin_maindb_master=payin_maindb_master,
         payin_paymentdb_master=payin_paymentdb_master,
+        stripe=stripe,
     )
 
     context.log.debug("app context created")

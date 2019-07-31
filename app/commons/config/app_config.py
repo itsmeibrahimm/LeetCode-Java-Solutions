@@ -59,3 +59,9 @@ class AppConfig:
     PAYOUT_MAINDB_URL: Secret
     PAYOUT_BANKDB_URL: Secret
     PAYIN_MAINDB_URL: Secret
+
+    # Payment Service Provider
+    STRIPE_US_SECRET_KEY: Secret
+    STRIPE_US_PUBLIC_KEY: Secret
+
+    STRIPE_MAX_WORKERS: int = 10
