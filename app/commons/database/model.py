@@ -42,17 +42,18 @@ class Database:
 
     """
 
-    master_url: Secret
-    replica_url: Optional[Secret] = None
+    _master_url: Secret
+    _replica_url: Optional[Secret] = None
     _master: GinoEngine = no_init_field()
     _replica: Optional[GinoEngine] = no_init_field(None)
 
-    async def init(self):
-        created_master = await gino.create_engine(self.master_url.value)
+    async def init(self) -> "Database":
+        created_master = await gino.create_engine(self._master_url.value)
         object.__setattr__(self, "_master", created_master)
-        if self.replica_url:
-            created_replica = await gino.create_engine(self.replica_url.value)
+        if self._replica_url:
+            created_replica = await gino.create_engine(self._replica_url.value)
             object.__setattr__(self, "_replica", created_replica)
+        return self
 
     # TODO: may need to tune this to a reasonable number or even beef up a config object
     STATEMENT_TIMEOUT_SEC: int = no_init_field(5)
