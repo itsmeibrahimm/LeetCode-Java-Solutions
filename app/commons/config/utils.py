@@ -29,11 +29,7 @@ def init_app_config() -> AppConfig:
         config_key in _CONFIG_MAP
     ), f"Cannot find AppConfig specified by environment={config_key}"
 
-    assert (
-        environment in _CONFIG_MAP
-    ), f"Cannot find AppConfig specified by environment={environment}"
-
-    app_config = _CONFIG_MAP[environment]()
+    app_config = _CONFIG_MAP[config_key]()
 
     if app_config.NINOX_ENABLED:
         ninox = Helper(config_section=environment)

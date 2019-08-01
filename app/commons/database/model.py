@@ -42,18 +42,18 @@ class Database:
 
     """
 
-    _master_url: Secret
-    _replica_url: Optional[Secret] = None
-    _master: GinoEngine = no_init_field()
-    _replica: Optional[GinoEngine] = no_init_field(None)
+    _master: GinoEngine
+    _replica: Optional[GinoEngine] = None
 
-    async def init(self) -> "Database":
-        created_master = await gino.create_engine(self._master_url.value)
-        object.__setattr__(self, "_master", created_master)
-        if self._replica_url:
-            created_replica = await gino.create_engine(self._replica_url.value)
-            object.__setattr__(self, "_replica", created_replica)
-        return self
+    @classmethod
+    async def from_url(
+        cls, master_url: Secret, replica_url: Optional[Secret] = None
+    ) -> "Database":
+        created_master = await gino.create_engine(master_url.value)
+        created_replica = None
+        if replica_url:
+            created_replica = await gino.create_engine(replica_url.value)
+        return cls(_master=created_master, _replica=created_replica)
 
     # TODO: may need to tune this to a reasonable number or even beef up a config object
     STATEMENT_TIMEOUT_SEC: int = no_init_field(5)
@@ -91,5 +91,3 @@ class DBRequestModel(BaseModel):
 
     class Config:
         allow_mutation = False  # Immutable
-
-    # TODO add interface to convert instance as dict and ignore unset keys (other than ignore default keys)

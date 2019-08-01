@@ -32,10 +32,7 @@ def add_app_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict
     application info (environment, etc)
     """
     event_dict["hostname"] = platform.node()
-    event_dict["app"] = {
-        "name": "python-flask-service-template",
-        "env": os.environ["ENVIRONMENT"],
-    }
+    event_dict["app"] = {"name": "payment-service", "env": os.environ["ENVIRONMENT"]}
     return event_dict
 
 

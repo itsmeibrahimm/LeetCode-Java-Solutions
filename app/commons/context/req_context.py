@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from app.commons.context.app_context import get_context_from_app
 
 
-@dataclass
+@dataclass(frozen=True)
 class ReqContext:
     req_id: UUID
     log: BoundLogger

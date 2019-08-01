@@ -14,7 +14,6 @@ def create_app_config() -> AppConfig:
         DEBUG=True,
         NINOX_ENABLED=False,
         METRICS_CONFIG={"service_name": "payment-service", "cluster": "local"},
-        # Secret configurations start here
         TEST_SECRET=Secret(name="test_secret", value="hello_world_secret"),
         PAYIN_MAINDB_URL=Secret(
             name="payin_maindb_url",

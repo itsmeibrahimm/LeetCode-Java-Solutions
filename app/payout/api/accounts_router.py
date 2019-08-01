@@ -4,12 +4,12 @@ from fastapi import APIRouter
 
 from app.payout.repository.maindb.payment_account import (
     PaymentAccount,
-    PaymentAccountRepository,
+    PaymentAccountRepositoryInterface,
 )
 
 
 def create_accounts_router(
-    payout_account_repository: PaymentAccountRepository
+    payout_account_repository: PaymentAccountRepositoryInterface
 ) -> APIRouter:
     router = APIRouter()
 

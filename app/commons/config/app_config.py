@@ -47,15 +47,16 @@ class AppConfig:
     - local: local.py::LOCAL
     - staging: staging.py::STAGING
     - prod: prod.py::PROD
-    TODO: breakdown this to decouple paying/payout sub-app configs
     """
 
     DEBUG: bool
     NINOX_ENABLED: bool
     METRICS_CONFIG: Dict[str, str]
 
-    # Secret configurations start here
+    # Test secret
     TEST_SECRET: Secret
+
+    # DB configs
     PAYOUT_MAINDB_URL: Secret
     PAYOUT_BANKDB_URL: Secret
     PAYIN_MAINDB_URL: Secret
