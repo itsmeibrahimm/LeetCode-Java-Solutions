@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 from concurrent import futures
 from typing import Optional, Union
 
@@ -9,7 +10,7 @@ class ThreadPoolHelper:
     prefix = ""
     executor: futures.ThreadPoolExecutor
 
-    def __init__(self, max_workers: Optional[int] = None, loop=None):
+    def __init__(self, max_workers: Optional[int] = None):
         self.executor = futures.ThreadPoolExecutor(max_workers, self.prefix)
 
     def shutdown(self, wait=True):
@@ -35,7 +36,16 @@ class ThreadPoolHelper:
             loop: asyncio.BaseEventLoop = asyncio.get_running_loop()
             return await loop.run_in_executor(self.executor, functools.partial(fn, **kwargs), *args)
         """
-        return await asyncio.wrap_future(self.executor.submit(fn, *args, **kwargs))
+        # ensure that contextvars are preserved in the threadpool executor
+        # see: https://github.com/getsentry/sentry-python/issues/162
+        #
+        # (this is the asyncio version of threading.local)
+        # see https://github.com/encode/starlette/pull/192/files for implementation example
+        context: contextvars.Context = contextvars.copy_context()
+
+        return await asyncio.wrap_future(
+            self.executor.submit(context.run, fn, *args, **kwargs)
+        )
 
     async def submit_with_timeout(self, timeout: Timeout, fn, *args, **kwargs):
         """
@@ -50,4 +60,7 @@ class ThreadPoolHelper:
             asyncio.futures.TimeoutError: if the execution times out
             asyncio.futures.CancelledError: if the execution gets cancelled
         """
-        return await asyncio.wait_for(self.submit(fn, *args, **kwargs), timeout=timeout)
+        context: contextvars.Context = contextvars.copy_context()
+        return await asyncio.wait_for(
+            self.submit(context.run, fn, *args, **kwargs), timeout=timeout
+        )

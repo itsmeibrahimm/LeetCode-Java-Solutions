@@ -1,8 +1,9 @@
 import asyncio
-import time
-import pytest
+import contextvars
 import logging
+import pytest
 import threading
+import time
 
 from app.commons.utils.pool import ThreadPoolHelper
 
@@ -69,3 +70,22 @@ class TestPool:
         task = pool.submit_with_timeout(0.15, slow_task, 35)
         with pytest.raises(asyncio.futures.TimeoutError):
             await task
+
+    async def test_submit_contextvars(
+        self, event_loop: asyncio.AbstractEventLoop, pool: ThreadPoolHelper
+    ):
+        var: contextvars.ContextVar = contextvars.ContextVar("real_result")
+        var.set(100)
+
+        def task(fake_result):
+            return var.get(fake_result)  # return default
+
+        assert (
+            await event_loop.run_in_executor(pool.executor, task, -1) == -1
+        ), "sanity check: contextvars are not preserved when running in the ThreadPoolExecutor directly"
+        assert (
+            await pool.submit(task, -1) == 100
+        ), "contextvars are preserved when using ThreadPoolHelper"
+        assert (
+            await pool.submit_with_timeout(0.5, task, -1) == 100
+        ), "contextvars are preserved when using ThreadPoolHelper"
