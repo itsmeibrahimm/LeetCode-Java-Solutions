@@ -1,11 +1,13 @@
+import asyncio
 from dataclasses import dataclass
 from typing import List, Optional
 
+import gino
 from gino import Gino, GinoEngine
 from pydantic import BaseModel
 from sqlalchemy import Column, Table
-from typing_extensions import Protocol
 
+from app.commons.config.app_config import Secret
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -16,7 +18,7 @@ class TableDefinition:
     extensions around table schema
     """
 
-    gino: Gino
+    db_metadata: Gino
     table: Table = no_init_field()
     name: str = no_init_field()
 
@@ -30,7 +32,7 @@ class TableDefinition:
             attribute = self.__getattribute__(k)
             if isinstance(attribute, Column):
                 columns.append(attribute)
-        object.__setattr__(self, "table", Table(self.name, self.gino, *columns))
+        object.__setattr__(self, "table", Table(self.name, self.db_metadata, *columns))
 
 
 @dataclass(frozen=True)
@@ -40,8 +42,17 @@ class Database:
 
     """
 
-    _master: GinoEngine
-    _replica: Optional[GinoEngine] = None
+    master_url: Secret
+    replica_url: Optional[Secret] = None
+    _master: GinoEngine = no_init_field()
+    _replica: Optional[GinoEngine] = no_init_field(None)
+
+    async def init(self):
+        created_master = await gino.create_engine(self.master_url.value)
+        object.__setattr__(self, "_master", created_master)
+        if self.replica_url:
+            created_replica = await gino.create_engine(self.replica_url.value)
+            object.__setattr__(self, "_replica", created_replica)
 
     # TODO: may need to tune this to a reasonable number or even beef up a config object
     STATEMENT_TIMEOUT_SEC: int = no_init_field(5)
@@ -51,6 +62,13 @@ class Database:
 
     def replica(self) -> GinoEngine:
         return self._replica or self._master
+
+    async def close(self):
+        engines = [self._master]
+        if self._replica:
+            engines.append(self._replica)
+
+        await asyncio.gather([engine.close() for engine in engines])
 
 
 class DBEntity(BaseModel):
@@ -74,12 +92,3 @@ class DBRequestModel(BaseModel):
         allow_mutation = False  # Immutable
 
     # TODO add interface to convert instance as dict and ignore unset keys (other than ignore default keys)
-
-
-class DBContext(Protocol):
-    """
-    A context protocol providing access to Database connection resources
-    """
-
-    payout_maindb: Database
-    # TODO add other db connection here after the pattern is shipped

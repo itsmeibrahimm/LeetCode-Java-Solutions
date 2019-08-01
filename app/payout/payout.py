@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
-
 from app.payout.api.accounts_router import create_accounts_router
-from app.payout.domain.repository import PayoutRepositories
+from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 
 
 def create_payout_app(context: AppContext) -> FastAPI:
@@ -12,13 +11,10 @@ def create_payout_app(context: AppContext) -> FastAPI:
     set_context_for_app(app, context)
 
     # Init data repositories
-    payout_repositories = PayoutRepositories(
-        _maindb_connection=context.payout_maindb_master,
-        _bankdb_connection=context.payout_bankdb_master,
-    )
+    payment_account_repository = PaymentAccountRepository(context=context)
 
     # Mount api
-    accounts_router = create_accounts_router(payout_repositories)
+    accounts_router = create_accounts_router(payment_account_repository)
     app.include_router(router=accounts_router, prefix="/accounts")
 
     return app

@@ -4,21 +4,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from gino import Gino, GinoConnection
+from gino import GinoConnection
 
-from app.commons.utils.dataclass_extensions import no_init_field
+from app.commons.database.model import Database
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.mx_transaction.types import MxTransactionType
-from app.ledger.models.paymentdb.mx_transaction import MxTransactionTable
+from app.ledger.models.paymentdb import mx_transactions
 
 
 @dataclass
 class MxTransactionRepository:
-    _gino: Gino
-    _table: MxTransactionTable = no_init_field()
-
-    def __post_init__(self):
-        self._table = MxTransactionTable(self._gino)
+    _db: Database
 
     async def insert_mx_transaction(
         self,
@@ -33,15 +29,15 @@ class MxTransactionRepository:
         metadata: str,
     ) -> MxTransaction:
         data = {
-            self._table.id: mx_transaction_id,
-            self._table.payment_account_id: payment_account_id,
-            self._table.amount: amount,
-            self._table.currency: currency,
-            self._table.ledger_id: ledger_id,
-            self._table.idempotency_key: idempotency_key,
-            self._table.type: type,
-            self._table.context: context,
-            self._table.metadata: metadata,
+            mx_transactions.id: mx_transaction_id,
+            mx_transactions.payment_account_id: payment_account_id,
+            mx_transactions.amount: amount,
+            mx_transactions.currency: currency,
+            mx_transactions.ledger_id: ledger_id,
+            mx_transactions.idempotency_key: idempotency_key,
+            mx_transactions.type: type,
+            mx_transactions.context: context,
+            mx_transactions.metadata: metadata,
         }
 
         # FIXME: remove when payment db credential is setup
@@ -59,28 +55,28 @@ class MxTransactionRepository:
             )
         else:
             stmt = (
-                self._table.table.insert()
+                mx_transactions.insert()
                 .values(data)
-                .returning(*self._table.table.columns.values())
+                .returning(*mx_transactions.table.columns.values())
             )
 
-            async with self._gino.acquire() as connection:  # type: GinoConnection
+            async with self._db.master().acquire() as connection:  # type: GinoConnection
                 row = await connection.first(stmt)
             return self._to_mx_transaction(row)
 
     def _to_mx_transaction(self, row: Any) -> MxTransaction:
         return MxTransaction(
-            mx_transaction_id=row[self._table.id],
-            payment_account_id=row[self._table.payment_account_id],
-            amount=row[self._table.amount],
-            currency=row[self._table.currency],
-            ledger_id=row[self._table.ledger_id],
-            idempotency_key=row[self._table.idempotency_key],
-            type=MxTransactionType(row[self._table.type]),
-            context=row[self._table.context],
-            metadata=row[self._table.metadata],
-            created_at=row[self._table.created_at],
-            updated_at=row[self._table.updated_at],
+            mx_transaction_id=row[mx_transactions.id],
+            payment_account_id=row[mx_transactions.payment_account_id],
+            amount=row[mx_transactions.amount],
+            currency=row[mx_transactions.currency],
+            ledger_id=row[mx_transactions.ledger_id],
+            idempotency_key=row[mx_transactions.idempotency_key],
+            type=MxTransactionType(row[mx_transactions.type]),
+            context=row[mx_transactions.context],
+            metadata=row[mx_transactions.metadata],
+            created_at=row[mx_transactions.created_at],
+            updated_at=row[mx_transactions.updated_at],
         )
 
     # FIXME: remove when payment db credential is setup

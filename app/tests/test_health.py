@@ -5,31 +5,31 @@ import pytest_mock
 from starlette.testclient import TestClient
 
 from app.commons.context.app_context import AppContext
-from app.commons.providers.stripe_client import StripeClientPool
 from app.commons.providers import stripe_models as models
+from app.commons.providers.stripe_client import StripeClientPool
 from app.main import app
 
 
 @pytest.fixture(autouse=True)
 def client(mocker: pytest_mock.MockFixture):
     logger = mocker.Mock()
-    payout_maindb_master = mocker.Mock()
-    payout_bankdb_master = mocker.Mock()
-    payin_maindb_master = mocker.Mock()
-    payin_paymentdb_master = mocker.Mock()
     payout_maindb = mocker.Mock()
-    ledger_maindb_master = mocker.Mock()
-    ledger_paymentdb_master = mocker.Mock()
+    payout_bankdb = mocker.Mock()
+    payin_maindb = mocker.Mock()
+    payin_paymentdb = mocker.Mock()
+    payout_maindb = mocker.Mock()
+    ledger_maindb = mocker.Mock()
+    ledger_paymentdb = mocker.Mock()
 
     # fake context
     context = AppContext(
         log=logger,
-        payout_maindb_master=payout_maindb_master,
-        payout_bankdb_master=payout_bankdb_master,
-        payin_maindb_master=payin_maindb_master,
-        payin_paymentdb_master=payin_paymentdb_master,
-        ledger_maindb_master=ledger_maindb_master,
-        ledger_paymentdb_master=ledger_paymentdb_master,
+        payout_maindb=payout_maindb,
+        payout_bankdb=payout_bankdb,
+        payin_maindb=payin_maindb,
+        payin_paymentdb=payin_paymentdb,
+        ledger_maindb=ledger_maindb,
+        ledger_paymentdb=ledger_paymentdb,
         stripe=StripeClientPool(
             max_workers=5,
             settings_list=[
@@ -38,7 +38,6 @@ def client(mocker: pytest_mock.MockFixture):
                 )
             ],
         ),
-        payout_maindb=payout_maindb,
     )
     app.extra["context"] = cast(Any, context)
 

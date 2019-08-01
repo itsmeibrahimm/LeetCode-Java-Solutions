@@ -7,5 +7,5 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
 
 payout_maindb_metadata = Gino()
 
-payment_accounts = PaymentAccountTable(gino=payout_maindb_metadata)
-stripe_managed_accounts = StripeManagedAccountTable(gino=payout_maindb_metadata)
+payment_accounts = PaymentAccountTable(db_metadata=payout_maindb_metadata)
+stripe_managed_accounts = StripeManagedAccountTable(db_metadata=payout_maindb_metadata)

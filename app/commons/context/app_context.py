@@ -1,29 +1,29 @@
 from asyncio import gather
-
 from dataclasses import dataclass
-from fastapi import FastAPI
-from gino import Gino
-from structlog import BoundLogger
 from typing import Any, cast
 
+from fastapi import FastAPI
+from structlog import BoundLogger
+
 from app.commons.config.app_config import AppConfig
-from app.commons.providers.stripe_client import StripeClientPool
-from app.commons.providers.stripe_models import StripeClientSettings
 from app.commons.context.logger import root_logger
 from app.commons.database.model import Database
+from app.commons.providers.stripe_client import StripeClientPool
+from app.commons.providers.stripe_models import StripeClientSettings
 
 
 @dataclass(frozen=True)
 class AppContext:
     log: BoundLogger
-    payout_maindb_master: Gino
-    payout_bankdb_master: Gino
-    payin_maindb_master: Gino
-    payin_paymentdb_master: Gino
-    ledger_maindb_master: Gino
-    ledger_paymentdb_master: Gino
-    stripe: StripeClientPool
+
     payout_maindb: Database
+    payout_bankdb: Database
+    payin_maindb: Database
+    payin_paymentdb: Database
+    ledger_maindb: Database
+    ledger_paymentdb: Database
+
+    stripe: StripeClientPool
 
     async def close(self):
         try:
@@ -31,43 +31,46 @@ class AppContext:
             self.stripe.shutdown(wait=False)
         finally:
             await gather(
-                self.payout_maindb_master.pop_bind().close(),
-                self.payout_bankdb_master.pop_bind().close(),
-                self.payin_maindb_master.pop_bind().close(),
-                self.payin_paymentdb_master.pop_bind().close(),
-                self.ledger_maindb_master.pop_bind().close(),
-                self.ledger_paymentdb_master.pop_bind().close(),
+                # Too many Databases here, we may need to create some "manager" to push them down
+                # Also current model assume each Database instance holds unique connection pool
+                # The way of closing will break if we have same connection pool assigned to different Database instance
+                self.payout_maindb.close(),
+                self.payout_bankdb.close(),
+                self.payin_maindb.close(),
+                self.payin_paymentdb.close(),
+                self.ledger_maindb.close(),
+                self.ledger_paymentdb.close(),
             )
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
     try:
-        payout_maindb_master = await Gino(config.PAYOUT_MAINDB_URL.value)
+        payout_maindb = await Database(master_url=config.PAYOUT_MAINDB_URL).init()
     except Exception:
         root_logger.exception("failed to connect to payout main db")
 
     try:
-        payout_bankdb_master = await Gino(config.PAYOUT_BANKDB_URL.value)
+        payout_bankdb = await Database(master_url=config.PAYOUT_BANKDB_URL).init()
     except Exception:
         root_logger.exception("failed to connect to payout bank db")
 
     try:
-        payin_maindb_master = await Gino(config.PAYIN_MAINDB_URL.value)
+        payin_maindb = await Database(master_url=config.PAYIN_MAINDB_URL).init()
     except Exception:
         root_logger.exception("failed to connect to payin main db")
 
     try:
-        payin_paymentdb_master = await Gino(config.PAYIN_MAINDB_URL.value)
+        payin_paymentdb = await Database(master_url=config.PAYIN_MAINDB_URL).init()
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
 
     try:
-        ledger_maindb_master = await Gino(config.LEDGER_MAINDB_URL.value)
+        ledger_maindb = await Database(master_url=config.LEDGER_MAINDB_URL).init()
     except Exception:
         root_logger.exception("failed to connect to ledger main db")
 
     try:
-        ledger_paymentdb_master = await Gino(config.LEDGER_MAINDB_URL.value)
+        ledger_paymentdb = await Database(master_url=config.LEDGER_MAINDB_URL).init()
     except Exception:
         root_logger.exception("failed to connect to ledger payment db")
 
@@ -82,14 +85,13 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     context = AppContext(
         log=root_logger,
-        payout_maindb_master=payout_maindb_master,
-        payout_bankdb_master=payout_bankdb_master,
-        payin_maindb_master=payin_maindb_master,
-        payin_paymentdb_master=payin_paymentdb_master,
-        ledger_maindb_master=ledger_maindb_master,
-        ledger_paymentdb_master=ledger_paymentdb_master,
+        payout_maindb=payout_maindb,
+        payout_bankdb=payout_bankdb,
+        payin_maindb=payin_maindb,
+        payin_paymentdb=payin_paymentdb,
+        ledger_maindb=ledger_maindb,
+        ledger_paymentdb=ledger_paymentdb,
         stripe=stripe,
-        payout_maindb=Database(_master=payout_maindb_master),
     )
 
     context.log.debug("app context created")

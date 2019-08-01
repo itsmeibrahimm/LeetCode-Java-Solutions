@@ -16,8 +16,7 @@ def create_ledger_app(context: AppContext) -> FastAPI:
     # Init data repositories
     global ledger_repositories
     ledger_repositories = LedgerRepositories(
-        _maindb_connection=context.ledger_maindb_master,
-        _paymentdb_connection=context.ledger_paymentdb_master,
+        _maindb=context.ledger_maindb, _paymentdb=context.ledger_paymentdb
     )
 
     app.include_router(mx_transaction_router)

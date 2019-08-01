@@ -12,10 +12,12 @@ class TestAccounts:
         with TestClient(app) as client:
             yield client
 
+    @pytest.mark.skip("skip until v0 account API created")
     def test_invalid(self, client: TestClient):
         response = client.get("/payout/accounts/")
         assert response.status_code == 405, "accessing accounts requires an id"
 
+    @pytest.mark.skip("skip until v0 account API created")
     def test_create(self, client: TestClient):
         response = client.post(
             "/payout/accounts/",

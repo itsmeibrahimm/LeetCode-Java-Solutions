@@ -29,7 +29,7 @@ $ ./development/dump-dsj-db-schemas.sh
 Recreate your local payment.dsj-postgres container and load updated schemas. Verify if updates are reflected in the new container.
 ```bash
 $ cd PATH/TO/PAYMENT/PROJECT
-$ docker-compose -f ./development/docker-compose.nodeploy.yml up -d --force-recreate --renew-anon-volumes payment.dsj-postgres
+$ docker-compose -f ./docker-compose.nodeploy.yml up -d --force-recreate --renew-anon-volumes payment.dsj-postgres
 $ docker exec -it payment.dsj-postgres psql [ maindb_dev | maindb_test | bandb_dev | bankdb_test ]
 ```
 

@@ -1,11 +1,10 @@
+import logging
+
 from fastapi import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
-
 from app.payin.api.payer.v1.api import router as payer_router
 from app.payin.repository.repository import PayinRepositories
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +19,7 @@ def create_payin_app(context: AppContext) -> FastAPI:
     # Init data repositories
     global payin_repositories
     payin_repositories = PayinRepositories(
-        _maindb_connection=context.payin_maindb_master,
-        _paymentdb_connection=context.payin_paymentdb_master,
+        _maindb=context.payin_maindb, _paymentdb=context.payin_paymentdb
     )
 
     app.include_router(payer_router)

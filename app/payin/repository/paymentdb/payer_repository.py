@@ -4,21 +4,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
-from gino import Gino, GinoConnection
+from gino import GinoConnection
 
-from app.commons.utils.dataclass_extensions import no_init_field
+from app.commons.database.model import Database
 from app.payin.core.payer.model import Payer, PaymentGatewayProviderCustomer
 from app.payin.core.payer.types import PayerType
-from app.payin.models.paymentdb.payer import PayerTable
+from app.payin.models.paymentdb import payers
 
 
 @dataclass
 class PayerRepository:
-    _gino: Gino
-    _table: PayerTable = no_init_field()
-
-    def __post_init__(self):
-        self._table = PayerTable(self._gino)
+    _db: Database
 
     async def insert_payer(
         self,
@@ -31,7 +27,7 @@ class PayerRepository:
         dd_payer_id: Optional[str] = None,
     ) -> Payer:
         # FIXME: remove when payment db credential is setup
-        if True:
+        if self:
             return self._to_mock_payer(
                 payer_id=payer_id,
                 payer_type=payer_type,
@@ -43,29 +39,29 @@ class PayerRepository:
             )
         else:
             data = {
-                self._table.id: payer_id,
-                self._table.payer_type: payer_type,
-                self._table.legacy_stripe_customer_id: legacy_stripe_customer_id,
-                self._table.country: country,
+                payers.id: payer_id,
+                payers.payer_type: payer_type,
+                payers.legacy_stripe_customer_id: legacy_stripe_customer_id,
+                payers.country: country,
             }
             if account_balance:
-                data.update({self._table.account_balance: account_balance})
+                data.update({payers.account_balance: account_balance})
             if description:
-                data.update({self._table.description: description})
+                data.update({payers.description: description})
             if dd_payer_id:
-                data.update({self._table.dd_payer_id: dd_payer_id})
+                data.update({payers.dd_payer_id: dd_payer_id})
             stmt = (
-                self._table.table.insert()
+                payers.table.insert()
                 .values(data)
-                .returning(*self._table.table.columns.values())
+                .returning(*payers.table.columns.values())
             )
 
-            async with self._gino.acquire() as connection:  # type: GinoConnection
+            async with self._db.master().acquire() as connection:  # type: GinoConnection
                 row = await connection.first(stmt)
             return self._to_payer(row)
 
     async def get_payer_by_id(self, payer_id: str) -> Optional[Payer]:
-        stmt = self._table.table.select().where(self._table.id == payer_id)
+        stmt = payers.table.select().where(payers.id == payer_id)
         # FIXME: remove when payment db credential is setup
         if True:
             return self._to_mock_payer(
@@ -78,15 +74,15 @@ class PayerRepository:
                 description="mock_description",
             )
         else:
-            async with self._gino.acquire() as connection:  # type: GinoConnection
+            async with self._db.master().acquire() as connection:  # type: GinoConnection
                 row = await connection.first(stmt)
             return self._to_payer(row) if row else None
 
     async def get_payer_by_stripe_customer_id(
         self, stripe_customer_id: str
     ) -> Optional[Payer]:
-        stmt = self._table.table.select().where(
-            self._table.legacy_stripe_customer_id == stripe_customer_id
+        stmt = payers.table.select().where(
+            payers.legacy_stripe_customer_id == stripe_customer_id
         )
         # FIXME: remove when payment db credential is setup
         if True:
@@ -100,28 +96,26 @@ class PayerRepository:
                 description="mock_description",
             )
         else:
-            async with self._gino.acquire() as connection:  # type: GinoConnection
+            async with self._db.master().acquire() as connection:  # type: GinoConnection
                 row = await connection.first(stmt)
             return self._to_payer(row) if row else None
 
     def _to_payer(self, row: Any) -> Payer:
         return Payer(
-            payer_id=row[self._table.id],
-            payer_type=PayerType(row[self._table.payer_type]),
-            dd_payer_id=row[self._table.dd_payer_id],
+            payer_id=row[payers.id],
+            payer_type=PayerType(row[payers.payer_type]),
+            dd_payer_id=row[payers.dd_payer_id],
             payment_gateway_provider_customers=[
                 PaymentGatewayProviderCustomer(
                     payment_provider="stripe",
-                    payment_provider_customer_id=row[
-                        self._table.legacy_stripe_customer_id
-                    ],
+                    payment_provider_customer_id=row[payers.legacy_stripe_customer_id],
                 )
             ],
-            country=row[self._table.country],
-            # account_balance=row[self._table.account_balance],
-            description=row[self._table.description],
-            created_at=row[self._table.created_at],
-            updated_at=row[self._table.updated_at],
+            country=row[payers.country],
+            # account_balance=row[payers.account_balance],
+            description=row[payers.description],
+            created_at=row[payers.created_at],
+            updated_at=row[payers.updated_at],
         )
 
     # FIXME: remove when payment db credential is setup
