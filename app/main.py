@@ -18,6 +18,7 @@ from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
 from app.middleware.req_context import ReqContextMiddleware
 from app.payin.payin import create_payin_app
 from app.payout.payout import create_payout_app
+from app.ledger.ledger import create_ledger_app
 
 import logging
 
@@ -59,6 +60,9 @@ async def startup():
 
     payin_app = create_payin_app(context)
     app.mount(payin_app.openapi_prefix, payin_app)
+
+    ledger_app = create_ledger_app(context)
+    app.mount(ledger_app.openapi_prefix, ledger_app)
 
     app.mount(example_v1.openapi_prefix, example_v1)
 

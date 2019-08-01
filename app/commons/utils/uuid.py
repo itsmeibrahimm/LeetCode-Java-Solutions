@@ -15,6 +15,8 @@ class ResourceUuidPrefix(str, Enum):
     PGP_REFUND = "pgre"
     PGP_DISPUTE = "pgdp"
     STRIPE_CUSTOMER = "cus"
+    MX_TRANSACTION = "mxtxn"
+    MX_LEDGER = "mxl"
 
 
 def generate_object_uuid(prefix: ResourceUuidPrefix) -> str:

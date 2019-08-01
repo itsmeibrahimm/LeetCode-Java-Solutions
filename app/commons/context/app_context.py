@@ -20,6 +20,8 @@ class AppContext:
     payout_bankdb_master: Gino
     payin_maindb_master: Gino
     payin_paymentdb_master: Gino
+    ledger_maindb_master: Gino
+    ledger_paymentdb_master: Gino
     stripe: StripeClientPool
     payout_maindb: Database
 
@@ -33,6 +35,8 @@ class AppContext:
                 self.payout_bankdb_master.pop_bind().close(),
                 self.payin_maindb_master.pop_bind().close(),
                 self.payin_paymentdb_master.pop_bind().close(),
+                self.ledger_maindb_master.pop_bind().close(),
+                self.ledger_paymentdb_master.pop_bind().close(),
             )
 
 
@@ -57,6 +61,16 @@ async def create_app_context(config: AppConfig) -> AppContext:
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
 
+    try:
+        ledger_maindb_master = await Gino(config.LEDGER_MAINDB_URL.value)
+    except Exception:
+        root_logger.exception("failed to connect to ledger main db")
+
+    try:
+        ledger_paymentdb_master = await Gino(config.LEDGER_MAINDB_URL.value)
+    except Exception:
+        root_logger.exception("failed to connect to ledger payment db")
+
     stripe = StripeClientPool(
         settings_list=[
             StripeClientSettings(
@@ -72,6 +86,8 @@ async def create_app_context(config: AppConfig) -> AppContext:
         payout_bankdb_master=payout_bankdb_master,
         payin_maindb_master=payin_maindb_master,
         payin_paymentdb_master=payin_paymentdb_master,
+        ledger_maindb_master=ledger_maindb_master,
+        ledger_paymentdb_master=ledger_paymentdb_master,
         stripe=stripe,
         payout_maindb=Database(_master=payout_maindb_master),
     )

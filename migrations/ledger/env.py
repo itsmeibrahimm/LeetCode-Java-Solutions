@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-# import os
+import os
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -30,7 +30,7 @@ version_table = "alembic_version_ledger"
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 # Comment out below once payout schema is managed from payment-service
-# config.set_main_option('sqlalchemy.url', os.environ['PAYOUT_MAINDB_URL'])
+config.set_main_option("sqlalchemy.url", os.environ["LEDGER_MAINDB_URL"])
 
 
 def run_migrations_offline():

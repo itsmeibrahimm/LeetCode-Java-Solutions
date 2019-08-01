@@ -20,11 +20,13 @@ maindb_copies=(maindb_dev maindb_test)
 
 payin_db_user=${PAYIN_DB_USER:-payin_user}
 payout_db_user=${PAYOUT_DB_USER:-payout_user}
+ledger_db_user=${LEDGER_DB_USER:-ledger_user}
 
 echo "Creating payment db users"
 psql -v ON_ERROR_STOP=1 --username root --dbname base_db <<-EOSQL
     CREATE ROLE ${payin_db_user} WITH LOGIN NOSUPERUSER;
     CREATE ROLE ${payout_db_user} WITH LOGIN NOSUPERUSER;
+    CREATE ROLE ${ledger_db_user} WITH LOGIN NOSUPERUSER;
 EOSQL
 
 echo "Initializing bandb copies"
@@ -75,6 +77,7 @@ psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
 
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payin_db_user};
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payout_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${ledger_db_user};
 EOSQL
 echo "Initialized ${dbname}"
 done

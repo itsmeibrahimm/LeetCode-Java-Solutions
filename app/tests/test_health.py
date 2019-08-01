@@ -18,6 +18,8 @@ def client(mocker: pytest_mock.MockFixture):
     payin_maindb_master = mocker.Mock()
     payin_paymentdb_master = mocker.Mock()
     payout_maindb = mocker.Mock()
+    ledger_maindb_master = mocker.Mock()
+    ledger_paymentdb_master = mocker.Mock()
 
     # fake context
     context = AppContext(
@@ -26,6 +28,8 @@ def client(mocker: pytest_mock.MockFixture):
         payout_bankdb_master=payout_bankdb_master,
         payin_maindb_master=payin_maindb_master,
         payin_paymentdb_master=payin_paymentdb_master,
+        ledger_maindb_master=ledger_maindb_master,
+        ledger_paymentdb_master=ledger_paymentdb_master,
         stripe=StripeClientPool(
             max_workers=5,
             settings_list=[
