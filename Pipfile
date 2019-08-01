@@ -6,12 +6,12 @@ verify_ssl = true
 [[source]]
 name = "gemfury"
 url = "https://pypi.fury.io/${FURY_TOKEN}/doordash/"
-verify_ssl= false
+verify_ssl = true
 
 [[source]]
 name = "artifactory"
 url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/"
-verify_ssl= false
+verify_ssl = true
 
 [dev-packages]
 coverage = "==4.5.3"
