@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/api/v1/mx_transactions", status_code=HTTP_201_CREATED)
-async def create_mx_transaction(reqBody: CreateMxTransactionRequest):
+async def create_mx_transaction_api(reqBody: CreateMxTransactionRequest):
     """
     Create a mx_transaction on DoorDash payments platform
 
