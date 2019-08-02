@@ -8,7 +8,7 @@ class TestStartup:
     TIMEOUT_SECONDS = 30.0
     EXPECTED_THREADS = 1
 
-    def test_startup(self):
+    def test_startup(self, unused_tcp_port: int):
         """
         Ensure that we only have a single Python thread in the main process (having other system threads is fine)
 
@@ -19,8 +19,19 @@ class TestStartup:
         """
         child = pexpect.spawn(
             "gunicorn",
-            # run one worker with the main app to trigger the initialization code
-            ["--workers", "1", "app.main:app"],
+            [
+                # run one worker with the main app to trigger the initialization code
+                "--workers",
+                "1",
+                # ensure we use the uvicorn worker so the app init runs
+                "--worker-class",
+                "uvicorn.workers.UvicornWorker",
+                # unused port
+                "--bind",
+                f"0.0.0.0:{unused_tcp_port}",
+                # main app
+                "app.main:app",
+            ],
             # set char encoding for stdout output
             encoding="utf-8",
         )
