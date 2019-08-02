@@ -11,7 +11,7 @@ def create_payout_app(context: AppContext) -> FastAPI:
     set_context_for_app(app, context)
 
     # Init data repositories
-    payment_account_repository = PaymentAccountRepository(context=context)
+    payment_account_repository = PaymentAccountRepository.from_context(context=context)
 
     # Mount api
     accounts_router = create_accounts_router(payment_account_repository)

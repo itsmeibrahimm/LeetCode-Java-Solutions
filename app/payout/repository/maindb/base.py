@@ -1,8 +1,7 @@
-from dataclasses import InitVar, dataclass
+from dataclasses import dataclass
 
 from app.commons.context.app_context import AppContext
 from app.commons.database.model import Database
-from app.commons.utils.dataclass_extensions import no_init_field
 
 
 @dataclass
@@ -11,8 +10,8 @@ class PayoutMainDBRepository:
     Base repository containing Payout_MainDB connection resources
     """
 
-    context: InitVar[AppContext]  # constructor use only, not persisted in repo instance
-    database: Database = no_init_field()
+    database: Database
 
-    def __post_init__(self, context: AppContext):
-        self.database = context.payout_maindb
+    @classmethod
+    def from_context(cls, context: AppContext):
+        return cls(database=context.payout_maindb)

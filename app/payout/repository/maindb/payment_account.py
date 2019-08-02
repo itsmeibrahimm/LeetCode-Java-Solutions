@@ -11,7 +11,7 @@ from app.payout.repository.maindb.model import payment_accounts
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 
 
-class CreatePaymentAccount(DBRequestModel):
+class PaymentAccountWritable(DBRequestModel):
     account_id: int
     account_type: str
     statement_descriptor: str
@@ -45,7 +45,7 @@ class PaymentAccount(DBEntity):
 class PaymentAccountRepositoryInterface:
     @abstractmethod
     async def create_payment_account(
-        self, request: CreatePaymentAccount
+        self, request: PaymentAccountWritable
     ) -> PaymentAccount:
         ...
 
@@ -62,7 +62,7 @@ class PaymentAccountRepository(
     PaymentAccountRepositoryInterface, PayoutMainDBRepository
 ):
     async def create_payment_account(
-        self, request: CreatePaymentAccount
+        self, request: PaymentAccountWritable
     ) -> PaymentAccount:
         async with self.database.master().acquire() as connection:  # type: GinoConnection
             stmt = (

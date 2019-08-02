@@ -6,7 +6,7 @@ services:
     # container name for docker-compose run
     container_name: "${CI_CONTAINER_NAME:?CI_CONTAINER_NAME. Please specify a container name.}"
     environment:
-      - DSJ_DB_ENDPOINT=payment.dsj-postgres
+      - DSJ_DB_ENDPOINT=payment.dsj-postgres:5432
       - STRIPE_API_BASE=http://payment.stripe-mock:12111
     build:
       context: .
@@ -24,3 +24,4 @@ services:
     command: "bash -c 'cp -r /home/.git-ro /home/.git; tail -f /dev/null'"
     depends_on:
       - payment.dsj-postgres
+      - payment.stripe-mock

@@ -1,9 +1,11 @@
+import os
 from dataclasses import dataclass
 from typing import Any
-import os
+
 import pytest
-from gino import Gino
+
 from app.commons.config.app_config import AppConfig
+from app.commons.database.model import Database
 
 os.environ["ENVIRONMENT"] = "testing"
 
@@ -74,30 +76,30 @@ def app_config():
 
 
 @pytest.fixture
-async def payin_maindb(app_config: AppConfig) -> Gino:
+async def payin_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayIn user
     """
-    db = await Gino(app_config.PAYIN_MAINDB_URL.value)
+    db = await Database.from_url(master_url=app_config.PAYIN_MAINDB_URL)
     yield db
-    await db.pop_bind().close()
+    await db.close()
 
 
 @pytest.fixture
-async def payout_maindb(app_config: AppConfig) -> Gino:
+async def payout_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayOut user
     """
-    db = await Gino(app_config.PAYOUT_MAINDB_URL.value)
+    db = await Database.from_url(master_url=app_config.PAYOUT_MAINDB_URL)
     yield db
-    await db.pop_bind().close()
+    await db.close()
 
 
 @pytest.fixture
-async def payout_bankdb(app_config: AppConfig) -> Gino:
+async def payout_bankdb(app_config: AppConfig):
     """
     initialize the bankdb connection for PayOut user
     """
-    db = await Gino(app_config.PAYOUT_BANKDB_URL.value)
+    db = await Database.from_url(master_url=app_config.PAYOUT_BANKDB_URL)
     yield db
-    await db.pop_bind().close()
+    await db.close()

@@ -1,16 +1,17 @@
 import asyncio
 import os
 from asyncio import wait_for
+from typing import Optional
 
 from app.commons.config.app_config import AppConfig
 from app.commons.config.utils import init_app_config
-from app.commons.context.app_context import create_app_context
+from app.commons.context.app_context import create_app_context, AppContext
 
 ENVIRONMENT_KEY = "ENVIRONMENT"
 
 
-async def check_dependency(config: AppConfig):
-    await create_app_context(config)
+async def check_dependency(config: AppConfig) -> AppContext:
+    return await create_app_context(config)
 
 
 async def main():
@@ -20,10 +21,11 @@ async def main():
     interval_sec = 5.0
     timeout = 5
     last_error = None
+    app_context: Optional[AppContext] = None
     for i in range(retries, 0, -1):
         try:
-            await wait_for(check_dependency(app_config), timeout=timeout)
-            break  # startup successful
+            app_context = await wait_for(check_dependency(app_config), timeout=timeout)
+            break
         except asyncio.TimeoutError as e:
             print(str(e))
             last_error = e
@@ -34,6 +36,8 @@ async def main():
     else:
         # too many tries
         raise Exception("Failed checking connection to dependencies") from last_error
+    if app_context:
+        await app_context.close()
 
 
 if __name__ == "__main__":

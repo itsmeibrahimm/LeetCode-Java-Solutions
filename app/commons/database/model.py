@@ -1,9 +1,9 @@
-import asyncio
 from dataclasses import dataclass
 from typing import List, Optional
 
 import gino
 from gino import Gino, GinoEngine
+from gino.dialects.asyncpg import NullPool
 from pydantic import BaseModel
 from sqlalchemy import Column, Table
 
@@ -49,10 +49,17 @@ class Database:
     async def from_url(
         cls, master_url: Secret, replica_url: Optional[Secret] = None
     ) -> "Database":
-        created_master = await gino.create_engine(master_url.value)
+        # temporarily set nullpool here to unblock local dev
+        # TODO make pool sizing configurable per environment
+        created_master = await gino.create_engine(master_url.value, pool_class=NullPool)
+
         created_replica = None
         if replica_url:
-            created_replica = await gino.create_engine(replica_url.value)
+            # temporarily set pool size 2 here to unblock local dev
+            created_replica = await gino.create_engine(
+                replica_url.value, pool_class=NullPool
+            )
+
         return cls(_master=created_master, _replica=created_replica)
 
     # TODO: may need to tune this to a reasonable number or even beef up a config object
@@ -65,11 +72,9 @@ class Database:
         return self._replica or self._master
 
     async def close(self):
-        engines = [self._master]
+        await self._master.close()
         if self._replica:
-            engines.append(self._replica)
-
-        await asyncio.gather([engine.close() for engine in engines])
+            await self._replica.close()
 
 
 class DBEntity(BaseModel):
