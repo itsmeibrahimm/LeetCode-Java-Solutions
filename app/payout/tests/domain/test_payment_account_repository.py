@@ -10,7 +10,6 @@ from app.payout.repository.maindb.payment_account import (
 class TestPaymentAccountRepository:
     pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
-    @pytest.mark.skip("skip this for now to unblock local dev")
     async def test_create(self, payout_maindb: Database):
         repo = PaymentAccountRepository(database=payout_maindb)
         payment_account = PaymentAccountWritable(

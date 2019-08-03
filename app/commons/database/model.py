@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import ClassVar, List, Optional
 
 import gino
 from gino import Gino, GinoEngine
-from gino.dialects.asyncpg import NullPool
 from pydantic import BaseModel
 from sqlalchemy import Column, Table
 
@@ -42,6 +41,7 @@ class Database:
 
     """
 
+    _POOL_SIZE: ClassVar[int] = 1
     _master: GinoEngine
     _replica: Optional[GinoEngine] = None
 
@@ -49,15 +49,20 @@ class Database:
     async def from_url(
         cls, master_url: Secret, replica_url: Optional[Secret] = None
     ) -> "Database":
-        # temporarily set nullpool here to unblock local dev
+        # temporarily set poll size=1 here to unblock local dev
         # TODO make pool sizing configurable per environment
-        created_master = await gino.create_engine(master_url.value, pool_class=NullPool)
+        created_master = await gino.create_engine(
+            # DO NOT use 'pool_size' here. Asyncpg currently only take in max_size and min_size.
+            master_url.value,
+            max_size=cls._POOL_SIZE,
+            min_size=cls._POOL_SIZE,
+        )
 
         created_replica = None
         if replica_url:
-            # temporarily set pool size 2 here to unblock local dev
+            # temporarily set poll size=1 here to unblock local dev
             created_replica = await gino.create_engine(
-                replica_url.value, pool_class=NullPool
+                replica_url.value, max_size=cls._POOL_SIZE, min_size=cls._POOL_SIZE
             )
 
         return cls(_master=created_master, _replica=created_replica)
