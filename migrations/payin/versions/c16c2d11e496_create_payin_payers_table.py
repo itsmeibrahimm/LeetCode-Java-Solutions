@@ -18,7 +18,7 @@ depends_on = None
 
 def upgrade():
     op.create_table(
-        "pgp_customers",
+        "payers",
         sa.Column("id", sa.String(255), nullable=False, primary_key=True),
         sa.Column("legacy_id", sa.BigInteger),
         sa.Column("pgp_code", sa.String(16)),

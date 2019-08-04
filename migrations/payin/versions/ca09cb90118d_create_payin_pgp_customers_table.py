@@ -1,7 +1,7 @@
 """create pgp_customers table
 
-Revision ID: c39d2f0e7a22
-Revises: ca09cb90118d
+Revision ID: ca09cb90118d
+Revises: c16c2d11e496
 Create Date: 2019-08-02 22:12:37.124536
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "c39d2f0e7a22"
-down_revision = "ca09cb90118d"
+revision = "ca09cb90118d"
+down_revision = "c16c2d11e496"
 branch_labels = None
 depends_on = None
 
