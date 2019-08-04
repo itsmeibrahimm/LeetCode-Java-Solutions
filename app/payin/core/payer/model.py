@@ -21,8 +21,8 @@ PaymentGatewayProviderCustomer.update_forward_refs()
 @dataclass(frozen=True)
 class Payer:
     payer_id: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None
     payer_type: Optional[PayerType] = None
     country: Optional[str] = None
@@ -45,9 +45,9 @@ class PgpCustomer:
     updated_at: datetime
     account_balance: Optional[int] = None
     currency: Optional[str] = None
-    default_payment_method: Optional[str] = None
-    legacy_default_card: Optional[str] = None
-    legacy_default_source: Optional[str] = None
+    default_payment_method_id: Optional[str] = None
+    legacy_default_card_id: Optional[str] = None
+    legacy_default_source_id: Optional[str] = None
 
 
 @final

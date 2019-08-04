@@ -10,7 +10,7 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class PayerTable(TableDefinition):
-    name: str = no_init_field("payer")
+    name: str = no_init_field("payers")
     id: Column = no_init_field(Column("id", Text, primary_key=True))
     payer_type: Column = no_init_field(Column("payer_type", Text))
     dd_payer_id: Column = no_init_field(Column("dd_payer_id", Text))

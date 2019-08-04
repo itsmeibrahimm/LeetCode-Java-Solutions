@@ -24,6 +24,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_200_OK,
 )
 
 router = APIRouter()
@@ -70,8 +71,8 @@ async def create_payer(req_body: CreatePayerRequest):
     return payer
 
 
-@router.get("/api/v1/payers/{payer_id}")
-async def get_payer(payer_id: str):
+@router.get("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
+async def get_payer(payer_id: str, payer_type: str = None):
     """
     Get payer.
 
@@ -79,7 +80,7 @@ async def get_payer(payer_id: str):
     """
     logger.info("[get_payer] payer_id=%s", payer_id)
     try:
-        payer: Payer = await retrieve_payer(payer_id=payer_id)
+        payer: Payer = await retrieve_payer(payer_id=payer_id, payer_type=payer_type)
         logger.info("[get_payer] retrieve_payer completed")
     except PayerCreationError as e:
         return create_response_blob(
@@ -98,7 +99,7 @@ async def get_payer(payer_id: str):
     return payer
 
 
-@router.patch("/api/v1/payers/{payer_id}")
+@router.patch("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
 async def update_payer(payer_id: str, req_body: UpdatePayerRequest):
     """
     Update payer's default payment method
@@ -111,6 +112,10 @@ async def update_payer(payer_id: str, req_body: UpdatePayerRequest):
         payer: Payer = await update_payer_default_payment_method(
             payer_id=payer_id,
             default_payment_method_id=req_body.default_payment_method_id,
+            default_source_id=req_body.default_source_id,
+            default_card_id=req_body.default_card_id,
+            payer_id_type=req_body.payer_id_type,
+            payer_type=req_body.payer_type,
         )
     except PayerUpdateError as e:
         status = (

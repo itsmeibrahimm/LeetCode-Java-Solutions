@@ -9,6 +9,7 @@ payin_error_message_maps = {
     "payin_3": "Payer not found. Please ensure your payer_id is correct",
     "payin_4": "Payer not found. Please ensure your payer_id is correct",
     "payin_5": "Invalid data types. Please verify your input again!",
+    "payin_6": "Invalid payer type",
 }
 
 
@@ -18,6 +19,7 @@ class PayinErrorCode(str, Enum):
     PAYER_READ_NOT_FOUND = "payin_3"
     PAYER_UPDATE_NOT_FOUND = "payin_4"
     PAYER_UPDATE_DB_ERROR_INVALID_DATA = "payin_5"
+    PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_6"
 
 
 class PayerReadError(PaymentError):
