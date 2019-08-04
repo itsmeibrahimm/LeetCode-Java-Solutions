@@ -2,7 +2,8 @@ from asyncio import gather
 from dataclasses import dataclass
 from typing import Any, cast
 
-from fastapi import FastAPI
+from app.commons.applications import FastAPI
+
 from structlog import BoundLogger
 
 from app.commons.config.app_config import AppConfig

@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI
+from app.commons.applications import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.payin.api.payer.v1.api import router as payer_router

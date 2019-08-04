@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from app.commons.applications import FastAPI
 
 from app.example_v1.paths.items import router as items_router
 

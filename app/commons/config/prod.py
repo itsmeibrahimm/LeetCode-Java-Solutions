@@ -6,6 +6,7 @@ def create_app_config() -> AppConfig:
     Create AppConfig for prod environment
     """
     return AppConfig(
+        ENVIRONMENT="prod",
         DEBUG=False,
         NINOX_ENABLED=True,
         METRICS_CONFIG={"service_name": "payment-service", "cluster": "prod"},

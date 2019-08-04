@@ -49,6 +49,7 @@ class AppConfig:
     - prod: prod.py::PROD
     """
 
+    ENVIRONMENT: str
     DEBUG: bool
     NINOX_ENABLED: bool
     METRICS_CONFIG: Dict[str, str]
@@ -66,4 +67,6 @@ class AppConfig:
     STRIPE_US_SECRET_KEY: Secret
     STRIPE_US_PUBLIC_KEY: Secret
 
+    STATSD_SERVER: str = "prod-proxy-internal.doordash.com"
+    STATSD_PREFIX: str = "payment-service"
     STRIPE_MAX_WORKERS: int = 10

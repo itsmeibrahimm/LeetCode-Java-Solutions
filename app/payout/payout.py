@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from app.commons.applications import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.payout.api.accounts_router import create_accounts_router

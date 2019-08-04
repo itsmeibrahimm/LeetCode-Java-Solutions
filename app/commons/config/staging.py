@@ -6,6 +6,7 @@ def create_app_config() -> AppConfig:
     Create AppConfig for staging environment
     """
     return AppConfig(
+        ENVIRONMENT="staging",
         DEBUG=False,
         NINOX_ENABLED=True,
         METRICS_CONFIG={"service_name": "payment-service", "cluster": "staging"},

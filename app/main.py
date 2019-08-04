@@ -1,6 +1,7 @@
 import os
 
-from fastapi import FastAPI
+from app.commons.applications import FastAPI
+
 from fastapi.encoders import jsonable_encoder
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -14,7 +15,10 @@ from app.commons.context.app_context import (
 from app.commons.context.logger import root_logger
 from app.commons.error.errors import PaymentException, PaymentErrorResponseBody
 from app.example_v1.app import example_v1
-from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
+from app.middleware.doordash_metrics import (
+    DoorDashMetricsMiddleware,
+    init_global_statsd,
+)
 from app.middleware.req_context import ReqContextMiddleware
 from app.payin.payin import create_payin_app
 from app.payout.payout import create_payout_app
@@ -30,14 +34,12 @@ if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
     debug.bootstrap_debugger()
 
 config = init_app_config()
-
-app = FastAPI()
-app.debug = config.DEBUG
+app = FastAPI(title="Payment Service", debug=config.DEBUG)
 
 
 # middleware needs to be added in reverse order due to:
 # https://github.com/encode/starlette/issues/479
-app.add_middleware(DoorDashMetricsMiddleware, **config.METRICS_CONFIG)
+app.add_middleware(DoorDashMetricsMiddleware, config=config)
 app.add_middleware(ReqContextMiddleware)
 
 
@@ -54,6 +56,13 @@ async def startup():
     except Exception:
         root_logger.exception("failed to create application context")
         raise
+
+    # set up the global statsd client
+    init_global_statsd(
+        config.STATSD_PREFIX,
+        host=config.STATSD_SERVER,
+        fixed_tags={"env": config.ENVIRONMENT},
+    )
 
     payout_app = create_payout_app(context)
     app.mount(payout_app.openapi_prefix, payout_app)

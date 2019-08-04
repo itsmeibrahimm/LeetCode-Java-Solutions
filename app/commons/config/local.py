@@ -11,6 +11,7 @@ def create_app_config() -> AppConfig:
     dsj_db_endpoint: str = os.getenv("DSJ_DB_ENDPOINT", "localhost:5435")
 
     return AppConfig(
+        ENVIRONMENT="local",
         DEBUG=True,
         NINOX_ENABLED=False,
         METRICS_CONFIG={"service_name": "payment-service", "cluster": "local"},
