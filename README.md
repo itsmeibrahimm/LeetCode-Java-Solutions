@@ -160,6 +160,28 @@ make local-docker-server
   curl localhost:5000/health/ # docker port mapping defined in docker-compose.yml web container
   ```
 
+### Testing
+
+#### Run all tests
+Refers to [run tests locally](#running-tests-in-local-environment)
+
+
+#### Write tests
+We categorize tests cases into 3 groups with in payment-service repo. (Pulse test will be covered separately).
+
+1. **Unit tests**: Test cases should focus on test unit functionality **without any real connections to remote dependencies** like database, redis or stripe. Any remote dependencies should be mocked out in unit test case.
+    - Make target: `make test-unit`
+    - Directory: within each top level components (e.g. commons, payin, payout, ledger, middleware...), there is a `test_unit` folder where orresponding unit test files should be created.
+
+
+2. **Integration tests**: Test cases should focus on validate integration contract and santity with remote dependencies. Alternatively, if you really have to wire up dependency components to test some integration behavior, you can create test cases as integration test.
+    - Make target:
+        - `make test-integration`: run all integration tests including test cases depending on remote dependencies we owned (e.g. DB) and external dependencies like stripe.
+        - `make test-external`: only run test cases marked with `pytest.mark.external`, which usually are tests depending on external dependencies like stripe.
+    - Directory: within each top level components (e.g. commons, payin, payout, ledger, middleware...), there is a `test_integration` folder where orresponding integration test files should be created.
+    - Note: **DO NOT** place integrate tests outside of a `test_integration` folder, otherwise our test scripts won't startup corresponding dependencies for the test.
+
+
 ### Update Dependencies
 
 The `payment-service` uses `pipenv` to ensure deterministic builds.
