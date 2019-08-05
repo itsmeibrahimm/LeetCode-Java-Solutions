@@ -1,4 +1,3 @@
-from asyncio import gather
 from fastapi import HTTPException
 from typing import Dict, Tuple, List, Optional
 import uuid
@@ -117,8 +116,6 @@ class CartPaymentInterface:
             response = await self.app_context.stripe.create_payment_intent(
                 country=CountryCode(payment_intent.country), request=intent_request
             )
-            # req_context.log.info("Stripe response:")
-            # req_context.log.info(response)
             return response
             # return self._get_sample_response()
         except Exception as e:
@@ -129,11 +126,13 @@ class CartPaymentInterface:
     # req_context, payin_repos, pgp_intent_id, provider_payment_response
     async def _update_pgp_intent_from_provider(
         self,
+        connection,
         pgp_intent_id: uuid.UUID,
         status: PgpPaymentIntentStatus,
         provider_payment_response: Dict,
     ) -> None:
         await self.payment_repo.update_pgp_payment_intent(
+            connection,
             pgp_intent_id,
             status,
             provider_payment_response["id"],
@@ -146,26 +145,36 @@ class CartPaymentInterface:
     async def _submit_payment_to_provider(
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
     ):
-        # Call out to provider to create the payment intent in their system
+        # Call out to provider to create the payment intent in their system.  The payment_intent
+        # instance includes the idempotency_key, which is passed to provider to ensure records already
+        # sumitted are actually processed only once.
         provider_payment_response = await self._create_provider_payment(
             payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
         )
 
-        # TODO Create a transaction
+        connection, transaction = await (
+            self.payment_repo.get_payment_database_connection_and_transaction()
+        )
 
-        # Update the records we created to reflect that the provider has been invoked.
-        await gather(
-            self.payment_repo.update_payment_intent_status(
-                payment_intent.id, PaymentIntentStatus.PROCESSING
-            ),
-            self._update_pgp_intent_from_provider(
+        try:
+            # Update the records we created to reflect that the provider has been invoked.
+            # Cannot gather calls here because of shared connection/transaction
+            await self.payment_repo.update_payment_intent_status(
+                connection, payment_intent.id, PaymentIntentStatus.PROCESSING
+            )
+            await self._update_pgp_intent_from_provider(
+                connection,
                 pgp_payment_intent.id,
                 PgpPaymentIntentStatus.PROCESSING,
                 provider_payment_response,
-            ),
-        )
+            )
 
-        # TODO Commit and close transaction
+            await transaction.commit()
+        except Exception as e:
+            await transaction.rollback()
+            raise e
+        finally:
+            await self.payment_repo.close_payment_database_connection(connection)
 
     async def submit_new_payment(
         self,
@@ -180,62 +189,75 @@ class CartPaymentInterface:
             f"Submitting new payment for payer ${request_cart_payment.payer_id}"
         )
 
-        # TODO Start transaction
-
-        # Create CartPayment
-        cart_payment: CartPayment = await self.payment_repo.insert_cart_payment(
-            id=uuid.uuid4(),
-            payer_id=request_cart_payment.payer_id,
-            type=request_cart_payment.cart_metadata.type,
-            reference_id=request_cart_payment.cart_metadata.reference_id,
-            reference_ct_id=request_cart_payment.cart_metadata.ct_reference_id,
-            legacy_consumer_id=request_cart_payment.legacy_payment.consumer_id
-            if request_cart_payment.legacy_payment
-            else None,
-            amount_original=request_cart_payment.amount,
-            amount_total=request_cart_payment.amount,
+        connection, transaction = (
+            await self.payment_repo.get_payment_database_connection_and_transaction()
         )
 
-        # Create PaymentIntent
-        payment_intent: PaymentIntent = await self.payment_repo.insert_payment_intent(
-            id=uuid.uuid4(),
-            cart_payment_id=cart_payment.id,
-            idempotency_key=idempotency_key,
-            amount_initiated=request_cart_payment.amount,
-            amount=request_cart_payment.amount,
-            application_fee_amount=getattr(
-                request_cart_payment.split_payment, "application_fee_amount", None
-            ),
-            country=country,
-            currency=currency,
-            capture_method=request_cart_payment.capture_method,
-            confirmation_method=ConfirmationMethod.MANUAL,
-            status=PaymentIntentStatus.INIT,
-            statement_descriptor=request_cart_payment.payer_statement_description,
-        )
+        try:
+            # Create CartPayment
+            cart_payment: CartPayment = await self.payment_repo.insert_cart_payment(
+                connection=connection,
+                id=uuid.uuid4(),
+                payer_id=request_cart_payment.payer_id,
+                type=request_cart_payment.cart_metadata.type,
+                reference_id=request_cart_payment.cart_metadata.reference_id,
+                reference_ct_id=request_cart_payment.cart_metadata.ct_reference_id,
+                legacy_consumer_id=request_cart_payment.legacy_payment.consumer_id
+                if request_cart_payment.legacy_payment
+                else None,
+                amount_original=request_cart_payment.amount,
+                amount_total=request_cart_payment.amount,
+            )
 
-        # Create PgpPaymentIntent
-        pgp_payment_intent: PgpPaymentIntent = await self.payment_repo.insert_pgp_payment_intent(
-            id=uuid.uuid4(),
-            payment_intent_id=payment_intent.id,
-            idempotency_key=idempotency_key,
-            provider=PaymentProvider.STRIPE.value,
-            payment_method_resource_id=request_cart_payment.payment_method_id,
-            currency=currency,
-            amount=request_cart_payment.amount,
-            application_fee_amount=getattr(
-                request_cart_payment.split_payment, "application_fee_amount", None
-            ),
-            payout_account_id=getattr(
-                request_cart_payment.split_payment, "payout_account_id", None
-            ),
-            capture_method=request_cart_payment.capture_method,
-            confirmation_method=ConfirmationMethod.MANUAL,
-            status=PgpPaymentIntentStatus.INIT,
-            statement_descriptor=request_cart_payment.payer_statement_description,
-        )
+            # Create PaymentIntent
+            assert cart_payment.id
+            payment_intent: PaymentIntent = await self.payment_repo.insert_payment_intent(
+                connection=connection,
+                id=uuid.uuid4(),
+                cart_payment_id=cart_payment.id,
+                idempotency_key=idempotency_key,
+                amount_initiated=request_cart_payment.amount,
+                amount=request_cart_payment.amount,
+                application_fee_amount=getattr(
+                    request_cart_payment.split_payment, "application_fee_amount", None
+                ),
+                country=country,
+                currency=currency,
+                capture_method=request_cart_payment.capture_method,
+                confirmation_method=ConfirmationMethod.MANUAL,
+                status=PaymentIntentStatus.INIT,
+                statement_descriptor=request_cart_payment.payer_statement_description,
+            )
 
-        # TODO Commit and close transaction.  Close transaction prior to external call.
+            # Create PgpPaymentIntent
+            pgp_payment_intent: PgpPaymentIntent = await self.payment_repo.insert_pgp_payment_intent(
+                connection=connection,
+                id=uuid.uuid4(),
+                payment_intent_id=payment_intent.id,
+                idempotency_key=idempotency_key,
+                provider=PaymentProvider.STRIPE.value,
+                payment_method_resource_id=request_cart_payment.payment_method_id,
+                currency=currency,
+                amount=request_cart_payment.amount,
+                application_fee_amount=getattr(
+                    request_cart_payment.split_payment, "application_fee_amount", None
+                ),
+                payout_account_id=getattr(
+                    request_cart_payment.split_payment, "payout_account_id", None
+                ),
+                capture_method=request_cart_payment.capture_method,
+                confirmation_method=ConfirmationMethod.MANUAL,
+                status=PgpPaymentIntentStatus.INIT,
+                statement_descriptor=request_cart_payment.payer_statement_description,
+            )
+
+            # Commit and close transaction.  Close transaction prior to external call.
+            await transaction.commit()
+        except Exception as e:
+            await transaction.rollback()
+            raise e
+        finally:
+            await self.payment_repo.close_payment_database_connection(connection)
 
         await self._submit_payment_to_provider(payment_intent, pgp_payment_intent)
         return cart_payment
