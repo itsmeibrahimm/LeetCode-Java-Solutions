@@ -35,6 +35,7 @@ def upgrade():
             nullable=False,
         ),
         sa.Column("idempotency_key", sa.String(255), nullable=False),
+        sa.Column("routing_key", sa.DateTime(), nullable=False),
         sa.Column(
             "created_at", sa.DateTime(), server_default=sa.func.current_timestamp()
         ),
@@ -43,6 +44,12 @@ def upgrade():
         ),
         sa.Column("context", sa.JSON),
         sa.Column("metadata", sa.JSON),
+    )
+    op.create_index(
+        "idx_mx_transactions_payment_account_id_idempotency_key_uq",
+        "mx_transactions",
+        ["payment_account_id", "idempotency_key"],
+        unique=True,
     )
 
 
