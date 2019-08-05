@@ -13,6 +13,7 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import Payer, PaymentGatewayProviderCustomer
 from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PayerIdType
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
     InsertPayerOutput,
@@ -276,7 +277,10 @@ async def update_payer_default_payment_method(
                 ],
                 retryable=True,
             )
-    elif payer_id_type in ("stripe_customer_id", "stripe_customer_serial_id"):
+    elif payer_id_type in (
+        PayerIdType.STRIPE_CUSTOMER_ID.value,
+        PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
+    ):
         logger.info("[update_payer_data][%s] update by stripe customer id", payer_id)
 
         # lookup stripe_customer to ensure data is present

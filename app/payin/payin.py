@@ -2,6 +2,7 @@ from app.commons.applications import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.payin.api.payer.v1.api import router as payer_router
+from app.payin.api.payment_method.v1.api import router as payment_method_router
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.api.cart_payment.v1.api import create_cart_payments_router
@@ -27,4 +28,6 @@ def create_payin_app(context: AppContext) -> FastAPI:
 
     app.include_router(payer_router)
     app.include_router(cart_payments_router)
+    app.include_router(payment_method_router)
+
     return app

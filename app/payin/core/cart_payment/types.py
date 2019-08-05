@@ -18,10 +18,6 @@ class ConfirmationMethod(str, Enum):
     MANUAL = "manual"
 
 
-class Providers(str, Enum):
-    STRIPE = "Stripe"
-
-
 class PaymentIntentStatus(str, Enum):
     INIT = "init"
     PROCESSING = "processing"

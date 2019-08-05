@@ -1,10 +1,11 @@
 import logging
-from pydantic import BaseModel
 
 from fastapi import APIRouter
-from fastapi.encoders import jsonable_encoder
 
-from app.commons.error.errors import PaymentErrorResponseBody
+from app.commons.error.errors import (
+    PaymentErrorResponseBody,
+    create_payment_error_response_blob,
+)
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
 from app.payin.core.exceptions import (
     PayerCreationError,
@@ -18,7 +19,6 @@ from app.payin.core.payer.processor import (
     update_payer_default_payment_method,
 )
 
-from starlette.responses import JSONResponse
 from starlette.status import (
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
@@ -59,7 +59,7 @@ async def create_payer(req_body: CreatePayerRequest):
         #                        error_code=e.error_code,
         #                        error_message=e.error_message,
         #                        retryable=e.retryable)
-        return create_response_blob(
+        return create_payment_error_response_blob(
             HTTP_500_INTERNAL_SERVER_ERROR,
             PaymentErrorResponseBody(
                 error_code=e.error_code,
@@ -83,7 +83,7 @@ async def get_payer(payer_id: str, payer_type: str = None):
         payer: Payer = await retrieve_payer(payer_id=payer_id, payer_type=payer_type)
         logger.info("[get_payer] retrieve_payer completed")
     except PayerCreationError as e:
-        return create_response_blob(
+        return create_payment_error_response_blob(
             (
                 HTTP_404_NOT_FOUND
                 if e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value
@@ -123,7 +123,7 @@ async def update_payer(payer_id: str, req_body: UpdatePayerRequest):
             if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value
             else HTTP_500_INTERNAL_SERVER_ERROR
         )
-        return create_response_blob(
+        return create_payment_error_response_blob(
             status,
             PaymentErrorResponseBody(
                 error_code=e.error_code,
@@ -133,8 +133,3 @@ async def update_payer(payer_id: str, req_body: UpdatePayerRequest):
         )
 
     return payer
-
-
-def create_response_blob(status_code: int, resp_blob: BaseModel):
-    # FIXME: will be replaced by PaymentException
-    return JSONResponse(status_code=status_code, content=jsonable_encoder(resp_blob))

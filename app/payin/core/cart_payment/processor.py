@@ -7,6 +7,7 @@ from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
 from app.commons.types import CountryCode
 from app.commons.providers.stripe_models import CreatePaymentIntent
+from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentIntent,
@@ -14,10 +15,10 @@ from app.payin.core.cart_payment.model import (
 )
 from app.payin.core.cart_payment.types import (
     ConfirmationMethod,
-    Providers,
     PaymentIntentStatus,
     PgpPaymentIntentStatus,
 )
+
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
 
@@ -218,7 +219,7 @@ class CartPaymentInterface:
             id=uuid.uuid4(),
             payment_intent_id=payment_intent.id,
             idempotency_key=idempotency_key,
-            provider=Providers.STRIPE,
+            provider=PaymentProvider.STRIPE.value,
             payment_method_resource_id=request_cart_payment.payment_method_id,
             currency=currency,
             amount=request_cart_payment.amount,

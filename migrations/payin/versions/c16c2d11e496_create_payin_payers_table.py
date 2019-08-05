@@ -20,20 +20,13 @@ def upgrade():
     op.create_table(
         "payers",
         sa.Column("id", sa.String(255), nullable=False, primary_key=True),
-        sa.Column("legacy_id", sa.BigInteger),
-        sa.Column("pgp_code", sa.String(16)),
-        sa.Column("pgp_resource_id", sa.Text(), nullable=False),
-        sa.Column(
-            "payer_id",
-            sa.String(255),
-            sa.schema.ForeignKey("payers.id"),
-            nullable=False,
-        ),
+        sa.Column("payer_type", sa.String(32), nullable=False),
+        sa.Column("dd_payer_id", sa.String(128)),
+        sa.Column("legacy_stripe_customer_id", sa.Text()),
+        sa.Column("country", sa.String(2), nullable=False),
         sa.Column("account_balance", sa.BigInteger),
-        sa.Column("currency", sa.String(16)),
-        sa.Column("default_payment_method_id", sa.Text()),
-        sa.Column("legacy_default_source_id", sa.Text()),
-        sa.Column("legacy_default_card_id", sa.Text()),
+        sa.Column("description", sa.String(64)),
+        sa.Column("metadata", sa.JSON()),
         sa.Column(
             "created_at", sa.DateTime(), server_default=sa.func.current_timestamp()
         ),

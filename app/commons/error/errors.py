@@ -1,4 +1,6 @@
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
+from starlette.responses import JSONResponse
 
 
 class PaymentError(Exception):
@@ -51,6 +53,30 @@ class PaymentException(Exception):
 
 
 class PaymentErrorResponseBody(BaseModel):
+    """
+    Customized payment error http response body.
+
+    :param error_code: payin service predefined client-facing error codes.
+    :param error_message: friendly error message for client reference.
+    :param retryable: identify if the error is retryable or not.
+    """
+
     error_code: str
     error_message: str
     retryable: bool
+
+
+def create_payment_error_response_blob(
+    status_code: int, resp_blob: PaymentErrorResponseBody
+):
+    """
+    Create customized payment error http response.
+
+    :param status_code: http status code.
+    :param resp_blob: PaymentErrorResponseBody object.
+    :return:
+    """
+    # FIXME: this method should be replaced by FASTAPI custom exception handler:
+    #        https://fastapi.tiangolo.com/tutorial/handling-errors/#install-custom-exception-handlers
+    #        See PaymentException and payment_exception_handler for more information.
+    return JSONResponse(status_code=status_code, content=jsonable_encoder(resp_blob))
