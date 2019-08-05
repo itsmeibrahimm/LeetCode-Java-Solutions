@@ -975,7 +975,11 @@ CREATE TABLE consumer_announcement (
     created_at timestamp with time zone NOT NULL,
     show_once boolean NOT NULL,
     platform character varying(10),
-    image character varying(100)
+    image character varying(100),
+    target_dashpass_consumer boolean,
+    target_max_days_since_last_consumer_order integer,
+    target_min_days_since_last_consumer_order integer,
+    target_new_consumers boolean
 );
 
 
@@ -1725,6 +1729,7 @@ CREATE TABLE consumer_promotion (
     second_item_exclusion_list text,
     second_item_promo text,
     is_active boolean,
+    success_message text,
     CONSTRAINT consumer_promotion_incentive_id_check CHECK ((incentive_id >= 0)),
     CONSTRAINT consumer_promotion_max_applicable_delivery_count_check CHECK ((max_applicable_delivery_count >= 0)),
     CONSTRAINT consumer_promotion_max_total_redemption_count_check CHECK ((max_total_redemption_count >= 0)),
@@ -3221,6 +3226,7 @@ CREATE TABLE delivery (
     store_order_cart_id integer,
     submarket integer,
     transfer_id integer,
+    is_group_cart_delivery boolean,
     idempotency_key text
 );
 
@@ -3262,68 +3268,6 @@ CREATE SEQUENCE delivery_assignment_constraint_id_seq
 --
 
 ALTER SEQUENCE delivery_assignment_constraint_id_seq OWNED BY delivery_assignment_constraint.id;
-
-
---
--- Name: delivery_batch; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE delivery_batch (
-    id integer NOT NULL,
-    created_at timestamp with time zone NOT NULL
-);
-
-
---
--- Name: delivery_batch_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE delivery_batch_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: delivery_batch_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE delivery_batch_id_seq OWNED BY delivery_batch.id;
-
-
---
--- Name: delivery_batch_membership; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE delivery_batch_membership (
-    id integer NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    sort_index integer NOT NULL,
-    batch_id integer NOT NULL,
-    delivery_id integer NOT NULL,
-    CONSTRAINT delivery_batch_membership_sort_index_check CHECK ((sort_index >= 0))
-);
-
-
---
--- Name: delivery_batch_membership_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE delivery_batch_membership_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: delivery_batch_membership_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE delivery_batch_membership_id_seq OWNED BY delivery_batch_membership.id;
 
 
 --
@@ -4055,50 +3999,6 @@ CREATE SEQUENCE delivery_recipient_id_seq
 --
 
 ALTER SEQUENCE delivery_recipient_id_seq OWNED BY delivery_recipient.id;
-
-
---
--- Name: delivery_request; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE delivery_request (
-    id integer NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    first_name text NOT NULL,
-    last_name text NOT NULL,
-    business_name text NOT NULL,
-    email character varying(254) NOT NULL,
-    phone_number character varying(30) NOT NULL,
-    deliver_time timestamp with time zone NOT NULL,
-    order_size integer NOT NULL,
-    driver_tip integer NOT NULL,
-    special_instructions text NOT NULL,
-    creator_id integer NOT NULL,
-    delivery_id integer,
-    dropoff_address_id integer,
-    order_cart_id integer NOT NULL,
-    pickup_address_id integer NOT NULL,
-    store_id integer NOT NULL
-);
-
-
---
--- Name: delivery_request_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE delivery_request_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: delivery_request_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE delivery_request_id_seq OWNED BY delivery_request.id;
 
 
 --
@@ -6795,7 +6695,9 @@ CREATE TABLE "order" (
     menu_id integer,
     order_cart_id integer,
     store_id integer,
-    store_order_cart_id integer
+    store_order_cart_id integer,
+    payment_card_id integer,
+    payment_line_items text
 );
 
 
@@ -6888,7 +6790,8 @@ CREATE TABLE order_cart_device_fingerprint_link (
     source text,
     metadata jsonb NOT NULL,
     fingerprint_id integer NOT NULL,
-    order_cart_id integer NOT NULL
+    order_cart_id integer NOT NULL,
+    updated_at timestamp with time zone
 );
 
 
@@ -9734,7 +9637,8 @@ CREATE TABLE user_device_fingerprint_link (
     id integer NOT NULL,
     source text,
     fingerprint_id integer NOT NULL,
-    user_id integer NOT NULL
+    user_id integer NOT NULL,
+    updated_at timestamp with time zone
 );
 
 
@@ -10889,20 +10793,6 @@ ALTER TABLE ONLY delivery_assignment_constraint ALTER COLUMN id SET DEFAULT next
 
 
 --
--- Name: delivery_batch id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch ALTER COLUMN id SET DEFAULT nextval('delivery_batch_id_seq'::regclass);
-
-
---
--- Name: delivery_batch_membership id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch_membership ALTER COLUMN id SET DEFAULT nextval('delivery_batch_membership_id_seq'::regclass);
-
-
---
 -- Name: delivery_cancellation_reason id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -11033,13 +10923,6 @@ ALTER TABLE ONLY delivery_receipt ALTER COLUMN id SET DEFAULT nextval('delivery_
 --
 
 ALTER TABLE ONLY delivery_recipient ALTER COLUMN id SET DEFAULT nextval('delivery_recipient_id_seq'::regclass);
-
-
---
--- Name: delivery_request id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_request ALTER COLUMN id SET DEFAULT nextval('delivery_request_id_seq'::regclass);
 
 
 --
@@ -12174,6 +12057,7339 @@ ALTER TABLE ONLY web_deployment ALTER COLUMN id SET DEFAULT nextval('web_deploym
 --
 
 ALTER TABLE ONLY zendesk_template ALTER COLUMN id SET DEFAULT nextval('zendesk_template_id_seq'::regclass);
+
+
+--
+-- Data for Name: address; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY address (id, point, created_at, google_place_id, name, formatted_address, subpremise, establishment, street, neighborhood, sublocality, locality, administrative_area_level_5, administrative_area_level_4, administrative_area_level_3, administrative_area_level_2, administrative_area_level_1, country, country_shortname, zip_code, types, is_generic, city, state, county) FROM stdin;
+106767	0101000020E61000003B1F72709D7F5EC01E13DE5FC6AC4240	2014-11-14 14:48:24.437+00	\N	3665 Flora Vista Avenue	3665 Flora Vista Avenue, Santa Clara, CA 95051, USA			3665 Flora Vista Avenue		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95051	\N	\N	\N	\N	\N
+183514	0101000020E61000003DF24E08D9895DC0DD881880A7E54040	2015-02-16 20:27:52.648+00	\N	1982 North Obispo Avenue	1982 North Obispo Avenue, Signal Hill, CA 90755, USA			1982 North Obispo Avenue	Aubry at Alamitos Ridge	\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	90755	\N	\N	\N	\N	\N
+119620	0101000020E61000001FA0FB7266985DC07715527E52F14040	2014-12-06 01:37:55.188+00	\N	Manhattan Beach	1750 10th Street, Manhattan Beach, CA 90266, USA			1750 10th Street		\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	90266	\N	\N	\N	\N	\N
+58500	0101000020E6100000A9B6A35124875EC08FEB95687FB34240	2014-09-04 09:32:16.924+00	\N	San Antonio Shopping Center	555 San Antonio Road, San Antonio Shopping Center, Mountain View, CA 94040, USA		San Antonio Shopping Center	555 San Antonio Road		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94040	\N	\N	\N	\N	\N
+33060	0101000020E6100000000B4F9EE8895EC0FDE88A08B5B64240	2014-06-27 01:32:01.598+00	\N	98 Thoburn Court	98 Thoburn Court, Stanford University, Escondido Village, Stanford, CA 94305, USA		Escondido Village	98 Thoburn Court		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94305	\N	\N	\N	\N	\N
+4371	0101000020E6100000F91ADD9C258A5EC0E859FF9DA3B84240	2013-11-05 19:53:45.894+00	\N	214 Homer Avenue	214 Homer Avenue, Palo Alto, CA 94301, USA			214 Homer Avenue	University South	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94301	\N	\N	\N	\N	\N
+137197	0101000020E61000003878350F4ECA56C025861A0EA5943E40	2015-01-01 22:43:19.754+00	\N	500 South Johnston Street	500 South Johnston Street, Baker, LA 70714, USA			500 South Johnston Street		\N	\N	\N	\N	\N	East Baton Rouge Parish	LA	United States	\N	70714	\N	\N	\N	\N	\N
+128999	0101000020E61000007583C2088F7B5EC06F696FEFD8A54240	2014-12-19 03:40:21.264+00	\N	1500 South Bascom Avenue	1500 South Bascom Avenue, Campbell, CA 95008, USA			1500 South Bascom Avenue	Willow Glen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95008	\N	\N	\N	\N	\N
+21098	0101000020E610000097CA36CB407E5EC052B648DA8DA24240	2014-04-30 21:52:00.353+00	\N	1243 Chamberlin Court	1243 Chamberlin Court, Campbell, CA 95008, USA			1243 Chamberlin Court		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95008	\N	\N	\N	\N	\N
+153633	0101000020E6100000CDD8960C45915EC0FB894D5D58C24240	2015-01-21 20:59:47.135+00	\N	601 Harbor Boulevard	601 Harbor Boulevard, Belmont, CA 94002, USA			601 Harbor Boulevard		\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94002	\N	\N	\N	\N	\N
+36953	0101000020E610000016C3D50110815EC0158C4AEA04A64240	2014-07-13 05:53:58.643+00	\N	6353 Janary Way	6353 Janary Way, San Jose, CA 95129, USA			6353 Janary Way	Rainbow	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95129	\N	\N	\N	\N	\N
+179543	0101000020E6100000F90FE9B7AF8F5EC0611A868F88C54240	2015-02-14 00:26:52.836+00	\N	225 Shearwater Parkway	225 Shearwater Parkway, Redwood City, CA 94065, USA			225 Shearwater Parkway	Redwood Shores	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94065	\N	\N	\N	\N	\N
+163536	0101000020E610000093CDB0AC8FC751C0097888354B2B4540	2015-01-31 01:57:37.602+00	\N	45 Saint Paul Street	45 Saint Paul Street, Brookline, MA 02446, USA			45 Saint Paul Street	Coolidge Corner South Side	\N	\N	\N	\N	\N	Norfolk County	MA	United States	\N	02446	\N	\N	\N	\N	\N
+49246	0101000020E6100000780E65A88A725EC08B51D7DAFBA84240	2014-08-25 04:06:46.921+00	\N	3125 Linkshead Court	3125 Linkshead Court, San Jose, CA 95148, USA			3125 Linkshead Court	Evergreen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95148	\N	\N	\N	\N	\N
+38765	0101000020E6100000BA85AE44A0755EC066F50EB7439F4240	2014-07-20 20:31:45.554+00	\N	632 Pima Drive	632 Pima Drive, San Jose, CA 95123, USA			632 Pima Drive	Edenvale	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95123	\N	\N	\N	\N	\N
+9533	0101000020E610000046A28625548352C058E13BD631724440	2014-02-09 00:25:23.685+00	\N	310 Prospect Avenue	310 Prospect Avenue, Hackensack, NJ 07601, USA			310 Prospect Avenue		\N	\N	\N	\N	\N	Bergen County	NJ	United States	\N	07601	\N	\N	\N	\N	\N
+46840	0101000020E6100000B9420E000B7A5EC0A475AFEEB39D4240	2014-08-18 19:24:39.463+00	\N	5784 Lilac Blossom Lane	5784 Lilac Blossom Lane, San Jose, CA 95124, USA			5784 Lilac Blossom Lane	Cambrian	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95124	\N	\N	\N	\N	\N
+37025	0101000020E6100000CEE15AEDE1875EC092C8E30E40B34240	2014-07-13 19:49:56.637+00	\N	383 Mundell Way	383 Mundell Way, Los Altos, CA 94022, USA			383 Mundell Way	North Los Altos	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94022	\N	\N	\N	\N	\N
+17828	0101000020E6100000BFD76BD5097A5EC0FC1301F335A84240	2014-04-09 04:35:30.633+00	\N	894 Paula Street	894 Paula Street, San Jose, CA 95126, USA			894 Paula Street	Willow Glen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95126	\N	\N	\N	\N	\N
+67720	0101000020E6100000B12DC922C98B5EC0ED3CF90D76B84240	2014-09-05 08:06:23.767+00	\N	Menlo Park	440 Santa Rita Avenue, Menlo Park, CA 94025, USA			440 Santa Rita Avenue		\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94025	\N	\N	\N	\N	\N
+50169	0101000020E61000001178BBB9538A5EC0FBF48E09E7B84240	2014-08-28 02:42:33.764+00	\N	548 Ramona St	548 Ramona Street, Palo Alto, CA 94301, USA			548 Ramona Street	University South	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94301	\N	\N	\N	\N	\N
+159845	0101000020E6100000B8D96CE72E8D5EC00DC3057FF3B54240	2015-01-27 19:04:21.196+00	\N	2550 Sand Hill Road	2550 Sand Hill Road, Menlo Park, CA 94025, USA			2550 Sand Hill Road	Sharon Heights	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94025	\N	\N	\N	\N	\N
+60373	0101000020E6100000A4FD51CCA88A5EC0711FDA4352B64240	2014-09-04 09:48:03.963+00	\N	Stanford	500-542 Galvez Street, Stanford University, Stanford, CA 94305, USA		Stanford University	500-542 Galvez Street		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94305	\N	\N	\N	\N	\N
+99962	0101000020E61000006F7DFDB561C651C007B29E5A7D2D4540	2014-11-03 01:12:26.354+00	\N	Cambridge	Massachusetts Institute of Technology, 450 Memorial Drive, Cambridge, MA 02139, USA		Massachusetts Institute of Technology	450 Memorial Drive	MIT	\N	\N	\N	\N	\N	Middlesex County	MA	United States	\N	02139	\N	\N	\N	\N	\N
+70580	0101000020E6100000DA541F406D9C5DC0297C11C880FA4040	2014-09-05 08:25:54.254+00	\N	407 Campdell Street	407 Campdell Street, Playa del Rey, CA 90293, USA			407 Campdell Street		\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	90293	\N	\N	\N	\N	\N
+170249	0101000020E61000004C9D91529A985EC028E89BD953CC4240	2015-02-06 04:03:35.287+00	\N	1860 El Camino Real #108	1860 El Camino Real #108, Burlingame, CA 94010, USA	108		1860 El Camino Real	Ingold - Milldale	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94010	\N	\N	\N	\N	\N
+135321	0101000020E6100000705F07CE19855EC0B79C4B7155AD4240	2014-12-29 23:03:35.364+00	\N	1219 Lisa Court	1219 Lisa Court, Los Altos, CA 94024, USA			1219 Lisa Court		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94024	\N	\N	\N	\N	\N
+145888	0101000020E61000008ACE8D44C3C851C0B57DD98706304540	2015-01-12 22:54:45.053+00	\N	371 Mount Auburn Street	371 Mount Auburn Street, Cambridge, MA 02138, USA			371 Mount Auburn Street	West Cambridge	\N	\N	\N	\N	\N	Middlesex County	MA	United States	\N	02138	\N	\N	\N	\N	\N
+20860	0101000020E61000004C6BD3D85E7C5EC0D28E1B7E37A54240	2014-04-30 01:50:52.609+00	\N	250 North Central Avenue	250 North Central Avenue, Campbell, CA 95008, USA			250 North Central Avenue	Downtown	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95008	\N	\N	\N	\N	\N
+179645	0101000020E610000070E4260FB0995EC0DB65643502CE4240	2015-02-14 01:11:58.01+00	\N	1375 El Camino Real	1375 El Camino Real, Millbrae, CA 94030, USA			1375 El Camino Real		\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94030	\N	\N	\N	\N	\N
+77730	0101000020E610000066BCADF4DAC951C09620C8E64F2D4540	2014-09-16 03:14:21.153+00	\N	93 Goodenough Street	93 Goodenough Street, Brighton, MA 02135, USA			93 Goodenough Street	Oak Square	\N	\N	\N	\N	\N	Suffolk County	MA	United States	\N	02135	\N	\N	\N	\N	\N
+158890	0101000020E610000004E3E0D2319B5EC0562AA8A8FAE14240	2015-01-26 18:17:15.417+00	\N	360 Guerrero Street	360 Guerrero Street, San Francisco, CA 94103, USA			360 Guerrero Street	Mission Dolores	\N	\N	\N	\N	\N	San Francisco County	CA	United States	\N	94103	\N	\N	\N	\N	\N
+167365	0101000020E6100000E9633E20D09A5EC0560DC2DCEEDD4240	2015-02-03 03:19:07.195+00	\N	388 Benton Avenue	388 Benton Avenue, San Francisco, CA 94110, USA			388 Benton Avenue	Bernal Heights	\N	\N	\N	\N	\N	San Francisco County	CA	United States	\N	94110	\N	\N	\N	\N	\N
+92882	0101000020E61000003B191C25AF925EC0B2BAD573D2C34240	2014-10-19 03:18:25.146+00	\N	4107 Beresford Street	4107 Beresford Street, San Mateo, CA 94403, USA			4107 Beresford Street	South San Mateo	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94403	\N	\N	\N	\N	\N
+44607	0101000020E610000074B33F506E945EC03E07962364C44240	2014-08-12 02:58:35.228+00	\N	2812 Monterey Street	2812 Monterey Street, San Mateo, CA 94403, USA			2812 Monterey Street	Beresford Park	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94403	\N	\N	\N	\N	\N
+116682	0101000020E6100000A8D583B0DF7A5EC079E8941501A74240	2014-12-01 01:48:30.48+00	\N	1500-1536 De Rose Way	1500-1536 De Rose Way, San Jose, CA 95126, USA			1500-1536 De Rose Way	Willow Glen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95126	\N	\N	\N	\N	\N
+112187	0101000020E6100000431F2C6343C751C0849ECDAACF2F4540	2014-11-22 21:14:47.244+00	\N	Harvard University	Harvard University, 20 Prescott Street, Cambridge, MA 02138, USA		Harvard University	20 Prescott Street	Mid-Cambridge	\N	\N	\N	\N	\N	Middlesex County	MA	United States	\N	02138	\N	\N	\N	\N	\N
+138562	0101000020E6100000907CC9AE8B9B5EC03F7C446835E04240	2015-01-03 16:14:08.163+00	\N	3936 24th Street	3936 24th Street, San Francisco, CA 94114, USA			3936 24th Street	Noe Valley	\N	\N	\N	\N	\N	San Francisco County	CA	United States	\N	94114	\N	\N	\N	\N	\N
+105653	0101000020E6100000BD5C1F31D5845EC0F0B8F2A32BB44240	2014-11-12 18:53:16.422+00	\N	Linda Vista Avenue	Linda Vista Avenue, Mountain View, CA 94043, USA			Linda Vista Avenue		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94043	\N	\N	\N	\N	\N
+165794	0101000020E6100000CB0EF10F5B9F5EC0088F368E58CF4240	2015-02-01 21:58:31.639+00	\N	276 Seaside Drive	276 Seaside Drive, Pacifica, CA 94044, USA			276 Seaside Drive	Fairway Park	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94044	\N	\N	\N	\N	\N
+116753	0101000020E610000015BE9FC95A7C5EC052A5535B9BB24240	2014-12-01 02:38:31.661+00	\N	3901 Lick Mill Boulevard	3901 Lick Mill Boulevard, Santa Clara, CA 95054, USA			3901 Lick Mill Boulevard		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95054	\N	\N	\N	\N	\N
+157861	0101000020E6100000B471C45A7C865EC003E962D34AAF4240	2015-01-25 20:44:29.179+00	\N	746 Casa Bonita Court	746 Casa Bonita Court, Los Altos, CA 94024, USA			746 Casa Bonita Court		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94024	\N	\N	\N	\N	\N
+108594	0101000020E610000018B325AB22765EC01E3691990B9E4240	2014-11-17 01:16:50.185+00	\N	6162 Chesbro Avenue	6162 Chesbro Avenue, San Jose, CA 95123, USA			6162 Chesbro Avenue	Edenvale	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95123	\N	\N	\N	\N	\N
+152308	0101000020E61000006B056F9A0A955EC03AB46E79A2C74240	2015-01-20 03:46:56.132+00	\N	225 Virginia Avenue	225 Virginia Avenue, San Mateo, CA 94402, USA			225 Virginia Avenue	Baywood - Aragon	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94402	\N	\N	\N	\N	\N
+73299	0101000020E6100000B0CA85CABF7A5EC0B16F2711E1B14240	2014-09-06 23:23:22.24+00	\N	535 Brennan Street	535 Brennan Street, San Jose, CA 95131, USA			535 Brennan Street	North San Jose	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95131	\N	\N	\N	\N	\N
+182768	0101000020E610000086FAFB8E607A5EC01170B2DFF5A84240	2015-02-16 02:14:41.949+00	\N	1310 Saddle Rack Street	1310 Saddle Rack Street, San Jose, CA 95126, USA			1310 Saddle Rack Street	Central San Jose	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95126	\N	\N	\N	\N	\N
+30300	0101000020E61000000DDC2681F29D5DC02EB6FFB748024140	2014-06-16 17:39:32.785+00	\N	2231 20th Street	2231 20th Street, Santa Monica, CA 90405, USA			2231 20th Street	Sunset Park	\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	90405	\N	\N	\N	\N	\N
+1549	0101000020E61000007C2C7DE882885EC0C3482F6AF7B54240	2013-08-14 20:32:02.475+00	\N	268 Margarita Avenue	268 Margarita Avenue, Palo Alto, CA 94306, USA			268 Margarita Avenue	Ventura	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94306	\N	\N	\N	\N	\N
+74711	0101000020E6100000C826F911BF815EC00AF4893C49A64240	2014-09-10 00:23:15.071+00	\N	6999 Calabazas Creek Circle	6999 Calabazas Creek Circle, San Jose, CA 95129, USA			6999 Calabazas Creek Circle	Calabazas South	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95129	\N	\N	\N	\N	\N
+80594	0101000020E6100000041902EFB56D58C0F71E6867A83C3E40	2014-09-22 03:18:55.318+00	\N	1300 Crossing Place	1300 Crossing Place, Austin, TX 78741, USA			1300 Crossing Place	Pleasant Valley	\N	\N	\N	\N	\N	Travis County	TX	United States	\N	78741	\N	\N	\N	\N	\N
+173604	0101000020E6100000271EC0B079705DC07B11A0B5F1104140	2015-02-08 07:04:36.221+00	\N	2625 Roadrunner Drive	2625 Roadrunner Drive, La Verne, CA 91750, USA			2625 Roadrunner Drive	Bonita	\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	91750	\N	\N	\N	\N	\N
+107094	0101000020E6100000A13193A8177C5EC05FB69DB646A64240	2014-11-15 01:07:49.975+00	\N	418 Pamlar Avenue	418 Pamlar Avenue, San Jose, CA 95128, USA			418 Pamlar Avenue	Willow Glen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95128	\N	\N	\N	\N	\N
+123779	0101000020E6100000FDBE7FF3E2895EC0EB573A1F9EBB4240	2014-12-12 01:37:16.858+00	\N	312 Chester Street	312 Chester Street, Menlo Park, CA 94025, USA			312 Chester Street	The Willows	\N	\N	\N	\N	\N	San Mateo County	CA	United States	\N	94025	\N	\N	\N	\N	\N
+63503	0101000020E61000009A38C150AA785EC0D232F73537A44240	2014-09-04 10:11:27.431+00	\N	1167 Denise Way	1167 Denise Way, San Jose, CA 95125, USA			1167 Denise Way	Willow Glen South - Lincoln Glen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95125	\N	\N	\N	\N	\N
+66711	0101000020E61000007B4412DE5A785EC03768759394A44240	2014-09-05 07:22:53.637+00	\N	935 Wren Drive	935 Wren Drive, San Jose, CA 95125, USA			935 Wren Drive	South San Jose	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95125	\N	\N	\N	\N	\N
+180955	0101000020E6100000A8751B48F4C751C02939F549D7304540	2015-02-15 00:33:32.799+00	\N	Harvard University	60 Linnaean Street, Cambridge, MA 02138, USA		Harvard University	60 Linnaean Street	Neighborhood Nine	\N	\N	\N	\N	\N	Middlesex County	MA	United States	\N	02138	\N	\N	\N	\N	\N
+42937	0101000020E610000066C7FC92C37C5EC09BCB683FADA84240	2014-08-06 06:45:58.924+00	\N	550 South Winchester Boulevard	550 South Winchester Boulevard, San Jose, CA 95128, USA			550 South Winchester Boulevard	West San Jose	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95128	\N	\N	\N	\N	\N
+64026	0101000020E6100000395B48D9859E5DC012989878D1054140	2014-09-04 10:15:23.629+00	\N	840 Centinela Avenue	840 Centinela Avenue, Santa Monica, CA 90403, USA			840 Centinela Avenue	Northeast	\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	90403	\N	\N	\N	\N	\N
+68809	0101000020E6100000FB9A1F5E9B785EC04C05700E32A44240	2014-09-05 08:13:44.933+00	\N	1140 Denise Way	1140 Denise Way, San Jose, CA 95125, USA			1140 Denise Way	Willow Glen South - Lincoln Glen	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95125	\N	\N	\N	\N	\N
+65370	0101000020E6100000F83A4605D0885EC073CE99FEB6B34240	2014-09-05 07:13:45.364+00	\N	Loop Road	Loop Road, Palo Alto, CA 94304, USA			Loop Road		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94304	\N	\N	\N	\N	\N
+66797	0101000020E61000002F831885B0795EC0FB6EE3E4B8B54240	2014-09-05 07:23:27.929+00	\N	125 East Curtis Avenue	125 East Curtis Avenue, Milpitas, CA 95035, USA			125 East Curtis Avenue		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95035	\N	\N	\N	\N	\N
+68909	0101000020E6100000480B23FF048B5EC0CE0350730FB64240	2014-09-05 08:14:24.053+00	\N	436 Mayfield Avenue	436 Mayfield Avenue, Stanford University, Stanford, CA 94305, USA		Stanford University	436 Mayfield Avenue		\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	94305	\N	\N	\N	\N	\N
+88916	0101000020E61000003201BF4692C151C051D845D1032C4540	2014-10-10 20:05:09.145+00	\N	88 Black Falcon Avenue	88 Black Falcon Avenue, Boston, MA 02210, USA			88 Black Falcon Avenue	Seaport District	\N	\N	\N	\N	\N	Suffolk County	MA	United States	\N	02210	\N	\N	\N	\N	\N
+122740	0101000020E6100000401F3A39EC815EC01C138447C5A74240	2014-12-10 20:15:31.03+00	\N	1014 South De Anza Boulevard	1014 South De Anza Boulevard, San Jose, CA 95129, USA			1014 South De Anza Boulevard	Calabazas North	\N	\N	\N	\N	\N	Santa Clara County	CA	United States	\N	95129	\N	\N	\N	\N	\N
+100964	0101000020E61000009D685721E5995DC049B9FB1C1FF34040	2014-11-05 02:41:00.687+00	\N	3307 Laurel Avenue	3307 Laurel Avenue, Manhattan Beach, CA 90266, USA			3307 Laurel Avenue		\N	\N	\N	\N	\N	Los Angeles County	CA	United States	\N	90266	\N	\N	\N	\N	\N
+100965	0101000020E61000002219726C3D994E4090F46915FDBC62C0	2014-11-05 02:41:00.687+00	\N	2606 Spenard Rd	2606 Spenard Rd, Anchorage, AK 99503, USA			2606 Spenard Rd		\N	\N	\N	\N	\N	Anchorage County	AK	United States	\N	99503	\N	\N	\N	\N	\N
+183515	0101000020E610000022DE3AFFF6885EC0916BF9371EB64240	2019-08-04 03:41:59.787104+00	\N	470 Olive Ave	470 Olive Ave, Palo Alto, CA, United States			470 Olive Ave		\N	Palo Alto	\N	\N	\N	San Francisco County	CA	United States	\N	94306	\N	\N	Palo Alto	\N	\N
+183516	0101000020E61000006FE6A1009B895EC0FD38F5DC9DB64240	2019-08-04 03:42:58.982799+00	\N	565 Stanford Ave	565 Stanford Ave, Palo Alto, CA, United States			565 Stanford Ave		\N	Palo Alto	\N	\N	\N	San Francisco County	CA	United States	\N	94306	\N	\N	Palo Alto	\N	\N
+183517	0101000020E610000022DE3AFFF6885EC0916BF9371EB64240	2019-08-04 03:47:14.411072+00	\N	470 Olive Ave	470 Olive Ave, Palo Alto, CA 94306, USA			470 Olive Ave		\N	Palo Alto	\N	\N	\N	San Francisco County	CA	United States	\N	94306	\N	\N	\N	\N	\N
+\.
+
+
+--
+-- Name: address_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('address_id_seq', 183517, true);
+
+
+--
+-- Data for Name: address_place_tag_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY address_place_tag_link (id, created_at, updated_at, address_id, place_tag_id) FROM stdin;
+\.
+
+
+--
+-- Name: address_place_tag_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('address_place_tag_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: analytics_businessconstants; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY analytics_businessconstants (id, created_at, active_date, stripe_fixed_fee, stripe_commission, stripe_transfer_fee, eel_cost_per_call, support_unit_cost) FROM stdin;
+\.
+
+
+--
+-- Name: analytics_businessconstants_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('analytics_businessconstants_id_seq', 1, false);
+
+
+--
+-- Data for Name: analytics_dailybusinessmetrics; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY analytics_dailybusinessmetrics (id, created_at, active_date, deliveries_by_district, profit, delivery_count, incorrect_delivery_count, asap_delivery_count, median_delivery_time, lateness_metrics, ratings_count, ratings_sum, revenue, costs, constants_id, submarket_id) FROM stdin;
+\.
+
+
+--
+-- Name: analytics_dailybusinessmetrics_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('analytics_dailybusinessmetrics_id_seq', 1, false);
+
+
+--
+-- Data for Name: analytics_siteoutage; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY analytics_siteoutage (id, start_time, end_time, service, minutes_down, deliveries_lost, minutes_to_detection, notes, reported_by_id, postmortem_link, severity) FROM stdin;
+\.
+
+
+--
+-- Name: analytics_siteoutage_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('analytics_siteoutage_id_seq', 1, false);
+
+
+--
+-- Data for Name: api_key; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY api_key (key, created_at, is_active, is_test_key, user_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: app_deploy_app; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY app_deploy_app (id, name, version, plist, ipa, is_active, is_beta, added_at, minimum_os) FROM stdin;
+\.
+
+
+--
+-- Name: app_deploy_app_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('app_deploy_app_id_seq', 1, false);
+
+
+--
+-- Data for Name: apple_notification_app; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY apple_notification_app (id, bundle_id, team_id, apns_key_id, apns_secret_key, name) FROM stdin;
+\.
+
+
+--
+-- Name: apple_notification_app_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('apple_notification_app_id_seq', 1, false);
+
+
+--
+-- Data for Name: attribution_data; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY attribution_data (id, object_type, object_id, data) FROM stdin;
+\.
+
+
+--
+-- Name: attribution_data_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('attribution_data_id_seq', 1, false);
+
+
+--
+-- Data for Name: auth_group; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY auth_group (id, name) FROM stdin;
+1	dispatch
+\.
+
+
+--
+-- Name: auth_group_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('auth_group_id_seq', 1, true);
+
+
+--
+-- Data for Name: auth_group_permissions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY auth_group_permissions (id, group_id, permission_id) FROM stdin;
+\.
+
+
+--
+-- Name: auth_group_permissions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('auth_group_permissions_id_seq', 1, false);
+
+
+--
+-- Data for Name: auth_permission; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY auth_permission (id, name, content_type_id, codename) FROM stdin;
+1	Can add permission	1	add_permission
+2	Can change permission	1	change_permission
+3	Can delete permission	1	delete_permission
+4	Can add group	2	add_group
+5	Can change group	2	change_group
+6	Can delete group	2	delete_group
+7	Can add content type	3	add_contenttype
+8	Can change content type	3	change_contenttype
+9	Can delete content type	3	delete_contenttype
+10	Can add session	4	add_session
+11	Can change session	4	change_session
+12	Can delete session	4	delete_session
+13	Can add log entry	5	add_logentry
+14	Can change log entry	5	change_logentry
+15	Can delete log entry	5	delete_logentry
+16	Can add consumer communication channel	6	add_consumercommunicationchannel
+17	Can change consumer communication channel	6	change_consumercommunicationchannel
+18	Can delete consumer communication channel	6	delete_consumercommunicationchannel
+19	Can add delivery rating	7	add_deliveryrating
+20	Can change delivery rating	7	change_deliveryrating
+21	Can delete delivery rating	7	delete_deliveryrating
+22	Can add consumer donation recipient link	8	add_consumerdonationrecipientlink
+23	Can change consumer donation recipient link	8	change_consumerdonationrecipientlink
+24	Can delete consumer donation recipient link	8	delete_consumerdonationrecipientlink
+25	Can add drive external store id mapping	9	add_driveexternalstoreidmapping
+26	Can change drive external store id mapping	9	change_driveexternalstoreidmapping
+27	Can delete drive external store id mapping	9	delete_driveexternalstoreidmapping
+28	Can add consumer stripe customer link	10	add_consumerstripecustomerlink
+29	Can change consumer stripe customer link	10	change_consumerstripecustomerlink
+30	Can delete consumer stripe customer link	10	delete_consumerstripecustomerlink
+31	Can add image	11	add_image
+32	Can change image	11	change_image
+33	Can delete image	11	delete_image
+34	Can add consumer survey answer option	12	add_consumersurveyansweroption
+35	Can change consumer survey answer option	12	change_consumersurveyansweroption
+36	Can delete consumer survey answer option	12	delete_consumersurveyansweroption
+37	Can add error	13	add_error
+38	Can change error	13	change_error
+39	Can delete error	13	delete_error
+40	Can add experiment	14	add_experiment
+41	Can change experiment	14	change_experiment
+42	Can delete experiment	14	delete_experiment
+43	Can add consumer survey response	15	add_consumersurveyresponse
+44	Can change consumer survey response	15	change_consumersurveyresponse
+45	Can delete consumer survey response	15	delete_consumersurveyresponse
+46	Can add starting point set	16	add_startingpointset
+47	Can change starting point set	16	change_startingpointset
+48	Can delete starting point set	16	delete_startingpointset
+49	Can add dasher onboarding type	17	add_dasheronboardingtype
+50	Can change dasher onboarding type	17	change_dasheronboardingtype
+51	Can delete dasher onboarding type	17	delete_dasheronboardingtype
+52	Can add photo	18	add_photo
+53	Can change photo	18	change_photo
+54	Can delete photo	18	delete_photo
+55	Can add experiment2	19	add_experiment2
+56	Can change experiment2	19	change_experiment2
+57	Can delete experiment2	19	delete_experiment2
+58	Can add experiment override	20	add_experimentoverride
+59	Can change experiment override	20	change_experimentoverride
+60	Can delete experiment override	20	delete_experimentoverride
+61	Can add consumer promotion	21	add_consumerpromotion
+62	Can change consumer promotion	21	change_consumerpromotion
+63	Can delete consumer promotion	21	delete_consumerpromotion
+64	Can add weather forecast model	22	add_weatherforecastmodel
+65	Can change weather forecast model	22	change_weatherforecastmodel
+66	Can delete weather forecast model	22	delete_weatherforecastmodel
+67	Can add consumer faq	23	add_consumerfaq
+68	Can change consumer faq	23	change_consumerfaq
+69	Can delete consumer faq	23	delete_consumerfaq
+70	Can add promo code consumer link	24	add_promocodeconsumerlink
+71	Can change promo code consumer link	24	change_promocodeconsumerlink
+72	Can delete promo code consumer link	24	delete_promocodeconsumerlink
+73	Can add city	25	add_city
+74	Can change city	25	change_city
+75	Can delete city	25	delete_city
+76	Can add delivery rating category link	26	add_deliveryratingcategorylink
+77	Can change delivery rating category link	26	change_deliveryratingcategorylink
+78	Can delete delivery rating category link	26	delete_deliveryratingcategorylink
+79	Can add blacklisted user	27	add_blacklisteduser
+80	Can change blacklisted user	27	change_blacklisteduser
+81	Can delete blacklisted user	27	delete_blacklisteduser
+82	Can add consumer	28	add_consumer
+83	Can change consumer	28	change_consumer
+84	Can delete consumer	28	delete_consumer
+85	Can add delivery fee promotion	29	add_deliveryfeepromotion
+86	Can change delivery fee promotion	29	change_deliveryfeepromotion
+87	Can delete delivery fee promotion	29	delete_deliveryfeepromotion
+88	Can add compensation request	30	add_compensationrequest
+89	Can change compensation request	30	change_compensationrequest
+90	Can delete compensation request	30	delete_compensationrequest
+91	Can add drive store catering setup instruction	31	add_drivestorecateringsetupinstruction
+92	Can change drive store catering setup instruction	31	change_drivestorecateringsetupinstruction
+93	Can delete drive store catering setup instruction	31	delete_drivestorecateringsetupinstruction
+94	Can add dasher capacity model	32	add_dashercapacitymodel
+95	Can change dasher capacity model	32	change_dashercapacitymodel
+96	Can delete dasher capacity model	32	delete_dashercapacitymodel
+97	Can add experiment user	33	add_experimentuser
+98	Can change experiment user	33	change_experimentuser
+99	Can delete experiment user	33	delete_experimentuser
+100	Can add starting point geometry	34	add_startingpointgeometry
+101	Can change starting point geometry	34	change_startingpointgeometry
+102	Can delete starting point geometry	34	delete_startingpointgeometry
+103	Can add promotions featured location	35	add_promotionsfeaturedlocation
+104	Can change promotions featured location	35	change_promotionsfeaturedlocation
+105	Can delete promotions featured location	35	delete_promotionsfeaturedlocation
+106	Can add promotion place tag link	36	add_promotionplacetaglink
+107	Can change promotion place tag link	36	change_promotionplacetaglink
+108	Can delete promotion place tag link	36	delete_promotionplacetaglink
+109	Can add blacklisted consumer address	37	add_blacklistedconsumeraddress
+110	Can change blacklisted consumer address	37	change_blacklistedconsumeraddress
+111	Can delete blacklisted consumer address	37	delete_blacklistedconsumeraddress
+112	Can add market	38	add_market
+113	Can change market	38	change_market
+114	Can delete market	38	delete_market
+115	Can add percentage promotion	39	add_percentagepromotion
+116	Can change percentage promotion	39	change_percentagepromotion
+117	Can delete percentage promotion	39	delete_percentagepromotion
+118	Can add external hr employee	40	add_externalhremployee
+119	Can change external hr employee	40	change_externalhremployee
+120	Can delete external hr employee	40	delete_externalhremployee
+121	Can add experiment bucket assignment	41	add_experimentbucketassignment
+122	Can change experiment bucket assignment	41	change_experimentbucketassignment
+123	Can delete experiment bucket assignment	41	delete_experimentbucketassignment
+124	Can add consumer delivery rating category link	42	add_consumerdeliveryratingcategorylink
+125	Can change consumer delivery rating category link	42	change_consumerdeliveryratingcategorylink
+126	Can delete consumer delivery rating category link	42	delete_consumerdeliveryratingcategorylink
+127	Can add consumer donation	43	add_consumerdonation
+128	Can change consumer donation	43	change_consumerdonation
+129	Can delete consumer donation	43	delete_consumerdonation
+130	Can add promo code submarket link	44	add_promocodesubmarketlink
+131	Can change promo code submarket link	44	change_promocodesubmarketlink
+132	Can delete promo code submarket link	44	delete_promocodesubmarketlink
+133	Can add region	45	add_region
+134	Can change region	45	change_region
+135	Can delete region	45	delete_region
+136	Can add consumer subscription unit	46	add_consumersubscriptionunit
+137	Can change consumer subscription unit	46	change_consumersubscriptionunit
+138	Can delete consumer subscription unit	46	delete_consumersubscriptionunit
+139	Can add order cart discount	47	add_ordercartdiscount
+140	Can change order cart discount	47	change_ordercartdiscount
+141	Can delete order cart discount	47	delete_ordercartdiscount
+142	Can add promotion redemption event	48	add_promotionredemptionevent
+143	Can change promotion redemption event	48	change_promotionredemptionevent
+144	Can delete promotion redemption event	48	delete_promotionredemptionevent
+145	Can add sms opt out number	49	add_smsoptoutnumber
+146	Can change sms opt out number	49	change_smsoptoutnumber
+147	Can delete sms opt out number	49	delete_smsoptoutnumber
+148	Can add value delivery fee promotion	50	add_valuedeliveryfeepromotion
+149	Can change value delivery fee promotion	50	change_valuedeliveryfeepromotion
+150	Can delete value delivery fee promotion	50	delete_valuedeliveryfeepromotion
+151	Can add order item substitution event	51	add_orderitemsubstitutionevent
+152	Can change order item substitution event	51	change_orderitemsubstitutionevent
+153	Can delete order item substitution event	51	delete_orderitemsubstitutionevent
+154	Can add subnational division	52	add_subnationaldivision
+155	Can change subnational division	52	change_subnationaldivision
+156	Can delete subnational division	52	delete_subnationaldivision
+157	Can add delivery recipient	53	add_deliveryrecipient
+158	Can change delivery recipient	53	change_deliveryrecipient
+159	Can delete delivery recipient	53	delete_deliveryrecipient
+160	Can add starting point batching parameters	54	add_startingpointbatchingparameters
+161	Can change starting point batching parameters	54	change_startingpointbatchingparameters
+162	Can delete starting point batching parameters	54	delete_startingpointbatchingparameters
+163	Can add order menu option	55	add_ordermenuoption
+164	Can change order menu option	55	change_ordermenuoption
+165	Can delete order menu option	55	delete_ordermenuoption
+166	Can add blacklisted phone number	56	add_blacklistedphonenumber
+167	Can change blacklisted phone number	56	change_blacklistedphonenumber
+168	Can delete blacklisted phone number	56	delete_blacklistedphonenumber
+169	Can add consumer survey	57	add_consumersurvey
+170	Can change consumer survey	57	change_consumersurvey
+171	Can delete consumer survey	57	delete_consumersurvey
+172	Can add promotion submarket link	58	add_promotionsubmarketlink
+173	Can change promotion submarket link	58	change_promotionsubmarketlink
+174	Can delete promotion submarket link	58	delete_promotionsubmarketlink
+175	Can add order cart escalation	59	add_ordercartescalation
+176	Can change order cart escalation	59	change_ordercartescalation
+177	Can delete order cart escalation	59	delete_ordercartescalation
+178	Can add email notification	60	add_emailnotification
+179	Can change email notification	60	change_emailnotification
+180	Can delete email notification	60	delete_emailnotification
+181	Can add starting point r2c stats	61	add_startingpointr2cstats
+182	Can change starting point r2c stats	61	change_startingpointr2cstats
+183	Can delete starting point r2c stats	61	delete_startingpointr2cstats
+184	Can add photo shoot task	62	add_photoshoottask
+185	Can change photo shoot task	62	change_photoshoottask
+186	Can delete photo shoot task	62	delete_photoshoottask
+187	Can add delivery request submission monitor	63	add_deliveryrequestsubmissionmonitor
+188	Can change delivery request submission monitor	63	change_deliveryrequestsubmissionmonitor
+189	Can delete delivery request submission monitor	63	delete_deliveryrequestsubmissionmonitor
+190	Can add consumer subscription plan trial submarket link	64	add_consumersubscriptionplantrialsubmarketlink
+191	Can change consumer subscription plan trial submarket link	64	change_consumersubscriptionplantrialsubmarketlink
+192	Can delete consumer subscription plan trial submarket link	64	delete_consumersubscriptionplantrialsubmarketlink
+193	Can add address	65	add_address
+194	Can change address	65	change_address
+195	Can delete address	65	delete_address
+196	Can add consumer preferences category link	66	add_consumerpreferencescategorylink
+197	Can change consumer preferences category link	66	change_consumerpreferencescategorylink
+198	Can delete consumer preferences category link	66	delete_consumerpreferencescategorylink
+199	Can add photo feedback	67	add_photofeedback
+200	Can change photo feedback	67	change_photofeedback
+201	Can delete photo feedback	67	delete_photofeedback
+202	Can add consumer account credits transaction	68	add_consumeraccountcreditstransaction
+203	Can change consumer account credits transaction	68	change_consumeraccountcreditstransaction
+204	Can delete consumer account credits transaction	68	delete_consumeraccountcreditstransaction
+205	Can add store consumer review tag link	69	add_storeconsumerreviewtaglink
+206	Can change store consumer review tag link	69	change_storeconsumerreviewtaglink
+207	Can delete store consumer review tag link	69	delete_storeconsumerreviewtaglink
+208	Can add starting point assignment latency stats	70	add_startingpointassignmentlatencystats
+209	Can change starting point assignment latency stats	70	change_startingpointassignmentlatencystats
+210	Can delete starting point assignment latency stats	70	delete_startingpointassignmentlatencystats
+211	Can add weather historical model	71	add_weatherhistoricalmodel
+212	Can change weather historical model	71	change_weatherhistoricalmodel
+213	Can delete weather historical model	71	delete_weatherhistoricalmodel
+214	Can add starting point delivery duration stats	72	add_startingpointdeliverydurationstats
+215	Can change starting point delivery duration stats	72	change_startingpointdeliverydurationstats
+216	Can delete starting point delivery duration stats	72	delete_startingpointdeliverydurationstats
+217	Can add delivery growth prediction	73	add_deliverygrowthprediction
+218	Can change delivery growth prediction	73	change_deliverygrowthprediction
+219	Can delete delivery growth prediction	73	delete_deliverygrowthprediction
+220	Can add market special hours	74	add_marketspecialhours
+221	Can change market special hours	74	change_marketspecialhours
+222	Can delete market special hours	74	delete_marketspecialhours
+223	Can add price transparency bucket assignment	75	add_pricetransparencybucketassignment
+224	Can change price transparency bucket assignment	75	change_pricetransparencybucketassignment
+225	Can delete price transparency bucket assignment	75	delete_pricetransparencybucketassignment
+226	Can add curated category	76	add_curatedcategory
+227	Can change curated category	76	change_curatedcategory
+228	Can delete curated category	76	delete_curatedcategory
+229	Can add consumer subscription plan featured location link	77	add_consumersubscriptionplanfeaturedlocationlink
+230	Can change consumer subscription plan featured location link	77	change_consumersubscriptionplanfeaturedlocationlink
+231	Can delete consumer subscription plan featured location link	77	delete_consumersubscriptionplanfeaturedlocationlink
+232	Can add consumer account credits	78	add_consumeraccountcredits
+233	Can change consumer account credits	78	change_consumeraccountcredits
+234	Can delete consumer account credits	78	delete_consumeraccountcredits
+235	Can add store consumer review	79	add_storeconsumerreview
+236	Can change store consumer review	79	change_storeconsumerreview
+237	Can delete store consumer review	79	delete_storeconsumerreview
+238	Can add vanity url	80	add_vanityurl
+239	Can change vanity url	80	change_vanityurl
+240	Can delete vanity url	80	delete_vanityurl
+241	Can add consumer fraud info	81	add_consumerfraudinfo
+242	Can change consumer fraud info	81	change_consumerfraudinfo
+243	Can delete consumer fraud info	81	delete_consumerfraudinfo
+244	Can add vehicle reservation	82	add_vehiclereservation
+245	Can change vehicle reservation	82	change_vehiclereservation
+246	Can delete vehicle reservation	82	delete_vehiclereservation
+247	Can add blacklisted payment card	83	add_blacklistedpaymentcard
+248	Can change blacklisted payment card	83	change_blacklistedpaymentcard
+249	Can delete blacklisted payment card	83	delete_blacklistedpaymentcard
+250	Can add store confirmed time feature snapshot	84	add_storeconfirmedtimefeaturesnapshot
+251	Can change store confirmed time feature snapshot	84	change_storeconfirmedtimefeaturesnapshot
+252	Can delete store confirmed time feature snapshot	84	delete_storeconfirmedtimefeaturesnapshot
+253	Can add dasher onboarding	85	add_dasheronboarding
+254	Can change dasher onboarding	85	change_dasheronboarding
+255	Can delete dasher onboarding	85	delete_dasheronboarding
+256	Can add variable	86	add_variable
+257	Can change variable	86	change_variable
+258	Can delete variable	86	delete_variable
+259	Can add order item	87	add_orderitem
+260	Can change order item	87	change_orderitem
+261	Can delete order item	87	delete_orderitem
+262	Can add consumer verification status	88	add_consumerverificationstatus
+263	Can change consumer verification status	88	change_consumerverificationstatus
+264	Can delete consumer verification status	88	delete_consumerverificationstatus
+265	Can add consumer promotion campaign	89	add_consumerpromotioncampaign
+266	Can change consumer promotion campaign	89	change_consumerpromotioncampaign
+267	Can delete consumer promotion campaign	89	delete_consumerpromotioncampaign
+268	Can add submarket	90	add_submarket
+269	Can change submarket	90	change_submarket
+270	Can delete submarket	90	delete_submarket
+271	Can add blacklisted email	91	add_blacklistedemail
+272	Can change blacklisted email	91	change_blacklistedemail
+273	Can delete blacklisted email	91	delete_blacklistedemail
+274	Can add value promotion	92	add_valuepromotion
+275	Can change value promotion	92	change_valuepromotion
+276	Can delete value promotion	92	delete_valuepromotion
+277	Can add delivery receipt	93	add_deliveryreceipt
+278	Can change delivery receipt	93	change_deliveryreceipt
+279	Can delete delivery receipt	93	delete_deliveryreceipt
+280	Can add credit refund delivery error	94	add_creditrefunddeliveryerror
+281	Can change credit refund delivery error	94	change_creditrefunddeliveryerror
+282	Can delete credit refund delivery error	94	delete_creditrefunddeliveryerror
+283	Can add drive external batch id mapping	95	add_driveexternalbatchidmapping
+284	Can change drive external batch id mapping	95	change_driveexternalbatchidmapping
+285	Can delete drive external batch id mapping	95	delete_driveexternalbatchidmapping
+286	Can add district geometry	96	add_districtgeometry
+287	Can change district geometry	96	change_districtgeometry
+288	Can delete district geometry	96	delete_districtgeometry
+289	Can add consumer subscription plan trial featured location link	97	add_consumersubscriptionplantrialfeaturedlocationlink
+290	Can change consumer subscription plan trial featured location link	97	change_consumersubscriptionplantrialfeaturedlocationlink
+291	Can delete consumer subscription plan trial featured location link	97	delete_consumersubscriptionplantrialfeaturedlocationlink
+292	Can add gift code	98	add_giftcode
+293	Can change gift code	98	change_giftcode
+294	Can delete gift code	98	delete_giftcode
+295	Can add real time demand evaluation	99	add_realtimedemandevaluation
+296	Can change real time demand evaluation	99	change_realtimedemandevaluation
+297	Can delete real time demand evaluation	99	delete_realtimedemandevaluation
+298	Can add delivery gift	100	add_deliverygift
+299	Can change delivery gift	100	change_deliverygift
+300	Can delete delivery gift	100	delete_deliverygift
+301	Can add capacity planning evaluation	101	add_capacityplanningevaluation
+302	Can change capacity planning evaluation	101	change_capacityplanningevaluation
+303	Can delete capacity planning evaluation	101	delete_capacityplanningevaluation
+304	Can add order	102	add_order
+305	Can change order	102	change_order
+306	Can delete order	102	delete_order
+307	Can add business constants	103	add_businessconstants
+308	Can change business constants	103	change_businessconstants
+309	Can delete business constants	103	delete_businessconstants
+310	Can add eta prediction	104	add_etaprediction
+311	Can change eta prediction	104	change_etaprediction
+312	Can delete eta prediction	104	delete_etaprediction
+313	Can add place tag	105	add_placetag
+314	Can change place tag	105	change_placetag
+315	Can delete place tag	105	delete_placetag
+316	Can add shortened url	106	add_shortenedurl
+317	Can change shortened url	106	change_shortenedurl
+318	Can delete shortened url	106	delete_shortenedurl
+319	Can add drive effort based pay vars	107	add_driveeffortbasedpayvars
+320	Can change drive effort based pay vars	107	change_driveeffortbasedpayvars
+321	Can delete drive effort based pay vars	107	delete_driveeffortbasedpayvars
+322	Can add consumer discount	108	add_consumerdiscount
+323	Can change consumer discount	108	change_consumerdiscount
+324	Can delete consumer discount	108	delete_consumerdiscount
+325	Can add consumer delivery rating	109	add_consumerdeliveryrating
+326	Can change consumer delivery rating	109	change_consumerdeliveryrating
+327	Can delete consumer delivery rating	109	delete_consumerdeliveryrating
+328	Can add zendesk template	110	add_zendesktemplate
+329	Can change zendesk template	110	change_zendesktemplate
+330	Can delete zendesk template	110	delete_zendesktemplate
+331	Can add experiment version	111	add_experimentversion
+332	Can change experiment version	111	change_experimentversion
+333	Can delete experiment version	111	delete_experimentversion
+334	Can add free delivery promotion	112	add_freedeliverypromotion
+335	Can change free delivery promotion	112	change_freedeliverypromotion
+336	Can delete free delivery promotion	112	delete_freedeliverypromotion
+337	Can add rating category	113	add_ratingcategory
+338	Can change rating category	113	change_ratingcategory
+339	Can delete rating category	113	delete_ratingcategory
+340	Can add multi promotion	114	add_multipromotion
+341	Can change multi promotion	114	change_multipromotion
+342	Can delete multi promotion	114	delete_multipromotion
+343	Can add order cart pricing strategy	115	add_ordercartpricingstrategy
+344	Can change order cart pricing strategy	115	change_ordercartpricingstrategy
+345	Can delete order cart pricing strategy	115	delete_ordercartpricingstrategy
+346	Can add mass communication status	116	add_masscommunicationstatus
+347	Can change mass communication status	116	change_masscommunicationstatus
+348	Can delete mass communication status	116	delete_masscommunicationstatus
+349	Can add employment period	117	add_employmentperiod
+350	Can change employment period	117	change_employmentperiod
+351	Can delete employment period	117	delete_employmentperiod
+352	Can add consumer survey question	118	add_consumersurveyquestion
+353	Can change consumer survey question	118	change_consumersurveyquestion
+354	Can delete consumer survey question	118	delete_consumersurveyquestion
+355	Can add consumer address link	119	add_consumeraddresslink
+356	Can change consumer address link	119	change_consumeraddresslink
+357	Can delete consumer address link	119	delete_consumeraddresslink
+358	Can add address place tag link	120	add_addressplacetaglink
+359	Can change address place tag link	120	change_addressplacetaglink
+360	Can delete address place tag link	120	delete_addressplacetaglink
+361	Can add delivery item	121	add_deliveryitem
+362	Can change delivery item	121	change_deliveryitem
+363	Can delete delivery item	121	delete_deliveryitem
+364	Can add starting point	122	add_startingpoint
+365	Can change starting point	122	change_startingpoint
+366	Can delete starting point	122	delete_startingpoint
+367	Can add monthly culture shift	123	add_monthlycultureshift
+368	Can change monthly culture shift	123	change_monthlycultureshift
+369	Can delete monthly culture shift	123	delete_monthlycultureshift
+370	Can add donation recipient	124	add_donationrecipient
+371	Can change donation recipient	124	change_donationrecipient
+372	Can delete donation recipient	124	delete_donationrecipient
+373	Can add starting point flf thresholds	125	add_startingpointflfthresholds
+374	Can change starting point flf thresholds	125	change_startingpointflfthresholds
+375	Can delete starting point flf thresholds	125	delete_startingpointflfthresholds
+376	Can add consumer channel	126	add_consumerchannel
+377	Can change consumer channel	126	change_consumerchannel
+378	Can delete consumer channel	126	delete_consumerchannel
+379	Can add district	127	add_district
+380	Can change district	127	change_district
+381	Can delete district	127	delete_district
+382	Can add kill switch interval	128	add_killswitchinterval
+383	Can change kill switch interval	128	change_killswitchinterval
+384	Can delete kill switch interval	128	delete_killswitchinterval
+385	Can add daily business metrics	129	add_dailybusinessmetrics
+386	Can change daily business metrics	129	change_dailybusinessmetrics
+387	Can delete daily business metrics	129	delete_dailybusinessmetrics
+388	Can add depot	130	add_depot
+389	Can change depot	130	change_depot
+390	Can delete depot	130	delete_depot
+391	Can add promo code	131	add_promocode
+392	Can change promo code	131	change_promocode
+393	Can delete promo code	131	delete_promocode
+394	Can add consumer subscription plan submarket link	132	add_consumersubscriptionplansubmarketlink
+395	Can change consumer subscription plan submarket link	132	change_consumersubscriptionplansubmarketlink
+396	Can delete consumer subscription plan submarket link	132	delete_consumersubscriptionplansubmarketlink
+397	Can add order item extra option	133	add_orderitemextraoption
+398	Can change order item extra option	133	change_orderitemextraoption
+399	Can delete order item extra option	133	delete_orderitemextraoption
+400	Can add consumer subscription plan trial	134	add_consumersubscriptionplantrial
+401	Can change consumer subscription plan trial	134	change_consumersubscriptionplantrial
+402	Can delete consumer subscription plan trial	134	delete_consumersubscriptionplantrial
+403	Can add photo shoot	135	add_photoshoot
+404	Can change photo shoot	135	change_photoshoot
+405	Can delete photo shoot	135	delete_photoshoot
+406	Can add delivery simulator	136	add_deliverysimulator
+407	Can change delivery simulator	136	change_deliverysimulator
+408	Can delete delivery simulator	136	delete_deliverysimulator
+409	Can add base price sos event	137	add_basepricesosevent
+410	Can change base price sos event	137	change_basepricesosevent
+411	Can delete base price sos event	137	delete_basepricesosevent
+412	Can add consumer subscription	138	add_consumersubscription
+413	Can change consumer subscription	138	change_consumersubscription
+414	Can delete consumer subscription	138	delete_consumersubscription
+415	Can add consumer announcement	139	add_consumerannouncement
+416	Can change consumer announcement	139	change_consumerannouncement
+417	Can delete consumer announcement	139	delete_consumerannouncement
+418	Can add store order cart	140	add_storeordercart
+419	Can change store order cart	140	change_storeordercart
+420	Can delete store order cart	140	delete_storeordercart
+421	Can add delivery drive info	141	add_deliverydriveinfo
+422	Can change delivery drive info	141	change_deliverydriveinfo
+423	Can delete delivery drive info	141	delete_deliverydriveinfo
+424	Can add currency exchange rate	142	add_currencyexchangerate
+425	Can change currency exchange rate	142	change_currencyexchangerate
+426	Can delete currency exchange rate	142	delete_currencyexchangerate
+427	Can add consumer push notification	143	add_consumerpushnotification
+428	Can change consumer push notification	143	change_consumerpushnotification
+429	Can delete consumer push notification	143	delete_consumerpushnotification
+430	Can add consumer announcement district link	144	add_consumerannouncementdistrictlink
+431	Can change consumer announcement district link	144	change_consumerannouncementdistrictlink
+432	Can delete consumer announcement district link	144	delete_consumerannouncementdistrictlink
+433	Can add photographer	145	add_photographer
+434	Can change photographer	145	change_photographer
+435	Can delete photographer	145	delete_photographer
+436	Can add search engine store feed	146	add_searchenginestorefeed
+437	Can change search engine store feed	146	change_searchenginestorefeed
+438	Can delete search engine store feed	146	delete_searchenginestorefeed
+439	Can add delivery catering verification	147	add_deliverycateringverification
+440	Can change delivery catering verification	147	change_deliverycateringverification
+441	Can delete delivery catering verification	147	delete_deliverycateringverification
+442	Can add delivery growth model	148	add_deliverygrowthmodel
+443	Can change delivery growth model	148	change_deliverygrowthmodel
+444	Can delete delivery growth model	148	delete_deliverygrowthmodel
+445	Can add verification attempt	149	add_verificationattempt
+446	Can change verification attempt	149	change_verificationattempt
+447	Can delete verification attempt	149	delete_verificationattempt
+448	Can add consumer delivery rating category	150	add_consumerdeliveryratingcategory
+449	Can change consumer delivery rating category	150	change_consumerdeliveryratingcategory
+450	Can delete consumer delivery rating category	150	delete_consumerdeliveryratingcategory
+451	Can add developer	151	add_developer
+452	Can change developer	151	change_developer
+453	Can delete developer	151	delete_developer
+454	Can add issue	152	add_issue
+455	Can change issue	152	change_issue
+456	Can delete issue	152	delete_issue
+457	Can add country	153	add_country
+458	Can change country	153	change_country
+459	Can delete country	153	delete_country
+460	Can add real time supply model	154	add_realtimesupplymodel
+461	Can change real time supply model	154	change_realtimesupplymodel
+462	Can delete real time supply model	154	delete_realtimesupplymodel
+463	Can add estimate	155	add_estimate
+464	Can change estimate	155	change_estimate
+465	Can delete estimate	155	delete_estimate
+466	Can add delivery cancellation reason category	156	add_deliverycancellationreasoncategory
+467	Can change delivery cancellation reason category	156	change_deliverycancellationreasoncategory
+468	Can delete delivery cancellation reason category	156	delete_deliverycancellationreasoncategory
+469	Can add seo local region	157	add_seolocalregion
+470	Can change seo local region	157	change_seolocalregion
+471	Can delete seo local region	157	delete_seolocalregion
+472	Can add store order place latency stats	158	add_storeorderplacelatencystats
+473	Can change store order place latency stats	158	change_storeorderplacelatencystats
+474	Can delete store order place latency stats	158	delete_storeorderplacelatencystats
+475	Can add event	159	add_event
+476	Can change event	159	change_event
+477	Can delete event	159	delete_event
+478	Can add store point of sale transaction	160	add_storepointofsaletransaction
+479	Can change store point of sale transaction	160	change_storepointofsaletransaction
+480	Can delete store point of sale transaction	160	delete_storepointofsaletransaction
+481	Can add consumer preferences	161	add_consumerpreferences
+482	Can change consumer preferences	161	change_consumerpreferences
+483	Can delete consumer preferences	161	delete_consumerpreferences
+484	Can add scheduled caps boost	162	add_scheduledcapsboost
+485	Can change scheduled caps boost	162	change_scheduledcapsboost
+486	Can delete scheduled caps boost	162	delete_scheduledcapsboost
+487	Can add experiment distribution	163	add_experimentdistribution
+488	Can change experiment distribution	163	change_experimentdistribution
+489	Can delete experiment distribution	163	delete_experimentdistribution
+490	Can add order cart	164	add_ordercart
+491	Can change order cart	164	change_ordercart
+492	Can delete order cart	164	delete_ordercart
+493	Can add sms help message status	165	add_smshelpmessagestatus
+494	Can change sms help message status	165	change_smshelpmessagestatus
+495	Can delete sms help message status	165	delete_smshelpmessagestatus
+496	Can add referral program	166	add_referralprogram
+497	Can change referral program	166	change_referralprogram
+498	Can delete referral program	166	delete_referralprogram
+499	Can add credit refund order item error	167	add_creditrefundorderitemerror
+500	Can change credit refund order item error	167	change_creditrefundorderitemerror
+501	Can delete credit refund order item error	167	delete_creditrefundorderitemerror
+502	Can add store delivery duration stats	168	add_storedeliverydurationstats
+503	Can change store delivery duration stats	168	change_storedeliverydurationstats
+504	Can delete store delivery duration stats	168	delete_storedeliverydurationstats
+505	Can add communication preferences channel link	169	add_communicationpreferenceschannellink
+506	Can change communication preferences channel link	169	change_communicationpreferenceschannellink
+507	Can delete communication preferences channel link	169	delete_communicationpreferenceschannellink
+508	Can add delivery cancellation reason	170	add_deliverycancellationreason
+509	Can change delivery cancellation reason	170	change_deliverycancellationreason
+510	Can delete delivery cancellation reason	170	delete_deliverycancellationreason
+511	Can add snapshot	171	add_snapshot
+512	Can change snapshot	171	change_snapshot
+513	Can delete snapshot	171	delete_snapshot
+514	Can add drive quote	172	add_drivequote
+515	Can change drive quote	172	change_drivequote
+516	Can delete drive quote	172	delete_drivequote
+517	Can add consumer communication preferences	173	add_consumercommunicationpreferences
+518	Can change consumer communication preferences	173	change_consumercommunicationpreferences
+519	Can delete consumer communication preferences	173	delete_consumercommunicationpreferences
+520	Can add drive delivery identifier mapping	174	add_drivedeliveryidentifiermapping
+521	Can change drive delivery identifier mapping	174	change_drivedeliveryidentifiermapping
+522	Can delete drive delivery identifier mapping	174	delete_drivedeliveryidentifiermapping
+523	Can add apple notification app	175	add_applenotificationapp
+524	Can change apple notification app	175	change_applenotificationapp
+525	Can delete apple notification app	175	delete_applenotificationapp
+526	Can add consumer survey question response	176	add_consumersurveyquestionresponse
+527	Can change consumer survey question response	176	change_consumersurveyquestionresponse
+528	Can delete consumer survey question response	176	delete_consumersurveyquestionresponse
+529	Can add real time supply prediction	177	add_realtimesupplyprediction
+530	Can change real time supply prediction	177	change_realtimesupplyprediction
+531	Can delete real time supply prediction	177	delete_realtimesupplyprediction
+532	Can add dispatcher	178	add_dispatcher
+533	Can change dispatcher	178	change_dispatcher
+534	Can delete dispatcher	178	delete_dispatcher
+535	Can add store consumer review tag	179	add_storeconsumerreviewtag
+536	Can change store consumer review tag	179	change_storeconsumerreviewtag
+537	Can delete store consumer review tag	179	delete_storeconsumerreviewtag
+538	Can add event category	180	add_eventcategory
+539	Can change event category	180	change_eventcategory
+540	Can delete event category	180	delete_eventcategory
+541	Can add email preference	181	add_emailpreference
+542	Can change email preference	181	change_emailpreference
+543	Can delete email preference	181	delete_emailpreference
+544	Can add delivery	182	add_delivery
+545	Can change delivery	182	change_delivery
+546	Can delete delivery	182	delete_delivery
+547	Can add consumer variable pay	183	add_consumervariablepay
+548	Can change consumer variable pay	183	change_consumervariablepay
+549	Can delete consumer variable pay	183	delete_consumervariablepay
+550	Can add error source	184	add_errorsource
+551	Can change error source	184	change_errorsource
+552	Can delete error source	184	delete_errorsource
+553	Can add consumer subscription plan promotion info	185	add_consumersubscriptionplanpromotioninfo
+554	Can change consumer subscription plan promotion info	185	change_consumersubscriptionplanpromotioninfo
+555	Can delete consumer subscription plan promotion info	185	delete_consumersubscriptionplanpromotioninfo
+556	Can add user activation change event	186	add_useractivationchangeevent
+557	Can change user activation change event	186	change_useractivationchangeevent
+558	Can delete user activation change event	186	delete_useractivationchangeevent
+559	Can add consumer terms of service	187	add_consumertermsofservice
+560	Can change consumer terms of service	187	change_consumertermsofservice
+561	Can delete consumer terms of service	187	delete_consumertermsofservice
+562	Can add drive order	188	add_driveorder
+563	Can change drive order	188	change_driveorder
+564	Can delete drive order	188	delete_driveorder
+565	Can add order cart escalation reason	189	add_ordercartescalationreason
+566	Can change order cart escalation reason	189	change_ordercartescalationreason
+567	Can delete order cart escalation reason	189	delete_ordercartescalationreason
+568	Can add consumer store request	190	add_consumerstorerequest
+569	Can change consumer store request	190	change_consumerstorerequest
+570	Can delete consumer store request	190	delete_consumerstorerequest
+571	Can add consumer tos link	191	add_consumertoslink
+572	Can change consumer tos link	191	change_consumertoslink
+573	Can delete consumer tos link	191	delete_consumertoslink
+574	Can add consumer favorites	192	add_consumerfavorites
+575	Can change consumer favorites	192	change_consumerfavorites
+576	Can delete consumer favorites	192	delete_consumerfavorites
+577	Can add starship delivery info	193	add_starshipdeliveryinfo
+578	Can change starship delivery info	193	change_starshipdeliveryinfo
+579	Can delete starship delivery info	193	delete_starshipdeliveryinfo
+580	Can add drive business mapping	194	add_drivebusinessmapping
+581	Can change drive business mapping	194	change_drivebusinessmapping
+582	Can delete drive business mapping	194	delete_drivebusinessmapping
+583	Can add twilio masking number assignment	195	add_twiliomaskingnumberassignment
+584	Can change twilio masking number assignment	195	change_twiliomaskingnumberassignment
+585	Can delete twilio masking number assignment	195	delete_twiliomaskingnumberassignment
+586	Can add drive quote acceptance	196	add_drivequoteacceptance
+587	Can change drive quote acceptance	196	change_drivequoteacceptance
+588	Can delete drive quote acceptance	196	delete_drivequoteacceptance
+589	Can add consumer profile edit history	197	add_consumerprofileedithistory
+590	Can change consumer profile edit history	197	change_consumerprofileedithistory
+591	Can delete consumer profile edit history	197	delete_consumerprofileedithistory
+592	Can add empty store list request	198	add_emptystorelistrequest
+593	Can change empty store list request	198	change_emptystorelistrequest
+594	Can delete empty store list request	198	delete_emptystorelistrequest
+595	Can add delivery assignment constraint	199	add_deliveryassignmentconstraint
+596	Can change delivery assignment constraint	199	change_deliveryassignmentconstraint
+597	Can delete delivery assignment constraint	199	delete_deliveryassignmentconstraint
+598	Can add delivery set	200	add_deliveryset
+599	Can change delivery set	200	change_deliveryset
+600	Can delete delivery set	200	delete_deliveryset
+601	Can add order cart consumer promotion link	201	add_ordercartconsumerpromotionlink
+602	Can change order cart consumer promotion link	201	change_ordercartconsumerpromotionlink
+603	Can delete order cart consumer promotion link	201	delete_ordercartconsumerpromotionlink
+604	Can add consumer subscription plan	202	add_consumersubscriptionplan
+605	Can change consumer subscription plan	202	change_consumersubscriptionplan
+606	Can delete consumer subscription plan	202	delete_consumersubscriptionplan
+607	Can add drive webhook event	203	add_drivewebhookevent
+608	Can change drive webhook event	203	change_drivewebhookevent
+609	Can delete drive webhook event	203	delete_drivewebhookevent
+610	Can add credit refund error	204	add_creditrefunderror
+611	Can change credit refund error	204	change_creditrefunderror
+612	Can delete credit refund error	204	delete_creditrefunderror
+613	Can add starting point delivery hours	205	add_startingpointdeliveryhours
+614	Can change starting point delivery hours	205	change_startingpointdeliveryhours
+615	Can delete starting point delivery hours	205	delete_startingpointdeliveryhours
+616	Can add email holdout group	206	add_emailholdoutgroup
+617	Can change email holdout group	206	change_emailholdoutgroup
+618	Can delete email holdout group	206	delete_emailholdoutgroup
+619	Can add model annotation	207	add_modelannotation
+620	Can change model annotation	207	change_modelannotation
+621	Can delete model annotation	207	delete_modelannotation
+622	Can add consumer referral	208	add_consumerreferral
+623	Can change consumer referral	208	change_consumerreferral
+624	Can delete consumer referral	208	delete_consumerreferral
+625	Can add gatekeeper	209	add_gatekeeper
+626	Can change gatekeeper	209	change_gatekeeper
+627	Can delete gatekeeper	209	delete_gatekeeper
+628	Can add dasher capacity plan	210	add_dashercapacityplan
+629	Can change dasher capacity plan	210	change_dashercapacityplan
+630	Can delete dasher capacity plan	210	delete_dashercapacityplan
+631	Can add github activity metrics	211	add_githubactivitymetrics
+632	Can change github activity metrics	211	change_githubactivitymetrics
+633	Can delete github activity metrics	211	delete_githubactivitymetrics
+634	Can add twilio masking number	212	add_twiliomaskingnumber
+635	Can change twilio masking number	212	change_twiliomaskingnumber
+636	Can delete twilio masking number	212	delete_twiliomaskingnumber
+637	Can add promotion featured location link	213	add_promotionfeaturedlocationlink
+638	Can change promotion featured location link	213	change_promotionfeaturedlocationlink
+639	Can delete promotion featured location link	213	delete_promotionfeaturedlocationlink
+640	Can add order cart discount component source type	214	add_ordercartdiscountcomponentsourcetype
+641	Can change order cart discount component source type	214	change_ordercartdiscountcomponentsourcetype
+642	Can delete order cart discount component source type	214	delete_ordercartdiscountcomponentsourcetype
+643	Can add order cart discount component	215	add_ordercartdiscountcomponent
+644	Can change order cart discount component	215	change_ordercartdiscountcomponent
+645	Can delete order cart discount component	215	delete_ordercartdiscountcomponent
+646	Can add twilio number	216	add_twilionumber
+647	Can change twilio number	216	change_twilionumber
+648	Can delete twilio number	216	delete_twilionumber
+649	Can add platform	217	add_platform
+650	Can change platform	217	change_platform
+651	Can delete platform	217	delete_platform
+652	Can add attribution data	218	add_attributiondata
+653	Can change attribution data	218	change_attributiondata
+654	Can delete attribution data	218	delete_attributiondata
+655	Can add d d4b expense code	219	add_dd4bexpensecode
+656	Can change d d4b expense code	219	change_dd4bexpensecode
+657	Can delete d d4b expense code	219	delete_dd4bexpensecode
+658	Can add site outage	220	add_siteoutage
+659	Can change site outage	220	change_siteoutage
+660	Can delete site outage	220	delete_siteoutage
+661	Can add curated category membership	221	add_curatedcategorymembership
+662	Can change curated category membership	221	change_curatedcategorymembership
+663	Can delete curated category membership	221	delete_curatedcategorymembership
+664	Can add order placer queue state	222	add_orderplacerqueuestate
+665	Can change order placer queue state	222	change_orderplacerqueuestate
+666	Can delete order placer queue state	222	delete_orderplacerqueuestate
+667	Can add user deactivation source	223	add_userdeactivationsource
+668	Can change user deactivation source	223	change_userdeactivationsource
+669	Can delete user deactivation source	223	delete_userdeactivationsource
+670	Can add delivery set mapping	224	add_deliverysetmapping
+671	Can change delivery set mapping	224	change_deliverysetmapping
+672	Can delete delivery set mapping	224	delete_deliverysetmapping
+673	Can add share	225	add_share
+674	Can change share	225	change_share
+675	Can delete share	225	delete_share
+676	Can add delivery masking number assignment	226	add_deliverymaskingnumberassignment
+677	Can change delivery masking number assignment	226	change_deliverymaskingnumberassignment
+678	Can delete delivery masking number assignment	226	delete_deliverymaskingnumberassignment
+679	Can add drive webhook subscription	227	add_drivewebhooksubscription
+680	Can change drive webhook subscription	227	change_drivewebhooksubscription
+681	Can delete drive webhook subscription	227	delete_drivewebhooksubscription
+682	Can add promotion consumer link	228	add_promotionconsumerlink
+683	Can change promotion consumer link	228	change_promotionconsumerlink
+684	Can delete promotion consumer link	228	delete_promotionconsumerlink
+685	Can add employee	229	add_employee
+686	Can change employee	229	change_employee
+687	Can delete employee	229	delete_employee
+688	Can add shift delivery set assignment	230	add_shiftdeliverysetassignment
+689	Can change shift delivery set assignment	230	change_shiftdeliverysetassignment
+690	Can delete shift delivery set assignment	230	delete_shiftdeliverysetassignment
+691	Can add shift delivery assignment2	231	add_shiftdeliveryassignment2
+692	Can change shift delivery assignment2	231	change_shiftdeliveryassignment2
+693	Can delete shift delivery assignment2	231	delete_shiftdeliveryassignment2
+694	Can add built in tax category rule	232	add_builtintaxcategoryrule
+695	Can change built in tax category rule	232	change_builtintaxcategoryrule
+696	Can delete built in tax category rule	232	delete_builtintaxcategoryrule
+697	Can add merchant promotion target	233	add_merchantpromotiontarget
+698	Can change merchant promotion target	233	change_merchantpromotiontarget
+699	Can delete merchant promotion target	233	delete_merchantpromotiontarget
+700	Can add store promotion membership	234	add_storepromotionmembership
+701	Can change store promotion membership	234	change_storepromotionmembership
+702	Can delete store promotion membership	234	delete_storepromotionmembership
+703	Can add store open hours	235	add_storeopenhours
+704	Can change store open hours	235	change_storeopenhours
+705	Can delete store open hours	235	delete_storeopenhours
+706	Can add opaque id mapping	236	add_opaqueidmapping
+707	Can change opaque id mapping	236	change_opaqueidmapping
+708	Can delete opaque id mapping	236	delete_opaqueidmapping
+709	Can add bounty payment	237	add_bountypayment
+710	Can change bounty payment	237	change_bountypayment
+711	Can delete bounty payment	237	delete_bountypayment
+712	Can add merchant promotion category	238	add_merchantpromotioncategory
+713	Can change merchant promotion category	238	change_merchantpromotioncategory
+714	Can delete merchant promotion category	238	delete_merchantpromotioncategory
+715	Can add business group	239	add_businessgroup
+716	Can change business group	239	change_businessgroup
+717	Can delete business group	239	delete_businessgroup
+718	Can add magic meal	240	add_magicmeal
+719	Can change magic meal	240	change_magicmeal
+720	Can delete magic meal	240	delete_magicmeal
+721	Can add store order cart payment info	241	add_storeordercartpaymentinfo
+722	Can change store order cart payment info	241	change_storeordercartpaymentinfo
+723	Can delete store order cart payment info	241	delete_storeordercartpaymentinfo
+724	Can add store delivery constraints	242	add_storedeliveryconstraints
+725	Can change store delivery constraints	242	change_storedeliveryconstraints
+726	Can delete store delivery constraints	242	delete_storedeliveryconstraints
+727	Can add business tag link	243	add_businesstaglink
+728	Can change business tag link	243	change_businesstaglink
+729	Can delete business tag link	243	delete_businesstaglink
+730	Can add store sort boost	244	add_storesortboost
+731	Can change store sort boost	244	change_storesortboost
+732	Can delete store sort boost	244	delete_storesortboost
+733	Can add partner loyalty program	245	add_partnerloyaltyprogram
+734	Can change partner loyalty program	245	change_partnerloyaltyprogram
+735	Can delete partner loyalty program	245	delete_partnerloyaltyprogram
+736	Can add item vehicle type link	246	add_itemvehicletypelink
+737	Can change item vehicle type link	246	change_itemvehicletypelink
+738	Can delete item vehicle type link	246	delete_itemvehicletypelink
+739	Can add merchant robocall	247	add_merchantrobocall
+740	Can change merchant robocall	247	change_merchantrobocall
+741	Can delete merchant robocall	247	delete_merchantrobocall
+742	Can add store deactivation reason category	248	add_storedeactivationreasoncategory
+743	Can change store deactivation reason category	248	change_storedeactivationreasoncategory
+744	Can delete store deactivation reason category	248	delete_storedeactivationreasoncategory
+745	Can add merchant announcement store views	249	add_merchantannouncementstoreviews
+746	Can change merchant announcement store views	249	change_merchantannouncementstoreviews
+747	Can delete merchant announcement store views	249	delete_merchantannouncementstoreviews
+748	Can add temporary deactivation reason category	250	add_temporarydeactivationreasoncategory
+749	Can change temporary deactivation reason category	250	change_temporarydeactivationreasoncategory
+750	Can delete temporary deactivation reason category	250	delete_temporarydeactivationreasoncategory
+751	Can add merchant announcement	251	add_merchantannouncement
+752	Can change merchant announcement	251	change_merchantannouncement
+753	Can delete merchant announcement	251	delete_merchantannouncement
+754	Can add merchant role	252	add_merchantrole
+755	Can change merchant role	252	change_merchantrole
+756	Can delete merchant role	252	delete_merchantrole
+757	Can add store point of sale info	253	add_storepointofsaleinfo
+758	Can change store point of sale info	253	change_storepointofsaleinfo
+759	Can delete store point of sale info	253	delete_storepointofsaleinfo
+760	Can add tax category rule	254	add_taxcategoryrule
+761	Can change tax category rule	254	change_taxcategoryrule
+762	Can delete tax category rule	254	delete_taxcategoryrule
+763	Can add business referred customer	255	add_businessreferredcustomer
+764	Can change business referred customer	255	change_businessreferredcustomer
+765	Can delete business referred customer	255	delete_businessreferredcustomer
+766	Can add product code item tag link	256	add_productcodeitemtaglink
+767	Can change product code item tag link	256	change_productcodeitemtaglink
+768	Can delete product code item tag link	256	delete_productcodeitemtaglink
+769	Can add store disclaimer	257	add_storedisclaimer
+770	Can change store disclaimer	257	change_storedisclaimer
+771	Can delete store disclaimer	257	delete_storedisclaimer
+772	Can add menu option	258	add_menuoption
+773	Can change menu option	258	change_menuoption
+774	Can delete menu option	258	delete_menuoption
+775	Can add store composite score data	259	add_storecompositescoredata
+776	Can change store composite score data	259	change_storecompositescoredata
+777	Can delete store composite score data	259	delete_storecompositescoredata
+778	Can add temporary deactivation reason	260	add_temporarydeactivationreason
+779	Can change temporary deactivation reason	260	change_temporarydeactivationreason
+780	Can delete temporary deactivation reason	260	delete_temporarydeactivationreason
+781	Can add merchant role permission link	261	add_merchantrolepermissionlink
+782	Can change merchant role permission link	261	change_merchantrolepermissionlink
+783	Can delete merchant role permission link	261	delete_merchantrolepermissionlink
+784	Can add item tag group	262	add_itemtaggroup
+785	Can change item tag group	262	change_itemtaggroup
+786	Can delete item tag group	262	delete_itemtaggroup
+787	Can add store item extra option deactivation	263	add_storeitemextraoptiondeactivation
+788	Can change store item extra option deactivation	263	change_storeitemextraoptiondeactivation
+789	Can delete store item extra option deactivation	263	delete_storeitemextraoptiondeactivation
+790	Can add qr code action	264	add_qrcodeaction
+791	Can change qr code action	264	change_qrcodeaction
+792	Can delete qr code action	264	delete_qrcodeaction
+793	Can add business tag	265	add_businesstag
+794	Can change business tag	265	change_businesstag
+795	Can delete business tag	265	delete_businesstag
+796	Can add store disclaimer link	266	add_storedisclaimerlink
+797	Can change store disclaimer link	266	change_storedisclaimerlink
+798	Can delete store disclaimer link	266	delete_storedisclaimerlink
+799	Can add store menu category deactivation	267	add_storemenucategorydeactivation
+800	Can change store menu category deactivation	267	change_storemenucategorydeactivation
+801	Can delete store menu category deactivation	267	delete_storemenucategorydeactivation
+802	Can add merchant	268	add_merchant
+803	Can change merchant	268	change_merchant
+804	Can delete merchant	268	delete_merchant
+805	Can add blacklisted dasher by store	269	add_blacklisteddasherbystore
+806	Can change blacklisted dasher by store	269	change_blacklisteddasherbystore
+807	Can delete blacklisted dasher by store	269	delete_blacklisteddasherbystore
+808	Can add store closure	270	add_storeclosure
+809	Can change store closure	270	change_storeclosure
+810	Can delete store closure	270	delete_storeclosure
+811	Can add store special hours	271	add_storespecialhours
+812	Can change store special hours	271	change_storespecialhours
+813	Can delete store special hours	271	delete_storespecialhours
+814	Can add merchant announcement store interval	272	add_merchantannouncementstoreinterval
+980	Can change bounty program	327	change_bountyprogram
+815	Can change merchant announcement store interval	272	change_merchantannouncementstoreinterval
+816	Can delete merchant announcement store interval	272	delete_merchantannouncementstoreinterval
+817	Can add store bounty program link	273	add_storebountyprogramlink
+818	Can change store bounty program link	273	change_storebountyprogramlink
+819	Can delete store bounty program link	273	delete_storebountyprogramlink
+820	Can add store item extra deactivation	274	add_storeitemextradeactivation
+821	Can change store item extra deactivation	274	change_storeitemextradeactivation
+822	Can delete store item extra deactivation	274	delete_storeitemextradeactivation
+823	Can add store push device	275	add_storepushdevice
+824	Can change store push device	275	change_storepushdevice
+825	Can delete store push device	275	delete_storepushdevice
+826	Can add item tag	276	add_itemtag
+827	Can change item tag	276	change_itemtag
+828	Can delete item tag	276	delete_itemtag
+829	Can add store partnership	277	add_storepartnership
+830	Can change store partnership	277	change_storepartnership
+831	Can delete store partnership	277	delete_storepartnership
+832	Can add store payment account link	278	add_storepaymentaccountlink
+833	Can change store payment account link	278	change_storepaymentaccountlink
+834	Can delete store payment account link	278	delete_storepaymentaccountlink
+835	Can add store delivery stat	279	add_storedeliverystat
+836	Can change store delivery stat	279	change_storedeliverystat
+837	Can delete store delivery stat	279	delete_storedeliverystat
+838	Can add temporary deactivation	280	add_temporarydeactivation
+839	Can change temporary deactivation	280	change_temporarydeactivation
+840	Can delete temporary deactivation	280	delete_temporarydeactivation
+841	Can add business category	281	add_businesscategory
+842	Can change business category	281	change_businesscategory
+843	Can delete business category	281	delete_businesscategory
+844	Can add menu	282	add_menu
+845	Can change menu	282	change_menu
+846	Can delete menu	282	delete_menu
+847	Can add menu to pilot menu	283	add_menutopilotmenu
+848	Can change menu to pilot menu	283	change_menutopilotmenu
+849	Can delete menu to pilot menu	283	delete_menutopilotmenu
+850	Can add drive partnership	284	add_drivepartnership
+851	Can change drive partnership	284	change_drivepartnership
+852	Can delete drive partnership	284	delete_drivepartnership
+853	Can add merchant promotion generated codes for consumer	285	add_merchantpromotiongeneratedcodesforconsumer
+854	Can change merchant promotion generated codes for consumer	285	change_merchantpromotiongeneratedcodesforconsumer
+855	Can delete merchant promotion generated codes for consumer	285	delete_merchantpromotiongeneratedcodesforconsumer
+856	Can add merchant promotion	286	add_merchantpromotion
+857	Can change merchant promotion	286	change_merchantpromotion
+858	Can delete merchant promotion	286	delete_merchantpromotion
+859	Can add merchant tax transaction	287	add_merchanttaxtransaction
+860	Can change merchant tax transaction	287	change_merchanttaxtransaction
+861	Can delete merchant tax transaction	287	delete_merchanttaxtransaction
+862	Can add item popularity	288	add_itempopularity
+863	Can change item popularity	288	change_itempopularity
+864	Can delete item popularity	288	delete_itempopularity
+865	Can add store deactivation reason	289	add_storedeactivationreason
+866	Can change store deactivation reason	289	change_storedeactivationreason
+867	Can delete store deactivation reason	289	delete_storedeactivationreason
+868	Can add merchant device link	290	add_merchantdevicelink
+869	Can change merchant device link	290	change_merchantdevicelink
+870	Can delete merchant device link	290	delete_merchantdevicelink
+871	Can add yelp business	291	add_yelpbusiness
+872	Can change yelp business	291	change_yelpbusiness
+873	Can delete yelp business	291	delete_yelpbusiness
+874	Can add account owner	292	add_accountowner
+875	Can change account owner	292	change_accountowner
+876	Can delete account owner	292	delete_accountowner
+877	Can add item item tag link	293	add_itemitemtaglink
+878	Can change item item tag link	293	change_itemitemtaglink
+879	Can delete item item tag link	293	delete_itemitemtaglink
+880	Can add business vertical	294	add_businessvertical
+881	Can change business vertical	294	change_businessvertical
+882	Can delete business vertical	294	delete_businessvertical
+883	Can add menu category	295	add_menucategory
+884	Can change menu category	295	change_menucategory
+885	Can delete menu category	295	delete_menucategory
+886	Can add merchant promotion store order cart link	296	add_merchantpromotionstoreordercartlink
+887	Can change merchant promotion store order cart link	296	change_merchantpromotionstoreordercartlink
+888	Can delete merchant promotion store order cart link	296	delete_merchantpromotionstoreordercartlink
+889	Can add payment protocol	297	add_paymentprotocol
+890	Can change payment protocol	297	change_paymentprotocol
+891	Can delete payment protocol	297	delete_paymentprotocol
+892	Can add business vertical item tag link	298	add_businessverticalitemtaglink
+893	Can change business vertical item tag link	298	change_businessverticalitemtaglink
+894	Can delete business vertical item tag link	298	delete_businessverticalitemtaglink
+895	Can add item extra option item extra link	299	add_itemextraoptionitemextralink
+896	Can change item extra option item extra link	299	change_itemextraoptionitemextralink
+897	Can delete item extra option item extra link	299	delete_itemextraoptionitemextralink
+898	Can add menu push job	300	add_menupushjob
+899	Can change menu push job	300	change_menupushjob
+900	Can delete menu push job	300	delete_menupushjob
+901	Can add item	301	add_item
+902	Can change item	301	change_item
+903	Can delete item	301	delete_item
+904	Can add merchant promotion daypart constraint	302	add_merchantpromotiondaypartconstraint
+905	Can change merchant promotion daypart constraint	302	change_merchantpromotiondaypartconstraint
+906	Can delete merchant promotion daypart constraint	302	delete_merchantpromotiondaypartconstraint
+907	Can add store omnivore info	303	add_storeomnivoreinfo
+908	Can change store omnivore info	303	change_storeomnivoreinfo
+909	Can delete store omnivore info	303	delete_storeomnivoreinfo
+910	Can add business employee	304	add_businessemployee
+911	Can change business employee	304	change_businessemployee
+912	Can delete business employee	304	delete_businessemployee
+913	Can add business group link	305	add_businessgrouplink
+914	Can change business group link	305	change_businessgrouplink
+915	Can delete business group link	305	delete_businessgrouplink
+916	Can add tax category	306	add_taxcategory
+917	Can change tax category	306	change_taxcategory
+918	Can delete tax category	306	delete_taxcategory
+919	Can add store payment reason	307	add_storepaymentreason
+920	Can change store payment reason	307	change_storepaymentreason
+921	Can delete store payment reason	307	delete_storepaymentreason
+922	Can add store address link	308	add_storeaddresslink
+923	Can change store address link	308	change_storeaddresslink
+924	Can delete store address link	308	delete_storeaddresslink
+925	Can add partner loyalty program consumer link	309	add_partnerloyaltyprogramconsumerlink
+926	Can change partner loyalty program consumer link	309	change_partnerloyaltyprogramconsumerlink
+927	Can delete partner loyalty program consumer link	309	delete_partnerloyaltyprogramconsumerlink
+928	Can add business	310	add_business
+929	Can change business	310	change_business
+930	Can delete business	310	delete_business
+931	Can add store customer history	311	add_storecustomerhistory
+932	Can change store customer history	311	change_storecustomerhistory
+933	Can delete store customer history	311	delete_storecustomerhistory
+934	Can add store item link	312	add_storeitemlink
+935	Can change store item link	312	change_storeitemlink
+936	Can delete store item link	312	delete_storeitemlink
+937	Can add store payment	313	add_storepayment
+938	Can change store payment	313	change_storepayment
+939	Can delete store payment	313	delete_storepayment
+940	Can add merchant permission	314	add_merchantpermission
+941	Can change merchant permission	314	change_merchantpermission
+942	Can delete merchant permission	314	delete_merchantpermission
+943	Can add item extra option	315	add_itemextraoption
+944	Can change item extra option	315	change_itemextraoption
+945	Can delete item extra option	315	delete_itemextraoption
+946	Can add external store	316	add_externalstore
+947	Can change external store	316	change_externalstore
+948	Can delete external store	316	delete_externalstore
+949	Can add store menu link	317	add_storemenulink
+950	Can change store menu link	317	change_storemenulink
+951	Can delete store menu link	317	delete_storemenulink
+952	Can add merchant robocall job	318	add_merchantrobocalljob
+953	Can change merchant robocall job	318	change_merchantrobocalljob
+954	Can delete merchant robocall job	318	delete_merchantrobocalljob
+955	Can add preferred dasher by business	319	add_preferreddasherbybusiness
+956	Can change preferred dasher by business	319	change_preferreddasherbybusiness
+957	Can delete preferred dasher by business	319	delete_preferreddasherbybusiness
+958	Can add store item deactivation	320	add_storeitemdeactivation
+959	Can change store item deactivation	320	change_storeitemdeactivation
+960	Can delete store item deactivation	320	delete_storeitemdeactivation
+961	Can add blacklisted dasher by business	321	add_blacklisteddasherbybusiness
+962	Can change blacklisted dasher by business	321	change_blacklisteddasherbybusiness
+963	Can delete blacklisted dasher by business	321	delete_blacklisteddasherbybusiness
+964	Can add item extra	322	add_itemextra
+965	Can change item extra	322	change_itemextra
+966	Can delete item extra	322	delete_itemextra
+967	Can add store discounted item link	323	add_storediscounteditemlink
+968	Can change store discounted item link	323	change_storediscounteditemlink
+969	Can delete store discounted item link	323	delete_storediscounteditemlink
+970	Can add store item extra option link	324	add_storeitemextraoptionlink
+971	Can change store item extra option link	324	change_storeitemextraoptionlink
+972	Can delete store item extra option link	324	delete_storeitemextraoptionlink
+973	Can add store metrics	325	add_storemetrics
+974	Can change store metrics	325	change_storemetrics
+975	Can delete store metrics	325	delete_storemetrics
+976	Can add item extra default item extra option link	326	add_itemextradefaultitemextraoptionlink
+977	Can change item extra default item extra option link	326	change_itemextradefaultitemextraoptionlink
+978	Can delete item extra default item extra option link	326	delete_itemextradefaultitemextraoptionlink
+979	Can add bounty program	327	add_bountyprogram
+981	Can delete bounty program	327	delete_bountyprogram
+982	Can add product code	328	add_productcode
+983	Can change product code	328	change_productcode
+984	Can delete product code	328	delete_productcode
+985	Can add store deactivation	329	add_storedeactivation
+986	Can change store deactivation	329	change_storedeactivation
+987	Can delete store deactivation	329	delete_storedeactivation
+988	Can add qr code	330	add_qrcode
+989	Can change qr code	330	change_qrcode
+990	Can delete qr code	330	delete_qrcode
+991	Can add business employee store membership	331	add_businessemployeestoremembership
+992	Can change business employee store membership	331	change_businessemployeestoremembership
+993	Can delete business employee store membership	331	delete_businessemployeestoremembership
+994	Can add store	332	add_store
+995	Can change store	332	change_store
+996	Can delete store	332	delete_store
+997	Can add job	333	add_job
+998	Can change job	333	change_job
+999	Can delete job	333	delete_job
+1000	Can add manual assign interval	334	add_manualassigninterval
+1001	Can change manual assign interval	334	change_manualassigninterval
+1002	Can delete manual assign interval	334	delete_manualassigninterval
+1003	Can add dasher orientation slide deck	335	add_dasherorientationslidedeck
+1004	Can change dasher orientation slide deck	335	change_dasherorientationslidedeck
+1005	Can delete dasher orientation slide deck	335	delete_dasherorientationslidedeck
+1006	Can add vehicle rental payment job	336	add_vehiclerentalpaymentjob
+1007	Can change vehicle rental payment job	336	change_vehiclerentalpaymentjob
+1008	Can delete vehicle rental payment job	336	delete_vehiclerentalpaymentjob
+1009	Can add dasher feature preference	337	add_dasherfeaturepreference
+1010	Can change dasher feature preference	337	change_dasherfeaturepreference
+1011	Can delete dasher feature preference	337	delete_dasherfeaturepreference
+1012	Can add dasher alcohol info	338	add_dasheralcoholinfo
+1013	Can change dasher alcohol info	338	change_dasheralcoholinfo
+1014	Can delete dasher alcohol info	338	delete_dasheralcoholinfo
+1015	Can add dasher challenge progress	339	add_dasherchallengeprogress
+1016	Can change dasher challenge progress	339	change_dasherchallengeprogress
+1017	Can delete dasher challenge progress	339	delete_dasherchallengeprogress
+1018	Can add dasher rating	340	add_dasherrating
+1019	Can change dasher rating	340	change_dasherrating
+1020	Can delete dasher rating	340	delete_dasherrating
+1021	Can add shift	341	add_shift
+1022	Can change shift	341	change_shift
+1023	Can delete shift	341	delete_shift
+1024	Can add dasher orientation quiz question	342	add_dasherorientationquizquestion
+1025	Can change dasher orientation quiz question	342	change_dasherorientationquizquestion
+1026	Can delete dasher orientation quiz question	342	delete_dasherorientationquizquestion
+1027	Can add dasher score	343	add_dasherscore
+1028	Can change dasher score	343	change_dasherscore
+1029	Can delete dasher score	343	delete_dasherscore
+1030	Can add dasher tos link	344	add_dashertoslink
+1031	Can change dasher tos link	344	change_dashertoslink
+1032	Can delete dasher tos link	344	delete_dashertoslink
+1033	Can add historical dasher pay campaign interval	345	add_historicaldasherpaycampaigninterval
+1034	Can change historical dasher pay campaign interval	345	change_historicaldasherpaycampaigninterval
+1035	Can delete historical dasher pay campaign interval	345	delete_historicaldasherpaycampaigninterval
+1036	Can add daily scheduling limit	346	add_dailyschedulinglimit
+1037	Can change daily scheduling limit	346	change_dailyschedulinglimit
+1038	Can delete daily scheduling limit	346	delete_dailyschedulinglimit
+1039	Can add dasher equipment	347	add_dasherequipment
+1040	Can change dasher equipment	347	change_dasherequipment
+1041	Can delete dasher equipment	347	delete_dasherequipment
+1042	Can add slide deck slide link	348	add_slidedeckslidelink
+1043	Can change slide deck slide link	348	change_slidedeckslidelink
+1044	Can delete slide deck slide link	348	delete_slidedeckslidelink
+1045	Can add dasher robot data	349	add_dasherrobotdata
+1046	Can change dasher robot data	349	change_dasherrobotdata
+1047	Can delete dasher robot data	349	delete_dasherrobotdata
+1048	Can add dasher terms of service	350	add_dashertermsofservice
+1049	Can change dasher terms of service	350	change_dashertermsofservice
+1050	Can delete dasher terms of service	350	delete_dashertermsofservice
+1051	Can add dasher daily stat	351	add_dasherdailystat
+1052	Can change dasher daily stat	351	change_dasherdailystat
+1053	Can delete dasher daily stat	351	delete_dasherdailystat
+1054	Can add hotspot	352	add_hotspot
+1055	Can change hotspot	352	change_hotspot
+1056	Can delete hotspot	352	delete_hotspot
+1057	Can add preference for dasher	353	add_preferencefordasher
+1058	Can change preference for dasher	353	change_preferencefordasher
+1059	Can delete preference for dasher	353	delete_preferencefordasher
+1060	Can add dasher referral activation change event	354	add_dasherreferralactivationchangeevent
+1061	Can change dasher referral activation change event	354	change_dasherreferralactivationchangeevent
+1062	Can delete dasher referral activation change event	354	delete_dasherreferralactivationchangeevent
+1063	Can add dasher guaranteed earnings progress	355	add_dasherguaranteedearningsprogress
+1064	Can change dasher guaranteed earnings progress	355	change_dasherguaranteedearningsprogress
+1065	Can delete dasher guaranteed earnings progress	355	delete_dasherguaranteedearningsprogress
+1066	Can add dasher deactivation warning	356	add_dasherdeactivationwarning
+1067	Can change dasher deactivation warning	356	change_dasherdeactivationwarning
+1068	Can delete dasher deactivation warning	356	delete_dasherdeactivationwarning
+1069	Can add dasher referral	357	add_dasherreferral
+1070	Can change dasher referral	357	change_dasherreferral
+1071	Can delete dasher referral	357	delete_dasherreferral
+1072	Can add delivery robot type	358	add_deliveryrobottype
+1073	Can change delivery robot type	358	change_deliveryrobottype
+1074	Can delete delivery robot type	358	delete_deliveryrobottype
+1075	Can add shift event	359	add_shiftevent
+1076	Can change shift event	359	change_shiftevent
+1077	Can delete shift event	359	delete_shiftevent
+1078	Can add background check report	360	add_backgroundcheckreport
+1079	Can change background check report	360	change_backgroundcheckreport
+1080	Can delete background check report	360	delete_backgroundcheckreport
+1081	Can add dasher delivery pay	361	add_dasherdeliverypay
+1082	Can change dasher delivery pay	361	change_dasherdeliverypay
+1083	Can delete dasher delivery pay	361	delete_dasherdeliverypay
+1084	Can add merchant dasher rating	362	add_merchantdasherrating
+1085	Can change merchant dasher rating	362	change_merchantdasherrating
+1086	Can delete merchant dasher rating	362	delete_merchantdasherrating
+1087	Can add vehicle	363	add_vehicle
+1088	Can change vehicle	363	change_vehicle
+1089	Can delete vehicle	363	delete_vehicle
+1090	Can add dasher incident	364	add_dasherincident
+1091	Can change dasher incident	364	change_dasherincident
+1092	Can delete dasher incident	364	delete_dasherincident
+1093	Can add dasher orientation	365	add_dasherorientation
+1094	Can change dasher orientation	365	change_dasherorientation
+1095	Can delete dasher orientation	365	delete_dasherorientation
+1096	Can add dasher delivery rating	366	add_dasherdeliveryrating
+1097	Can change dasher delivery rating	366	change_dasherdeliveryrating
+1098	Can delete dasher delivery rating	366	delete_dasherdeliveryrating
+1099	Can add dasher faq	367	add_dasherfaq
+1100	Can change dasher faq	367	change_dasherfaq
+1101	Can delete dasher faq	367	delete_dasherfaq
+1102	Can add dasher pay target	368	add_dasherpaytarget
+1103	Can change dasher pay target	368	change_dasherpaytarget
+1104	Can delete dasher pay target	368	delete_dasherpaytarget
+1105	Can add dasher orientation slide	369	add_dasherorientationslide
+1106	Can change dasher orientation slide	369	change_dasherorientationslide
+1107	Can delete dasher orientation slide	369	delete_dasherorientationslide
+1108	Can add dasher reported error link	370	add_dasherreportederrorlink
+1109	Can change dasher reported error link	370	change_dasherreportederrorlink
+1110	Can delete dasher reported error link	370	delete_dasherreportederrorlink
+1111	Can add dasher guaranteed earnings campaign	371	add_dasherguaranteedearningscampaign
+1112	Can change dasher guaranteed earnings campaign	371	change_dasherguaranteedearningscampaign
+1113	Can delete dasher guaranteed earnings campaign	371	delete_dasherguaranteedearningscampaign
+1114	Can add dasher delivery rating category	372	add_dasherdeliveryratingcategory
+1115	Can change dasher delivery rating category	372	change_dasherdeliveryratingcategory
+1116	Can delete dasher delivery rating category	372	delete_dasherdeliveryratingcategory
+1117	Can add vehicle type	373	add_vehicletype
+1118	Can change vehicle type	373	change_vehicletype
+1119	Can delete vehicle type	373	delete_vehicletype
+1120	Can add dasher local office	374	add_dasherlocaloffice
+1121	Can change dasher local office	374	change_dasherlocaloffice
+1122	Can delete dasher local office	374	delete_dasherlocaloffice
+1123	Can add slide deck quiz question link	375	add_slidedeckquizquestionlink
+1124	Can change slide deck quiz question link	375	change_slidedeckquizquestionlink
+1125	Can delete slide deck quiz question link	375	delete_slidedeckquizquestionlink
+1126	Can add dasher reward tier status	376	add_dasherrewardtierstatus
+1127	Can change dasher reward tier status	376	change_dasherrewardtierstatus
+1128	Can delete dasher reward tier status	376	delete_dasherrewardtierstatus
+1129	Can add shift event category	377	add_shifteventcategory
+1130	Can change shift event category	377	change_shifteventcategory
+1131	Can delete shift event category	377	delete_shifteventcategory
+1132	Can add dasher orientation quiz	378	add_dasherorientationquiz
+1133	Can change dasher orientation quiz	378	change_dasherorientationquiz
+1134	Can delete dasher orientation quiz	378	delete_dasherorientationquiz
+1135	Can add dasher pay campaign interval	379	add_dasherpaycampaigninterval
+1136	Can change dasher pay campaign interval	379	change_dasherpaycampaigninterval
+1137	Can delete dasher pay campaign interval	379	delete_dasherpaycampaigninterval
+1138	Can add delivery depot	380	add_deliverydepot
+1139	Can change delivery depot	380	change_deliverydepot
+1140	Can delete delivery depot	380	delete_deliverydepot
+1141	Can add dasher achievement link	381	add_dasherachievementlink
+1142	Can change dasher achievement link	381	change_dasherachievementlink
+1143	Can delete dasher achievement link	381	delete_dasherachievementlink
+1144	Can add dasher referral campaign	382	add_dasherreferralcampaign
+1145	Can change dasher referral campaign	382	change_dasherreferralcampaign
+1146	Can delete dasher referral campaign	382	delete_dasherreferralcampaign
+1147	Can add shift pay campaign record	383	add_shiftpaycampaignrecord
+1148	Can change shift pay campaign record	383	change_shiftpaycampaignrecord
+1149	Can delete shift pay campaign record	383	delete_shiftpaycampaignrecord
+1150	Can add dasher achievement	384	add_dasherachievement
+1151	Can change dasher achievement	384	change_dasherachievement
+1152	Can delete dasher achievement	384	delete_dasherachievement
+1153	Can add dasher deactivation reason	385	add_dasherdeactivationreason
+1154	Can change dasher deactivation reason	385	change_dasherdeactivationreason
+1155	Can delete dasher deactivation reason	385	delete_dasherdeactivationreason
+1156	Can add request a dasher guaranteed pay	386	add_requestadasherguaranteedpay
+1157	Can change request a dasher guaranteed pay	386	change_requestadasherguaranteedpay
+1158	Can delete request a dasher guaranteed pay	386	delete_requestadasherguaranteedpay
+1159	Can add shift stats	387	add_shiftstats
+1160	Can change shift stats	387	change_shiftstats
+1161	Can delete shift stats	387	delete_shiftstats
+1162	Can add dasher appeal unique key	388	add_dasherappealuniquekey
+1163	Can change dasher appeal unique key	388	change_dasherappealuniquekey
+1164	Can delete dasher appeal unique key	388	delete_dasherappealuniquekey
+1165	Can add background check status	389	add_backgroundcheckstatus
+1166	Can change background check status	389	change_backgroundcheckstatus
+1167	Can delete background check status	389	delete_backgroundcheckstatus
+1168	Can add vehicle partner payment job	390	add_vehiclepartnerpaymentjob
+1169	Can change vehicle partner payment job	390	change_vehiclepartnerpaymentjob
+1170	Can delete vehicle partner payment job	390	delete_vehiclepartnerpaymentjob
+1171	Can add dasher equipment type	391	add_dasherequipmenttype
+1172	Can change dasher equipment type	391	change_dasherequipmenttype
+1173	Can delete dasher equipment type	391	delete_dasherequipmenttype
+1174	Can add dasher announcement submarket link	392	add_dasherannouncementsubmarketlink
+1175	Can change dasher announcement submarket link	392	change_dasherannouncementsubmarketlink
+1176	Can delete dasher announcement submarket link	392	delete_dasherannouncementsubmarketlink
+1177	Can add dasher referral fraud state	393	add_dasherreferralfraudstate
+1178	Can change dasher referral fraud state	393	change_dasherreferralfraudstate
+1179	Can delete dasher referral fraud state	393	delete_dasherreferralfraudstate
+1180	Can add grab driver info	394	add_grabdriverinfo
+1181	Can change grab driver info	394	change_grabdriverinfo
+1182	Can delete grab driver info	394	delete_grabdriverinfo
+1183	Can add dasher challenge rule progress	395	add_dasherchallengeruleprogress
+1184	Can change dasher challenge rule progress	395	change_dasherchallengeruleprogress
+1185	Can delete dasher challenge rule progress	395	delete_dasherchallengeruleprogress
+1186	Can add dasher reward	396	add_dasherreward
+1187	Can change dasher reward	396	change_dasherreward
+1188	Can delete dasher reward	396	delete_dasherreward
+1189	Can add dasher referral rules	397	add_dasherreferralrules
+1190	Can change dasher referral rules	397	change_dasherreferralrules
+1191	Can delete dasher referral rules	397	delete_dasherreferralrules
+1192	Can add delivery reference	398	add_deliveryreference
+1193	Can change delivery reference	398	change_deliveryreference
+1194	Can delete delivery reference	398	delete_deliveryreference
+1195	Can add merchant dasher rating reason	399	add_merchantdasherratingreason
+1196	Can change merchant dasher rating reason	399	change_merchantdasherratingreason
+1197	Can delete merchant dasher rating reason	399	delete_merchantdasherratingreason
+1198	Can add dasher early access	400	add_dasherearlyaccess
+1199	Can change dasher early access	400	change_dasherearlyaccess
+1200	Can delete dasher early access	400	delete_dasherearlyaccess
+1201	Can add batch	401	add_batch
+1202	Can change batch	401	change_batch
+1203	Can delete batch	401	delete_batch
+1204	Can add dasher delivery rating category link	402	add_dasherdeliveryratingcategorylink
+1205	Can change dasher delivery rating category link	402	change_dasherdeliveryratingcategorylink
+1206	Can delete dasher delivery rating category link	402	delete_dasherdeliveryratingcategorylink
+1207	Can add starting point migration	403	add_startingpointmigration
+1208	Can change starting point migration	403	change_startingpointmigration
+1209	Can delete starting point migration	403	delete_startingpointmigration
+1210	Can add vehicle type starting point link	404	add_vehicletypestartingpointlink
+1211	Can change vehicle type starting point link	404	change_vehicletypestartingpointlink
+1212	Can delete vehicle type starting point link	404	delete_vehicletypestartingpointlink
+1213	Can add dasher applicant	405	add_dasherapplicant
+1214	Can change dasher applicant	405	change_dasherapplicant
+1215	Can delete dasher applicant	405	delete_dasherapplicant
+1216	Can add dasher challenge	406	add_dasherchallenge
+1217	Can change dasher challenge	406	change_dasherchallenge
+1218	Can delete dasher challenge	406	delete_dasherchallenge
+1219	Can add dasher announcement	407	add_dasherannouncement
+1220	Can change dasher announcement	407	change_dasherannouncement
+1221	Can delete dasher announcement	407	delete_dasherannouncement
+1222	Can add dasher pay delivery prediction duration	408	add_dasherpaydeliverypredictionduration
+1223	Can change dasher pay delivery prediction duration	408	change_dasherpaydeliverypredictionduration
+1224	Can delete dasher pay delivery prediction duration	408	delete_dasherpaydeliverypredictionduration
+1225	Can add dasher	409	add_dasher
+1226	Can change dasher	409	change_dasher
+1227	Can delete dasher	409	delete_dasher
+1228	Can add shift change event	410	add_shiftchangeevent
+1229	Can change shift change event	410	change_shiftchangeevent
+1230	Can delete shift change event	410	delete_shiftchangeevent
+1231	Can add dasher australian tax info	411	add_dasheraustraliantaxinfo
+1232	Can change dasher australian tax info	411	change_dasheraustraliantaxinfo
+1233	Can delete dasher australian tax info	411	delete_dasheraustraliantaxinfo
+1234	Can add merchant dasher rating reason link	412	add_merchantdasherratingreasonlink
+1235	Can change merchant dasher rating reason link	412	change_merchantdasherratingreasonlink
+1236	Can delete merchant dasher rating reason link	412	delete_merchantdasherratingreasonlink
+1237	Can add dasher ephemeral flags	413	add_dasherephemeralflags
+1238	Can change dasher ephemeral flags	413	change_dasherephemeralflags
+1239	Can delete dasher ephemeral flags	413	delete_dasherephemeralflags
+1240	Can add region scheduled task	414	add_regionscheduledtask
+1241	Can change region scheduled task	414	change_regionscheduledtask
+1242	Can delete region scheduled task	414	delete_regionscheduledtask
+1243	Can add scheduled callback	415	add_scheduledcallback
+1244	Can change scheduled callback	415	change_scheduledcallback
+1245	Can delete scheduled callback	415	delete_scheduledcallback
+1246	Can add user locale preference	416	add_userlocalepreference
+1247	Can change user locale preference	416	change_userlocalepreference
+1248	Can delete user locale preference	416	delete_userlocalepreference
+1249	Can add guest user type	417	add_guestusertype
+1250	Can change guest user type	417	change_guestusertype
+1251	Can delete guest user type	417	delete_guestusertype
+1252	Can add device fingerprint	418	add_devicefingerprint
+1253	Can change device fingerprint	418	change_devicefingerprint
+1254	Can delete device fingerprint	418	delete_devicefingerprint
+1255	Can add user social data	419	add_usersocialdata
+1256	Can change user social data	419	change_usersocialdata
+1257	Can delete user social data	419	delete_usersocialdata
+1258	Can add user	420	add_user
+1259	Can change user	420	change_user
+1260	Can delete user	420	delete_user
+1261	Can add order cart device fingerprint link	421	add_ordercartdevicefingerprintlink
+1262	Can change order cart device fingerprint link	421	change_ordercartdevicefingerprintlink
+1263	Can delete order cart device fingerprint link	421	delete_ordercartdevicefingerprintlink
+1264	Can add email verification request	422	add_emailverificationrequest
+1265	Can change email verification request	422	change_emailverificationrequest
+1266	Can delete email verification request	422	delete_emailverificationrequest
+1267	Can add user device fingerprint link	423	add_userdevicefingerprintlink
+1268	Can change user device fingerprint link	423	change_userdevicefingerprintlink
+1269	Can delete user device fingerprint link	423	delete_userdevicefingerprintlink
+1270	Can add fraud status	424	add_fraudstatus
+1271	Can change fraud status	424	change_fraudstatus
+1272	Can delete fraud status	424	delete_fraudstatus
+1273	Can add user group admin	425	add_usergroupadmin
+1274	Can change user group admin	425	change_usergroupadmin
+1275	Can delete user group admin	425	delete_usergroupadmin
+1276	Can add client	426	add_client
+1277	Can change client	426	change_client
+1278	Can delete client	426	delete_client
+1279	Can add api key	427	add_apikey
+1280	Can change api key	427	change_apikey
+1281	Can delete api key	427	delete_apikey
+1282	Can add banned ip address	428	add_bannedipaddress
+1283	Can change banned ip address	428	change_bannedipaddress
+1284	Can delete banned ip address	428	delete_bannedipaddress
+1285	Can add support salesforce case record	429	add_supportsalesforcecaserecord
+1286	Can change support salesforce case record	429	change_supportsalesforcecaserecord
+1287	Can delete support salesforce case record	429	delete_supportsalesforcecaserecord
+1288	Can add support delivery banner	430	add_supportdeliverybanner
+1289	Can change support delivery banner	430	change_supportdeliverybanner
+1290	Can delete support delivery banner	430	delete_supportdeliverybanner
+1291	Can add delivery customer pii	431	add_deliverycustomerpii
+1292	Can change delivery customer pii	431	change_deliverycustomerpii
+1293	Can delete delivery customer pii	431	delete_deliverycustomerpii
+1294	Can add invoicing group onboarding rule	432	add_invoicinggrouponboardingrule
+1295	Can change invoicing group onboarding rule	432	change_invoicinggrouponboardingrule
+1296	Can delete invoicing group onboarding rule	432	delete_invoicinggrouponboardingrule
+1297	Can add invoicing group membership	433	add_invoicinggroupmembership
+1298	Can change invoicing group membership	433	change_invoicinggroupmembership
+1299	Can delete invoicing group membership	433	delete_invoicinggroupmembership
+1300	Can add store netsuite customer link	434	add_storenetsuitecustomerlink
+1301	Can change store netsuite customer link	434	change_storenetsuitecustomerlink
+1302	Can delete store netsuite customer link	434	delete_storenetsuitecustomerlink
+1303	Can add invoicing group	435	add_invoicinggroup
+1304	Can change invoicing group	435	change_invoicinggroup
+1305	Can delete invoicing group	435	delete_invoicinggroup
+1306	Can add payout card	436	add_payoutcard
+1307	Can change payout card	436	change_payoutcard
+1308	Can delete payout card	436	delete_payoutcard
+1309	Can add card acceptor restaurant association	437	add_cardacceptorrestaurantassociation
+1310	Can change card acceptor restaurant association	437	change_cardacceptorrestaurantassociation
+1311	Can delete card acceptor restaurant association	437	delete_cardacceptorrestaurantassociation
+1312	Can add grab transfer	438	add_grabtransfer
+1313	Can change grab transfer	438	change_grabtransfer
+1314	Can delete grab transfer	438	delete_grabtransfer
+1315	Can add marqeta decline exemption	439	add_marqetadeclineexemption
+1316	Can change marqeta decline exemption	439	change_marqetadeclineexemption
+1317	Can delete marqeta decline exemption	439	delete_marqetadeclineexemption
+1318	Can add aggregate report recipient	440	add_aggregatereportrecipient
+1319	Can change aggregate report recipient	440	change_aggregatereportrecipient
+1320	Can delete aggregate report recipient	440	delete_aggregatereportrecipient
+1321	Can add transfer transaction	441	add_transfertransaction
+1322	Can change transfer transaction	441	change_transfertransaction
+1323	Can delete transfer transaction	441	delete_transfertransaction
+1324	Can add marqeta transaction	442	add_marqetatransaction
+1325	Can change marqeta transaction	442	change_marqetatransaction
+1326	Can delete marqeta transaction	442	delete_marqetatransaction
+1327	Can add external request	443	add_externalrequest
+1328	Can change external request	443	change_externalrequest
+1329	Can delete external request	443	delete_externalrequest
+1330	Can add stripe card	444	add_stripecard
+1331	Can change stripe card	444	change_stripecard
+1332	Can delete stripe card	444	delete_stripecard
+1333	Can add stripe charge	445	add_stripecharge
+1334	Can change stripe charge	445	change_stripecharge
+1335	Can delete stripe charge	445	delete_stripecharge
+1336	Can add marqeta card transition	446	add_marqetacardtransition
+1337	Can change marqeta card transition	446	change_marqetacardtransition
+1338	Can delete marqeta card transition	446	delete_marqetacardtransition
+1339	Can add stripe card event	447	add_stripecardevent
+1340	Can change stripe card event	447	change_stripecardevent
+1341	Can delete stripe card event	447	delete_stripecardevent
+1342	Can add aggregate report entity	448	add_aggregatereportentity
+1343	Can change aggregate report entity	448	change_aggregatereportentity
+1344	Can delete aggregate report entity	448	delete_aggregatereportentity
+1345	Can add delivery funding	449	add_deliveryfunding
+1346	Can change delivery funding	449	change_deliveryfunding
+1347	Can delete delivery funding	449	delete_deliveryfunding
+1348	Can add managed account transfer	450	add_managedaccounttransfer
+1349	Can change managed account transfer	450	change_managedaccounttransfer
+1350	Can delete managed account transfer	450	delete_managedaccounttransfer
+1351	Can add cash payment	451	add_cashpayment
+1352	Can change cash payment	451	change_cashpayment
+1353	Can delete cash payment	451	delete_cashpayment
+1354	Can add stripe managed account	452	add_stripemanagedaccount
+1355	Can change stripe managed account	452	change_stripemanagedaccount
+1356	Can delete stripe managed account	452	delete_stripemanagedaccount
+1357	Can add payout	453	add_payout
+1358	Can change payout	453	change_payout
+1359	Can delete payout	453	delete_payout
+1360	Can add payment account edit history	454	add_paymentaccountedithistory
+1361	Can change payment account edit history	454	change_paymentaccountedithistory
+1362	Can delete payment account edit history	454	delete_paymentaccountedithistory
+1363	Can add store payment summary email	455	add_storepaymentsummaryemail
+1364	Can change store payment summary email	455	change_storepaymentsummaryemail
+1365	Can delete store payment summary email	455	delete_storepaymentsummaryemail
+1366	Can add payout method	456	add_payoutmethod
+1367	Can change payout method	456	change_payoutmethod
+1368	Can delete payout method	456	delete_payoutmethod
+1369	Can add card acceptor	457	add_cardacceptor
+1370	Can change card acceptor	457	change_cardacceptor
+1371	Can delete card acceptor	457	delete_cardacceptor
+1372	Can add transaction status	458	add_transactionstatus
+1373	Can change transaction status	458	change_transactionstatus
+1374	Can delete transaction status	458	delete_transactionstatus
+1375	Can add marqeta transaction event	459	add_marqetatransactionevent
+1376	Can change marqeta transaction event	459	change_marqetatransactionevent
+1377	Can delete marqeta transaction event	459	delete_marqetatransactionevent
+1378	Can add payment account	460	add_paymentaccount
+1379	Can change payment account	460	change_paymentaccount
+1380	Can delete payment account	460	delete_paymentaccount
+1381	Can add transaction status history	461	add_transactionstatushistory
+1382	Can change transaction status history	461	change_transactionstatushistory
+1383	Can delete transaction status history	461	delete_transactionstatushistory
+1384	Can add stripe transfer	462	add_stripetransfer
+1385	Can change stripe transfer	462	change_stripetransfer
+1386	Can delete stripe transfer	462	delete_stripetransfer
+1387	Can add aggregate report	463	add_aggregatereport
+1388	Can change aggregate report	463	change_aggregatereport
+1389	Can delete aggregate report	463	delete_aggregatereport
+1390	Can add payment method	464	add_paymentmethod
+1391	Can change payment method	464	change_paymentmethod
+1392	Can delete payment method	464	delete_paymentmethod
+1393	Can add marqeta card	465	add_marqetacard
+1394	Can change marqeta card	465	change_marqetacard
+1395	Can delete marqeta card	465	delete_marqetacard
+1396	Can add marqeta card ownership	466	add_marqetacardownership
+1397	Can change marqeta card ownership	466	change_marqetacardownership
+1398	Can delete marqeta card ownership	466	delete_marqetacardownership
+1399	Can add transfer submission lock	467	add_transfersubmissionlock
+1400	Can change transfer submission lock	467	change_transfersubmissionlock
+1401	Can delete transfer submission lock	467	delete_transfersubmissionlock
+1402	Can add stripe payout request	468	add_stripepayoutrequest
+1403	Can change stripe payout request	468	change_stripepayoutrequest
+1404	Can delete stripe payout request	468	delete_stripepayoutrequest
+1405	Can add transaction	469	add_transaction
+1406	Can change transaction	469	change_transaction
+1407	Can delete transaction	469	delete_transaction
+1408	Can add charge	470	add_charge
+1409	Can change charge	470	change_charge
+1410	Can delete charge	470	delete_charge
+1411	Can add store mastercard data	471	add_storemastercarddata
+1412	Can change store mastercard data	471	change_storemastercarddata
+1413	Can delete store mastercard data	471	delete_storemastercarddata
+1414	Can add stripe recipient	472	add_striperecipient
+1415	Can change stripe recipient	472	change_striperecipient
+1416	Can delete stripe recipient	472	delete_striperecipient
+1417	Can add stripe customer	473	add_stripecustomer
+1418	Can change stripe customer	473	change_stripecustomer
+1419	Can delete stripe customer	473	delete_stripecustomer
+1420	Can add stripe bank account	474	add_stripebankaccount
+1421	Can change stripe bank account	474	change_stripebankaccount
+1422	Can delete stripe bank account	474	delete_stripebankaccount
+1423	Can add grab pay account	475	add_grabpayaccount
+1424	Can change grab pay account	475	change_grabpayaccount
+1425	Can delete grab pay account	475	delete_grabpayaccount
+1426	Can add grab pay charge	476	add_grabpaycharge
+1427	Can change grab pay charge	476	change_grabpaycharge
+1428	Can delete grab pay charge	476	delete_grabpaycharge
+1429	Can add payout account	477	add_payoutaccount
+1430	Can change payout account	477	change_payoutaccount
+1431	Can delete payout account	477	delete_payoutaccount
+1432	Can add stripe transfer request	478	add_stripetransferrequest
+1433	Can change stripe transfer request	478	change_stripetransferrequest
+1434	Can delete stripe transfer request	478	delete_stripetransferrequest
+1435	Can add stripe managed account transfer	479	add_stripemanagedaccounttransfer
+1436	Can change stripe managed account transfer	479	change_stripemanagedaccounttransfer
+1437	Can delete stripe managed account transfer	479	delete_stripemanagedaccounttransfer
+1438	Can add transfer	480	add_transfer
+1439	Can change transfer	480	change_transfer
+1440	Can delete transfer	480	delete_transfer
+1441	Can add grab payment account	481	add_grabpaymentaccount
+1442	Can change grab payment account	481	change_grabpaymentaccount
+1443	Can delete grab payment account	481	delete_grabpaymentaccount
+1444	Can add stripe dispute	482	add_stripedispute
+1445	Can change stripe dispute	482	change_stripedispute
+1446	Can delete stripe dispute	482	delete_stripedispute
+1447	Can add web deployment	483	add_webdeployment
+1448	Can change web deployment	483	change_webdeployment
+1449	Can delete web deployment	483	delete_webdeployment
+1450	Can add app	484	add_app
+1451	Can change app	484	change_app
+1452	Can delete app	484	delete_app
+1453	Can add Token	485	add_token
+1454	Can change Token	485	change_token
+1455	Can delete Token	485	delete_token
+1456	Can add caller	486	add_caller
+1457	Can change caller	486	change_caller
+1458	Can delete caller	486	delete_caller
+1459	Can add credential	487	add_credential
+1460	Can change credential	487	change_credential
+1461	Can delete credential	487	delete_credential
+1462	Can add device	488	add_device
+1463	Can change device	488	change_device
+1464	Can delete device	488	delete_device
+1465	Can add feedback service	489	add_feedbackservice
+1466	Can change feedback service	489	change_feedbackservice
+1467	Can delete feedback service	489	delete_feedbackservice
+1468	Can add notification	490	add_notification
+1469	Can change notification	490	change_notification
+1470	Can delete notification	490	delete_notification
+1471	Can add apn service	491	add_apnservice
+1472	Can change apn service	491	change_apnservice
+1473	Can delete apn service	491	delete_apnservice
+1474	Can add refresh token	492	add_refreshtoken
+1475	Can change refresh token	492	change_refreshtoken
+1476	Can delete refresh token	492	delete_refreshtoken
+\.
+
+
+--
+-- Name: auth_permission_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('auth_permission_id_seq', 1476, true);
+
+
+--
+-- Data for Name: authtoken_token; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY authtoken_token (key, created, user_id) FROM stdin;
+d0f1c8df379e3efe0da7aa728f5770dc3e95b22e	2019-08-04 03:41:05.488388+00	1
+aeedcb7cbe705fe0536b959efd41843e1ae3a014	2019-08-04 03:41:37.292245+00	2
+4ca9d9439efcbf466e4a85571d0c2d5407e16eb1	2019-08-04 03:42:14.621651+00	3
+376d49115c5ca97d49c532e483856c07377446bc	2019-08-04 03:42:36.815589+00	4
+88c7b07261afb6784d0ec9094b12102bb32ddd1f	2019-08-04 03:42:59.009365+00	5
+14a635322c23a459c9d111d2bf8c88fbeab0574f	2019-08-04 03:43:21.198865+00	6
+5a44b633f2e78cd182026c12e21a2fa48c0e82a1	2019-08-04 03:43:43.393927+00	7
+c7b7f210c353c0c5347bac3ad385501fbbb5fb28	2019-08-04 03:44:05.587993+00	8
+6b93c07c52fc40488a3fff66882c77d56d877911	2019-08-04 03:44:28.094508+00	9
+f0aedbe533d1d53b009ddb56032344760b811e31	2019-08-04 03:45:01.344796+00	10
+0e71446d2b56c8f83b0f61ed8ae9d0291d99e287	2019-08-04 03:45:34.605652+00	11
+aaeb5759e2b4dfa31422543ac0b020d230c8c52f	2019-08-04 03:46:07.862086+00	12
+649385fec15b7639a6472153037762ac3937e68e	2019-08-04 03:46:41.113524+00	13
+4ab931a67654c95279a3c37dd952d6decd78931c	2019-08-04 03:47:16.404442+00	14
+46a3c022e08dfb7a5d89a134fd98857077cd08a4	2019-08-04 03:47:50.036561+00	15
+\.
+
+
+--
+-- Data for Name: banned_ip_address; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY banned_ip_address (id, created_at, ip_address) FROM stdin;
+\.
+
+
+--
+-- Name: banned_ip_address_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('banned_ip_address_id_seq', 1, false);
+
+
+--
+-- Data for Name: base_price_sos_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY base_price_sos_event (id, metadata, created_at, base_sos_amount, activation_time, expiration_time, category, deactivated_at, created_by_id, deactivated_by_id, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: base_price_sos_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('base_price_sos_event_id_seq', 1, false);
+
+
+--
+-- Data for Name: blacklisted_consumer_address; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY blacklisted_consumer_address (id, subpremise, blacklisted_at, reason, block_deliveries_to_address, address_id, blacklisted_by_id, blacklisted_user_id, regex_to_match_subpremise, use_regex) FROM stdin;
+\.
+
+
+--
+-- Name: blacklisted_consumer_address_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('blacklisted_consumer_address_id_seq', 1, false);
+
+
+--
+-- Data for Name: capacity_planning_evaluation; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY capacity_planning_evaluation (id, updated_at, active_date, num_deliveries, killed_duration, actual_supply_error, predicted_supply_error, predicted_caps_error, actual_caps_error, percent_utilization, oversupply_score, undersupply_score, manual_changes_score, growth_error, percent_time_on_manual_assign, percent_caps_hit, idle_ratios_by_window, flf_by_window, actual_scheduling_by_window, post_adjustment_limits, actual_delivery_counts_by_window, ideal_supply, ideal_caps, actual_supply, capacity_plan_id, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: capacity_planning_evaluation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('capacity_planning_evaluation_id_seq', 1, false);
+
+
+--
+-- Data for Name: card_acceptor; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY card_acceptor (id, created_at, mid, name, city, zip_code, state, should_be_examined, is_blacklisted, blacklisted_by_id) FROM stdin;
+\.
+
+
+--
+-- Name: card_acceptor_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('card_acceptor_id_seq', 1, false);
+
+
+--
+-- Data for Name: card_acceptor_store_association; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY card_acceptor_store_association (id, created_at, unique_drivers, strength, status, card_acceptor_id, manually_checked_by_id, store_id) FROM stdin;
+\.
+
+
+--
+-- Name: card_acceptor_store_association_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('card_acceptor_store_association_id_seq', 1, false);
+
+
+--
+-- Data for Name: cash_payment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY cash_payment (id, created_at, currency, status, amount, amount_refunded, description, error_reason, charge_id) FROM stdin;
+\.
+
+
+--
+-- Name: cash_payment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('cash_payment_id_seq', 1, false);
+
+
+--
+-- Data for Name: city; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY city (id, name, shortname, slug, is_active, center, num_stores, market_id, submarket_id) FROM stdin;
+\.
+
+
+--
+-- Name: city_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('city_id_seq', 1, false);
+
+
+--
+-- Data for Name: communication_preferences_channel_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY communication_preferences_channel_link (id, communication_channel_id, communication_preferences_id) FROM stdin;
+\.
+
+
+--
+-- Name: communication_preferences_channel_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('communication_preferences_channel_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: compensation_request; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY compensation_request (id, created_at, approved_at, recommended_refund, recommended_credits, store_cost, currency, request_data, category, revision_reason, cannot_auto_approve_reason, submit_platform, approved_by_id, delivery_id, error_id) FROM stdin;
+\.
+
+
+--
+-- Name: compensation_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('compensation_request_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer (id, created_at, first_week, receive_text_notifications, receive_push_notifications, receive_marketing_push_notifications, sanitized_email, catering_contact_email, account_credits_deprecated, applied_new_user_credits, last_alcohol_delivery_time, gcm_id, fcm_id, android_version, default_payment_method, stripe_id, channel, default_substitution_preference, delivery_customer_pii_id, referral_code, referrer_code, last_delivery_time, came_from_group_signup, default_address_id, default_card_id, default_country_id, stripe_country_id, user_id, vip_tier, existing_card_found_at, existing_phone_found_at) FROM stdin;
+1	2019-08-04 03:41:59.814175+00	2019-07-28	t	f	\N	admin@doordash.com	\N	0	f	\N	\N	\N	\N	\N	cus_FYi1OIMNHWAkmF			\N	Allison-Evans-469798	\N	\N	\N	183515	1	1	1	2	\N	\N	\N
+2	2019-08-04 03:42:58.986603+00	2019-07-28	t	f	\N	person4@doordash.com	\N	0	f	\N	\N	\N	\N	\N				\N	David-Wilkerson-520841	\N	\N	\N	183516	\N	1	1	4	\N	\N	\N
+3	2019-08-04 03:43:21.176364+00	2019-07-28	t	f	\N	person5@doordash.com	\N	0	f	\N	\N	\N	\N	\N				\N	Cheryl-Rivers-675435	\N	\N	\N	183515	\N	1	1	5	\N	\N	\N
+4	2019-08-04 03:43:43.369625+00	2019-07-28	t	f	\N	person6@doordash.com	\N	0	f	\N	\N	\N	\N	\N				\N	Cheryl-Schmidt-564322	\N	\N	\N	183515	\N	1	1	6	\N	\N	\N
+5	2019-08-04 03:44:05.565909+00	2019-07-28	t	f	\N	person7@doordash.com	\N	0	f	\N	\N	\N	\N	\N				\N	Carol-West-378112	\N	\N	\N	183515	\N	1	1	7	\N	\N	\N
+6	2019-08-04 03:44:28.069214+00	2019-07-28	t	f	\N	person8@doordash.com	\N	0	f	\N	\N	\N	\N	\N				\N	Melinda-Flores-919343	\N	\N	\N	183515	\N	1	1	8	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: consumer_account_credits; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_account_credits (id, support_credit, referree_credit, referrer_credit, gift_code_credit, delivery_gift_credit, delivery_update_credit, manual_credit, other_credit, currency, updated_at, consumer_id) FROM stdin;
+1	0	0	0	0	0	0	0	0	USD	2019-08-04 03:42:01.318634+00	1
+2	0	0	0	0	0	0	0	0	USD	2019-08-04 03:42:59.001218+00	2
+3	0	0	0	0	0	0	0	0	USD	2019-08-04 03:43:21.191099+00	3
+4	0	0	0	0	0	0	0	0	USD	2019-08-04 03:43:43.384426+00	4
+5	0	0	0	0	0	0	0	0	USD	2019-08-04 03:44:05.580449+00	5
+6	0	0	0	0	0	0	0	0	USD	2019-08-04 03:44:28.084225+00	6
+\.
+
+
+--
+-- Name: consumer_account_credits_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_account_credits_id_seq', 6, true);
+
+
+--
+-- Data for Name: consumer_account_credits_transaction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_account_credits_transaction (id, created_at, amount, balance, currency, description, type, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_account_credits_transaction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_account_credits_transaction_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_address_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_address_link (id, created_at, dasher_instructions, is_active, manual_point, subpremise, address_id, consumer_id, address_validation_info, entry_code, parking_instructions) FROM stdin;
+1	2019-08-04 03:42:01.250472+00		t	\N		183515	1	{"is_missing_secondary": false, "is_commercial": false, "is_invalid_secondary": false}	Mock Entry Code	Mock Parking Instructions
+2	2019-08-04 03:42:58.997224+00		t	\N		183516	2	{"is_missing_secondary": false, "is_commercial": false, "is_invalid_secondary": false}	Mock Entry Code	Mock Parking Instructions
+3	2019-08-04 03:43:21.187409+00		t	\N		183515	3	{"is_missing_secondary": false, "is_commercial": false, "is_invalid_secondary": false}	Mock Entry Code	Mock Parking Instructions
+4	2019-08-04 03:43:43.380938+00		t	\N		183515	4	{"is_missing_secondary": false, "is_commercial": false, "is_invalid_secondary": false}	Mock Entry Code	Mock Parking Instructions
+5	2019-08-04 03:44:05.577003+00		t	\N		183515	5	{"is_missing_secondary": false, "is_commercial": false, "is_invalid_secondary": false}	Mock Entry Code	Mock Parking Instructions
+6	2019-08-04 03:44:28.080697+00		t	\N		183515	6	{"is_missing_secondary": false, "is_commercial": false, "is_invalid_secondary": false}	Mock Entry Code	Mock Parking Instructions
+\.
+
+
+--
+-- Name: consumer_address_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_address_link_id_seq', 6, true);
+
+
+--
+-- Data for Name: consumer_announcement; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_announcement (id, title, body, expiration_date, created_at, show_once, platform, image, target_dashpass_consumer, target_max_days_since_last_consumer_order, target_min_days_since_last_consumer_order, target_new_consumers) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_announcement_district_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_announcement_district_link (id, consumer_announcement_id, district_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_announcement_district_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_announcement_district_link_id_seq', 1, false);
+
+
+--
+-- Name: consumer_announcement_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_announcement_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_announcement_submarkets; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_announcement_submarkets (id, consumerannouncement_id, submarket_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_announcement_submarkets_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_announcement_submarkets_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_channel; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_channel (id, name, image_url) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_channel_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_channel_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_channel_submarkets; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_channel_submarkets (id, consumerchannel_id, submarket_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_channel_submarkets_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_channel_submarkets_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_charge; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_charge (id, target_id, idempotency_key, is_stripe_connect_based, created_at, total, original_total, currency, consumer_id, country_id, issue_id, stripe_customer_id, target_ct_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_charge_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_charge_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_communication_channel; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_communication_channel (id, name) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_communication_channel_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_communication_channel_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_communication_preferences; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_communication_preferences (consumer_id, email_unsubscribe_time, email_holdout_group_id, email_preference_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_delivery_rating; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_delivery_rating (id, created_at, updated_at, merchant_rating, dasher_rating, dasher_comments, merchant_comments, show_consumer, processed_at, store_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_delivery_rating_category; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_delivery_rating_category (id, created_at, name, friendly_name) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_delivery_rating_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_delivery_rating_category_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_delivery_rating_category_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_delivery_rating_category_link (id, category_id, rating_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_delivery_rating_category_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_delivery_rating_category_link_id_seq', 1, false);
+
+
+--
+-- Name: consumer_delivery_rating_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_delivery_rating_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_discount; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_discount (id, delivery_fee, service_rate, extra_sos_fee, discount_percentage, discount_value, max_discount, currency, minimum_subtotal, discount_type) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_discount_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_discount_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_donation; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_donation (id, created_at, voided_at, paid_at, order_cart_id, donation_recipient_id, status, amount, currency) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_donation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_donation_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_donation_recipient_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_donation_recipient_link (id, created_at, consumer_id, donation_recipient_id, is_active) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_donation_recipient_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_donation_recipient_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_empty_store_list_request; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_empty_store_list_request (id, location, created_at) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_empty_store_list_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_empty_store_list_request_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_faq; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_faq (id, question, answer, order_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_faq_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_faq_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_favorites; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_favorites (id, business_id, created_at, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_favorites_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_favorites_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_fraud_info; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_fraud_info (id, created_at, event_name, sift_score, charge_id, consumer_id, order_cart_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_fraud_info_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_fraud_info_id_seq', 1, false);
+
+
+--
+-- Name: consumer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_id_seq', 6, true);
+
+
+--
+-- Data for Name: consumer_ios_devices; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_ios_devices (id, consumer_id, device_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_ios_devices_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_ios_devices_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_preferences; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_preferences (id, created_at, updated_at, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_preferences_category_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_preferences_category_link (id, category_name, consumer_preferences_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_preferences_category_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_preferences_category_link_id_seq', 1, false);
+
+
+--
+-- Name: consumer_preferences_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_preferences_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_profile_edit_history; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_profile_edit_history (id, edit_type, platform, old_value, new_value, created_at, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_profile_edit_history_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_profile_edit_history_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_promotion (id, created_at, updated_at, start_time, end_time, local_merchant_start_time, num_days_active, max_applicable_consumer_count, max_applicable_delivery_count, max_total_redemption_count, max_redemption_count_per_timezone, redemption_count_per_time_interval, redemption_throttle_time_interval, error_message_overrides, code, type, order_type, restricted_to_submarket, free_service_fee, free_small_order_fee, notes, description, title, cuisine_promo, item_promo, new_customer_for_item_promo_only, store_ids_for_promo, currency, new_customer_only, subscriber_only, featured_on_app, click_to_apply_only, incentive_type, incentive_id, budget_source, auto_redeem, auto_apply_only, "group", display_promotion_delivery_fee_on_store, discount_source, channel_id, consumer_promotion_campaign_id, item_promo_exclusion_list, second_item_exclusion_list, second_item_promo, is_active, success_message) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_promotion_campaign; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_promotion_campaign (id, created_at, updated_at, name, is_active, notes, store_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_promotion_campaign_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_promotion_campaign_id_seq', 1, false);
+
+
+--
+-- Name: consumer_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_push_notification; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_push_notification (id, created_at, message, data, unthrottled, min_android_version, min_ios_version, topic, scheduled_time, sent_time, received_time, cancelled_by_server, cancelled_by_client, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_push_notification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_push_notification_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_referral_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_referral_link (id, created_at, redeemed_at, email, first_name, last_name, amount, currency, referrer_amount, referree_amount, referrer_submarket_id, referree_submarket_id, min_referree_order_subtotal, referree_promotion_id, no_payout_reason, duplicate_consumer_ids, order_cart_id, referree_id, referrer_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_referral_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_referral_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_share; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_share (id, created_at, social_media_type, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_share_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_share_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_store_request; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_store_request (id, created_at, requested_store_type, requested_store_id, consumer_id, notified_date, store_activation_date) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_store_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_store_request_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_stripe_customer_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_stripe_customer_link (id, stripe_id, country_code, consumer_id) FROM stdin;
+1	cus_FYi1OIMNHWAkmF	US	1
+\.
+
+
+--
+-- Name: consumer_stripe_customer_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_stripe_customer_link_id_seq', 1, true);
+
+
+--
+-- Data for Name: consumer_subscription; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription (id, stripe_id, is_active, subscription_status, temporarily_deactivated_at, renew, start_time, end_time, cancellation_requested_at, cancelled_at, submarket_id_subscribed_from, currency, consumer_id, consumer_subscription_plan_id, payment_card_id, payment_method_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan (id, stripe_id, created_at, updated_at, fee, currency, charge_description, start_time, end_time, is_accepting_new_subscribers, employees_only, allow_all_stores, callout_text, policy_text, recurrence_interval_type, recurrence_interval_units, plan_benefit_short, plan_benefit_long, plan_benefit_delivery_fee, signup_email_campaign_id, terms_and_conditions, consumer_discount_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_subscription_plan_featured_location_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_featured_location_link (id, consumer_subscription_plan_id, featured_location_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_featured_location_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_featured_location_link_id_seq', 1, false);
+
+
+--
+-- Name: consumer_subscription_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan_promotion_info; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_promotion_info (id, type, title, subtitle, icon_image_url) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_promotion_info_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_promotion_info_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan_promotion_infos; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_promotion_infos (id, consumersubscriptionplan_id, consumersubscriptionplanpromotioninfo_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_promotion_infos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_promotion_infos_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan_submarket_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_submarket_link (id, updated_at, popular_stores, consumer_subscription_plan_id, submarket_id, consent_details) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_submarket_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_submarket_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan_trial; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_trial (id, created_at, updated_at, is_active, interval_type, interval_units, payment_provider_type, consumer_subscription_plan_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_subscription_plan_trial_featured_location_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_trial_featured_location_link (id, consumer_subscription_plan_trial_id, featured_location_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_trial_featured_location_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_trial_featured_location_link_id_seq', 1, false);
+
+
+--
+-- Name: consumer_subscription_plan_trial_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_trial_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan_trial_promotion_infos; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_trial_promotion_infos (id, consumersubscriptionplantrial_id, consumersubscriptionplanpromotioninfo_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_trial_promotion_infos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_trial_promotion_infos_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_plan_trial_submarket_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_plan_trial_submarket_link (id, updated_at, consumer_subscription_plan_trial_id, submarket_id, trial_consent_details) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_plan_trial_submarket_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_plan_trial_submarket_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_subscription_unit; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_subscription_unit (id, stripe_id, start_time, end_time, currency, amount, charge_id, consumer_subscription_id, consumer_subscription_plan_trial_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_subscription_unit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_subscription_unit_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_survey; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_survey (id, activated_at, deactivated_at, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: consumer_survey_answer_option; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_survey_answer_option (id, created_at, updated_at, text, survey_question_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_survey_answer_option_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_survey_answer_option_id_seq', 1, false);
+
+
+--
+-- Name: consumer_survey_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_survey_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_survey_question; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_survey_question (id, created_at, updated_at, question, include_freeform_answer_option, survey_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_survey_question_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_survey_question_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_survey_question_response; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_survey_question_response (id, created_at, updated_at, answer_text, is_freeform, survey_answer_option_id, survey_question_id, survey_response_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_survey_question_response_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_survey_question_response_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_survey_response; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_survey_response (id, created_at, updated_at, consumer_id, survey_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_survey_response_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_survey_response_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_terms_of_service; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_terms_of_service (id, version, created_at) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_terms_of_service_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_terms_of_service_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_tos_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_tos_link (id, accepted_at, consumer_id, terms_of_service_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_tos_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_tos_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_variable_pay; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_variable_pay (id, created_at, consumer_cohort, pricing_tiers, tier, distance, consumer_id, delivery_id, district_id) FROM stdin;
+\.
+
+
+--
+-- Name: consumer_variable_pay_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('consumer_variable_pay_id_seq', 1, false);
+
+
+--
+-- Data for Name: consumer_verification_status; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY consumer_verification_status (created_at, consumer_id, is_phone_number_verified, is_email_verified) FROM stdin;
+2019-08-04 03:42:00.434538+00	1	f	f
+2019-08-04 03:42:58.994993+00	2	f	f
+2019-08-04 03:43:21.184894+00	3	f	f
+2019-08-04 03:43:43.378723+00	4	f	f
+2019-08-04 03:44:05.574808+00	5	f	f
+2019-08-04 03:44:28.078405+00	6	f	f
+\.
+
+
+--
+-- Data for Name: core_image; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY core_image (id, target_id, image, target_ct_id) FROM stdin;
+\.
+
+
+--
+-- Name: core_image_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('core_image_id_seq', 1, false);
+
+
+--
+-- Data for Name: core_modelannotation; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY core_modelannotation (id, target_id, annotation_type, data, target_ct_id) FROM stdin;
+\.
+
+
+--
+-- Name: core_modelannotation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('core_modelannotation_id_seq', 1, false);
+
+
+--
+-- Data for Name: country; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY country (id, name, shortname, is_active, has_fees_tax, allows_pre_tipping) FROM stdin;
+1	United States	US	t	f	\N
+2	Canada	CA	t	f	\N
+3	Australia	AU	t	f	\N
+\.
+
+
+--
+-- Name: country_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('country_id_seq', 3, true);
+
+
+--
+-- Data for Name: credit_refund_delivery_error; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY credit_refund_delivery_error (id, created_at, category, recommended_credits, recommended_refund, is_allowed_redelivery, actual_credits_given, actual_refund_given, was_actually_redelivered, currency, created_by_id, credit_refund_error_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: credit_refund_delivery_error_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('credit_refund_delivery_error_id_seq', 1, false);
+
+
+--
+-- Data for Name: credit_refund_error; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY credit_refund_error (id, created_at, recommended_credits, recommended_refund, is_allowed_redelivery, actual_credits_given, actual_refund_given, was_actually_redelivered, categories, currency, amount_charged_to_store, created_by_id, delivery_id, dispatch_error_id, redelivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: credit_refund_error_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('credit_refund_error_id_seq', 1, false);
+
+
+--
+-- Data for Name: credit_refund_order_item_error; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY credit_refund_order_item_error (id, created_at, category, recommended_credits, recommended_refund, is_allowed_redelivery, actual_credits_given, actual_refund_given, was_actually_redelivered, currency, created_by_id, credit_refund_error_id, order_item_id, order_item_extra_id) FROM stdin;
+\.
+
+
+--
+-- Name: credit_refund_order_item_error_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('credit_refund_order_item_error_id_seq', 1, false);
+
+
+--
+-- Data for Name: curated_category; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY curated_category (id, created_at, start_time, end_time, identifier, name, description, display_message, notes, sort_order, target_types, image, large_image, show_as_carousel, submarket_id) FROM stdin;
+1	2019-08-04 03:41:01.898664+00	2019-08-04 03:41:01.898677+00	\N	newly_added	Newly Added		\N		0	["restaurant"]			\N	1
+2	2019-08-04 03:41:01.903868+00	2019-08-04 03:41:01.903879+00	\N	popular	Popular		\N		0	["restaurant"]			\N	1
+3	2019-08-04 03:41:02.824288+00	2019-08-04 03:41:02.8243+00	\N	newly_added	Newly Added		\N		0	["restaurant"]			\N	2
+4	2019-08-04 03:41:02.828687+00	2019-08-04 03:41:02.828698+00	\N	popular	Popular		\N		0	["restaurant"]			\N	2
+5	2019-08-04 03:41:03.251367+00	2019-08-04 03:41:03.251379+00	\N	newly_added	Newly Added		\N		0	["restaurant"]			\N	3
+6	2019-08-04 03:41:03.25607+00	2019-08-04 03:41:03.256081+00	\N	popular	Popular		\N		0	["restaurant"]			\N	3
+7	2019-08-04 03:41:03.416712+00	2019-08-04 03:41:03.416723+00	\N	newly_added	Newly Added		\N		0	["restaurant"]			\N	4
+8	2019-08-04 03:41:03.421337+00	2019-08-04 03:41:03.421348+00	\N	popular	Popular		\N		0	["restaurant"]			\N	4
+9	2019-08-04 03:41:03.551857+00	2019-08-04 03:41:03.551869+00	\N	newly_added	Newly Added		\N		0	["restaurant"]			\N	5
+10	2019-08-04 03:41:03.556415+00	2019-08-04 03:41:03.556426+00	\N	popular	Popular		\N		0	["restaurant"]			\N	5
+11	2019-08-04 03:41:03.685101+00	2019-08-04 03:41:03.685112+00	\N	newly_added	Newly Added		\N		0	["restaurant"]			\N	6
+12	2019-08-04 03:41:03.689483+00	2019-08-04 03:41:03.689494+00	\N	popular	Popular		\N		0	["restaurant"]			\N	6
+\.
+
+
+--
+-- Name: curated_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('curated_category_id_seq', 12, true);
+
+
+--
+-- Data for Name: curated_category_membership; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY curated_category_membership (id, created_at, start_time, end_time, sort_order, member_id, category_id, member_ct_id) FROM stdin;
+1	2019-08-04 03:47:16.388396+00	2019-08-03 17:07:16.388317+00	2020-08-03 03:47:16.388328+00	0	1	2	332
+\.
+
+
+--
+-- Name: curated_category_membership_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('curated_category_membership_id_seq', 1, true);
+
+
+--
+-- Data for Name: currency_exchange_rate; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY currency_exchange_rate (id, currency, "timestamp", quote) FROM stdin;
+\.
+
+
+--
+-- Name: currency_exchange_rate_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('currency_exchange_rate_id_seq', 1, false);
+
+
+--
+-- Data for Name: dasher_capacity_model; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dasher_capacity_model (id, name, active_date, metadata, weights, normalized_training_mse, normalized_testing_mse, training_mse, testing_mse, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: dasher_capacity_model_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('dasher_capacity_model_id_seq', 1, false);
+
+
+--
+-- Data for Name: dasher_capacity_plan; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dasher_capacity_plan (id, created_at, active_date, supply_target, caps_target, estimated_growth_rate, estimated_delivery_distribution, estimated_activation_rates, estimated_incoming_delivery_counts, estimated_outstanding_delivery_counts, estimated_active_efficiencies, ideal_flfs, adjustment_vector, predictor_id, weather_factor, model_id, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: dasher_capacity_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('dasher_capacity_plan_id_seq', 1, false);
+
+
+--
+-- Data for Name: dasher_onboarding; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dasher_onboarding (id, dasher_id, tier, onboarded_at, onboarding_type_id) FROM stdin;
+\.
+
+
+--
+-- Name: dasher_onboarding_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('dasher_onboarding_id_seq', 1, false);
+
+
+--
+-- Data for Name: dasher_onboarding_type; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dasher_onboarding_type (id, name) FROM stdin;
+\.
+
+
+--
+-- Name: dasher_onboarding_type_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('dasher_onboarding_type_id_seq', 1, false);
+
+
+--
+-- Data for Name: dd4b_expense_code; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dd4b_expense_code (id, organization_id, expense_code, friendly_name, is_active) FROM stdin;
+\.
+
+
+--
+-- Name: dd4b_expense_code_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('dd4b_expense_code_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery (id, public_id, created_at, cancelled_at, abandoned_at, did_respond_to_customer, should_be_manually_assigned, manually_assigned, urgent_cutoff, is_pending_resolution, payout_for_store_no_errors, dasher_notes, is_asap, is_from_store_to_us, is_from_partner_store, is_consumer_pickup, is_depot, is_test, is_preassign, is_preassignable, is_route_based_delivery, fulfillment_type, is_curbside_dropoff, proactive_monitoring_required, source, partner_source, signature_required, allow_unattended_delivery, google_estimate, gmaps_d2r_for_candidates, gmaps_d2r_at_assignment, active_date, assignment_first_considered_time, first_assignment_made_time, dasher_assigned_time, dasher_confirmed_time, dasher_at_store_time, dasher_confirmed_at_store_time, dasher_confirmed_at_consumer_time, estimated_store_prep_time, internally_calculated_pickup_time, actual_pickup_time, internally_calculated_delivery_time, actual_delivery_time, delivery_completed_message, delivery_location, onsite_estimated_prep_time, onsite_estimated_prep_time_updated_at, onsite_estimated_prep_time_timestamp, at_depot_time, quoted_delivery_time, eta_prediction_updated_at, fee, fee_baserate, marketing_fee, boost, currency, batch_id, value_of_contents, cash_on_delivery, consumer_pickup_auto_closed, updated_at, dasher_wait_until, market_shortname, starting_point_id, pickup_location_info, dropoff_location_info, min_age_required, can_be_batched, soft_requirements, serviceable_vehicle_types, order_protocol_type, store_order_confirmed_time, order_ready_time, creator_id, delivery_address_id, eta_prediction_id, market, merchant_transaction_id, order_cart_id, parent_delivery_id, pickup_address_id, shift_id, store_id, store_order_cart_id, submarket, transfer_id, is_group_cart_delivery, idempotency_key) FROM stdin;
+\.
+
+
+--
+-- Data for Name: delivery_assignment_constraint; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_assignment_constraint (id, delivery_id, single_store_batching, order_volume, max_batch_size, max_mins_allowed_on_road, pickup_window_start_time, pickup_window_end_time, delivery_window_start_time, delivery_window_end_time, updated_at, preferred_dasher_equipment_ids) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_assignment_constraint_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_assignment_constraint_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_cancellation_reason; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_cancellation_reason (id, name, friendly_name, sort_order, category_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: delivery_cancellation_reason_category; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_cancellation_reason_category (id, name, friendly_name, consumer_sms_reason_copy, consumer_email_reason_copy, consumer_email_reason_copy_credit, consumer_email_reason_copy_just_cancel, consumer_email_reason_copy_refund) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_cancellation_reason_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_cancellation_reason_category_id_seq', 1, false);
+
+
+--
+-- Name: delivery_cancellation_reason_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_cancellation_reason_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_catering_verification; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_catering_verification (id, created_at, cancelled_at, dasher_id, setup_photo_url, setup_waived, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_catering_verification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_catering_verification_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_drive_info; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_drive_info (created_at, updated_at, delivery_id, pickup_business_name, pickup_instructions, pickup_phone_number, external_order_reference, order_type, order_volume, verification_type, is_route_based, dasher_pay_per_dropoff, verification_attempts, accept_dasher_receipts, commission_rate, delivery_pay_pad_time, delivery_radius, min_fee, max_fee, setup_pay, sof_pay_boost, requires_catering_setup, include_catering_setup, searchable, completed_by_preferred_dasher, completed_by_drive_dasher, delivery_requirements, pickup_window_start_time, pickup_window_end_time, delivery_window_start_time, delivery_window_end_time, team_lift_required, quantity, is_return_delivery, return_type, contains_alcohol, min_age_requirement, commission_subtotal, commission_tax, commission_total, barcode_scanning_required, delivery_metadata, allowed_vehicles, tip_pending_until, return_delivery_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: delivery_error_source; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_error_source (id, name) FROM stdin;
+1	dispatch_error_tool
+2	dispatch_merchant_adjustment_tool
+\.
+
+
+--
+-- Name: delivery_error_source_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_error_source_id_seq', 2, true);
+
+
+--
+-- Data for Name: delivery_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_event (id, created_at, metadata, category_id, created_by_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: delivery_event_category; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_event_category (id, name, description, created_at, can_view, can_create) FROM stdin;
+2	order_received	Dispatch has received the order	2014-08-15 19:12:35+00	["consumer", "dispatch", "driver"]	["dispatch"]
+3	order_sent_to_merchant	The order has been sent to the merchant	2014-08-15 19:13:40+00	["dispatch", "merchant"]	["dispatch"]
+4	merchant_confirmed	The merchant has confirmed receipt of the order	2014-08-15 19:16:24+00	["consumer", "dispatch", "merchant"]	["dispatch", "merchant"]
+5	driver_assigned	Driver has been assigned to complete the delivery	2014-08-15 19:17:36+00	["dispatch", "driver"]	["dispatch"]
+6	driver_confirmed	Driver has confirmed receipt of delivery instructions	2014-08-15 19:18:35+00	["consumer", "dispatch", "driver"]	["dispatch", "driver"]
+7	driver_arrived_at_merchant	Driver has arrived at the merchant	2014-08-15 19:19:10+00	["consumer", "dispatch", "driver", "merchant"]	["dispatch", "driver", "merchant"]
+8	driver_picked_up	Driver has confirmed the pick up.	2014-08-15 19:21:04+00	["consumer", "dispatch", "driver", "merchant"]	["dispatch", "driver"]
+9	driver_approaching_customer	Driver is approaching the customer's delivery address	2014-08-15 19:30:00+00	["consumer", "dispatch", "driver"]	["dispatch", "driver"]
+10	driver_dropped_off	Driver has confirmed the drop off.	2014-08-15 19:31:01+00	["consumer", "dispatch", "driver"]	["dispatch", "driver"]
+11	driver_unconfirmed	Driver has failed to confirm the receipt of the order after a specified duration	2014-08-15 19:31:46+00	["dispatch", "driver"]	["dispatch", "driver"]
+12	driver_unassigned	Driver has been unassigned from the delivery	2014-09-16 03:45:53+00	["dispatch"]	["dispatch"]
+13	delivery_address_change	A delivery had its delivery address changed	2014-09-27 01:09:56+00	["dispatch"]	["dispatch"]
+14	switch_to_manual_place		2015-01-09 01:07:32.13+00	["dispatch"]	[]
+15	switch_to_manual_assign		2015-01-09 01:07:32.141+00	["dispatch"]	[]
+16	manual_assign_driver		2015-01-09 01:07:37.211+00	["dispatch"]	[]
+17	manual_confirm_order		2015-01-09 01:08:37.707+00	["dispatch"]	[]
+18	manual_place_call_order		2015-01-09 01:18:43.27+00	["dispatch"]	[]
+19	manual_unassign_driver	Dispatch manually unassigns a driver from a delivery	2015-01-09 01:19:11+00	["dispatch"]	[]
+20	manual_place_fax_order		2015-01-09 01:25:46.279+00	["dispatch"]	[]
+21	manual_place_email_order		2015-01-09 01:34:52.836+00	["dispatch"]	[]
+22	switch_to_auto_place		2015-01-09 01:43:37.196+00	["dispatch"]	[]
+23	switch_to_auto_assign		2015-01-09 01:43:37.211+00	["dispatch"]	[]
+24	manual_place_ipad_order		2015-01-09 02:19:21.254+00	["dispatch"]	[]
+25	restaurant_unconfirmed		2015-01-15 09:23:55+00	["delivery_support", "dispatch"]	[]
+26	order_placer_escalation		2015-01-15 09:24:14+00	["delivery_support", "dispatch"]	[]
+27	placed_order_escalation		2015-01-15 09:24:34+00	["delivery_support", "dispatch"]	[]
+28	manually_change_delivery_to_scheduled_time		2015-01-16 08:37:16.828+00	["dispatch"]	[]
+29	manually_reset_delivery_to_asap		2015-01-17 03:13:11.695+00	["dispatch"]	[]
+30	unassigned_for_too_long		2015-01-19 17:08:29+00	["delivery_support", "dispatch"]	[]
+31	driver_slow_r2c		2015-01-19 17:16:32+00	["delivery_support", "dispatch"]	[]
+32	driver_slow_to_restaurant		2015-01-19 17:17:12+00	["delivery_support", "dispatch"]	[]
+33	delivered_very_late		2015-01-28 03:35:43+00	["dispatch"]	[]
+34	big_order_created		2015-01-28 03:35:55+00	["delivery_support", "dispatch"]	[]
+35	catering_order_created		2015-01-28 03:36:04+00	["delivery_support", "dispatch"]	[]
+36	manual_confirm_driver		2015-01-31 01:35:19.079+00	["dispatch"]	[]
+37	consumer_phone_call		2015-02-04 02:02:49+00	["dispatch"]	["dispatch"]
+38	driver_phone_call		2015-02-04 02:02:57+00	["dispatch"]	["dispatch"]
+39	merchant_phone_call		2015-02-04 02:03:03+00	["dispatch"]	["dispatch"]
+40	driver_monitor_sent_warning		2015-02-05 08:42:14+00	["dispatch"]	[]
+41	driver_monitor_unassigned_driver	driver monitor put a dasher in MA because they were sent a delivery but dasher did not confirm.	2015-02-05 08:42:23+00	["dispatch"]	[]
+43	driver_urgent_auto_assigned		2015-02-10 01:01:42+00	["dispatch"]	[]
+45	manual_place_misc_order		2015-02-12 23:19:31.69+00	["dispatch"]	[]
+46	driver_monitor_sent_unassignment_text		2015-03-03 01:40:39+00	["dispatch"]	[]
+47	delayed_batch		2015-03-03 11:52:39+00	["dispatch", "delivery_support"]	[]
+48	order_placer_claimed		2015-03-06 02:44:31+00	["dispatch"]	[]
+49	sent_confirmation_robocall		2015-03-09 21:16:19+00	["dispatch"]	[]
+50	order_cart_adjustment		2015-03-09 21:20:55+00	["dispatch"]	[]
+51	create_redelivery		2015-03-09 21:53:40+00	["dispatch"]	[]
+52	driver_received_assignment		2015-03-16 20:14:08+00	["dispatch"]	["driver"]
+53	driver_went_offline		2015-03-19 07:55:45+00	["dispatch"]	[]
+54	confirmed_order_thru_robocall		2015-03-26 01:02:57+00	["dispatch"]	[]
+55	fax_failed		2015-03-27 20:20:47+00	["delivery_support", "dispatch"]	[]
+56	fax_went_through		2015-03-27 20:21:13+00	["dispatch"]	[]
+57	sent_to_order_placer		2015-03-27 20:21:42+00	["dispatch"]	[]
+58	manual_place_order		2015-03-27 21:42:29.567+00	["dispatch"]	[]
+59	low_rating_created		2015-03-30 23:29:15+00	["delivery_support", "dispatch"]	[]
+60	request_dasher_place		2015-04-01 20:48:05+00	["dispatch"]	[]
+61	unplaced_on_dasher_arrival		2015-04-01 20:48:33+00	["dispatch"]	[]
+62	order_placer_attempt		2015-04-06 19:16:03+00	["dispatch"]	["dispatch"]
+63	very_late_auto_refund		2015-04-14 18:58:24+00	["dispatch"]	[]
+64	support_ticket_created		2015-04-21 23:39:56+00	["dispatch"]	[]
+65	support_ticket_closed		2015-04-21 23:40:03+00	["dispatch"]	[]
+66	driver_unassigned_from_batch		2015-04-23 22:43:41+00	["dispatch"]	[]
+67	driver_abandoned		2015-04-23 22:43:45+00	["dispatch"]	[]
+68	driver_left_merchant		2015-04-23 22:43:55+00	["dispatch"]	[]
+69	driver_left_customer		2015-04-23 22:44:15+00	["dispatch"]	[]
+70	resend_to_order_placer_queue		2015-04-23 22:44:30+00	["dispatch"]	[]
+71	dasher_place_customer_update		2015-04-23 22:45:10+00	["dispatch"]	[]
+72	sent_dasher_leave_text		2015-04-24 00:05:41+00	["dispatch"]	[]
+73	sent_dasher_wait_for_customer_text		2015-04-24 00:05:52+00	["dispatch"]	[]
+74	customer_unavailable		2015-04-24 00:06:02+00	["dispatch"]	[]
+75	customer_resolved_substitution		2015-05-06 01:16:38+00	["dispatch"]	[]
+76	create_substitution_link		2015-05-06 01:16:41+00	["dispatch"]	[]
+77	texted_customer_substitution_link		2015-05-06 01:16:59+00	["dispatch"]	[]
+78	customer_open_expired_substitution		2015-05-06 01:17:20+00	["dispatch"]	[]
+79	customer_open_substitution_page		2015-05-06 01:17:45+00	["dispatch"]	[]
+80	driver_didnt_receive_assignment		2015-05-09 06:59:23+00	["dispatch"]	[]
+154	cancel_by_dasher		2016-02-10 22:16:37+00	["dispatch"]	["driver"]
+155	flash_sale_delivery	To record flash sale deliveries.	2016-02-17 22:56:09+00	["dispatch"]	[]
+81	marqeta_decline_insufficient_funds	When a driver attempts to make a purchase with a marqeta card but has insufficient funds.	2015-05-10 00:30:09+00	["delivery_support", "dispatch", "driver"]	[]
+82	marqeta_purchase	When a dashers make a purchase with their marqeta card.	2015-05-10 04:59:19+00	["dispatch", "driver"]	[]
+83	marqeta_decline_card_inactive	When a dasher attempts to make a purchase but their marqeta card is inactive.	2015-05-10 05:23:04+00	["dispatch", "driver"]	[]
+84	no_marqeta_card	For deliveries where a driver does not have a marqeta card.	2015-05-11 21:01:01+00	["dispatch"]	[]
+85	marqeta_batched_purchase	When a driver is assigned a batch, we record a purchase event for both deliveries since we don't currently have the ability to identify which place they purchased from.	2015-05-13 17:41:49+00	["dispatch"]	[]
+86	incorrect_delivery_report		2015-05-30 02:06:29+00	["dispatch"]	[]
+87	change_address_request		2015-05-30 03:28:11+00	["delivery_support", "dispatch"]	[]
+88	reschedule_request		2015-05-30 03:28:19+00	["delivery_support", "dispatch"]	[]
+89	adjust_order_request		2015-05-30 03:28:32+00	["delivery_support", "dispatch"]	[]
+90	never_delivered_report		2015-05-30 03:28:38+00	["delivery_support", "dispatch"]	[]
+91	unsatisfactory_delivery_report		2015-05-30 03:28:52+00	["dispatch"]	[]
+92	other_customer_request		2015-05-30 03:29:00+00	["dispatch"]	[]
+93	cancel_by_customer		2015-06-01 22:42:44+00	["dispatch"]	[]
+94	status_update_request		2015-06-04 00:31:30+00	["dispatch"]	[]
+95	one_off_consumer_email		2015-06-05 06:42:20+00	["dispatch"]	[]
+96	outbound_driver_text		2015-06-11 20:32:53+00	["dispatch"]	[]
+97	inbound_driver_text		2015-06-11 20:32:56+00	["dispatch"]	[]
+98	redelivery_request		2015-06-12 03:56:37+00	["delivery_support", "dispatch"]	[]
+99	customer_ping_dasher		2015-06-13 00:45:06+00	["dispatch"]	[]
+100	driver_reassigned		2015-06-19 18:10:11+00	["dispatch"]	[]
+101	cancel_by_dispatch		2015-06-19 23:48:44+00	["dispatch"]	[]
+102	revert_delivered_status		2015-06-24 01:44:47+00	["dispatch"]	[]
+103	revert_picked_up_status		2015-06-24 01:44:57+00	["dispatch"]	[]
+104	auto_resend_to_order_placer_queue		2015-06-25 11:18:46+00	["dispatch"]	[]
+105	auto_dasher_place_from_escalation		2015-06-25 11:18:52+00	["dispatch"]	[]
+106	merchant_received_order		2015-06-28 09:01:43+00	["dispatch"]	[]
+107	manual_resend_order		2015-06-28 09:01:52+00	["dispatch"]	[]
+108	merchant_didnt_receive_order		2015-06-29 20:51:44+00	["delivery_support", "dispatch"]	[]
+109	dispatcher_note		2015-07-02 03:58:55+00	["dispatch"]	["dispatch"]
+110	manually_mark_as_picked_up		2015-07-02 03:59:00+00	["dispatch"]	[]
+111	manually_mark_as_delivered		2015-07-02 03:59:57+00	["dispatch"]	[]
+112	error_created		2015-07-02 22:44:49+00	["dispatch"]	[]
+113	pickup_status_inquiry_response:en_route		2015-07-17 20:19:52.632+00	["dispatch"]	["driver"]
+114	pickup_status_inquiry_response:food_ready		2015-07-17 20:19:52.738+00	["dispatch"]	["driver"]
+115	pickup_status_inquiry_response:in_line		2015-07-17 20:19:52.743+00	["dispatch"]	["driver"]
+116	pickup_status_inquiry_response:other		2015-07-17 20:19:52.749+00	["dispatch"]	["driver"]
+117	pickup_status_inquiry_response:waiting_for_food		2015-07-17 20:19:52.754+00	["dispatch"]	["driver"]
+118	driver_batched		2015-07-28 20:38:35+00	["dispatch"]	[]
+119	no_marqeta_purchase_upon_delivery	Identify scenarios where we don't have a marqeta purchase in our system when a driver hits delivered.	2015-07-31 22:12:33+00	["dispatch"]	[]
+120	pinged_pickup_status		2015-08-05 17:38:53+00	["dispatch"]	[]
+121	retroactively_apply_promo		2015-08-07 08:51:53+00	["dispatch"]	[]
+122	tip_adjustment		2015-08-07 08:52:08+00	["dispatch"]	[]
+123	dasher_calls_customer	Dasher calls the customer with a masked number.	2015-08-13 00:07:15+00	["dispatch"]	[]
+124	customer_calls_dasher	Customer calls the dasher with a masked number.	2015-08-13 00:07:39+00	["dispatch"]	[]
+125	dasher_texts_customer	Dasher texts the customer with a masked number.	2015-08-13 00:07:53+00	["dispatch"]	[]
+126	customer_texts_dasher	Customer texts the dasher with a masked number.	2015-08-13 00:08:07+00	["dispatch"]	[]
+128	alcohol_delivery_age_submission_legal	Event category for when there is a submission for consumer's DOB from dasher	2015-08-26 20:43:30+00	["dispatch"]	["driver"]
+129	alcohol_delivery_age_submission_illegal	Dasher clicks on consumer is not 21	2015-08-26 20:45:04+00	["dispatch"]	["driver"]
+130	compensation_request		2015-08-27 09:15:57+00	["delivery_support", "dispatch"]	[]
+131	dasher_self_unassigned		2015-08-27 22:53:00+00	["dispatch"]	[]
+132	customer_reschedule		2015-09-03 22:28:58+00	["dispatch"]	[]
+133	merchant_notify_delivery_ready	For stores that want to notify dashers of when a delivery is ready for pickup	2015-09-06 02:46:09+00	["dispatch"]	[]
+134	sent_price_difference_warning		2015-09-09 18:58:05+00	["dispatch"]	[]
+135	dasher_place_claim		2015-09-11 05:26:12+00	["dispatch"]	[]
+136	inbound_store_call		2015-09-16 00:54:38+00	["dispatch"]	[]
+137	inbound_dasher_call		2015-09-16 00:54:44+00	["dispatch"]	[]
+138	inbound_consumer_call		2015-09-16 00:54:50+00	["dispatch"]	[]
+139	already_late_not_picked_up		2015-09-17 21:22:04+00	["delivery_support", "dispatch"]	[]
+140	dasher_unresponsive		2015-09-17 21:22:31+00	["delivery_support", "dispatch"]	[]
+141	marqeta_finance_delivery	fired when we activate a driver's marqeta card and add funds to it. This happens when the dasher is assigned a delivery and accepts it. 	2015-09-29 21:36:02+00	["dispatch"]	[]
+142	fax_attempt_success		2015-10-15 23:06:25+00	["dispatch"]	[]
+143	fax_attempt_failure		2015-10-15 23:06:30+00	["dispatch"]	[]
+144	critical_support_escalation	For tier 1 agents, when they cannot directly solve the issue. This is the highest priority (of 3).	2015-10-16 19:42:12+00	["delivery_support", "dispatch"]	[]
+145	urgent_support_escalation	For tier 1 agents, when they cannot directly solve the issue. This is the 2nd highest level of priority (of 3).	2015-10-16 19:42:52+00	["delivery_support", "dispatch"]	[]
+146	follow_up_support_escalation	For tier 1 agents, when they cannot directly solve the issue. This is the least urgent priority (of 3).	2015-10-16 19:43:21+00	["delivery_support", "dispatch"]	[]
+147	manual_address_change		2015-10-17 00:37:56+00	["dispatch"]	[]
+148	send_email_order		2015-10-27 03:48:53+00	["dispatch"]	[]
+149	email_went_through		2015-10-29 01:26:55+00	["dispatch"]	[]
+150	merchant_email_failed		2015-10-29 01:27:35+00	["delivery_support", "dispatch"]	[]
+151	merchant_requested_deactivation	For deliveries with deactivated items. Indicates that the delivery needs to be resolved before the merchant will continue preparing the order.	2015-11-12 00:16:08+00	["delivery_support", "dispatch"]	[]
+152	eng_error		2015-12-16 02:53:32.919+00	["dispatch"]	[]
+153	sent_late_delivery_apology		2016-02-05 06:21:46+00	["dispatch"]	[]
+156	marqeta_limit_exemption		2016-03-05 07:26:21.34+00	["dispatch"]	[]
+157	store_closed	Dasher has indicated the store is closed via active self-help	2016-03-08 04:05:02+00	["dispatch"]	[]
+158	delivery_unsuccessful	Dasher has waited 10 minutes past ETA without reaching customer. Hit "Delivery unsuccessful" button in self help.	2016-03-08 04:05:21+00	["dispatch"]	[]
+159	marqeta_funding		2016-03-08 06:53:15.179+00	["dispatch"]	[]
+160	sent_late_auto_refund_sms		2016-03-11 01:41:57+00	["dispatch"]	[]
+161	stripe_commando_pending_payment	Stripe down, so we're queuing up to charge later.	2016-03-16 04:38:08+00	["delivery_support", "dispatch"]	[]
+162	stripe_commando_charge	Charge pending payments via Stripe.	2016-03-16 04:39:13+00	["delivery_support", "dispatch"]	[]
+166	dasher_declined	Dasher declined delivery through modal	2016-05-03 20:38:03+00	["dispatch"]	["dispatch"]
+167	store_filtering_exp_delivery	For recording deliveries from store filtering experiment	2016-05-09 19:40:11+00	["dispatch"]	[]
+168	hide_stores_exp_delivery	Track deliveries that are subject to the hide stores experiment.	2016-05-11 07:39:26+00	["dispatch"]	[]
+169	comp_request_auto_approved	Compensation request submitted by customer has been automatically approved	2016-06-13 23:39:12+00	["dispatch"]	[]
+170	comp_request_needs_review	Compensation request submitted by customer needs manual review	2016-06-13 23:40:02+00	["dispatch"]	[]
+171	almost_late_at_store		2016-06-22 00:28:12+00	["dispatch"]	[]
+172	almost_late_before_store_arrival		2016-06-22 00:28:29+00	["dispatch"]	[]
+173	sent_almost_late_notification		2016-06-22 21:59:36+00	["dispatch"]	[]
+174	merchant_reconfirmed		2016-06-25 18:38:16+00	["dispatch"]	[]
+175	reconfirmed_order_thru_robocall		2016-06-25 18:38:50+00	["dispatch"]	[]
+176	sent_reconfirmation_robocall		2016-06-25 18:38:58+00	["dispatch"]	[]
+177	order_cart_fraud_escalation	Order Cart Fraud Escalation	2016-06-26 03:23:25+00	["delivery_support", "dispatch"]	["delivery_support"]
+178	store_missed_second_confirmation		2016-06-27 21:33:46+00	["delivery_support", "dispatch"]	[]
+179	dasher_reports_unavailable_items	Dasher reports unavailable items through the help section of the app.	2016-07-06 18:51:40+00	["dispatch"]	["driver"]
+180	dasher_reports_substitutions	Dasher reporting to dispatch the merchant recommended item when the original item is unavailable.	2016-07-06 18:55:07+00	["dispatch"]	["driver"]
+181	dasher_refunds_items	Dasher refunds items when they are unavailable, per customer's substitution preference.	2016-07-06 18:57:47+00	["dispatch"]	["driver"]
+182	dasher_refunds_items_successfully	Dasher refunds an unavailable item successfully	2016-07-06 21:07:15+00	["dispatch"]	["driver"]
+183	dasher_refunds_items_unsuccessfully	Dasher unsuccessfully refunds an item	2016-07-06 21:08:21+00	["dispatch"]	["driver"]
+184	cancel_by_order_placer		2016-07-12 22:28:52+00	["dispatch"]	[]
+185	substitute_by_order_placer		2016-07-12 22:29:02+00	["dispatch"]	[]
+186	cancel_by_merchant		2016-07-15 00:08:56+00	["dispatch"]	[]
+187	refund_and_mark_fraudulent		2016-07-20 17:43:44.64+00	["dispatch"]	[]
+188	refund_item_by_order_placer		2016-07-28 01:48:22+00	["dispatch"]	[]
+189	start_checking_items	Triggered when user starts checking off items at a restaurant.	2016-08-11 21:42:00+00	["driver"]	["driver"]
+190	left_store_in_vehicle	Not implemented. Ignore.	2016-08-11 23:49:18+00	[]	["driver"]
+191	dasher_plugged_in_phone		2016-08-12 23:23:56+00	["driver"]	["driver"]
+192	dasher_unplugged_phone		2016-08-12 23:24:29+00	["driver"]	["driver"]
+193	merchant_reschedule		2016-08-17 23:51:28+00	["dispatch"]	[]
+194	order_adjusted_by_order_placer_refund	Order get adjusted by order placer and have refund.	2016-08-24 21:33:54+00	[]	[]
+195	dasher_confirmed_store_arrival	Triggered when dasher swipes after arrival at store. Associated with timestamp dasher_confirmed_store_arrival.	2016-08-26 02:35:20+00	["dispatch", "delivery_support"]	[]
+196	order_adjusted_by_order_placer		2016-08-30 23:25:56+00	["dispatch"]	[]
+197	dasher_mark_as_delivered	event that is triggered when an event is marked as delivered from the an api call starting from the dasher app.	2016-08-31 06:56:48+00	["dispatch"]	[]
+198	cancel_by_unknown		2016-09-13 18:24:00.295+00	[]	[]
+199	merchant_payment_adjustment	Adjust a merchant's weekly payment	2016-09-14 00:39:32+00	["dispatch"]	[]
+200	order_placer_marked_store_closed	Order placer speaks to restaurant and marks store closed via OP tool. This action also cancels the order.	2016-09-30 20:17:32+00	["dispatch"]	[]
+201	order_placer_marked_store_too_busy	Order placer is told merchant is too busy to accept the order. Order is cancelled.	2016-09-30 20:18:34+00	["dispatch"]	[]
+202	order_placer_switched_to_dasher_place	Order placer is told we should place order in person. Switches order to dasher place protocol.	2016-09-30 20:19:13+00	["dispatch"]	[]
+204	drive_order_not_assigned_on_time		2016-10-20 20:00:29+00	["delivery_support", "dispatch"]	[]
+205	drive_order_not_ready_at_store		2016-10-21 00:49:03+00	["delivery_support", "dispatch"]	[]
+206	unassigned_for_late_check_in		2016-10-21 23:59:10+00	["dispatch"]	[]
+207	drive_order_not_picked_up_on_time		2016-10-24 08:16:33+00	["delivery_support", "dispatch"]	[]
+208	drive_order_driver_running_late		2016-10-26 21:07:15+00	["delivery_support", "dispatch"]	[]
+209	drive_order_submission_not_going_thru		2016-10-27 01:11:35+00	["delivery_support", "dispatch"]	[]
+211	drive_order_dasher_running_late		2016-11-02 01:06:14+00	["delivery_support", "dispatch"]	[]
+212	early_assign_dasher		2016-11-08 02:09:18+00	["dispatch"]	[]
+213	dasher_calls_merchant	Dasher calls merchant with a masked number	2016-11-10 18:49:00+00	["dispatch"]	[]
+214	dasher_texts_merchant	Dasher texts merchant with a masked number	2016-11-10 18:49:17+00	["dispatch"]	[]
+215	low_merchant_rating_created	When a merchant gives a Dasher a poor rating	2016-11-19 02:05:23+00	["delivery_support", "dispatch"]	[]
+216	drive_order_inconsistent_dropoff		2016-11-22 02:59:30+00	["delivery_support", "dispatch"]	[]
+217	dasher_deactivated	dasher deactivated -> shift removed from preassigned delivery	2016-11-29 00:33:02+00	[]	[]
+218	dasher_confirmed_consumer_arrival	Triggered when dasher swipes after arrival at consumer. Associated with timestamp dasher_confirmed_consumer_arrival.	2016-12-09 02:45:51+00	["dispatch", "delivery_support"]	[]
+219	drive_order_dasher_receipt_not_attached	Triggered when delivery requires receipt and dasher drops off without attaching a receipt.	2016-12-09 02:47:01+00	["dispatch", "delivery_support"]	[]
+220	schedule_order_not_placed	Scheduled order cannot be placed due to Menu change.	2016-12-14 02:12:11+00	["dispatch"]	[]
+221	store_changed_menu	Store changed its menu	2016-12-30 00:19:44+00	["dispatch"]	[]
+222	drive_order_dasher_running_late_to_merchant		2016-12-30 00:19:44+00	["dispatch"]	[]
+223	drive_order_dasher_running_late_to_customer		2016-12-30 00:19:44+00	["dispatch"]	[]
+224	drive_order_customer_unavailable		2016-12-30 00:19:44+00	["dispatch"]	[]
+231	dasher_entered_vehicle_beacon_region		2017-03-14 00:19:44+00	[]	["driver"]
+232	dasher_left_vehicle_beacon_region		2017-03-14 00:19:44+00	[]	["driver"]
+233	dasher_entered_store_beacon_region		2017-03-14 00:19:44+00	[]	["driver"]
+234	dasher_left_store_beacon_region		2017-03-14 00:19:44+00	[]	["driver"]
+237	unable_mark_delivered		2017-06-12 00:15:44+00	[]	[]
+238	unable_finish_current_delivery		2017-06-12 00:19:44+00	[]	[]
+239	driver_approaching_customer_wide		2016-11-29 00:32:27.380131+00	[]	[]
+240	driver_left_customer_wide		2016-11-29 00:32:27.380131+00	[]	[]
+241	dasher_mark_delivered_not_allowed		2016-11-29 00:32:27.380131+00	[]	[]
+242	dasher_mark_delivered_allowed		2016-11-29 00:32:27.380131+00	[]	[]
+243	sent_confirmation_text_for_preassign		2017-07-11 00:32:27.380131+00	[]	[]
+244	proactive_cancel_unable_to_place		2017-08-11 00:32:27.380131+00	[]	[]
+247	drive_tip_verification_escalation		2017-09-16 00:32:27.380131+00	[]	[]
+248	dasher_self_request_funding		2017-09-24 00:32:27.380131+00	[]	[]
+249	dasher_app_pulled_delivery_info		2017-09-24 00:32:27.380131+00	[]	[]
+250	immobile_dasher_alerted		2017-09-24 00:32:27.380131+00	[]	[]
+251	dasher_earned_on_time_bonus		2017-11-24 00:32:27.380131+00	[]	[]
+252	order_not_ready		2017-09-24 00:32:27.380131+00	["dispatch", "delivery_support"]	["driver"]
+253	too_far_from_store_dasher_alerted		2017-09-24 00:32:27.380131+00	[]	[]
+269	proactive_cancel_starting_point_closing		2018-04-07 00:32:27.380131+00	["dispatch"]	["dispatch"]
+270	merchant_marked_order_as_not_picked_up	Merchant Marked Order as Not Picked Up	2018-05-29 18:00:00+00	["dispatch"]	[]
+271	merchant_marked_order_as_picked_up	Merchant Marked Order as Picked Up	2018-05-29 18:10:00+00	["dispatch"]	[]
+272	order_auto_closed_after_one_hour	Automatically marking order as picked up after 1 hour due to lack of response from Merchant	2018-05-29 18:20:00+00	["dispatch"]	[]
+273	merchant_marked_order_as_ready	Merchant Marked Order as Ready	2018-05-29 18:30:00+00	["dispatch"]	[]
+274	order_ready_per_prep_time_estimate	Order Ready per Prep Time Estimate	2018-05-30 18:00:00+00	["dispatch"]	[]
+275	delivery_cancelled_by_auto_close_out_shift	The delivery was cancelled as part of auto closing the shift	2018-09-05 00:52:05+00	["delivery_support", "dispatch"]	[]
+276	marked_delivered_by_auto_close_out_shift	Marked as delivered by the auto close shifts task	2018-09-05 19:40:13+00	["delivery_support", "dispatch"]	[]
+277	pinged_dropoff_status		2019-01-30 19:26:00+00	["dispatch"]	[]
+571	dropoff_status_inquiry_response:ignored		2019-02-06 15:52:00+00	["dispatch"]	["driver"]
+572	dropoff_status_inquiry_response:parking		2019-02-06 15:53:56+00	["dispatch"]	["driver"]
+573	dropoff_status_inquiry_response:cant_find_address		2019-02-06 15:54:17+00	["dispatch"]	["driver"]
+574	dasher_texts_customer_failed		2019-03-01 16:28:23+00	["dispatch"]	[]
+604	dropped_off_without_customer		2019-02-13 16:28:23+00	["dispatch"]	[]
+637	support_workflow_resolved		2019-04-13 16:28:23+00	["delivery_support", "dispatch", "consumer"]	["delivery_support", "dispatch", "consumer"]
+703	dasher_marked_pickup_allowed	The pickup geofence check determined that the driver was inside of the merchant geofence.	2019-03-06 16:38:23+00	["delivery_support", "dispatch"]	[]
+704	dasher_marked_pickup_not_allowed	The pickup geofence check determined that the driver was outside of the merchant geofence.	2019-03-06 16:38:23+00	["delivery_support", "dispatch"]	[]
+705	completed_with_apartment_mapping_data	Dasher completed the delivery, with detailed apartment mapping data (unit/parking location) provided to them.	2019-04-04 16:38:23+00	[]	[]
+801	moved_to_depot	Delivery was included as part of a depot experiment	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+802	removed_from_depot	Delivery was removed from the depot experiment	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+803	order_at_depot	Food is at the depot	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+804	order_claimed_by_runner	Delivery was claimed by a runner	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+805	order_picked_up_by_runner	Delivery was picked up by a runner	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+806	order_arrived_at_mx_hub	Order arrived at merchant hub	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+807	order_departed_from_mx_hub	Orders left the merchant hub	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+808	order_arrived_at_cx_hub	Order arrived at consumer hub	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+809	order_departed_from_cx_hub	Order left the consumer hub	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+810	disaster_delivery_proactive_cancel	Disaster Delivery Proactive Cancellation	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+811	order_sent_back_to_store	Order sent back to store	2017-09-24 00:32:27.380131+00	[]	["delivery_support", "dispatch"]
+812	dasher_left_pickup_inquiry	Sent when dasher receives push notification due to leaving merchant proximity without marking order as picked up.	2019-07-09 19:39:27.380131+00	["dispatch"]	[]
+\.
+
+
+--
+-- Name: delivery_event_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_event_category_id_seq', 812, true);
+
+
+--
+-- Name: delivery_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_event_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_fee_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_fee_promotion (id, created_at, delivery_fee, min_subtotal) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_fee_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_fee_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_funding; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_funding (id, amount, created_at, created_by_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_funding_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_funding_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_gift; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_gift (id, created_at, value, currency, code, expires_at, status, redeemed_at, consumer_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_gift_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_gift_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_growth_model; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_growth_model (id, name, active_date, weights, normalized_training_mse, normalized_testing_mse, training_mse, testing_mse, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_growth_model_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_growth_model_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_growth_prediction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_growth_prediction (id, active_date, created_at, metadata, prediction, growth_model_id, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_growth_prediction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_growth_prediction_id_seq', 1, false);
+
+
+--
+-- Name: delivery_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_issue; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_issue (id, created_at, claimed_at, resolved_at, notes, salesforce_case_uid, zendesk_id, claimed_by_id, created_by_id, event_id, resolved_by_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_issue_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_issue_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_item; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_item (id, name, description, quantity, bundle_key, barcode, scan_status, is_damaged, delivery_id, drive_order_id, external_id, volume, weight) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_item_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_item_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_masking_number_assignment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_masking_number_assignment (id, created_at, deactivated_at, is_active, consumer_id, dasher_id, store_id, consumer_phone_number, dasher_phone_number, store_phone_number, participants_type, delivery_id, twilio_masking_number_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_masking_number_assignment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_masking_number_assignment_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_rating; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_rating (id, created_at, waived_at, stars, comments, dasher_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: delivery_rating_category; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_rating_category (id, created_at, name, description, delivery_method) FROM stdin;
+1	2019-08-04 03:41:05.437439+00	Food was cold	Food arrived cold	delivery
+2	2019-08-04 03:41:05.440343+00	Missing or Incorrect Items	Delivery was missing items, or some items were incorrect	delivery
+3	2019-08-04 03:41:05.442183+00	Late Delivery	Delivery arrived late	delivery
+4	2019-08-04 03:41:05.443897+00	Driver Unprofessional	Driver was unprofessional	delivery
+5	2019-08-04 03:41:05.445575+00	Store Closed	The store was closed	pickup
+\.
+
+
+--
+-- Name: delivery_rating_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_rating_category_id_seq', 5, true);
+
+
+--
+-- Data for Name: delivery_rating_category_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_rating_category_link (id, category_id, rating_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_rating_category_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_rating_category_link_id_seq', 1, false);
+
+
+--
+-- Name: delivery_rating_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_rating_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_receipt; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_receipt (id, created_at, cancelled_at, viewed_at, image_url, recipient_name, dasher_input_tip_amount, override_tip_amount, currency, dasher_creator_id, delivery_id, transaction_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_receipt_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_receipt_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_recipient; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_recipient (id, first_name, last_name, business_name, email, phone_number) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_recipient_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_recipient_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_request_submission_monitor; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_request_submission_monitor (id, key, created_at) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_request_submission_monitor_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_request_submission_monitor_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_set; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_set (id, assigned_at, completion_bonus_cents, created_at, earliest_pickup_time, latest_delivery_time, cancelled_at, completed_at, should_be_manually_assigned, market_id) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_set_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_set_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_set_mapping; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_set_mapping (id, delivery_set_id, delivery_id, dropoff_route_order, removed_at) FROM stdin;
+\.
+
+
+--
+-- Name: delivery_set_mapping_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('delivery_set_mapping_id_seq', 1, false);
+
+
+--
+-- Data for Name: delivery_simulator; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY delivery_simulator (delivery_id, mode, state, in_transition, business_id, drive_order_id, store_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: depot; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY depot (id, config) FROM stdin;
+\.
+
+
+--
+-- Name: depot_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('depot_id_seq', 1, false);
+
+
+--
+-- Data for Name: developer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY developer (user_id, created_at, deactivated_at, webhook_url, source, business_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: device_fingerprint; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY device_fingerprint (id, fingerprint, fingerprint_type, block_reason, created_at, updated_at, metadata, abuse_reason) FROM stdin;
+\.
+
+
+--
+-- Name: device_fingerprint_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('device_fingerprint_id_seq', 1, false);
+
+
+--
+-- Data for Name: dispatch_error; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dispatch_error (id, created_at, consumer_refund, consumer_charge, store_charge, store_refund, dasher_penalty, consumer_credits, currency, category, fault, consumer_explanation, store_explanation, dasher_explanation, dispatch_notes, created_by_id, delivery_id, order_id, shift_id, source_id, transaction_id) FROM stdin;
+\.
+
+
+--
+-- Name: dispatch_error_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('dispatch_error_id_seq', 1, false);
+
+
+--
+-- Data for Name: dispatcher; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY dispatcher (user_id, is_active, timezone, customer_support, delivery_support, dasher_support, market_management_tool, can_fund, can_refund, can_refund_and_mark_fraudulent, can_edit_delivery) FROM stdin;
+1	t	US/Pacific	t	t	t	f	f	f	\N	\N
+2	t	US/Pacific	t	t	t	f	f	f	\N	\N
+\.
+
+
+--
+-- Data for Name: district; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY district (id, name, user_facing_name, shortname, is_active, slug, geohash_precision, is_on_homepage, use_tiered_delivery_radius, html_color, store_radius, store_road_duration, previous_store_road_duration, printable_delivery_hours, delivery_fee_discount_subtotal_threshold, delivery_fee_discount, tiered_delivery_fee, first_delivery_price, price_per_second, average_s2c_duration_seconds, avg_speed_meters_per_second, popular_business_tag_names, override, city_id, market_id, submarket_id) FROM stdin;
+1	Palo Alto		MNSA	t		\N	f	f	#f3eebc	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	1
+2	Mountain View		NKLM	t		\N	f	f	#f3f250	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	1
+3	Sunnyvale		BBQG	t		\N	f	f	#2bf357	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	1
+4	Santa Clara		1DOL	t		\N	f	f	#203cf3	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	1
+5	SoMa		BEK6	t		\N	f	f	#ca8ef3	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	2
+6	Mission		TPQU	t		\N	f	f	#edf3d5	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	2
+7	Noe Valley		QHHN	t		\N	f	f	#4cf35c	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	1	2
+8	Santa Monica		XDLG	t		\N	f	f	#a6ccf3	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	2	3
+9	Somerville		QOUW	t		\N	f	f	#f3cd26	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	3	4
+10	Downtown Core		H9HA	t		\N	f	f	#f390ee	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	4	5
+11	CBD		EF77	t		\N	f	f	#53baf3	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	5	6
+12	Fitzroy		XPYP	t		\N	f	f	#0235f3	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	5	6
+13	Collingwood		TB1B	t		\N	f	f	#c9f3df	7000	\N	\N	[{"hours": ["11:30am - 2:00pm (Mon-Fri)", "11:30am - 3:00pm (Weekend)"], "name": "Lunch"}, {"hours": ["5:00pm - 10:00pm (Daily)"], "name": "Dinner"}]	4000	0	{"1": 599, "0": 699, "3": 399, "2": 499, "5": 199, "4": 299}	0	\N	\N	\N	["Chinese", "Sushi", "Mexican", "Italian", "Thai", "Asian", "Ramen", "Breakfast", "Burgers", "American", "Salad", "Desserts", "Soup", "Indian", "Japanese", "Mediterranean", "Sandwiches", "Vegan", "Korean", "Alcohol", "Fast Food", "Vietnamese", "Barbecue", "Pasta", "Vegetarian", "Dim Sum", "Gluten-Free", "Greek", "Smoothie", "Steak"]	f	\N	5	6
+\.
+
+
+--
+-- Data for Name: district_geometry; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY district_geometry (district_id, geom) FROM stdin;
+1	0106000020E61000003D00000001030000000100000005000000BCF8550E2D8A5EC05CE87A14AEB742402034355EBA895EC05CE87A14AEB742402034355EBA895EC09371BC7493B84240BCF8550E2D8A5EC09371BC7493B84240BCF8550E2D8A5EC05CE87A14AEB74240010300000001000000050000002034355EBA895EC05CE87A14AEB74240846F14AE47895EC05CE87A14AEB74240846F14AE47895EC09371BC7493B842402034355EBA895EC09371BC7493B842402034355EBA895EC05CE87A14AEB74240010300000001000000050000002034355EBA895EC09371BC7493B84240846F14AE47895EC09371BC7493B84240846F14AE47895EC0CAFAFDD478B942402034355EBA895EC0CAFAFDD478B942402034355EBA895EC09371BC7493B84240010300000001000000050000002034355EBA895EC0CAFAFDD478B94240846F14AE47895EC0CAFAFDD478B94240846F14AE47895EC001843F355EBA42402034355EBA895EC001843F355EBA42402034355EBA895EC0CAFAFDD478B9424001030000000100000005000000846F14AE47895EC05CE87A14AEB74240E8AAF3FDD4885EC05CE87A14AEB74240E8AAF3FDD4885EC09371BC7493B84240846F14AE47895EC09371BC7493B84240846F14AE47895EC05CE87A14AEB7424001030000000100000005000000E8AAF3FDD4885EC05CE87A14AEB742404CE6D24D62885EC05CE87A14AEB742404CE6D24D62885EC09371BC7493B84240E8AAF3FDD4885EC09371BC7493B84240E8AAF3FDD4885EC05CE87A14AEB74240010300000001000000050000004CE6D24D62885EC05CE87A14AEB74240B021B29DEF875EC05CE87A14AEB74240B021B29DEF875EC09371BC7493B842404CE6D24D62885EC09371BC7493B842404CE6D24D62885EC05CE87A14AEB7424001030000000100000005000000B021B29DEF875EC05CE87A14AEB74240145D91ED7C875EC05CE87A14AEB74240145D91ED7C875EC09371BC7493B84240B021B29DEF875EC09371BC7493B84240B021B29DEF875EC05CE87A14AEB7424001030000000100000005000000145D91ED7C875EC05CE87A14AEB742407898703D0A875EC05CE87A14AEB742407898703D0A875EC09371BC7493B84240145D91ED7C875EC09371BC7493B84240145D91ED7C875EC05CE87A14AEB7424001030000000100000005000000846F14AE47895EC09371BC7493B84240E8AAF3FDD4885EC09371BC7493B84240E8AAF3FDD4885EC0CAFAFDD478B94240846F14AE47895EC0CAFAFDD478B94240846F14AE47895EC09371BC7493B8424001030000000100000005000000E8AAF3FDD4885EC09371BC7493B842404CE6D24D62885EC09371BC7493B842404CE6D24D62885EC0CAFAFDD478B94240E8AAF3FDD4885EC0CAFAFDD478B94240E8AAF3FDD4885EC09371BC7493B84240010300000001000000050000004CE6D24D62885EC09371BC7493B84240B021B29DEF875EC09371BC7493B84240B021B29DEF875EC0CAFAFDD478B942404CE6D24D62885EC0CAFAFDD478B942404CE6D24D62885EC09371BC7493B8424001030000000100000005000000B021B29DEF875EC09371BC7493B84240145D91ED7C875EC09371BC7493B84240145D91ED7C875EC0CAFAFDD478B94240B021B29DEF875EC0CAFAFDD478B94240B021B29DEF875EC09371BC7493B8424001030000000100000005000000846F14AE47895EC0CAFAFDD478B94240E8AAF3FDD4885EC0CAFAFDD478B94240E8AAF3FDD4885EC001843F355EBA4240846F14AE47895EC001843F355EBA4240846F14AE47895EC0CAFAFDD478B9424001030000000100000005000000E8AAF3FDD4885EC0CAFAFDD478B942404CE6D24D62885EC0CAFAFDD478B942404CE6D24D62885EC001843F355EBA4240E8AAF3FDD4885EC001843F355EBA4240E8AAF3FDD4885EC0CAFAFDD478B9424001030000000100000005000000B021B29DEF875EC0255F39B4C8B64240145D91ED7C875EC0255F39B4C8B64240145D91ED7C875EC05CE87A14AEB74240B021B29DEF875EC05CE87A14AEB74240B021B29DEF875EC0255F39B4C8B6424001030000000100000005000000145D91ED7C875EC0255F39B4C8B642407898703D0A875EC0255F39B4C8B642407898703D0A875EC05CE87A14AEB74240145D91ED7C875EC05CE87A14AEB74240145D91ED7C875EC0255F39B4C8B64240010300000001000000050000007898703D0A875EC0EED5F753E3B54240DCD34F8D97865EC0EED5F753E3B54240DCD34F8D97865EC0255F39B4C8B642407898703D0A875EC0255F39B4C8B642407898703D0A875EC0EED5F753E3B54240010300000001000000050000007898703D0A875EC0255F39B4C8B64240DCD34F8D97865EC0255F39B4C8B64240DCD34F8D97865EC05CE87A14AEB742407898703D0A875EC05CE87A14AEB742407898703D0A875EC0255F39B4C8B64240010300000001000000050000007898703D0A875EC0B74CB6F3FDB44240DCD34F8D97865EC0B74CB6F3FDB44240DCD34F8D97865EC0EED5F753E3B542407898703D0A875EC0EED5F753E3B542407898703D0A875EC0B74CB6F3FDB4424001030000000100000005000000BCF8550E2D8A5EC0255F39B4C8B642402034355EBA895EC0255F39B4C8B642402034355EBA895EC05CE87A14AEB74240BCF8550E2D8A5EC05CE87A14AEB74240BCF8550E2D8A5EC0255F39B4C8B64240010300000001000000050000002034355EBA895EC0255F39B4C8B64240846F14AE47895EC0255F39B4C8B64240846F14AE47895EC05CE87A14AEB742402034355EBA895EC05CE87A14AEB742402034355EBA895EC0255F39B4C8B6424001030000000100000005000000846F14AE47895EC0255F39B4C8B64240E8AAF3FDD4885EC0255F39B4C8B64240E8AAF3FDD4885EC05CE87A14AEB74240846F14AE47895EC05CE87A14AEB74240846F14AE47895EC0255F39B4C8B6424001030000000100000005000000E8AAF3FDD4885EC0255F39B4C8B642404CE6D24D62885EC0255F39B4C8B642404CE6D24D62885EC05CE87A14AEB74240E8AAF3FDD4885EC05CE87A14AEB74240E8AAF3FDD4885EC0255F39B4C8B64240010300000001000000050000007898703D0A875EC080C3749318B44240DCD34F8D97865EC080C3749318B44240DCD34F8D97865EC0B74CB6F3FDB442407898703D0A875EC0B74CB6F3FDB442407898703D0A875EC080C3749318B44240010300000001000000050000002034355EBA895EC0493A333333B34240846F14AE47895EC0493A333333B34240846F14AE47895EC080C3749318B442402034355EBA895EC080C3749318B442402034355EBA895EC0493A333333B3424001030000000100000005000000846F14AE47895EC0493A333333B34240E8AAF3FDD4885EC0493A333333B34240E8AAF3FDD4885EC080C3749318B44240846F14AE47895EC080C3749318B44240846F14AE47895EC0493A333333B3424001030000000100000005000000E8AAF3FDD4885EC0493A333333B342404CE6D24D62885EC0493A333333B342404CE6D24D62885EC080C3749318B44240E8AAF3FDD4885EC080C3749318B44240E8AAF3FDD4885EC0493A333333B34240010300000001000000050000004CE6D24D62885EC0493A333333B34240B021B29DEF875EC0493A333333B34240B021B29DEF875EC080C3749318B442404CE6D24D62885EC080C3749318B442404CE6D24D62885EC0493A333333B3424001030000000100000005000000145D91ED7C875EC0493A333333B342407898703D0A875EC0493A333333B342407898703D0A875EC080C3749318B44240145D91ED7C875EC080C3749318B44240145D91ED7C875EC0493A333333B34240010300000001000000050000002034355EBA895EC080C3749318B44240846F14AE47895EC080C3749318B44240846F14AE47895EC0B74CB6F3FDB442402034355EBA895EC0B74CB6F3FDB442402034355EBA895EC080C3749318B4424001030000000100000005000000846F14AE47895EC080C3749318B44240E8AAF3FDD4885EC080C3749318B44240E8AAF3FDD4885EC0B74CB6F3FDB44240846F14AE47895EC0B74CB6F3FDB44240846F14AE47895EC080C3749318B4424001030000000100000005000000E8AAF3FDD4885EC080C3749318B442404CE6D24D62885EC080C3749318B442404CE6D24D62885EC0B74CB6F3FDB44240E8AAF3FDD4885EC0B74CB6F3FDB44240E8AAF3FDD4885EC080C3749318B44240010300000001000000050000004CE6D24D62885EC080C3749318B44240B021B29DEF875EC080C3749318B44240B021B29DEF875EC0B74CB6F3FDB442404CE6D24D62885EC0B74CB6F3FDB442404CE6D24D62885EC080C3749318B4424001030000000100000005000000B021B29DEF875EC080C3749318B44240145D91ED7C875EC080C3749318B44240145D91ED7C875EC0B74CB6F3FDB44240B021B29DEF875EC0B74CB6F3FDB44240B021B29DEF875EC080C3749318B4424001030000000100000005000000145D91ED7C875EC080C3749318B442407898703D0A875EC080C3749318B442407898703D0A875EC0B74CB6F3FDB44240145D91ED7C875EC0B74CB6F3FDB44240145D91ED7C875EC080C3749318B44240010300000001000000050000002034355EBA895EC0B74CB6F3FDB44240846F14AE47895EC0B74CB6F3FDB44240846F14AE47895EC0EED5F753E3B542402034355EBA895EC0EED5F753E3B542402034355EBA895EC0B74CB6F3FDB4424001030000000100000005000000846F14AE47895EC0B74CB6F3FDB44240E8AAF3FDD4885EC0B74CB6F3FDB44240E8AAF3FDD4885EC0EED5F753E3B54240846F14AE47895EC0EED5F753E3B54240846F14AE47895EC0B74CB6F3FDB4424001030000000100000005000000E8AAF3FDD4885EC0B74CB6F3FDB442404CE6D24D62885EC0B74CB6F3FDB442404CE6D24D62885EC0EED5F753E3B54240E8AAF3FDD4885EC0EED5F753E3B54240E8AAF3FDD4885EC0B74CB6F3FDB44240010300000001000000050000004CE6D24D62885EC0B74CB6F3FDB44240B021B29DEF875EC0B74CB6F3FDB44240B021B29DEF875EC0EED5F753E3B542404CE6D24D62885EC0EED5F753E3B542404CE6D24D62885EC0B74CB6F3FDB4424001030000000100000005000000B021B29DEF875EC0B74CB6F3FDB44240145D91ED7C875EC0B74CB6F3FDB44240145D91ED7C875EC0EED5F753E3B54240B021B29DEF875EC0EED5F753E3B54240B021B29DEF875EC0B74CB6F3FDB4424001030000000100000005000000145D91ED7C875EC0B74CB6F3FDB442407898703D0A875EC0B74CB6F3FDB442407898703D0A875EC0EED5F753E3B54240145D91ED7C875EC0EED5F753E3B54240145D91ED7C875EC0B74CB6F3FDB44240010300000001000000050000002034355EBA895EC0EED5F753E3B54240846F14AE47895EC0EED5F753E3B54240846F14AE47895EC0255F39B4C8B642402034355EBA895EC0255F39B4C8B642402034355EBA895EC0EED5F753E3B5424001030000000100000005000000846F14AE47895EC0EED5F753E3B54240E8AAF3FDD4885EC0EED5F753E3B54240E8AAF3FDD4885EC0255F39B4C8B64240846F14AE47895EC0255F39B4C8B64240846F14AE47895EC0EED5F753E3B5424001030000000100000005000000E8AAF3FDD4885EC0EED5F753E3B542404CE6D24D62885EC0EED5F753E3B542404CE6D24D62885EC0255F39B4C8B64240E8AAF3FDD4885EC0255F39B4C8B64240E8AAF3FDD4885EC0EED5F753E3B54240010300000001000000050000004CE6D24D62885EC0EED5F753E3B54240B021B29DEF875EC0EED5F753E3B54240B021B29DEF875EC0255F39B4C8B642404CE6D24D62885EC0255F39B4C8B642404CE6D24D62885EC0EED5F753E3B5424001030000000100000005000000B021B29DEF875EC0EED5F753E3B54240145D91ED7C875EC0EED5F753E3B54240145D91ED7C875EC0255F39B4C8B64240B021B29DEF875EC0255F39B4C8B64240B021B29DEF875EC0EED5F753E3B5424001030000000100000005000000145D91ED7C875EC0EED5F753E3B542407898703D0A875EC0EED5F753E3B542407898703D0A875EC0255F39B4C8B64240145D91ED7C875EC0255F39B4C8B64240145D91ED7C875EC0EED5F753E3B5424001030000000100000005000000BCF8550E2D8A5EC0493A333333B342402034355EBA895EC0493A333333B342402034355EBA895EC080C3749318B44240BCF8550E2D8A5EC080C3749318B44240BCF8550E2D8A5EC0493A333333B342400103000000010000000500000058BD76BE9F8A5EC09371BC7493B84240BCF8550E2D8A5EC09371BC7493B84240BCF8550E2D8A5EC0CAFAFDD478B9424058BD76BE9F8A5EC0CAFAFDD478B9424058BD76BE9F8A5EC09371BC7493B8424001030000000100000005000000BCF8550E2D8A5EC09371BC7493B842402034355EBA895EC09371BC7493B842402034355EBA895EC0CAFAFDD478B94240BCF8550E2D8A5EC0CAFAFDD478B94240BCF8550E2D8A5EC09371BC7493B842400103000000010000000500000058BD76BE9F8A5EC0CAFAFDD478B94240BCF8550E2D8A5EC0CAFAFDD478B94240BCF8550E2D8A5EC001843F355EBA424058BD76BE9F8A5EC001843F355EBA424058BD76BE9F8A5EC0CAFAFDD478B9424001030000000100000005000000BCF8550E2D8A5EC0CAFAFDD478B942402034355EBA895EC0CAFAFDD478B942402034355EBA895EC001843F355EBA4240BCF8550E2D8A5EC001843F355EBA4240BCF8550E2D8A5EC0CAFAFDD478B94240010300000001000000050000004CE6D24D62885EC0255F39B4C8B64240B021B29DEF875EC0255F39B4C8B64240B021B29DEF875EC05CE87A14AEB742404CE6D24D62885EC05CE87A14AEB742404CE6D24D62885EC0255F39B4C8B6424001030000000100000005000000BCF8550E2D8A5EC001843F355EBA42402034355EBA895EC001843F355EBA42402034355EBA895EC0380D819543BB4240BCF8550E2D8A5EC0380D819543BB4240BCF8550E2D8A5EC001843F355EBA4240010300000001000000050000002034355EBA895EC001843F355EBA4240846F14AE47895EC001843F355EBA4240846F14AE47895EC0380D819543BB42402034355EBA895EC0380D819543BB42402034355EBA895EC001843F355EBA424001030000000100000005000000BCF8550E2D8A5EC012B1F1D24DB242402034355EBA895EC012B1F1D24DB242402034355EBA895EC0493A333333B34240BCF8550E2D8A5EC0493A333333B34240BCF8550E2D8A5EC012B1F1D24DB24240010300000001000000050000002034355EBA895EC012B1F1D24DB24240846F14AE47895EC012B1F1D24DB24240846F14AE47895EC0493A333333B342402034355EBA895EC0493A333333B342402034355EBA895EC012B1F1D24DB2424001030000000100000005000000846F14AE47895EC012B1F1D24DB24240E8AAF3FDD4885EC012B1F1D24DB24240E8AAF3FDD4885EC0493A333333B34240846F14AE47895EC0493A333333B34240846F14AE47895EC012B1F1D24DB2424001030000000100000005000000E8AAF3FDD4885EC012B1F1D24DB242404CE6D24D62885EC012B1F1D24DB242404CE6D24D62885EC0493A333333B34240E8AAF3FDD4885EC0493A333333B34240E8AAF3FDD4885EC012B1F1D24DB242400103000000010000000500000058BD76BE9F8A5EC001843F355EBA4240BCF8550E2D8A5EC001843F355EBA4240BCF8550E2D8A5EC0380D819543BB424058BD76BE9F8A5EC0380D819543BB424058BD76BE9F8A5EC001843F355EBA4240
+2	0106000020E61000004300000001030000000100000005000000400F2FDD24865EC0368CEB51B8AE4240A44A0E2DB2855EC0368CEB51B8AE4240A44A0E2DB2855EC06D152DB29DAF4240400F2FDD24865EC06D152DB29DAF4240400F2FDD24865EC0368CEB51B8AE424001030000000100000005000000A44A0E2DB2855EC0368CEB51B8AE42400886ED7C3F855EC0368CEB51B8AE42400886ED7C3F855EC06D152DB29DAF4240A44A0E2DB2855EC06D152DB29DAF4240A44A0E2DB2855EC0368CEB51B8AE4240010300000001000000050000000886ED7C3F855EC0368CEB51B8AE42406CC1CCCCCC845EC0368CEB51B8AE42406CC1CCCCCC845EC06D152DB29DAF42400886ED7C3F855EC06D152DB29DAF42400886ED7C3F855EC0368CEB51B8AE4240010300000001000000050000006CC1CCCCCC845EC0368CEB51B8AE4240D0FCAB1C5A845EC0368CEB51B8AE4240D0FCAB1C5A845EC06D152DB29DAF42406CC1CCCCCC845EC06D152DB29DAF42406CC1CCCCCC845EC0368CEB51B8AE424001030000000100000005000000D0FCAB1C5A845EC0368CEB51B8AE424034388B6CE7835EC0368CEB51B8AE424034388B6CE7835EC06D152DB29DAF4240D0FCAB1C5A845EC06D152DB29DAF4240D0FCAB1C5A845EC0368CEB51B8AE424001030000000100000005000000400F2FDD24865EC06D152DB29DAF4240A44A0E2DB2855EC06D152DB29DAF4240A44A0E2DB2855EC0A49E6E1283B04240400F2FDD24865EC0A49E6E1283B04240400F2FDD24865EC06D152DB29DAF424001030000000100000005000000A44A0E2DB2855EC06D152DB29DAF42400886ED7C3F855EC06D152DB29DAF42400886ED7C3F855EC0A49E6E1283B04240A44A0E2DB2855EC0A49E6E1283B04240A44A0E2DB2855EC06D152DB29DAF4240010300000001000000050000000886ED7C3F855EC06D152DB29DAF42406CC1CCCCCC845EC06D152DB29DAF42406CC1CCCCCC845EC0A49E6E1283B042400886ED7C3F855EC0A49E6E1283B042400886ED7C3F855EC06D152DB29DAF4240010300000001000000050000006CC1CCCCCC845EC06D152DB29DAF4240D0FCAB1C5A845EC06D152DB29DAF4240D0FCAB1C5A845EC0A49E6E1283B042406CC1CCCCCC845EC0A49E6E1283B042406CC1CCCCCC845EC06D152DB29DAF424001030000000100000005000000D0FCAB1C5A845EC06D152DB29DAF424034388B6CE7835EC06D152DB29DAF424034388B6CE7835EC0A49E6E1283B04240D0FCAB1C5A845EC0A49E6E1283B04240D0FCAB1C5A845EC06D152DB29DAF424001030000000100000005000000400F2FDD24865EC0A49E6E1283B04240A44A0E2DB2855EC0A49E6E1283B04240A44A0E2DB2855EC0DB27B07268B14240400F2FDD24865EC0DB27B07268B14240400F2FDD24865EC0A49E6E1283B0424001030000000100000005000000A44A0E2DB2855EC0A49E6E1283B042400886ED7C3F855EC0A49E6E1283B042400886ED7C3F855EC0DB27B07268B14240A44A0E2DB2855EC0DB27B07268B14240A44A0E2DB2855EC0A49E6E1283B04240010300000001000000050000000886ED7C3F855EC0A49E6E1283B042406CC1CCCCCC845EC0A49E6E1283B042406CC1CCCCCC845EC0DB27B07268B142400886ED7C3F855EC0DB27B07268B142400886ED7C3F855EC0A49E6E1283B04240010300000001000000050000006CC1CCCCCC845EC0A49E6E1283B04240D0FCAB1C5A845EC0A49E6E1283B04240D0FCAB1C5A845EC0DB27B07268B142406CC1CCCCCC845EC0DB27B07268B142406CC1CCCCCC845EC0A49E6E1283B0424001030000000100000005000000D0FCAB1C5A845EC0A49E6E1283B0424034388B6CE7835EC0A49E6E1283B0424034388B6CE7835EC0DB27B07268B14240D0FCAB1C5A845EC0DB27B07268B14240D0FCAB1C5A845EC0A49E6E1283B0424001030000000100000005000000400F2FDD24865EC0DB27B07268B14240A44A0E2DB2855EC0DB27B07268B14240A44A0E2DB2855EC012B1F1D24DB24240400F2FDD24865EC012B1F1D24DB24240400F2FDD24865EC0DB27B07268B1424001030000000100000005000000A44A0E2DB2855EC0DB27B07268B142400886ED7C3F855EC0DB27B07268B142400886ED7C3F855EC012B1F1D24DB24240A44A0E2DB2855EC012B1F1D24DB24240A44A0E2DB2855EC0DB27B07268B14240010300000001000000050000000886ED7C3F855EC0DB27B07268B142406CC1CCCCCC845EC0DB27B07268B142406CC1CCCCCC845EC012B1F1D24DB242400886ED7C3F855EC012B1F1D24DB242400886ED7C3F855EC0DB27B07268B14240010300000001000000050000006CC1CCCCCC845EC0DB27B07268B14240D0FCAB1C5A845EC0DB27B07268B14240D0FCAB1C5A845EC012B1F1D24DB242406CC1CCCCCC845EC012B1F1D24DB242406CC1CCCCCC845EC0DB27B07268B1424001030000000100000005000000D0FCAB1C5A845EC0DB27B07268B1424034388B6CE7835EC0DB27B07268B1424034388B6CE7835EC012B1F1D24DB24240D0FCAB1C5A845EC012B1F1D24DB24240D0FCAB1C5A845EC0DB27B07268B1424001030000000100000005000000400F2FDD24865EC012B1F1D24DB24240A44A0E2DB2855EC012B1F1D24DB24240A44A0E2DB2855EC0493A333333B34240400F2FDD24865EC0493A333333B34240400F2FDD24865EC012B1F1D24DB2424001030000000100000005000000A44A0E2DB2855EC012B1F1D24DB242400886ED7C3F855EC012B1F1D24DB242400886ED7C3F855EC0493A333333B34240A44A0E2DB2855EC0493A333333B34240A44A0E2DB2855EC012B1F1D24DB24240010300000001000000050000000886ED7C3F855EC012B1F1D24DB242406CC1CCCCCC845EC012B1F1D24DB242406CC1CCCCCC845EC0493A333333B342400886ED7C3F855EC0493A333333B342400886ED7C3F855EC012B1F1D24DB24240010300000001000000050000006CC1CCCCCC845EC012B1F1D24DB24240D0FCAB1C5A845EC012B1F1D24DB24240D0FCAB1C5A845EC0493A333333B342406CC1CCCCCC845EC0493A333333B342406CC1CCCCCC845EC012B1F1D24DB24240010300000001000000050000007898703D0A875EC0493A333333B34240DCD34F8D97865EC0493A333333B34240DCD34F8D97865EC080C3749318B442407898703D0A875EC080C3749318B442407898703D0A875EC0493A333333B3424001030000000100000005000000DCD34F8D97865EC0493A333333B34240400F2FDD24865EC0493A333333B34240400F2FDD24865EC080C3749318B44240DCD34F8D97865EC080C3749318B44240DCD34F8D97865EC0493A333333B3424001030000000100000005000000400F2FDD24865EC0493A333333B34240A44A0E2DB2855EC0493A333333B34240A44A0E2DB2855EC080C3749318B44240400F2FDD24865EC080C3749318B44240400F2FDD24865EC0493A333333B3424001030000000100000005000000A44A0E2DB2855EC0493A333333B342400886ED7C3F855EC0493A333333B342400886ED7C3F855EC080C3749318B44240A44A0E2DB2855EC080C3749318B44240A44A0E2DB2855EC0493A333333B34240010300000001000000050000007898703D0A875EC012B1F1D24DB24240DCD34F8D97865EC012B1F1D24DB24240DCD34F8D97865EC0493A333333B342407898703D0A875EC0493A333333B342407898703D0A875EC012B1F1D24DB2424001030000000100000005000000DCD34F8D97865EC012B1F1D24DB24240400F2FDD24865EC012B1F1D24DB24240400F2FDD24865EC0493A333333B34240DCD34F8D97865EC0493A333333B34240DCD34F8D97865EC012B1F1D24DB242400103000000010000000500000034388B6CE7835EC0A49E6E1283B0424098736ABC74835EC0A49E6E1283B0424098736ABC74835EC0DB27B07268B1424034388B6CE7835EC0DB27B07268B1424034388B6CE7835EC0A49E6E1283B042400103000000010000000500000034388B6CE7835EC0DB27B07268B1424098736ABC74835EC0DB27B07268B1424098736ABC74835EC012B1F1D24DB2424034388B6CE7835EC012B1F1D24DB2424034388B6CE7835EC0DB27B07268B142400103000000010000000500000098736ABC74835EC0A49E6E1283B04240FCAE490C02835EC0A49E6E1283B04240FCAE490C02835EC0DB27B07268B1424098736ABC74835EC0DB27B07268B1424098736ABC74835EC0A49E6E1283B042400103000000010000000500000098736ABC74835EC0DB27B07268B14240FCAE490C02835EC0DB27B07268B14240FCAE490C02835EC012B1F1D24DB2424098736ABC74835EC012B1F1D24DB2424098736ABC74835EC0DB27B07268B1424001030000000100000005000000D0FCAB1C5A845EC012B1F1D24DB2424034388B6CE7835EC012B1F1D24DB2424034388B6CE7835EC0493A333333B34240D0FCAB1C5A845EC0493A333333B34240D0FCAB1C5A845EC012B1F1D24DB242400103000000010000000500000034388B6CE7835EC012B1F1D24DB2424098736ABC74835EC012B1F1D24DB2424098736ABC74835EC0493A333333B3424034388B6CE7835EC0493A333333B3424034388B6CE7835EC012B1F1D24DB242400103000000010000000500000098736ABC74835EC012B1F1D24DB24240FCAE490C02835EC012B1F1D24DB24240FCAE490C02835EC0493A333333B3424098736ABC74835EC0493A333333B3424098736ABC74835EC012B1F1D24DB242400103000000010000000500000034388B6CE7835EC06D152DB29DAF424098736ABC74835EC06D152DB29DAF424098736ABC74835EC0A49E6E1283B0424034388B6CE7835EC0A49E6E1283B0424034388B6CE7835EC06D152DB29DAF424001030000000100000005000000DCD34F8D97865EC080C3749318B44240400F2FDD24865EC080C3749318B44240400F2FDD24865EC0B74CB6F3FDB44240DCD34F8D97865EC0B74CB6F3FDB44240DCD34F8D97865EC080C3749318B4424001030000000100000005000000DCD34F8D97865EC0B74CB6F3FDB44240400F2FDD24865EC0B74CB6F3FDB44240400F2FDD24865EC0EED5F753E3B54240DCD34F8D97865EC0EED5F753E3B54240DCD34F8D97865EC0B74CB6F3FDB4424001030000000100000005000000DCD34F8D97865EC0EED5F753E3B54240400F2FDD24865EC0EED5F753E3B54240400F2FDD24865EC0255F39B4C8B64240DCD34F8D97865EC0255F39B4C8B64240DCD34F8D97865EC0EED5F753E3B5424001030000000100000005000000400F2FDD24865EC0B74CB6F3FDB44240A44A0E2DB2855EC0B74CB6F3FDB44240A44A0E2DB2855EC0EED5F753E3B54240400F2FDD24865EC0EED5F753E3B54240400F2FDD24865EC0B74CB6F3FDB4424001030000000100000005000000400F2FDD24865EC080C3749318B44240A44A0E2DB2855EC080C3749318B44240A44A0E2DB2855EC0B74CB6F3FDB44240400F2FDD24865EC0B74CB6F3FDB44240400F2FDD24865EC080C3749318B4424001030000000100000005000000A44A0E2DB2855EC080C3749318B442400886ED7C3F855EC080C3749318B442400886ED7C3F855EC0B74CB6F3FDB44240A44A0E2DB2855EC0B74CB6F3FDB44240A44A0E2DB2855EC080C3749318B44240010300000001000000050000000886ED7C3F855EC080C3749318B442406CC1CCCCCC845EC080C3749318B442406CC1CCCCCC845EC0B74CB6F3FDB442400886ED7C3F855EC0B74CB6F3FDB442400886ED7C3F855EC080C3749318B44240010300000001000000050000006CC1CCCCCC845EC0493A333333B34240D0FCAB1C5A845EC0493A333333B34240D0FCAB1C5A845EC080C3749318B442406CC1CCCCCC845EC080C3749318B442406CC1CCCCCC845EC0493A333333B3424001030000000100000005000000D0FCAB1C5A845EC0493A333333B3424034388B6CE7835EC0493A333333B3424034388B6CE7835EC080C3749318B44240D0FCAB1C5A845EC080C3749318B44240D0FCAB1C5A845EC0493A333333B342400103000000010000000500000034388B6CE7835EC0493A333333B3424098736ABC74835EC0493A333333B3424098736ABC74835EC080C3749318B4424034388B6CE7835EC080C3749318B4424034388B6CE7835EC0493A333333B34240010300000001000000050000006CC1CCCCCC845EC080C3749318B44240D0FCAB1C5A845EC080C3749318B44240D0FCAB1C5A845EC0B74CB6F3FDB442406CC1CCCCCC845EC0B74CB6F3FDB442406CC1CCCCCC845EC080C3749318B44240010300000001000000050000000886ED7C3F855EC0493A333333B342406CC1CCCCCC845EC0493A333333B342406CC1CCCCCC845EC080C3749318B442400886ED7C3F855EC080C3749318B442400886ED7C3F855EC0493A333333B3424001030000000100000005000000DCD34F8D97865EC0255F39B4C8B64240400F2FDD24865EC0255F39B4C8B64240400F2FDD24865EC05CE87A14AEB74240DCD34F8D97865EC05CE87A14AEB74240DCD34F8D97865EC0255F39B4C8B6424001030000000100000005000000400F2FDD24865EC0FF02AAF1D2AD4240A44A0E2DB2855EC0FF02AAF1D2AD4240A44A0E2DB2855EC0368CEB51B8AE4240400F2FDD24865EC0368CEB51B8AE4240400F2FDD24865EC0FF02AAF1D2AD424001030000000100000005000000A44A0E2DB2855EC0FF02AAF1D2AD42400886ED7C3F855EC0FF02AAF1D2AD42400886ED7C3F855EC0368CEB51B8AE4240A44A0E2DB2855EC0368CEB51B8AE4240A44A0E2DB2855EC0FF02AAF1D2AD4240010300000001000000050000000886ED7C3F855EC0FF02AAF1D2AD42406CC1CCCCCC845EC0FF02AAF1D2AD42406CC1CCCCCC845EC0368CEB51B8AE42400886ED7C3F855EC0368CEB51B8AE42400886ED7C3F855EC0FF02AAF1D2AD4240010300000001000000050000006CC1CCCCCC845EC0FF02AAF1D2AD4240D0FCAB1C5A845EC0FF02AAF1D2AD4240D0FCAB1C5A845EC0368CEB51B8AE42406CC1CCCCCC845EC0368CEB51B8AE42406CC1CCCCCC845EC0FF02AAF1D2AD424001030000000100000005000000D0FCAB1C5A845EC0FF02AAF1D2AD424034388B6CE7835EC0FF02AAF1D2AD424034388B6CE7835EC0368CEB51B8AE4240D0FCAB1C5A845EC0368CEB51B8AE4240D0FCAB1C5A845EC0FF02AAF1D2AD424001030000000100000005000000D0FCAB1C5A845EC0C8796891EDAC424034388B6CE7835EC0C8796891EDAC424034388B6CE7835EC0FF02AAF1D2AD4240D0FCAB1C5A845EC0FF02AAF1D2AD4240D0FCAB1C5A845EC0C8796891EDAC4240010300000001000000050000006CC1CCCCCC845EC0C8796891EDAC4240D0FCAB1C5A845EC0C8796891EDAC4240D0FCAB1C5A845EC0FF02AAF1D2AD42406CC1CCCCCC845EC0FF02AAF1D2AD42406CC1CCCCCC845EC0C8796891EDAC424001030000000100000005000000D0FCAB1C5A845EC091F0263108AC424034388B6CE7835EC091F0263108AC424034388B6CE7835EC0C8796891EDAC4240D0FCAB1C5A845EC0C8796891EDAC4240D0FCAB1C5A845EC091F0263108AC4240010300000001000000050000000886ED7C3F855EC0C8796891EDAC42406CC1CCCCCC845EC0C8796891EDAC42406CC1CCCCCC845EC0FF02AAF1D2AD42400886ED7C3F855EC0FF02AAF1D2AD42400886ED7C3F855EC0C8796891EDAC424001030000000100000005000000400F2FDD24865EC0255F39B4C8B64240A44A0E2DB2855EC0255F39B4C8B64240A44A0E2DB2855EC05CE87A14AEB74240400F2FDD24865EC05CE87A14AEB74240400F2FDD24865EC0255F39B4C8B6424001030000000100000005000000A44A0E2DB2855EC0255F39B4C8B642400886ED7C3F855EC0255F39B4C8B642400886ED7C3F855EC05CE87A14AEB74240A44A0E2DB2855EC05CE87A14AEB74240A44A0E2DB2855EC0255F39B4C8B64240010300000001000000050000000886ED7C3F855EC0255F39B4C8B642406CC1CCCCCC845EC0255F39B4C8B642406CC1CCCCCC845EC05CE87A14AEB742400886ED7C3F855EC05CE87A14AEB742400886ED7C3F855EC0255F39B4C8B64240010300000001000000050000006CC1CCCCCC845EC0255F39B4C8B64240D0FCAB1C5A845EC0255F39B4C8B64240D0FCAB1C5A845EC05CE87A14AEB742406CC1CCCCCC845EC05CE87A14AEB742406CC1CCCCCC845EC0255F39B4C8B64240010300000001000000050000006CC1CCCCCC845EC05CE87A14AEB74240D0FCAB1C5A845EC05CE87A14AEB74240D0FCAB1C5A845EC09371BC7493B842406CC1CCCCCC845EC09371BC7493B842406CC1CCCCCC845EC05CE87A14AEB74240010300000001000000050000000886ED7C3F855EC05CE87A14AEB742406CC1CCCCCC845EC05CE87A14AEB742406CC1CCCCCC845EC09371BC7493B842400886ED7C3F855EC09371BC7493B842400886ED7C3F855EC05CE87A14AEB7424001030000000100000005000000A44A0E2DB2855EC05CE87A14AEB742400886ED7C3F855EC05CE87A14AEB742400886ED7C3F855EC09371BC7493B84240A44A0E2DB2855EC09371BC7493B84240A44A0E2DB2855EC05CE87A14AEB74240
+3	\N
+4	\N
+5	\N
+6	0106000020E61000000C00000001030000000100000005000000E4273333339B5EC03E904160E5E0424048631283C09A5EC03E904160E5E0424048631283C09A5EC0751983C0CAE14240E4273333339B5EC0751983C0CAE14240E4273333339B5EC03E904160E5E0424001030000000100000005000000E4273333339B5EC00707000000E0424048631283C09A5EC00707000000E0424048631283C09A5EC03E904160E5E04240E4273333339B5EC03E904160E5E04240E4273333339B5EC00707000000E042400103000000010000000500000048631283C09A5EC00707000000E04240AC9EF1D24D9A5EC00707000000E04240AC9EF1D24D9A5EC03E904160E5E0424048631283C09A5EC03E904160E5E0424048631283C09A5EC00707000000E0424001030000000100000005000000AC9EF1D24D9A5EC00707000000E0424010DAD022DB995EC00707000000E0424010DAD022DB995EC03E904160E5E04240AC9EF1D24D9A5EC03E904160E5E04240AC9EF1D24D9A5EC00707000000E0424001030000000100000005000000AC9EF1D24D9A5EC03E904160E5E0424010DAD022DB995EC03E904160E5E0424010DAD022DB995EC0751983C0CAE14240AC9EF1D24D9A5EC0751983C0CAE14240AC9EF1D24D9A5EC03E904160E5E042400103000000010000000500000048631283C09A5EC03E904160E5E04240AC9EF1D24D9A5EC03E904160E5E04240AC9EF1D24D9A5EC0751983C0CAE1424048631283C09A5EC0751983C0CAE1424048631283C09A5EC03E904160E5E0424001030000000100000005000000E4273333339B5EC0751983C0CAE1424048631283C09A5EC0751983C0CAE1424048631283C09A5EC0ACA2C420B0E24240E4273333339B5EC0ACA2C420B0E24240E4273333339B5EC0751983C0CAE142400103000000010000000500000048631283C09A5EC0751983C0CAE14240AC9EF1D24D9A5EC0751983C0CAE14240AC9EF1D24D9A5EC0ACA2C420B0E2424048631283C09A5EC0ACA2C420B0E2424048631283C09A5EC0751983C0CAE1424001030000000100000005000000AC9EF1D24D9A5EC0751983C0CAE1424010DAD022DB995EC0751983C0CAE1424010DAD022DB995EC0ACA2C420B0E24240AC9EF1D24D9A5EC0ACA2C420B0E24240AC9EF1D24D9A5EC0751983C0CAE142400103000000010000000500000048631283C09A5EC0D07DBE9F1ADF4240AC9EF1D24D9A5EC0D07DBE9F1ADF4240AC9EF1D24D9A5EC00707000000E0424048631283C09A5EC00707000000E0424048631283C09A5EC0D07DBE9F1ADF424001030000000100000005000000E4273333339B5EC0D07DBE9F1ADF424048631283C09A5EC0D07DBE9F1ADF424048631283C09A5EC00707000000E04240E4273333339B5EC00707000000E04240E4273333339B5EC0D07DBE9F1ADF424001030000000100000005000000AC9EF1D24D9A5EC0D07DBE9F1ADF424010DAD022DB995EC0D07DBE9F1ADF424010DAD022DB995EC00707000000E04240AC9EF1D24D9A5EC00707000000E04240AC9EF1D24D9A5EC0D07DBE9F1ADF4240
+7	\N
+8	0106000020E610000036000000010300000001000000050000006C89438B6C9F5DC016450AD7A3004140D0C422DBF99E5DC016450AD7A3004140D0C422DBF99E5DC04DCE4B37890141406C89438B6C9F5DC04DCE4B37890141406C89438B6C9F5DC016450AD7A300414001030000000100000005000000084E643BDF9F5DC016450AD7A30041406C89438B6C9F5DC016450AD7A30041406C89438B6C9F5DC04DCE4B3789014140084E643BDF9F5DC04DCE4B3789014140084E643BDF9F5DC016450AD7A300414001030000000100000005000000084E643BDF9F5DC04DCE4B37890141406C89438B6C9F5DC04DCE4B37890141406C89438B6C9F5DC084578D976E024140084E643BDF9F5DC084578D976E024140084E643BDF9F5DC04DCE4B3789014140010300000001000000050000006C89438B6C9F5DC04DCE4B3789014140D0C422DBF99E5DC04DCE4B3789014140D0C422DBF99E5DC084578D976E0241406C89438B6C9F5DC084578D976E0241406C89438B6C9F5DC04DCE4B378901414001030000000100000005000000D0C422DBF99E5DC04DCE4B37890141403400022B879E5DC04DCE4B37890141403400022B879E5DC084578D976E024140D0C422DBF99E5DC084578D976E024140D0C422DBF99E5DC04DCE4B3789014140010300000001000000050000003400022B879E5DC04DCE4B3789014140983BE17A149E5DC04DCE4B3789014140983BE17A149E5DC084578D976E0241403400022B879E5DC084578D976E0241403400022B879E5DC04DCE4B378901414001030000000100000005000000983BE17A149E5DC04DCE4B3789014140FC76C0CAA19D5DC04DCE4B3789014140FC76C0CAA19D5DC084578D976E024140983BE17A149E5DC084578D976E024140983BE17A149E5DC04DCE4B378901414001030000000100000005000000FC76C0CAA19D5DC04DCE4B378901414060B29F1A2F9D5DC04DCE4B378901414060B29F1A2F9D5DC084578D976E024140FC76C0CAA19D5DC084578D976E024140FC76C0CAA19D5DC04DCE4B378901414001030000000100000005000000FC76C0CAA19D5DC084578D976E02414060B29F1A2F9D5DC084578D976E02414060B29F1A2F9D5DC0BBE0CEF753034140FC76C0CAA19D5DC0BBE0CEF753034140FC76C0CAA19D5DC084578D976E0241400103000000010000000500000060B29F1A2F9D5DC084578D976E024140C4ED7E6ABC9C5DC084578D976E024140C4ED7E6ABC9C5DC0BBE0CEF75303414060B29F1A2F9D5DC0BBE0CEF75303414060B29F1A2F9D5DC084578D976E0241400103000000010000000500000060B29F1A2F9D5DC04DCE4B3789014140C4ED7E6ABC9C5DC04DCE4B3789014140C4ED7E6ABC9C5DC084578D976E02414060B29F1A2F9D5DC084578D976E02414060B29F1A2F9D5DC04DCE4B378901414001030000000100000005000000A41285EB51A05DC04DCE4B3789014140084E643BDF9F5DC04DCE4B3789014140084E643BDF9F5DC084578D976E024140A41285EB51A05DC084578D976E024140A41285EB51A05DC04DCE4B37890141400103000000010000000500000040D7A59BC4A05DC084578D976E024140A41285EB51A05DC084578D976E024140A41285EB51A05DC0BBE0CEF75303414040D7A59BC4A05DC0BBE0CEF75303414040D7A59BC4A05DC084578D976E0241400103000000010000000500000040D7A59BC4A05DC0BBE0CEF753034140A41285EB51A05DC0BBE0CEF753034140A41285EB51A05DC0F26910583904414040D7A59BC4A05DC0F26910583904414040D7A59BC4A05DC0BBE0CEF75303414001030000000100000005000000A41285EB51A05DC0BBE0CEF753034140084E643BDF9F5DC0BBE0CEF753034140084E643BDF9F5DC0F269105839044140A41285EB51A05DC0F269105839044140A41285EB51A05DC0BBE0CEF75303414001030000000100000005000000A41285EB51A05DC084578D976E024140084E643BDF9F5DC084578D976E024140084E643BDF9F5DC0BBE0CEF753034140A41285EB51A05DC0BBE0CEF753034140A41285EB51A05DC084578D976E02414001030000000100000005000000A41285EB51A05DC0F269105839044140084E643BDF9F5DC0F269105839044140084E643BDF9F5DC029F351B81E054140A41285EB51A05DC029F351B81E054140A41285EB51A05DC0F269105839044140010300000001000000050000006C89438B6C9F5DC0F269105839044140D0C422DBF99E5DC0F269105839044140D0C422DBF99E5DC029F351B81E0541406C89438B6C9F5DC029F351B81E0541406C89438B6C9F5DC0F26910583904414001030000000100000005000000084E643BDF9F5DC0F2691058390441406C89438B6C9F5DC0F2691058390441406C89438B6C9F5DC029F351B81E054140084E643BDF9F5DC029F351B81E054140084E643BDF9F5DC0F26910583904414001030000000100000005000000084E643BDF9F5DC029F351B81E0541406C89438B6C9F5DC029F351B81E0541406C89438B6C9F5DC0607C931804064140084E643BDF9F5DC0607C931804064140084E643BDF9F5DC029F351B81E054140010300000001000000050000006C89438B6C9F5DC029F351B81E054140D0C422DBF99E5DC029F351B81E054140D0C422DBF99E5DC0607C9318040641406C89438B6C9F5DC0607C9318040641406C89438B6C9F5DC029F351B81E05414001030000000100000005000000D0C422DBF99E5DC029F351B81E0541403400022B879E5DC029F351B81E0541403400022B879E5DC0607C931804064140D0C422DBF99E5DC0607C931804064140D0C422DBF99E5DC029F351B81E05414001030000000100000005000000D0C422DBF99E5DC0F2691058390441403400022B879E5DC0F2691058390441403400022B879E5DC029F351B81E054140D0C422DBF99E5DC029F351B81E054140D0C422DBF99E5DC0F26910583904414001030000000100000005000000D0C422DBF99E5DC0BBE0CEF7530341403400022B879E5DC0BBE0CEF7530341403400022B879E5DC0F269105839044140D0C422DBF99E5DC0F269105839044140D0C422DBF99E5DC0BBE0CEF75303414001030000000100000005000000D0C422DBF99E5DC084578D976E0241403400022B879E5DC084578D976E0241403400022B879E5DC0BBE0CEF753034140D0C422DBF99E5DC0BBE0CEF753034140D0C422DBF99E5DC084578D976E02414001030000000100000005000000084E643BDF9F5DC084578D976E0241406C89438B6C9F5DC084578D976E0241406C89438B6C9F5DC0BBE0CEF753034140084E643BDF9F5DC0BBE0CEF753034140084E643BDF9F5DC084578D976E024140010300000001000000050000006C89438B6C9F5DC0BBE0CEF753034140D0C422DBF99E5DC0BBE0CEF753034140D0C422DBF99E5DC0F2691058390441406C89438B6C9F5DC0F2691058390441406C89438B6C9F5DC0BBE0CEF753034140010300000001000000050000006C89438B6C9F5DC084578D976E024140D0C422DBF99E5DC084578D976E024140D0C422DBF99E5DC0BBE0CEF7530341406C89438B6C9F5DC0BBE0CEF7530341406C89438B6C9F5DC084578D976E02414001030000000100000005000000084E643BDF9F5DC0BBE0CEF7530341406C89438B6C9F5DC0BBE0CEF7530341406C89438B6C9F5DC0F269105839044140084E643BDF9F5DC0F269105839044140084E643BDF9F5DC0BBE0CEF75303414001030000000100000005000000983BE17A149E5DC084578D976E024140FC76C0CAA19D5DC084578D976E024140FC76C0CAA19D5DC0BBE0CEF753034140983BE17A149E5DC0BBE0CEF753034140983BE17A149E5DC084578D976E02414001030000000100000005000000FC76C0CAA19D5DC0BBE0CEF75303414060B29F1A2F9D5DC0BBE0CEF75303414060B29F1A2F9D5DC0F269105839044140FC76C0CAA19D5DC0F269105839044140FC76C0CAA19D5DC0BBE0CEF75303414001030000000100000005000000983BE17A149E5DC0BBE0CEF753034140FC76C0CAA19D5DC0BBE0CEF753034140FC76C0CAA19D5DC0F269105839044140983BE17A149E5DC0F269105839044140983BE17A149E5DC0BBE0CEF753034140010300000001000000050000003400022B879E5DC0BBE0CEF753034140983BE17A149E5DC0BBE0CEF753034140983BE17A149E5DC0F2691058390441403400022B879E5DC0F2691058390441403400022B879E5DC0BBE0CEF753034140010300000001000000050000003400022B879E5DC084578D976E024140983BE17A149E5DC084578D976E024140983BE17A149E5DC0BBE0CEF7530341403400022B879E5DC0BBE0CEF7530341403400022B879E5DC084578D976E024140010300000001000000050000003400022B879E5DC0F269105839044140983BE17A149E5DC0F269105839044140983BE17A149E5DC029F351B81E0541403400022B879E5DC029F351B81E0541403400022B879E5DC0F26910583904414001030000000100000005000000983BE17A149E5DC0F269105839044140FC76C0CAA19D5DC0F269105839044140FC76C0CAA19D5DC029F351B81E054140983BE17A149E5DC029F351B81E054140983BE17A149E5DC0F269105839044140010300000001000000050000003400022B879E5DC029F351B81E054140983BE17A149E5DC029F351B81E054140983BE17A149E5DC0607C9318040641403400022B879E5DC0607C9318040641403400022B879E5DC029F351B81E05414001030000000100000005000000C4ED7E6ABC9C5DC04DCE4B378901414028295EBA499C5DC04DCE4B378901414028295EBA499C5DC084578D976E024140C4ED7E6ABC9C5DC084578D976E024140C4ED7E6ABC9C5DC04DCE4B378901414001030000000100000005000000DC9BC64B37A15DC0BBE0CEF75303414040D7A59BC4A05DC0BBE0CEF75303414040D7A59BC4A05DC0F269105839044140DC9BC64B37A15DC0F269105839044140DC9BC64B37A15DC0BBE0CEF75303414001030000000100000005000000A41285EB51A05DC016450AD7A3004140084E643BDF9F5DC016450AD7A3004140084E643BDF9F5DC04DCE4B3789014140A41285EB51A05DC04DCE4B3789014140A41285EB51A05DC016450AD7A30041400103000000010000000500000040D7A59BC4A05DC04DCE4B3789014140A41285EB51A05DC04DCE4B3789014140A41285EB51A05DC084578D976E02414040D7A59BC4A05DC084578D976E02414040D7A59BC4A05DC04DCE4B378901414001030000000100000005000000DC9BC64B37A15DC084578D976E02414040D7A59BC4A05DC084578D976E02414040D7A59BC4A05DC0BBE0CEF753034140DC9BC64B37A15DC0BBE0CEF753034140DC9BC64B37A15DC084578D976E02414001030000000100000005000000084E643BDF9F5DC0DFBBC876BEFF40406C89438B6C9F5DC0DFBBC876BEFF40406C89438B6C9F5DC016450AD7A3004140084E643BDF9F5DC016450AD7A3004140084E643BDF9F5DC0DFBBC876BEFF404001030000000100000005000000C4ED7E6ABC9C5DC084578D976E02414028295EBA499C5DC084578D976E02414028295EBA499C5DC0BBE0CEF753034140C4ED7E6ABC9C5DC0BBE0CEF753034140C4ED7E6ABC9C5DC084578D976E0241400103000000010000000500000060B29F1A2F9D5DC0BBE0CEF753034140C4ED7E6ABC9C5DC0BBE0CEF753034140C4ED7E6ABC9C5DC0F26910583904414060B29F1A2F9D5DC0F26910583904414060B29F1A2F9D5DC0BBE0CEF75303414001030000000100000005000000FC76C0CAA19D5DC0F26910583904414060B29F1A2F9D5DC0F26910583904414060B29F1A2F9D5DC029F351B81E054140FC76C0CAA19D5DC029F351B81E054140FC76C0CAA19D5DC0F2691058390441400103000000010000000500000060B29F1A2F9D5DC0F269105839044140C4ED7E6ABC9C5DC0F269105839044140C4ED7E6ABC9C5DC029F351B81E05414060B29F1A2F9D5DC029F351B81E05414060B29F1A2F9D5DC0F26910583904414001030000000100000005000000C4ED7E6ABC9C5DC0BBE0CEF75303414028295EBA499C5DC0BBE0CEF75303414028295EBA499C5DC0F269105839044140C4ED7E6ABC9C5DC0F269105839044140C4ED7E6ABC9C5DC0BBE0CEF75303414001030000000100000005000000C4ED7E6ABC9C5DC0F26910583904414028295EBA499C5DC0F26910583904414028295EBA499C5DC029F351B81E054140C4ED7E6ABC9C5DC029F351B81E054140C4ED7E6ABC9C5DC0F26910583904414001030000000100000005000000FC76C0CAA19D5DC029F351B81E05414060B29F1A2F9D5DC029F351B81E05414060B29F1A2F9D5DC0607C931804064140FC76C0CAA19D5DC0607C931804064140FC76C0CAA19D5DC029F351B81E0541400103000000010000000500000060B29F1A2F9D5DC029F351B81E054140C4ED7E6ABC9C5DC029F351B81E054140C4ED7E6ABC9C5DC0607C93180406414060B29F1A2F9D5DC0607C93180406414060B29F1A2F9D5DC029F351B81E05414001030000000100000005000000983BE17A149E5DC029F351B81E054140FC76C0CAA19D5DC029F351B81E054140FC76C0CAA19D5DC0607C931804064140983BE17A149E5DC0607C931804064140983BE17A149E5DC029F351B81E0541400103000000010000000500000028295EBA499C5DC0BBE0CEF7530341408C643D0AD79B5DC0BBE0CEF7530341408C643D0AD79B5DC0F26910583904414028295EBA499C5DC0F26910583904414028295EBA499C5DC0BBE0CEF7530341400103000000010000000500000028295EBA499C5DC084578D976E0241408C643D0AD79B5DC084578D976E0241408C643D0AD79B5DC0BBE0CEF75303414028295EBA499C5DC0BBE0CEF75303414028295EBA499C5DC084578D976E024140
+9	\N
+10	\N
+11	\N
+12	\N
+13	\N
+\.
+
+
+--
+-- Name: district_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('district_id_seq', 13, true);
+
+
+--
+-- Data for Name: district_starting_point_availability_override; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY district_starting_point_availability_override (id, district_id, startingpoint_id) FROM stdin;
+\.
+
+
+--
+-- Name: district_starting_point_availability_override_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('district_starting_point_availability_override_id_seq', 1, false);
+
+
+--
+-- Data for Name: django_admin_log; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY django_admin_log (id, action_time, object_id, object_repr, action_flag, change_message, content_type_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: django_admin_log_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('django_admin_log_id_seq', 1, false);
+
+
+--
+-- Data for Name: django_content_type; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY django_content_type (id, app_label, model) FROM stdin;
+1	auth	permission
+2	auth	group
+3	contenttypes	contenttype
+4	sessions	session
+5	admin	logentry
+6	doordash	consumercommunicationchannel
+7	doordash	deliveryrating
+8	doordash	consumerdonationrecipientlink
+9	doordash	driveexternalstoreidmapping
+10	doordash	consumerstripecustomerlink
+11	doordash	image
+12	doordash	consumersurveyansweroption
+13	doordash	error
+14	doordash	experiment
+15	doordash	consumersurveyresponse
+16	doordash	startingpointset
+17	doordash	dasheronboardingtype
+18	doordash	photo
+19	doordash	experiment2
+20	doordash	experimentoverride
+21	doordash	consumerpromotion
+22	doordash	weatherforecastmodel
+23	doordash	consumerfaq
+24	doordash	promocodeconsumerlink
+25	doordash	city
+26	doordash	deliveryratingcategorylink
+27	doordash	blacklisteduser
+28	doordash	consumer
+29	doordash	deliveryfeepromotion
+30	doordash	compensationrequest
+31	doordash	drivestorecateringsetupinstruction
+32	doordash	dashercapacitymodel
+33	doordash	experimentuser
+34	doordash	startingpointgeometry
+35	doordash	promotionsfeaturedlocation
+36	doordash	promotionplacetaglink
+37	doordash	blacklistedconsumeraddress
+38	doordash	market
+39	doordash	percentagepromotion
+40	doordash	externalhremployee
+41	doordash	experimentbucketassignment
+42	doordash	consumerdeliveryratingcategorylink
+43	doordash	consumerdonation
+44	doordash	promocodesubmarketlink
+45	doordash	region
+46	doordash	consumersubscriptionunit
+47	doordash	ordercartdiscount
+48	doordash	promotionredemptionevent
+49	doordash	smsoptoutnumber
+50	doordash	valuedeliveryfeepromotion
+51	doordash	orderitemsubstitutionevent
+52	doordash	subnationaldivision
+53	doordash	deliveryrecipient
+54	doordash	startingpointbatchingparameters
+55	doordash	ordermenuoption
+56	doordash	blacklistedphonenumber
+57	doordash	consumersurvey
+58	doordash	promotionsubmarketlink
+59	doordash	ordercartescalation
+60	doordash	emailnotification
+61	doordash	startingpointr2cstats
+62	doordash	photoshoottask
+63	doordash	deliveryrequestsubmissionmonitor
+64	doordash	consumersubscriptionplantrialsubmarketlink
+65	doordash	address
+66	doordash	consumerpreferencescategorylink
+67	doordash	photofeedback
+68	doordash	consumeraccountcreditstransaction
+69	doordash	storeconsumerreviewtaglink
+70	doordash	startingpointassignmentlatencystats
+71	doordash	weatherhistoricalmodel
+72	doordash	startingpointdeliverydurationstats
+73	doordash	deliverygrowthprediction
+74	doordash	marketspecialhours
+75	doordash	pricetransparencybucketassignment
+76	doordash	curatedcategory
+77	doordash	consumersubscriptionplanfeaturedlocationlink
+78	doordash	consumeraccountcredits
+79	doordash	storeconsumerreview
+80	doordash	vanityurl
+81	doordash	consumerfraudinfo
+82	doordash	vehiclereservation
+83	doordash	blacklistedpaymentcard
+84	doordash	storeconfirmedtimefeaturesnapshot
+85	doordash	dasheronboarding
+86	doordash	variable
+87	doordash	orderitem
+88	doordash	consumerverificationstatus
+89	doordash	consumerpromotioncampaign
+90	doordash	submarket
+91	doordash	blacklistedemail
+92	doordash	valuepromotion
+93	doordash	deliveryreceipt
+94	doordash	creditrefunddeliveryerror
+95	doordash	driveexternalbatchidmapping
+96	doordash	districtgeometry
+97	doordash	consumersubscriptionplantrialfeaturedlocationlink
+98	doordash	giftcode
+99	doordash	realtimedemandevaluation
+100	doordash	deliverygift
+101	doordash	capacityplanningevaluation
+102	doordash	order
+103	doordash	businessconstants
+104	doordash	etaprediction
+105	doordash	placetag
+106	doordash	shortenedurl
+107	doordash	driveeffortbasedpayvars
+108	doordash	consumerdiscount
+109	doordash	consumerdeliveryrating
+110	doordash	zendesktemplate
+111	doordash	experimentversion
+112	doordash	freedeliverypromotion
+113	doordash	ratingcategory
+114	doordash	multipromotion
+115	doordash	ordercartpricingstrategy
+116	doordash	masscommunicationstatus
+117	doordash	employmentperiod
+118	doordash	consumersurveyquestion
+119	doordash	consumeraddresslink
+120	doordash	addressplacetaglink
+121	doordash	deliveryitem
+122	doordash	startingpoint
+123	doordash	monthlycultureshift
+124	doordash	donationrecipient
+125	doordash	startingpointflfthresholds
+126	doordash	consumerchannel
+127	doordash	district
+128	doordash	killswitchinterval
+129	doordash	dailybusinessmetrics
+130	doordash	depot
+131	doordash	promocode
+132	doordash	consumersubscriptionplansubmarketlink
+133	doordash	orderitemextraoption
+134	doordash	consumersubscriptionplantrial
+135	doordash	photoshoot
+136	doordash	deliverysimulator
+137	doordash	basepricesosevent
+138	doordash	consumersubscription
+139	doordash	consumerannouncement
+140	doordash	storeordercart
+141	doordash	deliverydriveinfo
+142	doordash	currencyexchangerate
+143	doordash	consumerpushnotification
+144	doordash	consumerannouncementdistrictlink
+145	doordash	photographer
+146	doordash	searchenginestorefeed
+147	doordash	deliverycateringverification
+148	doordash	deliverygrowthmodel
+149	doordash	verificationattempt
+150	doordash	consumerdeliveryratingcategory
+151	doordash	developer
+152	doordash	issue
+153	doordash	country
+154	doordash	realtimesupplymodel
+155	doordash	estimate
+156	doordash	deliverycancellationreasoncategory
+157	doordash	seolocalregion
+158	doordash	storeorderplacelatencystats
+159	doordash	event
+160	doordash	storepointofsaletransaction
+161	doordash	consumerpreferences
+162	doordash	scheduledcapsboost
+163	doordash	experimentdistribution
+164	doordash	ordercart
+165	doordash	smshelpmessagestatus
+166	doordash	referralprogram
+167	doordash	creditrefundorderitemerror
+168	doordash	storedeliverydurationstats
+169	doordash	communicationpreferenceschannellink
+170	doordash	deliverycancellationreason
+171	doordash	snapshot
+172	doordash	drivequote
+173	doordash	consumercommunicationpreferences
+174	doordash	drivedeliveryidentifiermapping
+175	doordash	applenotificationapp
+176	doordash	consumersurveyquestionresponse
+177	doordash	realtimesupplyprediction
+178	doordash	dispatcher
+179	doordash	storeconsumerreviewtag
+180	doordash	eventcategory
+181	doordash	emailpreference
+182	doordash	delivery
+183	doordash	consumervariablepay
+184	doordash	errorsource
+185	doordash	consumersubscriptionplanpromotioninfo
+186	doordash	useractivationchangeevent
+187	doordash	consumertermsofservice
+188	doordash	driveorder
+189	doordash	ordercartescalationreason
+190	doordash	consumerstorerequest
+191	doordash	consumertoslink
+192	doordash	consumerfavorites
+193	doordash	starshipdeliveryinfo
+194	doordash	drivebusinessmapping
+195	doordash	twiliomaskingnumberassignment
+196	doordash	drivequoteacceptance
+197	doordash	consumerprofileedithistory
+198	doordash	emptystorelistrequest
+199	doordash	deliveryassignmentconstraint
+200	doordash	deliveryset
+201	doordash	ordercartconsumerpromotionlink
+202	doordash	consumersubscriptionplan
+203	doordash	drivewebhookevent
+204	doordash	creditrefunderror
+205	doordash	startingpointdeliveryhours
+206	doordash	emailholdoutgroup
+207	doordash	modelannotation
+208	doordash	consumerreferral
+209	doordash	gatekeeper
+210	doordash	dashercapacityplan
+211	doordash	githubactivitymetrics
+212	doordash	twiliomaskingnumber
+213	doordash	promotionfeaturedlocationlink
+214	doordash	ordercartdiscountcomponentsourcetype
+215	doordash	ordercartdiscountcomponent
+216	doordash	twilionumber
+217	doordash	platform
+218	doordash	attributiondata
+219	doordash	dd4bexpensecode
+220	doordash	siteoutage
+221	doordash	curatedcategorymembership
+222	doordash	orderplacerqueuestate
+223	doordash	userdeactivationsource
+224	doordash	deliverysetmapping
+225	doordash	share
+226	doordash	deliverymaskingnumberassignment
+227	doordash	drivewebhooksubscription
+228	doordash	promotionconsumerlink
+229	doordash	employee
+230	assignment	shiftdeliverysetassignment
+231	assignment	shiftdeliveryassignment2
+232	merchant	builtintaxcategoryrule
+233	merchant	merchantpromotiontarget
+234	merchant	storepromotionmembership
+235	merchant	storeopenhours
+236	merchant	opaqueidmapping
+237	merchant	bountypayment
+238	merchant	merchantpromotioncategory
+239	merchant	businessgroup
+240	merchant	magicmeal
+241	merchant	storeordercartpaymentinfo
+242	merchant	storedeliveryconstraints
+243	merchant	businesstaglink
+244	merchant	storesortboost
+245	merchant	partnerloyaltyprogram
+246	merchant	itemvehicletypelink
+247	merchant	merchantrobocall
+248	merchant	storedeactivationreasoncategory
+249	merchant	merchantannouncementstoreviews
+250	merchant	temporarydeactivationreasoncategory
+251	merchant	merchantannouncement
+252	merchant	merchantrole
+253	merchant	storepointofsaleinfo
+254	merchant	taxcategoryrule
+255	merchant	businessreferredcustomer
+256	merchant	productcodeitemtaglink
+257	merchant	storedisclaimer
+258	merchant	menuoption
+259	merchant	storecompositescoredata
+260	merchant	temporarydeactivationreason
+261	merchant	merchantrolepermissionlink
+262	merchant	itemtaggroup
+263	merchant	storeitemextraoptiondeactivation
+264	merchant	qrcodeaction
+265	merchant	businesstag
+266	merchant	storedisclaimerlink
+267	merchant	storemenucategorydeactivation
+268	merchant	merchant
+269	merchant	blacklisteddasherbystore
+270	merchant	storeclosure
+271	merchant	storespecialhours
+272	merchant	merchantannouncementstoreinterval
+273	merchant	storebountyprogramlink
+274	merchant	storeitemextradeactivation
+275	merchant	storepushdevice
+276	merchant	itemtag
+277	merchant	storepartnership
+278	merchant	storepaymentaccountlink
+279	merchant	storedeliverystat
+280	merchant	temporarydeactivation
+281	merchant	businesscategory
+282	merchant	menu
+283	merchant	menutopilotmenu
+284	merchant	drivepartnership
+285	merchant	merchantpromotiongeneratedcodesforconsumer
+286	merchant	merchantpromotion
+287	merchant	merchanttaxtransaction
+288	merchant	itempopularity
+289	merchant	storedeactivationreason
+290	merchant	merchantdevicelink
+291	merchant	yelpbusiness
+292	merchant	accountowner
+293	merchant	itemitemtaglink
+294	merchant	businessvertical
+295	merchant	menucategory
+296	merchant	merchantpromotionstoreordercartlink
+297	merchant	paymentprotocol
+298	merchant	businessverticalitemtaglink
+299	merchant	itemextraoptionitemextralink
+300	merchant	menupushjob
+301	merchant	item
+302	merchant	merchantpromotiondaypartconstraint
+303	merchant	storeomnivoreinfo
+304	merchant	businessemployee
+305	merchant	businessgrouplink
+306	merchant	taxcategory
+307	merchant	storepaymentreason
+308	merchant	storeaddresslink
+309	merchant	partnerloyaltyprogramconsumerlink
+310	merchant	business
+311	merchant	storecustomerhistory
+312	merchant	storeitemlink
+313	merchant	storepayment
+314	merchant	merchantpermission
+315	merchant	itemextraoption
+316	merchant	externalstore
+317	merchant	storemenulink
+318	merchant	merchantrobocalljob
+319	merchant	preferreddasherbybusiness
+320	merchant	storeitemdeactivation
+321	merchant	blacklisteddasherbybusiness
+322	merchant	itemextra
+323	merchant	storediscounteditemlink
+324	merchant	storeitemextraoptionlink
+325	merchant	storemetrics
+326	merchant	itemextradefaultitemextraoptionlink
+327	merchant	bountyprogram
+328	merchant	productcode
+329	merchant	storedeactivation
+330	merchant	qrcode
+331	merchant	businessemployeestoremembership
+332	merchant	store
+333	dasher	job
+334	dasher	manualassigninterval
+335	dasher	dasherorientationslidedeck
+336	dasher	vehiclerentalpaymentjob
+337	dasher	dasherfeaturepreference
+338	dasher	dasheralcoholinfo
+339	dasher	dasherchallengeprogress
+340	dasher	dasherrating
+341	dasher	shift
+342	dasher	dasherorientationquizquestion
+343	dasher	dasherscore
+344	dasher	dashertoslink
+345	dasher	historicaldasherpaycampaigninterval
+346	dasher	dailyschedulinglimit
+347	dasher	dasherequipment
+348	dasher	slidedeckslidelink
+349	dasher	dasherrobotdata
+350	dasher	dashertermsofservice
+351	dasher	dasherdailystat
+352	dasher	hotspot
+353	dasher	preferencefordasher
+354	dasher	dasherreferralactivationchangeevent
+355	dasher	dasherguaranteedearningsprogress
+356	dasher	dasherdeactivationwarning
+357	dasher	dasherreferral
+358	dasher	deliveryrobottype
+359	dasher	shiftevent
+360	dasher	backgroundcheckreport
+361	dasher	dasherdeliverypay
+362	dasher	merchantdasherrating
+363	dasher	vehicle
+364	dasher	dasherincident
+365	dasher	dasherorientation
+366	dasher	dasherdeliveryrating
+367	dasher	dasherfaq
+368	dasher	dasherpaytarget
+369	dasher	dasherorientationslide
+370	dasher	dasherreportederrorlink
+371	dasher	dasherguaranteedearningscampaign
+372	dasher	dasherdeliveryratingcategory
+373	dasher	vehicletype
+374	dasher	dasherlocaloffice
+375	dasher	slidedeckquizquestionlink
+376	dasher	dasherrewardtierstatus
+377	dasher	shifteventcategory
+378	dasher	dasherorientationquiz
+379	dasher	dasherpaycampaigninterval
+380	dasher	deliverydepot
+381	dasher	dasherachievementlink
+382	dasher	dasherreferralcampaign
+383	dasher	shiftpaycampaignrecord
+384	dasher	dasherachievement
+385	dasher	dasherdeactivationreason
+386	dasher	requestadasherguaranteedpay
+387	dasher	shiftstats
+388	dasher	dasherappealuniquekey
+389	dasher	backgroundcheckstatus
+390	dasher	vehiclepartnerpaymentjob
+391	dasher	dasherequipmenttype
+392	dasher	dasherannouncementsubmarketlink
+393	dasher	dasherreferralfraudstate
+394	dasher	grabdriverinfo
+395	dasher	dasherchallengeruleprogress
+396	dasher	dasherreward
+397	dasher	dasherreferralrules
+398	dasher	deliveryreference
+399	dasher	merchantdasherratingreason
+400	dasher	dasherearlyaccess
+401	dasher	batch
+402	dasher	dasherdeliveryratingcategorylink
+403	dasher	startingpointmigration
+404	dasher	vehicletypestartingpointlink
+405	dasher	dasherapplicant
+406	dasher	dasherchallenge
+407	dasher	dasherannouncement
+408	dasher	dasherpaydeliverypredictionduration
+409	dasher	dasher
+410	dasher	shiftchangeevent
+411	dasher	dasheraustraliantaxinfo
+412	dasher	merchantdasherratingreasonlink
+413	dasher	dasherephemeralflags
+414	scheduler	regionscheduledtask
+415	scheduler	scheduledcallback
+416	accounts	userlocalepreference
+417	accounts	guestusertype
+418	accounts	devicefingerprint
+419	accounts	usersocialdata
+420	accounts	user
+421	accounts	ordercartdevicefingerprintlink
+422	accounts	emailverificationrequest
+423	accounts	userdevicefingerprintlink
+424	accounts	fraudstatus
+425	accounts	usergroupadmin
+426	version	client
+427	security	apikey
+428	security	bannedipaddress
+429	support	supportsalesforcecaserecord
+430	support	supportdeliverybanner
+431	encrypted_pii	deliverycustomerpii
+432	invoicing	invoicinggrouponboardingrule
+433	invoicing	invoicinggroupmembership
+434	invoicing	storenetsuitecustomerlink
+435	invoicing	invoicinggroup
+436	payments	payoutcard
+437	payments	cardacceptorrestaurantassociation
+438	payments	grabtransfer
+439	payments	marqetadeclineexemption
+440	payments	aggregatereportrecipient
+441	payments	transfertransaction
+442	payments	marqetatransaction
+443	payments	externalrequest
+444	payments	stripecard
+445	payments	stripecharge
+446	payments	marqetacardtransition
+447	payments	stripecardevent
+448	payments	aggregatereportentity
+449	payments	deliveryfunding
+450	payments	managedaccounttransfer
+451	payments	cashpayment
+452	payments	stripemanagedaccount
+453	payments	payout
+454	payments	paymentaccountedithistory
+455	payments	storepaymentsummaryemail
+456	payments	payoutmethod
+457	payments	cardacceptor
+458	payments	transactionstatus
+459	payments	marqetatransactionevent
+460	payments	paymentaccount
+461	payments	transactionstatushistory
+462	payments	stripetransfer
+463	payments	aggregatereport
+464	payments	paymentmethod
+465	payments	marqetacard
+466	payments	marqetacardownership
+467	payments	transfersubmissionlock
+468	payments	stripepayoutrequest
+469	payments	transaction
+470	payments	charge
+471	payments	storemastercarddata
+472	payments	striperecipient
+473	payments	stripecustomer
+474	payments	stripebankaccount
+475	payments	grabpayaccount
+476	payments	grabpaycharge
+477	payments	payoutaccount
+478	payments	stripetransferrequest
+479	payments	stripemanagedaccounttransfer
+480	payments	transfer
+481	payments	grabpaymentaccount
+482	payments	stripedispute
+483	app_deploy	webdeployment
+484	app_deploy	app
+485	authtoken	token
+486	django_twilio	caller
+487	django_twilio	credential
+488	ios_notifications	device
+489	ios_notifications	feedbackservice
+490	ios_notifications	notification
+491	ios_notifications	apnservice
+492	refreshtoken	refreshtoken
+\.
+
+
+--
+-- Name: django_content_type_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('django_content_type_id_seq', 492, true);
+
+
+--
+-- Data for Name: django_migrations; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY django_migrations (id, app, name, applied) FROM stdin;
+1	contenttypes	0001_initial	2019-08-04 03:10:08.115322+00
+2	contenttypes	0002_remove_content_type_name	2019-08-04 03:10:08.142158+00
+3	auth	0001_initial	2019-08-04 03:10:08.201306+00
+4	auth	0002_alter_permission_name_max_length	2019-08-04 03:10:08.215374+00
+5	auth	0003_alter_user_email_max_length	2019-08-04 03:10:08.228542+00
+6	auth	0004_alter_user_username_opts	2019-08-04 03:10:08.241672+00
+7	auth	0005_alter_user_last_login_null	2019-08-04 03:10:08.25476+00
+8	auth	0006_require_contenttypes_0002	2019-08-04 03:10:08.25773+00
+9	auth	0007_alter_validators_add_error_messages	2019-08-04 03:10:08.272803+00
+10	accounts	0001_initial	2019-08-04 03:10:08.469919+00
+11	doordash	0001_initial	2019-08-04 03:10:18.448176+00
+12	accounts	0002_auto_20190313_2101	2019-08-04 03:10:19.550455+00
+13	accounts	0003_userlocalepreference	2019-08-04 03:10:19.604248+00
+14	accounts	0004_auto_20190528_1346	2019-08-04 03:10:19.642807+00
+15	accounts	0005_devicefingerprint_abuse_reason	2019-08-04 03:10:19.678332+00
+16	accounts	0006_remove_cascading_delete	2019-08-04 03:10:19.814859+00
+17	accounts	0007_fingerprint_updated_at	2019-08-04 03:10:19.882799+00
+18	admin	0001_initial	2019-08-04 03:10:19.943194+00
+19	admin	0002_logentry_remove_auto_add	2019-08-04 03:10:19.986777+00
+20	app_deploy	0001_initial	2019-08-04 03:10:20.076035+00
+21	assignment	0001_initial	2019-08-04 03:10:20.097094+00
+22	assignment	0002_shiftdeliverysetassignment	2019-08-04 03:10:20.119007+00
+23	assignment	0003_shiftdeliveryassignment2_estimation_info	2019-08-04 03:10:20.143873+00
+24	auth	0008_alter_user_username_max_length	2019-08-04 03:10:20.178721+00
+25	authtoken	0001_initial	2019-08-04 03:10:20.225396+00
+26	authtoken	0002_auto_20160226_1747	2019-08-04 03:10:20.361752+00
+27	merchant	0001_initial	2019-08-04 03:10:23.13633+00
+28	doordash	0002_auto_20190313_2101	2019-08-04 03:10:31.198008+00
+29	dasher	0001_initial	2019-08-04 03:10:33.027922+00
+30	dasher	0002_auto_20190313_2101	2019-08-04 03:10:37.898658+00
+31	payments	0001_initial	2019-08-04 03:10:51.621419+00
+32	ios_notifications	0001_initial	2019-08-04 03:10:53.824962+00
+33	ios_notifications	0002_notification_silent	2019-08-04 03:10:53.874184+00
+34	ios_notifications	0003_notification_loc_payload	2019-08-04 03:10:53.933907+00
+35	ios_notifications	0004_auto_20141105_1515	2019-08-04 03:10:53.990922+00
+36	dasher	0003_auto_20190313_2101	2019-08-04 03:11:20.625724+00
+37	doordash	0003_auto_20190313_2101	2019-08-04 03:13:20.717359+00
+38	doordash	0004_referral_not_credited_reason	2019-08-04 03:13:20.799236+00
+39	doordash	0005_auto_20190314_1654	2019-08-04 03:13:20.951649+00
+40	doordash	0006_delete_unused_tables	2019-08-04 03:13:22.202541+00
+41	doordash	0007_remove_deliveryrequest	2019-08-04 03:13:27.574131+00
+42	doordash	0008_notified_cx_request	2019-08-04 03:13:27.72659+00
+43	doordash	0009_driveorder_cancelled_at	2019-08-04 03:13:27.768608+00
+44	doordash	0010_consumerstorerequest_store_activation_date	2019-08-04 03:13:27.844115+00
+45	doordash	0011_auto_20190326_2104	2019-08-04 03:13:27.988861+00
+46	doordash	0012_auto_20190401_1645	2019-08-04 03:13:28.079467+00
+47	doordash	0013_auto_20190408_1316	2019-08-04 03:13:28.530821+00
+48	doordash	0014_auto_20190409_1641	2019-08-04 03:13:29.357734+00
+49	doordash	0015_deliverysimulator_store_id	2019-08-04 03:13:29.474457+00
+50	doordash	0016_auto_20190410_1526	2019-08-04 03:13:29.793915+00
+51	doordash	0017_bogo_promotion_second_item_promo	2019-08-04 03:13:30.132449+00
+52	doordash	0018_eta_pred_no_cascade_delete	2019-08-04 03:13:30.440745+00
+53	doordash	0019_consumer_vip_tier	2019-08-04 03:13:30.578906+00
+54	doordash	0020_auto_20190424_1123	2019-08-04 03:13:30.84659+00
+55	doordash	0021_auto_20190424_1348	2019-08-04 03:13:31.103075+00
+56	doordash	0022_remove_consumer_is_vip	2019-08-04 03:13:31.202605+00
+57	doordash	0023_deliveryassignmentconstraint_preferred_dasher_equipment_ids	2019-08-04 03:13:31.244598+00
+58	doordash	0024_experiment2_mobile_version_rules	2019-08-04 03:13:31.308343+00
+59	doordash	0025_driveorder_external_order_status	2019-08-04 03:13:31.348749+00
+60	doordash	0026_auto_20190501_1125	2019-08-04 03:13:31.515093+00
+61	doordash	0027_driveorder_aggregator_fee	2019-08-04 03:13:31.556211+00
+62	doordash	0028_storeordercart_updated_at	2019-08-04 03:13:31.658536+00
+63	doordash	0029_auto_20190514_2319	2019-08-04 03:13:32.556719+00
+64	doordash	0030_remove_storeordercart_updated_at	2019-08-04 03:13:32.648264+00
+65	doordash	0031_auto_20190508_0453	2019-08-04 03:13:32.677548+00
+66	doordash	0032_auto_20190521_1040	2019-08-04 03:13:32.84934+00
+67	doordash	0033_auto_20190524_1531	2019-08-04 03:13:33.429524+00
+68	doordash	0034_add_fr_ca_columns_to_support_i18n	2019-08-04 03:13:33.697442+00
+69	doordash	0035_auto_20190529_1636	2019-08-04 03:13:33.788059+00
+70	doordash	0036_experiment2_enable_real_time_tracking	2019-08-04 03:13:33.841668+00
+71	doordash	0037_auto_20190530_1048	2019-08-04 03:13:33.915723+00
+72	doordash	0038_auto_20190530_1017	2019-08-04 03:13:33.956392+00
+73	doordash	0039_auto_20190603_0946	2019-08-04 03:13:34.05947+00
+74	doordash	0040_auto_20190604_1331	2019-08-04 03:13:34.163011+00
+75	doordash	0041_market_updated_at	2019-08-04 03:13:34.25509+00
+76	doordash	0042_dispatcher_can_edit_delivery	2019-08-04 03:13:34.311572+00
+77	doordash	0043_delivery_is_group_cart_delivery	2019-08-04 03:13:34.626515+00
+78	doordash	0044_deliverysetmapping_removed_at	2019-08-04 03:13:34.663739+00
+79	doordash	0045_idempotency_key	2019-08-04 03:13:34.828481+00
+80	doordash	0046_consumerpromotion_is_active	2019-08-04 03:13:34.940394+00
+81	doordash	0047_address_formatted_address_and_name	2019-08-04 03:13:35.057371+00
+82	doordash	0048_country_allows_pre_tipping	2019-08-04 03:13:35.10118+00
+83	doordash	0049_storeordercart_delivery_id	2019-08-04 03:13:35.179282+00
+84	doordash	0050_auto_20190624_1554	2019-08-04 03:13:36.155355+00
+85	doordash	0051_fix_cascading_deletes	2019-08-04 03:13:41.601113+00
+86	doordash	0052_remove_menu_fk	2019-08-04 03:13:42.040071+00
+87	doordash	0053_variable_can_edit	2019-08-04 03:13:42.077537+00
+88	doordash	0054_idempotency_key_uniqueness	2019-08-04 03:13:42.354153+00
+89	doordash	0055_driveorder_post_tip	2019-08-04 03:13:42.397694+00
+90	dasher	0004_dasher_deactivation	2019-08-04 03:13:42.680731+00
+91	dasher	0005_dasherdeliverypay_adjustment_amount	2019-08-04 03:13:42.75288+00
+92	dasher	0006_auto_20190423_1817	2019-08-04 03:13:42.888429+00
+93	dasher	0007_dasher_feature_preference	2019-08-04 03:13:42.970636+00
+94	dasher	0008_deliveryreference	2019-08-04 03:13:42.997263+00
+95	dasher	0009_auto_20190513_1359	2019-08-04 03:13:43.029201+00
+96	dasher	0010_deliverydepot	2019-08-04 03:13:43.054093+00
+97	dasher	0011_dasher_challenge	2019-08-04 03:13:43.141216+00
+98	dasher	0012_auto_20190528_2332	2019-08-04 03:13:44.199207+00
+99	dasher	0013_auto_20190603_2303	2019-08-04 03:13:44.271051+00
+100	dasher	0014_dasheraustraliantaxinfo	2019-08-04 03:13:44.297268+00
+101	dasher	0015_auto_20190622_1945	2019-08-04 03:13:44.560433+00
+102	dasher	0016_auto_20190701_1332	2019-08-04 03:13:44.617748+00
+103	dasher	0017_auto_20190702_0021	2019-08-04 03:13:45.235746+00
+104	dasher	0018_auto_20190712_1136	2019-08-04 03:13:45.902092+00
+105	dasher	0019_dasherapplicant_referral_campaign	2019-08-04 03:13:46.338346+00
+106	dasher	0020_auto_20190722_1613	2019-08-04 03:13:46.501646+00
+107	dasher	0021_auto_20190802_1926	2019-08-04 03:13:46.793896+00
+108	django_twilio	0001_initial	2019-08-04 03:13:48.34978+00
+109	payments	0002_stripecard_external_stripe_customer_id	2019-08-04 03:13:48.469124+00
+110	payments	0003_transaction_inserted_at	2019-08-04 03:13:48.523771+00
+111	payments	0004_stripecard_tokenization_method	2019-08-04 03:13:48.638194+00
+112	payments	0005_stripecharge_updated_at	2019-08-04 03:13:48.717557+00
+113	payments	0006_auto_20190422_0856	2019-08-04 03:13:48.949895+00
+114	payments	0007_paymentaccountedithistory_login_as_user_id	2019-08-04 03:13:48.984767+00
+115	payments	0008_scan_card_challege_field	2019-08-04 03:13:49.176593+00
+116	payments	0009_paymentaccountedithistory_notes	2019-08-04 03:13:49.210756+00
+117	payments	0010_charge_updated_at	2019-08-04 03:13:49.978406+00
+118	payments	0011_remove_charge_updated_at	2019-08-04 03:13:50.061126+00
+119	doordash	0056_order_payment_information	2019-08-04 03:13:50.655218+00
+120	doordash	0057_auto_20190725_0931	2019-08-04 03:13:51.045773+00
+121	doordash	0058_consumerpromotion_success_message	2019-08-04 03:13:51.227265+00
+122	doordash	0059_auto_20190731_1148	2019-08-04 03:13:51.6332+00
+123	encrypted_pii	0001_initial	2019-08-04 03:13:51.695012+00
+124	invoicing	0001_initial	2019-08-04 03:13:51.876522+00
+125	merchant	0002_auto_20190313_2101	2019-08-04 03:15:13.995145+00
+126	merchant	0003_storebountyprogramlink_deactivated_at	2019-08-04 03:15:14.077987+00
+127	merchant	0004_auto_20190325_1849	2019-08-04 03:15:14.580899+00
+128	merchant	0005_store_activation_source	2019-08-04 03:15:14.747403+00
+129	merchant	0006_store_fulfills_own_deliveries_disabled	2019-08-04 03:15:14.914016+00
+130	merchant	0007_auto_20190408_1416	2019-08-04 03:15:14.918485+00
+131	merchant	0008_auto_20190408_1441	2019-08-04 03:15:14.990073+00
+132	merchant	0009_auto_20190411_1031	2019-08-04 03:15:16.239955+00
+133	merchant	0010_storeitemextradeactivation	2019-08-04 03:15:16.274419+00
+134	merchant	0011_store_max_delivery_polygon	2019-08-04 03:15:16.440475+00
+135	merchant	0012_alter_email_helper_text	2019-08-04 03:15:16.613+00
+136	merchant	0013_auto_20190501_1059	2019-08-04 03:15:16.69736+00
+137	merchant	0014_temporarydeactivation_timezone	2019-08-04 03:15:16.831779+00
+138	merchant	0015_auto_20190515_1807	2019-08-04 03:15:17.02054+00
+139	merchant	0016_itemextraoption_itemvehicletypelink_timestamp	2019-08-04 03:15:17.28031+00
+140	merchant	0017_merchantpromotionstoreordercartlink	2019-08-04 03:15:17.313808+00
+141	merchant	0018_menutopilotmenu	2019-08-04 03:15:17.347939+00
+142	merchant	0019_printer_fee	2019-08-04 03:15:17.534516+00
+143	merchant	0020_store_subscription_commission_trial_end_time	2019-08-04 03:15:17.641655+00
+144	merchant	0021_create_created_deactivated_by	2019-08-04 03:15:17.847337+00
+145	merchant	0022_remove_id_column_move_to_etl	2019-08-04 03:15:17.889348+00
+146	merchant	0023_merchantpromotiontarget	2019-08-04 03:15:17.921058+00
+147	merchant	0024_opaqueidmapping	2019-08-04 03:15:17.954657+00
+148	merchant	0025_auto_20190612_1500	2019-08-04 03:15:18.002836+00
+149	merchant	0026_merchantpromotionstoreordercartlink_bcs_promotion_uuid	2019-08-04 03:15:18.045952+00
+150	merchant	0027_merchantpromotiontarget_bcs_promotion_uuid	2019-08-04 03:15:18.089181+00
+151	merchant	0028_auto_20190618_1247	2019-08-04 03:15:18.286274+00
+152	merchant	0029_builtintaxcategoryrule	2019-08-04 03:15:18.313049+00
+153	merchant	0030_merchantpromotion_generated_codes_for_consumer_table	2019-08-04 03:15:18.369966+00
+154	merchant	0031_menudb_into_merchantdb_migration	2019-08-04 03:15:19.781663+00
+155	merchant	0032_menu_source_of_creation	2019-08-04 03:15:19.858964+00
+156	merchant	0033_auto_20190725_1112	2019-08-04 03:15:20.074357+00
+157	merchant	0034_modify_merchant_promotion	2019-08-04 03:15:20.290053+00
+158	merchant	0035_merchantpromotionstoreordercartlink_created_at	2019-08-04 03:15:20.33604+00
+159	merchant	0036_storepromotionmembership_created_at	2019-08-04 03:15:20.433075+00
+160	merchant	0037_qrcode_qrcodeaction	2019-08-04 03:15:21.119359+00
+161	payments	0012_auto_20190718_1023	2019-08-04 03:15:22.655717+00
+162	refreshtoken	0001_initial	2019-08-04 03:15:23.125944+00
+163	scheduler	0001_initial	2019-08-04 03:15:23.161548+00
+164	scheduler	0002_regionscheduledtask	2019-08-04 03:15:23.191665+00
+165	scheduler	0003_auto_20190603_1341	2019-08-04 03:15:23.23222+00
+166	security	0001_initial	2019-08-04 03:15:23.616923+00
+167	sessions	0001_initial	2019-08-04 03:15:23.66043+00
+168	support	0001_initial	2019-08-04 03:15:24.491326+00
+169	version	0001_initial	2019-08-04 03:15:24.542067+00
+\.
+
+
+--
+-- Name: django_migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('django_migrations_id_seq', 169, true);
+
+
+--
+-- Data for Name: django_session; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY django_session (session_key, session_data, expire_date) FROM stdin;
+\.
+
+
+--
+-- Data for Name: django_twilio_caller; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY django_twilio_caller (id, blacklisted, phone_number) FROM stdin;
+\.
+
+
+--
+-- Name: django_twilio_caller_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('django_twilio_caller_id_seq', 1, false);
+
+
+--
+-- Data for Name: django_twilio_credential; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY django_twilio_credential (id, name, account_sid, auth_token, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: django_twilio_credential_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('django_twilio_credential_id_seq', 1, false);
+
+
+--
+-- Data for Name: donation_recipient; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY donation_recipient (id, created_at, name, short_description, long_description, logo_image_url, cover_image_url, is_active) FROM stdin;
+\.
+
+
+--
+-- Name: donation_recipient_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('donation_recipient_id_seq', 1, false);
+
+
+--
+-- Data for Name: doordash_blacklistedemail; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY doordash_blacklistedemail (id, email, blacklisted_at, reason, blacklisted_by_id, blacklisted_user_id) FROM stdin;
+\.
+
+
+--
+-- Name: doordash_blacklistedemail_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('doordash_blacklistedemail_id_seq', 1, false);
+
+
+--
+-- Data for Name: doordash_blacklistedpaymentcard; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY doordash_blacklistedpaymentcard (id, fingerprint, blacklisted_at, reason, blacklisted_by_id, blacklisted_user_id) FROM stdin;
+\.
+
+
+--
+-- Name: doordash_blacklistedpaymentcard_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('doordash_blacklistedpaymentcard_id_seq', 1, false);
+
+
+--
+-- Data for Name: doordash_blacklistedphonenumber; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY doordash_blacklistedphonenumber (id, phone_number, blacklisted_at, reason, blacklisted_by_id, blacklisted_user_id) FROM stdin;
+\.
+
+
+--
+-- Name: doordash_blacklistedphonenumber_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('doordash_blacklistedphonenumber_id_seq', 1, false);
+
+
+--
+-- Data for Name: doordash_blacklisteduser; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY doordash_blacklisteduser (id, blacklisted_at, reason, blacklisted_by_id, deactivation_source_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: doordash_blacklisteduser_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('doordash_blacklisteduser_id_seq', 1, false);
+
+
+--
+-- Data for Name: doordash_employmentperiod; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY doordash_employmentperiod (id, employee_id, hire_date, termination_date, is_intern, is_full_time) FROM stdin;
+\.
+
+
+--
+-- Name: doordash_employmentperiod_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('doordash_employmentperiod_id_seq', 1, false);
+
+
+--
+-- Data for Name: doordash_orderitemsubstitutionevent; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY doordash_orderitemsubstitutionevent (id, created_at, type, order_item_id, replaced_order_item_id) FROM stdin;
+\.
+
+
+--
+-- Name: doordash_orderitemsubstitutionevent_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('doordash_orderitemsubstitutionevent_id_seq', 1, false);
+
+
+--
+-- Data for Name: drive_business_mapping; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_business_mapping (id, brand_name, source, business_id, developer_id) FROM stdin;
+\.
+
+
+--
+-- Name: drive_business_mapping_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('drive_business_mapping_id_seq', 1, false);
+
+
+--
+-- Data for Name: drive_delivery_identifier_mapping; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_delivery_identifier_mapping (created_at, delivery_id, drive_order_id, external_id, external_source, developer_id, store_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: drive_effort_based_pay_vars; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_effort_based_pay_vars (id, submarket_id, start_time, retention_wage, toll_pay, large_order_buckets, delivery_pay_floor) FROM stdin;
+\.
+
+
+--
+-- Name: drive_effort_based_pay_vars_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('drive_effort_based_pay_vars_id_seq', 1, false);
+
+
+--
+-- Data for Name: drive_external_batch_id_mapping; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_external_batch_id_mapping (created_at, delivery_id, external_batch_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: drive_order; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_order (id, public_id, created_at, updated_at, store_id, driver_reference_tag, quoted_delivery_time, quoted_pickup_time, order_type, order_volume, is_route_based, pickup_window_start_time, pickup_window_end_time, delivery_window_start_time, delivery_window_end_time, delivery_id, return_delivery_id, accepts_dasher_receipts, requires_catering_setup, includes_catering_setup, requires_barcode_scanning, contains_alcohol, requires_team_lift, requires_signature, allow_unattended_delivery, allowed_vehicles, min_age_requirement, tip, commission_rate, commission_subtotal, commission_tax, commission_total, merchant_payment_transaction_id, is_asap, pickup_instructions, dropoff_instructions, currency, order_value, delivery_tracking_url, developer_id, external_delivery_id, num_items, pickup_address_id, dropoff_address_id, delivery_creation_status, delivery_creation_response, task_id, items, customer, delivery_creation_extra_params, return_type, cancelled_at, external_order_status, aggregator_fee, post_tip) FROM stdin;
+\.
+
+
+--
+-- Name: drive_order_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('drive_order_id_seq', 1, false);
+
+
+--
+-- Data for Name: drive_quote; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_quote (created_at, quote_id, delivery_time, pickup_time, delivery_fee, delivery_fee_subtotal, delivery_fee_tax, currency, order_value, has_quoted_pickup_time, expires_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: drive_quote_acceptance; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_quote_acceptance (quote_id, delivery_id, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: drive_store_catering_setup_instruction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_store_catering_setup_instruction (id, created_at, name, store_id, url) FROM stdin;
+\.
+
+
+--
+-- Name: drive_store_catering_setup_instruction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('drive_store_catering_setup_instruction_id_seq', 1, false);
+
+
+--
+-- Data for Name: drive_store_id_mapping; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_store_id_mapping (store_id, external_store_id, business_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: drive_webhook_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_webhook_event (id, created_at, payload_url, request_body, exception, retried, response_status_code, request_id, request_retries, business_id, delivery_id, delivery_event_category_id) FROM stdin;
+\.
+
+
+--
+-- Name: drive_webhook_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('drive_webhook_event_id_seq', 1, false);
+
+
+--
+-- Data for Name: drive_webhook_subscription; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY drive_webhook_subscription (id, created_at, business_id, delivery_event_category_id) FROM stdin;
+\.
+
+
+--
+-- Name: drive_webhook_subscription_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('drive_webhook_subscription_id_seq', 1, false);
+
+
+--
+-- Data for Name: email_holdout_group; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY email_holdout_group (id, name) FROM stdin;
+\.
+
+
+--
+-- Name: email_holdout_group_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('email_holdout_group_id_seq', 1, false);
+
+
+--
+-- Data for Name: email_notification; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY email_notification (id, target_id, message, created_at, subject, from_email, bcc, issue_id, target_ct_id) FROM stdin;
+\.
+
+
+--
+-- Name: email_notification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('email_notification_id_seq', 1, false);
+
+
+--
+-- Data for Name: email_preference; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY email_preference (id, name) FROM stdin;
+\.
+
+
+--
+-- Name: email_preference_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('email_preference_id_seq', 1, false);
+
+
+--
+-- Data for Name: email_verification_request; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY email_verification_request (id, created_at, token_created_at, verified_at, email, token, num_token_generations, num_verification_attempts, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: email_verification_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('email_verification_request_id_seq', 1, false);
+
+
+--
+-- Data for Name: employee; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY employee (user_id, title, display_name, description, profile_picture, is_active, team, location, birth_date, tshirt_size, gender, hr_superpower, favorite_doordash_store, favorite_food_item, manager_id) FROM stdin;
+1					t			\N			f			\N
+\.
+
+
+--
+-- Data for Name: employee_monthly_culture_shift; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY employee_monthly_culture_shift (id, created_at, shift_type, month, year, employee_id, approved_by_id, approved_at, rejected_by_id, rejected_at, description, metadata) FROM stdin;
+\.
+
+
+--
+-- Name: employee_monthly_culture_shift_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('employee_monthly_culture_shift_id_seq', 1, false);
+
+
+--
+-- Data for Name: estimate; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY estimate (id, start_time, estimated_at, estimator_id, info, duration, result_info, target_name, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: estimate_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('estimate_id_seq', 1, false);
+
+
+--
+-- Data for Name: eta_prediction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY eta_prediction (id, predictor_id, is_asap, predicted_at, estimated_assignment_latency, estimated_assignment_latency_calculated_at, estimated_order_place_duration, estimated_order_place_time, per_starting_point, estimated_prep_duration, estimated_prep_duration_calculated_at, estimated_assignment_to_pickup_duration, estimated_assignment_to_pickup_duration_calculated_at, estimated_r2c_duration, estimated_pickup_duration, estimated_pickup_time, manual_pickup_time, ideal_pickup_duration, ideal_pickup_time, store_list_asap_duration, estimated_delivery_duration, estimated_delivery_time, quoted_delivery_duration, quoted_delivery_time, max_estimated_assignment_latency, restaurant_min_prep_duration, restaurant_max_prep_duration, market_min_asap_duration, extra_starting_point_pad_duration, extra_submarket_pad_duration, prediction_info, features_info, delivery_id, order_cart_id) FROM stdin;
+\.
+
+
+--
+-- Name: eta_prediction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('eta_prediction_id_seq', 1, false);
+
+
+--
+-- Data for Name: experiment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment (id, name, description, is_active, target, bucket_key, analytics_key, whitelist_type, whitelist_ids, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: experiment2; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment2 (id, name, description, created_at, updated_at, active_version, returned_parameters, reserved_mapping, whitelist_type, whitelist_ids, overrides, default_employee_treatments, default_bucket_key, target, tracking_target, disable_logging, has_frontend_tracking, owner_id, mobile_version_rules, enable_real_time_tracking) FROM stdin;
+\.
+
+
+--
+-- Name: experiment2_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('experiment2_id_seq', 1, false);
+
+
+--
+-- Data for Name: experiment_bucket_assignment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment_bucket_assignment (id, user_id, experiment_id, created_at, last_accessed_at, bucket_key) FROM stdin;
+\.
+
+
+--
+-- Name: experiment_bucket_assignment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('experiment_bucket_assignment_id_seq', 1, false);
+
+
+--
+-- Data for Name: experiment_distribution; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment_distribution (id, identifier, description, buckets, weights, bucket_index_map, bucket_index_rules, default_employee_value, experiment_id) FROM stdin;
+\.
+
+
+--
+-- Name: experiment_distribution_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('experiment_distribution_id_seq', 1, false);
+
+
+--
+-- Data for Name: experiment_override; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment_override (id, bucket, experiment_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: experiment_override_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('experiment_override_id_seq', 1, false);
+
+
+--
+-- Data for Name: experiment_user; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment_user (id, created_at, original_device_id, original_session_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: experiment_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('experiment_user_id_seq', 1, false);
+
+
+--
+-- Data for Name: experiment_version; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY experiment_version (id, version, created_at, updated_at, last_activated_at, specification, compiled_specification, simple_yaml, experiment_id) FROM stdin;
+\.
+
+
+--
+-- Name: experiment_version_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('experiment_version_id_seq', 1, false);
+
+
+--
+-- Data for Name: external_request; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY external_request (id, entity_type, entity_id, idempotency_key, updated_at, started_at, completed_at) FROM stdin;
+\.
+
+
+--
+-- Name: external_request_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('external_request_id_seq', 1, false);
+
+
+--
+-- Data for Name: fraud_status; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY fraud_status (id, entity_type, entity_id, action, created_at, updated_at, status, metadata) FROM stdin;
+\.
+
+
+--
+-- Name: fraud_status_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('fraud_status_id_seq', 1, false);
+
+
+--
+-- Data for Name: free_delivery_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY free_delivery_promotion (id, created_at, min_subtotal, max_value) FROM stdin;
+\.
+
+
+--
+-- Name: free_delivery_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('free_delivery_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: gift_code; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY gift_code (id, created_at, last_modified, value, currency, code, redeemed, redeemed_at, potential_redeemer_email, message, new_customer_only, is_deactivated, deactivation_reason, charge_id, creator_id, redeemer_id) FROM stdin;
+\.
+
+
+--
+-- Name: gift_code_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('gift_code_id_seq', 1, false);
+
+
+--
+-- Data for Name: github_activity_metrics; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY github_activity_metrics (id, updated_at, created_at, active_date, type, data) FROM stdin;
+\.
+
+
+--
+-- Name: github_activity_metrics_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('github_activity_metrics_id_seq', 1, false);
+
+
+--
+-- Data for Name: globalvars_gatekeeper; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY globalvars_gatekeeper (name, staff_users, public, allowed_emails) FROM stdin;
+\.
+
+
+--
+-- Data for Name: globalvars_variable; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY globalvars_variable (key, value, can_view, can_edit) FROM stdin;
+CONSECUTIVE_UNFULFILLED_DELIVERIES_LIMIT	3	[]	\N
+SCS_FOR_ALL_SMS_WHITELIST	[]	[]	\N
+ORDER_THROTTLE_SETTINGS	[]	[]	\N
+BUSINESS_COMMISSION_SERVICE_METRICS_READ	false	[]	\N
+DELIVERY_SUPPORT_PARAMETERS	{"late_and_not_picked_up_buffer_in_seconds": 0, "batch_route_max_delay_in_seconds": 900, "big_order_dasher_slow_r2c_buffer_in_seconds": 1500, "driver_slow_to_restaurant_buffer_in_seconds": 300, "slow_assignment_buffer_for_tentative_in_seconds": 1800, "driver_slow_r2c_buffer_in_seconds": 300, "restaurant_unconfirmed_deadline_in_seconds": 900, "big_order_slow_assignment_buffer_in_seconds": 300, "driver_unconfirmed_deadline_in_seconds": 360, "big_order_slow_assignment_buffer_for_tentative_in_seconds": 300, "dasher_unresponsive_deadline_in_seconds": 900, "slow_assignment_buffer_in_seconds": 900, "reassignment_buffer_in_seconds": 240, "merchant_receive_order_deadline_in_seconds": 360, "big_order_dasher_slow_d2r_buffer_in_seconds": 1500}	[]	\N
+DRIVE_ON_TIME_STORE_ARRIVAL_EXTRA_PAY_RECEIVED_MESSAGE	{dollar_amount} extra pay earned by arriving at {store_name} on time	[]	\N
+EXPERIMENTS_WITH_USER_OVERRIDES_USE_CACHE	false	[]	\N
+ALMOST_LATE_AT_STORE_CUSTOMER_NOTIFICATION	true	[]	\N
+INCLUDE_POPULAR_MENU_CATEGORY	false	[]	\N
+REFERRAL_FRAUD_BLOCKER_LIVE	true	[]	\N
+MAX_UNASSIGN_VALID_PLATFORMS	["ios"]	[]	\N
+COMPOSITE_SCORE_STORE_IDS	[]	[]	\N
+DEFAULT_MIN_REFERREE_ORDER_SUBTOTAL_IN_CENTS	2000	[]	\N
+DAILY_TRANSFER_BUSINESS_IDS	[47543]	[]	\N
+USE_FANCY_SYNCHRONOUS_ASSIGNMENT	true	[]	\N
+REDESIGN_SPLASH_VARIANTS	["NEW_FM1_ONLY_V2"]	[]	\N
+DISPATCH_SOS_PRICE_DASH_NOW_SWITCH	false	[]	\N
+AUTO_ORDER_PLACER_PARAMETERS	{}	[]	\N
+RESTAURANT_LIST_COUNT_EXACT	false	[]	\N
+FAX_ENABLED	true	[]	\N
+SUBMARKETS_NOT_ON_DISPATCH_V1	[]	[]	\N
+DISCOVERY_DEFAULT_DAYS_IN_NEWLY_ADDED	14	[]	\N
+ALLOW_INTERNAL_ALGO	false	[]	\N
+EXPERIMENTS_WITH_USER_OVERRIDES	["test_overrides"]	[]	\N
+SUPER_USER_ONLY_VARIABLES	[]	[]	\N
+ENABLE_SIFT_SCORING_IN_ALL_MARKETS	false	[]	\N
+STARTING_POINTS_NOT_ON_AUTO_CAPACITY_PLANNING_PUBLISHING	[]	[]	\N
+GEOHASH_PRECISION	6	[]	\N
+USE_GEOHASH	true	[]	\N
+DRIVE_ADJUST_EARLY_PICKUP_BUSINESS_IDS	[]	[]	\N
+ENFORCE_PAY_CAMPAIGN_VALIDATION	true	[]	\N
+DRIVE_TREAT_SMALL_ORDER_AS_MARKETPLACE_THRESHOLD_CENTS	5000	[]	\N
+MARQETA_VALID_IPS	["23.253.9.28", "23.253.9.30", "23.253.9.29", "23.253.9.31"]	[]	\N
+R2C_DRIVE_PADDING_SECONDS	1200	[]	\N
+EXTRA_CART_ORDER_FEE	0	[]	\N
+MERCHANT_EMAIL_CUSTOM_CLIENT	true	[]	\N
+KILLSWITCH_NOTIFICATION_SETTINGS	{"trigger_duration_in_seconds": 300, "starting_point_flf_notification_thresholds": {"1": 1.5}}	[]	\N
+DRIVE_PREFERRED_DASHER_STORE_NOTIFICATION	{"message": "{store_name} has submitted a new Drive order! You are a preferred dasher at this store, so you have early access to this order for the next {num_minutes} minutes."}	[]	\N
+PRICING_EXPERIMENT_OVERRIDE_SUBMARKETS	[]	[]	\N
+SMS_ENFORCE_BLOCK_FOR_OPT_OUTS	true	[]	\N
+DRIVE_ON_TIME_STORE_ARRIVAL_EXTRA_PAY_AVAILABLE_MESSAGE	Your Drive order this dash qualifies for ${dollar_amount} timeliness extra pay! Arrive at {store_name} before {pickup_time} to earn the extra pay. Extra pay will show up in earnings after your dash.	[]	\N
+SHIFT_CHECK_OUT_FIX_CORRUPT_ROUTE	true	[]	\N
+EMAIL_ORDER_CONFIRMATION_ITERABLE_PERCENT	100.0	[]	\N
+AMM_FLF_SMOOTHING_PARAMS	{}	[]	\N
+SUPPORT_SALESFORCE_ROLLOUT_RATE	0	[]	\N
+ROBOCALL_PARAMETERS	{"initial_delay_for_email_in_seconds": 60, "long_delay": 300, "default_initial_delay_in_seconds": 60, "max_retries": 3, "initial_delay_for_fax_in_seconds": 60, "repeat_interval_in_seconds": 100, "initial_delay_for_ipad_in_seconds": 300}	[]	\N
+DEFAULT_STARTING_POINT_ID	82	[]	\N
+ES_SEARCH_MAX_LIMIT	600	[]	\N
+EARLIEST_TIME_WINDOW_FOR_DRIVE	20	[]	\N
+PICKUP_DROPOFF_MAX_GAP_IN_SEC	1800	[]	\N
+MERCHANT_ACCOUNTABILITY_EXEMPTION_LIST	[]	[]	\N
+TOO_FAR_FROM_STORE_DASHER_ALERT_THRESHOLD_PARAMETERS	{"warning": {"distance": 3000, "time": 20}, "unassign": {"distance": 2000, "time": 30}}	[]	\N
+SHIFT_DELIVERY_LIST_API_USE_REPLICA	true	[]	\N
+CREATE_ZENDESK_TICKET	["drive_tip_verification_escalation"]	[]	\N
+WHOLE_FOODS_DASHER_SETTINGS	{}	[]	\N
+SCHEDULED_DOWNTIME_INTERVAL	{}	[]	\N
+PREASSIGN_MIN_HOURS_IN_ADVANCE	{"hours": 1}	[]	\N
+CHECKOUT_REFUND_DUPLICATE_CHARGES	true	[]	\N
+PROACTIVE_SUPPORT_BLACKLIST_STORES	[58354]	[]	\N
+USE_ES_FOR_EARLY_ASSIGN_DELIVERIES	false	[]	\N
+HOTSPOT_CALCULATION_ENABLED	true	[]	\N
+SOS_PRICE_FLF_THRESHOLD_EDIT_GROUP	[]	[]	\N
+LATEST_TIME_WINDOW_FOR_DRIVE	10	[]	\N
+EARLY_ASSIGN_REMINDER_TEXT	hello	[]	\N
+PAY_CAMPAIGN_MAX_MIN_CENTS	3500	[]	\N
+GLOBAL_SUBMISSION_KILLSWITCH	false	[]	\N
+MERCHANT_EMAIL_PROVIDER	sendgrid	[]	\N
+DISPATCH_SOS_PRICE_CURVE_BASED_SUBMARKET_PARAMS	{}	[]	\N
+PROMO_REMINDERS_CONFIG	[{"promo_code": "promo", "days_remaining": [{"message": "Get $4 off", "days": 3}, {"message": "just 1 day left", "days": 1}]}, {"promo_code": "ONEPIECE", "days_remaining": [{"message": "Get $4 off", "days": 3}, {"message": "just 1 day left", "days": 1}]}]	[]	\N
+KILLED_ORDER_PROTOCOLS	[]	[]	\N
+DRIVE_ADDRESS_TABLE_MAPPING_BUSINESS_IDS	["all"]	[]	\N
+RUNNING_BATCHING_TEST	false	[]	\N
+APPLE_PAY_PROMO_NEW_USER_ONLY	true	[]	\N
+DASHER_TO_AVAILABLE_PREASSIGNS_RATIO	3	[]	\N
+MARQETA_USER_ID	2410229	[]	\N
+SHOULD_LOG_BATCH_DATA	true	[]	\N
+SHOULD_LOG_INTERLACED_BATCH_DATA_ONLY	true	[]	\N
+ANDROID_PAY_PROMO	ANDROID_PAY	[]	\N
+PHONE_MASKING_BLACKLISTED_MERCHANTS	[]	[]	\N
+DELIVERY_URGENT_CUTOFF_IN_SECONDS	600	[]	\N
+POINT_OF_SALE_MENU_INGESTION_STORE_ID_WHITELIST	[1]	[]	\N
+LOCATION_SMOOTHING_PARAMS	{}	[]	\N
+DISPATCH_SOS_PRICE_SWITCH_BACK_TEST_SUBMARKETS	[]	[]	\N
+DISPATCH_SOS_PRICE_CURVE_BASED_SOS_PRICE_PARAMS	{}	[]	\N
+MIN_GPV_FOR_REFERRAL_IN_CENTS	5000	[]	\N
+CREDIT_REFUND_POLICY	{"special_instr_ignored_food_style_preferences": {"comp_type": "none", "allow_redelivery": false}, "special_instr_severe_allergies": {"comp_type": "item_cost_times_quantity", "allow_redelivery": true}, "item_extras_incorrect_option": {"comp_type": "extra_cost_times_quantity", "allow_redelivery": true, "comp_param_default": 500}, "missing_side_item": {"comp_type": "max_item_cost_default", "allow_redelivery": true, "comp_param_default": 500}, "delivery_never_made": {"comp_type": "full_order_total", "allow_redelivery": true}, "additional_credit": {"comp_type": "free_form", "allow_redelivery": false, "comp_param_default": 500}, "missing_main_item": {"comp_type": "item_cost_times_quantity", "allow_redelivery": true}, "item_extras_missing_option": {"comp_type": "extra_cost_times_quantity", "allow_redelivery": true, "comp_param_default": 500}, "incorrect_main_item": {"comp_type": "item_cost_times_quantity", "allow_redelivery": true}, "special_instr_minor_allergies": {"comp_type": "fixed", "allow_redelivery": true, "comp_param_default": 500}, "poor_quality": {"comp_type": "max_item_cost_default", "allow_redelivery": true, "comp_param_default": 500}, "other": {"comp_type": "free_form", "allow_redelivery": true, "comp_param_default": 500}, "item_extras_poor_quality": {"comp_type": "extra_cost_times_quantity", "allow_redelivery": true, "comp_param_default": 500}, "special_instr_missing_requested_ingredients": {"comp_type": "none", "allow_redelivery": false}, "too_late_or_too_early": {"comp_type": "percent_order_round_up", "intervals": [{"comp_param": 0.25, "boundary": -30, "minimum_resolution": 500, "allow_redelivery": false}, {"comp_param": 0.15, "boundary": -15, "minimum_resolution": 0, "allow_redelivery": false}, {"comp_param": 0, "boundary": 0, "minimum_resolution": 0, "allow_redelivery": false}, {"comp_param": 0, "boundary": 15, "minimum_resolution": 0, "allow_redelivery": false}, {"comp_param": 0.15, "boundary": 30, "minimum_resolution": 500, "allow_redelivery": false}, {"comp_param": 0.25, "boundary": 45, "minimum_resolution": 1000, "allow_redelivery": false}, {"comp_param": 0.8, "boundary": 60, "minimum_resolution": 1000, "allow_redelivery": false}, {"comp_param": 1, "boundary": 90, "minimum_resolution": 1000, "allow_redelivery": true}, {"comp_param": 1.2, "boundary": "infinity", "minimum_resolution": 1000, "allow_redelivery": true}], "round_to_nearest": 500}, "special_instr_did_not_remove_ingredients": {"comp_type": "none", "allow_redelivery": false}, "dasher_unprofessional": {"comp_type": "fixed", "allow_redelivery": false, "comp_param_default": 500}, "incorrect_side_item": {"comp_type": "max_item_cost_default", "allow_redelivery": true, "comp_param_default": 500}}	[]	\N
+NATIONAL_BUSINESSES_WITH_LOCKED_MENUS	[]	[]	\N
+BEVMO_VALID_SKUS	["1", "2", "3"]	[]	\N
+STORE_LEVEL_PAY_EXPERIMENT_STORE_IDS	[]	[]	\N
+IGNORE_SEARCH_FILTERS	false	[]	\N
+SCS_FOR_MASS_SMS	false	[]	\N
+EXPERIMENTAL_BATCHING_ROUTING_CONSTANTS	{"DROPOFF_DEADLINE_PADDING_IN_SEC": 300, "PICKUP_DEADLINE_OFFSET_IN_SEC": 600, "PICKUP_DROPOFF_MAX_GAP_IN_SEC": 1800, "ROUTE_POINT_TIME_PADDING_IN_SEC": 360}	[]	\N
+EXPERIMENTS_WITH_USER_OVERRIDES_CACHE	["test_overrides"]	[]	\N
+KAFKA_ENABLED	true	[]	\N
+MARQETA_KILLSWITCH	false	[]	\N
+IMMOBILE_DASHER_ALERT_MESSAGES_PARAMETERS	{"second": "Please make sure that you're completing the order, or it will be reassigned soon.", "third": "An order was reassigned after 25 minutes of inactivity", "first": "You don't appear to be heading towards the order. Do you need help?"}	[]	\N
+ACCEPT_KAFKA_STORE_ASAP_UPDATES	true	[]	\N
+REFERRAL_BONUS_IN_CENTS	500	[]	\N
+RATING_EMAIL_PROMPT_DELAY_IN_MINUTES	300	[]	\N
+DISPATCH_SOS_PRICE_RANDOMIZED_SOS_PRICE_SUBMARKETS	[]	[]	\N
+SKIP_DRIVER_SCREEN	true	[]	\N
+MAX_UNASSIGN_FORCE_EXPERIMENT_DASHER_IDS	[]	[]	\N
+EVENT_CATEGORIES_TO_CAPTURE_DROPOFF_TIME	[]	[]	\N
+ENABLE_DAILY_TRANSFERS	true	[]	\N
+DRIVE_PARTNERSHIPS_ALLOW_DJANGO_FALLBACK_STORE_IDS	[]	[]	\N
+DEBUG_CURRENT_ROUTE	false	[]	\N
+PUSHER_ENABLED	true	[]	\N
+LARGE_DELIVERY_DOUBLE_DRIVER_PAY	true	[]	\N
+DEFAULT_REFERREE_BONUS_IN_CENTS	500	[]	\N
+ENABLE_APPLE_PAY_PROMO_SEP_IOS	true	[]	\N
+SCS_FAILURE_HANDLING_ENABLED	true	[]	\N
+FEATURE_ONLY_IF_REDEEMABLE_PROMOS	["special_promo"]	[]	\N
+CAP_SCHEDULED_BOOST	{}	[]	\N
+BLACKLIST_EMAIL_DOMAINS	["sharklasers.com"]	[]	\N
+CONSUMER_ES_BACKUP_PERCENTAGE	0.0	[]	\N
+MAXIMUM_ITEM_PRICE_CENTS_FOR_ADD_ONS	1000	[]	\N
+FEATURED_FEED_THREAD_TIMEOUT	0.05	[]	\N
+DRIVE_PREASSIGNED_THRESHOLD_HOURS	1	[]	\N
+EXPERIMENT_LOG_CACHE_SETTING		[]	\N
+MANDRILL_ORDER_RECEIPT	true	[]	\N
+DEFAULT_DASHER_HOURLY_RATE	2000	[]	\N
+ROUTE_POINT_TIME_PADDING_IN_SEC	360	[]	\N
+CONSUMER_ES_BACKUP_WRITE_ENABLED	false	[]	\N
+PLACE_ACTIONS_EXCLUDE_STORES	{"store_ids": [1], "business_ids": [2]}	[]	\N
+ETA_QUOTED_TIME_PARAMS	{}	[]	\N
+NEW_USER_SPLASH_VARIANTS_FALLBACK	control	[]	\N
+RATING_PROMPT_DELAY_IN_MINUTES	20	[]	\N
+BUSINESS_ACTIVATION_NOTIFICATIONS	{"123": ["test"]}	[]	\N
+DISPATCH_SOS_PRICE_DEFAULT_PARAMS	{}	[]	\N
+BEVMO_LOCATION_ID_TO_STORE_ID_MAP	{"1": 22827, "3": 76262, "7": 32034, "6": 32035}	[]	\N
+DRIVE_ON_TIME_RATE_DEACTIVATION_THRESHOLD	0.9	[]	\N
+DRIVE_USE_NEW_AGGREGATOR_MODEL_USER_IDS	[]	[]	\N
+DASHER_PAY_CAMPAIGNS_ENABLED	true	[]	\N
+MERCHANT_ACCOUNTABILITY_SUBMARKETS	[6]	[]	\N
+ANDROID_PAY_PROMO_NEW_USER_ONLY	true	[]	\N
+DASHER_PLACE_CUSTOMER_NOTIFICATION	false	[]	\N
+DRIVE_AUTO_STORE_ONBOARDING_BUSINESS_IDS	["all"]	[]	\N
+MARQETA_DRIVER_WHITELIST	[]	[]	\N
+OFFLINE_DRIVE_R2C_PREDICTOR_PARAMETERS	{"padding_seconds": 300}	[]	\N
+SMS_OPT_OUT_ENABLED	true	[]	\N
+MAX_ESTIMATED_ASSIGNMENT_LATENCY	45	[]	\N
+ENABLE_DELIVERY_FEE_DISCOUNT	true	[]	\N
+STORE_LEVEL_DELIVERY_RADIUS_ENABLED	true	[]	\N
+MISSPELLING_SUGGESTIONS_ENABLED	true	[]	\N
+NEW_USER_SPLASH_VARIANTS	["NEW_FM1_ONLY_V2", "FDF_ONLY", "FM1_ONLY_V2"]	[]	\N
+USE_NEW_MOBILE_EXPERIMENTS	{}	[]	\N
+EARLY_ASSIGN_UNASSIGN_PADDING_IN_MINUTES	25	[]	\N
+CATERING_MENU_IDS_ON_PREASSIGN	[]	[]	\N
+DRIVER_INCIDENT_CATEGORIES	[["poor_communication", "Poor Communication"], ["hostile_attitude", "Hostile Attitude"], ["pex_abuse", "PEX Abuse"], ["minimum_abuse", "Minimum Abuse"], ["sloppy_delivery", "Sloppy Delivery"]]	[]	\N
+ENABLE_INNER_HITS_ITEM_SEARCH	true	[]	\N
+FORCE_ORDER_READY_STORES	[]	[]	\N
+ORDER_PLACER_DELAY_ENABLED	true	[]	\N
+LIMIT_PAUSE_VALID_PLATFORMS	["ios"]	[]	\N
+DELIVERY_SHIFT_ASSIGNMENT_RACE_CONDITION_PROTECTION	false	[]	\N
+DISCOVERY_RECENT_ORDER_INCLUDE_AMOUNT	3	[]	\N
+STORE_EXTRA_ASAP_PADS	{}	[]	\N
+FIRST_DELIVERY_FEE_ENABLED	true	[]	\N
+PHONE_MASKING_WHITELISTED_MARKETS	[]	[]	\N
+DASHER_RATINGS_CUSTOMER_RATING_THRESHOLDS	{"default": [5.0, 4.7, 4.5, 4.3]}	[]	\N
+ENABLE_EXPERIMENTAL_ESCALATIONS	true	[]	\N
+MIN_ORDER_SUBTOTAL	0	[]	\N
+DRIVE_STORE_ONBOARDING_V2_WHITELIST	[]	[]	\N
+FIRST_DELIVERY_FEE	100	[]	\N
+PREASSIGN_PREFERRED_DASHER_PADDING_IN_MINUTES	15	[]	\N
+ALMOST_LATE_BEFORE_STORE_ARRIVAL_CUSTOMER_NOTIFICATION	true	[]	\N
+DISPATCH_SOS_PRICE_GLOBAL_SWITCH	false	[]	\N
+SLACK_CONTACTS_PER_MARKET	{"MSP": "@humanA @humanB", "BAY": "@rohan @abdul"}	[]	\N
+ADD_ITEM_BIKE_FRIENDLY_ASYNC	true	[]	\N
+MAX_ASAP_TIME	90	[]	\N
+OFFLINE_DRIVERS_MONITOR_IS_ON	true	[]	\N
+PAUSE_DASHERS_AFTER_UNASSIGN	false	[]	\N
+ALGO_HEURISTIC_PARAMS	{"biker_bonus": -8046.7, "suggested_shift_bonus": -1609340, "from_dropoff_fraction": 0.75, "sp_width_fraction": 0.1, "avg_seconds_per_meter": 0.0895}	[]	\N
+ALLOW_CROSS_REGION_EMAILS	[]	[]	\N
+ENABLE_ORIGINAL_DEVICE_IDS_EXP	true	[]	\N
+PREFERRED_PARTNER_DISCOUNT_IN_CENTS	100	[]	\N
+DRIVE_ON_TIME_RATE_QUALITY_LOWER_BOUNDS	[0, 0.7, 0.9, 1]	[]	\N
+DD_DRIVE_BAY_SUBMARKETS	["Peninsula", "East Bay", "San Francisco", "South Bay"]	[]	\N
+UNCONFIRMED_MERCHANT_TABLET_DELIVERY_ALERT_THRESHOLD	10	[]	\N
+PROBABILITY_GIFT_CODE	0.5	[]	\N
+DRIVE_SMALL_FULFILLMENT_ORDER_STORE_ID_LIST	[]	[]	\N
+COMPOSITE_SCORE_COMPONENT_WEIGHTS	{"rating_score": 0.4, "popularity_score": 0.4, "partner_score": 0.0, "inflation_score": 0.0, "retention_score": 0.2}	[]	\N
+DRIVE_ON_TIME_RATE_QUALITY_LABELS	["low", "medium", "high", "perfect"]	[]	\N
+DRIVER_PRO_TIPS_FAQS	[{"answer": "Dasher Pro Tips is cool", "question": "What is Dasher Pro Tips?"}]	[]	\N
+DELIGHTED_EMAIL_SURVEY_PERCENT	100	[]	\N
+LARGE_MP_ORDER_ON_DRIVE_SUBMARKETS	[]	[]	\N
+ADVERTISE_ALCOHOL_HOURS	[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]	[]	\N
+PICKUP_DEADLINE_OFFSET_IN_SEC	600	[]	\N
+EARLY_ASSIGN_REMINDER_MESSAGE	Check in now to avoid losing your order	[]	\N
+MX_TABLET_ALERT_SLACK_HOOK	https://hooks.slack.com/services/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	[]	\N
+ENABLE_SMS_HELP_MESSAGE	true	[]	\N
+UPDATE_BIKE_FRIENDLY_CHECKOUT	true	[]	\N
+STRIPE_NOTIFICATION_EMAILS	[]	[]	\N
+PREFER_SAME_RESTAURANT_BATCHING	true	[]	\N
+CUSTOMER_UNAVAILABLE_DASHER_TEXTS	{"leave_customer": "Give the customer a final call, and if they don't answer, hit \\"delivered\\", leave the food in your hot bag, and continue your dash!", "wait_for_customer": "We just let the customer know that you've arrived. Give the customer another call and text, and hang tight for 10 minutes!"}	[]	\N
+DRIVE_ON_TIME_STORE_ARRIVAL_EXTRA_PAY_IN_CENTS	200	[]	\N
+DRIVER_MONITOR_PARAMETERS	{"unresponsive_driver_warning_in_seconds": 30, "unresponsive_driver_unassignment_message": "You didn't confirm this assignment in time. We've removed it from your app and reassigned it to another dasher. You will not be sent another order until you click 'Resume Dash' in your app.", "no_receipt_deadline_in_seconds": 120, "driver_unconfirmed_warning_message": "You have a new order! Please press 'Got it' or the order will be removed from your app.", "no_receipt_unassignment_message": "We tried to assign you a new order, but it didn't successfully reach your app. We've removed it from your app so another dasher can take it. Check your internet connectivity, restart your app, and then let us know when you're ready to go!", "exp_no_receipt_deadline_in_seconds": 120, "ma_evaluation_period_minutes": 240, "put_batched_drivers_on_ma": true, "unresponsive_driver_deadline_in_seconds": 180, "exp_unresponsive_driver_deadline_in_seconds": 40, "ma_seconds_allowed_per_dash": 900}	[]	\N
+DROPOFF_DEADLINE_PADDING_IN_SEC	-900	[]	\N
+ENABLED_MENU_CATEGORIES_FOR_MENU_FILTERING	[]	[]	\N
+PREVENTED_THRIFT_EVENTS	[]	[]	\N
+ROBOCALL_ALL_RESTAURANTS	true	[]	\N
+ORDER_PLACER_DELAY_SETTINGS	{"us": 180}	[]	\N
+SERVICE_FEE_EXP_SUBMARKET_CONFIG	{}	[]	\N
+UNCONFIRMED_DELIVERIES_MONITOR_IS_ON	true	[]	\N
+SCS_FOR_MASS_SMS_WHITELIST	[]	[]	\N
+MAXIMUM_ALCOHOL_ITEM_PRICE_CENTS_FOR_ADD_ONS	2000	[]	\N
+ES_TIME_OUT	5s	[]	\N
+DELIVERY_COMPLETED_CATEGORIES_TO_WEIGHTS	{"1": "0.6", "3": "0.045", "2": "0.35", "4": "0.005"}	[]	\N
+REFERRAL_INELIGIBLE_REFERER_URIS	[]	[]	\N
+MAX_UNCLAIMED_DELIVERIES_FOR_DELAY	150	[]	\N
+DISABLE_NIMDA_ELASTICSEARCH	false	[]	\N
+DISTRICT_FIRST_DELIVERY_FEE_CONFIG	{"treatment_99": 99, "treatment_199": 199}	[]	\N
+ENABLE_DELIVERY_TEXTING_EVENTS	true	[]	\N
+PRICING_EXP_SUBMARKET_CONFIG	{}	[]	\N
+SHOW_SCHEDULED_TIME_RANGE	false	[]	\N
+SUPPORT_SALESFORCE_CASE_FIELDS	[]	[]	\N
+MASS_TEXT_RATE_LIMIT_ON	false	[]	\N
+PAY_CAMPAIGN_MAX_DELIVERY_PAY_CENTS	2000	[]	\N
+ENABLE_AUTO_HANDLE_OP_ESCALS	true	[]	\N
+SEND_PICKUP_STATUS_INQUIRY	true	[]	\N
+FIRST_TIME_DELIVERY_ASSIGNMENT_PRIORITY_IN_MIN	11	[]	\N
+USE_PUBLIC_ADDRESS_FIX	true	[]	\N
+STORE_LEVEL_PAY_EXPERIMENT_EXTRA_PAY_AMOUNT	200	[]	\N
+HOTSPOT_CLUSTERING_PARAMS	{"neighborhood_distance_in_metres": 800, "min_points_per_density_cluster": 2}	[]	\N
+END_STATE_PRICING_SUBMARKET_CONFIG	{}	[]	\N
+MIN_DOORDASH_DELIVERY_CONTRIBUTION_CENTS	100	[]	\N
+MARKETS_WITH_HIGH_FRAUD_RATES	[]	[]	\N
+EXTERNAL_PROMOTION_CONFIG	{"DDFBPROMO": {"new_user_only": false, "utm_campaign": "facebook-promo", "referer": "facebook"}}	[]	\N
+MARQETA_DEBUG_EMAILS	[]	[]	\N
+STARTING_POINTS_NOT_ON_AUTO_CAPACITY_PLANNING	[]	[]	\N
+AUTO_REFUND_ENABLED	true	[]	\N
+USE_GEOHASH_DISTRICT	true	[]	\N
+RESTAURANT_LIST_USE_ES	true	[]	\N
+HOURS_OPEN	[[{"minute": 30, "hour": 11}, {"minute": 0, "hour": 14}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}], [{"minute": 30, "hour": 11}, {"minute": 0, "hour": 14}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}], [{"minute": 30, "hour": 11}, {"minute": 0, "hour": 14}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}], [{"minute": 30, "hour": 11}, {"minute": 0, "hour": 14}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}], [{"minute": 30, "hour": 11}, {"minute": 0, "hour": 14}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}], [{"minute": 30, "hour": 11}, {"minute": 0, "hour": 15}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}], [{"minute": 30, "hour": 11}, {"minute": 0, "hour": 15}, {"minute": 0, "hour": 17}, {"minute": 0, "hour": 22}]]	[]	\N
+DISPATCH_SOS_PRICE_SP_PARAMS	{}	[]	\N
+PRICING_TRANSPARENCY_ENABLED	false	[]	\N
+NATIONAL_MENU_EDITOR_LIST_USER_IDS	[]	[]	\N
+MISSION_CONTROL_TRAVEL_ESTIMATE_PADDING_SECONDS	600	[]	\N
+ALLOW_TEXT_NOTIFICATIONS	true	[]	\N
+BLACKLIST_BIKE_FRIENDLY_ITEMS	[]	[]	\N
+DASHER_RATINGS_COMPLETION_RATE_THRESHOLDS	{"default": [1.0, 0.95, 0.9, 0.85]}	[]	\N
+DISPATCH_SOS_PRICE_RANDOMIZED_SOS_PRICE_SWITCH	false	[]	\N
+UPCOMING_DDDRIVE_SHIFT_REMINDER	You're scheduled to be at {store_name}, in {city_name} at {pick_up_time}. Remember you need to check into your shift by {check_in_time} to avoid losing the delivery.	[]	\N
+DASHER_PAY_CAMPAIGNS_ENABLED_FOR_DELIVERY	true	[]	\N
+NUM_UNASSIGNED_TOO_LONG_THRESHOLD	10	[]	\N
+STARTING_POINTS_NOT_ON_AMM	[]	[]	\N
+MARQETA_MIN_PURCHASE_PADDING_IN_CENTS	2000	[]	\N
+POPULARITY_FILTER_THRESHOLD_PERCENTILE	0.5	[]	\N
+CREATE_ISSUE_FOR_EVENTS	[]	[]	\N
+DASH_HALF_PAY_ENABLED	true	[]	\N
+RESTAURANT_LIST_R2C_IN_MINS	15	[]	\N
+COMMISSION_TAX_IS_ON	true	[]	\N
+FAXER_PRIORITY	["PHAXIO", "INTERFAX"]	[]	\N
+AMM_SP_NOT_ON_REGULARIZED_FLF_LIST	[]	[]	\N
+DD_2_0_COMPATIBLE_BROWSERS	{"firefox": "36", "chrome mobile": "35", "safari": "8.0", "android browser": "3", "silk": "47", "ie": "10.0", "opera": "34", "mobile safari": "7.0", "chrome": "35", "edge": "11", "chrome mobile ios": "35"}	[]	\N
+CHECK_STARTING_POINTS_HEALTH	true	[]	\N
+MAX_DOORDASH_DYNAMIC_MIN_PAY_CENTS	5000	[]	\N
+PREASSIGN_MAX_HOURS_IN_ADVANCE	{"hours": 24}	[]	\N
+DASHER_PLACE_TEXT_TEMPLATES	{"default": "Please place the order at {restaurant} in person! It's the quickest way to get the food made. Thanks!", "being_placed": "The order at {restaurant} is being placed right now. Please hang tight and don't place the order yourself", "from_dispatch": "We're having trouble placing the order at {restaurant}, please place it in person. Thanks!", "unplaced": "Unfortunately, we didn't get a chance to place the order at {restaurant}. Please place it in person. Thanks!"}	[]	\N
+DRIVE_ACCOUNT_LEVEL_PARTNERSHIP_FALLBACK_BUSINESS_IDS	["all"]	[]	\N
+ESCALATION_NEW_DAY_HOURS_CUT	12	[]	\N
+FACEBOOK_PROMO_SKIP_REMOVE_JOB	false	[]	\N
+AMM_SP_FLF_THRESHOLDS	{"1": {"dangerous_threshold": 2.5, "critical_threshold": 2.7, "warning_threshold": 2.2}}	[]	\N
+LIMIT_PAUSE_FORCE_EXPERIMENT_DASHER_IDS	[]	[]	\N
+CACHE_RESTAURANTS_LEGACY	false	[]	\N
+INGEST_MODEL_CHANGE_THROTTLE	100	[]	\N
+OLO_ORDERS_ORDER_VALUE_MIN_THRESHOLD	{}	[]	\N
+USE_FAST_DELIVERY_SERIALIZER	true	[]	\N
+SLACK_CHANNEL_PER_MARKET	{"BAY": "https://hooks.slack.com/services/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"}	[]	\N
+STORE_CLOSED_EXEMPT_BUSINESS_IDS	[]	[]	\N
+FEATURED_FEED_ENABLED	true	[]	\N
+AUTO_CLOSE_STORE	true	[]	\N
+ALGO_ASSIGNMENT_EMAILS	["test@doordash.com"]	[]	\N
+MIN_DELIVERIES_FOR_RATING_THRESHOLD	2	[]	\N
+STARTING_POINT_HEALTH_THRESHOLDS	{"1": {"Critical Threshold": 20, "Dangerous Threshold": 15, "Warning Threshold": 10}, "default": {"Critical Threshold": 5, "Dangerous Threshold": 4, "Warning Threshold": 3}}	[]	\N
+DISABLE_CUSTOMER_SUPPORT_ELASTICSEARCH	false	[]	\N
+AUTO_REFUND_THRESHOLD_IN_MINUTES	30	[]	\N
+CHECK_DASHER_SHIFT_PROXIMITY_THROTTLE_SECONDS	60	[]	\N
+CONSUMER_REVIEW_BANNED_WORD_LIST	["smegma", "bugger", "jizz", "sh1t", "pussy", "biatch", "dildo", "labia", "bloody", "twat", "bollock", "butt", "homo", "bitch", "prick", "hell", "boner", "dyke", "shit", "buttplug", "felching", "bastard", "crap", "pube", "tit", "fellate", "dick", "muff", "fag", "scrotum", "bollok", "queer", "damn", "fudge packer", "wank", "boob", "vagina", "wtf", "piss", "ass", "anus", "nigger", "fellatio", "jerk", "lmfao", "clitoris", "poop", "flange", "slut", "fuck", "fucked", "blowjob", "nigga", "tosser", "bum", "penis", "omg", "sex", "knobend", "coon", "cunt", "lmao", "fudgepacker", "arse", "balls", "blow job", "s hit", "goddamn", "ballsack", "spunk", "feck", "whore", "anal", "turd", "cock", "driver", "miss", "dasher", "cold", "late", "wrong", "idiot", "forgot", "incorrect", "never", "arrive", "arrived", "deliver", "refund", "receive", "uber", "postmates", "caviar"]	[]	\N
+MAX_CURATED_CATEGORY_BANNER_SIZE_BYTES	500000	[]	\N
+ENABLE_REFACTORED_DISCOUNTS_CODE	["first_delivery", "subscriptions", "promotions"]	[]	\N
+MARQETA_USE_WHITELIST	false	[]	\N
+IMMOBILE_DASHER_ALERT_THRESHOLD_PARAMETERS	{"second": {"distance": 100, "time": 15}, "third": {"distance": 100, "time": 25}, "first": {"distance": 20, "time": 5}}	[]	\N
+MARQETA_PERCENT_OF_COST_PADDING	0.2	[]	\N
+RATING_TIPS	{"reassignment": {"reinforcement_text": "Be sure to check your app often for assignments. If you don't confirm, we have to give it to another Dasher.", "improvement_text": "When you don't confirm a delivery fast enough, we have to reassign it. Be sure to check your app often for assignments."}, "missing_items": {"reinforcement_text": "We noticed that you forgot some items recently. Remember to make sure you have everything in the order.", "improvement_text": "Customers have reported several instances of missing or incorrect items. Be sure to double check for all items, and confirm with merchant staff if necessary."}, "no_show": {"reinforcement_text": "We noticed a few no-shows. If you can't Dash, remember to delete the Dash from your schedule.", "improvement_text": "Uh oh, you have too many no-shows! This may affect your ability to schedule Dashes in the future."}, "avg_star_rating": {"reinforcement_text": "Customers rate your deliveries slightly below average.", "improvement_text": "Customers rate your deliveries below average."}, "flagged_unprofessional": {"reinforcement_text": "Remember to always be courteous and respectful to customers.", "improvement_text": "Several customers have flagged you as 'unprofessional'."}, "r2c": {"reinforcement_text": "Remember to double check for special driving instructions", "improvement_text": "If you're having trouble finding your destination, remember to text in to driver support."}, "untimeliness": {"reinforcement_text": "Try to check-in within 10 minutes of the start of your Dash", "improvement_text": "It looks like you've been checking in later then usual."}, "confirm_speed": {"reinforcement_text": "Check your phone often for new assignments.", "improvement_text": "Check your phone often for new assignments."}}	[]	\N
+SCS_FOR_ALL_SMS	0	[]	\N
+STRIPE_COMMANDO_MODE	false	[]	\N
+SUPPORT_SALESFORCE_TASK	false	[]	\N
+OLO_ORDERS_ORDER_VALUE_MAX_THRESHOLD	{}	[]	\N
+LARGE_MARKETPLACE_ON_DRIVE_MIN_SUBTOTAL	15000	[]	\N
+STARTING_POINT_DAILY_EFFICIENCIES	{"1": 1.2, "default": 1.1}	[]	\N
+FREE_DELIVERY_EMAILS	[]	[]	\N
+DASHER_RATINTS_ACCEPTANCE_RATE_THRESHOLDS	{"default": [1.0, 0.8, 0.5, 0.25]}	[]	\N
+DISASTER_DELIVERY_ASSIGNMENT_MARKET_PAY_CONFIG	{}	[]	\N
+DASHER_TOS_BLACKLISTED_IDS	[]	[]	\N
+USE_OLO_ADDRESS_FIX	true	[]	\N
+TOO_FAR_FROM_STORE_DASHER_ALERT_MESSAGES_PARAMETERS	{"warning": "You don't appear to be heading towards the store. It will be reassigned soon.", "unassign": "An order was reassigned since you did not appear to be heading towards the store."}	[]	\N
+EARLY_ASSIGN_REMINDER_TIME_IN_MINUTES	45	[]	\N
+DRIVE_PREASSIGN_SHOW_MARKET_IDS	[1]	[]	\N
+MERCHANT_ACCOUNTABILITY_EXP_STORES	[2320]	[]	\N
+\.
+
+
+--
+-- Data for Name: grab_pay_account; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY grab_pay_account (id, created_at, status, bind_token, additional_data, idempotency_key, grab_pay_transaction_id, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: grab_pay_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('grab_pay_account_id_seq', 1, false);
+
+
+--
+-- Data for Name: grab_pay_charge; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY grab_pay_charge (id, created_at, currency, status, amount, amount_refunded, description, error_reason, additional_data, idempotency_key, grab_pay_transaction_id, charge_id, grab_pay_account_id) FROM stdin;
+\.
+
+
+--
+-- Name: grab_pay_charge_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('grab_pay_charge_id_seq', 1, false);
+
+
+--
+-- Data for Name: grab_payment_account; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY grab_payment_account (id, created_at, safe_id, country_shortname) FROM stdin;
+\.
+
+
+--
+-- Name: grab_payment_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('grab_payment_account_id_seq', 1, false);
+
+
+--
+-- Data for Name: grab_transfer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY grab_transfer (id, created_at, grab_pay_transfer_id, grab_pay_status, grab_pay_failure_code, grab_pay_failure_message, idempotency_key, original_grab_pay_transfer_id, grab_pay_account_type, country_shortname, transfer_id) FROM stdin;
+\.
+
+
+--
+-- Name: grab_transfer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('grab_transfer_id_seq', 1, false);
+
+
+--
+-- Data for Name: guest_user_type; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY guest_user_type (id, name) FROM stdin;
+1	group_order_guest
+2	delivery_request_guest
+3	visited_site_on_web_guest
+\.
+
+
+--
+-- Name: guest_user_type_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('guest_user_type_id_seq', 3, true);
+
+
+--
+-- Data for Name: invoicing_group; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY invoicing_group (id, name, netsuite_entity_id, netsuite_market_name, netsuite_customform_id, export_external_order_reference, created_at) FROM stdin;
+\.
+
+
+--
+-- Name: invoicing_group_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('invoicing_group_id_seq', 1, false);
+
+
+--
+-- Data for Name: invoicing_group_membership; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY invoicing_group_membership (id, store_id, created_at, invoicing_group_id) FROM stdin;
+\.
+
+
+--
+-- Name: invoicing_group_membership_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('invoicing_group_membership_id_seq', 1, false);
+
+
+--
+-- Data for Name: invoicing_group_onboarding_rule; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY invoicing_group_onboarding_rule (id, entity_type, entity_id, created_at, invoicing_group_id) FROM stdin;
+\.
+
+
+--
+-- Name: invoicing_group_onboarding_rule_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('invoicing_group_onboarding_rule_id_seq', 1, false);
+
+
+--
+-- Data for Name: ios_notifications_apnservice; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY ios_notifications_apnservice (id, name, hostname, certificate, private_key, passphrase) FROM stdin;
+\.
+
+
+--
+-- Name: ios_notifications_apnservice_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('ios_notifications_apnservice_id_seq', 1, false);
+
+
+--
+-- Data for Name: ios_notifications_device; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY ios_notifications_device (id, token, is_active, deactivated_at, added_at, last_notified_at, platform, display, os_version, service_id) FROM stdin;
+\.
+
+
+--
+-- Name: ios_notifications_device_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('ios_notifications_device_id_seq', 1, false);
+
+
+--
+-- Data for Name: ios_notifications_device_users; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY ios_notifications_device_users (id, device_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: ios_notifications_device_users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('ios_notifications_device_users_id_seq', 1, false);
+
+
+--
+-- Data for Name: ios_notifications_feedbackservice; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY ios_notifications_feedbackservice (id, name, hostname, apn_service_id) FROM stdin;
+\.
+
+
+--
+-- Name: ios_notifications_feedbackservice_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('ios_notifications_feedbackservice_id_seq', 1, false);
+
+
+--
+-- Data for Name: ios_notifications_notification; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY ios_notifications_notification (id, message, badge, sound, created_at, last_sent_at, custom_payload, service_id, silent, loc_payload) FROM stdin;
+\.
+
+
+--
+-- Name: ios_notifications_notification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('ios_notifications_notification_id_seq', 1, false);
+
+
+--
+-- Data for Name: kill_switch_interval; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY kill_switch_interval (id, date, start_time, end_time, start_datetime, end_datetime, killed_by_id, starting_point_id, unkilled_by_id) FROM stdin;
+\.
+
+
+--
+-- Name: kill_switch_interval_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('kill_switch_interval_id_seq', 1, false);
+
+
+--
+-- Data for Name: managed_account_transfer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY managed_account_transfer (id, account_id, amount, currency, stripe_id, stripe_status, created_at, submitted_at, account_ct_id, payment_account_id, transfer_id) FROM stdin;
+\.
+
+
+--
+-- Name: managed_account_transfer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('managed_account_transfer_id_seq', 1, false);
+
+
+--
+-- Data for Name: market; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY market (id, name, shortname, is_active, is_acquiring_dashers, is_at_dasher_capacity, local_team_email, performance_score_threshold_for_drive, orientation_length, virtual_orientation_passing_threshold, bounds, center, timezone, tax_rate_override, min_asap_time, under_dr_control, use_dr_etas, always_run_fallback_assigner, country_id, region_id, subnational_division_id, virtual_orientation_slide_deck_id, virtual_orientation_slide_deck_bikes_only_id, updated_at) FROM stdin;
+1	Bay Area	BAY	t	t	f		100	3	\N	\N	\N	US/Pacific	\N	35	f	f	f	1	\N	1	\N	\N	2019-08-04 03:41:01.849904+00
+2	Los Angeles	LA	t	t	f		100	3	\N	\N	\N	US/Pacific	\N	35	f	f	f	1	\N	1	\N	\N	2019-08-04 03:41:03.235319+00
+3	Boston	BOS	t	t	f		100	3	\N	\N	\N	US/Pacific	\N	35	f	f	f	1	\N	1	\N	\N	2019-08-04 03:41:03.400908+00
+4	Toronto	TOR	t	t	f		100	3	\N	\N	\N	US/Pacific	\N	35	f	f	f	2	\N	1	\N	\N	2019-08-04 03:41:03.536065+00
+5	Melbourne	SD	t	t	f		100	3	\N	\N	\N	US/Pacific	\N	35	f	f	f	3	\N	1	\N	\N	2019-08-04 03:41:03.669666+00
+\.
+
+
+--
+-- Name: market_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('market_id_seq', 5, true);
+
+
+--
+-- Data for Name: market_special_hours; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY market_special_hours (id, date, start_time, end_time, closed, market_id) FROM stdin;
+\.
+
+
+--
+-- Name: market_special_hours_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('market_special_hours_id_seq', 1, false);
+
+
+--
+-- Data for Name: marqeta_card; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY marqeta_card (token, delight_number, terminated_at, last4) FROM stdin;
+test_dasher_card_1	0	\N
+test_dasher_card_2	0	\N
+test_dasher_card_3	0	\N
+test_dasher_card_4	0	\N
+test_dasher_card_5	0	\N
+test_dasher_card_6	0	\N
+\.
+
+
+--
+-- Data for Name: marqeta_card_ownership; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY marqeta_card_ownership (id, created_at, ended_at, card_id, dasher_id) FROM stdin;
+1	2019-08-04 03:42:03.167074+00	\N	test_dasher_card_1	1
+2	2019-08-04 03:44:50.284445+00	\N	test_dasher_card_2	2
+3	2019-08-04 03:45:23.548211+00	\N	test_dasher_card_3	3
+4	2019-08-04 03:45:56.806686+00	\N	test_dasher_card_4	4
+5	2019-08-04 03:46:30.05761+00	\N	test_dasher_card_5	5
+6	2019-08-04 03:47:03.315696+00	\N	test_dasher_card_6	6
+\.
+
+
+--
+-- Name: marqeta_card_ownership_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('marqeta_card_ownership_id_seq', 6, true);
+
+
+--
+-- Data for Name: marqeta_card_transition; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY marqeta_card_transition (id, succeeded_at, aborted_at, created_at, desired_state, card_id, shift_id) FROM stdin;
+\.
+
+
+--
+-- Name: marqeta_card_transition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('marqeta_card_transition_id_seq', 1, false);
+
+
+--
+-- Data for Name: marqeta_decline_exemption; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY marqeta_decline_exemption (id, amount, mid, delivery_id, created_at, used_at, dasher_id, created_by_id) FROM stdin;
+\.
+
+
+--
+-- Name: marqeta_decline_exemption_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('marqeta_decline_exemption_id_seq', 1, false);
+
+
+--
+-- Data for Name: marqeta_transaction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY marqeta_transaction (id, token, amount, swiped_at, card_acceptor, currency, timed_out, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: marqeta_transaction_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY marqeta_transaction_event (id, created_at, token, amount, transaction_type, metadata, raw_type, card_acceptor_id, ownership_id, shift_id) FROM stdin;
+\.
+
+
+--
+-- Name: marqeta_transaction_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('marqeta_transaction_event_id_seq', 1, false);
+
+
+--
+-- Name: marqeta_transaction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('marqeta_transaction_id_seq', 1, false);
+
+
+--
+-- Data for Name: mass_communication_status; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY mass_communication_status (id, message_uuid, source, message, total_requests, in_progress, received_status, failed, delayed_by_5min, delayed_by_10min, delayed_by_15min, created_at, updated_at, sender_id) FROM stdin;
+\.
+
+
+--
+-- Name: mass_communication_status_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('mass_communication_status_id_seq', 1, false);
+
+
+--
+-- Data for Name: multi_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY multi_promotion (id, created_at, delivery_fee, service_rate, extra_sos_fee, discount_percentage, discount_value, max_discount, currency, min_subtotal, discount_type) FROM stdin;
+\.
+
+
+--
+-- Name: multi_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('multi_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: order; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY "order" (id, created_at, cancelled_at, last_modified, dd4b_expense_code, consumer_id, menu_id, order_cart_id, store_id, store_order_cart_id, payment_card_id, payment_line_items) FROM stdin;
+\.
+
+
+--
+-- Data for Name: order_cart; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart (id, created_at, submitted_at, cancelled_at, fulfilled_at, url_code, order_special_instructions, dasher_instructions, subpremise, payment_policy, group_cart, max_individual_cost, max_individuals, hide_other_individual_orders, auto_checkout_time, split_bill, locked, is_first_ordercart, is_reorder, amount_paid_out_to_store, currency, extra_cart_order_fee, min_order_subtotal, charge_id, submit_platform, submission_attributes, is_bike_friendly, is_bike_friendly_updated_at, min_age_requirement, min_age_requirement_updated_at, omnivore_id, merchant_supplied_id, is_fraudulent, refunded_as_fraudulent, business_referral_id, creator_id, delivery_address_id, payment_card_id, payment_method_id, pricing_strategy_id, promo_code_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: order_cart_consumer_promotion_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_consumer_promotion_link (id, created_at, consumer_promotion_id, order_cart_id) FROM stdin;
+\.
+
+
+--
+-- Name: order_cart_consumer_promotion_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_consumer_promotion_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_cart_device_fingerprint_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_device_fingerprint_link (id, source, metadata, fingerprint_id, order_cart_id, updated_at) FROM stdin;
+\.
+
+
+--
+-- Name: order_cart_device_fingerprint_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_device_fingerprint_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_cart_discount; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_discount (id, support_credit, first_delivery_discount, upsell_delivery_discount, referree_credit, referrer_credit, gift_code_credit, delivery_gift_credit, first_time_promo_code_credit, promo_code_credit, delivery_update_credit, manual_credit, discount_percent, discount_percent_max_credit, accounting_consistency_credit, other_credit, currency, updated_at, order_cart_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: order_cart_discount_component; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_discount_component (id, monetary_field, source_id, "group", amount, status, delivery_fee, service_rate, extra_sos_fee, discount_percentage, max_discount, minimum_subtotal, metadata, currency, updated_at, order_cart_id, source_type_id, store_order_cart_id) FROM stdin;
+\.
+
+
+--
+-- Name: order_cart_discount_component_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_discount_component_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_cart_discount_component_source_type; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_discount_component_source_type (id, name, source_model_name, "group", priority, is_refundable, updated_at) FROM stdin;
+\.
+
+
+--
+-- Name: order_cart_discount_component_source_type_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_discount_component_source_type_id_seq', 1, false);
+
+
+--
+-- Name: order_cart_discount_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_discount_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_cart_escalation; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_escalation (created_at, reviewed_at, order_cart_id, status, notes, reviewed_by_id, stripe_charge_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: order_cart_escalation_reason; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_escalation_reason (id, created_at, escalation_type, detail, escalation_id) FROM stdin;
+\.
+
+
+--
+-- Name: order_cart_escalation_reason_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_escalation_reason_id_seq', 1, false);
+
+
+--
+-- Name: order_cart_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_cart_pricing_strategy; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_cart_pricing_strategy (id, created_at, strategy_type) FROM stdin;
+1	2019-08-04 03:41:04.439271+00	hybrid_fee
+2	2019-08-04 03:41:04.44232+00	capped_service_fee
+3	2019-08-04 03:41:04.444991+00	tiered_service_rate
+4	2019-08-04 03:41:04.447636+00	no_service_rate_default_delivery_fee
+5	2019-08-04 03:41:04.450298+00	no_service_rate_tiered_delivery_fee
+\.
+
+
+--
+-- Name: order_cart_pricing_strategy_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_cart_pricing_strategy_id_seq', 5, true);
+
+
+--
+-- Name: order_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_item; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_item (id, created_at, item, quantity, special_instructions, original_item_price, additional_cost, removed_at, is_recommendation, substitution_preference, num_missing, num_incorrect, subtotal, legacy_inflation_amount, bottle_deposit_amount, tax_amount, unit_price, unit_legacy_inflation_amount, discount_source, item_id, order_id, store_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: order_item_extra_option; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_item_extra_option (id, created_at, child_options, quantity, is_free, item_extra_option, original_option_price, item_extra_option_id, order_item_id, parent_order_item_extra_option_id) FROM stdin;
+\.
+
+
+--
+-- Name: order_item_extra_option_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_item_extra_option_id_seq', 1, false);
+
+
+--
+-- Name: order_item_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_item_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_menu_option; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_menu_option (id, created_at, selection, option_id, order_id) FROM stdin;
+\.
+
+
+--
+-- Name: order_menu_option_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_menu_option_id_seq', 1, false);
+
+
+--
+-- Data for Name: order_placer_queue_state; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY order_placer_queue_state (id, created_at, queue_length, number_of_order_placers, order_placer_ids, delivery_ids) FROM stdin;
+\.
+
+
+--
+-- Name: order_placer_queue_state_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('order_placer_queue_state_id_seq', 1, false);
+
+
+--
+-- Data for Name: payment_account; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY payment_account (id, account_type, account_id, entity, old_account_id, upgraded_to_managed_account_at, is_verified_with_stripe, transfers_enabled, charges_enabled, statement_descriptor, created_at, payout_disabled, resolve_outstanding_balance_frequency) FROM stdin;
+\.
+
+
+--
+-- Name: payment_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('payment_account_id_seq', 1, false);
+
+
+--
+-- Data for Name: payment_method; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY payment_method (id, name) FROM stdin;
+1	credit_card
+2	debit_bank_account
+3	payment_withholding
+\.
+
+
+--
+-- Name: payment_method_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('payment_method_id_seq', 3, true);
+
+
+--
+-- Data for Name: percentage_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY percentage_promotion (id, created_at, discount_percent, discount_percent_max_credit, min_subtotal) FROM stdin;
+\.
+
+
+--
+-- Name: percentage_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('percentage_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: place_tag; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY place_tag (id, created_at, updated_at, name) FROM stdin;
+\.
+
+
+--
+-- Name: place_tag_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('place_tag_id_seq', 1, false);
+
+
+--
+-- Data for Name: platform; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY platform (id, name) FROM stdin;
+1	drive
+\.
+
+
+--
+-- Name: platform_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('platform_id_seq', 1, true);
+
+
+--
+-- Data for Name: price_transparency_bucket_assignments; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY price_transparency_bucket_assignments (id, created_at, bucket, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: price_transparency_bucket_assignments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('price_transparency_bucket_assignments_id_seq', 1, false);
+
+
+--
+-- Data for Name: promo_code; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promo_code (id, created_at, last_modified, start_date, end_date, discount_percent, value, "limit", discount_percent_max_credit, code, channel, restricted_to_market, restricted_to_submarket, notes, cuisine_promo, item_promo, store_ids_for_promo, new_customer_only, min_subtotal) FROM stdin;
+\.
+
+
+--
+-- Data for Name: promo_code_consumer_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promo_code_consumer_link (id, created_at, consumer_id, promo_code_id) FROM stdin;
+\.
+
+
+--
+-- Name: promo_code_consumer_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promo_code_consumer_link_id_seq', 1, false);
+
+
+--
+-- Name: promo_code_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promo_code_id_seq', 1, false);
+
+
+--
+-- Data for Name: promo_code_markets; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promo_code_markets (id, promocode_id, market_id) FROM stdin;
+\.
+
+
+--
+-- Name: promo_code_markets_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promo_code_markets_id_seq', 1, false);
+
+
+--
+-- Data for Name: promo_code_submarket_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promo_code_submarket_link (id, promo_code_id, submarket_id) FROM stdin;
+\.
+
+
+--
+-- Name: promo_code_submarket_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promo_code_submarket_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: promotion_consumer_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promotion_consumer_link (id, created_at, num_remaining_deliveries, num_deliveries_redeemed, consumer_id, promotion_id) FROM stdin;
+\.
+
+
+--
+-- Name: promotion_consumer_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promotion_consumer_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: promotion_featured_location_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promotion_featured_location_link (id, featured_location_id, promotion_id) FROM stdin;
+\.
+
+
+--
+-- Name: promotion_featured_location_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promotion_featured_location_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: promotion_place_tag_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promotion_place_tag_link (id, created_at, updated_at, place_tag_id, promotion_id) FROM stdin;
+\.
+
+
+--
+-- Name: promotion_place_tag_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promotion_place_tag_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: promotion_redemption_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promotion_redemption_event (id, "timestamp", timezone, order_cart_id, promotion_id, promotion_campaign_id, region_id, store_id) FROM stdin;
+\.
+
+
+--
+-- Name: promotion_redemption_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promotion_redemption_event_id_seq', 1, false);
+
+
+--
+-- Data for Name: promotion_submarket_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promotion_submarket_link (id, promotion_id, submarket_id) FROM stdin;
+\.
+
+
+--
+-- Name: promotion_submarket_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promotion_submarket_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: promotions_featured_location; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY promotions_featured_location (id, created_at, updated_at, name, location_on_app, show_only_once, feature_component, cover_image, title, description, props, user_state, next_featured_location_id) FROM stdin;
+\.
+
+
+--
+-- Name: promotions_featured_location_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('promotions_featured_location_id_seq', 1, false);
+
+
+--
+-- Data for Name: real_time_supply_model; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY real_time_supply_model (id, name, active_date, metadata, weights, normalized_training_mse, normalized_testing_mse, training_mse, testing_mse, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: real_time_supply_model_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('real_time_supply_model_id_seq', 1, false);
+
+
+--
+-- Data for Name: real_time_supply_prediction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY real_time_supply_prediction (id, active_date, created_at, metadata, prediction, starting_point_id, supply_model_id) FROM stdin;
+\.
+
+
+--
+-- Name: real_time_supply_prediction_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('real_time_supply_prediction_id_seq', 1, false);
+
+
+--
+-- Data for Name: realtime_demand_evaluation; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY realtime_demand_evaluation (id, created_at, active_date, metadata, eyeballing_count_sum_prediction_list, outstanding_orders_mean_prediction_list, eyeballing_count_sum_target_list, outstanding_orders_mean_target_list, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: realtime_demand_evaluation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('realtime_demand_evaluation_id_seq', 1, false);
+
+
+--
+-- Data for Name: referral_programs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY referral_programs (id, name, referrer_amount, referree_amount, referree_promotion_id, min_referree_order_subtotal, referree_invite_title, referree_invite_subtitle, referree_invite_sms_text, referree_acceptance_title, referree_acceptance_subtitle, referree_acceptance_annotation, referree_invite_email_subject, referree_invite_email_body, referree_acceptance_annotation_fr_ca, referree_acceptance_subtitle_fr_ca, referree_acceptance_title_fr_ca, referree_invite_email_body_fr_ca, referree_invite_email_subject_fr_ca, referree_invite_sms_text_fr_ca, referree_invite_subtitle_fr_ca, referree_invite_title_fr_ca) FROM stdin;
+\.
+
+
+--
+-- Name: referral_programs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('referral_programs_id_seq', 1, false);
+
+
+--
+-- Data for Name: refresh_token; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY refresh_token (key, app, created, user_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: region; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY region (id, name, shortname, description, created_at, is_active, country_id) FROM stdin;
+\.
+
+
+--
+-- Name: region_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('region_id_seq', 1, false);
+
+
+--
+-- Data for Name: region_snapshot; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY region_snapshot (id, created_at, region, asap_time, kill_switch, total_onshift_dashers, total_busy_dashers, total_outstanding_orders, total_picked_up_orders, ideal_flf, date, auto_sos_price, base_sos_price, eyeballing_count, realtime_demand_prediction, metadata, district_id, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: region_snapshot_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('region_snapshot_id_seq', 1, false);
+
+
+--
+-- Data for Name: scheduled_caps_boost; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY scheduled_caps_boost (id, start_date, end_date, boost_factor, window_indices, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: scheduled_caps_boost_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('scheduled_caps_boost_id_seq', 1, false);
+
+
+--
+-- Data for Name: search_engine_store_feed; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY search_engine_store_feed (id, updated_at, search_engine, store_id, starting_point_id, offer_schema, restaurant_schema) FROM stdin;
+\.
+
+
+--
+-- Name: search_engine_store_feed_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('search_engine_store_feed_id_seq', 1, false);
+
+
+--
+-- Data for Name: seo_local_region; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY seo_local_region (id, name, slug, type, center, is_active, city_id) FROM stdin;
+\.
+
+
+--
+-- Name: seo_local_region_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('seo_local_region_id_seq', 1, false);
+
+
+--
+-- Data for Name: shortened_url; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY shortened_url (id, url_code, expanded_url, url_type, pub_date, count) FROM stdin;
+\.
+
+
+--
+-- Name: shortened_url_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('shortened_url_id_seq', 1, false);
+
+
+--
+-- Data for Name: sms_help_message_status; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY sms_help_message_status (id, phone_number, status, updated_at, created_at, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: sms_help_message_status_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('sms_help_message_status_id_seq', 1, false);
+
+
+--
+-- Data for Name: sms_opt_out_number; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY sms_opt_out_number (id, phone_number, created_at) FROM stdin;
+\.
+
+
+--
+-- Name: sms_opt_out_number_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('sms_opt_out_number_id_seq', 1, false);
+
+
+--
+-- Data for Name: starship_delivery_info; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starship_delivery_info (id, created_at, starship_delivery_id, status, tracking, tracker, drive_duration_to_loading, drive_duration_to_recipient, step, cancelled_at, cancelled_reason, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: starship_delivery_info_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starship_delivery_info_id_seq', 1, false);
+
+
+--
+-- Data for Name: starting_point; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point (id, created_at, dasher_instructions, extra_asap_pad, consumer_order_open_pad, consumer_order_close_pad, name, shortname, orientation_address, rate_per_delivery, hourly_minimum, double_pay, manual_assign_buffer, assignment_latency_coefficients, html_color, activation_time, deactivation_time, min_scheduling_slots_per_window, cap_smoothing_enabled, cap_planning_adjuster, ideal_flfs, sos_price_flf_threshold, market_id, submarket_id) FROM stdin;
+1	2019-08-04 03:41:02.114416+00		0	1800	1800	Palo Alto / Redwood City	E2AK	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#58f33b	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+2	2019-08-04 03:41:02.269731+00		0	1800	1800	Mountain View / Sunnyvale	AUTT	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#0285f3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+3	2019-08-04 03:41:02.397291+00		0	1800	1800	Santa Clara	MOGV	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#a690f3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+4	2019-08-04 03:41:02.479896+00		0	1800	1800	Milpitas	7B6O	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#eec1f3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+5	2019-08-04 03:41:02.56314+00		0	1800	1800	North San Jose	FFYH	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#f0eff3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+6	2019-08-04 03:41:02.650703+00		0	1800	1800	South San Jose	NCNP	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#a3adf3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+7	2019-08-04 03:41:02.736282+00		0	1800	1800	Cupertino / Campbell / Los Gatos	SWQZ	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#f3c4f2	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	1
+8	2019-08-04 03:41:02.979247+00		0	1800	1800	San Francisco (Fillmore/Marina)	FIYV	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#30f3a6	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	2
+9	2019-08-04 03:41:03.064163+00		0	1800	1800	San Francisco (Hayes/Sunset)	3MZB	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#f3b0e3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	2
+10	2019-08-04 03:41:03.148379+00		0	1800	1800	San Francisco (North Beach/Downtown)	6PNE	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#f32c2b	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	1	2
+11	2019-08-04 03:41:03.298594+00		0	1800	1800	Santa Monica - Venice Beach	MWCB	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#37f36b	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	2	3
+12	2019-08-04 03:41:03.451346+00		0	1800	1800	Boston	CLTZ	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#d1e8f3	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	3	4
+13	2019-08-04 03:41:03.585183+00		0	1800	1800	Downtown Toronto	VIYX	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#f37c09	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	4	5
+14	2019-08-04 03:41:03.761119+00		0	1800	1800	MEL: CBD	M5OU	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#4ff30b	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	5	6
+15	2019-08-04 03:41:03.841091+00		0	1800	1800	MEL: Carlton/Fitzroy	EAJH	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#10f364	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	5	6
+16	2019-08-04 03:41:04.362141+00		0	1800	1800	MEL: Richmond/St Kilda	TPR4	\N	400	0	t	0	[0.0, 0.9480401672841979, 2.818354117161432]	#f311c0	2014-01-01 00:00:00+00	\N	6	f	{"vectors": [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], "weight": 1.0}	\N	\N	5	6
+\.
+
+
+--
+-- Data for Name: starting_point_assignment_latency_stats; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_assignment_latency_stats (id, active_date, assignment_latency_mean, assignment_latency_std, assignment_latency_median, delivery_count, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: starting_point_assignment_latency_stats_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_assignment_latency_stats_id_seq', 1, false);
+
+
+--
+-- Data for Name: starting_point_batching_parameters; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_batching_parameters (id, forced_batches_pickup_distance_span_meters, forced_batches_pickup_time_span_seconds, forced_batches_dropoff_distance_span_meters, forced_batches_maximum_batch_size, starting_point_id) FROM stdin;
+1	\N	\N	\N	\N	1
+2	\N	\N	\N	\N	2
+3	\N	\N	\N	\N	3
+4	\N	\N	\N	\N	4
+5	\N	\N	\N	\N	5
+6	\N	\N	\N	\N	6
+7	\N	\N	\N	\N	7
+8	\N	\N	\N	\N	8
+9	\N	\N	\N	\N	9
+10	\N	\N	\N	\N	10
+11	\N	\N	\N	\N	11
+12	\N	\N	\N	\N	12
+13	\N	\N	\N	\N	13
+14	\N	\N	\N	\N	14
+15	\N	\N	\N	\N	15
+16	\N	\N	\N	\N	16
+\.
+
+
+--
+-- Name: starting_point_batching_parameters_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_batching_parameters_id_seq', 16, true);
+
+
+--
+-- Data for Name: starting_point_delivery_duration_stats; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_delivery_duration_stats (id, active_date, flf_by_window, delivery_duration_mean_by_window, delivery_duration_median_by_window, delivery_duration_std_by_window, delivery_count_by_window, delivery_duration_mean_without_r2c_by_window, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: starting_point_delivery_duration_stats_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_delivery_duration_stats_id_seq', 1, false);
+
+
+--
+-- Data for Name: starting_point_delivery_hours; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_delivery_hours (id, day_index, start_time, end_time, closed, drive_open_offset, starting_point_id) FROM stdin;
+1	0	08:00:00	22:00:00	f	0	1
+2	1	08:00:00	22:00:00	f	0	1
+3	2	08:00:00	22:00:00	f	0	1
+4	3	08:00:00	22:00:00	f	0	1
+5	4	08:00:00	22:00:00	f	0	1
+6	5	08:00:00	22:00:00	f	0	1
+7	6	08:00:00	22:00:00	f	0	1
+8	0	08:00:00	22:00:00	f	0	2
+9	1	08:00:00	22:00:00	f	0	2
+10	2	08:00:00	22:00:00	f	0	2
+11	3	08:00:00	22:00:00	f	0	2
+12	4	08:00:00	22:00:00	f	0	2
+13	5	08:00:00	22:00:00	f	0	2
+14	6	08:00:00	22:00:00	f	0	2
+15	0	08:00:00	22:00:00	f	0	3
+16	1	08:00:00	22:00:00	f	0	3
+17	2	08:00:00	22:00:00	f	0	3
+18	3	08:00:00	22:00:00	f	0	3
+19	4	08:00:00	22:00:00	f	0	3
+20	5	08:00:00	22:00:00	f	0	3
+21	6	08:00:00	22:00:00	f	0	3
+22	0	08:00:00	22:00:00	f	0	4
+23	1	08:00:00	22:00:00	f	0	4
+24	2	08:00:00	22:00:00	f	0	4
+25	3	08:00:00	22:00:00	f	0	4
+26	4	08:00:00	22:00:00	f	0	4
+27	5	08:00:00	22:00:00	f	0	4
+28	6	08:00:00	22:00:00	f	0	4
+29	0	08:00:00	22:00:00	f	0	5
+30	1	08:00:00	22:00:00	f	0	5
+31	2	08:00:00	22:00:00	f	0	5
+32	3	08:00:00	22:00:00	f	0	5
+33	4	08:00:00	22:00:00	f	0	5
+34	5	08:00:00	22:00:00	f	0	5
+35	6	08:00:00	22:00:00	f	0	5
+36	0	08:00:00	22:00:00	f	0	6
+37	1	08:00:00	22:00:00	f	0	6
+38	2	08:00:00	22:00:00	f	0	6
+39	3	08:00:00	22:00:00	f	0	6
+40	4	08:00:00	22:00:00	f	0	6
+41	5	08:00:00	22:00:00	f	0	6
+42	6	08:00:00	22:00:00	f	0	6
+43	0	08:00:00	22:00:00	f	0	7
+44	1	08:00:00	22:00:00	f	0	7
+45	2	08:00:00	22:00:00	f	0	7
+46	3	08:00:00	22:00:00	f	0	7
+47	4	08:00:00	22:00:00	f	0	7
+48	5	08:00:00	22:00:00	f	0	7
+49	6	08:00:00	22:00:00	f	0	7
+50	0	08:00:00	22:00:00	f	0	8
+51	1	08:00:00	22:00:00	f	0	8
+52	2	08:00:00	22:00:00	f	0	8
+53	3	08:00:00	22:00:00	f	0	8
+54	4	08:00:00	22:00:00	f	0	8
+55	5	08:00:00	22:00:00	f	0	8
+56	6	08:00:00	22:00:00	f	0	8
+57	0	08:00:00	22:00:00	f	0	9
+58	1	08:00:00	22:00:00	f	0	9
+59	2	08:00:00	22:00:00	f	0	9
+60	3	08:00:00	22:00:00	f	0	9
+61	4	08:00:00	22:00:00	f	0	9
+62	5	08:00:00	22:00:00	f	0	9
+63	6	08:00:00	22:00:00	f	0	9
+64	0	08:00:00	22:00:00	f	0	10
+65	1	08:00:00	22:00:00	f	0	10
+66	2	08:00:00	22:00:00	f	0	10
+67	3	08:00:00	22:00:00	f	0	10
+68	4	08:00:00	22:00:00	f	0	10
+69	5	08:00:00	22:00:00	f	0	10
+70	6	08:00:00	22:00:00	f	0	10
+71	0	08:00:00	22:00:00	f	0	11
+72	1	08:00:00	22:00:00	f	0	11
+73	2	08:00:00	22:00:00	f	0	11
+74	3	08:00:00	22:00:00	f	0	11
+75	4	08:00:00	22:00:00	f	0	11
+76	5	08:00:00	22:00:00	f	0	11
+77	6	08:00:00	22:00:00	f	0	11
+78	0	08:00:00	22:00:00	f	0	12
+79	1	08:00:00	22:00:00	f	0	12
+80	2	08:00:00	22:00:00	f	0	12
+81	3	08:00:00	22:00:00	f	0	12
+82	4	08:00:00	22:00:00	f	0	12
+83	5	08:00:00	22:00:00	f	0	12
+84	6	08:00:00	22:00:00	f	0	12
+85	0	08:00:00	22:00:00	f	0	13
+86	1	08:00:00	22:00:00	f	0	13
+87	2	08:00:00	22:00:00	f	0	13
+88	3	08:00:00	22:00:00	f	0	13
+89	4	08:00:00	22:00:00	f	0	13
+90	5	08:00:00	22:00:00	f	0	13
+91	6	08:00:00	22:00:00	f	0	13
+92	0	08:00:00	22:00:00	f	0	14
+93	1	08:00:00	22:00:00	f	0	14
+94	2	08:00:00	22:00:00	f	0	14
+95	3	08:00:00	22:00:00	f	0	14
+96	4	08:00:00	22:00:00	f	0	14
+97	5	08:00:00	22:00:00	f	0	14
+98	6	08:00:00	22:00:00	f	0	14
+99	0	08:00:00	22:00:00	f	0	15
+100	1	08:00:00	22:00:00	f	0	15
+101	2	08:00:00	22:00:00	f	0	15
+102	3	08:00:00	22:00:00	f	0	15
+103	4	08:00:00	22:00:00	f	0	15
+104	5	08:00:00	22:00:00	f	0	15
+105	6	08:00:00	22:00:00	f	0	15
+106	0	08:00:00	22:00:00	f	0	16
+107	1	08:00:00	22:00:00	f	0	16
+108	2	08:00:00	22:00:00	f	0	16
+109	3	08:00:00	22:00:00	f	0	16
+110	4	08:00:00	22:00:00	f	0	16
+111	5	08:00:00	22:00:00	f	0	16
+112	6	08:00:00	22:00:00	f	0	16
+\.
+
+
+--
+-- Name: starting_point_delivery_hours_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_delivery_hours_id_seq', 112, true);
+
+
+--
+-- Data for Name: starting_point_flf_thresholds; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_flf_thresholds (id, warning_threshold, dangerous_threshold, critical_threshold, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: starting_point_flf_thresholds_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_flf_thresholds_id_seq', 1, false);
+
+
+--
+-- Data for Name: starting_point_geometry; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_geometry (starting_point_id, geom) FROM stdin;
+1	0106000020E6100000E00100000103000000010000000500000088BC47E17A8C5EC06080EB51B8BE4240D09DC2F5288C5EC06080EB51B8BE4240D09DC2F5288C5EC0D1BDF5285CBF424088BC47E17A8C5EC0D1BDF5285CBF424088BC47E17A8C5EC06080EB51B8BE424001030000000100000005000000D09DC2F5288C5EC06080EB51B8BE4240187F3D0AD78B5EC06080EB51B8BE4240187F3D0AD78B5EC0D1BDF5285CBF4240D09DC2F5288C5EC0D1BDF5285CBF4240D09DC2F5288C5EC06080EB51B8BE424001030000000100000005000000D09DC2F5288C5EC0EF42E17A14BE4240187F3D0AD78B5EC0EF42E17A14BE4240187F3D0AD78B5EC06080EB51B8BE4240D09DC2F5288C5EC06080EB51B8BE4240D09DC2F5288C5EC0EF42E17A14BE42400103000000010000000500000088BC47E17A8C5EC0EF42E17A14BE4240D09DC2F5288C5EC0EF42E17A14BE4240D09DC2F5288C5EC06080EB51B8BE424088BC47E17A8C5EC06080EB51B8BE424088BC47E17A8C5EC0EF42E17A14BE424001030000000100000005000000E04B0AD7A3905EC0149F703D0AB74240282D85EB51905EC0149F703D0AB74240282D85EB51905EC085DC7A14AEB74240E04B0AD7A3905EC085DC7A14AEB74240E04B0AD7A3905EC0149F703D0AB7424001030000000100000005000000282D85EB51905EC0149F703D0AB74240700E000000905EC0149F703D0AB74240700E000000905EC085DC7A14AEB74240282D85EB51905EC085DC7A14AEB74240282D85EB51905EC0149F703D0AB7424001030000000100000005000000700E000000905EC0149F703D0AB74240B8EF7A14AE8F5EC0149F703D0AB74240B8EF7A14AE8F5EC085DC7A14AEB74240700E000000905EC085DC7A14AEB74240700E000000905EC0149F703D0AB7424001030000000100000005000000B8EF7A14AE8F5EC0149F703D0AB7424000D1F5285C8F5EC0149F703D0AB7424000D1F5285C8F5EC085DC7A14AEB74240B8EF7A14AE8F5EC085DC7A14AEB74240B8EF7A14AE8F5EC0149F703D0AB7424001030000000100000005000000E04B0AD7A3905EC085DC7A14AEB74240282D85EB51905EC085DC7A14AEB74240282D85EB51905EC0F61985EB51B84240E04B0AD7A3905EC0F61985EB51B84240E04B0AD7A3905EC085DC7A14AEB7424001030000000100000005000000282D85EB51905EC085DC7A14AEB74240700E000000905EC085DC7A14AEB74240700E000000905EC0F61985EB51B84240282D85EB51905EC0F61985EB51B84240282D85EB51905EC085DC7A14AEB7424001030000000100000005000000700E000000905EC085DC7A14AEB74240B8EF7A14AE8F5EC085DC7A14AEB74240B8EF7A14AE8F5EC0F61985EB51B84240700E000000905EC0F61985EB51B84240700E000000905EC085DC7A14AEB7424001030000000100000005000000B8EF7A14AE8F5EC085DC7A14AEB7424000D1F5285C8F5EC085DC7A14AEB7424000D1F5285C8F5EC0F61985EB51B84240B8EF7A14AE8F5EC0F61985EB51B84240B8EF7A14AE8F5EC085DC7A14AEB7424001030000000100000005000000E04B0AD7A3905EC0F61985EB51B84240282D85EB51905EC0F61985EB51B84240282D85EB51905EC067578FC2F5B84240E04B0AD7A3905EC067578FC2F5B84240E04B0AD7A3905EC0F61985EB51B8424001030000000100000005000000282D85EB51905EC0F61985EB51B84240700E000000905EC0F61985EB51B84240700E000000905EC067578FC2F5B84240282D85EB51905EC067578FC2F5B84240282D85EB51905EC0F61985EB51B8424001030000000100000005000000700E000000905EC0F61985EB51B84240B8EF7A14AE8F5EC0F61985EB51B84240B8EF7A14AE8F5EC067578FC2F5B84240700E000000905EC067578FC2F5B84240700E000000905EC0F61985EB51B8424001030000000100000005000000B8EF7A14AE8F5EC0F61985EB51B8424000D1F5285C8F5EC0F61985EB51B8424000D1F5285C8F5EC067578FC2F5B84240B8EF7A14AE8F5EC067578FC2F5B84240B8EF7A14AE8F5EC0F61985EB51B8424001030000000100000005000000E04B0AD7A3905EC067578FC2F5B84240282D85EB51905EC067578FC2F5B84240282D85EB51905EC0D894999999B94240E04B0AD7A3905EC0D894999999B94240E04B0AD7A3905EC067578FC2F5B8424001030000000100000005000000282D85EB51905EC067578FC2F5B84240700E000000905EC067578FC2F5B84240700E000000905EC0D894999999B94240282D85EB51905EC0D894999999B94240282D85EB51905EC067578FC2F5B8424001030000000100000005000000700E000000905EC067578FC2F5B84240B8EF7A14AE8F5EC067578FC2F5B84240B8EF7A14AE8F5EC0D894999999B94240700E000000905EC0D894999999B94240700E000000905EC067578FC2F5B8424001030000000100000005000000B8EF7A14AE8F5EC067578FC2F5B8424000D1F5285C8F5EC067578FC2F5B8424000D1F5285C8F5EC0D894999999B94240B8EF7A14AE8F5EC0D894999999B94240B8EF7A14AE8F5EC067578FC2F5B8424001030000000100000005000000E04B0AD7A3905EC0D894999999B94240282D85EB51905EC0D894999999B94240282D85EB51905EC049D2A3703DBA4240E04B0AD7A3905EC049D2A3703DBA4240E04B0AD7A3905EC0D894999999B9424001030000000100000005000000282D85EB51905EC0D894999999B94240700E000000905EC0D894999999B94240700E000000905EC049D2A3703DBA4240282D85EB51905EC049D2A3703DBA4240282D85EB51905EC0D894999999B9424001030000000100000005000000700E000000905EC0D894999999B94240B8EF7A14AE8F5EC0D894999999B94240B8EF7A14AE8F5EC049D2A3703DBA4240700E000000905EC049D2A3703DBA4240700E000000905EC0D894999999B9424001030000000100000005000000B8EF7A14AE8F5EC0D894999999B9424000D1F5285C8F5EC0D894999999B9424000D1F5285C8F5EC049D2A3703DBA4240B8EF7A14AE8F5EC049D2A3703DBA4240B8EF7A14AE8F5EC0D894999999B9424001030000000100000005000000E04B0AD7A3905EC049D2A3703DBA4240282D85EB51905EC049D2A3703DBA4240282D85EB51905EC0BA0FAE47E1BA4240E04B0AD7A3905EC0BA0FAE47E1BA4240E04B0AD7A3905EC049D2A3703DBA424001030000000100000005000000282D85EB51905EC049D2A3703DBA4240700E000000905EC049D2A3703DBA4240700E000000905EC0BA0FAE47E1BA4240282D85EB51905EC0BA0FAE47E1BA4240282D85EB51905EC049D2A3703DBA424001030000000100000005000000700E000000905EC049D2A3703DBA4240B8EF7A14AE8F5EC049D2A3703DBA4240B8EF7A14AE8F5EC0BA0FAE47E1BA4240700E000000905EC0BA0FAE47E1BA4240700E000000905EC049D2A3703DBA424001030000000100000005000000B8EF7A14AE8F5EC049D2A3703DBA424000D1F5285C8F5EC049D2A3703DBA424000D1F5285C8F5EC0BA0FAE47E1BA4240B8EF7A14AE8F5EC0BA0FAE47E1BA4240B8EF7A14AE8F5EC049D2A3703DBA424001030000000100000005000000E04B0AD7A3905EC0BA0FAE47E1BA4240282D85EB51905EC0BA0FAE47E1BA4240282D85EB51905EC02B4DB81E85BB4240E04B0AD7A3905EC02B4DB81E85BB4240E04B0AD7A3905EC0BA0FAE47E1BA424001030000000100000005000000282D85EB51905EC0BA0FAE47E1BA4240700E000000905EC0BA0FAE47E1BA4240700E000000905EC02B4DB81E85BB4240282D85EB51905EC02B4DB81E85BB4240282D85EB51905EC0BA0FAE47E1BA424001030000000100000005000000700E000000905EC0BA0FAE47E1BA4240B8EF7A14AE8F5EC0BA0FAE47E1BA4240B8EF7A14AE8F5EC02B4DB81E85BB4240700E000000905EC02B4DB81E85BB4240700E000000905EC0BA0FAE47E1BA424001030000000100000005000000B8EF7A14AE8F5EC0BA0FAE47E1BA424000D1F5285C8F5EC0BA0FAE47E1BA424000D1F5285C8F5EC02B4DB81E85BB4240B8EF7A14AE8F5EC02B4DB81E85BB4240B8EF7A14AE8F5EC0BA0FAE47E1BA424001030000000100000005000000E04B0AD7A3905EC02B4DB81E85BB4240282D85EB51905EC02B4DB81E85BB4240282D85EB51905EC09C8AC2F528BC4240E04B0AD7A3905EC09C8AC2F528BC4240E04B0AD7A3905EC02B4DB81E85BB424001030000000100000005000000282D85EB51905EC02B4DB81E85BB4240700E000000905EC02B4DB81E85BB4240700E000000905EC09C8AC2F528BC4240282D85EB51905EC09C8AC2F528BC4240282D85EB51905EC02B4DB81E85BB424001030000000100000005000000700E000000905EC02B4DB81E85BB4240B8EF7A14AE8F5EC02B4DB81E85BB4240B8EF7A14AE8F5EC09C8AC2F528BC4240700E000000905EC09C8AC2F528BC4240700E000000905EC02B4DB81E85BB424001030000000100000005000000B8EF7A14AE8F5EC02B4DB81E85BB424000D1F5285C8F5EC02B4DB81E85BB424000D1F5285C8F5EC09C8AC2F528BC4240B8EF7A14AE8F5EC09C8AC2F528BC4240B8EF7A14AE8F5EC02B4DB81E85BB424001030000000100000005000000E04B0AD7A3905EC09C8AC2F528BC4240282D85EB51905EC09C8AC2F528BC4240282D85EB51905EC00DC8CCCCCCBC4240E04B0AD7A3905EC00DC8CCCCCCBC4240E04B0AD7A3905EC09C8AC2F528BC424001030000000100000005000000282D85EB51905EC09C8AC2F528BC4240700E000000905EC09C8AC2F528BC4240700E000000905EC00DC8CCCCCCBC4240282D85EB51905EC00DC8CCCCCCBC4240282D85EB51905EC09C8AC2F528BC424001030000000100000005000000700E000000905EC09C8AC2F528BC4240B8EF7A14AE8F5EC09C8AC2F528BC4240B8EF7A14AE8F5EC00DC8CCCCCCBC4240700E000000905EC00DC8CCCCCCBC4240700E000000905EC09C8AC2F528BC424001030000000100000005000000B8EF7A14AE8F5EC09C8AC2F528BC424000D1F5285C8F5EC09C8AC2F528BC424000D1F5285C8F5EC00DC8CCCCCCBC4240B8EF7A14AE8F5EC00DC8CCCCCCBC4240B8EF7A14AE8F5EC09C8AC2F528BC424001030000000100000005000000E04B0AD7A3905EC00DC8CCCCCCBC4240282D85EB51905EC00DC8CCCCCCBC4240282D85EB51905EC07E05D7A370BD4240E04B0AD7A3905EC07E05D7A370BD4240E04B0AD7A3905EC00DC8CCCCCCBC424001030000000100000005000000282D85EB51905EC00DC8CCCCCCBC4240700E000000905EC00DC8CCCCCCBC4240700E000000905EC07E05D7A370BD4240282D85EB51905EC07E05D7A370BD4240282D85EB51905EC00DC8CCCCCCBC424001030000000100000005000000700E000000905EC00DC8CCCCCCBC4240B8EF7A14AE8F5EC00DC8CCCCCCBC4240B8EF7A14AE8F5EC07E05D7A370BD4240700E000000905EC07E05D7A370BD4240700E000000905EC00DC8CCCCCCBC424001030000000100000005000000B8EF7A14AE8F5EC00DC8CCCCCCBC424000D1F5285C8F5EC00DC8CCCCCCBC424000D1F5285C8F5EC07E05D7A370BD4240B8EF7A14AE8F5EC07E05D7A370BD4240B8EF7A14AE8F5EC00DC8CCCCCCBC424001030000000100000005000000E04B0AD7A3905EC07E05D7A370BD4240282D85EB51905EC07E05D7A370BD4240282D85EB51905EC0EF42E17A14BE4240E04B0AD7A3905EC0EF42E17A14BE4240E04B0AD7A3905EC07E05D7A370BD424001030000000100000005000000282D85EB51905EC07E05D7A370BD4240700E000000905EC07E05D7A370BD4240700E000000905EC0EF42E17A14BE4240282D85EB51905EC0EF42E17A14BE4240282D85EB51905EC07E05D7A370BD424001030000000100000005000000700E000000905EC07E05D7A370BD4240B8EF7A14AE8F5EC07E05D7A370BD4240B8EF7A14AE8F5EC0EF42E17A14BE4240700E000000905EC0EF42E17A14BE4240700E000000905EC07E05D7A370BD424001030000000100000005000000B8EF7A14AE8F5EC07E05D7A370BD424000D1F5285C8F5EC07E05D7A370BD424000D1F5285C8F5EC0EF42E17A14BE4240B8EF7A14AE8F5EC0EF42E17A14BE4240B8EF7A14AE8F5EC07E05D7A370BD424001030000000100000005000000E04B0AD7A3905EC0EF42E17A14BE4240282D85EB51905EC0EF42E17A14BE4240282D85EB51905EC06080EB51B8BE4240E04B0AD7A3905EC06080EB51B8BE4240E04B0AD7A3905EC0EF42E17A14BE424001030000000100000005000000282D85EB51905EC0EF42E17A14BE4240700E000000905EC0EF42E17A14BE4240700E000000905EC06080EB51B8BE4240282D85EB51905EC06080EB51B8BE4240282D85EB51905EC0EF42E17A14BE424001030000000100000005000000700E000000905EC0EF42E17A14BE4240B8EF7A14AE8F5EC0EF42E17A14BE4240B8EF7A14AE8F5EC06080EB51B8BE4240700E000000905EC06080EB51B8BE4240700E000000905EC0EF42E17A14BE424001030000000100000005000000B8EF7A14AE8F5EC0EF42E17A14BE424000D1F5285C8F5EC0EF42E17A14BE424000D1F5285C8F5EC06080EB51B8BE4240B8EF7A14AE8F5EC06080EB51B8BE4240B8EF7A14AE8F5EC0EF42E17A14BE424001030000000100000005000000E04B0AD7A3905EC06080EB51B8BE4240282D85EB51905EC06080EB51B8BE4240282D85EB51905EC0D1BDF5285CBF4240E04B0AD7A3905EC0D1BDF5285CBF4240E04B0AD7A3905EC06080EB51B8BE424001030000000100000005000000282D85EB51905EC06080EB51B8BE4240700E000000905EC06080EB51B8BE4240700E000000905EC0D1BDF5285CBF4240282D85EB51905EC0D1BDF5285CBF4240282D85EB51905EC06080EB51B8BE424001030000000100000005000000700E000000905EC06080EB51B8BE4240B8EF7A14AE8F5EC06080EB51B8BE4240B8EF7A14AE8F5EC0D1BDF5285CBF4240700E000000905EC0D1BDF5285CBF4240700E000000905EC06080EB51B8BE424001030000000100000005000000B8EF7A14AE8F5EC06080EB51B8BE424000D1F5285C8F5EC06080EB51B8BE424000D1F5285C8F5EC0D1BDF5285CBF4240B8EF7A14AE8F5EC0D1BDF5285CBF4240B8EF7A14AE8F5EC06080EB51B8BE424001030000000100000005000000E04B0AD7A3905EC0D1BDF5285CBF4240282D85EB51905EC0D1BDF5285CBF4240282D85EB51905EC042FBFFFFFFBF4240E04B0AD7A3905EC042FBFFFFFFBF4240E04B0AD7A3905EC0D1BDF5285CBF424001030000000100000005000000282D85EB51905EC0D1BDF5285CBF4240700E000000905EC0D1BDF5285CBF4240700E000000905EC042FBFFFFFFBF4240282D85EB51905EC042FBFFFFFFBF4240282D85EB51905EC0D1BDF5285CBF424001030000000100000005000000700E000000905EC0D1BDF5285CBF4240B8EF7A14AE8F5EC0D1BDF5285CBF4240B8EF7A14AE8F5EC042FBFFFFFFBF4240700E000000905EC042FBFFFFFFBF4240700E000000905EC0D1BDF5285CBF424001030000000100000005000000B8EF7A14AE8F5EC0D1BDF5285CBF424000D1F5285C8F5EC0D1BDF5285CBF424000D1F5285C8F5EC042FBFFFFFFBF4240B8EF7A14AE8F5EC042FBFFFFFFBF4240B8EF7A14AE8F5EC0D1BDF5285CBF424001030000000100000005000000508914AE47915EC0149F703D0AB74240986A8FC2F5905EC0149F703D0AB74240986A8FC2F5905EC085DC7A14AEB74240508914AE47915EC085DC7A14AEB74240508914AE47915EC0149F703D0AB7424001030000000100000005000000986A8FC2F5905EC0149F703D0AB74240E04B0AD7A3905EC0149F703D0AB74240E04B0AD7A3905EC085DC7A14AEB74240986A8FC2F5905EC085DC7A14AEB74240986A8FC2F5905EC0149F703D0AB7424001030000000100000005000000508914AE47915EC085DC7A14AEB74240986A8FC2F5905EC085DC7A14AEB74240986A8FC2F5905EC0F61985EB51B84240508914AE47915EC0F61985EB51B84240508914AE47915EC085DC7A14AEB7424001030000000100000005000000986A8FC2F5905EC085DC7A14AEB74240E04B0AD7A3905EC085DC7A14AEB74240E04B0AD7A3905EC0F61985EB51B84240986A8FC2F5905EC0F61985EB51B84240986A8FC2F5905EC085DC7A14AEB7424001030000000100000005000000508914AE47915EC0F61985EB51B84240986A8FC2F5905EC0F61985EB51B84240986A8FC2F5905EC067578FC2F5B84240508914AE47915EC067578FC2F5B84240508914AE47915EC0F61985EB51B8424001030000000100000005000000986A8FC2F5905EC0F61985EB51B84240E04B0AD7A3905EC0F61985EB51B84240E04B0AD7A3905EC067578FC2F5B84240986A8FC2F5905EC067578FC2F5B84240986A8FC2F5905EC0F61985EB51B8424001030000000100000005000000508914AE47915EC067578FC2F5B84240986A8FC2F5905EC067578FC2F5B84240986A8FC2F5905EC0D894999999B94240508914AE47915EC0D894999999B94240508914AE47915EC067578FC2F5B8424001030000000100000005000000986A8FC2F5905EC067578FC2F5B84240E04B0AD7A3905EC067578FC2F5B84240E04B0AD7A3905EC0D894999999B94240986A8FC2F5905EC0D894999999B94240986A8FC2F5905EC067578FC2F5B8424001030000000100000005000000508914AE47915EC0D894999999B94240986A8FC2F5905EC0D894999999B94240986A8FC2F5905EC049D2A3703DBA4240508914AE47915EC049D2A3703DBA4240508914AE47915EC0D894999999B9424001030000000100000005000000986A8FC2F5905EC0D894999999B94240E04B0AD7A3905EC0D894999999B94240E04B0AD7A3905EC049D2A3703DBA4240986A8FC2F5905EC049D2A3703DBA4240986A8FC2F5905EC0D894999999B9424001030000000100000005000000508914AE47915EC049D2A3703DBA4240986A8FC2F5905EC049D2A3703DBA4240986A8FC2F5905EC0BA0FAE47E1BA4240508914AE47915EC0BA0FAE47E1BA4240508914AE47915EC049D2A3703DBA424001030000000100000005000000986A8FC2F5905EC049D2A3703DBA4240E04B0AD7A3905EC049D2A3703DBA4240E04B0AD7A3905EC0BA0FAE47E1BA4240986A8FC2F5905EC0BA0FAE47E1BA4240986A8FC2F5905EC049D2A3703DBA424001030000000100000005000000508914AE47915EC0BA0FAE47E1BA4240986A8FC2F5905EC0BA0FAE47E1BA4240986A8FC2F5905EC02B4DB81E85BB4240508914AE47915EC02B4DB81E85BB4240508914AE47915EC0BA0FAE47E1BA424001030000000100000005000000986A8FC2F5905EC0BA0FAE47E1BA4240E04B0AD7A3905EC0BA0FAE47E1BA4240E04B0AD7A3905EC02B4DB81E85BB4240986A8FC2F5905EC02B4DB81E85BB4240986A8FC2F5905EC0BA0FAE47E1BA424001030000000100000005000000508914AE47915EC02B4DB81E85BB4240986A8FC2F5905EC02B4DB81E85BB4240986A8FC2F5905EC09C8AC2F528BC4240508914AE47915EC09C8AC2F528BC4240508914AE47915EC02B4DB81E85BB424001030000000100000005000000986A8FC2F5905EC02B4DB81E85BB4240E04B0AD7A3905EC02B4DB81E85BB4240E04B0AD7A3905EC09C8AC2F528BC4240986A8FC2F5905EC09C8AC2F528BC4240986A8FC2F5905EC02B4DB81E85BB424001030000000100000005000000508914AE47915EC09C8AC2F528BC4240986A8FC2F5905EC09C8AC2F528BC4240986A8FC2F5905EC00DC8CCCCCCBC4240508914AE47915EC00DC8CCCCCCBC4240508914AE47915EC09C8AC2F528BC424001030000000100000005000000986A8FC2F5905EC09C8AC2F528BC4240E04B0AD7A3905EC09C8AC2F528BC4240E04B0AD7A3905EC00DC8CCCCCCBC4240986A8FC2F5905EC00DC8CCCCCCBC4240986A8FC2F5905EC09C8AC2F528BC424001030000000100000005000000508914AE47915EC00DC8CCCCCCBC4240986A8FC2F5905EC00DC8CCCCCCBC4240986A8FC2F5905EC07E05D7A370BD4240508914AE47915EC07E05D7A370BD4240508914AE47915EC00DC8CCCCCCBC424001030000000100000005000000986A8FC2F5905EC00DC8CCCCCCBC4240E04B0AD7A3905EC00DC8CCCCCCBC4240E04B0AD7A3905EC07E05D7A370BD4240986A8FC2F5905EC07E05D7A370BD4240986A8FC2F5905EC00DC8CCCCCCBC424001030000000100000005000000986A8FC2F5905EC07E05D7A370BD4240E04B0AD7A3905EC07E05D7A370BD4240E04B0AD7A3905EC0EF42E17A14BE4240986A8FC2F5905EC0EF42E17A14BE4240986A8FC2F5905EC07E05D7A370BD424001030000000100000005000000986A8FC2F5905EC0EF42E17A14BE4240E04B0AD7A3905EC0EF42E17A14BE4240E04B0AD7A3905EC06080EB51B8BE4240986A8FC2F5905EC06080EB51B8BE4240986A8FC2F5905EC0EF42E17A14BE424001030000000100000005000000C0C61E85EB915EC06080EB51B8BE424008A8999999915EC06080EB51B8BE424008A8999999915EC0D1BDF5285CBF4240C0C61E85EB915EC0D1BDF5285CBF4240C0C61E85EB915EC06080EB51B8BE42400103000000010000000500000008A8999999915EC06080EB51B8BE4240508914AE47915EC06080EB51B8BE4240508914AE47915EC0D1BDF5285CBF424008A8999999915EC0D1BDF5285CBF424008A8999999915EC06080EB51B8BE424001030000000100000005000000508914AE47915EC06080EB51B8BE4240986A8FC2F5905EC06080EB51B8BE4240986A8FC2F5905EC0D1BDF5285CBF4240508914AE47915EC0D1BDF5285CBF4240508914AE47915EC06080EB51B8BE424001030000000100000005000000986A8FC2F5905EC06080EB51B8BE4240E04B0AD7A3905EC06080EB51B8BE4240E04B0AD7A3905EC0D1BDF5285CBF4240986A8FC2F5905EC0D1BDF5285CBF4240986A8FC2F5905EC06080EB51B8BE424001030000000100000005000000C0C61E85EB915EC0D1BDF5285CBF424008A8999999915EC0D1BDF5285CBF424008A8999999915EC042FBFFFFFFBF4240C0C61E85EB915EC042FBFFFFFFBF4240C0C61E85EB915EC0D1BDF5285CBF42400103000000010000000500000008A8999999915EC0D1BDF5285CBF4240508914AE47915EC0D1BDF5285CBF4240508914AE47915EC042FBFFFFFFBF424008A8999999915EC042FBFFFFFFBF424008A8999999915EC0D1BDF5285CBF424001030000000100000005000000508914AE47915EC0D1BDF5285CBF4240986A8FC2F5905EC0D1BDF5285CBF4240986A8FC2F5905EC042FBFFFFFFBF4240508914AE47915EC042FBFFFFFFBF4240508914AE47915EC0D1BDF5285CBF424001030000000100000005000000986A8FC2F5905EC0D1BDF5285CBF4240E04B0AD7A3905EC0D1BDF5285CBF4240E04B0AD7A3905EC042FBFFFFFFBF4240986A8FC2F5905EC042FBFFFFFFBF4240986A8FC2F5905EC0D1BDF5285CBF42400103000000010000000500000008A8999999915EC07E05D7A370BD4240508914AE47915EC07E05D7A370BD4240508914AE47915EC0EF42E17A14BE424008A8999999915EC0EF42E17A14BE424008A8999999915EC07E05D7A370BD424001030000000100000005000000508914AE47915EC07E05D7A370BD4240986A8FC2F5905EC07E05D7A370BD4240986A8FC2F5905EC0EF42E17A14BE4240508914AE47915EC0EF42E17A14BE4240508914AE47915EC07E05D7A370BD42400103000000010000000500000008A8999999915EC0EF42E17A14BE4240508914AE47915EC0EF42E17A14BE4240508914AE47915EC06080EB51B8BE424008A8999999915EC06080EB51B8BE424008A8999999915EC0EF42E17A14BE424001030000000100000005000000508914AE47915EC0EF42E17A14BE4240986A8FC2F5905EC0EF42E17A14BE4240986A8FC2F5905EC06080EB51B8BE4240508914AE47915EC06080EB51B8BE4240508914AE47915EC0EF42E17A14BE424001030000000100000005000000C0C61E85EB915EC0EF42E17A14BE424008A8999999915EC0EF42E17A14BE424008A8999999915EC06080EB51B8BE4240C0C61E85EB915EC06080EB51B8BE4240C0C61E85EB915EC0EF42E17A14BE424001030000000100000005000000C0C61E85EB915EC07E05D7A370BD424008A8999999915EC07E05D7A370BD424008A8999999915EC0EF42E17A14BE4240C0C61E85EB915EC0EF42E17A14BE4240C0C61E85EB915EC07E05D7A370BD42400103000000010000000500000008A8999999915EC00DC8CCCCCCBC4240508914AE47915EC00DC8CCCCCCBC4240508914AE47915EC07E05D7A370BD424008A8999999915EC07E05D7A370BD424008A8999999915EC00DC8CCCCCCBC42400103000000010000000500000008A8999999915EC09C8AC2F528BC4240508914AE47915EC09C8AC2F528BC4240508914AE47915EC00DC8CCCCCCBC424008A8999999915EC00DC8CCCCCCBC424008A8999999915EC09C8AC2F528BC42400103000000010000000500000000D1F5285C8F5EC0149F703D0AB7424048B2703D0A8F5EC0149F703D0AB7424048B2703D0A8F5EC085DC7A14AEB7424000D1F5285C8F5EC085DC7A14AEB7424000D1F5285C8F5EC0149F703D0AB742400103000000010000000500000048B2703D0A8F5EC0149F703D0AB742409093EB51B88E5EC0149F703D0AB742409093EB51B88E5EC085DC7A14AEB7424048B2703D0A8F5EC085DC7A14AEB7424048B2703D0A8F5EC0149F703D0AB74240010300000001000000050000009093EB51B88E5EC0149F703D0AB74240D8746666668E5EC0149F703D0AB74240D8746666668E5EC085DC7A14AEB742409093EB51B88E5EC085DC7A14AEB742409093EB51B88E5EC0149F703D0AB7424001030000000100000005000000D8746666668E5EC0149F703D0AB742402056E17A148E5EC0149F703D0AB742402056E17A148E5EC085DC7A14AEB74240D8746666668E5EC085DC7A14AEB74240D8746666668E5EC0149F703D0AB74240010300000001000000050000002056E17A148E5EC0149F703D0AB7424068375C8FC28D5EC0149F703D0AB7424068375C8FC28D5EC085DC7A14AEB742402056E17A148E5EC085DC7A14AEB742402056E17A148E5EC0149F703D0AB742400103000000010000000500000068375C8FC28D5EC0149F703D0AB74240B018D7A3708D5EC0149F703D0AB74240B018D7A3708D5EC085DC7A14AEB7424068375C8FC28D5EC085DC7A14AEB7424068375C8FC28D5EC0149F703D0AB742400103000000010000000500000000D1F5285C8F5EC085DC7A14AEB7424048B2703D0A8F5EC085DC7A14AEB7424048B2703D0A8F5EC0F61985EB51B8424000D1F5285C8F5EC0F61985EB51B8424000D1F5285C8F5EC085DC7A14AEB742400103000000010000000500000048B2703D0A8F5EC085DC7A14AEB742409093EB51B88E5EC085DC7A14AEB742409093EB51B88E5EC0F61985EB51B8424048B2703D0A8F5EC0F61985EB51B8424048B2703D0A8F5EC085DC7A14AEB74240010300000001000000050000009093EB51B88E5EC085DC7A14AEB74240D8746666668E5EC085DC7A14AEB74240D8746666668E5EC0F61985EB51B842409093EB51B88E5EC0F61985EB51B842409093EB51B88E5EC085DC7A14AEB7424001030000000100000005000000D8746666668E5EC085DC7A14AEB742402056E17A148E5EC085DC7A14AEB742402056E17A148E5EC0F61985EB51B84240D8746666668E5EC0F61985EB51B84240D8746666668E5EC085DC7A14AEB74240010300000001000000050000002056E17A148E5EC085DC7A14AEB7424068375C8FC28D5EC085DC7A14AEB7424068375C8FC28D5EC0F61985EB51B842402056E17A148E5EC0F61985EB51B842402056E17A148E5EC085DC7A14AEB742400103000000010000000500000000D1F5285C8F5EC0F61985EB51B8424048B2703D0A8F5EC0F61985EB51B8424048B2703D0A8F5EC067578FC2F5B8424000D1F5285C8F5EC067578FC2F5B8424000D1F5285C8F5EC0F61985EB51B842400103000000010000000500000048B2703D0A8F5EC0F61985EB51B842409093EB51B88E5EC0F61985EB51B842409093EB51B88E5EC067578FC2F5B8424048B2703D0A8F5EC067578FC2F5B8424048B2703D0A8F5EC0F61985EB51B84240010300000001000000050000009093EB51B88E5EC0F61985EB51B84240D8746666668E5EC0F61985EB51B84240D8746666668E5EC067578FC2F5B842409093EB51B88E5EC067578FC2F5B842409093EB51B88E5EC0F61985EB51B8424001030000000100000005000000D8746666668E5EC0F61985EB51B842402056E17A148E5EC0F61985EB51B842402056E17A148E5EC067578FC2F5B84240D8746666668E5EC067578FC2F5B84240D8746666668E5EC0F61985EB51B84240010300000001000000050000002056E17A148E5EC0F61985EB51B8424068375C8FC28D5EC0F61985EB51B8424068375C8FC28D5EC067578FC2F5B842402056E17A148E5EC067578FC2F5B842402056E17A148E5EC0F61985EB51B842400103000000010000000500000000D1F5285C8F5EC067578FC2F5B8424048B2703D0A8F5EC067578FC2F5B8424048B2703D0A8F5EC0D894999999B9424000D1F5285C8F5EC0D894999999B9424000D1F5285C8F5EC067578FC2F5B842400103000000010000000500000048B2703D0A8F5EC067578FC2F5B842409093EB51B88E5EC067578FC2F5B842409093EB51B88E5EC0D894999999B9424048B2703D0A8F5EC0D894999999B9424048B2703D0A8F5EC067578FC2F5B84240010300000001000000050000009093EB51B88E5EC067578FC2F5B84240D8746666668E5EC067578FC2F5B84240D8746666668E5EC0D894999999B942409093EB51B88E5EC0D894999999B942409093EB51B88E5EC067578FC2F5B8424001030000000100000005000000D8746666668E5EC067578FC2F5B842402056E17A148E5EC067578FC2F5B842402056E17A148E5EC0D894999999B94240D8746666668E5EC0D894999999B94240D8746666668E5EC067578FC2F5B84240010300000001000000050000002056E17A148E5EC067578FC2F5B8424068375C8FC28D5EC067578FC2F5B8424068375C8FC28D5EC0D894999999B942402056E17A148E5EC0D894999999B942402056E17A148E5EC067578FC2F5B842400103000000010000000500000000D1F5285C8F5EC0D894999999B9424048B2703D0A8F5EC0D894999999B9424048B2703D0A8F5EC049D2A3703DBA424000D1F5285C8F5EC049D2A3703DBA424000D1F5285C8F5EC0D894999999B942400103000000010000000500000048B2703D0A8F5EC0D894999999B942409093EB51B88E5EC0D894999999B942409093EB51B88E5EC049D2A3703DBA424048B2703D0A8F5EC049D2A3703DBA424048B2703D0A8F5EC0D894999999B94240010300000001000000050000009093EB51B88E5EC0D894999999B94240D8746666668E5EC0D894999999B94240D8746666668E5EC049D2A3703DBA42409093EB51B88E5EC049D2A3703DBA42409093EB51B88E5EC0D894999999B9424001030000000100000005000000D8746666668E5EC0D894999999B942402056E17A148E5EC0D894999999B942402056E17A148E5EC049D2A3703DBA4240D8746666668E5EC049D2A3703DBA4240D8746666668E5EC0D894999999B94240010300000001000000050000002056E17A148E5EC0D894999999B9424068375C8FC28D5EC0D894999999B9424068375C8FC28D5EC049D2A3703DBA42402056E17A148E5EC049D2A3703DBA42402056E17A148E5EC0D894999999B942400103000000010000000500000000D1F5285C8F5EC049D2A3703DBA424048B2703D0A8F5EC049D2A3703DBA424048B2703D0A8F5EC0BA0FAE47E1BA424000D1F5285C8F5EC0BA0FAE47E1BA424000D1F5285C8F5EC049D2A3703DBA42400103000000010000000500000048B2703D0A8F5EC049D2A3703DBA42409093EB51B88E5EC049D2A3703DBA42409093EB51B88E5EC0BA0FAE47E1BA424048B2703D0A8F5EC0BA0FAE47E1BA424048B2703D0A8F5EC049D2A3703DBA4240010300000001000000050000009093EB51B88E5EC049D2A3703DBA4240D8746666668E5EC049D2A3703DBA4240D8746666668E5EC0BA0FAE47E1BA42409093EB51B88E5EC0BA0FAE47E1BA42409093EB51B88E5EC049D2A3703DBA424001030000000100000005000000D8746666668E5EC049D2A3703DBA42402056E17A148E5EC049D2A3703DBA42402056E17A148E5EC0BA0FAE47E1BA4240D8746666668E5EC0BA0FAE47E1BA4240D8746666668E5EC049D2A3703DBA4240010300000001000000050000002056E17A148E5EC049D2A3703DBA424068375C8FC28D5EC049D2A3703DBA424068375C8FC28D5EC0BA0FAE47E1BA42402056E17A148E5EC0BA0FAE47E1BA42402056E17A148E5EC049D2A3703DBA42400103000000010000000500000000D1F5285C8F5EC0BA0FAE47E1BA424048B2703D0A8F5EC0BA0FAE47E1BA424048B2703D0A8F5EC02B4DB81E85BB424000D1F5285C8F5EC02B4DB81E85BB424000D1F5285C8F5EC0BA0FAE47E1BA42400103000000010000000500000048B2703D0A8F5EC0BA0FAE47E1BA42409093EB51B88E5EC0BA0FAE47E1BA42409093EB51B88E5EC02B4DB81E85BB424048B2703D0A8F5EC02B4DB81E85BB424048B2703D0A8F5EC0BA0FAE47E1BA4240010300000001000000050000009093EB51B88E5EC0BA0FAE47E1BA4240D8746666668E5EC0BA0FAE47E1BA4240D8746666668E5EC02B4DB81E85BB42409093EB51B88E5EC02B4DB81E85BB42409093EB51B88E5EC0BA0FAE47E1BA424001030000000100000005000000D8746666668E5EC0BA0FAE47E1BA42402056E17A148E5EC0BA0FAE47E1BA42402056E17A148E5EC02B4DB81E85BB4240D8746666668E5EC02B4DB81E85BB4240D8746666668E5EC0BA0FAE47E1BA4240010300000001000000050000002056E17A148E5EC0BA0FAE47E1BA424068375C8FC28D5EC0BA0FAE47E1BA424068375C8FC28D5EC02B4DB81E85BB42402056E17A148E5EC02B4DB81E85BB42402056E17A148E5EC0BA0FAE47E1BA42400103000000010000000500000000D1F5285C8F5EC02B4DB81E85BB424048B2703D0A8F5EC02B4DB81E85BB424048B2703D0A8F5EC09C8AC2F528BC424000D1F5285C8F5EC09C8AC2F528BC424000D1F5285C8F5EC02B4DB81E85BB42400103000000010000000500000048B2703D0A8F5EC02B4DB81E85BB42409093EB51B88E5EC02B4DB81E85BB42409093EB51B88E5EC09C8AC2F528BC424048B2703D0A8F5EC09C8AC2F528BC424048B2703D0A8F5EC02B4DB81E85BB4240010300000001000000050000009093EB51B88E5EC02B4DB81E85BB4240D8746666668E5EC02B4DB81E85BB4240D8746666668E5EC09C8AC2F528BC42409093EB51B88E5EC09C8AC2F528BC42409093EB51B88E5EC02B4DB81E85BB424001030000000100000005000000D8746666668E5EC02B4DB81E85BB42402056E17A148E5EC02B4DB81E85BB42402056E17A148E5EC09C8AC2F528BC4240D8746666668E5EC09C8AC2F528BC4240D8746666668E5EC02B4DB81E85BB4240010300000001000000050000002056E17A148E5EC02B4DB81E85BB424068375C8FC28D5EC02B4DB81E85BB424068375C8FC28D5EC09C8AC2F528BC42402056E17A148E5EC09C8AC2F528BC42402056E17A148E5EC02B4DB81E85BB42400103000000010000000500000000D1F5285C8F5EC09C8AC2F528BC424048B2703D0A8F5EC09C8AC2F528BC424048B2703D0A8F5EC00DC8CCCCCCBC424000D1F5285C8F5EC00DC8CCCCCCBC424000D1F5285C8F5EC09C8AC2F528BC42400103000000010000000500000048B2703D0A8F5EC09C8AC2F528BC42409093EB51B88E5EC09C8AC2F528BC42409093EB51B88E5EC00DC8CCCCCCBC424048B2703D0A8F5EC00DC8CCCCCCBC424048B2703D0A8F5EC09C8AC2F528BC4240010300000001000000050000009093EB51B88E5EC09C8AC2F528BC4240D8746666668E5EC09C8AC2F528BC4240D8746666668E5EC00DC8CCCCCCBC42409093EB51B88E5EC00DC8CCCCCCBC42409093EB51B88E5EC09C8AC2F528BC424001030000000100000005000000D8746666668E5EC09C8AC2F528BC42402056E17A148E5EC09C8AC2F528BC42402056E17A148E5EC00DC8CCCCCCBC4240D8746666668E5EC00DC8CCCCCCBC4240D8746666668E5EC09C8AC2F528BC4240010300000001000000050000002056E17A148E5EC09C8AC2F528BC424068375C8FC28D5EC09C8AC2F528BC424068375C8FC28D5EC00DC8CCCCCCBC42402056E17A148E5EC00DC8CCCCCCBC42402056E17A148E5EC09C8AC2F528BC42400103000000010000000500000000D1F5285C8F5EC00DC8CCCCCCBC424048B2703D0A8F5EC00DC8CCCCCCBC424048B2703D0A8F5EC07E05D7A370BD424000D1F5285C8F5EC07E05D7A370BD424000D1F5285C8F5EC00DC8CCCCCCBC42400103000000010000000500000048B2703D0A8F5EC00DC8CCCCCCBC42409093EB51B88E5EC00DC8CCCCCCBC42409093EB51B88E5EC07E05D7A370BD424048B2703D0A8F5EC07E05D7A370BD424048B2703D0A8F5EC00DC8CCCCCCBC4240010300000001000000050000009093EB51B88E5EC00DC8CCCCCCBC4240D8746666668E5EC00DC8CCCCCCBC4240D8746666668E5EC07E05D7A370BD42409093EB51B88E5EC07E05D7A370BD42409093EB51B88E5EC00DC8CCCCCCBC424001030000000100000005000000D8746666668E5EC00DC8CCCCCCBC42402056E17A148E5EC00DC8CCCCCCBC42402056E17A148E5EC07E05D7A370BD4240D8746666668E5EC07E05D7A370BD4240D8746666668E5EC00DC8CCCCCCBC4240010300000001000000050000002056E17A148E5EC00DC8CCCCCCBC424068375C8FC28D5EC00DC8CCCCCCBC424068375C8FC28D5EC07E05D7A370BD42402056E17A148E5EC07E05D7A370BD42402056E17A148E5EC00DC8CCCCCCBC42400103000000010000000500000000D1F5285C8F5EC07E05D7A370BD424048B2703D0A8F5EC07E05D7A370BD424048B2703D0A8F5EC0EF42E17A14BE424000D1F5285C8F5EC0EF42E17A14BE424000D1F5285C8F5EC07E05D7A370BD42400103000000010000000500000048B2703D0A8F5EC07E05D7A370BD42409093EB51B88E5EC07E05D7A370BD42409093EB51B88E5EC0EF42E17A14BE424048B2703D0A8F5EC0EF42E17A14BE424048B2703D0A8F5EC07E05D7A370BD4240010300000001000000050000009093EB51B88E5EC07E05D7A370BD4240D8746666668E5EC07E05D7A370BD4240D8746666668E5EC0EF42E17A14BE42409093EB51B88E5EC0EF42E17A14BE42409093EB51B88E5EC07E05D7A370BD424001030000000100000005000000D8746666668E5EC07E05D7A370BD42402056E17A148E5EC07E05D7A370BD42402056E17A148E5EC0EF42E17A14BE4240D8746666668E5EC0EF42E17A14BE4240D8746666668E5EC07E05D7A370BD4240010300000001000000050000002056E17A148E5EC07E05D7A370BD424068375C8FC28D5EC07E05D7A370BD424068375C8FC28D5EC0EF42E17A14BE42402056E17A148E5EC0EF42E17A14BE42402056E17A148E5EC07E05D7A370BD42400103000000010000000500000000D1F5285C8F5EC0EF42E17A14BE424048B2703D0A8F5EC0EF42E17A14BE424048B2703D0A8F5EC06080EB51B8BE424000D1F5285C8F5EC06080EB51B8BE424000D1F5285C8F5EC0EF42E17A14BE42400103000000010000000500000048B2703D0A8F5EC0EF42E17A14BE42409093EB51B88E5EC0EF42E17A14BE42409093EB51B88E5EC06080EB51B8BE424048B2703D0A8F5EC06080EB51B8BE424048B2703D0A8F5EC0EF42E17A14BE4240010300000001000000050000009093EB51B88E5EC0EF42E17A14BE4240D8746666668E5EC0EF42E17A14BE4240D8746666668E5EC06080EB51B8BE42409093EB51B88E5EC06080EB51B8BE42409093EB51B88E5EC0EF42E17A14BE424001030000000100000005000000D8746666668E5EC0EF42E17A14BE42402056E17A148E5EC0EF42E17A14BE42402056E17A148E5EC06080EB51B8BE4240D8746666668E5EC06080EB51B8BE4240D8746666668E5EC0EF42E17A14BE4240010300000001000000050000002056E17A148E5EC0EF42E17A14BE424068375C8FC28D5EC0EF42E17A14BE424068375C8FC28D5EC06080EB51B8BE42402056E17A148E5EC06080EB51B8BE42402056E17A148E5EC0EF42E17A14BE42400103000000010000000500000068375C8FC28D5EC0EF42E17A14BE4240B018D7A3708D5EC0EF42E17A14BE4240B018D7A3708D5EC06080EB51B8BE424068375C8FC28D5EC06080EB51B8BE424068375C8FC28D5EC0EF42E17A14BE42400103000000010000000500000000D1F5285C8F5EC06080EB51B8BE424048B2703D0A8F5EC06080EB51B8BE424048B2703D0A8F5EC0D1BDF5285CBF424000D1F5285C8F5EC0D1BDF5285CBF424000D1F5285C8F5EC06080EB51B8BE42400103000000010000000500000048B2703D0A8F5EC06080EB51B8BE42409093EB51B88E5EC06080EB51B8BE42409093EB51B88E5EC0D1BDF5285CBF424048B2703D0A8F5EC0D1BDF5285CBF424048B2703D0A8F5EC06080EB51B8BE4240010300000001000000050000009093EB51B88E5EC06080EB51B8BE4240D8746666668E5EC06080EB51B8BE4240D8746666668E5EC0D1BDF5285CBF42409093EB51B88E5EC0D1BDF5285CBF42409093EB51B88E5EC06080EB51B8BE424001030000000100000005000000D8746666668E5EC06080EB51B8BE42402056E17A148E5EC06080EB51B8BE42402056E17A148E5EC0D1BDF5285CBF4240D8746666668E5EC0D1BDF5285CBF4240D8746666668E5EC06080EB51B8BE4240010300000001000000050000002056E17A148E5EC06080EB51B8BE424068375C8FC28D5EC06080EB51B8BE424068375C8FC28D5EC0D1BDF5285CBF42402056E17A148E5EC0D1BDF5285CBF42402056E17A148E5EC06080EB51B8BE42400103000000010000000500000068375C8FC28D5EC06080EB51B8BE4240B018D7A3708D5EC06080EB51B8BE4240B018D7A3708D5EC0D1BDF5285CBF424068375C8FC28D5EC0D1BDF5285CBF424068375C8FC28D5EC06080EB51B8BE42400103000000010000000500000000D1F5285C8F5EC0D1BDF5285CBF424048B2703D0A8F5EC0D1BDF5285CBF424048B2703D0A8F5EC042FBFFFFFFBF424000D1F5285C8F5EC042FBFFFFFFBF424000D1F5285C8F5EC0D1BDF5285CBF42400103000000010000000500000048B2703D0A8F5EC0D1BDF5285CBF42409093EB51B88E5EC0D1BDF5285CBF42409093EB51B88E5EC042FBFFFFFFBF424048B2703D0A8F5EC042FBFFFFFFBF424048B2703D0A8F5EC0D1BDF5285CBF4240010300000001000000050000009093EB51B88E5EC0D1BDF5285CBF4240D8746666668E5EC0D1BDF5285CBF4240D8746666668E5EC042FBFFFFFFBF42409093EB51B88E5EC042FBFFFFFFBF42409093EB51B88E5EC0D1BDF5285CBF424001030000000100000005000000D8746666668E5EC0D1BDF5285CBF42402056E17A148E5EC0D1BDF5285CBF42402056E17A148E5EC042FBFFFFFFBF4240D8746666668E5EC042FBFFFFFFBF4240D8746666668E5EC0D1BDF5285CBF4240010300000001000000050000002056E17A148E5EC0D1BDF5285CBF424068375C8FC28D5EC0D1BDF5285CBF424068375C8FC28D5EC042FBFFFFFFBF42402056E17A148E5EC042FBFFFFFFBF42402056E17A148E5EC0D1BDF5285CBF42400103000000010000000500000068375C8FC28D5EC0D1BDF5285CBF4240B018D7A3708D5EC0D1BDF5285CBF4240B018D7A3708D5EC042FBFFFFFFBF424068375C8FC28D5EC042FBFFFFFFBF424068375C8FC28D5EC0D1BDF5285CBF42400103000000010000000500000000D1F5285C8F5EC042FBFFFFFFBF424048B2703D0A8F5EC042FBFFFFFFBF424048B2703D0A8F5EC0B3380AD7A3C0424000D1F5285C8F5EC0B3380AD7A3C0424000D1F5285C8F5EC042FBFFFFFFBF42400103000000010000000500000048B2703D0A8F5EC042FBFFFFFFBF42409093EB51B88E5EC042FBFFFFFFBF42409093EB51B88E5EC0B3380AD7A3C0424048B2703D0A8F5EC0B3380AD7A3C0424048B2703D0A8F5EC042FBFFFFFFBF4240010300000001000000050000009093EB51B88E5EC042FBFFFFFFBF4240D8746666668E5EC042FBFFFFFFBF4240D8746666668E5EC0B3380AD7A3C042409093EB51B88E5EC0B3380AD7A3C042409093EB51B88E5EC042FBFFFFFFBF424001030000000100000005000000D8746666668E5EC042FBFFFFFFBF42402056E17A148E5EC042FBFFFFFFBF42402056E17A148E5EC0B3380AD7A3C04240D8746666668E5EC0B3380AD7A3C04240D8746666668E5EC042FBFFFFFFBF4240010300000001000000050000002056E17A148E5EC042FBFFFFFFBF424068375C8FC28D5EC042FBFFFFFFBF424068375C8FC28D5EC0B3380AD7A3C042402056E17A148E5EC0B3380AD7A3C042402056E17A148E5EC042FBFFFFFFBF42400103000000010000000500000068375C8FC28D5EC042FBFFFFFFBF4240B018D7A3708D5EC042FBFFFFFFBF4240B018D7A3708D5EC0B3380AD7A3C0424068375C8FC28D5EC0B3380AD7A3C0424068375C8FC28D5EC042FBFFFFFFBF42400103000000010000000500000000D1F5285C8F5EC0B3380AD7A3C0424048B2703D0A8F5EC0B3380AD7A3C0424048B2703D0A8F5EC0247614AE47C1424000D1F5285C8F5EC0247614AE47C1424000D1F5285C8F5EC0B3380AD7A3C042400103000000010000000500000048B2703D0A8F5EC0B3380AD7A3C042409093EB51B88E5EC0B3380AD7A3C042409093EB51B88E5EC0247614AE47C1424048B2703D0A8F5EC0247614AE47C1424048B2703D0A8F5EC0B3380AD7A3C04240010300000001000000050000009093EB51B88E5EC0B3380AD7A3C04240D8746666668E5EC0B3380AD7A3C04240D8746666668E5EC0247614AE47C142409093EB51B88E5EC0247614AE47C142409093EB51B88E5EC0B3380AD7A3C0424001030000000100000005000000D8746666668E5EC0B3380AD7A3C042402056E17A148E5EC0B3380AD7A3C042402056E17A148E5EC0247614AE47C14240D8746666668E5EC0247614AE47C14240D8746666668E5EC0B3380AD7A3C04240010300000001000000050000002056E17A148E5EC0B3380AD7A3C0424068375C8FC28D5EC0B3380AD7A3C0424068375C8FC28D5EC0247614AE47C142402056E17A148E5EC0247614AE47C142402056E17A148E5EC0B3380AD7A3C042400103000000010000000500000068375C8FC28D5EC0B3380AD7A3C04240B018D7A3708D5EC0B3380AD7A3C04240B018D7A3708D5EC0247614AE47C1424068375C8FC28D5EC0247614AE47C1424068375C8FC28D5EC0B3380AD7A3C0424001030000000100000005000000B018D7A3708D5EC0149F703D0AB74240F8F951B81E8D5EC0149F703D0AB74240F8F951B81E8D5EC085DC7A14AEB74240B018D7A3708D5EC085DC7A14AEB74240B018D7A3708D5EC0149F703D0AB7424001030000000100000005000000F8F951B81E8D5EC0149F703D0AB7424040DBCCCCCC8C5EC0149F703D0AB7424040DBCCCCCC8C5EC085DC7A14AEB74240F8F951B81E8D5EC085DC7A14AEB74240F8F951B81E8D5EC0149F703D0AB7424001030000000100000005000000B018D7A3708D5EC0EF42E17A14BE4240F8F951B81E8D5EC0EF42E17A14BE4240F8F951B81E8D5EC06080EB51B8BE4240B018D7A3708D5EC06080EB51B8BE4240B018D7A3708D5EC0EF42E17A14BE424001030000000100000005000000F8F951B81E8D5EC0EF42E17A14BE424040DBCCCCCC8C5EC0EF42E17A14BE424040DBCCCCCC8C5EC06080EB51B8BE4240F8F951B81E8D5EC06080EB51B8BE4240F8F951B81E8D5EC0EF42E17A14BE424001030000000100000005000000B018D7A3708D5EC06080EB51B8BE4240F8F951B81E8D5EC06080EB51B8BE4240F8F951B81E8D5EC0D1BDF5285CBF4240B018D7A3708D5EC0D1BDF5285CBF4240B018D7A3708D5EC06080EB51B8BE424001030000000100000005000000F8F951B81E8D5EC06080EB51B8BE424040DBCCCCCC8C5EC06080EB51B8BE424040DBCCCCCC8C5EC0D1BDF5285CBF4240F8F951B81E8D5EC0D1BDF5285CBF4240F8F951B81E8D5EC06080EB51B8BE424001030000000100000005000000B018D7A3708D5EC0D1BDF5285CBF4240F8F951B81E8D5EC0D1BDF5285CBF4240F8F951B81E8D5EC042FBFFFFFFBF4240B018D7A3708D5EC042FBFFFFFFBF4240B018D7A3708D5EC0D1BDF5285CBF424001030000000100000005000000F8F951B81E8D5EC0D1BDF5285CBF424040DBCCCCCC8C5EC0D1BDF5285CBF424040DBCCCCCC8C5EC042FBFFFFFFBF4240F8F951B81E8D5EC042FBFFFFFFBF4240F8F951B81E8D5EC0D1BDF5285CBF424001030000000100000005000000B018D7A3708D5EC042FBFFFFFFBF4240F8F951B81E8D5EC042FBFFFFFFBF4240F8F951B81E8D5EC0B3380AD7A3C04240B018D7A3708D5EC0B3380AD7A3C04240B018D7A3708D5EC042FBFFFFFFBF424001030000000100000005000000F8F951B81E8D5EC042FBFFFFFFBF424040DBCCCCCC8C5EC042FBFFFFFFBF424040DBCCCCCC8C5EC0B3380AD7A3C04240F8F951B81E8D5EC0B3380AD7A3C04240F8F951B81E8D5EC042FBFFFFFFBF42400103000000010000000500000040DBCCCCCC8C5EC0EF42E17A14BE424088BC47E17A8C5EC0EF42E17A14BE424088BC47E17A8C5EC06080EB51B8BE424040DBCCCCCC8C5EC06080EB51B8BE424040DBCCCCCC8C5EC0EF42E17A14BE42400103000000010000000500000040DBCCCCCC8C5EC06080EB51B8BE424088BC47E17A8C5EC06080EB51B8BE424088BC47E17A8C5EC0D1BDF5285CBF424040DBCCCCCC8C5EC0D1BDF5285CBF424040DBCCCCCC8C5EC06080EB51B8BE42400103000000010000000500000088BC47E17A8C5EC06E2E333333B34240D09DC2F5288C5EC06E2E333333B34240D09DC2F5288C5EC0DF6B3D0AD7B3424088BC47E17A8C5EC0DF6B3D0AD7B3424088BC47E17A8C5EC06E2E333333B3424001030000000100000005000000D09DC2F5288C5EC06E2E333333B34240187F3D0AD78B5EC06E2E333333B34240187F3D0AD78B5EC0DF6B3D0AD7B34240D09DC2F5288C5EC0DF6B3D0AD7B34240D09DC2F5288C5EC06E2E333333B3424001030000000100000005000000187F3D0AD78B5EC06E2E333333B342406060B81E858B5EC06E2E333333B342406060B81E858B5EC0DF6B3D0AD7B34240187F3D0AD78B5EC0DF6B3D0AD7B34240187F3D0AD78B5EC06E2E333333B34240010300000001000000050000006060B81E858B5EC06E2E333333B34240A8413333338B5EC06E2E333333B34240A8413333338B5EC0DF6B3D0AD7B342406060B81E858B5EC0DF6B3D0AD7B342406060B81E858B5EC06E2E333333B3424001030000000100000005000000A8413333338B5EC06E2E333333B34240F022AE47E18A5EC06E2E333333B34240F022AE47E18A5EC0DF6B3D0AD7B34240A8413333338B5EC0DF6B3D0AD7B34240A8413333338B5EC06E2E333333B3424001030000000100000005000000F022AE47E18A5EC06E2E333333B342403804295C8F8A5EC06E2E333333B342403804295C8F8A5EC0DF6B3D0AD7B34240F022AE47E18A5EC0DF6B3D0AD7B34240F022AE47E18A5EC06E2E333333B34240010300000001000000050000003804295C8F8A5EC06E2E333333B3424080E5A3703D8A5EC06E2E333333B3424080E5A3703D8A5EC0DF6B3D0AD7B342403804295C8F8A5EC0DF6B3D0AD7B342403804295C8F8A5EC06E2E333333B342400103000000010000000500000080E5A3703D8A5EC06E2E333333B34240C8C61E85EB895EC06E2E333333B34240C8C61E85EB895EC0DF6B3D0AD7B3424080E5A3703D8A5EC0DF6B3D0AD7B3424080E5A3703D8A5EC06E2E333333B3424001030000000100000005000000C8C61E85EB895EC06E2E333333B3424010A8999999895EC06E2E333333B3424010A8999999895EC0DF6B3D0AD7B34240C8C61E85EB895EC0DF6B3D0AD7B34240C8C61E85EB895EC06E2E333333B342400103000000010000000500000010A8999999895EC06E2E333333B34240588914AE47895EC06E2E333333B34240588914AE47895EC0DF6B3D0AD7B3424010A8999999895EC0DF6B3D0AD7B3424010A8999999895EC06E2E333333B3424001030000000100000005000000588914AE47895EC06E2E333333B34240A06A8FC2F5885EC06E2E333333B34240A06A8FC2F5885EC0DF6B3D0AD7B34240588914AE47895EC0DF6B3D0AD7B34240588914AE47895EC06E2E333333B3424001030000000100000005000000A06A8FC2F5885EC06E2E333333B34240E84B0AD7A3885EC06E2E333333B34240E84B0AD7A3885EC0DF6B3D0AD7B34240A06A8FC2F5885EC0DF6B3D0AD7B34240A06A8FC2F5885EC06E2E333333B3424001030000000100000005000000E84B0AD7A3885EC06E2E333333B34240302D85EB51885EC06E2E333333B34240302D85EB51885EC0DF6B3D0AD7B34240E84B0AD7A3885EC0DF6B3D0AD7B34240E84B0AD7A3885EC06E2E333333B342400103000000010000000500000088BC47E17A8C5EC0DF6B3D0AD7B34240D09DC2F5288C5EC0DF6B3D0AD7B34240D09DC2F5288C5EC050A947E17AB4424088BC47E17A8C5EC050A947E17AB4424088BC47E17A8C5EC0DF6B3D0AD7B3424001030000000100000005000000D09DC2F5288C5EC0DF6B3D0AD7B34240187F3D0AD78B5EC0DF6B3D0AD7B34240187F3D0AD78B5EC050A947E17AB44240D09DC2F5288C5EC050A947E17AB44240D09DC2F5288C5EC0DF6B3D0AD7B3424001030000000100000005000000187F3D0AD78B5EC0DF6B3D0AD7B342406060B81E858B5EC0DF6B3D0AD7B342406060B81E858B5EC050A947E17AB44240187F3D0AD78B5EC050A947E17AB44240187F3D0AD78B5EC0DF6B3D0AD7B34240010300000001000000050000006060B81E858B5EC0DF6B3D0AD7B34240A8413333338B5EC0DF6B3D0AD7B34240A8413333338B5EC050A947E17AB442406060B81E858B5EC050A947E17AB442406060B81E858B5EC0DF6B3D0AD7B3424001030000000100000005000000A8413333338B5EC0DF6B3D0AD7B34240F022AE47E18A5EC0DF6B3D0AD7B34240F022AE47E18A5EC050A947E17AB44240A8413333338B5EC050A947E17AB44240A8413333338B5EC0DF6B3D0AD7B3424001030000000100000005000000F022AE47E18A5EC0DF6B3D0AD7B342403804295C8F8A5EC0DF6B3D0AD7B342403804295C8F8A5EC050A947E17AB44240F022AE47E18A5EC050A947E17AB44240F022AE47E18A5EC0DF6B3D0AD7B34240010300000001000000050000003804295C8F8A5EC0DF6B3D0AD7B3424080E5A3703D8A5EC0DF6B3D0AD7B3424080E5A3703D8A5EC050A947E17AB442403804295C8F8A5EC050A947E17AB442403804295C8F8A5EC0DF6B3D0AD7B342400103000000010000000500000080E5A3703D8A5EC0DF6B3D0AD7B34240C8C61E85EB895EC0DF6B3D0AD7B34240C8C61E85EB895EC050A947E17AB4424080E5A3703D8A5EC050A947E17AB4424080E5A3703D8A5EC0DF6B3D0AD7B3424001030000000100000005000000C8C61E85EB895EC0DF6B3D0AD7B3424010A8999999895EC0DF6B3D0AD7B3424010A8999999895EC050A947E17AB44240C8C61E85EB895EC050A947E17AB44240C8C61E85EB895EC0DF6B3D0AD7B342400103000000010000000500000010A8999999895EC0DF6B3D0AD7B34240588914AE47895EC0DF6B3D0AD7B34240588914AE47895EC050A947E17AB4424010A8999999895EC050A947E17AB4424010A8999999895EC0DF6B3D0AD7B3424001030000000100000005000000588914AE47895EC0DF6B3D0AD7B34240A06A8FC2F5885EC0DF6B3D0AD7B34240A06A8FC2F5885EC050A947E17AB44240588914AE47895EC050A947E17AB44240588914AE47895EC0DF6B3D0AD7B3424001030000000100000005000000A06A8FC2F5885EC0DF6B3D0AD7B34240E84B0AD7A3885EC0DF6B3D0AD7B34240E84B0AD7A3885EC050A947E17AB44240A06A8FC2F5885EC050A947E17AB44240A06A8FC2F5885EC0DF6B3D0AD7B3424001030000000100000005000000E84B0AD7A3885EC0DF6B3D0AD7B34240302D85EB51885EC0DF6B3D0AD7B34240302D85EB51885EC050A947E17AB44240E84B0AD7A3885EC050A947E17AB44240E84B0AD7A3885EC0DF6B3D0AD7B342400103000000010000000500000088BC47E17A8C5EC050A947E17AB44240D09DC2F5288C5EC050A947E17AB44240D09DC2F5288C5EC0C1E651B81EB5424088BC47E17A8C5EC0C1E651B81EB5424088BC47E17A8C5EC050A947E17AB4424001030000000100000005000000D09DC2F5288C5EC050A947E17AB44240187F3D0AD78B5EC050A947E17AB44240187F3D0AD78B5EC0C1E651B81EB54240D09DC2F5288C5EC0C1E651B81EB54240D09DC2F5288C5EC050A947E17AB4424001030000000100000005000000187F3D0AD78B5EC050A947E17AB442406060B81E858B5EC050A947E17AB442406060B81E858B5EC0C1E651B81EB54240187F3D0AD78B5EC0C1E651B81EB54240187F3D0AD78B5EC050A947E17AB44240010300000001000000050000006060B81E858B5EC050A947E17AB44240A8413333338B5EC050A947E17AB44240A8413333338B5EC0C1E651B81EB542406060B81E858B5EC0C1E651B81EB542406060B81E858B5EC050A947E17AB4424001030000000100000005000000A8413333338B5EC050A947E17AB44240F022AE47E18A5EC050A947E17AB44240F022AE47E18A5EC0C1E651B81EB54240A8413333338B5EC0C1E651B81EB54240A8413333338B5EC050A947E17AB4424001030000000100000005000000F022AE47E18A5EC050A947E17AB442403804295C8F8A5EC050A947E17AB442403804295C8F8A5EC0C1E651B81EB54240F022AE47E18A5EC0C1E651B81EB54240F022AE47E18A5EC050A947E17AB44240010300000001000000050000003804295C8F8A5EC050A947E17AB4424080E5A3703D8A5EC050A947E17AB4424080E5A3703D8A5EC0C1E651B81EB542403804295C8F8A5EC0C1E651B81EB542403804295C8F8A5EC050A947E17AB442400103000000010000000500000080E5A3703D8A5EC050A947E17AB44240C8C61E85EB895EC050A947E17AB44240C8C61E85EB895EC0C1E651B81EB5424080E5A3703D8A5EC0C1E651B81EB5424080E5A3703D8A5EC050A947E17AB4424001030000000100000005000000C8C61E85EB895EC050A947E17AB4424010A8999999895EC050A947E17AB4424010A8999999895EC0C1E651B81EB54240C8C61E85EB895EC0C1E651B81EB54240C8C61E85EB895EC050A947E17AB442400103000000010000000500000010A8999999895EC050A947E17AB44240588914AE47895EC050A947E17AB44240588914AE47895EC0C1E651B81EB5424010A8999999895EC0C1E651B81EB5424010A8999999895EC050A947E17AB4424001030000000100000005000000588914AE47895EC050A947E17AB44240A06A8FC2F5885EC050A947E17AB44240A06A8FC2F5885EC0C1E651B81EB54240588914AE47895EC0C1E651B81EB54240588914AE47895EC050A947E17AB4424001030000000100000005000000A06A8FC2F5885EC050A947E17AB44240E84B0AD7A3885EC050A947E17AB44240E84B0AD7A3885EC0C1E651B81EB54240A06A8FC2F5885EC0C1E651B81EB54240A06A8FC2F5885EC050A947E17AB4424001030000000100000005000000E84B0AD7A3885EC050A947E17AB44240302D85EB51885EC050A947E17AB44240302D85EB51885EC0C1E651B81EB54240E84B0AD7A3885EC0C1E651B81EB54240E84B0AD7A3885EC050A947E17AB442400103000000010000000500000088BC47E17A8C5EC0C1E651B81EB54240D09DC2F5288C5EC0C1E651B81EB54240D09DC2F5288C5EC032245C8FC2B5424088BC47E17A8C5EC032245C8FC2B5424088BC47E17A8C5EC0C1E651B81EB5424001030000000100000005000000D09DC2F5288C5EC0C1E651B81EB54240187F3D0AD78B5EC0C1E651B81EB54240187F3D0AD78B5EC032245C8FC2B54240D09DC2F5288C5EC032245C8FC2B54240D09DC2F5288C5EC0C1E651B81EB5424001030000000100000005000000187F3D0AD78B5EC0C1E651B81EB542406060B81E858B5EC0C1E651B81EB542406060B81E858B5EC032245C8FC2B54240187F3D0AD78B5EC032245C8FC2B54240187F3D0AD78B5EC0C1E651B81EB54240010300000001000000050000006060B81E858B5EC0C1E651B81EB54240A8413333338B5EC0C1E651B81EB54240A8413333338B5EC032245C8FC2B542406060B81E858B5EC032245C8FC2B542406060B81E858B5EC0C1E651B81EB5424001030000000100000005000000A8413333338B5EC0C1E651B81EB54240F022AE47E18A5EC0C1E651B81EB54240F022AE47E18A5EC032245C8FC2B54240A8413333338B5EC032245C8FC2B54240A8413333338B5EC0C1E651B81EB5424001030000000100000005000000F022AE47E18A5EC0C1E651B81EB542403804295C8F8A5EC0C1E651B81EB542403804295C8F8A5EC032245C8FC2B54240F022AE47E18A5EC032245C8FC2B54240F022AE47E18A5EC0C1E651B81EB54240010300000001000000050000003804295C8F8A5EC0C1E651B81EB5424080E5A3703D8A5EC0C1E651B81EB5424080E5A3703D8A5EC032245C8FC2B542403804295C8F8A5EC032245C8FC2B542403804295C8F8A5EC0C1E651B81EB542400103000000010000000500000080E5A3703D8A5EC0C1E651B81EB54240C8C61E85EB895EC0C1E651B81EB54240C8C61E85EB895EC032245C8FC2B5424080E5A3703D8A5EC032245C8FC2B5424080E5A3703D8A5EC0C1E651B81EB5424001030000000100000005000000C8C61E85EB895EC0C1E651B81EB5424010A8999999895EC0C1E651B81EB5424010A8999999895EC032245C8FC2B54240C8C61E85EB895EC032245C8FC2B54240C8C61E85EB895EC0C1E651B81EB542400103000000010000000500000010A8999999895EC0C1E651B81EB54240588914AE47895EC0C1E651B81EB54240588914AE47895EC032245C8FC2B5424010A8999999895EC032245C8FC2B5424010A8999999895EC0C1E651B81EB5424001030000000100000005000000588914AE47895EC0C1E651B81EB54240A06A8FC2F5885EC0C1E651B81EB54240A06A8FC2F5885EC032245C8FC2B54240588914AE47895EC032245C8FC2B54240588914AE47895EC0C1E651B81EB5424001030000000100000005000000A06A8FC2F5885EC0C1E651B81EB54240E84B0AD7A3885EC0C1E651B81EB54240E84B0AD7A3885EC032245C8FC2B54240A06A8FC2F5885EC032245C8FC2B54240A06A8FC2F5885EC0C1E651B81EB5424001030000000100000005000000E84B0AD7A3885EC0C1E651B81EB54240302D85EB51885EC0C1E651B81EB54240302D85EB51885EC032245C8FC2B54240E84B0AD7A3885EC032245C8FC2B54240E84B0AD7A3885EC0C1E651B81EB542400103000000010000000500000088BC47E17A8C5EC032245C8FC2B54240D09DC2F5288C5EC032245C8FC2B54240D09DC2F5288C5EC0A361666666B6424088BC47E17A8C5EC0A361666666B6424088BC47E17A8C5EC032245C8FC2B5424001030000000100000005000000D09DC2F5288C5EC032245C8FC2B54240187F3D0AD78B5EC032245C8FC2B54240187F3D0AD78B5EC0A361666666B64240D09DC2F5288C5EC0A361666666B64240D09DC2F5288C5EC032245C8FC2B5424001030000000100000005000000187F3D0AD78B5EC032245C8FC2B542406060B81E858B5EC032245C8FC2B542406060B81E858B5EC0A361666666B64240187F3D0AD78B5EC0A361666666B64240187F3D0AD78B5EC032245C8FC2B54240010300000001000000050000006060B81E858B5EC032245C8FC2B54240A8413333338B5EC032245C8FC2B54240A8413333338B5EC0A361666666B642406060B81E858B5EC0A361666666B642406060B81E858B5EC032245C8FC2B5424001030000000100000005000000A8413333338B5EC032245C8FC2B54240F022AE47E18A5EC032245C8FC2B54240F022AE47E18A5EC0A361666666B64240A8413333338B5EC0A361666666B64240A8413333338B5EC032245C8FC2B5424001030000000100000005000000F022AE47E18A5EC032245C8FC2B542403804295C8F8A5EC032245C8FC2B542403804295C8F8A5EC0A361666666B64240F022AE47E18A5EC0A361666666B64240F022AE47E18A5EC032245C8FC2B54240010300000001000000050000003804295C8F8A5EC032245C8FC2B5424080E5A3703D8A5EC032245C8FC2B5424080E5A3703D8A5EC0A361666666B642403804295C8F8A5EC0A361666666B642403804295C8F8A5EC032245C8FC2B542400103000000010000000500000080E5A3703D8A5EC032245C8FC2B54240C8C61E85EB895EC032245C8FC2B54240C8C61E85EB895EC0A361666666B6424080E5A3703D8A5EC0A361666666B6424080E5A3703D8A5EC032245C8FC2B5424001030000000100000005000000C8C61E85EB895EC032245C8FC2B5424010A8999999895EC032245C8FC2B5424010A8999999895EC0A361666666B64240C8C61E85EB895EC0A361666666B64240C8C61E85EB895EC032245C8FC2B542400103000000010000000500000010A8999999895EC032245C8FC2B54240588914AE47895EC032245C8FC2B54240588914AE47895EC0A361666666B6424010A8999999895EC0A361666666B6424010A8999999895EC032245C8FC2B5424001030000000100000005000000588914AE47895EC032245C8FC2B54240A06A8FC2F5885EC032245C8FC2B54240A06A8FC2F5885EC0A361666666B64240588914AE47895EC0A361666666B64240588914AE47895EC032245C8FC2B5424001030000000100000005000000A06A8FC2F5885EC032245C8FC2B54240E84B0AD7A3885EC032245C8FC2B54240E84B0AD7A3885EC0A361666666B64240A06A8FC2F5885EC0A361666666B64240A06A8FC2F5885EC032245C8FC2B5424001030000000100000005000000E84B0AD7A3885EC032245C8FC2B54240302D85EB51885EC032245C8FC2B54240302D85EB51885EC0A361666666B64240E84B0AD7A3885EC0A361666666B64240E84B0AD7A3885EC032245C8FC2B542400103000000010000000500000088BC47E17A8C5EC0A361666666B64240D09DC2F5288C5EC0A361666666B64240D09DC2F5288C5EC0149F703D0AB7424088BC47E17A8C5EC0149F703D0AB7424088BC47E17A8C5EC0A361666666B6424001030000000100000005000000D09DC2F5288C5EC0A361666666B64240187F3D0AD78B5EC0A361666666B64240187F3D0AD78B5EC0149F703D0AB74240D09DC2F5288C5EC0149F703D0AB74240D09DC2F5288C5EC0A361666666B6424001030000000100000005000000187F3D0AD78B5EC0A361666666B642406060B81E858B5EC0A361666666B642406060B81E858B5EC0149F703D0AB74240187F3D0AD78B5EC0149F703D0AB74240187F3D0AD78B5EC0A361666666B64240010300000001000000050000006060B81E858B5EC0A361666666B64240A8413333338B5EC0A361666666B64240A8413333338B5EC0149F703D0AB742406060B81E858B5EC0149F703D0AB742406060B81E858B5EC0A361666666B6424001030000000100000005000000A8413333338B5EC0A361666666B64240F022AE47E18A5EC0A361666666B64240F022AE47E18A5EC0149F703D0AB74240A8413333338B5EC0149F703D0AB74240A8413333338B5EC0A361666666B6424001030000000100000005000000F022AE47E18A5EC0A361666666B642403804295C8F8A5EC0A361666666B642403804295C8F8A5EC0149F703D0AB74240F022AE47E18A5EC0149F703D0AB74240F022AE47E18A5EC0A361666666B64240010300000001000000050000003804295C8F8A5EC0A361666666B6424080E5A3703D8A5EC0A361666666B6424080E5A3703D8A5EC0149F703D0AB742403804295C8F8A5EC0149F703D0AB742403804295C8F8A5EC0A361666666B642400103000000010000000500000080E5A3703D8A5EC0A361666666B64240C8C61E85EB895EC0A361666666B64240C8C61E85EB895EC0149F703D0AB7424080E5A3703D8A5EC0149F703D0AB7424080E5A3703D8A5EC0A361666666B6424001030000000100000005000000C8C61E85EB895EC0A361666666B6424010A8999999895EC0A361666666B6424010A8999999895EC0149F703D0AB74240C8C61E85EB895EC0149F703D0AB74240C8C61E85EB895EC0A361666666B642400103000000010000000500000010A8999999895EC0A361666666B64240588914AE47895EC0A361666666B64240588914AE47895EC0149F703D0AB7424010A8999999895EC0149F703D0AB7424010A8999999895EC0A361666666B6424001030000000100000005000000588914AE47895EC0A361666666B64240A06A8FC2F5885EC0A361666666B64240A06A8FC2F5885EC0149F703D0AB74240588914AE47895EC0149F703D0AB74240588914AE47895EC0A361666666B6424001030000000100000005000000A06A8FC2F5885EC0A361666666B64240E84B0AD7A3885EC0A361666666B64240E84B0AD7A3885EC0149F703D0AB74240A06A8FC2F5885EC0149F703D0AB74240A06A8FC2F5885EC0A361666666B6424001030000000100000005000000E84B0AD7A3885EC0A361666666B64240302D85EB51885EC0A361666666B64240302D85EB51885EC0149F703D0AB74240E84B0AD7A3885EC0149F703D0AB74240E84B0AD7A3885EC0A361666666B642400103000000010000000500000088BC47E17A8C5EC0149F703D0AB74240D09DC2F5288C5EC0149F703D0AB74240D09DC2F5288C5EC085DC7A14AEB7424088BC47E17A8C5EC085DC7A14AEB7424088BC47E17A8C5EC0149F703D0AB7424001030000000100000005000000D09DC2F5288C5EC0149F703D0AB74240187F3D0AD78B5EC0149F703D0AB74240187F3D0AD78B5EC085DC7A14AEB74240D09DC2F5288C5EC085DC7A14AEB74240D09DC2F5288C5EC0149F703D0AB7424001030000000100000005000000187F3D0AD78B5EC0149F703D0AB742406060B81E858B5EC0149F703D0AB742406060B81E858B5EC085DC7A14AEB74240187F3D0AD78B5EC085DC7A14AEB74240187F3D0AD78B5EC0149F703D0AB74240010300000001000000050000006060B81E858B5EC0149F703D0AB74240A8413333338B5EC0149F703D0AB74240A8413333338B5EC085DC7A14AEB742406060B81E858B5EC085DC7A14AEB742406060B81E858B5EC0149F703D0AB7424001030000000100000005000000A8413333338B5EC0149F703D0AB74240F022AE47E18A5EC0149F703D0AB74240F022AE47E18A5EC085DC7A14AEB74240A8413333338B5EC085DC7A14AEB74240A8413333338B5EC0149F703D0AB7424001030000000100000005000000F022AE47E18A5EC0149F703D0AB742403804295C8F8A5EC0149F703D0AB742403804295C8F8A5EC085DC7A14AEB74240F022AE47E18A5EC085DC7A14AEB74240F022AE47E18A5EC0149F703D0AB74240010300000001000000050000003804295C8F8A5EC0149F703D0AB7424080E5A3703D8A5EC0149F703D0AB7424080E5A3703D8A5EC085DC7A14AEB742403804295C8F8A5EC085DC7A14AEB742403804295C8F8A5EC0149F703D0AB742400103000000010000000500000080E5A3703D8A5EC0149F703D0AB74240C8C61E85EB895EC0149F703D0AB74240C8C61E85EB895EC085DC7A14AEB7424080E5A3703D8A5EC085DC7A14AEB7424080E5A3703D8A5EC0149F703D0AB7424001030000000100000005000000C8C61E85EB895EC0149F703D0AB7424010A8999999895EC0149F703D0AB7424010A8999999895EC085DC7A14AEB74240C8C61E85EB895EC085DC7A14AEB74240C8C61E85EB895EC0149F703D0AB742400103000000010000000500000010A8999999895EC0149F703D0AB74240588914AE47895EC0149F703D0AB74240588914AE47895EC085DC7A14AEB7424010A8999999895EC085DC7A14AEB7424010A8999999895EC0149F703D0AB7424001030000000100000005000000588914AE47895EC0149F703D0AB74240A06A8FC2F5885EC0149F703D0AB74240A06A8FC2F5885EC085DC7A14AEB74240588914AE47895EC085DC7A14AEB74240588914AE47895EC0149F703D0AB7424001030000000100000005000000A06A8FC2F5885EC0149F703D0AB74240E84B0AD7A3885EC0149F703D0AB74240E84B0AD7A3885EC085DC7A14AEB74240A06A8FC2F5885EC085DC7A14AEB74240A06A8FC2F5885EC0149F703D0AB7424001030000000100000005000000E84B0AD7A3885EC0149F703D0AB74240302D85EB51885EC0149F703D0AB74240302D85EB51885EC085DC7A14AEB74240E84B0AD7A3885EC085DC7A14AEB74240E84B0AD7A3885EC0149F703D0AB7424001030000000100000005000000D09DC2F5288C5EC085DC7A14AEB74240187F3D0AD78B5EC085DC7A14AEB74240187F3D0AD78B5EC0F61985EB51B84240D09DC2F5288C5EC0F61985EB51B84240D09DC2F5288C5EC085DC7A14AEB7424001030000000100000005000000187F3D0AD78B5EC085DC7A14AEB742406060B81E858B5EC085DC7A14AEB742406060B81E858B5EC0F61985EB51B84240187F3D0AD78B5EC0F61985EB51B84240187F3D0AD78B5EC085DC7A14AEB74240010300000001000000050000006060B81E858B5EC085DC7A14AEB74240A8413333338B5EC085DC7A14AEB74240A8413333338B5EC0F61985EB51B842406060B81E858B5EC0F61985EB51B842406060B81E858B5EC085DC7A14AEB7424001030000000100000005000000A8413333338B5EC085DC7A14AEB74240F022AE47E18A5EC085DC7A14AEB74240F022AE47E18A5EC0F61985EB51B84240A8413333338B5EC0F61985EB51B84240A8413333338B5EC085DC7A14AEB7424001030000000100000005000000F022AE47E18A5EC085DC7A14AEB742403804295C8F8A5EC085DC7A14AEB742403804295C8F8A5EC0F61985EB51B84240F022AE47E18A5EC0F61985EB51B84240F022AE47E18A5EC085DC7A14AEB74240010300000001000000050000003804295C8F8A5EC085DC7A14AEB7424080E5A3703D8A5EC085DC7A14AEB7424080E5A3703D8A5EC0F61985EB51B842403804295C8F8A5EC0F61985EB51B842403804295C8F8A5EC085DC7A14AEB742400103000000010000000500000080E5A3703D8A5EC085DC7A14AEB74240C8C61E85EB895EC085DC7A14AEB74240C8C61E85EB895EC0F61985EB51B8424080E5A3703D8A5EC0F61985EB51B8424080E5A3703D8A5EC085DC7A14AEB7424001030000000100000005000000C8C61E85EB895EC085DC7A14AEB7424010A8999999895EC085DC7A14AEB7424010A8999999895EC0F61985EB51B84240C8C61E85EB895EC0F61985EB51B84240C8C61E85EB895EC085DC7A14AEB742400103000000010000000500000010A8999999895EC085DC7A14AEB74240588914AE47895EC085DC7A14AEB74240588914AE47895EC0F61985EB51B8424010A8999999895EC0F61985EB51B8424010A8999999895EC085DC7A14AEB7424001030000000100000005000000588914AE47895EC085DC7A14AEB74240A06A8FC2F5885EC085DC7A14AEB74240A06A8FC2F5885EC0F61985EB51B84240588914AE47895EC0F61985EB51B84240588914AE47895EC085DC7A14AEB7424001030000000100000005000000A06A8FC2F5885EC085DC7A14AEB74240E84B0AD7A3885EC085DC7A14AEB74240E84B0AD7A3885EC0F61985EB51B84240A06A8FC2F5885EC0F61985EB51B84240A06A8FC2F5885EC085DC7A14AEB7424001030000000100000005000000E84B0AD7A3885EC085DC7A14AEB74240302D85EB51885EC085DC7A14AEB74240302D85EB51885EC0F61985EB51B84240E84B0AD7A3885EC0F61985EB51B84240E84B0AD7A3885EC085DC7A14AEB7424001030000000100000005000000D09DC2F5288C5EC0F61985EB51B84240187F3D0AD78B5EC0F61985EB51B84240187F3D0AD78B5EC067578FC2F5B84240D09DC2F5288C5EC067578FC2F5B84240D09DC2F5288C5EC0F61985EB51B8424001030000000100000005000000187F3D0AD78B5EC0F61985EB51B842406060B81E858B5EC0F61985EB51B842406060B81E858B5EC067578FC2F5B84240187F3D0AD78B5EC067578FC2F5B84240187F3D0AD78B5EC0F61985EB51B84240010300000001000000050000006060B81E858B5EC0F61985EB51B84240A8413333338B5EC0F61985EB51B84240A8413333338B5EC067578FC2F5B842406060B81E858B5EC067578FC2F5B842406060B81E858B5EC0F61985EB51B8424001030000000100000005000000A8413333338B5EC0F61985EB51B84240F022AE47E18A5EC0F61985EB51B84240F022AE47E18A5EC067578FC2F5B84240A8413333338B5EC067578FC2F5B84240A8413333338B5EC0F61985EB51B8424001030000000100000005000000F022AE47E18A5EC0F61985EB51B842403804295C8F8A5EC0F61985EB51B842403804295C8F8A5EC067578FC2F5B84240F022AE47E18A5EC067578FC2F5B84240F022AE47E18A5EC0F61985EB51B84240010300000001000000050000003804295C8F8A5EC0F61985EB51B8424080E5A3703D8A5EC0F61985EB51B8424080E5A3703D8A5EC067578FC2F5B842403804295C8F8A5EC067578FC2F5B842403804295C8F8A5EC0F61985EB51B842400103000000010000000500000080E5A3703D8A5EC0F61985EB51B84240C8C61E85EB895EC0F61985EB51B84240C8C61E85EB895EC067578FC2F5B8424080E5A3703D8A5EC067578FC2F5B8424080E5A3703D8A5EC0F61985EB51B8424001030000000100000005000000C8C61E85EB895EC0F61985EB51B8424010A8999999895EC0F61985EB51B8424010A8999999895EC067578FC2F5B84240C8C61E85EB895EC067578FC2F5B84240C8C61E85EB895EC0F61985EB51B842400103000000010000000500000010A8999999895EC0F61985EB51B84240588914AE47895EC0F61985EB51B84240588914AE47895EC067578FC2F5B8424010A8999999895EC067578FC2F5B8424010A8999999895EC0F61985EB51B8424001030000000100000005000000588914AE47895EC0F61985EB51B84240A06A8FC2F5885EC0F61985EB51B84240A06A8FC2F5885EC067578FC2F5B84240588914AE47895EC067578FC2F5B84240588914AE47895EC0F61985EB51B8424001030000000100000005000000A06A8FC2F5885EC0F61985EB51B84240E84B0AD7A3885EC0F61985EB51B84240E84B0AD7A3885EC067578FC2F5B84240A06A8FC2F5885EC067578FC2F5B84240A06A8FC2F5885EC0F61985EB51B8424001030000000100000005000000E84B0AD7A3885EC0F61985EB51B84240302D85EB51885EC0F61985EB51B84240302D85EB51885EC067578FC2F5B84240E84B0AD7A3885EC067578FC2F5B84240E84B0AD7A3885EC0F61985EB51B8424001030000000100000005000000D09DC2F5288C5EC067578FC2F5B84240187F3D0AD78B5EC067578FC2F5B84240187F3D0AD78B5EC0D894999999B94240D09DC2F5288C5EC0D894999999B94240D09DC2F5288C5EC067578FC2F5B8424001030000000100000005000000187F3D0AD78B5EC067578FC2F5B842406060B81E858B5EC067578FC2F5B842406060B81E858B5EC0D894999999B94240187F3D0AD78B5EC0D894999999B94240187F3D0AD78B5EC067578FC2F5B84240010300000001000000050000006060B81E858B5EC067578FC2F5B84240A8413333338B5EC067578FC2F5B84240A8413333338B5EC0D894999999B942406060B81E858B5EC0D894999999B942406060B81E858B5EC067578FC2F5B8424001030000000100000005000000A8413333338B5EC067578FC2F5B84240F022AE47E18A5EC067578FC2F5B84240F022AE47E18A5EC0D894999999B94240A8413333338B5EC0D894999999B94240A8413333338B5EC067578FC2F5B8424001030000000100000005000000F022AE47E18A5EC067578FC2F5B842403804295C8F8A5EC067578FC2F5B842403804295C8F8A5EC0D894999999B94240F022AE47E18A5EC0D894999999B94240F022AE47E18A5EC067578FC2F5B84240010300000001000000050000003804295C8F8A5EC067578FC2F5B8424080E5A3703D8A5EC067578FC2F5B8424080E5A3703D8A5EC0D894999999B942403804295C8F8A5EC0D894999999B942403804295C8F8A5EC067578FC2F5B842400103000000010000000500000080E5A3703D8A5EC067578FC2F5B84240C8C61E85EB895EC067578FC2F5B84240C8C61E85EB895EC0D894999999B9424080E5A3703D8A5EC0D894999999B9424080E5A3703D8A5EC067578FC2F5B8424001030000000100000005000000C8C61E85EB895EC067578FC2F5B8424010A8999999895EC067578FC2F5B8424010A8999999895EC0D894999999B94240C8C61E85EB895EC0D894999999B94240C8C61E85EB895EC067578FC2F5B842400103000000010000000500000010A8999999895EC067578FC2F5B84240588914AE47895EC067578FC2F5B84240588914AE47895EC0D894999999B9424010A8999999895EC0D894999999B9424010A8999999895EC067578FC2F5B8424001030000000100000005000000588914AE47895EC067578FC2F5B84240A06A8FC2F5885EC067578FC2F5B84240A06A8FC2F5885EC0D894999999B94240588914AE47895EC0D894999999B94240588914AE47895EC067578FC2F5B8424001030000000100000005000000A06A8FC2F5885EC067578FC2F5B84240E84B0AD7A3885EC067578FC2F5B84240E84B0AD7A3885EC0D894999999B94240A06A8FC2F5885EC0D894999999B94240A06A8FC2F5885EC067578FC2F5B8424001030000000100000005000000E84B0AD7A3885EC067578FC2F5B84240302D85EB51885EC067578FC2F5B84240302D85EB51885EC0D894999999B94240E84B0AD7A3885EC0D894999999B94240E84B0AD7A3885EC067578FC2F5B8424001030000000100000005000000D09DC2F5288C5EC0D894999999B94240187F3D0AD78B5EC0D894999999B94240187F3D0AD78B5EC049D2A3703DBA4240D09DC2F5288C5EC049D2A3703DBA4240D09DC2F5288C5EC0D894999999B9424001030000000100000005000000187F3D0AD78B5EC0D894999999B942406060B81E858B5EC0D894999999B942406060B81E858B5EC049D2A3703DBA4240187F3D0AD78B5EC049D2A3703DBA4240187F3D0AD78B5EC0D894999999B94240010300000001000000050000006060B81E858B5EC0D894999999B94240A8413333338B5EC0D894999999B94240A8413333338B5EC049D2A3703DBA42406060B81E858B5EC049D2A3703DBA42406060B81E858B5EC0D894999999B9424001030000000100000005000000A8413333338B5EC0D894999999B94240F022AE47E18A5EC0D894999999B94240F022AE47E18A5EC049D2A3703DBA4240A8413333338B5EC049D2A3703DBA4240A8413333338B5EC0D894999999B9424001030000000100000005000000F022AE47E18A5EC0D894999999B942403804295C8F8A5EC0D894999999B942403804295C8F8A5EC049D2A3703DBA4240F022AE47E18A5EC049D2A3703DBA4240F022AE47E18A5EC0D894999999B94240010300000001000000050000003804295C8F8A5EC0D894999999B9424080E5A3703D8A5EC0D894999999B9424080E5A3703D8A5EC049D2A3703DBA42403804295C8F8A5EC049D2A3703DBA42403804295C8F8A5EC0D894999999B942400103000000010000000500000080E5A3703D8A5EC0D894999999B94240C8C61E85EB895EC0D894999999B94240C8C61E85EB895EC049D2A3703DBA424080E5A3703D8A5EC049D2A3703DBA424080E5A3703D8A5EC0D894999999B9424001030000000100000005000000C8C61E85EB895EC0D894999999B9424010A8999999895EC0D894999999B9424010A8999999895EC049D2A3703DBA4240C8C61E85EB895EC049D2A3703DBA4240C8C61E85EB895EC0D894999999B942400103000000010000000500000010A8999999895EC0D894999999B94240588914AE47895EC0D894999999B94240588914AE47895EC049D2A3703DBA424010A8999999895EC049D2A3703DBA424010A8999999895EC0D894999999B9424001030000000100000005000000588914AE47895EC0D894999999B94240A06A8FC2F5885EC0D894999999B94240A06A8FC2F5885EC049D2A3703DBA4240588914AE47895EC049D2A3703DBA4240588914AE47895EC0D894999999B9424001030000000100000005000000A06A8FC2F5885EC0D894999999B94240E84B0AD7A3885EC0D894999999B94240E84B0AD7A3885EC049D2A3703DBA4240A06A8FC2F5885EC049D2A3703DBA4240A06A8FC2F5885EC0D894999999B9424001030000000100000005000000E84B0AD7A3885EC0D894999999B94240302D85EB51885EC0D894999999B94240302D85EB51885EC049D2A3703DBA4240E84B0AD7A3885EC049D2A3703DBA4240E84B0AD7A3885EC0D894999999B9424001030000000100000005000000D09DC2F5288C5EC049D2A3703DBA4240187F3D0AD78B5EC049D2A3703DBA4240187F3D0AD78B5EC0BA0FAE47E1BA4240D09DC2F5288C5EC0BA0FAE47E1BA4240D09DC2F5288C5EC049D2A3703DBA424001030000000100000005000000187F3D0AD78B5EC049D2A3703DBA42406060B81E858B5EC049D2A3703DBA42406060B81E858B5EC0BA0FAE47E1BA4240187F3D0AD78B5EC0BA0FAE47E1BA4240187F3D0AD78B5EC049D2A3703DBA4240010300000001000000050000006060B81E858B5EC049D2A3703DBA4240A8413333338B5EC049D2A3703DBA4240A8413333338B5EC0BA0FAE47E1BA42406060B81E858B5EC0BA0FAE47E1BA42406060B81E858B5EC049D2A3703DBA424001030000000100000005000000A8413333338B5EC049D2A3703DBA4240F022AE47E18A5EC049D2A3703DBA4240F022AE47E18A5EC0BA0FAE47E1BA4240A8413333338B5EC0BA0FAE47E1BA4240A8413333338B5EC049D2A3703DBA424001030000000100000005000000F022AE47E18A5EC049D2A3703DBA42403804295C8F8A5EC049D2A3703DBA42403804295C8F8A5EC0BA0FAE47E1BA4240F022AE47E18A5EC0BA0FAE47E1BA4240F022AE47E18A5EC049D2A3703DBA4240010300000001000000050000003804295C8F8A5EC049D2A3703DBA424080E5A3703D8A5EC049D2A3703DBA424080E5A3703D8A5EC0BA0FAE47E1BA42403804295C8F8A5EC0BA0FAE47E1BA42403804295C8F8A5EC049D2A3703DBA42400103000000010000000500000080E5A3703D8A5EC049D2A3703DBA4240C8C61E85EB895EC049D2A3703DBA4240C8C61E85EB895EC0BA0FAE47E1BA424080E5A3703D8A5EC0BA0FAE47E1BA424080E5A3703D8A5EC049D2A3703DBA424001030000000100000005000000C8C61E85EB895EC049D2A3703DBA424010A8999999895EC049D2A3703DBA424010A8999999895EC0BA0FAE47E1BA4240C8C61E85EB895EC0BA0FAE47E1BA4240C8C61E85EB895EC049D2A3703DBA42400103000000010000000500000010A8999999895EC049D2A3703DBA4240588914AE47895EC049D2A3703DBA4240588914AE47895EC0BA0FAE47E1BA424010A8999999895EC0BA0FAE47E1BA424010A8999999895EC049D2A3703DBA424001030000000100000005000000588914AE47895EC049D2A3703DBA4240A06A8FC2F5885EC049D2A3703DBA4240A06A8FC2F5885EC0BA0FAE47E1BA4240588914AE47895EC0BA0FAE47E1BA4240588914AE47895EC049D2A3703DBA424001030000000100000005000000A06A8FC2F5885EC049D2A3703DBA4240E84B0AD7A3885EC049D2A3703DBA4240E84B0AD7A3885EC0BA0FAE47E1BA4240A06A8FC2F5885EC0BA0FAE47E1BA4240A06A8FC2F5885EC049D2A3703DBA424001030000000100000005000000E84B0AD7A3885EC049D2A3703DBA4240302D85EB51885EC049D2A3703DBA4240302D85EB51885EC0BA0FAE47E1BA4240E84B0AD7A3885EC0BA0FAE47E1BA4240E84B0AD7A3885EC049D2A3703DBA424001030000000100000005000000D09DC2F5288C5EC0BA0FAE47E1BA4240187F3D0AD78B5EC0BA0FAE47E1BA4240187F3D0AD78B5EC02B4DB81E85BB4240D09DC2F5288C5EC02B4DB81E85BB4240D09DC2F5288C5EC0BA0FAE47E1BA424001030000000100000005000000187F3D0AD78B5EC0BA0FAE47E1BA42406060B81E858B5EC0BA0FAE47E1BA42406060B81E858B5EC02B4DB81E85BB4240187F3D0AD78B5EC02B4DB81E85BB4240187F3D0AD78B5EC0BA0FAE47E1BA4240010300000001000000050000006060B81E858B5EC0BA0FAE47E1BA4240A8413333338B5EC0BA0FAE47E1BA4240A8413333338B5EC02B4DB81E85BB42406060B81E858B5EC02B4DB81E85BB42406060B81E858B5EC0BA0FAE47E1BA424001030000000100000005000000A8413333338B5EC0BA0FAE47E1BA4240F022AE47E18A5EC0BA0FAE47E1BA4240F022AE47E18A5EC02B4DB81E85BB4240A8413333338B5EC02B4DB81E85BB4240A8413333338B5EC0BA0FAE47E1BA424001030000000100000005000000F022AE47E18A5EC0BA0FAE47E1BA42403804295C8F8A5EC0BA0FAE47E1BA42403804295C8F8A5EC02B4DB81E85BB4240F022AE47E18A5EC02B4DB81E85BB4240F022AE47E18A5EC0BA0FAE47E1BA4240010300000001000000050000003804295C8F8A5EC0BA0FAE47E1BA424080E5A3703D8A5EC0BA0FAE47E1BA424080E5A3703D8A5EC02B4DB81E85BB42403804295C8F8A5EC02B4DB81E85BB42403804295C8F8A5EC0BA0FAE47E1BA42400103000000010000000500000080E5A3703D8A5EC0BA0FAE47E1BA4240C8C61E85EB895EC0BA0FAE47E1BA4240C8C61E85EB895EC02B4DB81E85BB424080E5A3703D8A5EC02B4DB81E85BB424080E5A3703D8A5EC0BA0FAE47E1BA424001030000000100000005000000C8C61E85EB895EC0BA0FAE47E1BA424010A8999999895EC0BA0FAE47E1BA424010A8999999895EC02B4DB81E85BB4240C8C61E85EB895EC02B4DB81E85BB4240C8C61E85EB895EC0BA0FAE47E1BA42400103000000010000000500000010A8999999895EC0BA0FAE47E1BA4240588914AE47895EC0BA0FAE47E1BA4240588914AE47895EC02B4DB81E85BB424010A8999999895EC02B4DB81E85BB424010A8999999895EC0BA0FAE47E1BA424001030000000100000005000000588914AE47895EC0BA0FAE47E1BA4240A06A8FC2F5885EC0BA0FAE47E1BA4240A06A8FC2F5885EC02B4DB81E85BB4240588914AE47895EC02B4DB81E85BB4240588914AE47895EC0BA0FAE47E1BA424001030000000100000005000000A06A8FC2F5885EC0BA0FAE47E1BA4240E84B0AD7A3885EC0BA0FAE47E1BA4240E84B0AD7A3885EC02B4DB81E85BB4240A06A8FC2F5885EC02B4DB81E85BB4240A06A8FC2F5885EC0BA0FAE47E1BA424001030000000100000005000000E84B0AD7A3885EC0BA0FAE47E1BA4240302D85EB51885EC0BA0FAE47E1BA4240302D85EB51885EC02B4DB81E85BB4240E84B0AD7A3885EC02B4DB81E85BB4240E84B0AD7A3885EC0BA0FAE47E1BA424001030000000100000005000000D09DC2F5288C5EC02B4DB81E85BB4240187F3D0AD78B5EC02B4DB81E85BB4240187F3D0AD78B5EC09C8AC2F528BC4240D09DC2F5288C5EC09C8AC2F528BC4240D09DC2F5288C5EC02B4DB81E85BB424001030000000100000005000000187F3D0AD78B5EC02B4DB81E85BB42406060B81E858B5EC02B4DB81E85BB42406060B81E858B5EC09C8AC2F528BC4240187F3D0AD78B5EC09C8AC2F528BC4240187F3D0AD78B5EC02B4DB81E85BB4240010300000001000000050000006060B81E858B5EC02B4DB81E85BB4240A8413333338B5EC02B4DB81E85BB4240A8413333338B5EC09C8AC2F528BC42406060B81E858B5EC09C8AC2F528BC42406060B81E858B5EC02B4DB81E85BB424001030000000100000005000000A8413333338B5EC02B4DB81E85BB4240F022AE47E18A5EC02B4DB81E85BB4240F022AE47E18A5EC09C8AC2F528BC4240A8413333338B5EC09C8AC2F528BC4240A8413333338B5EC02B4DB81E85BB424001030000000100000005000000F022AE47E18A5EC02B4DB81E85BB42403804295C8F8A5EC02B4DB81E85BB42403804295C8F8A5EC09C8AC2F528BC4240F022AE47E18A5EC09C8AC2F528BC4240F022AE47E18A5EC02B4DB81E85BB4240010300000001000000050000003804295C8F8A5EC02B4DB81E85BB424080E5A3703D8A5EC02B4DB81E85BB424080E5A3703D8A5EC09C8AC2F528BC42403804295C8F8A5EC09C8AC2F528BC42403804295C8F8A5EC02B4DB81E85BB42400103000000010000000500000080E5A3703D8A5EC02B4DB81E85BB4240C8C61E85EB895EC02B4DB81E85BB4240C8C61E85EB895EC09C8AC2F528BC424080E5A3703D8A5EC09C8AC2F528BC424080E5A3703D8A5EC02B4DB81E85BB424001030000000100000005000000C8C61E85EB895EC02B4DB81E85BB424010A8999999895EC02B4DB81E85BB424010A8999999895EC09C8AC2F528BC4240C8C61E85EB895EC09C8AC2F528BC4240C8C61E85EB895EC02B4DB81E85BB42400103000000010000000500000010A8999999895EC02B4DB81E85BB4240588914AE47895EC02B4DB81E85BB4240588914AE47895EC09C8AC2F528BC424010A8999999895EC09C8AC2F528BC424010A8999999895EC02B4DB81E85BB424001030000000100000005000000588914AE47895EC02B4DB81E85BB4240A06A8FC2F5885EC02B4DB81E85BB4240A06A8FC2F5885EC09C8AC2F528BC4240588914AE47895EC09C8AC2F528BC4240588914AE47895EC02B4DB81E85BB424001030000000100000005000000A06A8FC2F5885EC02B4DB81E85BB4240E84B0AD7A3885EC02B4DB81E85BB4240E84B0AD7A3885EC09C8AC2F528BC4240A06A8FC2F5885EC09C8AC2F528BC4240A06A8FC2F5885EC02B4DB81E85BB424001030000000100000005000000E84B0AD7A3885EC02B4DB81E85BB4240302D85EB51885EC02B4DB81E85BB4240302D85EB51885EC09C8AC2F528BC4240E84B0AD7A3885EC09C8AC2F528BC4240E84B0AD7A3885EC02B4DB81E85BB424001030000000100000005000000D09DC2F5288C5EC09C8AC2F528BC4240187F3D0AD78B5EC09C8AC2F528BC4240187F3D0AD78B5EC00DC8CCCCCCBC4240D09DC2F5288C5EC00DC8CCCCCCBC4240D09DC2F5288C5EC09C8AC2F528BC424001030000000100000005000000187F3D0AD78B5EC09C8AC2F528BC42406060B81E858B5EC09C8AC2F528BC42406060B81E858B5EC00DC8CCCCCCBC4240187F3D0AD78B5EC00DC8CCCCCCBC4240187F3D0AD78B5EC09C8AC2F528BC4240010300000001000000050000006060B81E858B5EC09C8AC2F528BC4240A8413333338B5EC09C8AC2F528BC4240A8413333338B5EC00DC8CCCCCCBC42406060B81E858B5EC00DC8CCCCCCBC42406060B81E858B5EC09C8AC2F528BC424001030000000100000005000000A8413333338B5EC09C8AC2F528BC4240F022AE47E18A5EC09C8AC2F528BC4240F022AE47E18A5EC00DC8CCCCCCBC4240A8413333338B5EC00DC8CCCCCCBC4240A8413333338B5EC09C8AC2F528BC424001030000000100000005000000F022AE47E18A5EC09C8AC2F528BC42403804295C8F8A5EC09C8AC2F528BC42403804295C8F8A5EC00DC8CCCCCCBC4240F022AE47E18A5EC00DC8CCCCCCBC4240F022AE47E18A5EC09C8AC2F528BC4240010300000001000000050000003804295C8F8A5EC09C8AC2F528BC424080E5A3703D8A5EC09C8AC2F528BC424080E5A3703D8A5EC00DC8CCCCCCBC42403804295C8F8A5EC00DC8CCCCCCBC42403804295C8F8A5EC09C8AC2F528BC42400103000000010000000500000080E5A3703D8A5EC09C8AC2F528BC4240C8C61E85EB895EC09C8AC2F528BC4240C8C61E85EB895EC00DC8CCCCCCBC424080E5A3703D8A5EC00DC8CCCCCCBC424080E5A3703D8A5EC09C8AC2F528BC424001030000000100000005000000C8C61E85EB895EC09C8AC2F528BC424010A8999999895EC09C8AC2F528BC424010A8999999895EC00DC8CCCCCCBC4240C8C61E85EB895EC00DC8CCCCCCBC4240C8C61E85EB895EC09C8AC2F528BC42400103000000010000000500000010A8999999895EC09C8AC2F528BC4240588914AE47895EC09C8AC2F528BC4240588914AE47895EC00DC8CCCCCCBC424010A8999999895EC00DC8CCCCCCBC424010A8999999895EC09C8AC2F528BC424001030000000100000005000000588914AE47895EC09C8AC2F528BC4240A06A8FC2F5885EC09C8AC2F528BC4240A06A8FC2F5885EC00DC8CCCCCCBC4240588914AE47895EC00DC8CCCCCCBC4240588914AE47895EC09C8AC2F528BC424001030000000100000005000000A06A8FC2F5885EC09C8AC2F528BC4240E84B0AD7A3885EC09C8AC2F528BC4240E84B0AD7A3885EC00DC8CCCCCCBC4240A06A8FC2F5885EC00DC8CCCCCCBC4240A06A8FC2F5885EC09C8AC2F528BC424001030000000100000005000000E84B0AD7A3885EC09C8AC2F528BC4240302D85EB51885EC09C8AC2F528BC4240302D85EB51885EC00DC8CCCCCCBC4240E84B0AD7A3885EC00DC8CCCCCCBC4240E84B0AD7A3885EC09C8AC2F528BC424001030000000100000005000000D09DC2F5288C5EC00DC8CCCCCCBC4240187F3D0AD78B5EC00DC8CCCCCCBC4240187F3D0AD78B5EC07E05D7A370BD4240D09DC2F5288C5EC07E05D7A370BD4240D09DC2F5288C5EC00DC8CCCCCCBC424001030000000100000005000000187F3D0AD78B5EC00DC8CCCCCCBC42406060B81E858B5EC00DC8CCCCCCBC42406060B81E858B5EC07E05D7A370BD4240187F3D0AD78B5EC07E05D7A370BD4240187F3D0AD78B5EC00DC8CCCCCCBC4240010300000001000000050000006060B81E858B5EC00DC8CCCCCCBC4240A8413333338B5EC00DC8CCCCCCBC4240A8413333338B5EC07E05D7A370BD42406060B81E858B5EC07E05D7A370BD42406060B81E858B5EC00DC8CCCCCCBC424001030000000100000005000000A8413333338B5EC00DC8CCCCCCBC4240F022AE47E18A5EC00DC8CCCCCCBC4240F022AE47E18A5EC07E05D7A370BD4240A8413333338B5EC07E05D7A370BD4240A8413333338B5EC00DC8CCCCCCBC424001030000000100000005000000F022AE47E18A5EC00DC8CCCCCCBC42403804295C8F8A5EC00DC8CCCCCCBC42403804295C8F8A5EC07E05D7A370BD4240F022AE47E18A5EC07E05D7A370BD4240F022AE47E18A5EC00DC8CCCCCCBC4240010300000001000000050000003804295C8F8A5EC00DC8CCCCCCBC424080E5A3703D8A5EC00DC8CCCCCCBC424080E5A3703D8A5EC07E05D7A370BD42403804295C8F8A5EC07E05D7A370BD42403804295C8F8A5EC00DC8CCCCCCBC42400103000000010000000500000080E5A3703D8A5EC00DC8CCCCCCBC4240C8C61E85EB895EC00DC8CCCCCCBC4240C8C61E85EB895EC07E05D7A370BD424080E5A3703D8A5EC07E05D7A370BD424080E5A3703D8A5EC00DC8CCCCCCBC424001030000000100000005000000C8C61E85EB895EC00DC8CCCCCCBC424010A8999999895EC00DC8CCCCCCBC424010A8999999895EC07E05D7A370BD4240C8C61E85EB895EC07E05D7A370BD4240C8C61E85EB895EC00DC8CCCCCCBC42400103000000010000000500000010A8999999895EC00DC8CCCCCCBC4240588914AE47895EC00DC8CCCCCCBC4240588914AE47895EC07E05D7A370BD424010A8999999895EC07E05D7A370BD424010A8999999895EC00DC8CCCCCCBC424001030000000100000005000000588914AE47895EC00DC8CCCCCCBC4240A06A8FC2F5885EC00DC8CCCCCCBC4240A06A8FC2F5885EC07E05D7A370BD4240588914AE47895EC07E05D7A370BD4240588914AE47895EC00DC8CCCCCCBC424001030000000100000005000000A06A8FC2F5885EC00DC8CCCCCCBC4240E84B0AD7A3885EC00DC8CCCCCCBC4240E84B0AD7A3885EC07E05D7A370BD4240A06A8FC2F5885EC07E05D7A370BD4240A06A8FC2F5885EC00DC8CCCCCCBC424001030000000100000005000000E84B0AD7A3885EC00DC8CCCCCCBC4240302D85EB51885EC00DC8CCCCCCBC4240302D85EB51885EC07E05D7A370BD4240E84B0AD7A3885EC07E05D7A370BD4240E84B0AD7A3885EC00DC8CCCCCCBC424001030000000100000005000000D09DC2F5288C5EC07E05D7A370BD4240187F3D0AD78B5EC07E05D7A370BD4240187F3D0AD78B5EC0EF42E17A14BE4240D09DC2F5288C5EC0EF42E17A14BE4240D09DC2F5288C5EC07E05D7A370BD424001030000000100000005000000187F3D0AD78B5EC07E05D7A370BD42406060B81E858B5EC07E05D7A370BD42406060B81E858B5EC0EF42E17A14BE4240187F3D0AD78B5EC0EF42E17A14BE4240187F3D0AD78B5EC07E05D7A370BD4240010300000001000000050000006060B81E858B5EC07E05D7A370BD4240A8413333338B5EC07E05D7A370BD4240A8413333338B5EC0EF42E17A14BE42406060B81E858B5EC0EF42E17A14BE42406060B81E858B5EC07E05D7A370BD424001030000000100000005000000A8413333338B5EC07E05D7A370BD4240F022AE47E18A5EC07E05D7A370BD4240F022AE47E18A5EC0EF42E17A14BE4240A8413333338B5EC0EF42E17A14BE4240A8413333338B5EC07E05D7A370BD424001030000000100000005000000F022AE47E18A5EC07E05D7A370BD42403804295C8F8A5EC07E05D7A370BD42403804295C8F8A5EC0EF42E17A14BE4240F022AE47E18A5EC0EF42E17A14BE4240F022AE47E18A5EC07E05D7A370BD4240010300000001000000050000003804295C8F8A5EC07E05D7A370BD424080E5A3703D8A5EC07E05D7A370BD424080E5A3703D8A5EC0EF42E17A14BE42403804295C8F8A5EC0EF42E17A14BE42403804295C8F8A5EC07E05D7A370BD42400103000000010000000500000080E5A3703D8A5EC07E05D7A370BD4240C8C61E85EB895EC07E05D7A370BD4240C8C61E85EB895EC0EF42E17A14BE424080E5A3703D8A5EC0EF42E17A14BE424080E5A3703D8A5EC07E05D7A370BD424001030000000100000005000000C8C61E85EB895EC07E05D7A370BD424010A8999999895EC07E05D7A370BD424010A8999999895EC0EF42E17A14BE4240C8C61E85EB895EC0EF42E17A14BE4240C8C61E85EB895EC07E05D7A370BD42400103000000010000000500000010A8999999895EC07E05D7A370BD4240588914AE47895EC07E05D7A370BD4240588914AE47895EC0EF42E17A14BE424010A8999999895EC0EF42E17A14BE424010A8999999895EC07E05D7A370BD424001030000000100000005000000588914AE47895EC07E05D7A370BD4240A06A8FC2F5885EC07E05D7A370BD4240A06A8FC2F5885EC0EF42E17A14BE4240588914AE47895EC0EF42E17A14BE4240588914AE47895EC07E05D7A370BD424001030000000100000005000000A06A8FC2F5885EC07E05D7A370BD4240E84B0AD7A3885EC07E05D7A370BD4240E84B0AD7A3885EC0EF42E17A14BE4240A06A8FC2F5885EC0EF42E17A14BE4240A06A8FC2F5885EC07E05D7A370BD424001030000000100000005000000E84B0AD7A3885EC07E05D7A370BD4240302D85EB51885EC07E05D7A370BD4240302D85EB51885EC0EF42E17A14BE4240E84B0AD7A3885EC0EF42E17A14BE4240E84B0AD7A3885EC07E05D7A370BD4240010300000001000000050000003804295C8F8A5EC0FDF0285C8FB2424080E5A3703D8A5EC0FDF0285C8FB2424080E5A3703D8A5EC06E2E333333B342403804295C8F8A5EC06E2E333333B342403804295C8F8A5EC0FDF0285C8FB2424001030000000100000005000000F022AE47E18A5EC0FDF0285C8FB242403804295C8F8A5EC0FDF0285C8FB242403804295C8F8A5EC06E2E333333B34240F022AE47E18A5EC06E2E333333B34240F022AE47E18A5EC0FDF0285C8FB242400103000000010000000500000068375C8FC28D5EC085DC7A14AEB74240B018D7A3708D5EC085DC7A14AEB74240B018D7A3708D5EC0F61985EB51B8424068375C8FC28D5EC0F61985EB51B8424068375C8FC28D5EC085DC7A14AEB7424001030000000100000005000000B018D7A3708D5EC085DC7A14AEB74240F8F951B81E8D5EC085DC7A14AEB74240F8F951B81E8D5EC0F61985EB51B84240B018D7A3708D5EC0F61985EB51B84240B018D7A3708D5EC085DC7A14AEB7424001030000000100000005000000F8F951B81E8D5EC085DC7A14AEB7424040DBCCCCCC8C5EC085DC7A14AEB7424040DBCCCCCC8C5EC0F61985EB51B84240F8F951B81E8D5EC0F61985EB51B84240F8F951B81E8D5EC085DC7A14AEB742400103000000010000000500000040DBCCCCCC8C5EC085DC7A14AEB7424088BC47E17A8C5EC085DC7A14AEB7424088BC47E17A8C5EC0F61985EB51B8424040DBCCCCCC8C5EC0F61985EB51B8424040DBCCCCCC8C5EC085DC7A14AEB742400103000000010000000500000088BC47E17A8C5EC085DC7A14AEB74240D09DC2F5288C5EC085DC7A14AEB74240D09DC2F5288C5EC0F61985EB51B8424088BC47E17A8C5EC0F61985EB51B8424088BC47E17A8C5EC085DC7A14AEB742400103000000010000000500000068375C8FC28D5EC0F61985EB51B84240B018D7A3708D5EC0F61985EB51B84240B018D7A3708D5EC067578FC2F5B8424068375C8FC28D5EC067578FC2F5B8424068375C8FC28D5EC0F61985EB51B8424001030000000100000005000000B018D7A3708D5EC0F61985EB51B84240F8F951B81E8D5EC0F61985EB51B84240F8F951B81E8D5EC067578FC2F5B84240B018D7A3708D5EC067578FC2F5B84240B018D7A3708D5EC0F61985EB51B8424001030000000100000005000000F8F951B81E8D5EC0F61985EB51B8424040DBCCCCCC8C5EC0F61985EB51B8424040DBCCCCCC8C5EC067578FC2F5B84240F8F951B81E8D5EC067578FC2F5B84240F8F951B81E8D5EC0F61985EB51B842400103000000010000000500000040DBCCCCCC8C5EC0F61985EB51B8424088BC47E17A8C5EC0F61985EB51B8424088BC47E17A8C5EC067578FC2F5B8424040DBCCCCCC8C5EC067578FC2F5B8424040DBCCCCCC8C5EC0F61985EB51B842400103000000010000000500000088BC47E17A8C5EC0F61985EB51B84240D09DC2F5288C5EC0F61985EB51B84240D09DC2F5288C5EC067578FC2F5B8424088BC47E17A8C5EC067578FC2F5B8424088BC47E17A8C5EC0F61985EB51B842400103000000010000000500000068375C8FC28D5EC067578FC2F5B84240B018D7A3708D5EC067578FC2F5B84240B018D7A3708D5EC0D894999999B9424068375C8FC28D5EC0D894999999B9424068375C8FC28D5EC067578FC2F5B8424001030000000100000005000000B018D7A3708D5EC067578FC2F5B84240F8F951B81E8D5EC067578FC2F5B84240F8F951B81E8D5EC0D894999999B94240B018D7A3708D5EC0D894999999B94240B018D7A3708D5EC067578FC2F5B8424001030000000100000005000000F8F951B81E8D5EC067578FC2F5B8424040DBCCCCCC8C5EC067578FC2F5B8424040DBCCCCCC8C5EC0D894999999B94240F8F951B81E8D5EC0D894999999B94240F8F951B81E8D5EC067578FC2F5B842400103000000010000000500000040DBCCCCCC8C5EC067578FC2F5B8424088BC47E17A8C5EC067578FC2F5B8424088BC47E17A8C5EC0D894999999B9424040DBCCCCCC8C5EC0D894999999B9424040DBCCCCCC8C5EC067578FC2F5B842400103000000010000000500000088BC47E17A8C5EC067578FC2F5B84240D09DC2F5288C5EC067578FC2F5B84240D09DC2F5288C5EC0D894999999B9424088BC47E17A8C5EC0D894999999B9424088BC47E17A8C5EC067578FC2F5B842400103000000010000000500000068375C8FC28D5EC0D894999999B94240B018D7A3708D5EC0D894999999B94240B018D7A3708D5EC049D2A3703DBA424068375C8FC28D5EC049D2A3703DBA424068375C8FC28D5EC0D894999999B9424001030000000100000005000000B018D7A3708D5EC0D894999999B94240F8F951B81E8D5EC0D894999999B94240F8F951B81E8D5EC049D2A3703DBA4240B018D7A3708D5EC049D2A3703DBA4240B018D7A3708D5EC0D894999999B9424001030000000100000005000000F8F951B81E8D5EC0D894999999B9424040DBCCCCCC8C5EC0D894999999B9424040DBCCCCCC8C5EC049D2A3703DBA4240F8F951B81E8D5EC049D2A3703DBA4240F8F951B81E8D5EC0D894999999B942400103000000010000000500000040DBCCCCCC8C5EC0D894999999B9424088BC47E17A8C5EC0D894999999B9424088BC47E17A8C5EC049D2A3703DBA424040DBCCCCCC8C5EC049D2A3703DBA424040DBCCCCCC8C5EC0D894999999B942400103000000010000000500000088BC47E17A8C5EC0D894999999B94240D09DC2F5288C5EC0D894999999B94240D09DC2F5288C5EC049D2A3703DBA424088BC47E17A8C5EC049D2A3703DBA424088BC47E17A8C5EC0D894999999B942400103000000010000000500000068375C8FC28D5EC049D2A3703DBA4240B018D7A3708D5EC049D2A3703DBA4240B018D7A3708D5EC0BA0FAE47E1BA424068375C8FC28D5EC0BA0FAE47E1BA424068375C8FC28D5EC049D2A3703DBA424001030000000100000005000000B018D7A3708D5EC049D2A3703DBA4240F8F951B81E8D5EC049D2A3703DBA4240F8F951B81E8D5EC0BA0FAE47E1BA4240B018D7A3708D5EC0BA0FAE47E1BA4240B018D7A3708D5EC049D2A3703DBA424001030000000100000005000000F8F951B81E8D5EC049D2A3703DBA424040DBCCCCCC8C5EC049D2A3703DBA424040DBCCCCCC8C5EC0BA0FAE47E1BA4240F8F951B81E8D5EC0BA0FAE47E1BA4240F8F951B81E8D5EC049D2A3703DBA42400103000000010000000500000040DBCCCCCC8C5EC049D2A3703DBA424088BC47E17A8C5EC049D2A3703DBA424088BC47E17A8C5EC0BA0FAE47E1BA424040DBCCCCCC8C5EC0BA0FAE47E1BA424040DBCCCCCC8C5EC049D2A3703DBA42400103000000010000000500000088BC47E17A8C5EC049D2A3703DBA4240D09DC2F5288C5EC049D2A3703DBA4240D09DC2F5288C5EC0BA0FAE47E1BA424088BC47E17A8C5EC0BA0FAE47E1BA424088BC47E17A8C5EC049D2A3703DBA42400103000000010000000500000068375C8FC28D5EC0BA0FAE47E1BA4240B018D7A3708D5EC0BA0FAE47E1BA4240B018D7A3708D5EC02B4DB81E85BB424068375C8FC28D5EC02B4DB81E85BB424068375C8FC28D5EC0BA0FAE47E1BA424001030000000100000005000000B018D7A3708D5EC0BA0FAE47E1BA4240F8F951B81E8D5EC0BA0FAE47E1BA4240F8F951B81E8D5EC02B4DB81E85BB4240B018D7A3708D5EC02B4DB81E85BB4240B018D7A3708D5EC0BA0FAE47E1BA424001030000000100000005000000F8F951B81E8D5EC0BA0FAE47E1BA424040DBCCCCCC8C5EC0BA0FAE47E1BA424040DBCCCCCC8C5EC02B4DB81E85BB4240F8F951B81E8D5EC02B4DB81E85BB4240F8F951B81E8D5EC0BA0FAE47E1BA42400103000000010000000500000040DBCCCCCC8C5EC0BA0FAE47E1BA424088BC47E17A8C5EC0BA0FAE47E1BA424088BC47E17A8C5EC02B4DB81E85BB424040DBCCCCCC8C5EC02B4DB81E85BB424040DBCCCCCC8C5EC0BA0FAE47E1BA42400103000000010000000500000088BC47E17A8C5EC0BA0FAE47E1BA4240D09DC2F5288C5EC0BA0FAE47E1BA4240D09DC2F5288C5EC02B4DB81E85BB424088BC47E17A8C5EC02B4DB81E85BB424088BC47E17A8C5EC0BA0FAE47E1BA42400103000000010000000500000068375C8FC28D5EC02B4DB81E85BB4240B018D7A3708D5EC02B4DB81E85BB4240B018D7A3708D5EC09C8AC2F528BC424068375C8FC28D5EC09C8AC2F528BC424068375C8FC28D5EC02B4DB81E85BB424001030000000100000005000000B018D7A3708D5EC02B4DB81E85BB4240F8F951B81E8D5EC02B4DB81E85BB4240F8F951B81E8D5EC09C8AC2F528BC4240B018D7A3708D5EC09C8AC2F528BC4240B018D7A3708D5EC02B4DB81E85BB424001030000000100000005000000F8F951B81E8D5EC02B4DB81E85BB424040DBCCCCCC8C5EC02B4DB81E85BB424040DBCCCCCC8C5EC09C8AC2F528BC4240F8F951B81E8D5EC09C8AC2F528BC4240F8F951B81E8D5EC02B4DB81E85BB42400103000000010000000500000040DBCCCCCC8C5EC02B4DB81E85BB424088BC47E17A8C5EC02B4DB81E85BB424088BC47E17A8C5EC09C8AC2F528BC424040DBCCCCCC8C5EC09C8AC2F528BC424040DBCCCCCC8C5EC02B4DB81E85BB42400103000000010000000500000088BC47E17A8C5EC02B4DB81E85BB4240D09DC2F5288C5EC02B4DB81E85BB4240D09DC2F5288C5EC09C8AC2F528BC424088BC47E17A8C5EC09C8AC2F528BC424088BC47E17A8C5EC02B4DB81E85BB42400103000000010000000500000068375C8FC28D5EC09C8AC2F528BC4240B018D7A3708D5EC09C8AC2F528BC4240B018D7A3708D5EC00DC8CCCCCCBC424068375C8FC28D5EC00DC8CCCCCCBC424068375C8FC28D5EC09C8AC2F528BC424001030000000100000005000000B018D7A3708D5EC09C8AC2F528BC4240F8F951B81E8D5EC09C8AC2F528BC4240F8F951B81E8D5EC00DC8CCCCCCBC4240B018D7A3708D5EC00DC8CCCCCCBC4240B018D7A3708D5EC09C8AC2F528BC424001030000000100000005000000F8F951B81E8D5EC09C8AC2F528BC424040DBCCCCCC8C5EC09C8AC2F528BC424040DBCCCCCC8C5EC00DC8CCCCCCBC4240F8F951B81E8D5EC00DC8CCCCCCBC4240F8F951B81E8D5EC09C8AC2F528BC42400103000000010000000500000040DBCCCCCC8C5EC09C8AC2F528BC424088BC47E17A8C5EC09C8AC2F528BC424088BC47E17A8C5EC00DC8CCCCCCBC424040DBCCCCCC8C5EC00DC8CCCCCCBC424040DBCCCCCC8C5EC09C8AC2F528BC42400103000000010000000500000088BC47E17A8C5EC09C8AC2F528BC4240D09DC2F5288C5EC09C8AC2F528BC4240D09DC2F5288C5EC00DC8CCCCCCBC424088BC47E17A8C5EC00DC8CCCCCCBC424088BC47E17A8C5EC09C8AC2F528BC42400103000000010000000500000068375C8FC28D5EC00DC8CCCCCCBC4240B018D7A3708D5EC00DC8CCCCCCBC4240B018D7A3708D5EC07E05D7A370BD424068375C8FC28D5EC07E05D7A370BD424068375C8FC28D5EC00DC8CCCCCCBC424001030000000100000005000000B018D7A3708D5EC00DC8CCCCCCBC4240F8F951B81E8D5EC00DC8CCCCCCBC4240F8F951B81E8D5EC07E05D7A370BD4240B018D7A3708D5EC07E05D7A370BD4240B018D7A3708D5EC00DC8CCCCCCBC424001030000000100000005000000F8F951B81E8D5EC00DC8CCCCCCBC424040DBCCCCCC8C5EC00DC8CCCCCCBC424040DBCCCCCC8C5EC07E05D7A370BD4240F8F951B81E8D5EC07E05D7A370BD4240F8F951B81E8D5EC00DC8CCCCCCBC42400103000000010000000500000040DBCCCCCC8C5EC00DC8CCCCCCBC424088BC47E17A8C5EC00DC8CCCCCCBC424088BC47E17A8C5EC07E05D7A370BD424040DBCCCCCC8C5EC07E05D7A370BD424040DBCCCCCC8C5EC00DC8CCCCCCBC42400103000000010000000500000088BC47E17A8C5EC00DC8CCCCCCBC4240D09DC2F5288C5EC00DC8CCCCCCBC4240D09DC2F5288C5EC07E05D7A370BD424088BC47E17A8C5EC07E05D7A370BD424088BC47E17A8C5EC00DC8CCCCCCBC42400103000000010000000500000068375C8FC28D5EC07E05D7A370BD4240B018D7A3708D5EC07E05D7A370BD4240B018D7A3708D5EC0EF42E17A14BE424068375C8FC28D5EC0EF42E17A14BE424068375C8FC28D5EC07E05D7A370BD424001030000000100000005000000B018D7A3708D5EC07E05D7A370BD4240F8F951B81E8D5EC07E05D7A370BD4240F8F951B81E8D5EC0EF42E17A14BE4240B018D7A3708D5EC0EF42E17A14BE4240B018D7A3708D5EC07E05D7A370BD424001030000000100000005000000F8F951B81E8D5EC07E05D7A370BD424040DBCCCCCC8C5EC07E05D7A370BD424040DBCCCCCC8C5EC0EF42E17A14BE4240F8F951B81E8D5EC0EF42E17A14BE4240F8F951B81E8D5EC07E05D7A370BD42400103000000010000000500000040DBCCCCCC8C5EC07E05D7A370BD424088BC47E17A8C5EC07E05D7A370BD424088BC47E17A8C5EC0EF42E17A14BE424040DBCCCCCC8C5EC0EF42E17A14BE424040DBCCCCCC8C5EC07E05D7A370BD42400103000000010000000500000088BC47E17A8C5EC07E05D7A370BD4240D09DC2F5288C5EC07E05D7A370BD4240D09DC2F5288C5EC0EF42E17A14BE424088BC47E17A8C5EC0EF42E17A14BE424088BC47E17A8C5EC07E05D7A370BD42400103000000010000000500000040DBCCCCCC8C5EC0149F703D0AB7424088BC47E17A8C5EC0149F703D0AB7424088BC47E17A8C5EC085DC7A14AEB7424040DBCCCCCC8C5EC085DC7A14AEB7424040DBCCCCCC8C5EC0149F703D0AB7424001030000000100000005000000302D85EB51885EC06E2E333333B34240780E000000885EC06E2E333333B34240780E000000885EC0DF6B3D0AD7B34240302D85EB51885EC0DF6B3D0AD7B34240302D85EB51885EC06E2E333333B3424001030000000100000005000000302D85EB51885EC0DF6B3D0AD7B34240780E000000885EC0DF6B3D0AD7B34240780E000000885EC050A947E17AB44240302D85EB51885EC050A947E17AB44240302D85EB51885EC0DF6B3D0AD7B3424001030000000100000005000000302D85EB51885EC050A947E17AB44240780E000000885EC050A947E17AB44240780E000000885EC0C1E651B81EB54240302D85EB51885EC0C1E651B81EB54240302D85EB51885EC050A947E17AB4424001030000000100000005000000302D85EB51885EC0C1E651B81EB54240780E000000885EC0C1E651B81EB54240780E000000885EC032245C8FC2B54240302D85EB51885EC032245C8FC2B54240302D85EB51885EC0C1E651B81EB5424001030000000100000005000000302D85EB51885EC032245C8FC2B54240780E000000885EC032245C8FC2B54240780E000000885EC0A361666666B64240302D85EB51885EC0A361666666B64240302D85EB51885EC032245C8FC2B5424001030000000100000005000000302D85EB51885EC0A361666666B64240780E000000885EC0A361666666B64240780E000000885EC0149F703D0AB74240302D85EB51885EC0149F703D0AB74240302D85EB51885EC0A361666666B6424001030000000100000005000000302D85EB51885EC0149F703D0AB74240780E000000885EC0149F703D0AB74240780E000000885EC085DC7A14AEB74240302D85EB51885EC085DC7A14AEB74240302D85EB51885EC0149F703D0AB7424001030000000100000005000000302D85EB51885EC085DC7A14AEB74240780E000000885EC085DC7A14AEB74240780E000000885EC0F61985EB51B84240302D85EB51885EC0F61985EB51B84240302D85EB51885EC085DC7A14AEB7424001030000000100000005000000302D85EB51885EC0F61985EB51B84240780E000000885EC0F61985EB51B84240780E000000885EC067578FC2F5B84240302D85EB51885EC067578FC2F5B84240302D85EB51885EC0F61985EB51B8424001030000000100000005000000302D85EB51885EC067578FC2F5B84240780E000000885EC067578FC2F5B84240780E000000885EC0D894999999B94240302D85EB51885EC0D894999999B94240302D85EB51885EC067578FC2F5B8424001030000000100000005000000302D85EB51885EC0D894999999B94240780E000000885EC0D894999999B94240780E000000885EC049D2A3703DBA4240302D85EB51885EC049D2A3703DBA4240302D85EB51885EC0D894999999B9424001030000000100000005000000302D85EB51885EC049D2A3703DBA4240780E000000885EC049D2A3703DBA4240780E000000885EC0BA0FAE47E1BA4240302D85EB51885EC0BA0FAE47E1BA4240302D85EB51885EC049D2A3703DBA424001030000000100000005000000302D85EB51885EC0BA0FAE47E1BA4240780E000000885EC0BA0FAE47E1BA4240780E000000885EC02B4DB81E85BB4240302D85EB51885EC02B4DB81E85BB4240302D85EB51885EC0BA0FAE47E1BA424001030000000100000005000000302D85EB51885EC02B4DB81E85BB4240780E000000885EC02B4DB81E85BB4240780E000000885EC09C8AC2F528BC4240302D85EB51885EC09C8AC2F528BC4240302D85EB51885EC02B4DB81E85BB424001030000000100000005000000780E000000885EC067578FC2F5B84240C0EF7A14AE875EC067578FC2F5B84240C0EF7A14AE875EC0D894999999B94240780E000000885EC0D894999999B94240780E000000885EC067578FC2F5B8424001030000000100000005000000780E000000885EC085DC7A14AEB74240C0EF7A14AE875EC085DC7A14AEB74240C0EF7A14AE875EC0F61985EB51B84240780E000000885EC0F61985EB51B84240780E000000885EC085DC7A14AEB7424001030000000100000005000000780E000000885EC0F61985EB51B84240C0EF7A14AE875EC0F61985EB51B84240C0EF7A14AE875EC067578FC2F5B84240780E000000885EC067578FC2F5B84240780E000000885EC0F61985EB51B8424001030000000100000005000000780E000000885EC0A361666666B64240C0EF7A14AE875EC0A361666666B64240C0EF7A14AE875EC0149F703D0AB74240780E000000885EC0149F703D0AB74240780E000000885EC0A361666666B6424001030000000100000005000000780E000000885EC0149F703D0AB74240C0EF7A14AE875EC0149F703D0AB74240C0EF7A14AE875EC085DC7A14AEB74240780E000000885EC085DC7A14AEB74240780E000000885EC0149F703D0AB742400103000000010000000500000040DBCCCCCC8C5EC0A361666666B6424088BC47E17A8C5EC0A361666666B6424088BC47E17A8C5EC0149F703D0AB7424040DBCCCCCC8C5EC0149F703D0AB7424040DBCCCCCC8C5EC0A361666666B64240
+2	0106000020E6100000EF00000001030000000100000005000000207F3D0AD7835EC01B7614AE47B142406860B81E85835EC01B7614AE47B142406860B81E85835EC08CB31E85EBB14240207F3D0AD7835EC08CB31E85EBB14240207F3D0AD7835EC01B7614AE47B14240010300000001000000050000006860B81E85835EC01B7614AE47B14240B041333333835EC01B7614AE47B14240B041333333835EC08CB31E85EBB142406860B81E85835EC08CB31E85EBB142406860B81E85835EC01B7614AE47B1424001030000000100000005000000B041333333835EC01B7614AE47B14240F822AE47E1825EC01B7614AE47B14240F822AE47E1825EC08CB31E85EBB14240B041333333835EC08CB31E85EBB14240B041333333835EC01B7614AE47B1424001030000000100000005000000F822AE47E1825EC01B7614AE47B142404004295C8F825EC01B7614AE47B142404004295C8F825EC08CB31E85EBB14240F822AE47E1825EC08CB31E85EBB14240F822AE47E1825EC01B7614AE47B14240010300000001000000050000004004295C8F825EC01B7614AE47B1424088E5A3703D825EC01B7614AE47B1424088E5A3703D825EC08CB31E85EBB142404004295C8F825EC08CB31E85EBB142404004295C8F825EC01B7614AE47B142400103000000010000000500000088E5A3703D825EC01B7614AE47B14240D0C61E85EB815EC01B7614AE47B14240D0C61E85EB815EC08CB31E85EBB1424088E5A3703D825EC08CB31E85EBB1424088E5A3703D825EC01B7614AE47B1424001030000000100000005000000D0C61E85EB815EC01B7614AE47B1424018A8999999815EC01B7614AE47B1424018A8999999815EC08CB31E85EBB14240D0C61E85EB815EC08CB31E85EBB14240D0C61E85EB815EC01B7614AE47B142400103000000010000000500000018A8999999815EC01B7614AE47B14240608914AE47815EC01B7614AE47B14240608914AE47815EC08CB31E85EBB1424018A8999999815EC08CB31E85EBB1424018A8999999815EC01B7614AE47B1424001030000000100000005000000207F3D0AD7835EC08CB31E85EBB142406860B81E85835EC08CB31E85EBB142406860B81E85835EC0FDF0285C8FB24240207F3D0AD7835EC0FDF0285C8FB24240207F3D0AD7835EC08CB31E85EBB14240010300000001000000050000006860B81E85835EC08CB31E85EBB14240B041333333835EC08CB31E85EBB14240B041333333835EC0FDF0285C8FB242406860B81E85835EC0FDF0285C8FB242406860B81E85835EC08CB31E85EBB1424001030000000100000005000000B041333333835EC08CB31E85EBB14240F822AE47E1825EC08CB31E85EBB14240F822AE47E1825EC0FDF0285C8FB24240B041333333835EC0FDF0285C8FB24240B041333333835EC08CB31E85EBB1424001030000000100000005000000F822AE47E1825EC08CB31E85EBB142404004295C8F825EC08CB31E85EBB142404004295C8F825EC0FDF0285C8FB24240F822AE47E1825EC0FDF0285C8FB24240F822AE47E1825EC08CB31E85EBB14240010300000001000000050000004004295C8F825EC08CB31E85EBB1424088E5A3703D825EC08CB31E85EBB1424088E5A3703D825EC0FDF0285C8FB242404004295C8F825EC0FDF0285C8FB242404004295C8F825EC08CB31E85EBB142400103000000010000000500000088E5A3703D825EC08CB31E85EBB14240D0C61E85EB815EC08CB31E85EBB14240D0C61E85EB815EC0FDF0285C8FB2424088E5A3703D825EC0FDF0285C8FB2424088E5A3703D825EC08CB31E85EBB1424001030000000100000005000000D0C61E85EB815EC08CB31E85EBB1424018A8999999815EC08CB31E85EBB1424018A8999999815EC0FDF0285C8FB24240D0C61E85EB815EC0FDF0285C8FB24240D0C61E85EB815EC08CB31E85EBB142400103000000010000000500000018A8999999815EC08CB31E85EBB14240608914AE47815EC08CB31E85EBB14240608914AE47815EC0FDF0285C8FB2424018A8999999815EC0FDF0285C8FB2424018A8999999815EC08CB31E85EBB1424001030000000100000005000000207F3D0AD7835EC0FDF0285C8FB242406860B81E85835EC0FDF0285C8FB242406860B81E85835EC06E2E333333B34240207F3D0AD7835EC06E2E333333B34240207F3D0AD7835EC0FDF0285C8FB24240010300000001000000050000006860B81E85835EC0FDF0285C8FB24240B041333333835EC0FDF0285C8FB24240B041333333835EC06E2E333333B342406860B81E85835EC06E2E333333B342406860B81E85835EC0FDF0285C8FB2424001030000000100000005000000B041333333835EC0FDF0285C8FB24240F822AE47E1825EC0FDF0285C8FB24240F822AE47E1825EC06E2E333333B34240B041333333835EC06E2E333333B34240B041333333835EC0FDF0285C8FB2424001030000000100000005000000F822AE47E1825EC0FDF0285C8FB242404004295C8F825EC0FDF0285C8FB242404004295C8F825EC06E2E333333B34240F822AE47E1825EC06E2E333333B34240F822AE47E1825EC0FDF0285C8FB24240010300000001000000050000004004295C8F825EC0FDF0285C8FB2424088E5A3703D825EC0FDF0285C8FB2424088E5A3703D825EC06E2E333333B342404004295C8F825EC06E2E333333B342404004295C8F825EC0FDF0285C8FB242400103000000010000000500000088E5A3703D825EC0FDF0285C8FB24240D0C61E85EB815EC0FDF0285C8FB24240D0C61E85EB815EC06E2E333333B3424088E5A3703D825EC06E2E333333B3424088E5A3703D825EC0FDF0285C8FB2424001030000000100000005000000D0C61E85EB815EC0FDF0285C8FB2424018A8999999815EC0FDF0285C8FB2424018A8999999815EC06E2E333333B34240D0C61E85EB815EC06E2E333333B34240D0C61E85EB815EC0FDF0285C8FB242400103000000010000000500000018A8999999815EC0FDF0285C8FB24240608914AE47815EC0FDF0285C8FB24240608914AE47815EC06E2E333333B3424018A8999999815EC06E2E333333B3424018A8999999815EC0FDF0285C8FB2424001030000000100000005000000207F3D0AD7835EC06E2E333333B342406860B81E85835EC06E2E333333B342406860B81E85835EC0DF6B3D0AD7B34240207F3D0AD7835EC0DF6B3D0AD7B34240207F3D0AD7835EC06E2E333333B34240010300000001000000050000006860B81E85835EC06E2E333333B34240B041333333835EC06E2E333333B34240B041333333835EC0DF6B3D0AD7B342406860B81E85835EC0DF6B3D0AD7B342406860B81E85835EC06E2E333333B3424001030000000100000005000000B041333333835EC06E2E333333B34240F822AE47E1825EC06E2E333333B34240F822AE47E1825EC0DF6B3D0AD7B34240B041333333835EC0DF6B3D0AD7B34240B041333333835EC06E2E333333B3424001030000000100000005000000F822AE47E1825EC06E2E333333B342404004295C8F825EC06E2E333333B342404004295C8F825EC0DF6B3D0AD7B34240F822AE47E1825EC0DF6B3D0AD7B34240F822AE47E1825EC06E2E333333B34240010300000001000000050000004004295C8F825EC06E2E333333B3424088E5A3703D825EC06E2E333333B3424088E5A3703D825EC0DF6B3D0AD7B342404004295C8F825EC0DF6B3D0AD7B342404004295C8F825EC06E2E333333B342400103000000010000000500000088E5A3703D825EC06E2E333333B34240D0C61E85EB815EC06E2E333333B34240D0C61E85EB815EC0DF6B3D0AD7B3424088E5A3703D825EC0DF6B3D0AD7B3424088E5A3703D825EC06E2E333333B3424001030000000100000005000000D0C61E85EB815EC06E2E333333B3424018A8999999815EC06E2E333333B3424018A8999999815EC0DF6B3D0AD7B34240D0C61E85EB815EC0DF6B3D0AD7B34240D0C61E85EB815EC06E2E333333B342400103000000010000000500000018A8999999815EC06E2E333333B34240608914AE47815EC06E2E333333B34240608914AE47815EC0DF6B3D0AD7B3424018A8999999815EC0DF6B3D0AD7B3424018A8999999815EC06E2E333333B342400103000000010000000500000090BC47E17A845EC0224DB81E85AB4240D89DC2F528845EC0224DB81E85AB4240D89DC2F528845EC0938AC2F528AC424090BC47E17A845EC0938AC2F528AC424090BC47E17A845EC0224DB81E85AB424001030000000100000005000000D89DC2F528845EC0224DB81E85AB4240207F3D0AD7835EC0224DB81E85AB4240207F3D0AD7835EC0938AC2F528AC4240D89DC2F528845EC0938AC2F528AC4240D89DC2F528845EC0224DB81E85AB424001030000000100000005000000207F3D0AD7835EC0224DB81E85AB42406860B81E85835EC0224DB81E85AB42406860B81E85835EC0938AC2F528AC4240207F3D0AD7835EC0938AC2F528AC4240207F3D0AD7835EC0224DB81E85AB4240010300000001000000050000006860B81E85835EC0224DB81E85AB4240B041333333835EC0224DB81E85AB4240B041333333835EC0938AC2F528AC42406860B81E85835EC0938AC2F528AC42406860B81E85835EC0224DB81E85AB424001030000000100000005000000B041333333835EC0224DB81E85AB4240F822AE47E1825EC0224DB81E85AB4240F822AE47E1825EC0938AC2F528AC4240B041333333835EC0938AC2F528AC4240B041333333835EC0224DB81E85AB424001030000000100000005000000F822AE47E1825EC0224DB81E85AB42404004295C8F825EC0224DB81E85AB42404004295C8F825EC0938AC2F528AC4240F822AE47E1825EC0938AC2F528AC4240F822AE47E1825EC0224DB81E85AB4240010300000001000000050000004004295C8F825EC0224DB81E85AB424088E5A3703D825EC0224DB81E85AB424088E5A3703D825EC0938AC2F528AC42404004295C8F825EC0938AC2F528AC42404004295C8F825EC0224DB81E85AB42400103000000010000000500000088E5A3703D825EC0224DB81E85AB4240D0C61E85EB815EC0224DB81E85AB4240D0C61E85EB815EC0938AC2F528AC424088E5A3703D825EC0938AC2F528AC424088E5A3703D825EC0224DB81E85AB42400103000000010000000500000090BC47E17A845EC0938AC2F528AC4240D89DC2F528845EC0938AC2F528AC4240D89DC2F528845EC004C8CCCCCCAC424090BC47E17A845EC004C8CCCCCCAC424090BC47E17A845EC0938AC2F528AC424001030000000100000005000000D89DC2F528845EC0938AC2F528AC4240207F3D0AD7835EC0938AC2F528AC4240207F3D0AD7835EC004C8CCCCCCAC4240D89DC2F528845EC004C8CCCCCCAC4240D89DC2F528845EC0938AC2F528AC424001030000000100000005000000207F3D0AD7835EC0938AC2F528AC42406860B81E85835EC0938AC2F528AC42406860B81E85835EC004C8CCCCCCAC4240207F3D0AD7835EC004C8CCCCCCAC4240207F3D0AD7835EC0938AC2F528AC4240010300000001000000050000006860B81E85835EC0938AC2F528AC4240B041333333835EC0938AC2F528AC4240B041333333835EC004C8CCCCCCAC42406860B81E85835EC004C8CCCCCCAC42406860B81E85835EC0938AC2F528AC424001030000000100000005000000B041333333835EC0938AC2F528AC4240F822AE47E1825EC0938AC2F528AC4240F822AE47E1825EC004C8CCCCCCAC4240B041333333835EC004C8CCCCCCAC4240B041333333835EC0938AC2F528AC424001030000000100000005000000F822AE47E1825EC0938AC2F528AC42404004295C8F825EC0938AC2F528AC42404004295C8F825EC004C8CCCCCCAC4240F822AE47E1825EC004C8CCCCCCAC4240F822AE47E1825EC0938AC2F528AC4240010300000001000000050000004004295C8F825EC0938AC2F528AC424088E5A3703D825EC0938AC2F528AC424088E5A3703D825EC004C8CCCCCCAC42404004295C8F825EC004C8CCCCCCAC42404004295C8F825EC0938AC2F528AC42400103000000010000000500000088E5A3703D825EC0938AC2F528AC4240D0C61E85EB815EC0938AC2F528AC4240D0C61E85EB815EC004C8CCCCCCAC424088E5A3703D825EC004C8CCCCCCAC424088E5A3703D825EC0938AC2F528AC42400103000000010000000500000090BC47E17A845EC004C8CCCCCCAC4240D89DC2F528845EC004C8CCCCCCAC4240D89DC2F528845EC03D0AD7A370AD424090BC47E17A845EC03D0AD7A370AD424090BC47E17A845EC004C8CCCCCCAC424001030000000100000005000000D89DC2F528845EC004C8CCCCCCAC4240207F3D0AD7835EC004C8CCCCCCAC4240207F3D0AD7835EC03D0AD7A370AD4240D89DC2F528845EC03D0AD7A370AD4240D89DC2F528845EC004C8CCCCCCAC424001030000000100000005000000207F3D0AD7835EC004C8CCCCCCAC42406860B81E85835EC004C8CCCCCCAC42406860B81E85835EC03D0AD7A370AD4240207F3D0AD7835EC03D0AD7A370AD4240207F3D0AD7835EC004C8CCCCCCAC4240010300000001000000050000006860B81E85835EC004C8CCCCCCAC4240B041333333835EC004C8CCCCCCAC4240B041333333835EC03D0AD7A370AD42406860B81E85835EC03D0AD7A370AD42406860B81E85835EC004C8CCCCCCAC424001030000000100000005000000B041333333835EC004C8CCCCCCAC4240F822AE47E1825EC004C8CCCCCCAC4240F822AE47E1825EC03D0AD7A370AD4240B041333333835EC03D0AD7A370AD4240B041333333835EC004C8CCCCCCAC424001030000000100000005000000F822AE47E1825EC004C8CCCCCCAC42404004295C8F825EC004C8CCCCCCAC42404004295C8F825EC03D0AD7A370AD4240F822AE47E1825EC03D0AD7A370AD4240F822AE47E1825EC004C8CCCCCCAC4240010300000001000000050000004004295C8F825EC004C8CCCCCCAC424088E5A3703D825EC004C8CCCCCCAC424088E5A3703D825EC03D0AD7A370AD42404004295C8F825EC03D0AD7A370AD42404004295C8F825EC004C8CCCCCCAC42400103000000010000000500000088E5A3703D825EC004C8CCCCCCAC4240D0C61E85EB815EC004C8CCCCCCAC4240D0C61E85EB815EC03D0AD7A370AD424088E5A3703D825EC03D0AD7A370AD424088E5A3703D825EC004C8CCCCCCAC42400103000000010000000500000090BC47E17A845EC03D0AD7A370AD4240D89DC2F528845EC03D0AD7A370AD4240D89DC2F528845EC0E642E17A14AE424090BC47E17A845EC0E642E17A14AE424090BC47E17A845EC03D0AD7A370AD424001030000000100000005000000D89DC2F528845EC03D0AD7A370AD4240207F3D0AD7835EC03D0AD7A370AD4240207F3D0AD7835EC0E642E17A14AE4240D89DC2F528845EC0E642E17A14AE4240D89DC2F528845EC03D0AD7A370AD424001030000000100000005000000207F3D0AD7835EC03D0AD7A370AD42406860B81E85835EC03D0AD7A370AD42406860B81E85835EC0E642E17A14AE4240207F3D0AD7835EC0E642E17A14AE4240207F3D0AD7835EC03D0AD7A370AD4240010300000001000000050000006860B81E85835EC03D0AD7A370AD4240B041333333835EC03D0AD7A370AD4240B041333333835EC0E642E17A14AE42406860B81E85835EC0E642E17A14AE42406860B81E85835EC03D0AD7A370AD424001030000000100000005000000B041333333835EC03D0AD7A370AD4240F822AE47E1825EC03D0AD7A370AD4240F822AE47E1825EC0E642E17A14AE4240B041333333835EC0E642E17A14AE4240B041333333835EC03D0AD7A370AD424001030000000100000005000000F822AE47E1825EC03D0AD7A370AD42404004295C8F825EC03D0AD7A370AD42404004295C8F825EC0E642E17A14AE4240F822AE47E1825EC0E642E17A14AE4240F822AE47E1825EC03D0AD7A370AD4240010300000001000000050000004004295C8F825EC03D0AD7A370AD424088E5A3703D825EC03D0AD7A370AD424088E5A3703D825EC0E642E17A14AE42404004295C8F825EC0E642E17A14AE42404004295C8F825EC03D0AD7A370AD42400103000000010000000500000088E5A3703D825EC03D0AD7A370AD4240D0C61E85EB815EC03D0AD7A370AD4240D0C61E85EB815EC0E642E17A14AE424088E5A3703D825EC0E642E17A14AE424088E5A3703D825EC03D0AD7A370AD42400103000000010000000500000090BC47E17A845EC0E642E17A14AE4240D89DC2F528845EC0E642E17A14AE4240D89DC2F528845EC05780EB51B8AE424090BC47E17A845EC05780EB51B8AE424090BC47E17A845EC0E642E17A14AE424001030000000100000005000000D89DC2F528845EC0E642E17A14AE4240207F3D0AD7835EC0E642E17A14AE4240207F3D0AD7835EC05780EB51B8AE4240D89DC2F528845EC05780EB51B8AE4240D89DC2F528845EC0E642E17A14AE424001030000000100000005000000207F3D0AD7835EC0E642E17A14AE42406860B81E85835EC0E642E17A14AE42406860B81E85835EC05780EB51B8AE4240207F3D0AD7835EC05780EB51B8AE4240207F3D0AD7835EC0E642E17A14AE4240010300000001000000050000006860B81E85835EC0E642E17A14AE4240B041333333835EC0E642E17A14AE4240B041333333835EC05780EB51B8AE42406860B81E85835EC05780EB51B8AE42406860B81E85835EC0E642E17A14AE424001030000000100000005000000B041333333835EC0E642E17A14AE4240F822AE47E1825EC0E642E17A14AE4240F822AE47E1825EC05780EB51B8AE4240B041333333835EC05780EB51B8AE4240B041333333835EC0E642E17A14AE424001030000000100000005000000F822AE47E1825EC0E642E17A14AE42404004295C8F825EC0E642E17A14AE42404004295C8F825EC05780EB51B8AE4240F822AE47E1825EC05780EB51B8AE4240F822AE47E1825EC0E642E17A14AE4240010300000001000000050000004004295C8F825EC0E642E17A14AE424088E5A3703D825EC0E642E17A14AE424088E5A3703D825EC05780EB51B8AE42404004295C8F825EC05780EB51B8AE42404004295C8F825EC0E642E17A14AE42400103000000010000000500000088E5A3703D825EC0E642E17A14AE4240D0C61E85EB815EC0E642E17A14AE4240D0C61E85EB815EC05780EB51B8AE424088E5A3703D825EC05780EB51B8AE424088E5A3703D825EC0E642E17A14AE42400103000000010000000500000090BC47E17A845EC05780EB51B8AE4240D89DC2F528845EC05780EB51B8AE4240D89DC2F528845EC0C8BDF5285CAF424090BC47E17A845EC0C8BDF5285CAF424090BC47E17A845EC05780EB51B8AE424001030000000100000005000000D89DC2F528845EC05780EB51B8AE4240207F3D0AD7835EC05780EB51B8AE4240207F3D0AD7835EC0C8BDF5285CAF4240D89DC2F528845EC0C8BDF5285CAF4240D89DC2F528845EC05780EB51B8AE424001030000000100000005000000207F3D0AD7835EC05780EB51B8AE42406860B81E85835EC05780EB51B8AE42406860B81E85835EC0C8BDF5285CAF4240207F3D0AD7835EC0C8BDF5285CAF4240207F3D0AD7835EC05780EB51B8AE4240010300000001000000050000006860B81E85835EC05780EB51B8AE4240B041333333835EC05780EB51B8AE4240B041333333835EC0C8BDF5285CAF42406860B81E85835EC0C8BDF5285CAF42406860B81E85835EC05780EB51B8AE424001030000000100000005000000B041333333835EC05780EB51B8AE4240F822AE47E1825EC05780EB51B8AE4240F822AE47E1825EC0C8BDF5285CAF4240B041333333835EC0C8BDF5285CAF4240B041333333835EC05780EB51B8AE424001030000000100000005000000F822AE47E1825EC05780EB51B8AE42404004295C8F825EC05780EB51B8AE42404004295C8F825EC0C8BDF5285CAF4240F822AE47E1825EC0C8BDF5285CAF4240F822AE47E1825EC05780EB51B8AE4240010300000001000000050000004004295C8F825EC05780EB51B8AE424088E5A3703D825EC05780EB51B8AE424088E5A3703D825EC0C8BDF5285CAF42404004295C8F825EC0C8BDF5285CAF42404004295C8F825EC05780EB51B8AE42400103000000010000000500000088E5A3703D825EC05780EB51B8AE4240D0C61E85EB815EC05780EB51B8AE4240D0C61E85EB815EC0C8BDF5285CAF424088E5A3703D825EC0C8BDF5285CAF424088E5A3703D825EC05780EB51B8AE42400103000000010000000500000090BC47E17A845EC0C8BDF5285CAF4240D89DC2F528845EC0C8BDF5285CAF4240D89DC2F528845EC039FBFFFFFFAF424090BC47E17A845EC039FBFFFFFFAF424090BC47E17A845EC0C8BDF5285CAF424001030000000100000005000000D89DC2F528845EC0C8BDF5285CAF4240207F3D0AD7835EC0C8BDF5285CAF4240207F3D0AD7835EC039FBFFFFFFAF4240D89DC2F528845EC039FBFFFFFFAF4240D89DC2F528845EC0C8BDF5285CAF424001030000000100000005000000207F3D0AD7835EC0C8BDF5285CAF42406860B81E85835EC0C8BDF5285CAF42406860B81E85835EC039FBFFFFFFAF4240207F3D0AD7835EC039FBFFFFFFAF4240207F3D0AD7835EC0C8BDF5285CAF4240010300000001000000050000006860B81E85835EC0C8BDF5285CAF4240B041333333835EC0C8BDF5285CAF4240B041333333835EC039FBFFFFFFAF42406860B81E85835EC039FBFFFFFFAF42406860B81E85835EC0C8BDF5285CAF424001030000000100000005000000B041333333835EC0C8BDF5285CAF4240F822AE47E1825EC0C8BDF5285CAF4240F822AE47E1825EC039FBFFFFFFAF4240B041333333835EC039FBFFFFFFAF4240B041333333835EC0C8BDF5285CAF424001030000000100000005000000F822AE47E1825EC0C8BDF5285CAF42404004295C8F825EC0C8BDF5285CAF42404004295C8F825EC039FBFFFFFFAF4240F822AE47E1825EC039FBFFFFFFAF4240F822AE47E1825EC0C8BDF5285CAF4240010300000001000000050000004004295C8F825EC0C8BDF5285CAF424088E5A3703D825EC0C8BDF5285CAF424088E5A3703D825EC039FBFFFFFFAF42404004295C8F825EC039FBFFFFFFAF42404004295C8F825EC0C8BDF5285CAF42400103000000010000000500000088E5A3703D825EC0C8BDF5285CAF4240D0C61E85EB815EC0C8BDF5285CAF4240D0C61E85EB815EC039FBFFFFFFAF424088E5A3703D825EC039FBFFFFFFAF424088E5A3703D825EC0C8BDF5285CAF424001030000000100000005000000207F3D0AD7835EC039FBFFFFFFAF42406860B81E85835EC039FBFFFFFFAF42406860B81E85835EC0AA380AD7A3B04240207F3D0AD7835EC0AA380AD7A3B04240207F3D0AD7835EC039FBFFFFFFAF4240010300000001000000050000006860B81E85835EC039FBFFFFFFAF4240B041333333835EC039FBFFFFFFAF4240B041333333835EC0AA380AD7A3B042406860B81E85835EC0AA380AD7A3B042406860B81E85835EC039FBFFFFFFAF424001030000000100000005000000B041333333835EC039FBFFFFFFAF4240F822AE47E1825EC039FBFFFFFFAF4240F822AE47E1825EC0AA380AD7A3B04240B041333333835EC0AA380AD7A3B04240B041333333835EC039FBFFFFFFAF424001030000000100000005000000F822AE47E1825EC039FBFFFFFFAF42404004295C8F825EC039FBFFFFFFAF42404004295C8F825EC0AA380AD7A3B04240F822AE47E1825EC0AA380AD7A3B04240F822AE47E1825EC039FBFFFFFFAF4240010300000001000000050000004004295C8F825EC039FBFFFFFFAF424088E5A3703D825EC039FBFFFFFFAF424088E5A3703D825EC0AA380AD7A3B042404004295C8F825EC0AA380AD7A3B042404004295C8F825EC039FBFFFFFFAF42400103000000010000000500000088E5A3703D825EC039FBFFFFFFAF4240D0C61E85EB815EC039FBFFFFFFAF4240D0C61E85EB815EC0AA380AD7A3B0424088E5A3703D825EC0AA380AD7A3B0424088E5A3703D825EC039FBFFFFFFAF424001030000000100000005000000207F3D0AD7835EC0AA380AD7A3B042406860B81E85835EC0AA380AD7A3B042406860B81E85835EC01B7614AE47B14240207F3D0AD7835EC01B7614AE47B14240207F3D0AD7835EC0AA380AD7A3B04240010300000001000000050000006860B81E85835EC0AA380AD7A3B04240B041333333835EC0AA380AD7A3B04240B041333333835EC01B7614AE47B142406860B81E85835EC01B7614AE47B142406860B81E85835EC0AA380AD7A3B0424001030000000100000005000000B041333333835EC0AA380AD7A3B04240F822AE47E1825EC0AA380AD7A3B04240F822AE47E1825EC01B7614AE47B14240B041333333835EC01B7614AE47B14240B041333333835EC0AA380AD7A3B0424001030000000100000005000000F822AE47E1825EC0AA380AD7A3B042404004295C8F825EC0AA380AD7A3B042404004295C8F825EC01B7614AE47B14240F822AE47E1825EC01B7614AE47B14240F822AE47E1825EC0AA380AD7A3B04240010300000001000000050000004004295C8F825EC0AA380AD7A3B0424088E5A3703D825EC0AA380AD7A3B0424088E5A3703D825EC01B7614AE47B142404004295C8F825EC01B7614AE47B142404004295C8F825EC0AA380AD7A3B042400103000000010000000500000088E5A3703D825EC0AA380AD7A3B04240D0C61E85EB815EC0AA380AD7A3B04240D0C61E85EB815EC01B7614AE47B1424088E5A3703D825EC01B7614AE47B1424088E5A3703D825EC0AA380AD7A3B0424001030000000100000005000000D0C61E85EB815EC0224DB81E85AB424018A8999999815EC0224DB81E85AB424018A8999999815EC0938AC2F528AC4240D0C61E85EB815EC0938AC2F528AC4240D0C61E85EB815EC0224DB81E85AB424001030000000100000005000000D0C61E85EB815EC0938AC2F528AC424018A8999999815EC0938AC2F528AC424018A8999999815EC004C8CCCCCCAC4240D0C61E85EB815EC004C8CCCCCCAC4240D0C61E85EB815EC0938AC2F528AC424001030000000100000005000000D0C61E85EB815EC004C8CCCCCCAC424018A8999999815EC004C8CCCCCCAC424018A8999999815EC03D0AD7A370AD4240D0C61E85EB815EC03D0AD7A370AD4240D0C61E85EB815EC004C8CCCCCCAC424001030000000100000005000000D0C61E85EB815EC03D0AD7A370AD424018A8999999815EC03D0AD7A370AD424018A8999999815EC0E642E17A14AE4240D0C61E85EB815EC0E642E17A14AE4240D0C61E85EB815EC03D0AD7A370AD424001030000000100000005000000D0C61E85EB815EC0E642E17A14AE424018A8999999815EC0E642E17A14AE424018A8999999815EC05780EB51B8AE4240D0C61E85EB815EC05780EB51B8AE4240D0C61E85EB815EC0E642E17A14AE424001030000000100000005000000D0C61E85EB815EC05780EB51B8AE424018A8999999815EC05780EB51B8AE424018A8999999815EC0C8BDF5285CAF4240D0C61E85EB815EC0C8BDF5285CAF4240D0C61E85EB815EC05780EB51B8AE424001030000000100000005000000D0C61E85EB815EC0C8BDF5285CAF424018A8999999815EC0C8BDF5285CAF424018A8999999815EC039FBFFFFFFAF4240D0C61E85EB815EC039FBFFFFFFAF4240D0C61E85EB815EC0C8BDF5285CAF424001030000000100000005000000D0C61E85EB815EC039FBFFFFFFAF424018A8999999815EC039FBFFFFFFAF424018A8999999815EC0AA380AD7A3B04240D0C61E85EB815EC0AA380AD7A3B04240D0C61E85EB815EC039FBFFFFFFAF424001030000000100000005000000D0C61E85EB815EC0AA380AD7A3B0424018A8999999815EC0AA380AD7A3B0424018A8999999815EC01B7614AE47B14240D0C61E85EB815EC01B7614AE47B14240D0C61E85EB815EC0AA380AD7A3B0424001030000000100000005000000780E000000885EC039FBFFFFFFAF4240C0EF7A14AE875EC039FBFFFFFFAF4240C0EF7A14AE875EC0AA380AD7A3B04240780E000000885EC0AA380AD7A3B04240780E000000885EC039FBFFFFFFAF424001030000000100000005000000C0EF7A14AE875EC039FBFFFFFFAF424008D1F5285C875EC039FBFFFFFFAF424008D1F5285C875EC0AA380AD7A3B04240C0EF7A14AE875EC0AA380AD7A3B04240C0EF7A14AE875EC039FBFFFFFFAF42400103000000010000000500000008D1F5285C875EC039FBFFFFFFAF424050B2703D0A875EC039FBFFFFFFAF424050B2703D0A875EC0AA380AD7A3B0424008D1F5285C875EC0AA380AD7A3B0424008D1F5285C875EC039FBFFFFFFAF42400103000000010000000500000050B2703D0A875EC039FBFFFFFFAF42409893EB51B8865EC039FBFFFFFFAF42409893EB51B8865EC0AA380AD7A3B0424050B2703D0A875EC0AA380AD7A3B0424050B2703D0A875EC039FBFFFFFFAF4240010300000001000000050000009893EB51B8865EC039FBFFFFFFAF4240E074666666865EC039FBFFFFFFAF4240E074666666865EC0AA380AD7A3B042409893EB51B8865EC0AA380AD7A3B042409893EB51B8865EC039FBFFFFFFAF424001030000000100000005000000E074666666865EC039FBFFFFFFAF42402856E17A14865EC039FBFFFFFFAF42402856E17A14865EC0AA380AD7A3B04240E074666666865EC0AA380AD7A3B04240E074666666865EC039FBFFFFFFAF4240010300000001000000050000002856E17A14865EC039FBFFFFFFAF424070375C8FC2855EC039FBFFFFFFAF424070375C8FC2855EC0AA380AD7A3B042402856E17A14865EC0AA380AD7A3B042402856E17A14865EC039FBFFFFFFAF42400103000000010000000500000070375C8FC2855EC039FBFFFFFFAF4240B818D7A370855EC039FBFFFFFFAF4240B818D7A370855EC0AA380AD7A3B0424070375C8FC2855EC0AA380AD7A3B0424070375C8FC2855EC039FBFFFFFFAF424001030000000100000005000000B818D7A370855EC039FBFFFFFFAF424000FA51B81E855EC039FBFFFFFFAF424000FA51B81E855EC0AA380AD7A3B04240B818D7A370855EC0AA380AD7A3B04240B818D7A370855EC039FBFFFFFFAF42400103000000010000000500000000FA51B81E855EC039FBFFFFFFAF424048DBCCCCCC845EC039FBFFFFFFAF424048DBCCCCCC845EC0AA380AD7A3B0424000FA51B81E855EC0AA380AD7A3B0424000FA51B81E855EC039FBFFFFFFAF42400103000000010000000500000048DBCCCCCC845EC039FBFFFFFFAF424090BC47E17A845EC039FBFFFFFFAF424090BC47E17A845EC0AA380AD7A3B0424048DBCCCCCC845EC0AA380AD7A3B0424048DBCCCCCC845EC039FBFFFFFFAF42400103000000010000000500000090BC47E17A845EC039FBFFFFFFAF4240D89DC2F528845EC039FBFFFFFFAF4240D89DC2F528845EC0AA380AD7A3B0424090BC47E17A845EC0AA380AD7A3B0424090BC47E17A845EC039FBFFFFFFAF424001030000000100000005000000D89DC2F528845EC039FBFFFFFFAF4240207F3D0AD7835EC039FBFFFFFFAF4240207F3D0AD7835EC0AA380AD7A3B04240D89DC2F528845EC0AA380AD7A3B04240D89DC2F528845EC039FBFFFFFFAF424001030000000100000005000000780E000000885EC0AA380AD7A3B04240C0EF7A14AE875EC0AA380AD7A3B04240C0EF7A14AE875EC01B7614AE47B14240780E000000885EC01B7614AE47B14240780E000000885EC0AA380AD7A3B0424001030000000100000005000000C0EF7A14AE875EC0AA380AD7A3B0424008D1F5285C875EC0AA380AD7A3B0424008D1F5285C875EC01B7614AE47B14240C0EF7A14AE875EC01B7614AE47B14240C0EF7A14AE875EC0AA380AD7A3B042400103000000010000000500000008D1F5285C875EC0AA380AD7A3B0424050B2703D0A875EC0AA380AD7A3B0424050B2703D0A875EC01B7614AE47B1424008D1F5285C875EC01B7614AE47B1424008D1F5285C875EC0AA380AD7A3B042400103000000010000000500000050B2703D0A875EC0AA380AD7A3B042409893EB51B8865EC0AA380AD7A3B042409893EB51B8865EC01B7614AE47B1424050B2703D0A875EC01B7614AE47B1424050B2703D0A875EC0AA380AD7A3B04240010300000001000000050000009893EB51B8865EC0AA380AD7A3B04240E074666666865EC0AA380AD7A3B04240E074666666865EC01B7614AE47B142409893EB51B8865EC01B7614AE47B142409893EB51B8865EC0AA380AD7A3B0424001030000000100000005000000E074666666865EC0AA380AD7A3B042402856E17A14865EC0AA380AD7A3B042402856E17A14865EC01B7614AE47B14240E074666666865EC01B7614AE47B14240E074666666865EC0AA380AD7A3B04240010300000001000000050000002856E17A14865EC0AA380AD7A3B0424070375C8FC2855EC0AA380AD7A3B0424070375C8FC2855EC01B7614AE47B142402856E17A14865EC01B7614AE47B142402856E17A14865EC0AA380AD7A3B042400103000000010000000500000070375C8FC2855EC0AA380AD7A3B04240B818D7A370855EC0AA380AD7A3B04240B818D7A370855EC01B7614AE47B1424070375C8FC2855EC01B7614AE47B1424070375C8FC2855EC0AA380AD7A3B0424001030000000100000005000000B818D7A370855EC0AA380AD7A3B0424000FA51B81E855EC0AA380AD7A3B0424000FA51B81E855EC01B7614AE47B14240B818D7A370855EC01B7614AE47B14240B818D7A370855EC0AA380AD7A3B042400103000000010000000500000000FA51B81E855EC0AA380AD7A3B0424048DBCCCCCC845EC0AA380AD7A3B0424048DBCCCCCC845EC01B7614AE47B1424000FA51B81E855EC01B7614AE47B1424000FA51B81E855EC0AA380AD7A3B042400103000000010000000500000048DBCCCCCC845EC0AA380AD7A3B0424090BC47E17A845EC0AA380AD7A3B0424090BC47E17A845EC01B7614AE47B1424048DBCCCCCC845EC01B7614AE47B1424048DBCCCCCC845EC0AA380AD7A3B042400103000000010000000500000090BC47E17A845EC0AA380AD7A3B04240D89DC2F528845EC0AA380AD7A3B04240D89DC2F528845EC01B7614AE47B1424090BC47E17A845EC01B7614AE47B1424090BC47E17A845EC0AA380AD7A3B0424001030000000100000005000000D89DC2F528845EC0AA380AD7A3B04240207F3D0AD7835EC0AA380AD7A3B04240207F3D0AD7835EC01B7614AE47B14240D89DC2F528845EC01B7614AE47B14240D89DC2F528845EC0AA380AD7A3B0424001030000000100000005000000780E000000885EC01B7614AE47B14240C0EF7A14AE875EC01B7614AE47B14240C0EF7A14AE875EC08CB31E85EBB14240780E000000885EC08CB31E85EBB14240780E000000885EC01B7614AE47B1424001030000000100000005000000C0EF7A14AE875EC01B7614AE47B1424008D1F5285C875EC01B7614AE47B1424008D1F5285C875EC08CB31E85EBB14240C0EF7A14AE875EC08CB31E85EBB14240C0EF7A14AE875EC01B7614AE47B142400103000000010000000500000008D1F5285C875EC01B7614AE47B1424050B2703D0A875EC01B7614AE47B1424050B2703D0A875EC08CB31E85EBB1424008D1F5285C875EC08CB31E85EBB1424008D1F5285C875EC01B7614AE47B142400103000000010000000500000050B2703D0A875EC01B7614AE47B142409893EB51B8865EC01B7614AE47B142409893EB51B8865EC08CB31E85EBB1424050B2703D0A875EC08CB31E85EBB1424050B2703D0A875EC01B7614AE47B14240010300000001000000050000009893EB51B8865EC01B7614AE47B14240E074666666865EC01B7614AE47B14240E074666666865EC08CB31E85EBB142409893EB51B8865EC08CB31E85EBB142409893EB51B8865EC01B7614AE47B1424001030000000100000005000000E074666666865EC01B7614AE47B142402856E17A14865EC01B7614AE47B142402856E17A14865EC08CB31E85EBB14240E074666666865EC08CB31E85EBB14240E074666666865EC01B7614AE47B14240010300000001000000050000002856E17A14865EC01B7614AE47B1424070375C8FC2855EC01B7614AE47B1424070375C8FC2855EC08CB31E85EBB142402856E17A14865EC08CB31E85EBB142402856E17A14865EC01B7614AE47B142400103000000010000000500000070375C8FC2855EC01B7614AE47B14240B818D7A370855EC01B7614AE47B14240B818D7A370855EC08CB31E85EBB1424070375C8FC2855EC08CB31E85EBB1424070375C8FC2855EC01B7614AE47B1424001030000000100000005000000B818D7A370855EC01B7614AE47B1424000FA51B81E855EC01B7614AE47B1424000FA51B81E855EC08CB31E85EBB14240B818D7A370855EC08CB31E85EBB14240B818D7A370855EC01B7614AE47B142400103000000010000000500000000FA51B81E855EC01B7614AE47B1424048DBCCCCCC845EC01B7614AE47B1424048DBCCCCCC845EC08CB31E85EBB1424000FA51B81E855EC08CB31E85EBB1424000FA51B81E855EC01B7614AE47B142400103000000010000000500000048DBCCCCCC845EC01B7614AE47B1424090BC47E17A845EC01B7614AE47B1424090BC47E17A845EC08CB31E85EBB1424048DBCCCCCC845EC08CB31E85EBB1424048DBCCCCCC845EC01B7614AE47B142400103000000010000000500000090BC47E17A845EC01B7614AE47B14240D89DC2F528845EC01B7614AE47B14240D89DC2F528845EC08CB31E85EBB1424090BC47E17A845EC08CB31E85EBB1424090BC47E17A845EC01B7614AE47B1424001030000000100000005000000D89DC2F528845EC01B7614AE47B14240207F3D0AD7835EC01B7614AE47B14240207F3D0AD7835EC08CB31E85EBB14240D89DC2F528845EC08CB31E85EBB14240D89DC2F528845EC01B7614AE47B1424001030000000100000005000000780E000000885EC08CB31E85EBB14240C0EF7A14AE875EC08CB31E85EBB14240C0EF7A14AE875EC0FDF0285C8FB24240780E000000885EC0FDF0285C8FB24240780E000000885EC08CB31E85EBB1424001030000000100000005000000C0EF7A14AE875EC08CB31E85EBB1424008D1F5285C875EC08CB31E85EBB1424008D1F5285C875EC0FDF0285C8FB24240C0EF7A14AE875EC0FDF0285C8FB24240C0EF7A14AE875EC08CB31E85EBB142400103000000010000000500000008D1F5285C875EC08CB31E85EBB1424050B2703D0A875EC08CB31E85EBB1424050B2703D0A875EC0FDF0285C8FB2424008D1F5285C875EC0FDF0285C8FB2424008D1F5285C875EC08CB31E85EBB142400103000000010000000500000050B2703D0A875EC08CB31E85EBB142409893EB51B8865EC08CB31E85EBB142409893EB51B8865EC0FDF0285C8FB2424050B2703D0A875EC0FDF0285C8FB2424050B2703D0A875EC08CB31E85EBB14240010300000001000000050000009893EB51B8865EC08CB31E85EBB14240E074666666865EC08CB31E85EBB14240E074666666865EC0FDF0285C8FB242409893EB51B8865EC0FDF0285C8FB242409893EB51B8865EC08CB31E85EBB1424001030000000100000005000000E074666666865EC08CB31E85EBB142402856E17A14865EC08CB31E85EBB142402856E17A14865EC0FDF0285C8FB24240E074666666865EC0FDF0285C8FB24240E074666666865EC08CB31E85EBB14240010300000001000000050000002856E17A14865EC08CB31E85EBB1424070375C8FC2855EC08CB31E85EBB1424070375C8FC2855EC0FDF0285C8FB242402856E17A14865EC0FDF0285C8FB242402856E17A14865EC08CB31E85EBB142400103000000010000000500000070375C8FC2855EC08CB31E85EBB14240B818D7A370855EC08CB31E85EBB14240B818D7A370855EC0FDF0285C8FB2424070375C8FC2855EC0FDF0285C8FB2424070375C8FC2855EC08CB31E85EBB1424001030000000100000005000000B818D7A370855EC08CB31E85EBB1424000FA51B81E855EC08CB31E85EBB1424000FA51B81E855EC0FDF0285C8FB24240B818D7A370855EC0FDF0285C8FB24240B818D7A370855EC08CB31E85EBB142400103000000010000000500000000FA51B81E855EC08CB31E85EBB1424048DBCCCCCC845EC08CB31E85EBB1424048DBCCCCCC845EC0FDF0285C8FB2424000FA51B81E855EC0FDF0285C8FB2424000FA51B81E855EC08CB31E85EBB142400103000000010000000500000048DBCCCCCC845EC08CB31E85EBB1424090BC47E17A845EC08CB31E85EBB1424090BC47E17A845EC0FDF0285C8FB2424048DBCCCCCC845EC0FDF0285C8FB2424048DBCCCCCC845EC08CB31E85EBB142400103000000010000000500000090BC47E17A845EC08CB31E85EBB14240D89DC2F528845EC08CB31E85EBB14240D89DC2F528845EC0FDF0285C8FB2424090BC47E17A845EC0FDF0285C8FB2424090BC47E17A845EC08CB31E85EBB1424001030000000100000005000000D89DC2F528845EC08CB31E85EBB14240207F3D0AD7835EC08CB31E85EBB14240207F3D0AD7835EC0FDF0285C8FB24240D89DC2F528845EC0FDF0285C8FB24240D89DC2F528845EC08CB31E85EBB1424001030000000100000005000000780E000000885EC0FDF0285C8FB24240C0EF7A14AE875EC0FDF0285C8FB24240C0EF7A14AE875EC06E2E333333B34240780E000000885EC06E2E333333B34240780E000000885EC0FDF0285C8FB2424001030000000100000005000000C0EF7A14AE875EC0FDF0285C8FB2424008D1F5285C875EC0FDF0285C8FB2424008D1F5285C875EC06E2E333333B34240C0EF7A14AE875EC06E2E333333B34240C0EF7A14AE875EC0FDF0285C8FB242400103000000010000000500000008D1F5285C875EC0FDF0285C8FB2424050B2703D0A875EC0FDF0285C8FB2424050B2703D0A875EC06E2E333333B3424008D1F5285C875EC06E2E333333B3424008D1F5285C875EC0FDF0285C8FB242400103000000010000000500000050B2703D0A875EC0FDF0285C8FB242409893EB51B8865EC0FDF0285C8FB242409893EB51B8865EC06E2E333333B3424050B2703D0A875EC06E2E333333B3424050B2703D0A875EC0FDF0285C8FB24240010300000001000000050000009893EB51B8865EC0FDF0285C8FB24240E074666666865EC0FDF0285C8FB24240E074666666865EC06E2E333333B342409893EB51B8865EC06E2E333333B342409893EB51B8865EC0FDF0285C8FB2424001030000000100000005000000E074666666865EC0FDF0285C8FB242402856E17A14865EC0FDF0285C8FB242402856E17A14865EC06E2E333333B34240E074666666865EC06E2E333333B34240E074666666865EC0FDF0285C8FB24240010300000001000000050000002856E17A14865EC0FDF0285C8FB2424070375C8FC2855EC0FDF0285C8FB2424070375C8FC2855EC06E2E333333B342402856E17A14865EC06E2E333333B342402856E17A14865EC0FDF0285C8FB242400103000000010000000500000070375C8FC2855EC0FDF0285C8FB24240B818D7A370855EC0FDF0285C8FB24240B818D7A370855EC06E2E333333B3424070375C8FC2855EC06E2E333333B3424070375C8FC2855EC0FDF0285C8FB2424001030000000100000005000000B818D7A370855EC0FDF0285C8FB2424000FA51B81E855EC0FDF0285C8FB2424000FA51B81E855EC06E2E333333B34240B818D7A370855EC06E2E333333B34240B818D7A370855EC0FDF0285C8FB242400103000000010000000500000000FA51B81E855EC0FDF0285C8FB2424048DBCCCCCC845EC0FDF0285C8FB2424048DBCCCCCC845EC06E2E333333B3424000FA51B81E855EC06E2E333333B3424000FA51B81E855EC0FDF0285C8FB242400103000000010000000500000048DBCCCCCC845EC0FDF0285C8FB2424090BC47E17A845EC0FDF0285C8FB2424090BC47E17A845EC06E2E333333B3424048DBCCCCCC845EC06E2E333333B3424048DBCCCCCC845EC0FDF0285C8FB242400103000000010000000500000090BC47E17A845EC0FDF0285C8FB24240D89DC2F528845EC0FDF0285C8FB24240D89DC2F528845EC06E2E333333B3424090BC47E17A845EC06E2E333333B3424090BC47E17A845EC0FDF0285C8FB2424001030000000100000005000000D89DC2F528845EC0FDF0285C8FB24240207F3D0AD7835EC0FDF0285C8FB24240207F3D0AD7835EC06E2E333333B34240D89DC2F528845EC06E2E333333B34240D89DC2F528845EC0FDF0285C8FB2424001030000000100000005000000780E000000885EC06E2E333333B34240C0EF7A14AE875EC06E2E333333B34240C0EF7A14AE875EC0DF6B3D0AD7B34240780E000000885EC0DF6B3D0AD7B34240780E000000885EC06E2E333333B3424001030000000100000005000000C0EF7A14AE875EC06E2E333333B3424008D1F5285C875EC06E2E333333B3424008D1F5285C875EC0DF6B3D0AD7B34240C0EF7A14AE875EC0DF6B3D0AD7B34240C0EF7A14AE875EC06E2E333333B342400103000000010000000500000008D1F5285C875EC06E2E333333B3424050B2703D0A875EC06E2E333333B3424050B2703D0A875EC0DF6B3D0AD7B3424008D1F5285C875EC0DF6B3D0AD7B3424008D1F5285C875EC06E2E333333B342400103000000010000000500000050B2703D0A875EC06E2E333333B342409893EB51B8865EC06E2E333333B342409893EB51B8865EC0DF6B3D0AD7B3424050B2703D0A875EC0DF6B3D0AD7B3424050B2703D0A875EC06E2E333333B34240010300000001000000050000009893EB51B8865EC06E2E333333B34240E074666666865EC06E2E333333B34240E074666666865EC0DF6B3D0AD7B342409893EB51B8865EC0DF6B3D0AD7B342409893EB51B8865EC06E2E333333B3424001030000000100000005000000E074666666865EC06E2E333333B342402856E17A14865EC06E2E333333B342402856E17A14865EC0DF6B3D0AD7B34240E074666666865EC0DF6B3D0AD7B34240E074666666865EC06E2E333333B34240010300000001000000050000002856E17A14865EC06E2E333333B3424070375C8FC2855EC06E2E333333B3424070375C8FC2855EC0DF6B3D0AD7B342402856E17A14865EC0DF6B3D0AD7B342402856E17A14865EC06E2E333333B342400103000000010000000500000070375C8FC2855EC06E2E333333B34240B818D7A370855EC06E2E333333B34240B818D7A370855EC0DF6B3D0AD7B3424070375C8FC2855EC0DF6B3D0AD7B3424070375C8FC2855EC06E2E333333B3424001030000000100000005000000B818D7A370855EC06E2E333333B3424000FA51B81E855EC06E2E333333B3424000FA51B81E855EC0DF6B3D0AD7B34240B818D7A370855EC0DF6B3D0AD7B34240B818D7A370855EC06E2E333333B342400103000000010000000500000000FA51B81E855EC06E2E333333B3424048DBCCCCCC845EC06E2E333333B3424048DBCCCCCC845EC0DF6B3D0AD7B3424000FA51B81E855EC0DF6B3D0AD7B3424000FA51B81E855EC06E2E333333B342400103000000010000000500000048DBCCCCCC845EC06E2E333333B3424090BC47E17A845EC06E2E333333B3424090BC47E17A845EC0DF6B3D0AD7B3424048DBCCCCCC845EC0DF6B3D0AD7B3424048DBCCCCCC845EC06E2E333333B342400103000000010000000500000090BC47E17A845EC06E2E333333B34240D89DC2F528845EC06E2E333333B34240D89DC2F528845EC0DF6B3D0AD7B3424090BC47E17A845EC0DF6B3D0AD7B3424090BC47E17A845EC06E2E333333B3424001030000000100000005000000D89DC2F528845EC06E2E333333B34240207F3D0AD7835EC06E2E333333B34240207F3D0AD7835EC0DF6B3D0AD7B34240D89DC2F528845EC0DF6B3D0AD7B34240D89DC2F528845EC06E2E333333B3424001030000000100000005000000780E000000885EC0DF6B3D0AD7B34240C0EF7A14AE875EC0DF6B3D0AD7B34240C0EF7A14AE875EC050A947E17AB44240780E000000885EC050A947E17AB44240780E000000885EC0DF6B3D0AD7B3424001030000000100000005000000C0EF7A14AE875EC0DF6B3D0AD7B3424008D1F5285C875EC0DF6B3D0AD7B3424008D1F5285C875EC050A947E17AB44240C0EF7A14AE875EC050A947E17AB44240C0EF7A14AE875EC0DF6B3D0AD7B342400103000000010000000500000008D1F5285C875EC0DF6B3D0AD7B3424050B2703D0A875EC0DF6B3D0AD7B3424050B2703D0A875EC050A947E17AB4424008D1F5285C875EC050A947E17AB4424008D1F5285C875EC0DF6B3D0AD7B342400103000000010000000500000050B2703D0A875EC0DF6B3D0AD7B342409893EB51B8865EC0DF6B3D0AD7B342409893EB51B8865EC050A947E17AB4424050B2703D0A875EC050A947E17AB4424050B2703D0A875EC0DF6B3D0AD7B34240010300000001000000050000009893EB51B8865EC0DF6B3D0AD7B34240E074666666865EC0DF6B3D0AD7B34240E074666666865EC050A947E17AB442409893EB51B8865EC050A947E17AB442409893EB51B8865EC0DF6B3D0AD7B3424001030000000100000005000000E074666666865EC0DF6B3D0AD7B342402856E17A14865EC0DF6B3D0AD7B342402856E17A14865EC050A947E17AB44240E074666666865EC050A947E17AB44240E074666666865EC0DF6B3D0AD7B34240010300000001000000050000002856E17A14865EC0DF6B3D0AD7B3424070375C8FC2855EC0DF6B3D0AD7B3424070375C8FC2855EC050A947E17AB442402856E17A14865EC050A947E17AB442402856E17A14865EC0DF6B3D0AD7B342400103000000010000000500000070375C8FC2855EC0DF6B3D0AD7B34240B818D7A370855EC0DF6B3D0AD7B34240B818D7A370855EC050A947E17AB4424070375C8FC2855EC050A947E17AB4424070375C8FC2855EC0DF6B3D0AD7B3424001030000000100000005000000B818D7A370855EC0DF6B3D0AD7B3424000FA51B81E855EC0DF6B3D0AD7B3424000FA51B81E855EC050A947E17AB44240B818D7A370855EC050A947E17AB44240B818D7A370855EC0DF6B3D0AD7B342400103000000010000000500000000FA51B81E855EC0DF6B3D0AD7B3424048DBCCCCCC845EC0DF6B3D0AD7B3424048DBCCCCCC845EC050A947E17AB4424000FA51B81E855EC050A947E17AB4424000FA51B81E855EC0DF6B3D0AD7B342400103000000010000000500000048DBCCCCCC845EC0DF6B3D0AD7B3424090BC47E17A845EC0DF6B3D0AD7B3424090BC47E17A845EC050A947E17AB4424048DBCCCCCC845EC050A947E17AB4424048DBCCCCCC845EC0DF6B3D0AD7B342400103000000010000000500000090BC47E17A845EC0DF6B3D0AD7B34240D89DC2F528845EC0DF6B3D0AD7B34240D89DC2F528845EC050A947E17AB4424090BC47E17A845EC050A947E17AB4424090BC47E17A845EC0DF6B3D0AD7B3424001030000000100000005000000D89DC2F528845EC0DF6B3D0AD7B34240207F3D0AD7835EC0DF6B3D0AD7B34240207F3D0AD7835EC050A947E17AB44240D89DC2F528845EC050A947E17AB44240D89DC2F528845EC0DF6B3D0AD7B3424001030000000100000005000000780E000000885EC050A947E17AB44240C0EF7A14AE875EC050A947E17AB44240C0EF7A14AE875EC0C1E651B81EB54240780E000000885EC0C1E651B81EB54240780E000000885EC050A947E17AB4424001030000000100000005000000C0EF7A14AE875EC050A947E17AB4424008D1F5285C875EC050A947E17AB4424008D1F5285C875EC0C1E651B81EB54240C0EF7A14AE875EC0C1E651B81EB54240C0EF7A14AE875EC050A947E17AB442400103000000010000000500000008D1F5285C875EC050A947E17AB4424050B2703D0A875EC050A947E17AB4424050B2703D0A875EC0C1E651B81EB5424008D1F5285C875EC0C1E651B81EB5424008D1F5285C875EC050A947E17AB442400103000000010000000500000050B2703D0A875EC050A947E17AB442409893EB51B8865EC050A947E17AB442409893EB51B8865EC0C1E651B81EB5424050B2703D0A875EC0C1E651B81EB5424050B2703D0A875EC050A947E17AB44240010300000001000000050000009893EB51B8865EC050A947E17AB44240E074666666865EC050A947E17AB44240E074666666865EC0C1E651B81EB542409893EB51B8865EC0C1E651B81EB542409893EB51B8865EC050A947E17AB4424001030000000100000005000000E074666666865EC050A947E17AB442402856E17A14865EC050A947E17AB442402856E17A14865EC0C1E651B81EB54240E074666666865EC0C1E651B81EB54240E074666666865EC050A947E17AB44240010300000001000000050000002856E17A14865EC050A947E17AB4424070375C8FC2855EC050A947E17AB4424070375C8FC2855EC0C1E651B81EB542402856E17A14865EC0C1E651B81EB542402856E17A14865EC050A947E17AB442400103000000010000000500000070375C8FC2855EC050A947E17AB44240B818D7A370855EC050A947E17AB44240B818D7A370855EC0C1E651B81EB5424070375C8FC2855EC0C1E651B81EB5424070375C8FC2855EC050A947E17AB4424001030000000100000005000000B818D7A370855EC050A947E17AB4424000FA51B81E855EC050A947E17AB4424000FA51B81E855EC0C1E651B81EB54240B818D7A370855EC0C1E651B81EB54240B818D7A370855EC050A947E17AB442400103000000010000000500000000FA51B81E855EC050A947E17AB4424048DBCCCCCC845EC050A947E17AB4424048DBCCCCCC845EC0C1E651B81EB5424000FA51B81E855EC0C1E651B81EB5424000FA51B81E855EC050A947E17AB442400103000000010000000500000048DBCCCCCC845EC050A947E17AB4424090BC47E17A845EC050A947E17AB4424090BC47E17A845EC0C1E651B81EB5424048DBCCCCCC845EC0C1E651B81EB5424048DBCCCCCC845EC050A947E17AB442400103000000010000000500000090BC47E17A845EC050A947E17AB44240D89DC2F528845EC050A947E17AB44240D89DC2F528845EC0C1E651B81EB5424090BC47E17A845EC0C1E651B81EB5424090BC47E17A845EC050A947E17AB4424001030000000100000005000000D89DC2F528845EC050A947E17AB44240207F3D0AD7835EC050A947E17AB44240207F3D0AD7835EC0C1E651B81EB54240D89DC2F528845EC0C1E651B81EB54240D89DC2F528845EC050A947E17AB4424001030000000100000005000000780E000000885EC0C1E651B81EB54240C0EF7A14AE875EC0C1E651B81EB54240C0EF7A14AE875EC032245C8FC2B54240780E000000885EC032245C8FC2B54240780E000000885EC0C1E651B81EB5424001030000000100000005000000C0EF7A14AE875EC0C1E651B81EB5424008D1F5285C875EC0C1E651B81EB5424008D1F5285C875EC032245C8FC2B54240C0EF7A14AE875EC032245C8FC2B54240C0EF7A14AE875EC0C1E651B81EB542400103000000010000000500000008D1F5285C875EC0C1E651B81EB5424050B2703D0A875EC0C1E651B81EB5424050B2703D0A875EC032245C8FC2B5424008D1F5285C875EC032245C8FC2B5424008D1F5285C875EC0C1E651B81EB542400103000000010000000500000050B2703D0A875EC0C1E651B81EB542409893EB51B8865EC0C1E651B81EB542409893EB51B8865EC032245C8FC2B5424050B2703D0A875EC032245C8FC2B5424050B2703D0A875EC0C1E651B81EB54240010300000001000000050000009893EB51B8865EC0C1E651B81EB54240E074666666865EC0C1E651B81EB54240E074666666865EC032245C8FC2B542409893EB51B8865EC032245C8FC2B542409893EB51B8865EC0C1E651B81EB5424001030000000100000005000000E074666666865EC0C1E651B81EB542402856E17A14865EC0C1E651B81EB542402856E17A14865EC032245C8FC2B54240E074666666865EC032245C8FC2B54240E074666666865EC0C1E651B81EB54240010300000001000000050000002856E17A14865EC0C1E651B81EB5424070375C8FC2855EC0C1E651B81EB5424070375C8FC2855EC032245C8FC2B542402856E17A14865EC032245C8FC2B542402856E17A14865EC0C1E651B81EB542400103000000010000000500000070375C8FC2855EC0C1E651B81EB54240B818D7A370855EC0C1E651B81EB54240B818D7A370855EC032245C8FC2B5424070375C8FC2855EC032245C8FC2B5424070375C8FC2855EC0C1E651B81EB5424001030000000100000005000000B818D7A370855EC0C1E651B81EB5424000FA51B81E855EC0C1E651B81EB5424000FA51B81E855EC032245C8FC2B54240B818D7A370855EC032245C8FC2B54240B818D7A370855EC0C1E651B81EB542400103000000010000000500000000FA51B81E855EC0C1E651B81EB5424048DBCCCCCC845EC0C1E651B81EB5424048DBCCCCCC845EC032245C8FC2B5424000FA51B81E855EC032245C8FC2B5424000FA51B81E855EC0C1E651B81EB542400103000000010000000500000048DBCCCCCC845EC0C1E651B81EB5424090BC47E17A845EC0C1E651B81EB5424090BC47E17A845EC032245C8FC2B5424048DBCCCCCC845EC032245C8FC2B5424048DBCCCCCC845EC0C1E651B81EB542400103000000010000000500000090BC47E17A845EC0C1E651B81EB54240D89DC2F528845EC0C1E651B81EB54240D89DC2F528845EC032245C8FC2B5424090BC47E17A845EC032245C8FC2B5424090BC47E17A845EC0C1E651B81EB5424001030000000100000005000000D89DC2F528845EC0C1E651B81EB54240207F3D0AD7835EC0C1E651B81EB54240207F3D0AD7835EC032245C8FC2B54240D89DC2F528845EC032245C8FC2B54240D89DC2F528845EC0C1E651B81EB5424001030000000100000005000000780E000000885EC032245C8FC2B54240C0EF7A14AE875EC032245C8FC2B54240C0EF7A14AE875EC0A361666666B64240780E000000885EC0A361666666B64240780E000000885EC032245C8FC2B5424001030000000100000005000000C0EF7A14AE875EC032245C8FC2B5424008D1F5285C875EC032245C8FC2B5424008D1F5285C875EC0A361666666B64240C0EF7A14AE875EC0A361666666B64240C0EF7A14AE875EC032245C8FC2B542400103000000010000000500000008D1F5285C875EC032245C8FC2B5424050B2703D0A875EC032245C8FC2B5424050B2703D0A875EC0A361666666B6424008D1F5285C875EC0A361666666B6424008D1F5285C875EC032245C8FC2B542400103000000010000000500000050B2703D0A875EC032245C8FC2B542409893EB51B8865EC032245C8FC2B542409893EB51B8865EC0A361666666B6424050B2703D0A875EC0A361666666B6424050B2703D0A875EC032245C8FC2B54240010300000001000000050000009893EB51B8865EC032245C8FC2B54240E074666666865EC032245C8FC2B54240E074666666865EC0A361666666B642409893EB51B8865EC0A361666666B642409893EB51B8865EC032245C8FC2B5424001030000000100000005000000E074666666865EC032245C8FC2B542402856E17A14865EC032245C8FC2B542402856E17A14865EC0A361666666B64240E074666666865EC0A361666666B64240E074666666865EC032245C8FC2B54240010300000001000000050000002856E17A14865EC032245C8FC2B5424070375C8FC2855EC032245C8FC2B5424070375C8FC2855EC0A361666666B642402856E17A14865EC0A361666666B642402856E17A14865EC032245C8FC2B542400103000000010000000500000070375C8FC2855EC032245C8FC2B54240B818D7A370855EC032245C8FC2B54240B818D7A370855EC0A361666666B6424070375C8FC2855EC0A361666666B6424070375C8FC2855EC032245C8FC2B5424001030000000100000005000000B818D7A370855EC032245C8FC2B5424000FA51B81E855EC032245C8FC2B5424000FA51B81E855EC0A361666666B64240B818D7A370855EC0A361666666B64240B818D7A370855EC032245C8FC2B542400103000000010000000500000000FA51B81E855EC032245C8FC2B5424048DBCCCCCC845EC032245C8FC2B5424048DBCCCCCC845EC0A361666666B6424000FA51B81E855EC0A361666666B6424000FA51B81E855EC032245C8FC2B542400103000000010000000500000048DBCCCCCC845EC032245C8FC2B5424090BC47E17A845EC032245C8FC2B5424090BC47E17A845EC0A361666666B6424048DBCCCCCC845EC0A361666666B6424048DBCCCCCC845EC032245C8FC2B542400103000000010000000500000090BC47E17A845EC032245C8FC2B54240D89DC2F528845EC032245C8FC2B54240D89DC2F528845EC0A361666666B6424090BC47E17A845EC0A361666666B6424090BC47E17A845EC032245C8FC2B5424001030000000100000005000000D89DC2F528845EC032245C8FC2B54240207F3D0AD7835EC032245C8FC2B54240207F3D0AD7835EC0A361666666B64240D89DC2F528845EC0A361666666B64240D89DC2F528845EC032245C8FC2B54240
+3	\N
+4	\N
+5	\N
+6	\N
+7	\N
+8	\N
+9	\N
+10	\N
+11	0106000020E61000009B00000001030000000100000005000000F8A8999999A15DC0CEE551B81E054140408A14AE47A15DC0CEE551B81E054140408A14AE47A15DC03F235C8FC2054140F8A8999999A15DC03F235C8FC2054140F8A8999999A15DC0CEE551B81E05414001030000000100000005000000B0C71E85EBA15DC0CEE551B81E054140F8A8999999A15DC0CEE551B81E054140F8A8999999A15DC03F235C8FC2054140B0C71E85EBA15DC03F235C8FC2054140B0C71E85EBA15DC0CEE551B81E05414001030000000100000005000000B0C71E85EBA15DC05DA847E17A044140F8A8999999A15DC05DA847E17A044140F8A8999999A15DC0CEE551B81E054140B0C71E85EBA15DC0CEE551B81E054140B0C71E85EBA15DC05DA847E17A04414001030000000100000005000000F8A8999999A15DC05DA847E17A044140408A14AE47A15DC05DA847E17A044140408A14AE47A15DC0CEE551B81E054140F8A8999999A15DC0CEE551B81E054140F8A8999999A15DC05DA847E17A04414001030000000100000005000000F8A8999999A15DC07B2D333333034140408A14AE47A15DC07B2D333333034140408A14AE47A15DC0EC6A3D0AD7034140F8A8999999A15DC0EC6A3D0AD7034140F8A8999999A15DC07B2D33333303414001030000000100000005000000408A14AE47A15DC07B2D333333034140886B8FC2F5A05DC07B2D333333034140886B8FC2F5A05DC0EC6A3D0AD7034140408A14AE47A15DC0EC6A3D0AD7034140408A14AE47A15DC07B2D33333303414001030000000100000005000000408A14AE47A15DC05DA847E17A044140886B8FC2F5A05DC05DA847E17A044140886B8FC2F5A05DC0CEE551B81E054140408A14AE47A15DC0CEE551B81E054140408A14AE47A15DC05DA847E17A04414001030000000100000005000000182E85EB51A05DC05DA847E17A044140600F000000A05DC05DA847E17A044140600F000000A05DC0CEE551B81E054140182E85EB51A05DC0CEE551B81E054140182E85EB51A05DC05DA847E17A04414001030000000100000005000000D04C0AD7A3A05DC05DA847E17A044140182E85EB51A05DC05DA847E17A044140182E85EB51A05DC0CEE551B81E054140D04C0AD7A3A05DC0CEE551B81E054140D04C0AD7A3A05DC05DA847E17A04414001030000000100000005000000D04C0AD7A3A05DC07B2D333333034140182E85EB51A05DC07B2D333333034140182E85EB51A05DC0EC6A3D0AD7034140D04C0AD7A3A05DC0EC6A3D0AD7034140D04C0AD7A3A05DC07B2D33333303414001030000000100000005000000408A14AE47A15DC0CEE551B81E054140886B8FC2F5A05DC0CEE551B81E054140886B8FC2F5A05DC03F235C8FC2054140408A14AE47A15DC03F235C8FC2054140408A14AE47A15DC0CEE551B81E05414001030000000100000005000000D04C0AD7A3A05DC0CEE551B81E054140182E85EB51A05DC0CEE551B81E054140182E85EB51A05DC03F235C8FC2054140D04C0AD7A3A05DC03F235C8FC2054140D04C0AD7A3A05DC0CEE551B81E05414001030000000100000005000000D04C0AD7A3A05DC00AF0285C8F024140182E85EB51A05DC00AF0285C8F024140182E85EB51A05DC07B2D333333034140D04C0AD7A3A05DC07B2D333333034140D04C0AD7A3A05DC00AF0285C8F02414001030000000100000005000000182E85EB51A05DC00AF0285C8F024140600F000000A05DC00AF0285C8F024140600F000000A05DC07B2D333333034140182E85EB51A05DC07B2D333333034140182E85EB51A05DC00AF0285C8F02414001030000000100000005000000182E85EB51A05DC07B2D333333034140600F000000A05DC07B2D333333034140600F000000A05DC0EC6A3D0AD7034140182E85EB51A05DC0EC6A3D0AD7034140182E85EB51A05DC07B2D33333303414001030000000100000005000000408A14AE47A15DC00AF0285C8F024140886B8FC2F5A05DC00AF0285C8F024140886B8FC2F5A05DC07B2D333333034140408A14AE47A15DC07B2D333333034140408A14AE47A15DC00AF0285C8F02414001030000000100000005000000A8F07A14AE9F5DC00AF0285C8F024140F0D1F5285C9F5DC00AF0285C8F024140F0D1F5285C9F5DC07B2D333333034140A8F07A14AE9F5DC07B2D333333034140A8F07A14AE9F5DC00AF0285C8F02414001030000000100000005000000A8F07A14AE9F5DC07B2D333333034140F0D1F5285C9F5DC07B2D333333034140F0D1F5285C9F5DC0EC6A3D0AD7034140A8F07A14AE9F5DC0EC6A3D0AD7034140A8F07A14AE9F5DC07B2D33333303414001030000000100000005000000A8F07A14AE9F5DC05DA847E17A044140F0D1F5285C9F5DC05DA847E17A044140F0D1F5285C9F5DC0CEE551B81E054140A8F07A14AE9F5DC0CEE551B81E054140A8F07A14AE9F5DC05DA847E17A04414001030000000100000005000000182E85EB51A05DC099B21E85EB014140600F000000A05DC099B21E85EB014140600F000000A05DC00AF0285C8F024140182E85EB51A05DC00AF0285C8F024140182E85EB51A05DC099B21E85EB01414001030000000100000005000000A8F07A14AE9F5DC099B21E85EB014140F0D1F5285C9F5DC099B21E85EB014140F0D1F5285C9F5DC00AF0285C8F024140A8F07A14AE9F5DC00AF0285C8F024140A8F07A14AE9F5DC099B21E85EB01414001030000000100000005000000F0D1F5285C9F5DC099B21E85EB01414038B3703D0A9F5DC099B21E85EB01414038B3703D0A9F5DC00AF0285C8F024140F0D1F5285C9F5DC00AF0285C8F024140F0D1F5285C9F5DC099B21E85EB01414001030000000100000005000000F0D1F5285C9F5DC0B7370AD7A300414038B3703D0A9F5DC0B7370AD7A300414038B3703D0A9F5DC0287514AE47014140F0D1F5285C9F5DC0287514AE47014140F0D1F5285C9F5DC0B7370AD7A300414001030000000100000005000000F0D1F5285C9F5DC00AF0285C8F02414038B3703D0A9F5DC00AF0285C8F02414038B3703D0A9F5DC07B2D333333034140F0D1F5285C9F5DC07B2D333333034140F0D1F5285C9F5DC00AF0285C8F02414001030000000100000005000000F0D1F5285C9F5DC07B2D33333303414038B3703D0A9F5DC07B2D33333303414038B3703D0A9F5DC0EC6A3D0AD7034140F0D1F5285C9F5DC0EC6A3D0AD7034140F0D1F5285C9F5DC07B2D3333330341400103000000010000000500000038B3703D0A9F5DC05DA847E17A0441408094EB51B89E5DC05DA847E17A0441408094EB51B89E5DC0CEE551B81E05414038B3703D0A9F5DC0CEE551B81E05414038B3703D0A9F5DC05DA847E17A0441400103000000010000000500000038B3703D0A9F5DC07B2D3333330341408094EB51B89E5DC07B2D3333330341408094EB51B89E5DC0EC6A3D0AD703414038B3703D0A9F5DC0EC6A3D0AD703414038B3703D0A9F5DC07B2D3333330341400103000000010000000500000038B3703D0A9F5DC00AF0285C8F0241408094EB51B89E5DC00AF0285C8F0241408094EB51B89E5DC07B2D33333303414038B3703D0A9F5DC07B2D33333303414038B3703D0A9F5DC00AF0285C8F02414001030000000100000005000000C8756666669E5DC00AF0285C8F0241401057E17A149E5DC00AF0285C8F0241401057E17A149E5DC07B2D333333034140C8756666669E5DC07B2D333333034140C8756666669E5DC00AF0285C8F02414001030000000100000005000000C8756666669E5DC099B21E85EB0141401057E17A149E5DC099B21E85EB0141401057E17A149E5DC00AF0285C8F024140C8756666669E5DC00AF0285C8F024140C8756666669E5DC099B21E85EB0141400103000000010000000500000038B3703D0A9F5DC099B21E85EB0141408094EB51B89E5DC099B21E85EB0141408094EB51B89E5DC00AF0285C8F02414038B3703D0A9F5DC00AF0285C8F02414038B3703D0A9F5DC099B21E85EB0141400103000000010000000500000038B3703D0A9F5DC0B7370AD7A30041408094EB51B89E5DC0B7370AD7A30041408094EB51B89E5DC0287514AE4701414038B3703D0A9F5DC0287514AE4701414038B3703D0A9F5DC0B7370AD7A300414001030000000100000005000000F0D1F5285C9F5DC046FAFFFFFFFF404038B3703D0A9F5DC046FAFFFFFFFF404038B3703D0A9F5DC0B7370AD7A3004140F0D1F5285C9F5DC0B7370AD7A3004140F0D1F5285C9F5DC046FAFFFFFFFF404001030000000100000005000000182E85EB51A05DC0CEE551B81E054140600F000000A05DC0CEE551B81E054140600F000000A05DC03F235C8FC2054140182E85EB51A05DC03F235C8FC2054140182E85EB51A05DC0CEE551B81E05414001030000000100000005000000F0D1F5285C9F5DC05DA847E17A04414038B3703D0A9F5DC05DA847E17A04414038B3703D0A9F5DC0CEE551B81E054140F0D1F5285C9F5DC0CEE551B81E054140F0D1F5285C9F5DC05DA847E17A044140010300000001000000050000001057E17A149E5DC0B7370AD7A300414058385C8FC29D5DC0B7370AD7A300414058385C8FC29D5DC0287514AE470141401057E17A149E5DC0287514AE470141401057E17A149E5DC0B7370AD7A300414001030000000100000005000000E8FA51B81E9D5DC099B21E85EB01414030DCCCCCCC9C5DC099B21E85EB01414030DCCCCCCC9C5DC00AF0285C8F024140E8FA51B81E9D5DC00AF0285C8F024140E8FA51B81E9D5DC099B21E85EB01414001030000000100000005000000A019D7A3709D5DC099B21E85EB014140E8FA51B81E9D5DC099B21E85EB014140E8FA51B81E9D5DC00AF0285C8F024140A019D7A3709D5DC00AF0285C8F024140A019D7A3709D5DC099B21E85EB01414001030000000100000005000000E8FA51B81E9D5DC00AF0285C8F02414030DCCCCCCC9C5DC00AF0285C8F02414030DCCCCCCC9C5DC07B2D333333034140E8FA51B81E9D5DC07B2D333333034140E8FA51B81E9D5DC00AF0285C8F02414001030000000100000005000000A019D7A3709D5DC00AF0285C8F024140E8FA51B81E9D5DC00AF0285C8F024140E8FA51B81E9D5DC07B2D333333034140A019D7A3709D5DC07B2D333333034140A019D7A3709D5DC00AF0285C8F024140010300000001000000050000001057E17A149E5DC00AF0285C8F02414058385C8FC29D5DC00AF0285C8F02414058385C8FC29D5DC07B2D3333330341401057E17A149E5DC07B2D3333330341401057E17A149E5DC00AF0285C8F024140010300000001000000050000001057E17A149E5DC099B21E85EB01414058385C8FC29D5DC099B21E85EB01414058385C8FC29D5DC00AF0285C8F0241401057E17A149E5DC00AF0285C8F0241401057E17A149E5DC099B21E85EB01414001030000000100000005000000C8756666669E5DC0B7370AD7A30041401057E17A149E5DC0B7370AD7A30041401057E17A149E5DC0287514AE47014140C8756666669E5DC0287514AE47014140C8756666669E5DC0B7370AD7A300414001030000000100000005000000D04C0AD7A3A05DC099B21E85EB014140182E85EB51A05DC099B21E85EB014140182E85EB51A05DC00AF0285C8F024140D04C0AD7A3A05DC00AF0285C8F024140D04C0AD7A3A05DC099B21E85EB01414001030000000100000005000000B0C71E85EBA15DC07B2D333333034140F8A8999999A15DC07B2D333333034140F8A8999999A15DC0EC6A3D0AD7034140B0C71E85EBA15DC0EC6A3D0AD7034140B0C71E85EBA15DC07B2D33333303414001030000000100000005000000F8A8999999A15DC0B060666666064140408A14AE47A15DC0B060666666064140408A14AE47A15DC0219E703D0A074140F8A8999999A15DC0219E703D0A074140F8A8999999A15DC0B06066666606414001030000000100000005000000B0C71E85EBA15DC0B060666666064140F8A8999999A15DC0B060666666064140F8A8999999A15DC0219E703D0A074140B0C71E85EBA15DC0219E703D0A074140B0C71E85EBA15DC0B06066666606414001030000000100000005000000A8F07A14AE9F5DC0B7370AD7A3004140F0D1F5285C9F5DC0B7370AD7A3004140F0D1F5285C9F5DC0287514AE47014140A8F07A14AE9F5DC0287514AE47014140A8F07A14AE9F5DC0B7370AD7A300414001030000000100000005000000C8756666669E5DC07B2D3333330341401057E17A149E5DC07B2D3333330341401057E17A149E5DC0EC6A3D0AD7034140C8756666669E5DC0EC6A3D0AD7034140C8756666669E5DC07B2D33333303414001030000000100000005000000B0C71E85EBA15DC03F235C8FC2054140F8A8999999A15DC03F235C8FC2054140F8A8999999A15DC0B060666666064140B0C71E85EBA15DC0B060666666064140B0C71E85EBA15DC03F235C8FC205414001030000000100000005000000F8A8999999A15DC03F235C8FC2054140408A14AE47A15DC03F235C8FC2054140408A14AE47A15DC0B060666666064140F8A8999999A15DC0B060666666064140F8A8999999A15DC03F235C8FC205414001030000000100000005000000B0C71E85EBA15DC0EC6A3D0AD7034140F8A8999999A15DC0EC6A3D0AD7034140F8A8999999A15DC05DA847E17A044140B0C71E85EBA15DC05DA847E17A044140B0C71E85EBA15DC0EC6A3D0AD703414001030000000100000005000000F8A8999999A15DC0EC6A3D0AD7034140408A14AE47A15DC0EC6A3D0AD7034140408A14AE47A15DC05DA847E17A044140F8A8999999A15DC05DA847E17A044140F8A8999999A15DC0EC6A3D0AD703414001030000000100000005000000408A14AE47A15DC0EC6A3D0AD7034140886B8FC2F5A05DC0EC6A3D0AD7034140886B8FC2F5A05DC05DA847E17A044140408A14AE47A15DC05DA847E17A044140408A14AE47A15DC0EC6A3D0AD703414001030000000100000005000000886B8FC2F5A05DC0EC6A3D0AD7034140D04C0AD7A3A05DC0EC6A3D0AD7034140D04C0AD7A3A05DC05DA847E17A044140886B8FC2F5A05DC05DA847E17A044140886B8FC2F5A05DC0EC6A3D0AD703414001030000000100000005000000886B8FC2F5A05DC07B2D333333034140D04C0AD7A3A05DC07B2D333333034140D04C0AD7A3A05DC0EC6A3D0AD7034140886B8FC2F5A05DC0EC6A3D0AD7034140886B8FC2F5A05DC07B2D33333303414001030000000100000005000000182E85EB51A05DC0EC6A3D0AD7034140600F000000A05DC0EC6A3D0AD7034140600F000000A05DC05DA847E17A044140182E85EB51A05DC05DA847E17A044140182E85EB51A05DC0EC6A3D0AD703414001030000000100000005000000D04C0AD7A3A05DC0EC6A3D0AD7034140182E85EB51A05DC0EC6A3D0AD7034140182E85EB51A05DC05DA847E17A044140D04C0AD7A3A05DC05DA847E17A044140D04C0AD7A3A05DC0EC6A3D0AD703414001030000000100000005000000886B8FC2F5A05DC00AF0285C8F024140D04C0AD7A3A05DC00AF0285C8F024140D04C0AD7A3A05DC07B2D333333034140886B8FC2F5A05DC07B2D333333034140886B8FC2F5A05DC00AF0285C8F02414001030000000100000005000000600F000000A05DC00AF0285C8F024140A8F07A14AE9F5DC00AF0285C8F024140A8F07A14AE9F5DC07B2D333333034140600F000000A05DC07B2D333333034140600F000000A05DC00AF0285C8F02414001030000000100000005000000600F000000A05DC099B21E85EB014140A8F07A14AE9F5DC099B21E85EB014140A8F07A14AE9F5DC00AF0285C8F024140600F000000A05DC00AF0285C8F024140600F000000A05DC099B21E85EB01414001030000000100000005000000600F000000A05DC0287514AE47014140A8F07A14AE9F5DC0287514AE47014140A8F07A14AE9F5DC099B21E85EB014140600F000000A05DC099B21E85EB014140600F000000A05DC0287514AE4701414001030000000100000005000000A8F07A14AE9F5DC0287514AE47014140F0D1F5285C9F5DC0287514AE47014140F0D1F5285C9F5DC099B21E85EB014140A8F07A14AE9F5DC099B21E85EB014140A8F07A14AE9F5DC0287514AE4701414001030000000100000005000000F0D1F5285C9F5DC0287514AE4701414038B3703D0A9F5DC0287514AE4701414038B3703D0A9F5DC099B21E85EB014140F0D1F5285C9F5DC099B21E85EB014140F0D1F5285C9F5DC0287514AE470141400103000000010000000500000038B3703D0A9F5DC0287514AE470141408094EB51B89E5DC0287514AE470141408094EB51B89E5DC099B21E85EB01414038B3703D0A9F5DC099B21E85EB01414038B3703D0A9F5DC0287514AE47014140010300000001000000050000008094EB51B89E5DC099B21E85EB014140C8756666669E5DC099B21E85EB014140C8756666669E5DC00AF0285C8F0241408094EB51B89E5DC00AF0285C8F0241408094EB51B89E5DC099B21E85EB014140010300000001000000050000008094EB51B89E5DC00AF0285C8F024140C8756666669E5DC00AF0285C8F024140C8756666669E5DC07B2D3333330341408094EB51B89E5DC07B2D3333330341408094EB51B89E5DC00AF0285C8F024140010300000001000000050000008094EB51B89E5DC07B2D333333034140C8756666669E5DC07B2D333333034140C8756666669E5DC0EC6A3D0AD70341408094EB51B89E5DC0EC6A3D0AD70341408094EB51B89E5DC07B2D33333303414001030000000100000005000000600F000000A05DC0EC6A3D0AD7034140A8F07A14AE9F5DC0EC6A3D0AD7034140A8F07A14AE9F5DC05DA847E17A044140600F000000A05DC05DA847E17A044140600F000000A05DC0EC6A3D0AD703414001030000000100000005000000600F000000A05DC07B2D333333034140A8F07A14AE9F5DC07B2D333333034140A8F07A14AE9F5DC0EC6A3D0AD7034140600F000000A05DC0EC6A3D0AD7034140600F000000A05DC07B2D33333303414001030000000100000005000000600F000000A05DC05DA847E17A044140A8F07A14AE9F5DC05DA847E17A044140A8F07A14AE9F5DC0CEE551B81E054140600F000000A05DC0CEE551B81E054140600F000000A05DC05DA847E17A04414001030000000100000005000000A8F07A14AE9F5DC0EC6A3D0AD7034140F0D1F5285C9F5DC0EC6A3D0AD7034140F0D1F5285C9F5DC05DA847E17A044140A8F07A14AE9F5DC05DA847E17A044140A8F07A14AE9F5DC0EC6A3D0AD703414001030000000100000005000000F0D1F5285C9F5DC0EC6A3D0AD703414038B3703D0A9F5DC0EC6A3D0AD703414038B3703D0A9F5DC05DA847E17A044140F0D1F5285C9F5DC05DA847E17A044140F0D1F5285C9F5DC0EC6A3D0AD70341400103000000010000000500000038B3703D0A9F5DC0EC6A3D0AD70341408094EB51B89E5DC0EC6A3D0AD70341408094EB51B89E5DC05DA847E17A04414038B3703D0A9F5DC05DA847E17A04414038B3703D0A9F5DC0EC6A3D0AD7034140010300000001000000050000008094EB51B89E5DC0287514AE47014140C8756666669E5DC0287514AE47014140C8756666669E5DC099B21E85EB0141408094EB51B89E5DC099B21E85EB0141408094EB51B89E5DC0287514AE4701414001030000000100000005000000C8756666669E5DC0287514AE470141401057E17A149E5DC0287514AE470141401057E17A149E5DC099B21E85EB014140C8756666669E5DC099B21E85EB014140C8756666669E5DC0287514AE47014140010300000001000000050000008094EB51B89E5DC0B7370AD7A3004140C8756666669E5DC0B7370AD7A3004140C8756666669E5DC0287514AE470141408094EB51B89E5DC0287514AE470141408094EB51B89E5DC0B7370AD7A3004140010300000001000000050000001057E17A149E5DC0287514AE4701414058385C8FC29D5DC0287514AE4701414058385C8FC29D5DC099B21E85EB0141401057E17A149E5DC099B21E85EB0141401057E17A149E5DC0287514AE470141400103000000010000000500000058385C8FC29D5DC099B21E85EB014140A019D7A3709D5DC099B21E85EB014140A019D7A3709D5DC00AF0285C8F02414058385C8FC29D5DC00AF0285C8F02414058385C8FC29D5DC099B21E85EB0141400103000000010000000500000058385C8FC29D5DC00AF0285C8F024140A019D7A3709D5DC00AF0285C8F024140A019D7A3709D5DC07B2D33333303414058385C8FC29D5DC07B2D33333303414058385C8FC29D5DC00AF0285C8F0241400103000000010000000500000058385C8FC29D5DC0287514AE47014140A019D7A3709D5DC0287514AE47014140A019D7A3709D5DC099B21E85EB01414058385C8FC29D5DC099B21E85EB01414058385C8FC29D5DC0287514AE4701414001030000000100000005000000E8FA51B81E9D5DC0287514AE4701414030DCCCCCCC9C5DC0287514AE4701414030DCCCCCCC9C5DC099B21E85EB014140E8FA51B81E9D5DC099B21E85EB014140E8FA51B81E9D5DC0287514AE4701414001030000000100000005000000A019D7A3709D5DC0287514AE47014140E8FA51B81E9D5DC0287514AE47014140E8FA51B81E9D5DC099B21E85EB014140A019D7A3709D5DC099B21E85EB014140A019D7A3709D5DC0287514AE4701414001030000000100000005000000886B8FC2F5A05DC05DA847E17A044140D04C0AD7A3A05DC05DA847E17A044140D04C0AD7A3A05DC0CEE551B81E054140886B8FC2F5A05DC0CEE551B81E054140886B8FC2F5A05DC05DA847E17A04414001030000000100000005000000886B8FC2F5A05DC0CEE551B81E054140D04C0AD7A3A05DC0CEE551B81E054140D04C0AD7A3A05DC03F235C8FC2054140886B8FC2F5A05DC03F235C8FC2054140886B8FC2F5A05DC0CEE551B81E054140010300000001000000050000008094EB51B89E5DC0EC6A3D0AD7034140C8756666669E5DC0EC6A3D0AD7034140C8756666669E5DC05DA847E17A0441408094EB51B89E5DC05DA847E17A0441408094EB51B89E5DC0EC6A3D0AD703414001030000000100000005000000A8F07A14AE9F5DC0CEE551B81E054140F0D1F5285C9F5DC0CEE551B81E054140F0D1F5285C9F5DC03F235C8FC2054140A8F07A14AE9F5DC03F235C8FC2054140A8F07A14AE9F5DC0CEE551B81E05414001030000000100000005000000C8756666669E5DC0EC6A3D0AD70341401057E17A149E5DC0EC6A3D0AD70341401057E17A149E5DC05DA847E17A044140C8756666669E5DC05DA847E17A044140C8756666669E5DC0EC6A3D0AD7034140010300000001000000050000001057E17A149E5DC07B2D33333303414058385C8FC29D5DC07B2D33333303414058385C8FC29D5DC0EC6A3D0AD70341401057E17A149E5DC0EC6A3D0AD70341401057E17A149E5DC07B2D3333330341400103000000010000000500000058385C8FC29D5DC07B2D333333034140A019D7A3709D5DC07B2D333333034140A019D7A3709D5DC0EC6A3D0AD703414058385C8FC29D5DC0EC6A3D0AD703414058385C8FC29D5DC07B2D33333303414001030000000100000005000000600F000000A05DC0CEE551B81E054140A8F07A14AE9F5DC0CEE551B81E054140A8F07A14AE9F5DC03F235C8FC2054140600F000000A05DC03F235C8FC2054140600F000000A05DC0CEE551B81E05414001030000000100000005000000182E85EB51A05DC03F235C8FC2054140600F000000A05DC03F235C8FC2054140600F000000A05DC0B060666666064140182E85EB51A05DC0B060666666064140182E85EB51A05DC03F235C8FC205414001030000000100000005000000D04C0AD7A3A05DC03F235C8FC2054140182E85EB51A05DC03F235C8FC2054140182E85EB51A05DC0B060666666064140D04C0AD7A3A05DC0B060666666064140D04C0AD7A3A05DC03F235C8FC205414001030000000100000005000000408A14AE47A15DC03F235C8FC2054140886B8FC2F5A05DC03F235C8FC2054140886B8FC2F5A05DC0B060666666064140408A14AE47A15DC0B060666666064140408A14AE47A15DC03F235C8FC205414001030000000100000005000000886B8FC2F5A05DC03F235C8FC2054140D04C0AD7A3A05DC03F235C8FC2054140D04C0AD7A3A05DC0B060666666064140886B8FC2F5A05DC0B060666666064140886B8FC2F5A05DC03F235C8FC20541400103000000010000000500000058385C8FC29D5DC0B7370AD7A3004140A019D7A3709D5DC0B7370AD7A3004140A019D7A3709D5DC0287514AE4701414058385C8FC29D5DC0287514AE4701414058385C8FC29D5DC0B7370AD7A300414001030000000100000005000000F0D1F5285C9F5DC0CEE551B81E05414038B3703D0A9F5DC0CEE551B81E05414038B3703D0A9F5DC03F235C8FC2054140F0D1F5285C9F5DC03F235C8FC2054140F0D1F5285C9F5DC0CEE551B81E05414001030000000100000005000000600F000000A05DC03F235C8FC2054140A8F07A14AE9F5DC03F235C8FC2054140A8F07A14AE9F5DC0B060666666064140600F000000A05DC0B060666666064140600F000000A05DC03F235C8FC20541400103000000010000000500000030DCCCCCCC9C5DC099B21E85EB01414078BD47E17A9C5DC099B21E85EB01414078BD47E17A9C5DC00AF0285C8F02414030DCCCCCCC9C5DC00AF0285C8F02414030DCCCCCCC9C5DC099B21E85EB0141400103000000010000000500000030DCCCCCCC9C5DC0287514AE4701414078BD47E17A9C5DC0287514AE4701414078BD47E17A9C5DC099B21E85EB01414030DCCCCCCC9C5DC099B21E85EB01414030DCCCCCCC9C5DC0287514AE470141400103000000010000000500000030DCCCCCCC9C5DC00AF0285C8F02414078BD47E17A9C5DC00AF0285C8F02414078BD47E17A9C5DC07B2D33333303414030DCCCCCCC9C5DC07B2D33333303414030DCCCCCCC9C5DC00AF0285C8F0241400103000000010000000500000078BD47E17A9C5DC00AF0285C8F024140C09EC2F5289C5DC00AF0285C8F024140C09EC2F5289C5DC07B2D33333303414078BD47E17A9C5DC07B2D33333303414078BD47E17A9C5DC00AF0285C8F02414001030000000100000005000000C09EC2F5289C5DC00AF0285C8F02414008803D0AD79B5DC00AF0285C8F02414008803D0AD79B5DC07B2D333333034140C09EC2F5289C5DC07B2D333333034140C09EC2F5289C5DC00AF0285C8F02414001030000000100000005000000C09EC2F5289C5DC099B21E85EB01414008803D0AD79B5DC099B21E85EB01414008803D0AD79B5DC00AF0285C8F024140C09EC2F5289C5DC00AF0285C8F024140C09EC2F5289C5DC099B21E85EB01414001030000000100000005000000C09EC2F5289C5DC0287514AE4701414008803D0AD79B5DC0287514AE4701414008803D0AD79B5DC099B21E85EB014140C09EC2F5289C5DC099B21E85EB014140C09EC2F5289C5DC0287514AE470141400103000000010000000500000078BD47E17A9C5DC0287514AE47014140C09EC2F5289C5DC0287514AE47014140C09EC2F5289C5DC099B21E85EB01414078BD47E17A9C5DC099B21E85EB01414078BD47E17A9C5DC0287514AE470141400103000000010000000500000078BD47E17A9C5DC099B21E85EB014140C09EC2F5289C5DC099B21E85EB014140C09EC2F5289C5DC00AF0285C8F02414078BD47E17A9C5DC00AF0285C8F02414078BD47E17A9C5DC099B21E85EB0141400103000000010000000500000068E6A3703DA25DC0B060666666064140B0C71E85EBA15DC0B060666666064140B0C71E85EBA15DC0219E703D0A07414068E6A3703DA25DC0219E703D0A07414068E6A3703DA25DC0B060666666064140010300000001000000050000002005295C8FA25DC0B06066666606414068E6A3703DA25DC0B06066666606414068E6A3703DA25DC0219E703D0A0741402005295C8FA25DC0219E703D0A0741402005295C8FA25DC0B06066666606414001030000000100000005000000D823AE47E1A25DC0B0606666660641402005295C8FA25DC0B0606666660641402005295C8FA25DC0219E703D0A074140D823AE47E1A25DC0219E703D0A074140D823AE47E1A25DC0B060666666064140010300000001000000050000002005295C8FA25DC0219E703D0A07414068E6A3703DA25DC0219E703D0A07414068E6A3703DA25DC092DB7A14AE0741402005295C8FA25DC092DB7A14AE0741402005295C8FA25DC0219E703D0A074140010300000001000000050000002005295C8FA25DC092DB7A14AE07414068E6A3703DA25DC092DB7A14AE07414068E6A3703DA25DC0031985EB510841402005295C8FA25DC0031985EB510841402005295C8FA25DC092DB7A14AE07414001030000000100000005000000D823AE47E1A25DC092DB7A14AE0741402005295C8FA25DC092DB7A14AE0741402005295C8FA25DC0031985EB51084140D823AE47E1A25DC0031985EB51084140D823AE47E1A25DC092DB7A14AE074140010300000001000000050000009042333333A35DC092DB7A14AE074140D823AE47E1A25DC092DB7A14AE074140D823AE47E1A25DC0031985EB510841409042333333A35DC0031985EB510841409042333333A35DC092DB7A14AE074140010300000001000000050000004861B81E85A35DC092DB7A14AE0741409042333333A35DC092DB7A14AE0741409042333333A35DC0031985EB510841404861B81E85A35DC0031985EB510841404861B81E85A35DC092DB7A14AE074140010300000001000000050000004861B81E85A35DC0219E703D0A0741409042333333A35DC0219E703D0A0741409042333333A35DC092DB7A14AE0741404861B81E85A35DC092DB7A14AE0741404861B81E85A35DC0219E703D0A074140010300000001000000050000009042333333A35DC0219E703D0A074140D823AE47E1A25DC0219E703D0A074140D823AE47E1A25DC092DB7A14AE0741409042333333A35DC092DB7A14AE0741409042333333A35DC0219E703D0A07414001030000000100000005000000D823AE47E1A25DC0219E703D0A0741402005295C8FA25DC0219E703D0A0741402005295C8FA25DC092DB7A14AE074140D823AE47E1A25DC092DB7A14AE074140D823AE47E1A25DC0219E703D0A074140010300000001000000050000002005295C8FA25DC03F235C8FC205414068E6A3703DA25DC03F235C8FC205414068E6A3703DA25DC0B0606666660641402005295C8FA25DC0B0606666660641402005295C8FA25DC03F235C8FC20541400103000000010000000500000068E6A3703DA25DC03F235C8FC2054140B0C71E85EBA15DC03F235C8FC2054140B0C71E85EBA15DC0B06066666606414068E6A3703DA25DC0B06066666606414068E6A3703DA25DC03F235C8FC20541400103000000010000000500000068E6A3703DA25DC0CEE551B81E054140B0C71E85EBA15DC0CEE551B81E054140B0C71E85EBA15DC03F235C8FC205414068E6A3703DA25DC03F235C8FC205414068E6A3703DA25DC0CEE551B81E054140010300000001000000050000002005295C8FA25DC0CEE551B81E05414068E6A3703DA25DC0CEE551B81E05414068E6A3703DA25DC03F235C8FC20541402005295C8FA25DC03F235C8FC20541402005295C8FA25DC0CEE551B81E05414001030000000100000005000000D823AE47E1A25DC0CEE551B81E0541402005295C8FA25DC0CEE551B81E0541402005295C8FA25DC03F235C8FC2054140D823AE47E1A25DC03F235C8FC2054140D823AE47E1A25DC0CEE551B81E05414001030000000100000005000000D823AE47E1A25DC03F235C8FC20541402005295C8FA25DC03F235C8FC20541402005295C8FA25DC0B060666666064140D823AE47E1A25DC0B060666666064140D823AE47E1A25DC03F235C8FC2054140010300000001000000050000009042333333A35DC0B060666666064140D823AE47E1A25DC0B060666666064140D823AE47E1A25DC0219E703D0A0741409042333333A35DC0219E703D0A0741409042333333A35DC0B060666666064140010300000001000000050000004861B81E85A35DC0B0606666660641409042333333A35DC0B0606666660641409042333333A35DC0219E703D0A0741404861B81E85A35DC0219E703D0A0741404861B81E85A35DC0B060666666064140010300000001000000050000004861B81E85A35DC03F235C8FC20541409042333333A35DC03F235C8FC20541409042333333A35DC0B0606666660641404861B81E85A35DC0B0606666660641404861B81E85A35DC03F235C8FC2054140010300000001000000050000009042333333A35DC03F235C8FC2054140D823AE47E1A25DC03F235C8FC2054140D823AE47E1A25DC0B0606666660641409042333333A35DC0B0606666660641409042333333A35DC03F235C8FC2054140010300000001000000050000009042333333A35DC0CEE551B81E054140D823AE47E1A25DC0CEE551B81E054140D823AE47E1A25DC03F235C8FC20541409042333333A35DC03F235C8FC20541409042333333A35DC0CEE551B81E054140010300000001000000050000004861B81E85A35DC0CEE551B81E0541409042333333A35DC0CEE551B81E0541409042333333A35DC03F235C8FC20541404861B81E85A35DC03F235C8FC20541404861B81E85A35DC0CEE551B81E054140010300000001000000050000009042333333A35DC05DA847E17A044140D823AE47E1A25DC05DA847E17A044140D823AE47E1A25DC0CEE551B81E0541409042333333A35DC0CEE551B81E0541409042333333A35DC05DA847E17A04414001030000000100000005000000D823AE47E1A25DC05DA847E17A0441402005295C8FA25DC05DA847E17A0441402005295C8FA25DC0CEE551B81E054140D823AE47E1A25DC0CEE551B81E054140D823AE47E1A25DC05DA847E17A044140010300000001000000050000002005295C8FA25DC05DA847E17A04414068E6A3703DA25DC05DA847E17A04414068E6A3703DA25DC0CEE551B81E0541402005295C8FA25DC0CEE551B81E0541402005295C8FA25DC05DA847E17A0441400103000000010000000500000068E6A3703DA25DC05DA847E17A044140B0C71E85EBA15DC05DA847E17A044140B0C71E85EBA15DC0CEE551B81E05414068E6A3703DA25DC0CEE551B81E05414068E6A3703DA25DC05DA847E17A0441400103000000010000000500000068E6A3703DA25DC0EC6A3D0AD7034140B0C71E85EBA15DC0EC6A3D0AD7034140B0C71E85EBA15DC05DA847E17A04414068E6A3703DA25DC05DA847E17A04414068E6A3703DA25DC0EC6A3D0AD7034140010300000001000000050000004861B81E85A35DC05DA847E17A0441409042333333A35DC05DA847E17A0441409042333333A35DC0CEE551B81E0541404861B81E85A35DC0CEE551B81E0541404861B81E85A35DC05DA847E17A04414001030000000100000005000000B0C71E85EBA15DC0219E703D0A074140F8A8999999A15DC0219E703D0A074140F8A8999999A15DC092DB7A14AE074140B0C71E85EBA15DC092DB7A14AE074140B0C71E85EBA15DC0219E703D0A07414001030000000100000005000000408A14AE47A15DC0219E703D0A074140886B8FC2F5A05DC0219E703D0A074140886B8FC2F5A05DC092DB7A14AE074140408A14AE47A15DC092DB7A14AE074140408A14AE47A15DC0219E703D0A07414001030000000100000005000000F8A8999999A15DC0219E703D0A074140408A14AE47A15DC0219E703D0A074140408A14AE47A15DC092DB7A14AE074140F8A8999999A15DC092DB7A14AE074140F8A8999999A15DC0219E703D0A07414001030000000100000005000000408A14AE47A15DC0B060666666064140886B8FC2F5A05DC0B060666666064140886B8FC2F5A05DC0219E703D0A074140408A14AE47A15DC0219E703D0A074140408A14AE47A15DC0B06066666606414001030000000100000005000000886B8FC2F5A05DC0B060666666064140D04C0AD7A3A05DC0B060666666064140D04C0AD7A3A05DC0219E703D0A074140886B8FC2F5A05DC0219E703D0A074140886B8FC2F5A05DC0B06066666606414001030000000100000005000000D04C0AD7A3A05DC0B060666666064140182E85EB51A05DC0B060666666064140182E85EB51A05DC0219E703D0A074140D04C0AD7A3A05DC0219E703D0A074140D04C0AD7A3A05DC0B06066666606414001030000000100000005000000600F000000A05DC0B060666666064140A8F07A14AE9F5DC0B060666666064140A8F07A14AE9F5DC0219E703D0A074140600F000000A05DC0219E703D0A074140600F000000A05DC0B06066666606414001030000000100000005000000600F000000A05DC0219E703D0A074140A8F07A14AE9F5DC0219E703D0A074140A8F07A14AE9F5DC092DB7A14AE074140600F000000A05DC092DB7A14AE074140600F000000A05DC0219E703D0A07414001030000000100000005000000182E85EB51A05DC0219E703D0A074140600F000000A05DC0219E703D0A074140600F000000A05DC092DB7A14AE074140182E85EB51A05DC092DB7A14AE074140182E85EB51A05DC0219E703D0A07414001030000000100000005000000182E85EB51A05DC0B060666666064140600F000000A05DC0B060666666064140600F000000A05DC0219E703D0A074140182E85EB51A05DC0219E703D0A074140182E85EB51A05DC0B06066666606414001030000000100000005000000D04C0AD7A3A05DC0219E703D0A074140182E85EB51A05DC0219E703D0A074140182E85EB51A05DC092DB7A14AE074140D04C0AD7A3A05DC092DB7A14AE074140D04C0AD7A3A05DC0219E703D0A07414001030000000100000005000000886B8FC2F5A05DC0219E703D0A074140D04C0AD7A3A05DC0219E703D0A074140D04C0AD7A3A05DC092DB7A14AE074140886B8FC2F5A05DC092DB7A14AE074140886B8FC2F5A05DC0219E703D0A0741400103000000010000000500000068E6A3703DA25DC0219E703D0A074140B0C71E85EBA15DC0219E703D0A074140B0C71E85EBA15DC092DB7A14AE07414068E6A3703DA25DC092DB7A14AE07414068E6A3703DA25DC0219E703D0A0741400103000000010000000500000000803D0AD7A35DC092DB7A14AE0741404861B81E85A35DC092DB7A14AE0741404861B81E85A35DC0031985EB5108414000803D0AD7A35DC0031985EB5108414000803D0AD7A35DC092DB7A14AE0741400103000000010000000500000000803D0AD7A35DC0219E703D0A0741404861B81E85A35DC0219E703D0A0741404861B81E85A35DC092DB7A14AE07414000803D0AD7A35DC092DB7A14AE07414000803D0AD7A35DC0219E703D0A0741400103000000010000000500000000803D0AD7A35DC0B0606666660641404861B81E85A35DC0B0606666660641404861B81E85A35DC0219E703D0A07414000803D0AD7A35DC0219E703D0A07414000803D0AD7A35DC0B0606666660641400103000000010000000500000000803D0AD7A35DC03F235C8FC20541404861B81E85A35DC03F235C8FC20541404861B81E85A35DC0B06066666606414000803D0AD7A35DC0B06066666606414000803D0AD7A35DC03F235C8FC20541400103000000010000000500000000803D0AD7A35DC0CEE551B81E0541404861B81E85A35DC0CEE551B81E0541404861B81E85A35DC03F235C8FC205414000803D0AD7A35DC03F235C8FC205414000803D0AD7A35DC0CEE551B81E0541400103000000010000000500000000803D0AD7A35DC05DA847E17A0441404861B81E85A35DC05DA847E17A0441404861B81E85A35DC0CEE551B81E05414000803D0AD7A35DC0CEE551B81E05414000803D0AD7A35DC05DA847E17A044140
+12	\N
+13	0106000020E61000000C00000001030000000100000005000000804CE5D022DB53C0ED558D976ED24540E487C420B0DA53C0ED558D976ED24540E487C420B0DA53C024DFCEF753D34540804CE5D022DB53C024DFCEF753D34540804CE5D022DB53C0ED558D976ED2454001030000000100000005000000E487C420B0DA53C0ED558D976ED2454048C3A3703DDA53C0ED558D976ED2454048C3A3703DDA53C024DFCEF753D34540E487C420B0DA53C024DFCEF753D34540E487C420B0DA53C0ED558D976ED245400103000000010000000500000048C3A3703DDA53C0ED558D976ED24540ACFE82C0CAD953C0ED558D976ED24540ACFE82C0CAD953C024DFCEF753D3454048C3A3703DDA53C024DFCEF753D3454048C3A3703DDA53C0ED558D976ED245400103000000010000000500000048C3A3703DDA53C024DFCEF753D34540ACFE82C0CAD953C024DFCEF753D34540ACFE82C0CAD953C05B68105839D4454048C3A3703DDA53C05B68105839D4454048C3A3703DDA53C024DFCEF753D3454001030000000100000005000000E487C420B0DA53C024DFCEF753D3454048C3A3703DDA53C024DFCEF753D3454048C3A3703DDA53C05B68105839D44540E487C420B0DA53C05B68105839D44540E487C420B0DA53C024DFCEF753D3454001030000000100000005000000804CE5D022DB53C024DFCEF753D34540E487C420B0DA53C024DFCEF753D34540E487C420B0DA53C05B68105839D44540804CE5D022DB53C05B68105839D44540804CE5D022DB53C024DFCEF753D3454001030000000100000005000000804CE5D022DB53C0B6CC4B3789D14540E487C420B0DA53C0B6CC4B3789D14540E487C420B0DA53C0ED558D976ED24540804CE5D022DB53C0ED558D976ED24540804CE5D022DB53C0B6CC4B3789D1454001030000000100000005000000E487C420B0DA53C0B6CC4B3789D1454048C3A3703DDA53C0B6CC4B3789D1454048C3A3703DDA53C0ED558D976ED24540E487C420B0DA53C0ED558D976ED24540E487C420B0DA53C0B6CC4B3789D145400103000000010000000500000048C3A3703DDA53C0B6CC4B3789D14540ACFE82C0CAD953C0B6CC4B3789D14540ACFE82C0CAD953C0ED558D976ED2454048C3A3703DDA53C0ED558D976ED2454048C3A3703DDA53C0B6CC4B3789D1454001030000000100000005000000ACFE82C0CAD953C0ED558D976ED24540103A621058D953C0ED558D976ED24540103A621058D953C024DFCEF753D34540ACFE82C0CAD953C024DFCEF753D34540ACFE82C0CAD953C0ED558D976ED2454001030000000100000005000000ACFE82C0CAD953C0B6CC4B3789D14540103A621058D953C0B6CC4B3789D14540103A621058D953C0ED558D976ED24540ACFE82C0CAD953C0ED558D976ED24540ACFE82C0CAD953C0B6CC4B3789D1454001030000000100000005000000ACFE82C0CAD953C024DFCEF753D34540103A621058D953C024DFCEF753D34540103A621058D953C05B68105839D44540ACFE82C0CAD953C05B68105839D44540ACFE82C0CAD953C024DFCEF753D34540
+14	\N
+15	\N
+16	\N
+\.
+
+
+--
+-- Name: starting_point_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_id_seq', 16, true);
+
+
+--
+-- Data for Name: starting_point_r2c_stats; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_r2c_stats (id, active_date, r2c_mean, r2c_std, r2c_median, estimated_r2c_mean, estimated_r2c_std, estimated_r2c_median, delivery_count, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: starting_point_r2c_stats_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_r2c_stats_id_seq', 1, false);
+
+
+--
+-- Data for Name: starting_point_set; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY starting_point_set (id, updated_at, sp_set_id, market_id, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: starting_point_set_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('starting_point_set_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_confirmed_time_snapshot; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_confirmed_time_snapshot (id, metadata, active_date, created_at, order_place_queue_length, busy_server_count, active_order_placer_last_hour_count) FROM stdin;
+\.
+
+
+--
+-- Name: store_confirmed_time_snapshot_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_confirmed_time_snapshot_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_consumer_review; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_consumer_review (id, created_at, updated_at, rating, title, body, show_to_consumer, processed_at, store_id, consumer_id) FROM stdin;
+\.
+
+
+--
+-- Name: store_consumer_review_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_consumer_review_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_consumer_review_tag; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_consumer_review_tag (id, created_at, name, friendly_name) FROM stdin;
+\.
+
+
+--
+-- Name: store_consumer_review_tag_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_consumer_review_tag_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_consumer_review_tag_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_consumer_review_tag_link (id, review_id, tag_id) FROM stdin;
+\.
+
+
+--
+-- Name: store_consumer_review_tag_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_consumer_review_tag_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_delivery_duration_stats; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_delivery_duration_stats (id, active_date, delivery_duration_mean_by_window, delivery_duration_median_by_window, delivery_duration_std_by_window, delivery_count_by_window, delivery_duration_mean_without_r2c_by_window, store_id) FROM stdin;
+\.
+
+
+--
+-- Name: store_delivery_duration_stats_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_delivery_duration_stats_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_mastercard_data; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_mastercard_data (id, mid, mname, updated_at, store_id) FROM stdin;
+\.
+
+
+--
+-- Name: store_mastercard_data_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_mastercard_data_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_netsuite_customer_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_netsuite_customer_link (store_id, netsuite_entity_id, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: store_order_cart; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_order_cart (id, created_at, submitted_at, cancelled_at, fulfilled_at, omnivore_id, merchant_supplied_id, currency, subtotal, tax_amount, subtotal_tax_amount, fees_tax_amount, tax_rate, service_fee, service_rate, extra_sos_delivery_fee, base_delivery_fee, delivery_fee, discount_amount, commission, commission_rate, flat_commission, commission_tax, is_reduced_commission, is_consumer_pickup, legacy_inflation_amount, tip_amount, is_bike_friendly, is_bike_friendly_updated_at, min_age_requirement, min_age_requirement_updated_at, bcs_store_order_cart_created, contains_alcohol, menu_id, order_cart_id, store_id, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: store_order_cart_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_order_cart_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_order_place_latency_stats; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_order_place_latency_stats (id, active_date, order_place_latency_count, order_place_latency_sum, order_place_latency_stddev, order_place_latency_count_lunch_peak, order_place_latency_sum_lunch_peak, order_place_latency_stddev_lunch_peak, order_place_latency_count_dinner_peak, order_place_latency_sum_dinner_peak, order_place_latency_stddev_dinner_peak, order_place_latency_count_large_order, order_place_latency_sum_large_order, order_place_latency_stddev_large_order, store_id) FROM stdin;
+\.
+
+
+--
+-- Name: store_order_place_latency_stats_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('store_order_place_latency_stats_id_seq', 1, false);
+
+
+--
+-- Data for Name: store_point_of_sale_transaction; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY store_point_of_sale_transaction (created_at, delivery_id, store_transaction_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: stripe_bank_account; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_bank_account (id, stripe_id, account_holder_name, fingerprint, last4, bank_name, status, active, removed_at, stripe_customer_id) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_bank_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_bank_account_id_seq', 1, false);
+
+
+--
+-- Data for Name: stripe_card; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_card (id, stripe_id, fingerprint, last4, dynamic_last4, exp_month, exp_year, type, country_of_origin, zip_code, created_at, removed_at, is_scanned, dd_fingerprint, active, consumer_id, stripe_customer_id, external_stripe_customer_id, tokenization_method, address_line1_check, address_zip_check, validation_card_id) FROM stdin;
+1	card_FYi1MXMsuSJUy1	rca24boD2K4iFl6k	4242		10	2020	Visa	US	\N	2019-08-04 03:42:02.492385+00	\N	f	\N	t	1	\N	cus_FYi1OIMNHWAkmF	\N	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: stripe_card_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_card_event (id, created_at, event_type, status, error_code, consumer_id, stripe_customer_id) FROM stdin;
+1	2019-08-04 03:42:02.486851+00	add-card	succeeded		1	\N
+\.
+
+
+--
+-- Name: stripe_card_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_card_event_id_seq', 1, true);
+
+
+--
+-- Name: stripe_card_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_card_id_seq', 1, true);
+
+
+--
+-- Data for Name: stripe_charge; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_charge (id, created_at, refunded_at, stripe_id, amount, amount_refunded, currency, status, error_reason, additional_payment_info, description, idempotency_key, card_id, charge_id, updated_at) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_charge_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_charge_id_seq', 1, false);
+
+
+--
+-- Data for Name: stripe_customer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_customer (id, stripe_id, country_shortname, owner_type, owner_id, default_card, default_source) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_customer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_customer_id_seq', 1, false);
+
+
+--
+-- Data for Name: stripe_dispute; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_dispute (id, stripe_dispute_id, disputed_at, amount, fee, net, currency, charged_at, reason, status, evidence_due_by, evidence_submitted_at, updated_at, stripe_card_id, stripe_charge_id) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_dispute_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_dispute_id_seq', 1, false);
+
+
+--
+-- Data for Name: stripe_managed_account; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_managed_account (id, stripe_id, country_shortname, stripe_last_updated_at, bank_account_last_updated_at, fingerprint, default_bank_last_four, default_bank_name, verification_disabled_reason, verification_due_by, verification_fields_needed) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_managed_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_managed_account_id_seq', 1, false);
+
+
+--
+-- Data for Name: stripe_recipient; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_recipient (id, stripe_id, country_shortname) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_recipient_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_recipient_id_seq', 1, false);
+
+
+--
+-- Data for Name: stripe_transfer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY stripe_transfer (id, created_at, stripe_id, stripe_request_id, stripe_status, stripe_failure_code, stripe_account_id, stripe_account_type, country_shortname, bank_last_four, bank_name, transfer_id, submission_error_code, submission_error_type, submission_status, submitted_at) FROM stdin;
+\.
+
+
+--
+-- Name: stripe_transfer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('stripe_transfer_id_seq', 1, false);
+
+
+--
+-- Data for Name: submarket; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY submarket (id, seo_fields, name, flf_migration_threshold, bikers_can_automigrate, daily_caps_publish_time, min_order_fee, min_order_subtotal, drinking_age, is_at_dasher_capacity, max_drive_delivery_radius_in_meters, max_dropoff_address_distance_change, slug, launch_date, launch_image, launch_mailchimp_waitlist_id, launch_iterable_waitlist_id, use_virtual_orientation, is_on_homepage, is_active, show_on_dasher_apply_page, home_background_image, homepage_order, extra_asap_pad, dasher_pay_campaign_constraints, rating_warn_threshold, rating_deactivate_threshold, adjusted_r2c_coefficient, adjusted_r2c_exponent, accepting_vehicle_types, ideal_flfs, sos_price_flf_threshold, referrer_amount, referree_amount, min_referree_order_subtotal, referree_promotion_id, referral_program_experiment_id, market_id, referral_program_id) FROM stdin;
+1	\N	Silicon Valley	1.80	f	00:00:00	200	1000	21	f	\N	\N	silicon-valley	\N			\N	f	f	t	t		\N	0	{}	\N	\N	7.2285	-0.6410	[1, 2, 3, 4]	[1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]	\N	\N	\N	\N	\N	\N	1	\N
+2	\N	San Francisco	1.80	f	00:00:00	200	1000	21	f	\N	\N	san-francisco	\N			\N	f	f	t	t		\N	0	{}	\N	\N	7.2285	-0.6410	[1, 2, 3, 4]	[1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]	\N	\N	\N	\N	\N	\N	1	\N
+3	\N	Los Angeles	1.80	f	00:00:00	200	1000	21	f	\N	\N	los-angeles	\N			\N	f	f	t	t		\N	0	{}	\N	\N	7.2285	-0.6410	[1, 2, 3, 4]	[1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]	\N	\N	\N	\N	\N	\N	2	\N
+4	\N	Boston	1.80	f	00:00:00	200	1000	21	f	\N	\N	boston	\N			\N	f	f	t	t		\N	0	{}	\N	\N	7.2285	-0.6410	[1, 2, 3, 4]	[1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]	\N	\N	\N	\N	\N	\N	3	\N
+5	\N	Toronto	1.80	f	00:00:00	200	1000	21	f	\N	\N	toronto	\N			\N	f	f	t	t		\N	0	{}	\N	\N	7.2285	-0.6410	[1, 2, 3, 4]	[1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]	\N	\N	\N	\N	\N	\N	4	\N
+6	\N	Melbourne	1.80	f	00:00:00	200	1000	21	f	\N	\N	melbourne	\N			\N	f	f	t	t		\N	0	{}	\N	\N	7.2285	-0.6410	[1, 2, 3, 4]	[1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2]	\N	\N	\N	\N	\N	\N	5	\N
+\.
+
+
+--
+-- Name: submarket_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('submarket_id_seq', 6, true);
+
+
+--
+-- Data for Name: subnational_division; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY subnational_division (id, name, shortname, country_id) FROM stdin;
+1	California	CA	1
+\.
+
+
+--
+-- Name: subnational_division_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('subnational_division_id_seq', 1, true);
+
+
+--
+-- Data for Name: support_delivery_banner; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY support_delivery_banner (id, delivery_type, content, created_at, expires_at) FROM stdin;
+\.
+
+
+--
+-- Name: support_delivery_banner_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('support_delivery_banner_id_seq', 1, false);
+
+
+--
+-- Data for Name: support_salesforce_case_record; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY support_salesforce_case_record (id, case_number, case_uid, customer_type, case_status, case_origin, created_at, delivery_id) FROM stdin;
+\.
+
+
+--
+-- Name: support_salesforce_case_record_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('support_salesforce_case_record_id_seq', 1, false);
+
+
+--
+-- Data for Name: transfer; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY transfer (id, recipient_id, subtotal, adjustments, amount, currency, created_at, submitted_at, deleted_at, method, manual_transfer_reason, status, status_code, submitting_at, should_retry_on_failure, statement_description, created_by_id, deleted_by_id, payment_account_id, recipient_ct_id, submitted_by_id) FROM stdin;
+\.
+
+
+--
+-- Name: transfer_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('transfer_id_seq', 1, false);
+
+
+--
+-- Data for Name: transfer_submission_lock; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY transfer_submission_lock (transfer_id, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: twilio_masking_number; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY twilio_masking_number (id, twilio_number_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: twilio_masking_number_assignment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY twilio_masking_number_assignment (id, created_at, deactivated_at, consumer_id, dasher_id, store_id, delivery_id, twilio_masking_number_id) FROM stdin;
+\.
+
+
+--
+-- Name: twilio_masking_number_assignment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('twilio_masking_number_assignment_id_seq', 1, false);
+
+
+--
+-- Name: twilio_masking_number_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('twilio_masking_number_id_seq', 1, false);
+
+
+--
+-- Data for Name: twilio_number; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY twilio_number (id, phone_sid, created_at, phone_number, name, blocked_at, is_active, is_callable, is_textable, country_id) FROM stdin;
+1	PN2443e564704d474ae3d684d29e7e1886	2015-06-19 18:45:01+00	+16504504940	robocall	\N	t	t	t	1
+2	PNba4f73ffe00785ff6dcced6a8bba362b	2015-06-19 18:48:04+00	+16504584388	mass_text	\N	t	t	t	1
+3	PN5c1423011e53fb54772de6627f3623f2	2015-06-19 18:49:01+00	+16506009935		\N	t	t	t	1
+4	PN82249fef0e9425982b08a4bec0853fb9	2015-06-19 18:49:23+00	+16503380040		\N	t	t	t	1
+5	PNb8aac6c678a712c55046ec0d58ac2ced	2015-06-19 18:49:39+00	+16502354660		\N	t	t	t	1
+6	PNa4c09037c6028557f41e81866a5f59e9	2015-06-19 18:49:53+00	+16502004313		\N	t	t	t	1
+7	PN5fd4c378c62fa70ee0ee6c1550d514b1	2015-06-19 18:50:14+00	+16502295442		\N	t	t	t	2
+\.
+
+
+--
+-- Name: twilio_number_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('twilio_number_id_seq', 7, true);
+
+
+--
+-- Data for Name: user; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY "user" (id, password, last_login, is_superuser, email, is_staff, is_active, is_guest, date_joined, week_joined, phone_number, first_name, last_name, auth_version, block_reason, experiment_id, bucket_key_override, is_blacklisted, is_whitelisted, password_change_required, password_changed_at, is_password_secure, password_checked_at, identity_service_key, dasher_id, guest_user_type_id, outgoing_number_id) FROM stdin;
+1	pbkdf2_sha256$36000$7kZCTFrm08Kd$3P0mNTdPspV7aXKcToBOfYhbzeaYbTnP1d5be5N359s=	\N	f	system@doordash.com	t	t	f	2019-08-04 03:41:05.476147+00	2019-07-29 03:41:05.476166+00	+14037153787	Brent	Elliott	1	\N	\N	\N	f	\N	f	2019-08-04 03:41:16.565156+00	\N	\N	\N	\N	\N	\N
+2	pbkdf2_sha256$36000$WqLx9zFKTy6c$VuTb27LhLNXTkc1z8JOCXRPGN1vLCqCU+v6dey9qPfU=	\N	t	admin@doordash.com	t	t	f	2019-08-04 03:41:37.284823+00	2019-07-29 03:41:37.284842+00	+14705590206	Allison	Evans	1	\N	\N	\N	f	\N	f	2019-08-04 03:41:48.368395+00	\N	\N	\N	1	\N	\N
+3	pbkdf2_sha256$36000$WaCIGIuWjslw$X+1zBqc25C8k8oouMN1m4InYwsQanWUwcNkpQvq1OYc=	\N	t	dasher_applicant@doordash.com	t	t	f	2019-08-04 03:42:14.617665+00	2019-07-29 03:42:14.617678+00	+13202283989	Thomas	Browning	1	\N	\N	\N	f	\N	f	2019-08-04 03:42:25.686733+00	\N	\N	\N	\N	\N	\N
+4	pbkdf2_sha256$36000$qt1xPyGL4hCj$+GUUHMnyFa9/qjGoThYm3lfxVzxFaCMPFmqQDtDrxeM=	\N	f	person4@doordash.com	f	t	f	2019-08-04 03:42:36.811822+00	2019-07-29 03:42:36.811834+00	+18324743426	David	Wilkerson	1	\N	\N	\N	f	\N	f	2019-08-04 03:42:47.876599+00	\N	\N	\N	\N	\N	\N
+5	pbkdf2_sha256$36000$jNlxvIXms34P$4vq3XX65xYTbsaTKEwkD4dfx4wHEQ0rK9vS83c9V28c=	\N	f	person5@doordash.com	f	t	f	2019-08-04 03:42:59.005302+00	2019-07-29 03:42:59.005313+00	+14637547497	Cheryl	Rivers	1	\N	\N	\N	f	\N	f	2019-08-04 03:43:10.074717+00	\N	\N	\N	\N	\N	\N
+6	pbkdf2_sha256$36000$9wE0wSqdkS6F$yHJlmD5fjnJ2SlLkmsn77HeirVAYIJW/07ZGWWw3DGY=	\N	f	person6@doordash.com	f	t	f	2019-08-04 03:43:21.194908+00	2019-07-29 03:43:21.194919+00	+19138881223	Cheryl	Schmidt	1	\N	\N	\N	f	\N	f	2019-08-04 03:43:32.26319+00	\N	\N	\N	\N	\N	\N
+7	pbkdf2_sha256$36000$bhpnchVLeB1a$GSZ4YIynWHMcAvPpQQ37RLICfahvI0bBOc5E11nPVdw=	\N	f	person7@doordash.com	f	t	f	2019-08-04 03:43:43.388099+00	2019-07-29 03:43:43.38811+00	+12147081108	Carol	West	1	\N	\N	\N	f	\N	f	2019-08-04 03:43:54.457684+00	\N	\N	\N	\N	\N	\N
+8	pbkdf2_sha256$36000$1DmIquOhewg3$1sm3jg8GrB/WNU0qguqMBVkK+xTuX4ilSdEDGe7/XxQ=	\N	f	person8@doordash.com	f	t	f	2019-08-04 03:44:05.584093+00	2019-07-29 03:44:05.584104+00	+14054494557	Melinda	Flores	1	\N	\N	\N	f	\N	f	2019-08-04 03:44:16.652664+00	\N	\N	\N	\N	\N	\N
+9	pbkdf2_sha256$36000$aYqHKY9X6UyO$6wVoUZaMsII0kW3+uEv2iX8iVVjNDe5QW486xxX5MZg=	\N	f	person9@doordash.com	f	t	f	2019-08-04 03:44:28.0907+00	2019-07-29 03:44:28.090712+00	+16026524055	William	Calderon	1	\N	\N	\N	f	\N	f	2019-08-04 03:44:39.158131+00	\N	\N	\N	2	\N	\N
+10	pbkdf2_sha256$36000$IZAYpz1hJQ8M$tjjfe6nvqdFEoG0RE2to2KNbOEVJoIhDhIUOqpnSbQA=	\N	f	person10@doordash.com	f	t	f	2019-08-04 03:45:01.338037+00	2019-07-29 03:45:01.338058+00	+15196297052	Christian	Reynolds	1	\N	\N	\N	f	\N	f	2019-08-04 03:45:12.414071+00	\N	\N	\N	3	\N	\N
+11	pbkdf2_sha256$36000$pWqQedcLWM0q$Y4MAlDMc8KK8t1JBg0t9S/VKaNVhsxQqyirq5F9pX5U=	\N	f	person11@doordash.com	f	t	f	2019-08-04 03:45:34.601151+00	2019-07-29 03:45:34.601164+00	+17133561510	Tammy	Adams	1	\N	\N	\N	f	\N	f	2019-08-04 03:45:45.675531+00	\N	\N	\N	4	\N	\N
+12	pbkdf2_sha256$36000$CMj5FiRuaMab$zsm+FZL3M1M7lLwhhF/lMxb8E0OqP0BBwpan82QNCd8=	\N	f	person12@doordash.com	f	t	f	2019-08-04 03:46:07.857326+00	2019-07-29 03:46:07.85734+00	+19133342812	Joseph	Koch	1	\N	\N	\N	f	\N	f	2019-08-04 03:46:18.924666+00	\N	\N	\N	5	\N	\N
+13	pbkdf2_sha256$36000$lQwzuFkGTQO0$p20ih5f8l/Bfm2iuByxzB7O29pYRgTLL3+4FFLfWBxQ=	\N	f	person13@doordash.com	f	t	f	2019-08-04 03:46:41.109076+00	2019-07-29 03:46:41.10909+00	+17247693294	Jeffery	Reid	1	\N	\N	\N	f	\N	f	2019-08-04 03:46:52.183726+00	\N	\N	\N	6	\N	\N
+15	pbkdf2_sha256$36000$kzMe8KCvUugZ$gzEHg1zm/4GII9Qh3h4FhOwO16cRTH1i8c+KuliLXlM=	\N	f	3068559790@ipad.doordash.com	f	t	f	2019-08-04 03:47:50.03411+00	2019-07-29 03:47:50.034122+00				1	\N	1e94f6c7-e775-4323-8be9-a7bf5c35600b	\N	f	\N	f	2019-08-04 03:48:01.111968+00	\N	\N	\N	\N	\N	\N
+14	pbkdf2_sha256$36000$RMCDvBeIFNWn$iIGPiPMx/xcqR3KqrT0DaeruoEl49eV7W0+rjuDRf+E=	\N	f	merchant1@doordash.com	f	t	f	2019-08-04 03:47:16.400551+00	2019-07-29 03:47:16.400563+00	+17243951278	Heidi	Randall	3	\N	\N	\N	f	\N	f	2019-08-04 03:48:12.283615+00	\N	\N	\N	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: user_activation_change_event; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_activation_change_event (id, created_at, reason, reason_type, type, changed_by_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: user_activation_change_event_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_activation_change_event_id_seq', 1, false);
+
+
+--
+-- Data for Name: user_deactivation_source; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_deactivation_source (id, source_type, description, created_at) FROM stdin;
+\.
+
+
+--
+-- Name: user_deactivation_source_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_deactivation_source_id_seq', 1, false);
+
+
+--
+-- Data for Name: user_device_fingerprint_link; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_device_fingerprint_link (id, source, fingerprint_id, user_id, updated_at) FROM stdin;
+\.
+
+
+--
+-- Name: user_device_fingerprint_link_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_device_fingerprint_link_id_seq', 1, false);
+
+
+--
+-- Data for Name: user_group_admin ; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY "user_group_admin " (id, role, group_id, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: user_group_admin _id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('"user_group_admin _id_seq"', 1, false);
+
+
+--
+-- Data for Name: user_groups; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_groups (id, user_id, group_id) FROM stdin;
+1	1	1
+2	2	1
+\.
+
+
+--
+-- Name: user_groups_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_groups_id_seq', 2, true);
+
+
+--
+-- Name: user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_id_seq', 15, true);
+
+
+--
+-- Data for Name: user_locale_preference; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_locale_preference (id, created_at, language, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: user_locale_preference_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_locale_preference_id_seq', 1, false);
+
+
+--
+-- Data for Name: user_social_data; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_social_data (id, provider, uid, extra_data, created_at, user_id) FROM stdin;
+\.
+
+
+--
+-- Name: user_social_data_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_social_data_id_seq', 1, false);
+
+
+--
+-- Data for Name: user_user_permissions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY user_user_permissions (id, user_id, permission_id) FROM stdin;
+\.
+
+
+--
+-- Name: user_user_permissions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('user_user_permissions_id_seq', 1, false);
+
+
+--
+-- Data for Name: value_delivery_fee_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY value_delivery_fee_promotion (id, created_at, value, delivery_fee, min_subtotal) FROM stdin;
+\.
+
+
+--
+-- Name: value_delivery_fee_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('value_delivery_fee_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: value_promotion; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY value_promotion (id, created_at, value, min_subtotal) FROM stdin;
+\.
+
+
+--
+-- Name: value_promotion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('value_promotion_id_seq', 1, false);
+
+
+--
+-- Data for Name: vanity_url; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY vanity_url (id, url, target, utm_source, utm_campaign, notes, is_active, created_at, utm_term_id) FROM stdin;
+\.
+
+
+--
+-- Name: vanity_url_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('vanity_url_id_seq', 1, false);
+
+
+--
+-- Data for Name: vehicle_reservation; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY vehicle_reservation (id, dasher_id, created_at, expires_at, security_deposit, deposit_paid_at, deposit_refunded_at, rental_id, country_id, charge_id) FROM stdin;
+\.
+
+
+--
+-- Name: vehicle_reservation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('vehicle_reservation_id_seq', 1, false);
+
+
+--
+-- Data for Name: verification_attempt; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY verification_attempt (id, created_at, verification_type, verification_code, code_expiration, verification_attempt_count, consumer_verification_status_id) FROM stdin;
+\.
+
+
+--
+-- Name: verification_attempt_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('verification_attempt_id_seq', 1, false);
+
+
+--
+-- Data for Name: version_client; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY version_client (id, name, min_version, current_version) FROM stdin;
+1	consumer-android	1	1
+2	consumer-ios	1	1
+3	dasher-android	1	1
+4	dasher-ios	1	1
+5	merchant-android	1	1
+6	merchant-ios	1	1
+\.
+
+
+--
+-- Name: version_client_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('version_client_id_seq', 6, true);
+
+
+--
+-- Data for Name: weather_forecast_model; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY weather_forecast_model (id, "current_date", forecast_date, precip_probability, precip_intensity, weather_summary, weather_json, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: weather_forecast_model_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('weather_forecast_model_id_seq', 1, false);
+
+
+--
+-- Data for Name: weather_historical_model; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY weather_historical_model (id, past_date, precip_intensity, weather_summary, weather_json, starting_point_id) FROM stdin;
+\.
+
+
+--
+-- Name: weather_historical_model_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('weather_historical_model_id_seq', 1, false);
+
+
+--
+-- Data for Name: web_deployment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY web_deployment (id, created_at, env, frontend_release_id, backend_release_id) FROM stdin;
+\.
+
+
+--
+-- Name: web_deployment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('web_deployment_id_seq', 1, false);
+
+
+--
+-- Data for Name: zendesk_template; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY zendesk_template (id, requester_name, requester_email, issue_symptom_field_id, subject_template, desc_template, category_id) FROM stdin;
+\.
+
+
+--
+-- Name: zendesk_template_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('zendesk_template_id_seq', 1, false);
 
 
 --
@@ -13353,38 +20569,6 @@ ALTER TABLE ONLY delivery_assignment_constraint
 
 
 --
--- Name: delivery_batch_membership delivery_batch_membership_batch_id_sort_index_3046d8ea_uniq; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch_membership
-    ADD CONSTRAINT delivery_batch_membership_batch_id_sort_index_3046d8ea_uniq UNIQUE (batch_id, sort_index);
-
-
---
--- Name: delivery_batch_membership delivery_batch_membership_delivery_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch_membership
-    ADD CONSTRAINT delivery_batch_membership_delivery_id_key UNIQUE (delivery_id);
-
-
---
--- Name: delivery_batch_membership delivery_batch_membership_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch_membership
-    ADD CONSTRAINT delivery_batch_membership_pkey PRIMARY KEY (id);
-
-
---
--- Name: delivery_batch delivery_batch_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch
-    ADD CONSTRAINT delivery_batch_pkey PRIMARY KEY (id);
-
-
---
 -- Name: delivery_cancellation_reason_category delivery_cancellation_reason_category_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -13654,22 +20838,6 @@ ALTER TABLE ONLY delivery_recipient
 
 ALTER TABLE ONLY delivery_recipient
     ADD CONSTRAINT delivery_recipient_pkey PRIMARY KEY (id);
-
-
---
--- Name: delivery_request delivery_request_delivery_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_request
-    ADD CONSTRAINT delivery_request_delivery_id_key UNIQUE (delivery_id);
-
-
---
--- Name: delivery_request delivery_request_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_request
-    ADD CONSTRAINT delivery_request_pkey PRIMARY KEY (id);
 
 
 --
@@ -16758,6 +23926,13 @@ CREATE INDEX consumer_store_request_requested_store_type_92fff26d_like ON consum
 
 
 --
+-- Name: consumer_store_request_store_activation_date_534234d4; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX consumer_store_request_store_activation_date_534234d4 ON consumer_store_request USING btree (store_activation_date);
+
+
+--
 -- Name: consumer_stripe_country_id_b02ababd; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -17192,31 +24367,10 @@ CREATE INDEX delivery_actual_delivery_time_b4fa8714 ON delivery USING btree (act
 
 
 --
--- Name: delivery_batch_created_at_2dc28585; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_batch_created_at_2dc28585 ON delivery_batch USING btree (created_at);
-
-
---
 -- Name: delivery_batch_id_3847577c; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX delivery_batch_id_3847577c ON delivery USING btree (batch_id);
-
-
---
--- Name: delivery_batch_membership_batch_id_76f3bd57; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_batch_membership_batch_id_76f3bd57 ON delivery_batch_membership USING btree (batch_id);
-
-
---
--- Name: delivery_batch_membership_created_at_dce83a6e; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_batch_membership_created_at_dce83a6e ON delivery_batch_membership USING btree (created_at);
 
 
 --
@@ -17616,48 +24770,6 @@ CREATE INDEX delivery_receipt_delivery_id_a9e6037c ON delivery_receipt USING btr
 --
 
 CREATE INDEX delivery_receipt_transaction_id_4eac6077 ON delivery_receipt USING btree (transaction_id);
-
-
---
--- Name: delivery_request_created_at_c2653f83; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_request_created_at_c2653f83 ON delivery_request USING btree (created_at);
-
-
---
--- Name: delivery_request_creator_id_66f35496; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_request_creator_id_66f35496 ON delivery_request USING btree (creator_id);
-
-
---
--- Name: delivery_request_dropoff_address_id_ce0e432a; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_request_dropoff_address_id_ce0e432a ON delivery_request USING btree (dropoff_address_id);
-
-
---
--- Name: delivery_request_order_cart_id_4231d4bf; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_request_order_cart_id_4231d4bf ON delivery_request USING btree (order_cart_id);
-
-
---
--- Name: delivery_request_pickup_address_id_885fd4cf; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_request_pickup_address_id_885fd4cf ON delivery_request USING btree (pickup_address_id);
-
-
---
--- Name: delivery_request_store_id_766984b2; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delivery_request_store_id_766984b2 ON delivery_request USING btree (store_id);
 
 
 --
@@ -20510,14 +27622,6 @@ ALTER TABLE ONLY communication_preferences_channel_link
 
 
 --
--- Name: compensation_request compensation_request_approved_by_id_c0af7cfe_fk_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY compensation_request
-    ADD CONSTRAINT compensation_request_approved_by_id_c0af7cfe_fk_user_id FOREIGN KEY (approved_by_id) REFERENCES "user"(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: compensation_request compensation_request_error_id_f3456ea5_fk_dispatch_error_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -21078,27 +28182,11 @@ ALTER TABLE ONLY dasher_capacity_plan
 
 
 --
--- Name: delivery_batch_membership delivery_batch_membe_batch_id_76f3bd57_fk_delivery_; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_batch_membership
-    ADD CONSTRAINT delivery_batch_membe_batch_id_76f3bd57_fk_delivery_ FOREIGN KEY (batch_id) REFERENCES delivery_batch(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: delivery_event delivery_event_category_id_c39cda48_fk_delivery_; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY delivery_event
     ADD CONSTRAINT delivery_event_category_id_c39cda48_fk_delivery_ FOREIGN KEY (category_id) REFERENCES delivery_event_category(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: delivery_event delivery_event_created_by_id_2c294d4a_fk_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_event
-    ADD CONSTRAINT delivery_event_created_by_id_2c294d4a_fk_user_id FOREIGN KEY (created_by_id) REFERENCES "user"(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -21142,35 +28230,11 @@ ALTER TABLE ONLY delivery_growth_prediction
 
 
 --
--- Name: delivery_issue delivery_issue_claimed_by_id_529f5739_fk_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_issue
-    ADD CONSTRAINT delivery_issue_claimed_by_id_529f5739_fk_user_id FOREIGN KEY (claimed_by_id) REFERENCES "user"(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: delivery_issue delivery_issue_created_by_id_9d83b02f_fk_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_issue
-    ADD CONSTRAINT delivery_issue_created_by_id_9d83b02f_fk_user_id FOREIGN KEY (created_by_id) REFERENCES "user"(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: delivery_issue delivery_issue_event_id_4ed3909d_fk_delivery_event_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY delivery_issue
     ADD CONSTRAINT delivery_issue_event_id_4ed3909d_fk_delivery_event_id FOREIGN KEY (event_id) REFERENCES delivery_event(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: delivery_issue delivery_issue_resolved_by_id_e01555ff_fk_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_issue
-    ADD CONSTRAINT delivery_issue_resolved_by_id_e01555ff_fk_user_id FOREIGN KEY (resolved_by_id) REFERENCES "user"(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -21203,30 +28267,6 @@ ALTER TABLE ONLY delivery_rating_category_link
 
 ALTER TABLE ONLY delivery_rating_category_link
     ADD CONSTRAINT delivery_rating_cate_rating_id_0d7544c0_fk_delivery_ FOREIGN KEY (rating_id) REFERENCES delivery_rating(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: delivery_request delivery_request_dropoff_address_id_ce0e432a_fk_address_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_request
-    ADD CONSTRAINT delivery_request_dropoff_address_id_ce0e432a_fk_address_id FOREIGN KEY (dropoff_address_id) REFERENCES address(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: delivery_request delivery_request_order_cart_id_4231d4bf_fk_order_cart_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_request
-    ADD CONSTRAINT delivery_request_order_cart_id_4231d4bf_fk_order_cart_id FOREIGN KEY (order_cart_id) REFERENCES order_cart(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: delivery_request delivery_request_pickup_address_id_885fd4cf_fk_address_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY delivery_request
-    ADD CONSTRAINT delivery_request_pickup_address_id_885fd4cf_fk_address_id FOREIGN KEY (pickup_address_id) REFERENCES address(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -21499,14 +28539,6 @@ ALTER TABLE ONLY experiment_version
 
 ALTER TABLE ONLY gift_code
     ADD CONSTRAINT gift_code_creator_id_43de49a3_fk_consumer_id FOREIGN KEY (creator_id) REFERENCES consumer(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: gift_code gift_code_redeemer_id_7d769552_fk_consumer_id; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY gift_code
-    ADD CONSTRAINT gift_code_redeemer_id_7d769552_fk_consumer_id FOREIGN KEY (redeemer_id) REFERENCES consumer(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --

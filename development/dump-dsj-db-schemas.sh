@@ -53,12 +53,12 @@ fi
 
 echo "Dumping maindb schema"
 docker exec doorstep-django.postgres /bin/bash -c "mkdir -p ${SCHEMA_DUMP_DIR} \
-    && pg_dump --no-acl --no-owner --schema-only \
+    && pg_dump --no-acl --no-owner \
     --dbname=doorstepdb --schema=public --exclude-table=spatial_ref_sys \
     --file=${SCHEMA_DUMP_DIR}/${MAINDB_DUMP_NAME}"
 
 echo "Dumping bankdb schema"
-docker exec doorstep-django.postgres /bin/bash -c "pg_dump --no-acl --no-owner --schema-only \
+docker exec doorstep-django.postgres /bin/bash -c "pg_dump --no-acl --no-owner \
     --dbname=payments --schema=public --exclude-table=spatial_ref_sys \
     --file=${SCHEMA_DUMP_DIR}/${BANKDB_DUMP_NAME}"
 

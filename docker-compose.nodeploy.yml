@@ -12,7 +12,7 @@ services:
     #    Un comment following line to log db statements for debugging
     #    command: postgres -c log_statement=all
     volumes:
-      - $HOME/.mountedvolumes/payout.dsj-postgres/var/lib/postgresql:/var/lib/postgresql
+      - $HOME/.mountedvolumes/payment.dsj-postgres/var/lib/postgresql:/var/lib/postgresql
       - ./development/db-schemas:/tmp/db-schemas
       # rename with prefix "z_001" make sure it runs after postgis extension is initialized by postgis.sh
       - ./development/restore-dsj-db-schemas.sh:/docker-entrypoint-initdb.d/z_001_restore-dsj-db-schemas.sh

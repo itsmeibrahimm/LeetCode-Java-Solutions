@@ -1,11 +1,8 @@
 from copy import deepcopy
 from dataclasses import field
-from typing import TypeVar
-
-T = TypeVar("T")
 
 
-def no_init_field(val: T = None) -> T:
+def no_init_field(val=None):
     """
     A short cut on dataclass:field to declare an instance variable which should only be initialized internally
     not through direct assignment in __init__

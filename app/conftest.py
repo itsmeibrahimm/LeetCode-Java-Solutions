@@ -1,8 +1,9 @@
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, List
 
 import pytest
+from _pytest.nodes import Item
 
 from app.commons.config.app_config import AppConfig
 from app.commons.database.model import Database
@@ -103,3 +104,11 @@ async def payout_bankdb(app_config: AppConfig):
     db = await Database.from_url(master_url=app_config.PAYOUT_BANKDB_URL)
     yield db
     await db.close()
+
+
+def pytest_collection_modifyitems(items: List[Item]):
+    for item in items:
+        # For all test cases placed under any .../test_integration/... path:
+        # Dynamically add pytest.mark.integration to integration tests
+        if "test_integration" in item.nodeid:
+            item.add_marker(pytest.mark.integration)

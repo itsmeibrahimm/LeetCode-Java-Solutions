@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Column, DateTime, Integer, Text
+from sqlalchemy import Column, DateTime, Integer, Text, text
 from typing_extensions import final
 
-from app.commons.database.model import TableDefinition
+from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -11,7 +13,14 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @dataclass(frozen=True)
 class StripeManagedAccountTable(TableDefinition):
     name: str = no_init_field("stripe_managed_account")
-    id: Column = no_init_field(Column("id", Integer, primary_key=True))
+    id: Column = no_init_field(
+        Column(
+            "id",
+            Integer,
+            primary_key=True,
+            server_default=text("nextval('stripe_managed_account_id_seq'::regclass)"),
+        )
+    )
     stripe_id: Column = no_init_field(
         Column("stripe_id", Text, nullable=False, index=True)
     )
@@ -38,3 +47,34 @@ class StripeManagedAccountTable(TableDefinition):
     verification_fields_needed: Column = no_init_field(
         Column("verification_fields_needed", Text)
     )
+
+
+class StripeManagedAccount(DBEntity):
+    country_shortname: str
+    stripe_id: str
+    id: Optional[int]
+    stripe_last_updated_at: Optional[datetime]
+    bank_account_last_updated_at: Optional[datetime]
+    fingerprint: Optional[str]
+    default_bank_last_four: Optional[str]
+    default_bank_name: Optional[str]
+    verification_disabled_reason: Optional[str]
+    verification_due_by: Optional[datetime]
+    verification_fields_needed: Optional[str]
+
+
+class StripeManagedAccountWrite(StripeManagedAccount):
+    pass
+
+
+class StripeManagedAccountUpdate(DBEntity):
+    stripe_id: Optional[str]
+    country_shortname: Optional[str]
+    stripe_last_updated_at: Optional[datetime]
+    bank_account_last_updated_at: Optional[datetime]
+    fingerprint: Optional[str]
+    default_bank_last_four: Optional[str]
+    default_bank_name: Optional[str]
+    verification_disabled_reason: Optional[str]
+    verification_due_by: Optional[datetime]
+    verification_fields_needed: Optional[str]

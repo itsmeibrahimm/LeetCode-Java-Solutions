@@ -70,24 +70,24 @@
         },
         "boto3": {
             "hashes": [
-                "sha256:0cd4a3e158f40eedb54b36b3fbe60d135db74a245f0ca8eead1af2eb6d46a649",
-                "sha256:68e9eba6f846cf8e01973ec565afdb1adfb9612b531c15bb5c5524394db4df5b"
+                "sha256:0fec671879bbddffb0e088d970051f159effa0b7ad2a04541121372c719efd75",
+                "sha256:53c2b5f00990435f5c2a3f3ce1f9543246d8300c6444b4d7da8ffd69063c4182"
             ],
-            "version": "==1.9.199"
+            "version": "==1.9.200"
         },
         "botocore": {
             "hashes": [
-                "sha256:25d87047241b7b775443570c0e790ca952f9f7491d4d6472430a4b006383a257",
-                "sha256:e4729c1acaa936d4c5c948a18d279f92bbf61fad9b5fb03942c753ec405e427d"
+                "sha256:9448deffdb58e852935eeaae90682b7a0b4ef3c45eb6f17fa4444873f45f9ae6",
+                "sha256:d2ead76e77e7d0cd4c6bf9445e0ff54e279aee3c727eb30255b4ec327f956d22"
             ],
-            "version": "==1.12.199"
+            "version": "==1.12.200"
         },
         "botostubs": {
             "hashes": [
-                "sha256:60bf42e145e888884a54dae0ed675a4063975a8a9ac9a887e470a155d74603ac",
-                "sha256:ec5dbe0b4ff717f71109225899c0dcba639dc50cfb4db3888ed392f4973c7cd9"
+                "sha256:08795ddf0993d705a59c776596462bd6b0eb1419adceadf939871bc99d5b49a2",
+                "sha256:d2e1f0aed9923542cac93d5d8ca39e2a88709802393af786d7e36548d3278857"
             ],
-            "version": "==0.10.1.9.199"
+            "version": "==0.10.1.9.200"
         },
         "bunch": {
             "hashes": [
@@ -267,7 +267,6 @@
             "hashes": [
                 "sha256:e00cbd7ba01ff748e494248183abc6e153f49181169d8a3d41bb49132ca01dfc"
             ],
-            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.0.13"
         },
         "idna": {
@@ -558,7 +557,6 @@
                 "sha256:c48692bf4587ce281d641087658eca275a5ad3b63c78297bbded96570ae9ce8f",
                 "sha256:fefc3b2b947c99737c348887db2c32e539160dcbeb7af9aa6b53db7a283538fe"
             ],
-            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.12.2"
         },
         "websockets": {
