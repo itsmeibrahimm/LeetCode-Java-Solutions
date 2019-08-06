@@ -13,7 +13,6 @@ from app.main import app
 @pytest.fixture(autouse=True)
 def client(mocker: pytest_mock.MockFixture):
     logger = mocker.Mock()
-    payout_maindb = mocker.Mock()
     payout_bankdb = mocker.Mock()
     payin_maindb = mocker.Mock()
     payin_paymentdb = mocker.Mock()

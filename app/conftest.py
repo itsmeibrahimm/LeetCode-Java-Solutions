@@ -106,6 +106,16 @@ async def payout_bankdb(app_config: AppConfig):
     await db.close()
 
 
+@pytest.fixture
+async def ledger_paymentdb(app_config: AppConfig):
+    """
+    initialize the paymentdb connection for Ledger user
+    """
+    db = await Database.from_url(master_url=app_config.LEDGER_MAINDB_URL)
+    yield db
+    await db.close()
+
+
 def pytest_collection_modifyitems(items: List[Item]):
     for item in items:
         # For all test cases placed under any .../test_integration/... path:
