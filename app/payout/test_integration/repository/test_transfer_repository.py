@@ -2,10 +2,10 @@ import pytest
 
 from app.commons.database.model import Database
 from app.payout.repository.maindb.model.stripe_transfer import (
-    StripeTransferWrite,
+    StripeTransfer,
     StripeTransferUpdate,
 )
-from app.payout.repository.maindb.model.transfer import TransferWrite, TransferUpdate
+from app.payout.repository.maindb.model.transfer import Transfer, TransferUpdate
 from app.payout.repository.maindb.transfer import TransferRepository
 
 
@@ -17,7 +17,7 @@ class TestTransferRepository:
         return TransferRepository(database=payout_maindb)
 
     async def test_create_update_get_transfer(self, transfer_repo: TransferRepository):
-        data = TransferWrite(
+        data = Transfer(
             subtotal=123, adjustments="some-adjustment", amount=123, method="stripe"
         )
 
@@ -45,14 +45,12 @@ class TestTransferRepository:
     async def test_create_update_get_stripe_transfer(self, transfer_repo):
 
         existing_transfer = await transfer_repo.create_transfer(
-            TransferWrite(
+            Transfer(
                 subtotal=123, adjustments="some-adjustment", amount=123, method="stripe"
             )
         )
 
-        data = StripeTransferWrite(
-            stripe_status="status", transfer_id=existing_transfer.id
-        )
+        data = StripeTransfer(stripe_status="status", transfer_id=existing_transfer.id)
 
         created = await transfer_repo.create_stripe_transfer(data)
         assert created.id, "account is created, assigned an ID"

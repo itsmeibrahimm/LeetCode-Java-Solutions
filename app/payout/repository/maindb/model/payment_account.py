@@ -43,14 +43,11 @@ class PaymentAccountTable(TableDefinition):
     )
     transfers_enabled: Column = no_init_field(Column("transfers_enabled", Boolean))
     charges_enabled: Column = no_init_field(Column("charges_enabled", Boolean))
-    statement_descriptor: Column = no_init_field(Column("statement_descriptor", Text))
+    statement_descriptor: Column = no_init_field(
+        Column("statement_descriptor", Text, nullable=False)
+    )
     created_at: Column = no_init_field(
-        Column(
-            "created_at",
-            DateTime(True),
-            default=datetime.now,  # come back and revisit this timeout to be consistent with DSJ
-            nullable=False,
-        )
+        Column("created_at", DateTime(True), default=datetime.utcnow)
     )
     payout_disabled: Column = no_init_field(Column("payout_disabled", Boolean))
     resolve_outstanding_balance_frequency: Column = no_init_field(
@@ -70,12 +67,14 @@ class PaymentAccountTable(TableDefinition):
 
 
 class PaymentAccount(DBEntity):
-    id: Optional[int]
+    id: Optional[int]  # server default generated
+    created_at: Optional[datetime]  # client table definition default generated
+
+    statement_descriptor: str
+
     account_id: Optional[int]
     account_type: Optional[str]
-    statement_descriptor: Optional[str]
     entity: Optional[str]
-    created_at: Optional[datetime]
     resolve_outstanding_balance_frequency: Optional[str]
     payout_disabled: Optional[bool]
     charges_enabled: Optional[bool]
@@ -83,10 +82,6 @@ class PaymentAccount(DBEntity):
     upgraded_to_managed_account_at: Optional[datetime]
     is_verified_with_stripe: Optional[bool]
     transfers_enabled: Optional[bool]
-
-
-class PaymentAccountWrite(PaymentAccount):
-    pass
 
 
 class PaymentAccountUpdate(DBEntity):

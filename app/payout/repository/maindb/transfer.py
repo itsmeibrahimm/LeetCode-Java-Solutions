@@ -8,18 +8,18 @@ from app.payout.repository.maindb.model import transfers, stripe_transfers
 from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransferUpdate,
     StripeTransfer,
-    StripeTransferWrite,
+    StripeTransfer,
 )
 from app.payout.repository.maindb.model.transfer import (
     Transfer,
-    TransferWrite,
+    Transfer,
     TransferUpdate,
 )
 
 
 class TransferRepositoryInterface:
     @abstractmethod
-    async def create_transfer(self, data: TransferWrite) -> Transfer:
+    async def create_transfer(self, data: Transfer) -> Transfer:
         pass
 
     @abstractmethod
@@ -33,7 +33,7 @@ class TransferRepositoryInterface:
         pass
 
     @abstractmethod
-    async def create_stripe_transfer(self, data: StripeTransferWrite) -> StripeTransfer:
+    async def create_stripe_transfer(self, data: StripeTransfer) -> StripeTransfer:
         pass
 
     @abstractmethod
@@ -59,7 +59,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
             ).first(stmt)
             return Transfer.from_orm(row) if row else None
 
-    async def create_transfer(self, data: TransferWrite) -> Transfer:
+    async def create_transfer(self, data: Transfer) -> Transfer:
         async with self.database.master().acquire() as connection:  # type: GinoConnection
             stmt = (
                 transfers.table.insert()
@@ -100,7 +100,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
             ).first(stmt)
             return StripeTransfer.from_orm(row) if row else None
 
-    async def create_stripe_transfer(self, data: StripeTransferWrite) -> StripeTransfer:
+    async def create_stripe_transfer(self, data: StripeTransfer) -> StripeTransfer:
         async with self.database.master().acquire() as connection:  # type: GinoConnection
             stmt = (
                 stripe_transfers.table.insert()

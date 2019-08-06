@@ -39,7 +39,7 @@ class TransferTable(TableDefinition):
     currency: Column = no_init_field(Column("currency", Text))
     created_at: Column = no_init_field(
         Column(
-            "created_at", DateTime(True), nullable=False, default=datetime.now
+            "created_at", DateTime(True), nullable=False, default=datetime.utcnow
         )  # come back and revisit this timeout to be consistent with DSJ
     )
     submitted_at: Column = no_init_field(Column("submitted_at", DateTime(True)))
@@ -75,12 +75,14 @@ class TransferTable(TableDefinition):
 
 
 class Transfer(DBEntity):
-    id: Optional[int]
+    id: Optional[int]  # server default generated
+    created_at: Optional[datetime]  # client table definition default generated
+
     subtotal: int
     adjustments: str
     amount: int
     method: str
-    created_at: Optional[datetime]
+
     currency: Optional[str]
     submitted_at: Optional[datetime]
     deleted_at: Optional[datetime]
@@ -96,10 +98,6 @@ class Transfer(DBEntity):
     recipient_id: Optional[int]
     recipient_ct_id: Optional[int]
     submitted_by_id: Optional[int]
-
-
-class TransferWrite(Transfer):
-    pass
 
 
 class TransferUpdate(DBEntity):

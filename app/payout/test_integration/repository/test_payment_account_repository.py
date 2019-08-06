@@ -2,11 +2,11 @@ import pytest
 
 from app.commons.database.model import Database
 from app.payout.repository.maindb.model.payment_account import (
-    PaymentAccountWrite,
+    PaymentAccount,
     PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
-    StripeManagedAccountWrite,
+    StripeManagedAccount,
     StripeManagedAccountUpdate,
 )
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
@@ -22,7 +22,7 @@ class TestPaymentAccountRepository:
     async def test_create_update_get_payment_account(
         self, payment_account_repo: PaymentAccountRepository
     ):
-        data = PaymentAccountWrite(
+        data = PaymentAccount(
             account_type="some_type",
             account_id=123,
             statement_descriptor="my account",
@@ -51,7 +51,7 @@ class TestPaymentAccountRepository:
     async def test_create_update_get_stripe_managed_account(
         self, payment_account_repo: PaymentAccountRepository
     ):
-        data = StripeManagedAccountWrite(stripe_id="stripe_id", country_shortname="us")
+        data = StripeManagedAccount(stripe_id="stripe_id", country_shortname="us")
 
         created_account = await payment_account_repo.create_stripe_managed_account(data)
         assert created_account.id, "account is created, assigned an ID"

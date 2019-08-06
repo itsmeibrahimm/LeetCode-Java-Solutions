@@ -9,19 +9,18 @@ from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import payment_accounts, stripe_managed_accounts
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
-    PaymentAccountWrite,
     PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
-    StripeManagedAccountWrite,
+    StripeManagedAccount,
     StripeManagedAccountUpdate,
 )
 
 
 class PaymentAccountRepositoryInterface(Protocol):
     @abstractmethod
-    async def create_payment_account(self, data: PaymentAccountWrite) -> PaymentAccount:
+    async def create_payment_account(self, data: PaymentAccount) -> PaymentAccount:
         ...
 
     @abstractmethod
@@ -44,7 +43,7 @@ class PaymentAccountRepositoryInterface(Protocol):
 
     @abstractmethod
     async def create_stripe_managed_account(
-        self, data: StripeManagedAccountWrite
+        self, data: StripeManagedAccount
     ) -> StripeManagedAccount:
         ...
 
@@ -60,7 +59,7 @@ class PaymentAccountRepositoryInterface(Protocol):
 class PaymentAccountRepository(
     PayoutMainDBRepository, PaymentAccountRepositoryInterface
 ):
-    async def create_payment_account(self, data: PaymentAccountWrite) -> PaymentAccount:
+    async def create_payment_account(self, data: PaymentAccount) -> PaymentAccount:
         async with self.database.master().acquire() as connection:  # type: GinoConnection
             stmt = (
                 payment_accounts.table.insert()
@@ -113,7 +112,7 @@ class PaymentAccountRepository(
             return StripeManagedAccount.from_orm(row) if row else None
 
     async def create_stripe_managed_account(
-        self, data: StripeManagedAccountWrite
+        self, data: StripeManagedAccount
     ) -> StripeManagedAccount:
         async with self.database.master().acquire() as connection:  # type: GinoConnection
             stmt = (

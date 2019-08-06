@@ -5,12 +5,11 @@ from starlette.requests import Request
 
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
-    PaymentAccountWrite,
     PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
-    StripeManagedAccountWrite,
+    StripeManagedAccount,
     StripeManagedAccountUpdate,
 )
 from app.payout.repository.maindb.payment_account import (
@@ -24,9 +23,7 @@ def create_account_v0_router(
     router = APIRouter()
 
     @router.post("/")
-    async def create_payment_account(
-        payment_account: PaymentAccountWrite, request: Request
-    ):
+    async def create_payment_account(payment_account: PaymentAccount, request: Request):
         return await payment_account_repo.create_payment_account(payment_account)
 
     @router.get("/{account_id}")
@@ -53,7 +50,7 @@ def create_account_v0_router(
 
     @router.post("/pgp/stripe/")
     async def create_stripe_managed_account(
-        data: StripeManagedAccountWrite, request: Request
+        data: StripeManagedAccount, request: Request
     ) -> StripeManagedAccount:
         return await payment_account_repo.create_stripe_managed_account(data)
 

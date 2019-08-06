@@ -6,41 +6,39 @@ from app.commons.database.model import DBEntity, TableDefinition
 from app.payout.repository.maindb.model import PaymentAccountTable
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
-    PaymentAccountWrite,
     PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
     StripeManagedAccountTable,
-    StripeManagedAccountWrite,
+    StripeManagedAccount,
     StripeManagedAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransfer,
     StripeTransferTable,
-    StripeTransferWrite,
+    StripeTransfer,
     StripeTransferUpdate,
 )
 from app.payout.repository.maindb.model.transfer import (
     Transfer,
     TransferTable,
-    TransferWrite,
+    Transfer,
     TransferUpdate,
 )
 from app.commons.test_unit.database.utils import validation_db_entity_and_table_schema
 
 test_db_entity_and_table_definition_data = [
     (PaymentAccount, PaymentAccountTable),
-    (PaymentAccountWrite, PaymentAccountTable),
     (PaymentAccountUpdate, PaymentAccountTable),
     (StripeManagedAccount, StripeManagedAccountTable),
-    (StripeManagedAccountWrite, StripeManagedAccountTable),
+    (StripeManagedAccount, StripeManagedAccountTable),
     (StripeManagedAccountUpdate, StripeManagedAccountTable),
     (Transfer, TransferTable),
-    (TransferWrite, TransferTable),
+    (Transfer, TransferTable),
     (TransferUpdate, TransferTable),
     (StripeTransfer, StripeTransferTable),
-    (StripeTransferWrite, StripeTransferTable),
+    (StripeTransfer, StripeTransferTable),
     (StripeTransferUpdate, StripeTransferTable),
 ]
 

@@ -50,9 +50,11 @@ class StripeManagedAccountTable(TableDefinition):
 
 
 class StripeManagedAccount(DBEntity):
+    id: Optional[int]  # server default generated
+
     country_shortname: str
     stripe_id: str
-    id: Optional[int]
+
     stripe_last_updated_at: Optional[datetime]
     bank_account_last_updated_at: Optional[datetime]
     fingerprint: Optional[str]
@@ -61,10 +63,6 @@ class StripeManagedAccount(DBEntity):
     verification_disabled_reason: Optional[str]
     verification_due_by: Optional[datetime]
     verification_fields_needed: Optional[str]
-
-
-class StripeManagedAccountWrite(StripeManagedAccount):
-    pass
 
 
 class StripeManagedAccountUpdate(DBEntity):

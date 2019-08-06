@@ -4,13 +4,13 @@ from fastapi import APIRouter
 from starlette.requests import Request
 
 from app.payout.repository.maindb.model.stripe_transfer import (
-    StripeTransferWrite,
+    StripeTransfer,
     StripeTransfer,
     StripeTransferUpdate,
 )
 from app.payout.repository.maindb.model.transfer import (
     Transfer,
-    TransferWrite,
+    Transfer,
     TransferUpdate,
 )
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
@@ -20,7 +20,7 @@ def create_transfer_v0_router(transfer_repo: TransferRepositoryInterface) -> API
     router = APIRouter()
 
     @router.post("/")
-    async def create_transfer(data: TransferWrite, request: Request):
+    async def create_transfer(data: Transfer, request: Request):
         return await transfer_repo.create_transfer(data=data)
 
     @router.get("/{transfer_id}")
@@ -38,7 +38,7 @@ def create_transfer_v0_router(transfer_repo: TransferRepositoryInterface) -> API
         )
 
     @router.post("/pgp/stripe/")
-    async def create_stripe_transfer(data: StripeTransferWrite, request: Request):
+    async def create_stripe_transfer(data: StripeTransfer, request: Request):
         return await transfer_repo.create_stripe_transfer(data=data)
 
     @router.get("/pgp/stripe/{stripe_transfer_id}")

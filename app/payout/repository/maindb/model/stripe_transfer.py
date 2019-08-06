@@ -23,7 +23,7 @@ class StripeTransferTable(TableDefinition):
     )
     created_at: Column = no_init_field(
         Column(
-            "created_at", DateTime(True), nullable=False, default=datetime.now
+            "created_at", DateTime(True), nullable=False, default=datetime.utcnow
         )  # come back and revisit this timeout to be consistent with DSJ
     )
     stripe_id: Column = no_init_field(Column("stripe_id", String(50), index=True))
@@ -55,10 +55,12 @@ class StripeTransferTable(TableDefinition):
 
 
 class StripeTransfer(DBEntity):
-    id: Optional[int]
+    id: Optional[int]  # server default generated
+    created_at: Optional[datetime]  # client table definition default generated
+
     transfer_id: int
     stripe_status: str
-    created_at: Optional[datetime]
+
     stripe_id: Optional[str]
     stripe_request_id: Optional[str]
     stripe_failure_code: Optional[str]
@@ -71,10 +73,6 @@ class StripeTransfer(DBEntity):
     submission_error_type: Optional[str]
     submission_status: Optional[str]
     submitted_at: Optional[datetime]
-
-
-class StripeTransferWrite(StripeTransfer):
-    pass
 
 
 class StripeTransferUpdate(DBEntity):
