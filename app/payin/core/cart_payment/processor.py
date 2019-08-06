@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from typing import Dict, Tuple, List, Optional
+from typing import Any, Tuple, List, Optional
 import uuid
 
 from app.commons.context.app_context import AppContext
@@ -32,7 +32,7 @@ class CartPaymentInterface:
         self.req_context = req_context
         self.payment_repo = payment_repo
 
-    async def find_existing(
+    async def _find_existing(
         self, payer_id: str, idempotency_key: str
     ) -> Tuple[Optional[CartPayment], Optional[PaymentIntent]]:
         payment_intent = await self.payment_repo.get_payment_intent_for_idempotency_key(
@@ -48,52 +48,29 @@ class CartPaymentInterface:
 
         return (cart_payment, payment_intent)
 
-    def _get_sample_response(self):
-        # Return an example reponse from Stripe, for payment intent creation.
-        # TODO Delete this once we have integration tests in place.  This is only useful for local manual testing.
-        return {
-            "id": "pi_1DWxxK2eZvKYlo2CFnwDZCQP",
-            "object": "payment_intent",
-            "amount": 2000,
-            "amount_capturable": 0,
-            "amount_received": 0,
-            "application": None,
-            "application_fee_amount": None,
-            "canceled_at": None,
-            "cancellation_reason": None,
-            "capture_method": "automatic",
-            "charges": {
-                "object": "list",
-                "data": [],
-                "has_more": False,
-                "total_count": 0,
-                "url": "/v1/charges?payment_intent=pi_1DWxxK2eZvKYlo2CFnwDZCQP",
-            },
-            "client_secret": "pi_bogus_value",
-            "confirmation_method": "automatic",
-            "created": 1542338718,
-            "currency": "usd",
-            "customer": None,
-            "description": "Gold fish #20793",
-            "invoice": None,
-            "last_payment_error": None,
-            "livemode": False,
-            "metadata": {},
-            "next_action": None,
-            "on_behalf_of": None,
-            "payment_method": None,
-            "payment_method_options": {},
-            "payment_method_types": ["card"],
-            "receipt_email": None,
-            "review": None,
-            "setup_future_usage": None,
-            "shipping": None,
-            "source": None,
-            "statement_descriptor": None,
-            "status": "requires_payment_method",
-            "transfer_data": None,
-            "transfer_group": None,
-        }
+    def _transform_method_for_stripe(self, method_name: str) -> str:
+        if method_name == "auto":
+            return "automatic"
+        return method_name
+
+    def _get_provider_capture_method(
+        self, pgp_payment_intent: PgpPaymentIntent
+    ) -> CreatePaymentIntent.CaptureMethod:
+        target_method = self._transform_method_for_stripe(
+            pgp_payment_intent.capture_method
+        )
+        return CreatePaymentIntent.CaptureMethod(target_method)
+
+    def _get_provider_confirmation_method(
+        self, pgp_payment_intent: PgpPaymentIntent
+    ) -> CreatePaymentIntent.ConfirmationMethod:
+        target_method = self._transform_method_for_stripe(
+            pgp_payment_intent.confirmation_method
+        )
+        return CreatePaymentIntent.ConfirmationMethod(target_method)
+
+    def _get_provider_future_usage(self):
+        return CreatePaymentIntent.SetupFutureUsage("off_session")
 
     async def _create_provider_payment(
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
@@ -101,23 +78,27 @@ class CartPaymentInterface:
         # Call to stripe payment intent API
         try:
             # TODO add idempotency_key
-            intent_request: CreatePaymentIntent = CreatePaymentIntent(
+            intent_request = CreatePaymentIntent(
                 amount=pgp_payment_intent.amount,
                 currency=pgp_payment_intent.currency,
                 application_fee_amount=pgp_payment_intent.application_fee_amount,
-                capture_method=CreatePaymentIntent.CaptureMethod.manual,
+                capture_method=self._get_provider_capture_method(pgp_payment_intent),
                 confirm=False,
-                confirmation_method=CreatePaymentIntent.ConfirmationMethod.manual,
+                confirmation_method=self._get_provider_confirmation_method(
+                    pgp_payment_intent
+                ),
                 on_behalf_of=pgp_payment_intent.payout_account_id,
-                setup_future_usage="off_session",
+                setup_future_usage=self._get_provider_future_usage(),
                 payment_method=pgp_payment_intent.payment_method_resource_id,
                 statement_descriptor=payment_intent.statement_descriptor,
             )
+
             response = await self.app_context.stripe.create_payment_intent(
                 country=CountryCode(payment_intent.country), request=intent_request
             )
+            # self.req_context.log.info("Provider response: ")
+            # self.req_context.log.info(response)
             return response
-            # return self._get_sample_response()
         except Exception as e:
             # TODO Add better error handling here
             self.req_context.log.error(f"Error invoking provider: {e}")
@@ -129,17 +110,13 @@ class CartPaymentInterface:
         connection,
         pgp_intent_id: uuid.UUID,
         status: PgpPaymentIntentStatus,
-        provider_payment_response: Dict,
+        provider_payment_response: Any,
     ) -> None:
         await self.payment_repo.update_pgp_payment_intent(
-            connection,
-            pgp_intent_id,
-            status,
-            provider_payment_response["id"],
-            provider_payment_response["amount"],
-            provider_payment_response["amount_capturable"],
-            provider_payment_response["amount_received"],
-            provider_payment_response["application_fee_amount"],
+            connection=connection,
+            id=pgp_intent_id,
+            status=status,
+            provider_intent_id=provider_payment_response,
         )
 
     async def _submit_payment_to_provider(
@@ -341,7 +318,7 @@ async def submit_payment(
         app_context, req_context, payment_repo
     )
 
-    cart_payment, payment_intent = await cart_payment_interface.find_existing(
+    cart_payment, payment_intent = await cart_payment_interface._find_existing(
         request_cart_payment.payer_id, idempotency_key
     )
     if cart_payment:

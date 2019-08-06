@@ -214,27 +214,12 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_pgp_payment_intent(row)
 
     async def update_pgp_payment_intent(
-        self,
-        connection: GinoConnection,
-        id: UUID,
-        status: str,
-        provider_intent_id: str,
-        amount: int,
-        amount_capturable: int,
-        amount_received: int,
-        application_fee_amount: int,
+        self, connection: GinoConnection, id: UUID, status: str, provider_intent_id: str
     ) -> None:
         statement = (
             pgp_payment_intents.table.update()
             .where(pgp_payment_intents.id == id)
-            .values(
-                status=status,
-                resource_id=provider_intent_id,
-                amount=amount,
-                amount_capturable=amount_capturable,
-                amount_received=amount_received,
-                application_fee_amount=application_fee_amount,
-            )
+            .values(status=status, resource_id=provider_intent_id)
         )
 
         await connection.first(statement)

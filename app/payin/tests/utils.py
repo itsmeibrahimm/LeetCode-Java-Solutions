@@ -7,7 +7,11 @@ from app.payin.core.cart_payment.types import (
 )
 
 
-def generate_payment_intent(status: str):
+def generate_payment_intent(
+    status: str = "init",
+    capture_method: str = "manual",
+    confirmation_method: str = "manual",
+):
     return PaymentIntent(
         id=uuid.uuid4(),
         cart_payment_id=uuid.uuid4(),
@@ -17,8 +21,8 @@ def generate_payment_intent(status: str):
         amount_capturable=0,
         amount_received=0,
         application_fee_amount=0,
-        capture_method="manual",
-        confirmation_method="manual",
+        capture_method=capture_method,
+        confirmation_method=confirmation_method,
         country="US",
         currency="USD",
         status=PaymentIntentStatus(status),

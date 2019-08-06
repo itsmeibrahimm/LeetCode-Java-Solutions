@@ -82,6 +82,10 @@ class CreatePaymentIntent(BaseModel):
         automatic = "automatic"
         manual = "manual"
 
+    class SetupFutureUsage(str, Enum):
+        on_session = "on_session"
+        off_session = "off_session"
+
     class PaymentMethodOptions(BaseModel):
         class CardOptions(BaseModel):
             class RequestThreeDSecure(str, Enum):
@@ -96,12 +100,14 @@ class CreatePaymentIntent(BaseModel):
         destination: ConnectedAccountId
         amount: Optional[int]
 
+    # TODO Determine how we can use types where Enums are defined.  For example capture_method: Optional[CaptureMethod].
+    # If used directly stripe will error out.
     amount: int
     currency: str
     application_fee_amount: Optional[int]
-    capture_method: Optional[CaptureMethod]
+    capture_method: Optional[str]
     confirm: Optional[bool]
-    confirmation_method: Optional[ConfirmationMethod]
+    confirmation_method: Optional[str]
     customer: Optional[CustomerId]
     description: Optional[str]
     metadata: Optional[dict]
@@ -113,7 +119,7 @@ class CreatePaymentIntent(BaseModel):
     receipt_email: Optional[str]
     return_url: Optional[str]  # only when confirm=True
     save_payment_method: Optional[bool]
-    setup_future_usage: Optional[bool]
+    setup_future_usage: Optional[str]
     shipping: Optional[dict]
     statement_descriptor: Optional[str]
     transfer_data: Optional[TransferData]
