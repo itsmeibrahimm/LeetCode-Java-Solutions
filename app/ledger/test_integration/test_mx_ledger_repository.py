@@ -23,7 +23,6 @@ from app.ledger.repository.mx_ledger_repository import (
 class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
 
-    @pytest.mark.skip("no test db on CI")
     async def test_insert_mx_ledger_success(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
     ):
@@ -56,7 +55,6 @@ class TestMxLedgerRepository:
         assert mx_ledger.balance == 2000
         assert mx_ledger.payment_account_id == "pay_act_test_id"
 
-    @pytest.mark.skip("no test db on CI")
     async def test_insert_mx_ledger_raise_exception(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
     ):
@@ -85,7 +83,6 @@ class TestMxLedgerRepository:
         with pytest.raises(UniqueViolationError):
             await repo.insert_mx_ledger(mx_ledger_to_insert)
 
-    @pytest.mark.skip("no test db on CI")
     async def test_update_mx_ledger_balance_success(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
     ):
@@ -121,7 +118,6 @@ class TestMxLedgerRepository:
         assert mx_ledger.id == updated_mx_ledger.id
         assert updated_mx_ledger.balance == 3000
 
-    @pytest.mark.skip("no test db on CI")
     async def test_create_one_off_mx_ledger(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
     ):

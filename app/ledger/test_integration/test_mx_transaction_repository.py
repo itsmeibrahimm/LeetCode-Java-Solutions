@@ -26,7 +26,6 @@ from app.ledger.repository.mx_transaction_repository import (
 class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
 
-    @pytest.mark.skip("no test db on CI")
     async def test_insert_mx_transaction_success(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
     ):
@@ -74,7 +73,6 @@ class TestMxLedgerRepository:
         assert mx_transaction.payment_account_id == "pay_act_test_id"
         assert mx_transaction.idempotency_key == ide_key
 
-    @pytest.mark.skip("no test db on CI")
     async def test_insert_mx_transaction_raise_exception(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
     ):

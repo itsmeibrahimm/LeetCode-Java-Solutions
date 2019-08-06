@@ -1,6 +1,6 @@
 import asyncio
 import os
-from asyncio import wait_for
+from asyncio import wait_for, create_subprocess_exec
 from typing import Optional
 
 from app.commons.config.app_config import AppConfig
@@ -12,6 +12,53 @@ ENVIRONMENT_KEY = "ENVIRONMENT"
 
 async def check_dependency(config: AppConfig) -> AppContext:
     return await create_app_context(config)
+
+
+async def run_alembic_command(db_url, config_name):
+    """
+    Run command in subprocess.
+    """
+    # Create subprocess
+    command = [
+        "env",
+        db_url,
+        "alembic",
+        "--config",
+        "migrations/alembic.ini",
+        "--name",
+        config_name,
+        "upgrade",
+        "head",
+    ]
+    process = await create_subprocess_exec(
+        *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+
+    # Status
+    print("Started, pid=%s", process.pid, flush=True)
+
+    # Wait for the subprocess to finish
+    stdout, stderr = await process.communicate()
+    print(stdout.decode().strip())
+    print(stderr.decode().strip())
+
+    # Progress
+    if process.returncode == 0:
+        print("Done, pid=%s", process.pid)
+        return True
+    else:
+        print("Failed, pid=%s", process.pid)
+        raise Exception("Failed executing the command to update DB schema")
+
+
+async def update_test_db_schema(app_config: AppConfig):
+    # Function to migrate the db schema to latest version by alembic
+    # Only migrate PAYIN_MAINDB_URL and LEDGER_MAINDB_URL for now
+    ledger_db_url = "LEDGER_MAINDB_URL={}".format(app_config.LEDGER_MAINDB_URL.value)
+    await run_alembic_command(ledger_db_url, "ledger")
+
+    payin_db_url = "PAYIN_MAINDB_URL={}".format(app_config.PAYIN_MAINDB_URL.value)
+    await run_alembic_command(payin_db_url, "payin")
 
 
 async def main():
@@ -37,6 +84,7 @@ async def main():
         # too many tries
         raise Exception("Failed checking connection to dependencies") from last_error
     if app_context:
+        await update_test_db_schema(app_config)
         await app_context.close()
 
 
