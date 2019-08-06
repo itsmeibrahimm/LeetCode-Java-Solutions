@@ -27,7 +27,7 @@ class StripeCardTable(TableDefinition):
     dd_fingerprint: Column = no_init_field(Column("dd_fingerprint", Text))
     active: Column = no_init_field(Column("active", Boolean))
     consumer_id: Column = no_init_field(Column("consumer_id", Integer))
-    stripe_consumer_id: Column = no_init_field(Column("stripe_consumer_id", Integer))
+    stripe_customer_id: Column = no_init_field(Column("stripe_customer_id", Integer))
     external_stripe_customer_id: Column = no_init_field(
         Column("external_stripe_customer_id", Text)
     )

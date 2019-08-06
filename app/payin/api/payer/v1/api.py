@@ -14,9 +14,9 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.processor import (
-    onboard_payer,
-    retrieve_payer,
-    update_payer_default_payment_method,
+    create_payer_impl,
+    get_payer_impl,
+    update_payer_impl,
 )
 
 from starlette.status import (
@@ -46,7 +46,7 @@ async def create_payer(req_body: CreatePayerRequest):
     logger.info("create_payer()")
 
     try:
-        payer: Payer = await onboard_payer(
+        payer: Payer = await create_payer_impl(
             req_body.dd_payer_id,
             req_body.payer_type,
             req_body.email,
@@ -55,10 +55,6 @@ async def create_payer(req_body: CreatePayerRequest):
         )
         logger.info("[create_payer] onboard_payer() completed.")
     except PayerCreationError as e:
-        # raise PaymentException(http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        #                        error_code=e.error_code,
-        #                        error_message=e.error_message,
-        #                        retryable=e.retryable)
         return create_payment_error_response_blob(
             HTTP_500_INTERNAL_SERVER_ERROR,
             PaymentErrorResponseBody(
@@ -80,7 +76,7 @@ async def get_payer(payer_id: str, payer_type: str = None):
     """
     logger.info("[get_payer] payer_id=%s", payer_id)
     try:
-        payer: Payer = await retrieve_payer(payer_id=payer_id, payer_type=payer_type)
+        payer: Payer = await get_payer_impl(payer_id=payer_id, payer_type=payer_type)
         logger.info("[get_payer] retrieve_payer completed")
     except PayerCreationError as e:
         return create_payment_error_response_blob(
@@ -109,7 +105,7 @@ async def update_payer(payer_id: str, req_body: UpdatePayerRequest):
     logger.info("[update_payer] payer_id=%s", payer_id)
 
     try:
-        payer: Payer = await update_payer_default_payment_method(
+        payer: Payer = await update_payer_impl(
             payer_id=payer_id,
             default_payment_method_id=req_body.default_payment_method_id,
             default_source_id=req_body.default_source_id,

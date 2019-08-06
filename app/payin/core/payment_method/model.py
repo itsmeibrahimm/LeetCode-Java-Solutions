@@ -8,28 +8,26 @@ from typing_extensions import final
 @final
 @dataclass(frozen=True)
 class Card:
-    country: str
     last4: str
     exp_year: str
     exp_month: str
     fingerprint: str
     active: bool
+    country: Optional[str]
     brand: Optional[str]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
+    payment_provider_card_id: Optional[str] = None
 
 
 @final
 @dataclass(frozen=True)
 class PaymentMethod:
     id: str
-    payer_id: str
-    dd_consumer_id: Optional[str]
-    payment_provider_customer_id: Optional[str]
     payment_provider: str
-    type: str
     card: Card
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
+    payer_id: Optional[str]
+    type: Optional[str]
+    dd_consumer_id: Optional[str] = None
+    payment_provider_customer_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None

@@ -38,7 +38,7 @@ from app.payin.repository.payer_repo import (
 logger = logging.getLogger(__name__)
 
 
-async def onboard_payer(
+async def create_payer_impl(
     dd_payer_id: str, payer_type: PayerType, email: str, country: str, description: str
 ) -> Payer:
     """
@@ -58,13 +58,14 @@ async def onboard_payer(
     from app.payin.payin import payer_repository as payer_repo
 
     logger.info(
-        "[onboard_payer] dd_payer_id:%s, payer_type:%s", dd_payer_id, payer_type.value
+        "[create_payer_impl] dd_payer_id:%s, payer_type:%s",
+        dd_payer_id,
+        payer_type.value,
     )
 
     # TODO: step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
 
     # TODO: step 2: create PGP customer
-
     pgp_code = "stripe"
     stripe_customer_id = generate_object_uuid(ResourceUuidPrefix.STRIPE_CUSTOMER)
     currency = "US"
@@ -82,7 +83,7 @@ async def onboard_payer(
             )
         )
         logger.info(
-            "[onboard_payer] create payer completed. payer_id:%s", payer_entity.id
+            "[create_payer_impl] create payer completed. payer_id:%s", payer_entity.id
         )
 
         # step 4: create pgp_customer object. We only insert pgp_customer for PayerType.MARKETPLACE
@@ -97,7 +98,7 @@ async def onboard_payer(
                 )
             )
             logger.info(
-                "[onboard_payer][%s] create pgp_customer completed. ppg_customer_id_id:%s",
+                "[create_payer_impl][%s] create pgp_customer completed. ppg_customer_id_id:%s",
                 payer_entity.id,
                 pgp_customer_entity.id,
             )
@@ -111,20 +112,20 @@ async def onboard_payer(
                 )
             )
             logger.info(
-                "[onboard_payer][%s] create stripe_customer completed. stripe_customer_id_id:%s",
+                "[create_payer_impl][%s] create stripe_customer completed. stripe_customer_id_id:%s",
                 payer_entity.id,
                 stripe_customer_entity.id,
             )
     except DataError as e:
         logger.error(
-            "[onboard_payer][{}] DataError when writing into db.".format(
+            "[create_payer_impl][{}] DataError when writing into db.".format(
                 payer_entity.id, e
             )
         )
         raise PayerCreationError(
-            error_code=PayinErrorCode.PAYER_CREATION_INVALID_DATA,
+            error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
             error_message=payin_error_message_maps[
-                PayinErrorCode.PAYER_CREATION_INVALID_DATA.value
+                PayinErrorCode.PAYER_CREATE_INVALID_DATA.value
             ],
             retryable=True,
         )
@@ -134,7 +135,7 @@ async def onboard_payer(
     )
 
 
-async def retrieve_payer(payer_id: str, payer_type: Optional[str]) -> Payer:
+async def get_payer_impl(payer_id: str, payer_type: Optional[str]) -> Payer:
     """
     Retrieve DoorDash payer
 
@@ -144,7 +145,7 @@ async def retrieve_payer(payer_id: str, payer_type: Optional[str]) -> Payer:
                        new payer APIs.
     :return: Payer object
     """
-    logger.info("[retrieve_payer] payer_id:%s, payer_type:%s", payer_id, payer_type)
+    logger.info("[get_payer_impl] payer_id:%s, payer_type:%s", payer_id, payer_type)
 
     # FIXME: should be move into app_context.
     from app.payin.payin import payer_repository as payer_repo
@@ -184,7 +185,7 @@ async def retrieve_payer(payer_id: str, payer_type: Optional[str]) -> Payer:
             payer = _build_payer(payer_entity=payer_entity)
     except DataError as e:
         logger.error(
-            "[retrieve_payer][{}] DataError when read from db.".format(payer_id), e
+            "[get_payer_impl][{}] DataError when read from db.".format(payer_id), e
         )
         raise PayerCreationError(
             error_code=PayinErrorCode.PAYER_READ_INVALID_DATA,
@@ -197,7 +198,7 @@ async def retrieve_payer(payer_id: str, payer_type: Optional[str]) -> Payer:
     return payer
 
 
-async def update_payer_default_payment_method(
+async def update_payer_impl(
     payer_id: str,
     default_payment_method_id: Optional[str],
     default_source_id: Optional[str],
@@ -244,7 +245,7 @@ async def update_payer_default_payment_method(
                     retryable=False,
                 )
             logger.info(
-                "[update_payer_data][%s] pgp_customer resource id=%s",
+                "[update_payer_impl][%s] pgp_customer resource id=%s",
                 payer_id,
                 pgp_customer_entity.pgp_resource_id,
             )
@@ -268,7 +269,7 @@ async def update_payer_default_payment_method(
             return _build_payer(payer_entity, updated_pgp_customer_entity)
         except DataError as e:
             logger.error(
-                "[update_payer_data][{}] DataError when read db.".format(payer_id), e
+                "[update_payer_impl][{}] DataError when read db.".format(payer_id), e
             )
             raise PayerUpdateError(
                 error_code=PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value,
@@ -281,7 +282,7 @@ async def update_payer_default_payment_method(
         PayerIdType.STRIPE_CUSTOMER_ID.value,
         PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
     ):
-        logger.info("[update_payer_data][%s] update by stripe customer id", payer_id)
+        logger.info("[update_payer_impl][%s] update by stripe customer id", payer_id)
 
         # lookup stripe_customer to ensure data is present
         stripe_customer_entity: GetStripeCustomerOutput = await payer_repo.get_stripe_customer(
@@ -290,7 +291,7 @@ async def update_payer_default_payment_method(
             else GetStripeCustomerInput(id=payer_id)
         )
         if not stripe_customer_entity:
-            logger.info("[update_payer_data][%s] not found", payer_id)
+            logger.info("[update_payer_impl][%s] not found", payer_id)
             raise PayerUpdateError(
                 error_code=PayinErrorCode.PAYER_UPDATE_NOT_FOUND.value,
                 error_message=payin_error_message_maps[
@@ -322,7 +323,7 @@ async def update_payer_default_payment_method(
         )
     else:
         logger.error(
-            "[update_payer_data][%s] invalid payer_type: %s", payer_id, payer_id_type
+            "[update_payer_impl][%s] invalid payer_type: %s", payer_id, payer_id_type
         )
         raise PayerUpdateError(
             error_code=PayinErrorCode.PAYER_UPDATE_INVALID_PAYER_TYPE.value,

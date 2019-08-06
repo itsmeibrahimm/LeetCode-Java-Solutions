@@ -24,7 +24,6 @@ def upgrade():
         sa.Column("pgp_resource_id", sa.Text(), nullable=False),
         sa.Column("payer_id", sa.String(255)),
         sa.Column("pgp_card_id", sa.String(255)),
-        sa.Column("legacy_stripe_card_serial_id", sa.BigInteger),
         sa.Column("legacy_consumer_id", sa.Text()),
         sa.Column("object", sa.Text()),
         sa.Column("type", sa.Text()),

@@ -1,5 +1,6 @@
 import uuid
 from enum import Enum
+from typing import Optional
 
 
 class ResourceUuidPrefix(str, Enum):
@@ -19,7 +20,7 @@ class ResourceUuidPrefix(str, Enum):
     MX_LEDGER = "mxl"
 
 
-def generate_object_uuid(prefix: ResourceUuidPrefix) -> str:
+def generate_object_uuid(prefix: Optional[ResourceUuidPrefix] = None) -> str:
     """
     Generate UUID for payment object.
     :param prefix: uuid prefix
@@ -27,4 +28,4 @@ def generate_object_uuid(prefix: ResourceUuidPrefix) -> str:
     """
     # FIXME: for integration test now, need to revisit the algorithm of uuid generation,
     # rather than using uuid module directly
-    return "{}_{}".format(prefix.value, uuid.uuid4())
+    return "{}_{}".format(prefix.value, uuid.uuid4()) if prefix else str(uuid.uuid4())

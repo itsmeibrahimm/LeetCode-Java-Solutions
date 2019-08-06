@@ -177,6 +177,10 @@ class UpdateStripeCustomerOutput(StripeCustomerDbEntity):
 
 
 class PayerRepositoryInterface:
+    """
+    Payer repository interface class that exposes complicated CRUD operations APIs for business layer.
+    """
+
     @abstractmethod
     async def insert_payer(self, request: InsertPayerInput) -> InsertPayerOutput:
         ...
@@ -231,6 +235,10 @@ class PayerRepositoryInterface:
 @final
 @dataclass
 class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
+    """
+    Payer repository class that exposes complicated CRUD operations APIs for business layer.
+    """
+
     async def insert_payer(self, request: InsertPayerInput) -> InsertPayerOutput:
         async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
             stmt = (

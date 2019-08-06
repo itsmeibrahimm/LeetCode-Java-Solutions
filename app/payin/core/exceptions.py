@@ -10,18 +10,29 @@ payin_error_message_maps = {
     "payin_4": "Payer not found. Please ensure your payer_id is correct",
     "payin_5": "Invalid data types. Please verify your input again!",
     "payin_6": "Invalid payer type",
+    "payin_20": "Invalid data types. Please verify your input again!",
+    "payin_21": "Data I/O error. Please retry again!",
+    "payin_22": "Invalid input payment method type!",
+    "payin_23": "Payment method not found. Please ensure your payment_method_id is correct",
 }
 
 
 class PayinErrorCode(str, Enum):
-    PAYER_CREATION_INVALID_DATA = "payin_1"
+    PAYER_CREATE_INVALID_DATA = "payin_1"
     PAYER_READ_INVALID_DATA = "payin_2"
     PAYER_READ_NOT_FOUND = "payin_3"
     PAYER_UPDATE_NOT_FOUND = "payin_4"
     PAYER_UPDATE_DB_ERROR_INVALID_DATA = "payin_5"
     PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_6"
+    PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
+    PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
+    PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"
+    PAYMENT_METHOD_GET_NOT_FOUND = "payin_23"
 
 
+###########################################################
+# Payer Errors                                            #
+###########################################################
 class PayerReadError(PaymentError):
     pass
 
@@ -34,6 +45,9 @@ class PayerUpdateError(PaymentError):
     pass
 
 
+###########################################################
+# PaymentMethod Errors                                    #
+###########################################################
 class PaymentMethodCreateError(PaymentError):
     pass
 
@@ -43,4 +57,8 @@ class PaymentMethodReadError(PaymentError):
 
 
 class PaymentMethodDeleteError(PaymentError):
+    pass
+
+
+class PaymentMethodListError(PaymentError):
     pass
