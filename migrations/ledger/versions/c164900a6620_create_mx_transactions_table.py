@@ -27,7 +27,6 @@ def upgrade():
         sa.Column("amount", sa.Integer, nullable=False),
         sa.Column("currency", sa.String(6), nullable=False),
         sa.Column("target_type", sa.String(32), nullable=False),
-        sa.Column("target_id", sa.String(255), nullable=False),
         sa.Column(
             "ledger_id",
             postgresql.UUID(as_uuid=True),
@@ -36,6 +35,8 @@ def upgrade():
         ),
         sa.Column("idempotency_key", sa.String(255), nullable=False),
         sa.Column("routing_key", sa.DateTime(), nullable=False),
+        sa.Column("target_id", sa.String(255)),
+        sa.Column("legacy_transaction_id", sa.String(255)),
         sa.Column(
             "created_at", sa.DateTime(), server_default=sa.func.current_timestamp()
         ),

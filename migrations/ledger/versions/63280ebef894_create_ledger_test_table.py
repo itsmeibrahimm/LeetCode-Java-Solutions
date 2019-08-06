@@ -32,6 +32,7 @@ def upgrade():
         sa.Column("submitted_by_employee_id", sa.String(255)),
         sa.Column("state", sa.String(32), nullable=False),
         sa.Column("rolled_to_ledger_id", postgresql.UUID(as_uuid=True)),
+        sa.Column("legacy_transfer_id", sa.String(255)),
         sa.Column(
             "created_at", sa.DateTime(), server_default=sa.func.current_timestamp()
         ),
