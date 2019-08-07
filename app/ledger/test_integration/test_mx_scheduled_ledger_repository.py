@@ -107,8 +107,8 @@ class TestMxLedgerRepository:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            start_time=datetime(2019, 7, 29),
-            end_time=datetime(2019, 8, 5),
+            start_time=datetime(2019, 7, 29, 7),
+            end_time=datetime(2019, 8, 5, 7),
         )
         await ledger_repo.insert_mx_ledger(ledger_to_insert)
         await scheduled_ledger_repo.insert_mx_scheduled_ledger(
@@ -124,8 +124,8 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.payment_account_id == payment_account_id
         assert mx_scheduled_ledger.ledger_id == ledger_id
         assert mx_scheduled_ledger.interval_type == MxScheduledLedgerIntervalType.WEEKLY
-        assert mx_scheduled_ledger.start_time == datetime(2019, 7, 29)
-        assert mx_scheduled_ledger.end_time == datetime(2019, 8, 5)
+        assert mx_scheduled_ledger.start_time == datetime(2019, 7, 29, 7)
+        assert mx_scheduled_ledger.end_time == datetime(2019, 8, 5, 7)
 
     async def test_get_open_mx_scheduled_ledger_for_period_not_exist_success(
         self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
@@ -162,8 +162,8 @@ class TestMxLedgerRepository:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            start_time=datetime(2019, 8, 5),
-            end_time=datetime(2019, 8, 12),
+            start_time=datetime(2019, 8, 5, 7),
+            end_time=datetime(2019, 8, 12, 7),
         )
         await ledger_repo.insert_mx_ledger(ledger_to_insert)
         await scheduled_ledger_repo.insert_mx_scheduled_ledger(

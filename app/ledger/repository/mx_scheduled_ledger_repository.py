@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from pytz import timezone
 from math import ceil
 from typing import Optional
 from uuid import UUID
@@ -105,7 +106,7 @@ class MxScheduledLedgerRepository(
                     mx_scheduled_ledgers.payment_account_id
                     == request.payment_account_id,  # noqa: W503
                     mx_scheduled_ledgers.start_time
-                    == self.utc_start_time_for_current_interval(  # noqa: W503
+                    == self.pacific_start_time_for_current_interval(  # noqa: W503
                         request.routing_key, request.interval_type
                     ),
                     mx_ledgers.state == MxLedgerStateType.OPEN,
@@ -120,11 +121,12 @@ class MxScheduledLedgerRepository(
                 return None
             return GetMxScheduledLedgerOutput.from_orm(row)
 
-    def utc_start_time_for_current_interval(
+    def pacific_start_time_for_current_interval(
         self, routing_key: datetime, interval: MxScheduledLedgerIntervalType
     ) -> datetime:
         """
-        Calculate the start_time(in utc time but without tz info) for current interval based on given routing_key and interval
+        Calculate the start_time(in UTC time but without tz info) for current interval based on given routing_key and interval
+        The returned start_time represents Pacific start_time in UTC timezone
         :param routing_key: datetime, key to find the cur start_time
         :param interval: MxScheduledLedgerIntervalType,
         :return: start_time for current interval: datetime
@@ -134,12 +136,8 @@ class MxScheduledLedgerRepository(
             if interval == MxScheduledLedgerIntervalType.WEEKLY
             else timedelta(days=1)
         )
-        routing_key_utc = routing_key.replace(tzinfo=timezone.utc)
-        base_timestamp_utc = datetime(2019, 7, 1, tzinfo=timezone.utc)
-        num_intervals = ceil(
-            (routing_key_utc - base_timestamp_utc) / interval_in_timedelta
-        )
-        start_time_utc = base_timestamp_utc + interval_in_timedelta * (
-            num_intervals - 1
-        )
-        return start_time_utc.replace(tzinfo=None)
+        routing_key_utc = routing_key.astimezone(timezone("UTC"))
+        base_timestamp = timezone("US/Pacific").localize(datetime(2019, 7, 1))
+        num_intervals = ceil((routing_key_utc - base_timestamp) / interval_in_timedelta)
+        start_time = base_timestamp + interval_in_timedelta * (num_intervals - 1)
+        return start_time.astimezone(timezone("UTC")).replace(tzinfo=None)

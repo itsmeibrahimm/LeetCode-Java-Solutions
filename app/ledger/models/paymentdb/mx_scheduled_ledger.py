@@ -10,6 +10,12 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class MxScheduledLedgerTable(TableDefinition):
+    """
+    The start_time and end_time datetime will be in UTC time
+    The start_time and end_time represents 00:00:00 in Pacific time, e.g 2018-07-30 07:00:00
+    When create weekly payouts, the cutoff time would use start_time and end_time converted to Pacific time for US/CA marketplace.
+    """
+
     name: str = no_init_field("mx_scheduled_ledgers")
     id: Column = no_init_field(Column("id", Text, primary_key=True))
     payment_account_id: Column = no_init_field(Column("payment_account_id", Text))

@@ -26,8 +26,10 @@ class TestMxScheduledLedgerRepository:
             stripe=mocker.Mock(),
         )
         scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
-        start_time = scheduled_ledger_repo.utc_start_time_for_current_interval(
+        start_time = scheduled_ledger_repo.pacific_start_time_for_current_interval(
             routing_key, interval
         )
         assert not start_time == datetime(2018, 7, 30, tzinfo=timezone.utc)
-        assert start_time == datetime(2018, 7, 30)
+        assert start_time == datetime(
+            2018, 7, 30, 7
+        )  # Pacific time without time zone specified
