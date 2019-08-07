@@ -64,8 +64,8 @@ class PgpCustomerDbEntity(DBEntity):
 
     id: str
     payer_id: str
-    currency: str
     pgp_resource_id: str
+    currency: Optional[str] = None
     pgp_code: Optional[str] = None
     legacy_id: Optional[int] = None
     legacy_stripe_customer_id: Optional[str] = None

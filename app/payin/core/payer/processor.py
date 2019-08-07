@@ -1,8 +1,12 @@
-import logging
 from typing import Optional, Any
 
 from asyncpg import DataError
 
+from app.commons.context.app_context import AppContext
+from app.commons.context.req_context import ReqContext
+from app.commons.providers.stripe_models import CreateCustomer
+from app.commons.types import CountryCode
+from app.commons.utils.types import PaymentProvider
 from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
 from app.payin.core.exceptions import (
     PayerReadError,
@@ -35,11 +39,15 @@ from app.payin.repository.payer_repo import (
     InsertStripeCustomerOutput,
 )
 
-logger = logging.getLogger(__name__)
-
 
 async def create_payer_impl(
-    dd_payer_id: str, payer_type: PayerType, email: str, country: str, description: str
+    app_ctxt: AppContext,
+    req_ctxt: ReqContext,
+    dd_payer_id: str,
+    payer_type: PayerType,
+    email: str,
+    country: str,
+    description: str,
 ) -> Payer:
     """
     onboard a new DoorDash payer. We will create 3 models under the hood:
@@ -47,6 +55,8 @@ async def create_payer_impl(
         - PgpCustomer
         - StripeCustomer (for backward compatibility)
 
+    :param app_ctxt: Application context
+    :param req_ctxt: Request context
     :param dd_payer_id: DoorDash client identifier (consumer_id, etc.)
     :param payer_type: Identify the owner type
     :param email: payer email
@@ -57,18 +67,44 @@ async def create_payer_impl(
     # FIXME: should be move into app_context.
     from app.payin.payin import payer_repository as payer_repo
 
-    logger.info(
+    req_ctxt.log.info(
         "[create_payer_impl] dd_payer_id:%s, payer_type:%s",
         dd_payer_id,
         payer_type.value,
     )
-
+    # TODO: we should get pgp_code in different way
+    pgp_code = PaymentProvider.STRIPE.value
     # TODO: step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
 
     # TODO: step 2: create PGP customer
-    pgp_code = "stripe"
-    stripe_customer_id = generate_object_uuid(ResourceUuidPrefix.STRIPE_CUSTOMER)
-    currency = "US"
+    creat_cus_req: CreateCustomer = CreateCustomer(email=email, description=description)
+    try:
+        stripe_customer = await app_ctxt.stripe.create_customer(
+            country=CountryCode(country), request=creat_cus_req
+        )
+    except Exception as e:
+        req_ctxt.log.error(
+            "[create_payer_impl][{}] error while creating stripe customer".format(
+                dd_payer_id, e
+            )
+        )
+        raise PayerCreationError(
+            error_code=PayinErrorCode.PAYER_CREATE_STRIPE_ERROR,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYER_CREATE_STRIPE_ERROR.value
+            ],
+            retryable=False,
+        )
+    # FIXME: all stripe APIs should return entire blob rather than just id.
+    stripe_customer_id = stripe_customer
+    currency = None
+    # stripe_customer_id = stripe_customer.id
+    # currency = stripe_customer.currency
+    req_ctxt.log.info(
+        "[create_payer_impl][%s] create stripe customer completed. id:%s",
+        dd_payer_id,
+        stripe_customer_id,
+    )
 
     try:
         # step 3: create payer object
@@ -82,7 +118,7 @@ async def create_payer_impl(
                 description=description,
             )
         )
-        logger.info(
+        req_ctxt.log.info(
             "[create_payer_impl] create payer completed. payer_id:%s", payer_entity.id
         )
 
@@ -97,7 +133,7 @@ async def create_payer_impl(
                     currency=currency,
                 )
             )
-            logger.info(
+            req_ctxt.log.info(
                 "[create_payer_impl][%s] create pgp_customer completed. ppg_customer_id_id:%s",
                 payer_entity.id,
                 pgp_customer_entity.id,
@@ -111,13 +147,13 @@ async def create_payer_impl(
                     owner_id=int(dd_payer_id),
                 )
             )
-            logger.info(
+            req_ctxt.log.info(
                 "[create_payer_impl][%s] create stripe_customer completed. stripe_customer_id_id:%s",
                 payer_entity.id,
                 stripe_customer_entity.id,
             )
     except DataError as e:
-        logger.error(
+        req_ctxt.log.error(
             "[create_payer_impl][{}] DataError when writing into db.".format(
                 payer_entity.id, e
             )
@@ -135,17 +171,23 @@ async def create_payer_impl(
     )
 
 
-async def get_payer_impl(payer_id: str, payer_type: Optional[str]) -> Payer:
+async def get_payer_impl(
+    app_ctxt: AppContext, req_ctxt: ReqContext, payer_id: str, payer_type: Optional[str]
+) -> Payer:
     """
     Retrieve DoorDash payer
 
+    :param app_ctxt: Application context
+    :param req_ctxt: Request context
     :param payer_id: payer unique id.
     :param payer_type: Identify the owner type. This is for backward compatibility.
                        Caller can ignore it for new consumer who is onboard from
                        new payer APIs.
     :return: Payer object
     """
-    logger.info("[get_payer_impl] payer_id:%s, payer_type:%s", payer_id, payer_type)
+    req_ctxt.log.info(
+        "[get_payer_impl] payer_id:%s, payer_type:%s", payer_id, payer_type
+    )
 
     # FIXME: should be move into app_context.
     from app.payin.payin import payer_repository as payer_repo
@@ -184,7 +226,7 @@ async def get_payer_impl(payer_id: str, payer_type: Optional[str]) -> Payer:
                 )
             payer = _build_payer(payer_entity=payer_entity)
     except DataError as e:
-        logger.error(
+        req_ctxt.log.error(
             "[get_payer_impl][{}] DataError when read from db.".format(payer_id), e
         )
         raise PayerCreationError(
@@ -199,6 +241,8 @@ async def get_payer_impl(payer_id: str, payer_type: Optional[str]) -> Payer:
 
 
 async def update_payer_impl(
+    app_ctxt: AppContext,
+    req_ctxt: ReqContext,
     payer_id: str,
     default_payment_method_id: Optional[str],
     default_source_id: Optional[str],
@@ -209,6 +253,8 @@ async def update_payer_impl(
     """
     Update DoorDash payer's default payment method.
 
+    :param app_ctxt: Application context
+    :param req_ctxt: Request context
     :param payer_id: payer unique id.
     :param default_payment_method_id: new default payment_method identity.
     :param default_source_id:
@@ -236,7 +282,7 @@ async def update_payer_impl(
                 GetPgpCustomerInput(payer_id=payer_id, pgp_code=pgp_code)
             )
             if not pgp_customer_entity:
-                logger.info("[update_payer_data][%s] not found", payer_id)
+                req_ctxt.log.info("[update_payer_data][%s] not found", payer_id)
                 raise PayerUpdateError(
                     error_code=PayinErrorCode.PAYER_UPDATE_NOT_FOUND.value,
                     error_message=payin_error_message_maps[
@@ -244,7 +290,7 @@ async def update_payer_impl(
                     ],
                     retryable=False,
                 )
-            logger.info(
+            req_ctxt.log.info(
                 "[update_payer_impl][%s] pgp_customer resource id=%s",
                 payer_id,
                 pgp_customer_entity.pgp_resource_id,
@@ -268,7 +314,7 @@ async def update_payer_impl(
             ] = await payer_repo.get_payer_by_id(request=GetPayerByIdInput(id=payer_id))
             return _build_payer(payer_entity, updated_pgp_customer_entity)
         except DataError as e:
-            logger.error(
+            req_ctxt.log.error(
                 "[update_payer_impl][{}] DataError when read db.".format(payer_id), e
             )
             raise PayerUpdateError(
@@ -282,7 +328,9 @@ async def update_payer_impl(
         PayerIdType.STRIPE_CUSTOMER_ID.value,
         PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
     ):
-        logger.info("[update_payer_impl][%s] update by stripe customer id", payer_id)
+        req_ctxt.log.info(
+            "[update_payer_impl][%s] update by stripe customer id", payer_id
+        )
 
         # lookup stripe_customer to ensure data is present
         stripe_customer_entity: GetStripeCustomerOutput = await payer_repo.get_stripe_customer(
@@ -291,7 +339,7 @@ async def update_payer_impl(
             else GetStripeCustomerInput(id=payer_id)
         )
         if not stripe_customer_entity:
-            logger.info("[update_payer_impl][%s] not found", payer_id)
+            req_ctxt.log.info("[update_payer_impl][%s] not found", payer_id)
             raise PayerUpdateError(
                 error_code=PayinErrorCode.PAYER_UPDATE_NOT_FOUND.value,
                 error_message=payin_error_message_maps[
@@ -314,6 +362,7 @@ async def update_payer_impl(
 
         # lazy create payer if doesn't exist
         return await _lazy_create_payer(
+            req_ctxt=req_ctxt,
             stripe_customer_id=updated_stripe_customer_entity.stripe_id,
             country=updated_stripe_customer_entity.country_shortname,
             payer_type=payer_type,
@@ -322,7 +371,7 @@ async def update_payer_impl(
             default_card_id=default_card_id,
         )
     else:
-        logger.error(
+        req_ctxt.log.error(
             "[update_payer_impl][%s] invalid payer_type: %s", payer_id, payer_id_type
         )
         raise PayerUpdateError(
@@ -335,6 +384,7 @@ async def update_payer_impl(
 
 
 async def _lazy_create_payer(
+    req_ctxt: ReqContext,
     stripe_customer_id: str,
     country: str,
     payer_type: Optional[str],
@@ -348,6 +398,7 @@ async def _lazy_create_payer(
     """
     Perform lazy creation of Payer and PgpCustomer objects.
 
+    :param req_ctxt: Request context
     :param stripe_customer_id:
     :param country:
     :param payer_type:
@@ -367,7 +418,7 @@ async def _lazy_create_payer(
         request=GetPayerByIdInput(legacy_stripe_customer_id=stripe_customer_id)
     )
     if get_payer_entity:
-        logger.info(
+        req_ctxt.log.info(
             "[_lazy_create_payer] payer already exist for stipe_customer %s . payer_id:%s",
             stripe_customer_id,
             get_payer_entity.id,
