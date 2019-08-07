@@ -43,8 +43,13 @@ class TestCartPaymentProcessor:
         assert result == CreatePaymentIntent.ConfirmationMethod.automatic
 
     def test_get_provider_future_usage(self, cart_payment_interface):
-        result = cart_payment_interface._get_provider_future_usage()
+        intent = generate_payment_intent(capture_method="manual")
+        result = cart_payment_interface._get_provider_future_usage(intent)
         assert result == CreatePaymentIntent.SetupFutureUsage.off_session
+
+        intent = generate_payment_intent(capture_method="auto")
+        result = cart_payment_interface._get_provider_future_usage(intent)
+        assert result == CreatePaymentIntent.SetupFutureUsage.on_session
 
     def test_intent_submit_status_evaluation(self, cart_payment_interface):
         intent = generate_payment_intent(status="init")

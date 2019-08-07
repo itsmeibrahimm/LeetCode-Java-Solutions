@@ -15,7 +15,11 @@ from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
 )
-from app.payin.core.cart_payment.types import ConfirmationMethod, IntentStatus
+from app.payin.core.cart_payment.types import (
+    CaptureMethod,
+    ConfirmationMethod,
+    IntentStatus,
+)
 
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
@@ -68,8 +72,11 @@ class CartPaymentInterface:
         )
         return CreatePaymentIntent.ConfirmationMethod(target_method)
 
-    def _get_provider_future_usage(self):
-        return CreatePaymentIntent.SetupFutureUsage("off_session")
+    def _get_provider_future_usage(self, payment_intent: PaymentIntent):
+        if payment_intent.capture_method == CaptureMethod.AUTO:
+            return CreatePaymentIntent.SetupFutureUsage.on_session
+
+        return CreatePaymentIntent.SetupFutureUsage.off_session
 
     async def _create_provider_payment(
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
@@ -82,12 +89,12 @@ class CartPaymentInterface:
                 currency=pgp_payment_intent.currency,
                 application_fee_amount=pgp_payment_intent.application_fee_amount,
                 capture_method=self._get_provider_capture_method(pgp_payment_intent),
-                confirm=False,  # TODO fix confirm use
+                confirm=True,
                 confirmation_method=self._get_provider_confirmation_method(
                     pgp_payment_intent
                 ),
                 on_behalf_of=pgp_payment_intent.payout_account_id,
-                setup_future_usage=self._get_provider_future_usage(),
+                setup_future_usage=self._get_provider_future_usage(payment_intent),
                 payment_method=pgp_payment_intent.payment_method_resource_id,
                 statement_descriptor=payment_intent.statement_descriptor,
             )
