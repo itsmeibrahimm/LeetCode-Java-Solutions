@@ -5,18 +5,17 @@ import uuid
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
 from app.commons.types import CountryCode
-from app.commons.providers.stripe_models import CreatePaymentIntent
+from app.commons.providers.stripe_models import (
+    CapturePaymentIntent,
+    CreatePaymentIntent,
+)
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentIntent,
     PgpPaymentIntent,
 )
-from app.payin.core.cart_payment.types import (
-    ConfirmationMethod,
-    PaymentIntentStatus,
-    PgpPaymentIntentStatus,
-)
+from app.payin.core.cart_payment.types import ConfirmationMethod, IntentStatus
 
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
@@ -76,14 +75,14 @@ class CartPaymentInterface:
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
     ):
         # Call to stripe payment intent API
+        assert pgp_payment_intent.idempotency_key
         try:
-            # TODO add idempotency_key
             intent_request = CreatePaymentIntent(
                 amount=pgp_payment_intent.amount,
                 currency=pgp_payment_intent.currency,
                 application_fee_amount=pgp_payment_intent.application_fee_amount,
                 capture_method=self._get_provider_capture_method(pgp_payment_intent),
-                confirm=False,
+                confirm=False,  # TODO fix confirm use
                 confirmation_method=self._get_provider_confirmation_method(
                     pgp_payment_intent
                 ),
@@ -94,7 +93,9 @@ class CartPaymentInterface:
             )
 
             response = await self.app_context.stripe.create_payment_intent(
-                country=CountryCode(payment_intent.country), request=intent_request
+                country=CountryCode(payment_intent.country),
+                request=intent_request,
+                idempotency_key=pgp_payment_intent.idempotency_key,
             )
             # self.req_context.log.info("Provider response: ")
             # self.req_context.log.info(response)
@@ -109,7 +110,7 @@ class CartPaymentInterface:
         self,
         connection,
         pgp_intent_id: uuid.UUID,
-        status: PgpPaymentIntentStatus,
+        status: IntentStatus,
         provider_payment_response: Any,
     ) -> None:
         await self.payment_repo.update_pgp_payment_intent(
@@ -137,12 +138,12 @@ class CartPaymentInterface:
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
             await self.payment_repo.update_payment_intent_status(
-                connection, payment_intent.id, PaymentIntentStatus.PROCESSING
+                connection, payment_intent.id, IntentStatus.REQUIRES_CAPTURE
             )
             await self._update_pgp_intent_from_provider(
                 connection,
                 pgp_payment_intent.id,
-                PgpPaymentIntentStatus.PROCESSING,
+                IntentStatus.REQUIRES_CAPTURE,
                 provider_payment_response,
             )
 
@@ -202,7 +203,7 @@ class CartPaymentInterface:
                 currency=currency,
                 capture_method=request_cart_payment.capture_method,
                 confirmation_method=ConfirmationMethod.MANUAL,
-                status=PaymentIntentStatus.INIT,
+                status=IntentStatus.INIT,
                 statement_descriptor=request_cart_payment.payer_statement_description,
             )
 
@@ -224,7 +225,7 @@ class CartPaymentInterface:
                 ),
                 capture_method=request_cart_payment.capture_method,
                 confirmation_method=ConfirmationMethod.MANUAL,
-                status=PgpPaymentIntentStatus.INIT,
+                status=IntentStatus.INIT,
                 statement_descriptor=request_cart_payment.payer_statement_description,
             )
 
@@ -248,10 +249,18 @@ class CartPaymentInterface:
         return pgp_intents[0]
 
     def _is_payment_intent_submitted(self, payment_intent: PaymentIntent):
-        return payment_intent.status != PaymentIntentStatus.INIT
+        return payment_intent.status != IntentStatus.INIT
+
+    def _is_intent_processed(self, payment_intent: PaymentIntent):
+        return payment_intent.status in [IntentStatus.SUCCEEDED, IntentStatus.FAILED]
+
+    def _get_intent_status_from_provider_status(
+        self, provider_status: str
+    ) -> IntentStatus:
+        return IntentStatus(provider_status)
 
     def _is_pgp_payment_intent_submitted(self, pgp_payment_intent: PgpPaymentIntent):
-        return pgp_payment_intent.status != PaymentIntentStatus.INIT
+        return pgp_payment_intent.status != IntentStatus.INIT
 
     async def resubmit_existing_payment(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent
@@ -286,6 +295,94 @@ class CartPaymentInterface:
         )
         await self._submit_payment_to_provider(payment_intent, pgp_intent)
         return cart_payment
+
+    async def _capture_payment_with_provider(
+        self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
+    ) -> str:
+        # Call to stripe payment intent API
+        try:
+            intent_request = CapturePaymentIntent(sid=pgp_payment_intent.resource_id)
+
+            self.req_context.log.info(
+                f"Capturing payment intent: {payment_intent.country}, key: {pgp_payment_intent.idempotency_key}"
+            )
+            response = await self.app_context.stripe.capture_payment_intent(
+                country=CountryCode(payment_intent.country),
+                request=intent_request,
+                idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
+            )
+            self.req_context.log.info("Provider response: ")
+            self.req_context.log.info(response)
+            return response
+        except Exception as e:
+            # TODO Add better error handling here
+            self.req_context.log.error(f"Error invoking provider: {e}")
+            print(dir(e))
+            print(e.__traceback__)
+            raise HTTPException(status_code=500, detail="Internal error")
+
+    async def capture_payment(self, payment_intent: PaymentIntent) -> None:
+        """Capture a payment intent.
+
+        Arguments:
+            payment_intent {PaymentIntent} -- The PaymentIntent to capture.
+
+        Raises:
+            e: Raises an exception if database operations fail.
+
+        Returns:
+            None
+        """
+        self.req_context.log.info(
+            f"Capture attempt for payment_intent {payment_intent.id}"
+        )
+        # TODO scheduling of this logic
+        # TODO concurrency control to ensure we are capturing something once (though underlying provider call will be idempotent)
+        # Check state of intent.  If already captured (successfully or not), stop.  Clients are expected to
+        if self._is_intent_processed(payment_intent):
+            self.req_context.log.info(
+                f"Payment intent not eligible for capturing, in state {payment_intent.status}"
+            )
+            return
+
+        # Find the PgpPaymentIntent to capture
+        pgp_intents = await self.payment_repo.find_pgp_payment_intents(
+            payment_intent.id
+        )
+        # TODO work through case where there may be multiples
+        pgp_payment_intent = pgp_intents[0]
+
+        # Call to provider to capture, with idempotency key
+        provider_status = await self._capture_payment_with_provider(
+            payment_intent, pgp_payment_intent
+        )
+        new_status = self._get_intent_status_from_provider_status(provider_status)
+        self.req_context.log.info(
+            f"Updating intent {payment_intent.id}, pgp intent {pgp_payment_intent.id} to status {new_status}"
+        )
+
+        # Update state
+        connection, transaction = await (
+            self.payment_repo.get_payment_database_connection_and_transaction()
+        )
+
+        try:
+            await self.payment_repo.update_payment_intent_status(
+                connection, payment_intent.id, new_status
+            )
+            await self._update_pgp_intent_from_provider(
+                connection,
+                pgp_payment_intent.id,
+                new_status,
+                pgp_payment_intent.resource_id,
+            )
+
+            await transaction.commit()
+        except Exception as e:
+            await transaction.rollback()
+            raise e
+        finally:
+            await self.payment_repo.close_payment_database_connection(connection)
 
 
 async def submit_payment(

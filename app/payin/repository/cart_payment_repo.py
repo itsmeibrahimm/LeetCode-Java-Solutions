@@ -10,10 +10,7 @@ from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
 )
-from app.payin.core.cart_payment.types import (
-    PaymentIntentStatus,
-    PgpPaymentIntentStatus,
-)
+from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.models.paymentdb import (
     cart_payments,
     payment_intents,
@@ -138,7 +135,7 @@ class CartPaymentRepository(PayinDBRepository):
             confirmation_method=row[payment_intents.confirmation_method],
             country=row[payment_intents.country],
             currency=row[payment_intents.currency],
-            status=PaymentIntentStatus(row[payment_intents.status]),
+            status=IntentStatus(row[payment_intents.status]),
             statement_descriptor=row[payment_intents.statement_descriptor],
             created_at=row[payment_intents.created_at],
             updated_at=row[payment_intents.updated_at],
@@ -247,7 +244,7 @@ class CartPaymentRepository(PayinDBRepository):
             idempotency_key=row[pgp_payment_intents.idempotency_key],
             provider=row[pgp_payment_intents.provider],
             resource_id=row[pgp_payment_intents.resource_id],
-            status=PgpPaymentIntentStatus(row[pgp_payment_intents.status]),
+            status=IntentStatus(row[pgp_payment_intents.status]),
             invoice_resource_id=row[pgp_payment_intents.invoice_resource_id],
             charge_resource_id=row[pgp_payment_intents.charge_resource_id],
             payment_method_resource_id=row[

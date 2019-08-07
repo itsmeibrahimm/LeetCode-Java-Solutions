@@ -3,7 +3,7 @@ from starlette.testclient import TestClient
 import uuid
 
 
-@pytest.mark.skip("Schema application not added to CI/CD yet")
+@pytest.mark.skip("App context error - see comments in conftest")
 class TestCartPayment:
     def generate_create_request_body(self, idempotency_key=None):
         request_body = {

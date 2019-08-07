@@ -28,6 +28,7 @@ class StripeClientInterface:
         Create a new Stripe Customer
         https://stripe.com/docs/api/customers
         """
+        ...
 
     def create_payment_intent(
         self,
@@ -35,6 +36,22 @@ class StripeClientInterface:
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentIntentId:
+        """
+        Create a new PaymentIntent
+        https://stripe.com/docs/api/payment_intents
+        """
+        ...
+
+    def capture_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.CapturePaymentIntent,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentIntentStatus:
+        """
+        Capture a PaymentIntent
+        https://stripe.com/docs/api/payment_intents
+        """
         ...
 
 
@@ -101,6 +118,19 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return payment_intent.id
+
+    def capture_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.CapturePaymentIntent,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentIntentStatus:
+        payment_intent = stripe.PaymentIntent.capture(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payment_intent.status
 
 
 class StripeTestClient(StripeClient):
@@ -192,6 +222,19 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> models.PaymentIntentId:
         return await self.submit(
             self.client.create_payment_intent,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def capture_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.CapturePaymentIntent,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentIntentStatus:
+        return await self.submit(
+            self.client.capture_payment_intent,
             country,
             request,
             idempotency_key=idempotency_key,

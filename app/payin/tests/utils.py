@@ -1,10 +1,13 @@
 from datetime import datetime
+from unittest.mock import MagicMock
 import uuid
 from app.payin.core.cart_payment.model import PaymentIntent, PgpPaymentIntent
-from app.payin.core.cart_payment.types import (
-    PaymentIntentStatus,
-    PgpPaymentIntentStatus,
-)
+from app.payin.core.cart_payment.types import IntentStatus
+
+
+class FunctionMock(MagicMock):
+    async def __call__(self, *args, **kwargs):
+        return super(FunctionMock, self).__call__(*args, **kwargs)
 
 
 def generate_payment_intent(
@@ -25,7 +28,7 @@ def generate_payment_intent(
         confirmation_method=confirmation_method,
         country="US",
         currency="USD",
-        status=PaymentIntentStatus(status),
+        status=IntentStatus(status),
         statement_descriptor="descriptor",
         created_at=datetime.now(),
         updated_at=datetime.now(),
@@ -41,7 +44,7 @@ def generate_pgp_payment_intent(status: str) -> PgpPaymentIntent:
         idempotency_key=str(uuid.uuid4()),
         provider="Stripe",
         resource_id=str(uuid.uuid4()),
-        status=PgpPaymentIntentStatus(status),
+        status=IntentStatus(status),
         invoice_resource_id=None,
         charge_resource_id=None,
         payment_method_resource_id=str(uuid.uuid4),

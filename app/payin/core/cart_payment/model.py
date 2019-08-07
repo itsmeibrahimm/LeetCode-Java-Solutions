@@ -2,11 +2,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional
 from typing_extensions import final
-from app.payin.core.cart_payment.types import (
-    CartType,
-    PaymentIntentStatus,
-    PgpPaymentIntentStatus,
-)
+from app.payin.core.cart_payment.types import CartType, IntentStatus
 from uuid import UUID
 
 
@@ -66,7 +62,7 @@ class PaymentIntent:
     confirmation_method: str
     country: str
     currency: str
-    status: PaymentIntentStatus
+    status: IntentStatus
     statement_descriptor: str
     created_at: datetime
     updated_at: datetime
@@ -82,7 +78,7 @@ class PgpPaymentIntent:
     idempotency_key: str
     provider: str
     resource_id: Optional[str]
-    status: PgpPaymentIntentStatus
+    status: IntentStatus
     invoice_resource_id: Optional[str]
     charge_resource_id: Optional[str]
     payment_method_resource_id: str

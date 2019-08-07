@@ -18,11 +18,9 @@ class ConfirmationMethod(str, Enum):
     MANUAL = "manual"
 
 
-class PaymentIntentStatus(str, Enum):
+class IntentStatus(str, Enum):
     INIT = "init"
     PROCESSING = "processing"
-
-
-class PgpPaymentIntentStatus(str, Enum):
-    INIT = ("init",)
-    PROCESSING = "processing"
+    REQUIRES_CAPTURE = "requires_capture"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"

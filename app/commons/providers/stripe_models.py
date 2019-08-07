@@ -17,6 +17,7 @@ CustomerId = NewType("CustomerId", str)
 ConnectedAccountId = NewType("ConnectedAccountId", str)
 PaymentMethodId = NewType("PaymentMethodId", str)
 PaymentIntentId = NewType("PaymentIntentId", str)
+PaymentIntentStatus = NewType("PaymentIntentStatus", str)
 
 
 class BaseModel(pydantic.BaseModel):
@@ -69,6 +70,11 @@ class CreateCustomer(BaseModel):
     description: str
 
 
+class TransferData(BaseModel):
+    destination: ConnectedAccountId
+    amount: Optional[int]
+
+
 class CreatePaymentIntent(BaseModel):
     """
     See: https://stripe.com/docs/api/payment_intents/create
@@ -96,10 +102,6 @@ class CreatePaymentIntent(BaseModel):
 
         card: Optional[CardOptions]
 
-    class TransferData(BaseModel):
-        destination: ConnectedAccountId
-        amount: Optional[int]
-
     # TODO Determine how we can use types where Enums are defined.  For example capture_method: Optional[CaptureMethod].
     # If used directly stripe will error out.
     amount: int
@@ -124,3 +126,15 @@ class CreatePaymentIntent(BaseModel):
     statement_descriptor: Optional[str]
     transfer_data: Optional[TransferData]
     transfer_group: Optional[str]
+
+
+class CapturePaymentIntent(BaseModel):
+    """
+    See: https://stripe.com/docs/api/payment_intents/capture
+    """
+
+    sid: PaymentIntentId
+    amount_to_capture: Optional[int]
+    application_fee_amount: Optional[int]
+    statement_descriptor: Optional[str]
+    transfer_data: Optional[TransferData]
