@@ -53,11 +53,13 @@ async def run_alembic_command(db_url, config_name):
 
 async def update_test_db_schema(app_config: AppConfig):
     # Function to migrate the db schema to latest version by alembic
-    # Only migrate PAYIN_MAINDB_URL and LEDGER_MAINDB_URL for now
-    ledger_db_url = "LEDGER_MAINDB_URL={}".format(app_config.LEDGER_MAINDB_URL.value)
+    # Only migrate PAYIN_PAYMENTDB and LEDGER_PAYMENTDB for now
+    ledger_db_url = "LEDGER_PAYMENTDB_URL={}".format(
+        app_config.LEDGER_PAYMENTDB_URL.value
+    )
     await run_alembic_command(ledger_db_url, "ledger")
 
-    payin_db_url = "PAYIN_MAINDB_URL={}".format(app_config.PAYIN_MAINDB_URL.value)
+    payin_db_url = "PAYIN_PAYMENTDB_URL={}".format(app_config.PAYIN_PAYMENTDB_URL.value)
     await run_alembic_command(payin_db_url, "payin")
 
 

@@ -17,6 +17,7 @@ set -e
 
 bankdb_copies=(bankdb_dev bankdb_test)
 maindb_copies=(maindb_dev maindb_test)
+paymentdb_copies=(paymentdb_dev paymentdb_test)
 
 payin_db_user=${PAYIN_DB_USER:-payin_user}
 payout_db_user=${PAYOUT_DB_USER:-payout_user}
@@ -29,7 +30,20 @@ psql -v ON_ERROR_STOP=1 --username root --dbname base_db <<-EOSQL
     CREATE ROLE ${ledger_db_user} WITH LOGIN NOSUPERUSER;
 EOSQL
 
-echo "Initializing bandb copies"
+echo "Initializing paymentdb copies"
+for dbname in "${paymentdb_copies[@]}"; do
+createdb --username=root ${dbname}
+# Only grant access of payment DB for $payin_db_user and $ledger_db_user
+psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
+    GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${payin_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payin_db_user};
+    GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${ledger_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${ledger_db_user};
+EOSQL
+echo "Initialized ${dbname}"
+done
+
+echo "Initializing bankdb copies"
 for dbname in "${bankdb_copies[@]}"; do
 createdb --username=root ${dbname}
 psql --username=root -d ${dbname} -f /tmp/db-schemas/bankdb_dump.sql

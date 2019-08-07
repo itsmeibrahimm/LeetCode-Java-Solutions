@@ -61,7 +61,9 @@ class AppConfig:
     PAYOUT_MAINDB_URL: Secret
     PAYOUT_BANKDB_URL: Secret
     PAYIN_MAINDB_URL: Secret
+    PAYIN_PAYMENTDB_URL: Secret
     LEDGER_MAINDB_URL: Secret
+    LEDGER_PAYMENTDB_URL: Secret
 
     # Payment Service Provider
     STRIPE_US_SECRET_KEY: Secret

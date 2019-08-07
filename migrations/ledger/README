@@ -9,6 +9,6 @@ generated schema file will be placed in.
 
 To apply migrations locally, from root of repo, run:
 
-  env LEDGER_MAINDB_URL=<value> alembic --config migrations/alembic.ini --name ledger upgrade head
+  env LEDGER_PAYMENTDB_URL=<value> alembic --config migrations/alembic.ini --name ledger upgrade head
 
 The above is only necessary for local testing until a migration target is added into the Makefile.

@@ -111,7 +111,7 @@ async def ledger_paymentdb(app_config: AppConfig):
     """
     initialize the paymentdb connection for Ledger user
     """
-    db = await Database.from_url(master_url=app_config.LEDGER_MAINDB_URL)
+    db = await Database.from_url(master_url=app_config.LEDGER_PAYMENTDB_URL)
     yield db
     await db.close()
 

@@ -30,7 +30,7 @@ version_table = "alembic_version_ledger"
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 # Comment out below once payout schema is managed from payment-service
-config.set_main_option("sqlalchemy.url", os.environ["LEDGER_MAINDB_URL"])
+config.set_main_option("sqlalchemy.url", os.environ["LEDGER_PAYMENTDB_URL"])
 
 
 def run_migrations_offline():

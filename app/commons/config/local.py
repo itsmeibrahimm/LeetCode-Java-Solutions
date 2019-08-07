@@ -20,6 +20,10 @@ def create_app_config() -> AppConfig:
             name="payin_maindb_url",
             value=f"postgresql://payin_user@{dsj_db_endpoint}/maindb_dev",
         ),
+        PAYIN_PAYMENTDB_URL=Secret(
+            name="payin_paymentdb_url",
+            value=f"postgresql://payin_user@{dsj_db_endpoint}/paymentdb_dev",
+        ),
         PAYOUT_MAINDB_URL=Secret(
             name="payout_maindb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
@@ -31,6 +35,10 @@ def create_app_config() -> AppConfig:
         LEDGER_MAINDB_URL=Secret(
             name="ledger_maindb_url",
             value=f"postgresql://ledger_user@{dsj_db_endpoint}/maindb_dev",
+        ),
+        LEDGER_PAYMENTDB_URL=Secret(
+            name="ledger_paymentdb_url",
+            value=f"postgresql://ledger_user@{dsj_db_endpoint}/paymentdb_dev",
         ),
         STRIPE_US_SECRET_KEY=Secret(
             name="stripe_us_secret_key", value="sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"

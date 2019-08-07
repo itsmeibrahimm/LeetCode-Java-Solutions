@@ -29,7 +29,7 @@ version_table = "alembic_version_payin"
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-config.set_main_option("sqlalchemy.url", os.environ["PAYIN_MAINDB_URL"])
+config.set_main_option("sqlalchemy.url", os.environ["PAYIN_PAYMENTDB_URL"])
 
 
 def run_migrations_offline():

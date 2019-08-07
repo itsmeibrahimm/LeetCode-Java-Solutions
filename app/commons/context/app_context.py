@@ -61,7 +61,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         root_logger.exception("failed to connect to payin main db")
 
     try:
-        payin_paymentdb = await Database.from_url(master_url=config.PAYIN_MAINDB_URL)
+        payin_paymentdb = await Database.from_url(master_url=config.PAYIN_PAYMENTDB_URL)
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
 
@@ -71,7 +71,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
         root_logger.exception("failed to connect to ledger main db")
 
     try:
-        ledger_paymentdb = await Database.from_url(master_url=config.LEDGER_MAINDB_URL)
+        ledger_paymentdb = await Database.from_url(
+            master_url=config.LEDGER_PAYMENTDB_URL
+        )
     except Exception:
         root_logger.exception("failed to connect to ledger payment db")
 
