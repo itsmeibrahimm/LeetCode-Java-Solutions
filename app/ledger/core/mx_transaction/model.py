@@ -11,6 +11,7 @@ from app.ledger.core.mx_transaction.types import (
     MxTransactionType,
     MxLedgerType,
     MxLedgerStateType,
+    MxScheduledLedgerIntervalType,
 )
 
 
@@ -52,7 +53,7 @@ class MxLedger:
     state: MxLedgerStateType
     balance: int
     payment_account_id: str
-    created_at: datetime
+    created_at: Optional[datetime]
     updated_at: Optional[datetime]
     submitted_at: Optional[datetime]
     amount_paid: Optional[int]
@@ -61,3 +62,16 @@ class MxLedger:
     created_by_employee_id: Optional[str] = None
     submitted_by_employee_id: Optional[str] = None
     rolled_to_ledger_id: Optional[str] = None
+
+
+@final
+@dataclass(frozen=True)
+class MxScheduledLedger:
+    mx_scheduled_ledger_id: UUID
+    payment_account_id: str
+    ledger_id: UUID
+    interval_type: MxScheduledLedgerIntervalType
+    start_time: datetime
+    end_time: datetime
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]

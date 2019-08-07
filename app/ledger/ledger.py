@@ -2,11 +2,15 @@ from app.commons.applications import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
+from app.ledger.repository.mx_scheduled_ledger_repository import (
+    MxScheduledLedgerRepository,
+)
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 from app.payin.api.payer.v1.api import router as mx_transaction_router
 
 mx_ledger_repository: MxLedgerRepository
 mx_transaction_repository: MxTransactionRepository
+mx_scheduled_ledger_repository: MxScheduledLedgerRepository
 
 
 def create_ledger_app(context: AppContext) -> FastAPI:
@@ -21,6 +25,9 @@ def create_ledger_app(context: AppContext) -> FastAPI:
 
     global mx_transaction_repository
     mx_transaction_repository = MxTransactionRepository(context=context)
+
+    global mx_scheduled_ledger_repository
+    mx_scheduled_ledger_repository = MxScheduledLedgerRepository(context=context)
 
     app.include_router(mx_transaction_router)
 

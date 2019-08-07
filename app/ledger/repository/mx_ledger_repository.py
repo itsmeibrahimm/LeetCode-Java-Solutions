@@ -143,7 +143,6 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             idempotency_key=ide_key,
             target_type=MxTransactionType.MICRO_DEPOSIT,
             routing_key=datetime.utcnow(),
-            created_at=datetime.utcnow(),
         )
         async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
             stmt = (

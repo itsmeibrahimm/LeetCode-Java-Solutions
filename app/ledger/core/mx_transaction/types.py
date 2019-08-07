@@ -33,3 +33,12 @@ class MxLedgerStateType(str, Enum):
     FAILED = "failed"
     ROLLED = "rolled"
     REVERSED = "reversed"
+
+
+class MxScheduledLedgerIntervalType(str, Enum):
+    """
+    Enum definition of mx_scheduled_ledger interval type.
+    """
+
+    WEEKLY = "weekly"
+    DAILY = "daily"
