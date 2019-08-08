@@ -1,9 +1,14 @@
 import logging
+from datetime import datetime
 
 from typing import Optional, Any
 
 from asyncpg import DataError
 
+from app.commons.context.app_context import AppContext
+from app.commons.context.req_context import ReqContext
+from app.commons.providers.stripe_models import CreatePaymentMethod, AttachPaymentMethod
+from app.commons.types import CountryCode
 from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
@@ -30,61 +35,111 @@ logger = logging.getLogger(__name__)
 
 async def create_payment_method_impl(
     payment_method_repository: PaymentMethodRepository,
+    app_ctxt: AppContext,
+    req_ctxt: ReqContext,
     payer_id: Optional[str],
     payment_gateway: str,
     token: str,
     dd_consumer_id: Optional[str],
     stripe_customer_id: Optional[str],
+    country: Optional[str] = CountryCode.US.value,
 ) -> PaymentMethod:
     """
     Implementation to create a payment method.
 
     :param payment_method_repository:
+    :param app_ctxt: Application context
+    :param req_ctxt: Request context
     :param payer_id:
     :param payment_gateway:
     :param token:
     :param dd_consumer_id:
     :param stripe_customer_id:
+    :param country:
     :return: PaymentMethod object
     """
 
-    # TODO: step 1: create PGP payment_method
-    pgp_resource_id: str = "pm_" + generate_object_uuid()
-    fingerprint: str = "i am fingerprint"
-    last4: str = "1234"
-    dynamic_last4: str = "1233"
-    exp_month: str = "11"
-    exp_year: str = "1911"
-    ttt: str = "visa"
-    active: bool = True
+    # TODO: lookup stripe_customer_id by payer_id from Payers table if not present
+    st_cus_id = stripe_customer_id if stripe_customer_id else None
 
     # TODO: perform Payer's lazy creation
 
-    # TODO: step 2: attach the payment method to PGP customer
+    # step 1: create and attach PGP payment_method
+    try:
+        # create PGP payment method
+        stripe_payment_method = await app_ctxt.stripe.create_payment_method(
+            country=CountryCode(country),
+            request=CreatePaymentMethod(
+                type="card", card=CreatePaymentMethod.Card(token=token)
+            ),
+        )
 
-    # step 3: crete gpg_payment_method and stripe_card objects
+        # attach PGP payment method
+        attach_payment_method = await app_ctxt.stripe.attach_payment_method(
+            country=CountryCode(country),
+            request=AttachPaymentMethod(
+                sid=stripe_payment_method.id, customer=st_cus_id
+            ),
+        )
+        req_ctxt.log.info(
+            "[create_payment_method_impl][%s] attach payment_method completed. customer_id from response: %s",
+            payer_id,
+            attach_payment_method.customer,
+        )
+        now = datetime.utcnow()
+    except Exception as e:
+        req_ctxt.log.error(
+            "[create_payment_method_impl][{}] error while creating stripe payment method".format(
+                payer_id, e
+            )
+        )
+        raise PaymentMethodCreateError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR.value
+            ],
+            retryable=False,
+        )
+    req_ctxt.log.info(
+        "[create_payment_method_impl][%s] create stripe payment_method [%s] completed and attached to customer [%s]",
+        payer_id,
+        stripe_payment_method.id,
+        st_cus_id,
+    )
+
+    # FIXME: where do we refer the active flag from
+    active: bool = True
+
+    # step 2: crete pgp_payment_method and stripe_card objects
     try:
         pm_entity, sc_entity = await payment_method_repository.insert_payment_method_and_stripe_card(
             pm_input=InsertPgpPaymentMethodInput(
                 id=generate_object_uuid(ResourceUuidPrefix.PGP_PAYMENT_METHOD),
                 payer_id=(payer_id if payer_id else None),
                 pgp_code=payment_gateway,
-                pgp_resource_id=pgp_resource_id,
+                pgp_resource_id=stripe_payment_method.id,
                 legacy_consumer_id=dd_consumer_id,
+                type=stripe_payment_method.type,
+                object=stripe_payment_method.object,
+                created_at=now,
+                updated_at=now,
+                attached_at=now,
             ),
             sc_input=InsertStripeCardInput(
-                stripe_id=pgp_resource_id,
-                fingerprint=fingerprint,
-                last4=last4,
-                dynamic_last4=dynamic_last4,
-                exp_month=exp_month,
-                exp_year=exp_year,
-                type=ttt,
+                stripe_id=stripe_payment_method.id,
+                fingerprint=stripe_payment_method.card.fingerprint,
+                last4=stripe_payment_method.card.last4,
+                country_of_origin=stripe_payment_method.card.country,
+                dynamic_last4=stripe_payment_method.card.last4,
+                exp_month=stripe_payment_method.card.exp_month,
+                exp_year=stripe_payment_method.card.exp_year,
+                type=stripe_payment_method.card.brand,
                 active=active,
+                created_at=now,
             ),
         )
     except DataError as e:
-        logger.error(
+        req_ctxt.log.error(
             "[update_payer_impl][{}] DataError when read db.".format(payer_id), e
         )
         raise PaymentMethodCreateError(
@@ -95,7 +150,7 @@ async def create_payment_method_impl(
             retryable=True,
         )
 
-    # TODO step 4: determine to update default_payment_method _id in pgp_customers and stripe_customer tables
+    # TODO step 3: update default_payment_method _id in pgp_customers and stripe_customer tables
 
     return _build_payment_method(
         pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
@@ -104,16 +159,20 @@ async def create_payment_method_impl(
 
 async def get_payment_method_impl(
     payment_method_repository: PaymentMethodRepository,
+    app_ctxt: AppContext,
+    req_ctxt: ReqContext,
     payer_id: str,
     payment_method_id: str,
     payer_id_type: str = None,
     payment_method_id_type: str = None,
-    force_update: bool = None,
+    force_update: Optional[bool] = False,
 ) -> PaymentMethod:
     """
     Implementation to get a payment method.
 
     :param payment_method_repository:
+    :param app_ctxt: Application context
+    :param req_ctxt: Request context
     :param payer_id:
     :param payment_method_id:
     :param payer_id_type:
@@ -175,7 +234,7 @@ async def get_payment_method_impl(
         )
         not_found = True if sc_entity else False
     else:
-        logger.error(
+        req_ctxt.log.error(
             "[get_payment_method_impl][%s] invalid payment_method_id_type %s",
             payment_method_id,
             payment_method_id_type,
@@ -189,7 +248,7 @@ async def get_payment_method_impl(
         )
 
     if not_found is False:
-        logger.error(
+        req_ctxt.log.error(
             "[get_payment_method_impl][%s] cant retrieve data from pgp_payment_method and stripe_card tables!",
             payment_method_id,
         )
@@ -230,7 +289,8 @@ def _build_payment_method(
     """
     Build PaymentMethod object.
 
-    :param pgp_payment_method_entity: pgp_payment_method_entity returned from pgp_payment_method. It could be None if the payment_method was not created through payin APIs.
+    :param pgp_payment_method_entity: pgp_payment_method_entity returned from pgp_payment_method. It could
+           be None if the payment_method was not created through payin APIs.
     :param stripe_card_entity:
     :return: PaymentMethod object
     """

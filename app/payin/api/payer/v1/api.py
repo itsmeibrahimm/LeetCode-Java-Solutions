@@ -11,6 +11,7 @@ from app.payin.core.exceptions import (
     PayerCreationError,
     PayinErrorCode,
     PayerUpdateError,
+    PayerReadError,
 )
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.processor import (
@@ -78,11 +79,18 @@ def create_payer_router(payer_repository: PayerRepository):
         return payer
 
     @router.get("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
-    async def get_payer(request: Request, payer_id: str, payer_type: str = None):
+    async def get_payer(
+        request: Request,
+        payer_id: str,
+        payer_type: str = None,
+        force_update: bool = False,
+    ):
         """
         Get payer.
 
         - **payer_id**: DoorDash payer_id or stripe_customer_id
+        - **payer_type**: [string] identify the type of payer. Valid values include "marketplace", "drive", "merchant", "store", "business" (default is "marketplace")
+        - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
         """
         app_ctxt: AppContext = get_context_from_app(request.app)
         req_ctxt: ReqContext = get_context_from_req(request)
@@ -95,9 +103,10 @@ def create_payer_router(payer_repository: PayerRepository):
                 req_ctxt=req_ctxt,
                 payer_id=payer_id,
                 payer_type=payer_type,
+                force_update=force_update,
             )
             req_ctxt.log.info("[get_payer] retrieve_payer completed")
-        except PayerCreationError as e:
+        except PayerReadError as e:
             return create_payment_error_response_blob(
                 (
                     HTTP_404_NOT_FOUND

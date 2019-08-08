@@ -4,7 +4,9 @@ from asyncpg import DataError
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
-from app.commons.providers.stripe_models import CreateCustomer
+
+# from app.commons.providers import stripe_models as sm
+from app.commons.providers.stripe_models import CreateCustomer, CustomerId
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
 from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
@@ -79,7 +81,7 @@ async def create_payer_impl(
     # TODO: step 2: create PGP customer
     creat_cus_req: CreateCustomer = CreateCustomer(email=email, description=description)
     try:
-        stripe_customer = await app_ctxt.stripe.create_customer(
+        stripe_cus_id: CustomerId = await app_ctxt.stripe.create_customer(
             country=CountryCode(country), request=creat_cus_req
         )
     except Exception as e:
@@ -95,15 +97,10 @@ async def create_payer_impl(
             ],
             retryable=False,
         )
-    # FIXME: all stripe APIs should return entire blob rather than just id.
-    stripe_customer_id = stripe_customer
-    currency = None
-    # stripe_customer_id = stripe_customer.id
-    # currency = stripe_customer.currency
     req_ctxt.log.info(
         "[create_payer_impl][%s] create stripe customer completed. id:%s",
         dd_payer_id,
-        stripe_customer_id,
+        stripe_cus_id,
     )
 
     try:
@@ -113,7 +110,7 @@ async def create_payer_impl(
                 id=generate_object_uuid(ResourceUuidPrefix.PAYER),
                 payer_type=payer_type.value,
                 dd_payer_id=dd_payer_id,
-                legacy_stripe_customer_id=stripe_customer_id,
+                legacy_stripe_customer_id=stripe_cus_id,
                 country=country,
                 description=description,
             )
@@ -129,8 +126,7 @@ async def create_payer_impl(
                     id=generate_object_uuid(ResourceUuidPrefix.PGP_CUSTOMER),
                     payer_id=payer_entity.id,
                     pgp_code=pgp_code,
-                    pgp_resource_id=stripe_customer_id,
-                    currency=currency,
+                    pgp_resource_id=stripe_cus_id,
                 )
             )
             req_ctxt.log.info(
@@ -141,7 +137,7 @@ async def create_payer_impl(
         else:
             stripe_customer_entity: InsertStripeCustomerOutput = await payer_repository.insert_stripe_customer(
                 request=InsertStripeCustomerInput(
-                    stripe_id=stripe_customer_id,
+                    stripe_id=stripe_cus_id,
                     country_shortname=country,
                     owner_type=payer_type.value,
                     owner_id=int(dd_payer_id),
@@ -177,11 +173,11 @@ async def get_payer_impl(
     req_ctxt: ReqContext,
     payer_id: str,
     payer_type: Optional[str],
+    force_update: Optional[bool] = False,
 ) -> Payer:
     """
     Retrieve DoorDash payer
 
-    :type payer_repository: object
     :param app_ctxt: Application context
     :param req_ctxt: Request context
     :param payer_id: payer unique id.
@@ -194,7 +190,8 @@ async def get_payer_impl(
         "[get_payer_impl] payer_id:%s, payer_type:%s", payer_id, payer_type
     )
 
-    # TODO: should consider exposing a parameter to enforce update from PGP
+    # TODO: if force_update is true, we should retrieve the payment_method from GPG
+
     try:
         if not payer_type or payer_type == PayerType.MARKETPLACE.value:
             mp_payer_entity: Optional[

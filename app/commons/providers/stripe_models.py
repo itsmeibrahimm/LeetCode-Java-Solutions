@@ -138,3 +138,57 @@ class CapturePaymentIntent(BaseModel):
     application_fee_amount: Optional[int]
     statement_descriptor: Optional[str]
     transfer_data: Optional[TransferData]
+
+
+class CreatePaymentMethod(BaseModel):
+    class Card(BaseModel):
+        token: str
+
+    type: str
+    card: Card
+
+
+class AttachPaymentMethod(BaseModel):
+    sid: str
+    customer: str
+
+
+class RetrievePaymentMethod(BaseModel):
+    id: str
+
+
+class PaymentMethod(BaseModel):
+    """
+    See: https://stripe.com/docs/api/payment_methods/object
+    """
+
+    class Card(BaseModel):
+        exp_month: int
+        exp_year: int
+        fingerprint: str
+        last4: str
+        funding: Optional[str]
+        brand: Optional[str]
+        country: Optional[str]
+        description: Optional[str]
+
+    class BillingDetails(BaseModel):
+        class Address(BaseModel):
+            city: Optional[str]
+            country: Optional[str]
+            line1: Optional[str]
+            line2: Optional[str]
+            postal_code: Optional[str]
+            state: Optional[str]
+
+        address: Optional[Address]
+        email: Optional[str]
+        name: Optional[str]
+        phone: Optional[str]
+
+    id: str
+    type: str
+    object: Optional[str]
+    customer: Optional[str]
+    card: Card
+    billing_details: BillingDetails

@@ -15,6 +15,7 @@ payin_error_message_maps = {
     "payin_21": "Data I/O error. Please retry again!",
     "payin_22": "Invalid input payment method type!",
     "payin_23": "Payment method not found. Please ensure your payment_method_id is correct",
+    "payin_24": "Error returned from Payment Provider. Please make sure your token is correct!",
 }
 
 
@@ -30,6 +31,7 @@ class PayinErrorCode(str, Enum):
     PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
     PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"
     PAYMENT_METHOD_GET_NOT_FOUND = "payin_23"
+    PAYMENT_METHOD_CREATE_STRIPE_ERROR = "payin_24"
 
 
 ###########################################################

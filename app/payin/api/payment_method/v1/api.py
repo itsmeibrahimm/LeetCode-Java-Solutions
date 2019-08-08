@@ -3,11 +3,15 @@ from typing import Optional
 
 from fastapi import APIRouter
 
+from app.commons.context.app_context import get_context_from_app, AppContext
+from app.commons.context.req_context import get_context_from_req, ReqContext
 from app.commons.error.errors import (
     PaymentErrorResponseBody,
     create_payment_error_response_blob,
 )
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
+
+from starlette.requests import Request
 
 from starlette.status import (
     HTTP_201_CREATED,
@@ -31,7 +35,9 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
     router = APIRouter()
 
     @router.post("/api/v1/payment_methods", status_code=HTTP_201_CREATED)
-    async def create_payment_method(req_body: CreatePaymentMethodRequest):
+    async def create_payment_method(
+        request: Request, req_body: CreatePaymentMethodRequest
+    ):
         """
         Create a payment method for payer on DoorDash payments platform
 
@@ -43,7 +49,9 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         - **consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
         - **stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
         """
-        logger.info(
+        app_ctxt: AppContext = get_context_from_app(request.app)
+        req_ctxt: ReqContext = get_context_from_req(request)
+        req_ctxt.log.info(
             "[create_payment_method] receive request. payer_id:%s", req_body.payer_id
         )
 
@@ -56,20 +64,22 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         try:
             payment_method: PaymentMethod = await create_payment_method_impl(
                 payment_method_repository=payment_method_repository,
+                app_ctxt=app_ctxt,
+                req_ctxt=req_ctxt,
                 payer_id=req_body.payer_id,
                 payment_gateway=req_body.payment_gateway,
                 token=req_body.token,
                 dd_consumer_id=dd_consumer_id,
                 stripe_customer_id=stripe_customer_id,
             )
-            logger.info(
+            req_ctxt.log.info(
                 "[create_payment_method][%s][%s][%s] completed.",
                 req_body.payer_id,
                 dd_consumer_id,
                 stripe_customer_id,
             )
         except PaymentMethodCreateError as e:
-            logger.error(
+            req_ctxt.log.error(
                 "[create_payment_method][{}][{}][{}] exception.".format(
                     req_body.payer_id, dd_consumer_id, stripe_customer_id
                 ),
@@ -90,11 +100,12 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         status_code=HTTP_200_OK,
     )
     async def get_payment_method(
+        request: Request,
         payer_id: str,
         payment_method_id: str,
         payer_id_type: str = None,
         payment_method_id_type: str = None,
-        force_update: bool = None,
+        force_update: bool = False,
     ):
         """
         Get a payment method for payer on DoorDash payments platform
@@ -105,7 +116,9 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values include "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id" (default is "dd_payment_method_id")
         - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
         """
-        logger.info(
+        app_ctxt: AppContext = get_context_from_app(request.app)
+        req_ctxt: ReqContext = get_context_from_req(request)
+        req_ctxt.log.info(
             "[get_payment_method] receive request: payer_id=%s, payment_method_id=%s, payer_id_type=%s, payment_method_id_type=%s, force_update=%s",
             payer_id,
             payment_method_id,
@@ -117,6 +130,8 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         try:
             payment_method: PaymentMethod = await get_payment_method_impl(
                 payment_method_repository=payment_method_repository,
+                app_ctxt=app_ctxt,
+                req_ctxt=req_ctxt,
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
                 payer_id_type=payer_id_type,
@@ -124,7 +139,7 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                 force_update=force_update,
             )
         except PaymentMethodReadError as e:
-            logger.error(
+            req_ctxt.log.error(
                 "[create_payment_method][{}][{}] exception.".format(
                     payer_id, payment_method_id
                 ),
@@ -142,13 +157,16 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
 
     @router.get("/api/v1/payment_methods", status_code=HTTP_200_OK)
     async def list_payment_methods(
+        request: Request,
         payer_id: str = None,
         payment_method_id: str = None,
         payer_id_type: str = None,
         payment_method_object_type: str = None,
         force_update: bool = None,
     ):
-        logger.info("[list_payment_method] receive request")
+        # app_ctxt: AppContext = get_context_from_app(request.app)
+        req_ctxt: ReqContext = get_context_from_req(request)
+        req_ctxt.log.info("[list_payment_method] receive request")
 
         return create_payment_error_response_blob(
             HTTP_501_NOT_IMPLEMENTED,
@@ -164,12 +182,15 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         status_code=HTTP_200_OK,
     )
     async def delete_payment_method(
+        request: Request,
         payer_id: str,
         payment_method_id: str,
         payer_type: str = None,
         payment_method_object_type: str = None,
     ):
-        logger.info("[create_payment_method] receive request")
+        # app_ctxt: AppContext = get_context_from_app(request.app)
+        req_ctxt: ReqContext = get_context_from_req(request)
+        req_ctxt.log.info("[create_payment_method] receive request")
 
         return create_payment_error_response_blob(
             HTTP_501_NOT_IMPLEMENTED,

@@ -30,6 +30,42 @@ class StripeClientInterface:
         """
         ...
 
+    def create_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.CreatePaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        """
+        Create a new Stripe Payment Method
+        https://stripe.com/docs/api/payment_methods/create
+        """
+        ...
+
+    def attach_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.AttachPaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        """
+        Attach a Stripe Payment Method to existing Stripe Customer
+        https://stripe.com/docs/api/payment_methods/attach
+        """
+        ...
+
+    def retrieve_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.RetrievePaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        """
+        Retrieve a Stripe Payment Method
+        https://stripe.com/docs/api/payment_methods/retrieve
+        """
+        ...
+
     def create_payment_intent(
         self,
         country: models.CountryCode,
@@ -105,6 +141,45 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return customer.id
+
+    def create_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.CreatePaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        payment_method = stripe.PaymentMethod.create(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payment_method
+
+    def attach_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.AttachPaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        payment_method = stripe.PaymentMethod.attach(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payment_method
+
+    def retrieve_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.RetrievePaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        payment_method = stripe.PaymentMethod.retrieve(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payment_method
 
     def create_payment_intent(
         self,
@@ -209,6 +284,45 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> models.CustomerId:
         return await self.submit(
             self.client.create_customer,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def create_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.CreatePaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        return await self.submit(
+            self.client.create_payment_method,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def attach_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.AttachPaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        return await self.submit(
+            self.client.attach_payment_method,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def retrieve_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.RetrievePaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        return await self.submit(
+            self.client.retrieve_payment_method,
             country,
             request,
             idempotency_key=idempotency_key,
