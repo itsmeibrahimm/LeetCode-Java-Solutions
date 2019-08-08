@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel
 from typing_extensions import final
 
 from app.commons.types import CurrencyType
@@ -15,19 +14,10 @@ from app.ledger.core.mx_transaction.types import (
 )
 
 
-class PaymentGatewayProviderCustomer(BaseModel):
-    payment_provider: str
-    payment_provider_customer_id: str
-
-
-# https://pydantic-docs.helpmanual.io/#self-referencing-models
-PaymentGatewayProviderCustomer.update_forward_refs()
-
-
 @final
 @dataclass(frozen=True)
 class MxTransaction:
-    mx_transaction_id: UUID
+    id: UUID
     payment_account_id: str
     amount: int
     currency: str
@@ -47,7 +37,7 @@ class MxTransaction:
 @final
 @dataclass(frozen=True)
 class MxLedger:
-    mx_ledger_id: UUID
+    id: UUID
     type: MxLedgerType
     currency: CurrencyType
     state: MxLedgerStateType
@@ -67,7 +57,7 @@ class MxLedger:
 @final
 @dataclass(frozen=True)
 class MxScheduledLedger:
-    mx_scheduled_ledger_id: UUID
+    id: UUID
     payment_account_id: str
     ledger_id: UUID
     interval_type: MxScheduledLedgerIntervalType

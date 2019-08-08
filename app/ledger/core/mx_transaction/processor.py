@@ -1,19 +1,22 @@
-import logging
 import uuid
 from datetime import datetime
 
+from app.commons.context.app_context import AppContext
+from app.commons.context.req_context import ReqContext
 from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.mx_transaction.types import MxTransactionType
 from app.ledger.repository.mx_transaction_repository import (
     InsertMxTransactionInput,
     InsertMxTransactionOutput,
+    MxTransactionRepository,
 )
 
-logger = logging.getLogger(__name__)
 
-
-async def create_mx_transaction(
+async def create_mx_transaction_impl(
+    app_context: AppContext,
+    req_context: ReqContext,
+    mx_transaction_repository: MxTransactionRepository,
     payment_account_id: str,
     target_type: MxTransactionType,
     amount: int,
@@ -24,8 +27,11 @@ async def create_mx_transaction(
     context: str,
     metadata: str,
 ) -> MxTransaction:
-    # FIXME: should be move into app_context.
-    from app.ledger.ledger import mx_transaction_repository as tr
+    req_context.log.info(
+        "[create_mx_transaction_impl] payment_account_id:%s, target_type:%s",
+        payment_account_id,
+        target_type.value,
+    )
 
     # Step 1: Use payment_account_repo.get_or_create_ledger to find the current open ledger
     ledger_id = generate_object_uuid(ResourceUuidPrefix.MX_TRANSACTION)
@@ -44,14 +50,14 @@ async def create_mx_transaction(
         metadata=metadata,
     )
 
-    mx_transaction: InsertMxTransactionOutput = await tr.insert_mx_transaction(
+    mx_transaction: InsertMxTransactionOutput = await mx_transaction_repository.insert_mx_transaction(
         mx_transaction_to_insert
     )
 
     # step 3: Update ledger's balance
 
     return MxTransaction(
-        mx_transaction_id=mx_transaction.id,
+        id=mx_transaction.id,
         payment_account_id=payment_account_id,
         amount=amount,
         currency=currency,
