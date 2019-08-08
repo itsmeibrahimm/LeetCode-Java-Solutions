@@ -11,6 +11,7 @@ from app.commons.context.logger import root_logger
 from app.commons.database.model import Database
 from app.commons.providers.stripe_client import StripeClientPool
 from app.commons.providers.stripe_models import StripeClientSettings
+from app.commons.providers.dsj_client import DSJClient
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,8 @@ class AppContext:
     ledger_paymentdb: Database
 
     stripe: StripeClientPool
+
+    dsj_client: DSJClient
 
     async def close(self):
         try:
@@ -92,6 +95,15 @@ async def create_app_context(config: AppConfig) -> AppContext:
         max_workers=config.STRIPE_MAX_WORKERS,
     )
 
+    dsj_client = DSJClient(
+        {
+            "base_url": config.DSJ_API_BASE_URL,
+            "email": config.DSJ_API_USER_EMAIL.value,
+            "password": config.DSJ_API_USER_PASSWORD.value,
+            "jwt_token_ttl": config.DSJ_API_JWT_TOKEN_TTL,
+        }
+    )
+
     context = AppContext(
         log=root_logger,
         payout_maindb=payout_maindb,
@@ -101,6 +113,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
         stripe=stripe,
+        dsj_client=dsj_client,
     )
 
     context.log.debug("app context created")

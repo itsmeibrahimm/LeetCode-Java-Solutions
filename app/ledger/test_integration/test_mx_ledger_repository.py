@@ -35,6 +35,7 @@ class TestMxLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=ledger_paymentdb,
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         repo = MxLedgerRepository(context=app_context)
         mx_ledger_id = uuid.uuid4()
@@ -67,6 +68,7 @@ class TestMxLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=ledger_paymentdb,
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         repo = MxLedgerRepository(context=app_context)
         mx_ledger_id = uuid.uuid4()
@@ -95,6 +97,7 @@ class TestMxLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=ledger_paymentdb,
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         repo = MxLedgerRepository(context=app_context)
         mx_ledger_id = uuid.uuid4()
@@ -130,6 +133,7 @@ class TestMxLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=ledger_paymentdb,
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         repo = MxLedgerRepository(context=app_context)
         mx_ledger_id = uuid.uuid4()

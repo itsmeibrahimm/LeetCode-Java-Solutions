@@ -7,6 +7,7 @@ from starlette.testclient import TestClient
 from app.commons.context.app_context import AppContext
 from app.commons.providers import stripe_models as models
 from app.commons.providers.stripe_client import StripeClientPool
+from app.commons.providers.dsj_client import DSJClient
 from app.main import app
 
 
@@ -37,6 +38,7 @@ def client(mocker: pytest_mock.MockFixture):
                 )
             ],
         ),
+        dsj_client=DSJClient({}),
     )
     app.extra["context"] = cast(Any, context)
 

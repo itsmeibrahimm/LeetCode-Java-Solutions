@@ -69,6 +69,12 @@ class AppConfig:
     STRIPE_US_SECRET_KEY: Secret
     STRIPE_US_PUBLIC_KEY: Secret
 
+    # DSJ client
+    DSJ_API_USER_EMAIL: Secret
+    DSJ_API_USER_PASSWORD: Secret
+    DSJ_API_BASE_URL: str = "https://api.doordash.com"
+    DSJ_API_JWT_TOKEN_TTL: int = 1800  # in seconds
+
     STATSD_SERVER: str = "prod-proxy-internal.doordash.com"
     STATSD_PREFIX: str = "payment-service"
     STRIPE_MAX_WORKERS: int = 10

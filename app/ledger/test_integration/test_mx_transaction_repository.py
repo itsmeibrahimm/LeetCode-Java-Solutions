@@ -38,6 +38,7 @@ class TestMxLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=ledger_paymentdb,
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         repo = MxTransactionRepository(context=app_context)
         ledger_repo = MxLedgerRepository(context=app_context)
@@ -85,6 +86,7 @@ class TestMxLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=ledger_paymentdb,
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         repo = MxTransactionRepository(context=app_context)
         ledger_repo = MxLedgerRepository(context=app_context)

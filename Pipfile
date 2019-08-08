@@ -47,6 +47,7 @@ stripe = "==2.32.1"
 requests = "==2.22.0"
 setproctitle = "==1.1.10"
 email-validator = "==1.0.4"
+aiohttp = "==3.5.4"
 
 [requires]
 python_version = "3.7"

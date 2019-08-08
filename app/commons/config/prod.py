@@ -19,4 +19,8 @@ def create_app_config() -> AppConfig:
         LEDGER_PAYMENTDB_URL=Secret(name="ledger_paymentdb_url"),
         STRIPE_US_SECRET_KEY=Secret(name="stripe_us_secret_key"),
         STRIPE_US_PUBLIC_KEY=Secret(name="stripe_us_public_key"),
+        DSJ_API_BASE_URL="",
+        DSJ_API_USER_EMAIL=Secret(name="dsj_api_user_email"),
+        DSJ_API_USER_PASSWORD=Secret(name="dsj_api_user_password"),
+        DSJ_API_JWT_TOKEN_TTL=1800,
     )

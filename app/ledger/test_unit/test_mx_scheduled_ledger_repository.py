@@ -24,6 +24,7 @@ class TestMxScheduledLedgerRepository:
             ledger_maindb=mocker.Mock(),
             ledger_paymentdb=mocker.Mock(),
             stripe=mocker.Mock(),
+            dsj_client=mocker.Mock(),
         )
         scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
         start_time = scheduled_ledger_repo.pacific_start_time_for_current_interval(
