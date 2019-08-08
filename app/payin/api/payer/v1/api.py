@@ -37,7 +37,7 @@ def create_payer_router(payer_repository: PayerRepository):
     router = APIRouter()
 
     @router.post("/api/v1/payers", status_code=HTTP_201_CREATED)
-    async def create_payer(request: Request, req_body: CreatePayerRequest):
+    async def create_payer(request: Request, req_body: CreatePayerRequest) -> Payer:
         """
         Create a payer on DoorDash payments platform
 
@@ -84,7 +84,7 @@ def create_payer_router(payer_repository: PayerRepository):
         payer_id: str,
         payer_type: str = None,
         force_update: bool = False,
-    ):
+    ) -> Payer:
         """
         Get payer.
 

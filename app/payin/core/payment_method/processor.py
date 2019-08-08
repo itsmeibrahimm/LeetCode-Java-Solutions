@@ -88,6 +88,9 @@ async def create_payment_method_impl(
         )
         now = datetime.utcnow()
     except Exception as e:
+        # req_ctxt.log.error(e)
+        # TODO Error logged below does not describe what the error is, meaning log statement cannot be used to diagnose the problem.
+        # Add additional details to the log statement and use this convention throughout.
         req_ctxt.log.error(
             "[create_payment_method_impl][{}] error while creating stripe payment method".format(
                 payer_id, e

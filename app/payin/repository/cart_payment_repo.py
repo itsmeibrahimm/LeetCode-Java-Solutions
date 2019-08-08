@@ -28,6 +28,7 @@ class CartPaymentRepository(PayinDBRepository):
         id: UUID,
         payer_id: str,
         type: str,
+        client_description: Optional[str],
         reference_id: int,
         reference_ct_id: int,
         legacy_consumer_id: Optional[int],
@@ -38,6 +39,7 @@ class CartPaymentRepository(PayinDBRepository):
             cart_payments.id: id,
             cart_payments.payer_id: payer_id,
             cart_payments.type: type,
+            cart_payments.client_description: client_description,
             cart_payments.reference_id: reference_id,
             cart_payments.reference_ct_id: reference_ct_id,
             cart_payments.legacy_consumer_id: legacy_consumer_id,
@@ -55,13 +57,12 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_cart_payment(row)
 
     def to_cart_payment(self, row: Any) -> CartPayment:
-        # TODO fill in additional fields
         return CartPayment(
             id=row[cart_payments.id],
             payer_id=row[cart_payments.payer_id],
             amount=row[cart_payments.amount_total],
-            capture_method="todo",
-            payment_method_id="todo",
+            capture_method=None,
+            payment_method_id=None,
             client_description=row[cart_payments.client_description],
             cart_metadata=CartMetadata(
                 reference_id=row[cart_payments.reference_id],

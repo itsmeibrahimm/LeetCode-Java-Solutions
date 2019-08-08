@@ -161,6 +161,21 @@ class CartPaymentInterface:
         finally:
             await self.payment_repo.close_payment_database_connection(connection)
 
+    def _populate_cart_payment_for_response(
+        self, cart_payment: CartPayment, payment_intent: PaymentIntent
+    ):
+        """
+        Populate fields within a CartPayment instance to be suitable for an API response body.
+        Since CartPayment is a view on top of several models, it is necessary to synthesize info
+        into a CartPayment instance from associated models.
+
+        Arguments:
+            cart_payment {CartPayment} -- The CartPayment instance to update.
+            payment_intent {PaymentIntent} -- An associated PaymentIntent.
+        """
+        cart_payment.capture_method = payment_intent.capture_method
+        # TODO cart_payment.payment_method_id = payment_intent.payment_method_id
+
     async def submit_new_payment(
         self,
         request_cart_payment: CartPayment,
@@ -174,6 +189,10 @@ class CartPaymentInterface:
             f"Submitting new payment for payer ${request_cart_payment.payer_id}"
         )
 
+        # Required as inputs to creation API, but optional in model
+        assert request_cart_payment.capture_method
+        assert request_cart_payment.payment_method_id
+
         connection, transaction = (
             await self.payment_repo.get_payment_database_connection_and_transaction()
         )
@@ -185,6 +204,7 @@ class CartPaymentInterface:
                 id=uuid.uuid4(),
                 payer_id=request_cart_payment.payer_id,
                 type=request_cart_payment.cart_metadata.type,
+                client_description=request_cart_payment.client_description,
                 reference_id=request_cart_payment.cart_metadata.reference_id,
                 reference_ct_id=request_cart_payment.cart_metadata.ct_reference_id,
                 legacy_consumer_id=request_cart_payment.legacy_payment.consumer_id
@@ -245,6 +265,7 @@ class CartPaymentInterface:
             await self.payment_repo.close_payment_database_connection(connection)
 
         await self._submit_payment_to_provider(payment_intent, pgp_payment_intent)
+        self._populate_cart_payment_for_response(cart_payment, payment_intent)
         return cart_payment
 
     def _get_cart_payment_submission_pgp_intent(
@@ -301,6 +322,7 @@ class CartPaymentInterface:
             f"Attempting resubmission of payment to provider for cart_payment {cart_payment.id}, payment_intent {payment_intent.id}, pgp_payment_intent {pgp_intent.id if pgp_intent else 'None'}"
         )
         await self._submit_payment_to_provider(payment_intent, pgp_intent)
+        self._populate_cart_payment_for_response(cart_payment, payment_intent)
         return cart_payment
 
     async def _capture_payment_with_provider(

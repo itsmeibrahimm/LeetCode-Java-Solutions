@@ -29,14 +29,13 @@ class CartMetadata:
     type: CartType
 
 
-@final
-@dataclass(frozen=True)
+@dataclass
 class CartPayment:
     id: Optional[UUID]
     amount: int
     payer_id: str
-    payment_method_id: str
-    capture_method: str
+    payment_method_id: Optional[str]
+    capture_method: Optional[str]
     cart_metadata: CartMetadata
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
