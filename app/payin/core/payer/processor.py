@@ -37,10 +37,12 @@ from app.payin.repository.payer_repo import (
     UpdateStripeCustomerWhereInput,
     UpdatePgpCustomerWhereInput,
     InsertStripeCustomerOutput,
+    PayerRepository,
 )
 
 
 async def create_payer_impl(
+    payer_repository: PayerRepository,
     app_ctxt: AppContext,
     req_ctxt: ReqContext,
     dd_payer_id: str,
@@ -55,6 +57,7 @@ async def create_payer_impl(
         - PgpCustomer
         - StripeCustomer (for backward compatibility)
 
+    :param payer_repository:
     :param app_ctxt: Application context
     :param req_ctxt: Request context
     :param dd_payer_id: DoorDash client identifier (consumer_id, etc.)
@@ -64,9 +67,6 @@ async def create_payer_impl(
     :param description: short description for the payer
     :return: Payer object
     """
-    # FIXME: should be move into app_context.
-    from app.payin.payin import payer_repository as payer_repo
-
     req_ctxt.log.info(
         "[create_payer_impl] dd_payer_id:%s, payer_type:%s",
         dd_payer_id,
@@ -108,7 +108,7 @@ async def create_payer_impl(
 
     try:
         # step 3: create payer object
-        payer_entity: InsertPayerOutput = await payer_repo.insert_payer(
+        payer_entity: InsertPayerOutput = await payer_repository.insert_payer(
             request=InsertPayerInput(
                 id=generate_object_uuid(ResourceUuidPrefix.PAYER),
                 payer_type=payer_type.value,
@@ -124,7 +124,7 @@ async def create_payer_impl(
 
         # step 4: create pgp_customer object. We only insert pgp_customer for PayerType.MARKETPLACE
         if payer_type == PayerType.MARKETPLACE.value:
-            pgp_customer_entity: InsertPgpCustomerOutput = await payer_repo.insert_pgp_customer(
+            pgp_customer_entity: InsertPgpCustomerOutput = await payer_repository.insert_pgp_customer(
                 request=InsertPgpCustomerInput(
                     id=generate_object_uuid(ResourceUuidPrefix.PGP_CUSTOMER),
                     payer_id=payer_entity.id,
@@ -139,7 +139,7 @@ async def create_payer_impl(
                 pgp_customer_entity.id,
             )
         else:
-            stripe_customer_entity: InsertStripeCustomerOutput = await payer_repo.insert_stripe_customer(
+            stripe_customer_entity: InsertStripeCustomerOutput = await payer_repository.insert_stripe_customer(
                 request=InsertStripeCustomerInput(
                     stripe_id=stripe_customer_id,
                     country_shortname=country,
@@ -172,11 +172,16 @@ async def create_payer_impl(
 
 
 async def get_payer_impl(
-    app_ctxt: AppContext, req_ctxt: ReqContext, payer_id: str, payer_type: Optional[str]
+    payer_repository: PayerRepository,
+    app_ctxt: AppContext,
+    req_ctxt: ReqContext,
+    payer_id: str,
+    payer_type: Optional[str],
 ) -> Payer:
     """
     Retrieve DoorDash payer
 
+    :type payer_repository: object
     :param app_ctxt: Application context
     :param req_ctxt: Request context
     :param payer_id: payer unique id.
@@ -189,15 +194,14 @@ async def get_payer_impl(
         "[get_payer_impl] payer_id:%s, payer_type:%s", payer_id, payer_type
     )
 
-    # FIXME: should be move into app_context.
-    from app.payin.payin import payer_repository as payer_repo
-
     # TODO: should consider exposing a parameter to enforce update from PGP
     try:
         if not payer_type or payer_type == PayerType.MARKETPLACE.value:
             mp_payer_entity: Optional[
                 GetPayerByIdOutput
-            ] = await payer_repo.get_payer_by_id(request=GetPayerByIdInput(id=payer_id))
+            ] = await payer_repository.get_payer_by_id(
+                request=GetPayerByIdInput(id=payer_id)
+            )
             if not mp_payer_entity:
                 err_code = PayinErrorCode.PAYER_READ_NOT_FOUND.value
                 raise PayerReadError(
@@ -207,14 +211,14 @@ async def get_payer_impl(
                 )
             pgp_customer_entity: Optional[
                 GetPgpCustomerOutput
-            ] = await payer_repo.get_pgp_customer(
+            ] = await payer_repository.get_pgp_customer(
                 request=GetPgpCustomerInput(payer_id=payer_id, pgp_code="stripe")
             )
             payer = _build_payer(mp_payer_entity, pgp_customer_entity)
         else:
             payer_entity: Optional[
                 GetPayerByIdOutput
-            ] = await payer_repo.get_payer_by_id(
+            ] = await payer_repository.get_payer_by_id(
                 request=GetPayerByIdInput(legacy_stripe_customer_id=payer_id)
             )
             if not payer_entity:
@@ -241,6 +245,7 @@ async def get_payer_impl(
 
 
 async def update_payer_impl(
+    payer_repository: PayerRepository,
     app_ctxt: AppContext,
     req_ctxt: ReqContext,
     payer_id: str,
@@ -253,6 +258,7 @@ async def update_payer_impl(
     """
     Update DoorDash payer's default payment method.
 
+    :param payer_repository:
     :param app_ctxt: Application context
     :param req_ctxt: Request context
     :param payer_id: payer unique id.
@@ -265,8 +271,6 @@ async def update_payer_impl(
     :param payer_type:
     :return: Payer object
     """
-    # FIXME: should be move into app_context.
-    from app.payin.payin import payer_repository as payer_repo
 
     # Step 1: identify payer's target PGP from payment_methods table by payment_method_id
     # if payer_id.startswith(ResourceUuidPrefix.PAYER.value):
@@ -278,7 +282,7 @@ async def update_payer_impl(
             # ensure customer is present
             pgp_customer_entity: Optional[
                 GetPgpCustomerOutput
-            ] = await payer_repo.get_pgp_customer(
+            ] = await payer_repository.get_pgp_customer(
                 GetPgpCustomerInput(payer_id=payer_id, pgp_code=pgp_code)
             )
             if not pgp_customer_entity:
@@ -299,7 +303,7 @@ async def update_payer_impl(
             # TODO: call PGP/stripe api to update default payment method
 
             # update pgp_customer with new default_payment_method
-            updated_pgp_customer_entity: UpdatePgpCustomerOutput = await payer_repo.update_pgp_customer(
+            updated_pgp_customer_entity: UpdatePgpCustomerOutput = await payer_repository.update_pgp_customer(
                 UpdatePgpCustomerSetInput(
                     default_payment_method_id=default_payment_method_id,
                     legacy_default_source_id=default_source_id,
@@ -311,7 +315,9 @@ async def update_payer_impl(
             # build response Payer object
             payer_entity: Optional[
                 GetPayerByIdOutput
-            ] = await payer_repo.get_payer_by_id(request=GetPayerByIdInput(id=payer_id))
+            ] = await payer_repository.get_payer_by_id(
+                request=GetPayerByIdInput(id=payer_id)
+            )
             return _build_payer(payer_entity, updated_pgp_customer_entity)
         except DataError as e:
             req_ctxt.log.error(
@@ -333,7 +339,7 @@ async def update_payer_impl(
         )
 
         # lookup stripe_customer to ensure data is present
-        stripe_customer_entity: GetStripeCustomerOutput = await payer_repo.get_stripe_customer(
+        stripe_customer_entity: GetStripeCustomerOutput = await payer_repository.get_stripe_customer(
             GetStripeCustomerInput(stripe_id=payer_id)
             if payer_id_type == "stripe_customer_id"
             else GetStripeCustomerInput(id=payer_id)
@@ -353,7 +359,7 @@ async def update_payer_impl(
         # update stripe_customer with new default_payment_method
         # FIXME: need to handle the migration case where payer only updates default_payment_method which
         # is not supported by stripe_customer schema
-        updated_stripe_customer_entity: UpdateStripeCustomerOutput = await payer_repo.update_stripe_customer(
+        updated_stripe_customer_entity: UpdateStripeCustomerOutput = await payer_repository.update_stripe_customer(
             UpdateStripeCustomerSetInput(
                 default_source=default_source_id, default_card=default_card_id
             ),
@@ -362,6 +368,7 @@ async def update_payer_impl(
 
         # lazy create payer if doesn't exist
         return await _lazy_create_payer(
+            payer_repository=payer_repository,
             req_ctxt=req_ctxt,
             stripe_customer_id=updated_stripe_customer_entity.stripe_id,
             country=updated_stripe_customer_entity.country_shortname,
@@ -384,6 +391,7 @@ async def update_payer_impl(
 
 
 async def _lazy_create_payer(
+    payer_repository: PayerRepository,
     req_ctxt: ReqContext,
     stripe_customer_id: str,
     country: str,
@@ -410,11 +418,11 @@ async def _lazy_create_payer(
     :param description:
     :return: Payer object
     """
-    # FIXME: should be move into app_context.
-    from app.payin.payin import payer_repository as payer_repo
 
     # ensure Payer doesn't exist
-    get_payer_entity: Optional[GetPayerByIdOutput] = await payer_repo.get_payer_by_id(
+    get_payer_entity: Optional[
+        GetPayerByIdOutput
+    ] = await payer_repository.get_payer_by_id(
         request=GetPayerByIdInput(legacy_stripe_customer_id=stripe_customer_id)
     )
     if get_payer_entity:
@@ -426,7 +434,7 @@ async def _lazy_create_payer(
         return _build_payer(payer_entity=get_payer_entity)
 
     # create Payer object
-    payer_entity: InsertPayerOutput = await payer_repo.insert_payer(
+    payer_entity: InsertPayerOutput = await payer_repository.insert_payer(
         request=InsertPayerInput(
             id=generate_object_uuid(ResourceUuidPrefix.PAYER),
             payer_type=payer_type,
@@ -440,7 +448,7 @@ async def _lazy_create_payer(
     # create pgp_customer for marketplace
     if payer_type == PayerType.MARKETPLACE.value:
         pgp_code = "stripe"
-        pgp_customer_entity: InsertPgpCustomerOutput = await payer_repo.insert_pgp_customer(
+        pgp_customer_entity: InsertPgpCustomerOutput = await payer_repository.insert_pgp_customer(
             request=InsertPgpCustomerInput(
                 id=generate_object_uuid(ResourceUuidPrefix.PGP_CUSTOMER),
                 payer_id=payer_entity.id,

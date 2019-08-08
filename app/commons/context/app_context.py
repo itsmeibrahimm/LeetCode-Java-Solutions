@@ -49,26 +49,31 @@ async def create_app_context(config: AppConfig) -> AppContext:
         payout_maindb = await Database.from_url(master_url=config.PAYOUT_MAINDB_URL)
     except Exception:
         root_logger.exception("failed to connect to payout main db")
+        raise
 
     try:
         payout_bankdb = await Database.from_url(master_url=config.PAYOUT_BANKDB_URL)
     except Exception:
         root_logger.exception("failed to connect to payout bank db")
+        raise
 
     try:
         payin_maindb = await Database.from_url(master_url=config.PAYIN_MAINDB_URL)
     except Exception:
         root_logger.exception("failed to connect to payin main db")
+        raise
 
     try:
         payin_paymentdb = await Database.from_url(master_url=config.PAYIN_PAYMENTDB_URL)
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
+        raise
 
     try:
         ledger_maindb = await Database.from_url(master_url=config.LEDGER_MAINDB_URL)
     except Exception:
         root_logger.exception("failed to connect to ledger main db")
+        raise
 
     try:
         ledger_paymentdb = await Database.from_url(
@@ -76,6 +81,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         )
     except Exception:
         root_logger.exception("failed to connect to ledger payment db")
+        raise
 
     stripe = StripeClientPool(
         settings_list=[

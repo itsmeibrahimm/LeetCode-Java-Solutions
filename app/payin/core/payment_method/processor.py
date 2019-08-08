@@ -22,12 +22,14 @@ from app.payin.repository.payment_method_repo import (
     GetStripeCardByStripeIdInput,
     GetPgpPaymentMethodByPgpResourceIdInput,
     GetStripeCardByIdInput,
+    PaymentMethodRepository,
 )
 
 logger = logging.getLogger(__name__)
 
 
 async def create_payment_method_impl(
+    payment_method_repository: PaymentMethodRepository,
     payer_id: Optional[str],
     payment_gateway: str,
     token: str,
@@ -37,6 +39,7 @@ async def create_payment_method_impl(
     """
     Implementation to create a payment method.
 
+    :param payment_method_repository:
     :param payer_id:
     :param payment_gateway:
     :param token:
@@ -44,9 +47,6 @@ async def create_payment_method_impl(
     :param stripe_customer_id:
     :return: PaymentMethod object
     """
-
-    # FIXME: should be move into app_context.
-    from app.payin.payin import payment_method_repository as pm_repo
 
     # TODO: step 1: create PGP payment_method
     pgp_resource_id: str = "pm_" + generate_object_uuid()
@@ -64,7 +64,7 @@ async def create_payment_method_impl(
 
     # step 3: crete gpg_payment_method and stripe_card objects
     try:
-        pm_entity, sc_entity = await pm_repo.insert_payment_method_and_stripe_card(
+        pm_entity, sc_entity = await payment_method_repository.insert_payment_method_and_stripe_card(
             pm_input=InsertPgpPaymentMethodInput(
                 id=generate_object_uuid(ResourceUuidPrefix.PGP_PAYMENT_METHOD),
                 payer_id=(payer_id if payer_id else None),
@@ -103,6 +103,7 @@ async def create_payment_method_impl(
 
 
 async def get_payment_method_impl(
+    payment_method_repository: PaymentMethodRepository,
     payer_id: str,
     payment_method_id: str,
     payer_id_type: str = None,
@@ -112,6 +113,7 @@ async def get_payment_method_impl(
     """
     Implementation to get a payment method.
 
+    :param payment_method_repository:
     :param payer_id:
     :param payment_method_id:
     :param payer_id_type:
@@ -119,8 +121,6 @@ async def get_payment_method_impl(
     :param force_update:
     :return: PaymentMethod object.
     """
-    # FIXME: should be move into app_context.
-    from app.payin.payin import payment_method_repository as pm_repo
 
     # TODO: if force_update is true, we should retrieve the payment_method from GPG
 
@@ -132,7 +132,7 @@ async def get_payment_method_impl(
         payment_method_id_type == PaymentMethodIdType.DD_PAYMENT_PAYMENT_METHOD_ID.value
     ) or (not payment_method_id_type):
         # get pgp_payment_method object
-        pm_entity = await pm_repo.get_pgp_payment_method_by_payment_method_id(
+        pm_entity = await payment_method_repository.get_pgp_payment_method_by_payment_method_id(
             input=GetPgpPaymentMethodByPaymentMethodIdInput(
                 payment_method_id=payment_method_id
             )
@@ -141,33 +141,33 @@ async def get_payment_method_impl(
         sc_entity = (
             None
             if not pm_entity
-            else await pm_repo.get_stripe_card_by_stripe_id(
+            else await payment_method_repository.get_stripe_card_by_stripe_id(
                 GetStripeCardByStripeIdInput(stripe_id=pm_entity.pgp_resource_id)
             )
         )
         not_found = True if (pm_entity and sc_entity) else False
     elif payment_method_id_type == PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID.value:
         # get pgp_payment_method object
-        pm_entity = await pm_repo.get_pgp_payment_method_by_pgp_resource_id(
+        pm_entity = await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
             input=GetPgpPaymentMethodByPgpResourceIdInput(
                 pgp_resource_id=payment_method_id
             )
         )
         # get stripe_card object
-        sc_entity = await pm_repo.get_stripe_card_by_stripe_id(
+        sc_entity = await payment_method_repository.get_stripe_card_by_stripe_id(
             GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
         )
         not_found = True if sc_entity else False
     elif payment_method_id_type == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID.value:
         # get stripe_card object
-        sc_entity = await pm_repo.get_stripe_card_by_id(
+        sc_entity = await payment_method_repository.get_stripe_card_by_id(
             GetStripeCardByIdInput(id=payment_method_id)
         )
         # get pgp_payment_method object
         pm_entity = (
             None
             if not sc_entity
-            else await pm_repo.get_pgp_payment_method_by_pgp_resource_id(
+            else await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
                 input=GetPgpPaymentMethodByPgpResourceIdInput(
                     pgp_resource_id=sc_entity.stripe_id
                 )
