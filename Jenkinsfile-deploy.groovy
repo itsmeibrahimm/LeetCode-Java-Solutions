@@ -46,7 +46,7 @@ pipeline {
         script {
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
           common.runCIcontainer(common.getServiceName(), params['SHA'])
-          common.runTests(common.getServiceName())
+          common.runUnitTests(common.getServiceName())
         }
       }
     }
