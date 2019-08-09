@@ -33,7 +33,7 @@ pexpect = "==4.7.0"
 
 [packages]
 doordash-python-lib = {version = "==0.10.2",index = "gemfury"}
-ninox = {version = "==20190625",index = "gemfury",extras = ["py3", "CLI"]}
+ninox = {version = "*",index = "gemfury",extras = ["py3", "CLI"]}
 fastapi = "==0.33.0"
 uvicorn = "==0.8.4"
 gunicorn = "==19.9.0"
