@@ -2,7 +2,6 @@ import uuid
 from typing import Any, Tuple, List, Optional
 
 from fastapi import HTTPException
-from gino import GinoConnection
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
@@ -138,8 +137,7 @@ class CartPaymentInterface:
             payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
         )
 
-        connection: GinoConnection
-        with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
+        async with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
             await self.payment_repo.update_payment_intent_status(
@@ -179,7 +177,7 @@ class CartPaymentInterface:
         country: str,
         currency: str,
         client_description: str,
-    ):
+    ) -> CartPayment:
         # Create a new cart payment, with associated models
         self.req_context.log.debug(
             f"Submitting new payment for payer ${request_cart_payment.payer_id}"
@@ -189,8 +187,7 @@ class CartPaymentInterface:
         assert request_cart_payment.capture_method
         assert request_cart_payment.payment_method_id
 
-        connection: GinoConnection
-        with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
+        async with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
             # Create CartPayment
             cart_payment: CartPayment = await self.payment_repo.insert_cart_payment(
                 connection=connection,
@@ -380,8 +377,7 @@ class CartPaymentInterface:
         )
 
         # Update state
-        connection: GinoConnection
-        with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
+        async with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
             await self.payment_repo.update_payment_intent_status(
                 connection, payment_intent.id, new_status
             )
@@ -432,6 +428,14 @@ async def submit_payment(
             cart_payment, payment_intent
         )
 
-    return await cart_payment_interface.submit_new_payment(
+    cart_payment = await cart_payment_interface.submit_new_payment(
         request_cart_payment, idempotency_key, country, currency, client_description
     )
+
+    # TODO For demo/test only, to be removed later
+    # payment_intents = await payment_repo.get_payment_intents_for_cart_payment(
+    #     cart_payment.id
+    # )
+    # await cart_payment_interface.capture_payment(payment_intents[0])
+
+    return cart_payment

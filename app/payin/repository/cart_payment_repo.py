@@ -181,6 +181,17 @@ class CartPaymentRepository(PayinDBRepository):
 
         return self.to_payment_intent(row)
 
+    async def get_payment_intents_for_cart_payment(
+        self, cart_payment_id: Optional[UUID]
+    ) -> List[PaymentIntent]:
+        statement = payment_intents.table.select().where(
+            payment_intents.cart_payment_id == cart_payment_id
+        )
+        async with self.payment_database.master().acquire() as connection:  # type: GinoConnection
+            results = await connection.all(statement)
+
+        return [self.to_payment_intent(row) for row in results]
+
     async def insert_pgp_payment_intent(
         self,
         connection: GinoConnection,
