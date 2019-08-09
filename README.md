@@ -70,7 +70,7 @@ The following technologies/frameworks are used across the entire stack:
 1. Make sure you have followed [New eng setup guide](https://github.com/doordash/doordash-eng-wiki/blob/master/docs/New-Engineer-Setup-Guide.md#25-configure-doorstep-django) to properly setup your PIP install indices by envionment variables `ARTIFACTORY_URL`,`ARTIFACTORY_USERNAME`,`ARTIFACTORY_PASSWORD` and `PIP_EXTRA_INDEX_URL`
 2. After step #1, also include `FURY_TOKEN` in your `~/.bash_profile` by running:
    ```bash
-   echo "export FURY_TOKEN=$(echo $PIP_EXTRA_INDEX_URL | sed -E -e 's/.*\/([^/]+)@repo.fury.io\/doordash.*/\1/')" >> ~/.bash_profile
+   echo "export FURY_TOKEN=$(echo $PIP_EXTRA_INDEX_URL | sed -E -e 's/.*\/([^/]+):@repo.fury.io\/doordash.*/\1/')" >> ~/.bash_profile
    source ~/.bash_profile
    ```
 
