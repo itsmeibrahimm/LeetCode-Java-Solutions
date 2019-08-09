@@ -132,7 +132,7 @@ class CartPaymentInterface:
     ):
         # Call out to provider to create the payment intent in their system.  The payment_intent
         # instance includes the idempotency_key, which is passed to provider to ensure records already
-        # sumitted are actually processed only once.
+        # submitted are actually processed only once.
         provider_payment_response = await self._create_provider_payment(
             payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
         )
@@ -263,9 +263,9 @@ class CartPaymentInterface:
 
             # Commit and close transaction.  Close transaction prior to external call.
             await transaction.commit()
-        except Exception as e:
+        except Exception:
             await transaction.rollback()
-            raise e
+            raise
         finally:
             await self.payment_repo.close_payment_database_connection(connection)
 

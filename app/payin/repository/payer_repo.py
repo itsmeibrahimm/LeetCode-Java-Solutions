@@ -241,7 +241,9 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
     """
 
     async def insert_payer(self, request: InsertPayerInput) -> InsertPayerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
+        async with self.payment_database.master().acquire(
+            timeout=1
+        ) as conn:  # type: GinoConnection
             stmt = (
                 payers.table.insert()
                 .values(request.dict(skip_defaults=True))

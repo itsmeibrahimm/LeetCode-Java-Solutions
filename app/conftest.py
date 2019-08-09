@@ -6,7 +6,10 @@ import pytest
 from _pytest.nodes import Item
 
 from app.commons.config.app_config import AppConfig
+from app.commons.context.app_context import create_app_context
 from app.commons.database.model import Database
+from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.payer_repo import PayerRepository
 
 os.environ["ENVIRONMENT"] = "testing"
 
@@ -122,3 +125,21 @@ def pytest_collection_modifyitems(items: List[Item]):
         # Dynamically add pytest.mark.integration to integration tests
         if "test_integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
+
+
+# REPOSITORIES
+
+
+@pytest.yield_fixture
+async def cart_payment_repository(app_config: AppConfig):
+    app_context = await create_app_context(app_config)
+    yield CartPaymentRepository(app_context)
+    # TODO so hacky fix me
+    async with app_context.payin_paymentdb.master().acquire() as conn:
+        await conn.first("truncate payment_intents cascade")
+
+
+@pytest.fixture
+async def payer_repository(app_config: AppConfig):
+    app_context = await create_app_context(app_config)
+    yield PayerRepository(app_context)

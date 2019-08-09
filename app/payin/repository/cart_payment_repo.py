@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from gino import GinoConnection
 from typing import Any, List, Optional
-from typing_extensions import final
 from uuid import UUID
+
+from gino import GinoConnection
+from typing_extensions import final
 
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -72,6 +73,17 @@ class CartPaymentRepository(PayinDBRepository):
             created_at=row[cart_payments.created_at],
             updated_at=row[cart_payments.updated_at],
         )
+
+    async def find_uncaptured_payment_intents(self) -> List[PaymentIntent]:
+        statement = payment_intents.table.select().where(
+            payment_intents.status == IntentStatus.REQUIRES_CAPTURE
+        )
+        async with self.payment_database.master().acquire(
+            reuse=True, timeout=1
+        ) as connection:  # type: GinoConnection
+            results = await connection.all(statement)
+
+        return [self.to_payment_intent(row) for row in results]
 
     async def get_cart_payment_by_id(self, cart_payment_id: UUID) -> CartPayment:
         statement = cart_payments.table.select().where(
