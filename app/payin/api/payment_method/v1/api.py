@@ -18,9 +18,16 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_501_NOT_IMPLEMENTED,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_404_NOT_FOUND,
+    HTTP_400_BAD_REQUEST,
 )
 
-from app.payin.core.exceptions import PaymentMethodReadError, PaymentMethodCreateError
+from app.payin.core.exceptions import (
+    PaymentMethodReadError,
+    PaymentMethodCreateError,
+    PayerReadError,
+    PayinErrorCode,
+)
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import (
     create_payment_method_impl,
@@ -46,7 +53,7 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         - **token**: [string] Token from external PSP to collect sensitive card or bank account
                      details, or personally identifiable information (PII), directly from your customers.
         - **legacy_payment_info**: [json object] legacy information for DSJ backward compatibility.
-        - **consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
+        - **dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
         - **stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
         """
         app_ctxt: AppContext = get_context_from_app(request.app)
@@ -80,13 +87,31 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
             )
         except PaymentMethodCreateError as e:
             req_ctxt.log.error(
-                "[create_payment_method][{}][{}][{}] exception.".format(
+                "[create_payment_method][{}][{}][{}] PaymentMethodCreateError.".format(
                     req_body.payer_id, dd_consumer_id, stripe_customer_id
                 ),
                 e,
             )
+            if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
+                http_status = HTTP_400_BAD_REQUEST
+            else:
+                http_status = HTTP_500_INTERNAL_SERVER_ERROR
             return create_payment_error_response_blob(
-                HTTP_500_INTERNAL_SERVER_ERROR,
+                http_status,
+                PaymentErrorResponseBody(
+                    error_code=e.error_code,
+                    error_message=e.error_message,
+                    retryable=e.retryable,
+                ),
+            )
+        except PayerReadError as e:
+            req_ctxt.log.error(
+                "[create_payment_method][{}][{}][{}] PayerReadError.".format(
+                    req_body.payer_id, dd_consumer_id, stripe_customer_id
+                )
+            )
+            return create_payment_error_response_blob(
+                HTTP_404_NOT_FOUND,
                 PaymentErrorResponseBody(
                     error_code=e.error_code,
                     error_message=e.error_message,
@@ -140,7 +165,7 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
             )
         except PaymentMethodReadError as e:
             req_ctxt.log.error(
-                "[create_payment_method][{}][{}] exception.".format(
+                "[create_payment_method][{}][{}] PaymentMethodReadError.".format(
                     payer_id, payment_method_id
                 ),
                 e,

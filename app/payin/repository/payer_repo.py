@@ -48,6 +48,7 @@ class GetPayerByIdInput(DBRequestModel):
 
     id: Optional[str]
     legacy_stripe_customer_id: Optional[str]
+    dd_payer_id: Optional[str]
 
 
 class GetPayerByIdOutput(PayerDbEntity):
@@ -257,11 +258,15 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
             if request.id:
                 stmt = payers.table.select().where(payers.id == request.id)
-            else:
+            elif request.legacy_stripe_customer_id:
                 # the "id" below is for the damn silly pre-commit-mypy formatter error
                 id = request.legacy_stripe_customer_id
                 stmt = payers.table.select().where(
                     payers.legacy_stripe_customer_id == id
+                )
+            else:
+                stmt = payers.table.select().where(
+                    payers.dd_payer_id == request.dd_payer_id
                 )
             row = await conn.execution_options(
                 timeout=self.payment_database.STATEMENT_TIMEOUT_SEC

@@ -15,9 +15,16 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     payin_error_message_maps,
     PaymentMethodReadError,
+    PayerReadError,
 )
+
 from app.payin.core.payment_method.model import PaymentMethod, Card
 from app.payin.core.types import PaymentMethodIdType
+from app.payin.repository.payer_repo import (
+    PayerRepository,
+    GetPayerByIdInput,
+    GetPayerByIdOutput,
+)
 from app.payin.repository.payment_method_repo import (
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
@@ -59,12 +66,45 @@ async def create_payment_method_impl(
     :return: PaymentMethod object
     """
 
-    # TODO: lookup stripe_customer_id by payer_id from Payers table if not present
-    st_cus_id = stripe_customer_id if stripe_customer_id else None
+    # step 1: lookup stripe_customer_id by payer_id from Payers table if not present
+    # TODO: retrieve pgp_resouce_id from pgp_customers table, instead of payers.legacy_stripe_customer_id
+    st_cus_id: Optional[str]
+    if stripe_customer_id:
+        st_cus_id = stripe_customer_id
+    elif payer_id or dd_consumer_id:
+        payer_repository = PayerRepository(context=app_ctxt)
+        payer_entity: Optional[
+            GetPayerByIdOutput
+        ] = await payer_repository.get_payer_by_id(
+            request=(
+                GetPayerByIdInput(id=payer_id)
+                if payer_id
+                else GetPayerByIdInput(dd_payer_id=dd_consumer_id)
+            )
+        )
+        if not payer_entity:
+            err_code = PayinErrorCode.PAYER_READ_NOT_FOUND.value
+            raise PayerReadError(
+                error_code=err_code,
+                error_message=payin_error_message_maps[err_code],
+                retryable=False,
+            )
+        st_cus_id = payer_entity.legacy_stripe_customer_id
+    else:
+        req_ctxt.log.info(
+            "[create_payment_method_impl][%s] invalid input. must provide id : %s",
+            payer_id,
+        )
+        err_code = PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value
+        raise PaymentMethodCreateError(
+            error_code=err_code,
+            error_message=payin_error_message_maps[err_code],
+            retryable=False,
+        )
 
     # TODO: perform Payer's lazy creation
 
-    # step 1: create and attach PGP payment_method
+    # step 2: create and attach PGP payment_method
     try:
         # create PGP payment method
         stripe_payment_method = await app_ctxt.stripe.create_payment_method(
@@ -113,7 +153,7 @@ async def create_payment_method_impl(
     # FIXME: where do we refer the active flag from
     active: bool = True
 
-    # step 2: crete pgp_payment_method and stripe_card objects
+    # step 3: crete pgp_payment_method and stripe_card objects
     try:
         pm_entity, sc_entity = await payment_method_repository.insert_payment_method_and_stripe_card(
             pm_input=InsertPgpPaymentMethodInput(
@@ -153,7 +193,7 @@ async def create_payment_method_impl(
             retryable=True,
         )
 
-    # TODO step 3: update default_payment_method _id in pgp_customers and stripe_customer tables
+    # TODO step 4: update default_payment_method _id in pgp_customers and stripe_customer tables
 
     return _build_payment_method(
         pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity

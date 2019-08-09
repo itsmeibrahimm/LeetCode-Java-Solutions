@@ -89,7 +89,8 @@ def create_payer_router(payer_repository: PayerRepository):
         Get payer.
 
         - **payer_id**: DoorDash payer_id or stripe_customer_id
-        - **payer_type**: [string] identify the type of payer. Valid values include "marketplace", "drive", "merchant", "store", "business" (default is "marketplace")
+        - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",
+                          "drive", "merchant", "store", "business" (default is "marketplace")
         - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
         """
         app_ctxt: AppContext = get_context_from_app(request.app)
