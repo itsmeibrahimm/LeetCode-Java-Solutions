@@ -111,7 +111,7 @@ class TestCartPayment:
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
         assert cart_payment["payer_id"] == payer["payer_id"]
-        assert cart_payment["payment_method_id"] is None  # TODO
+        assert cart_payment["payment_method_id"] == request_body["payment_method_id"]
         assert cart_payment["capture_method"] == request_body["capture_method"]
         assert cart_payment["cart_metadata"]
         metadata = cart_payment["cart_metadata"]
@@ -121,7 +121,8 @@ class TestCartPayment:
         )
         assert metadata["type"] == request_body["metadata"]["type"]
         assert cart_payment["client_description"] == request_body["client_description"]
-        assert cart_payment["payer_statement_description"] is None  # TODO
+        statement_description = cart_payment["payer_statement_description"]
+        assert statement_description == request_body["payer_statement_description"]
         assert cart_payment["legacy_payment"] is None
         assert cart_payment["split_payment"] is None
         assert payer["created_at"]

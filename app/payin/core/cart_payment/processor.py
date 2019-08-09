@@ -162,7 +162,10 @@ class CartPaymentInterface:
             await self.payment_repo.close_payment_database_connection(connection)
 
     def _populate_cart_payment_for_response(
-        self, cart_payment: CartPayment, payment_intent: PaymentIntent
+        self,
+        cart_payment: CartPayment,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
     ):
         """
         Populate fields within a CartPayment instance to be suitable for an API response body.
@@ -172,9 +175,11 @@ class CartPaymentInterface:
         Arguments:
             cart_payment {CartPayment} -- The CartPayment instance to update.
             payment_intent {PaymentIntent} -- An associated PaymentIntent.
+            pgp_payment_intent {PgpPaymentIntent} -- An associated PgpPaymentIntent.
         """
         cart_payment.capture_method = payment_intent.capture_method
-        # TODO cart_payment.payment_method_id = payment_intent.payment_method_id
+        cart_payment.payer_statement_description = payment_intent.statement_descriptor
+        cart_payment.payment_method_id = pgp_payment_intent.payment_method_resource_id
 
     async def submit_new_payment(
         self,
@@ -265,7 +270,9 @@ class CartPaymentInterface:
             await self.payment_repo.close_payment_database_connection(connection)
 
         await self._submit_payment_to_provider(payment_intent, pgp_payment_intent)
-        self._populate_cart_payment_for_response(cart_payment, payment_intent)
+        self._populate_cart_payment_for_response(
+            cart_payment, payment_intent, pgp_payment_intent
+        )
         return cart_payment
 
     def _get_cart_payment_submission_pgp_intent(
@@ -322,7 +329,9 @@ class CartPaymentInterface:
             f"Attempting resubmission of payment to provider for cart_payment {cart_payment.id}, payment_intent {payment_intent.id}, pgp_payment_intent {pgp_intent.id if pgp_intent else 'None'}"
         )
         await self._submit_payment_to_provider(payment_intent, pgp_intent)
-        self._populate_cart_payment_for_response(cart_payment, payment_intent)
+        self._populate_cart_payment_for_response(
+            cart_payment, payment_intent, pgp_intent
+        )
         return cart_payment
 
     async def _capture_payment_with_provider(
