@@ -1,14 +1,16 @@
-from fastapi import HTTPException
-from typing import Any, Tuple, List, Optional
 import uuid
+from typing import Any, Tuple, List, Optional
+
+from fastapi import HTTPException
+from gino import GinoConnection
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
-from app.commons.types import CountryCode
 from app.commons.providers.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
 )
+from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -20,7 +22,6 @@ from app.payin.core.cart_payment.types import (
     ConfirmationMethod,
     IntentStatus,
 )
-
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
 
@@ -137,11 +138,8 @@ class CartPaymentInterface:
             payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
         )
 
-        connection, transaction = await (
-            self.payment_repo.get_payment_database_connection_and_transaction()
-        )
-
-        try:
+        connection: GinoConnection
+        with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
             await self.payment_repo.update_payment_intent_status(
@@ -153,13 +151,6 @@ class CartPaymentInterface:
                 IntentStatus.REQUIRES_CAPTURE,
                 provider_payment_response,
             )
-
-            await transaction.commit()
-        except Exception as e:
-            await transaction.rollback()
-            raise e
-        finally:
-            await self.payment_repo.close_payment_database_connection(connection)
 
     def _populate_cart_payment_for_response(
         self,
@@ -198,11 +189,8 @@ class CartPaymentInterface:
         assert request_cart_payment.capture_method
         assert request_cart_payment.payment_method_id
 
-        connection, transaction = (
-            await self.payment_repo.get_payment_database_connection_and_transaction()
-        )
-
-        try:
+        connection: GinoConnection
+        with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
             # Create CartPayment
             cart_payment: CartPayment = await self.payment_repo.insert_cart_payment(
                 connection=connection,
@@ -260,14 +248,6 @@ class CartPaymentInterface:
                 status=IntentStatus.INIT,
                 statement_descriptor=request_cart_payment.payer_statement_description,
             )
-
-            # Commit and close transaction.  Close transaction prior to external call.
-            await transaction.commit()
-        except Exception:
-            await transaction.rollback()
-            raise
-        finally:
-            await self.payment_repo.close_payment_database_connection(connection)
 
         await self._submit_payment_to_provider(payment_intent, pgp_payment_intent)
         self._populate_cart_payment_for_response(
@@ -400,11 +380,8 @@ class CartPaymentInterface:
         )
 
         # Update state
-        connection, transaction = await (
-            self.payment_repo.get_payment_database_connection_and_transaction()
-        )
-
-        try:
+        connection: GinoConnection
+        with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
             await self.payment_repo.update_payment_intent_status(
                 connection, payment_intent.id, new_status
             )
@@ -414,13 +391,6 @@ class CartPaymentInterface:
                 new_status,
                 pgp_payment_intent.resource_id,
             )
-
-            await transaction.commit()
-        except Exception as e:
-            await transaction.rollback()
-            raise e
-        finally:
-            await self.payment_repo.close_payment_database_connection(connection)
 
 
 async def submit_payment(

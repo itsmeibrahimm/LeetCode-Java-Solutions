@@ -18,7 +18,7 @@ from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
 async def payment_intent(
     payer_repository: PayerRepository, cart_payment_repository: CartPaymentRepository
 ):
-    connection = await cart_payment_repository.get_payment_database_connection()
+    connection = await cart_payment_repository.payment_database.master().acquire()
 
     insert_payer_input = InsertPayerInput(
         id=str(uuid4()), payer_type=PayerType.STORE, country=CountryCode.US
