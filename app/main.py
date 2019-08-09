@@ -3,8 +3,11 @@ import os
 from app.commons.applications import FastAPI
 
 from fastapi.encoders import jsonable_encoder
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+import sentry_sdk
 
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import (
@@ -41,11 +44,23 @@ app = FastAPI(title="Payment Service", debug=config.DEBUG)
 # https://github.com/encode/starlette/issues/479
 app.add_middleware(DoorDashMetricsMiddleware, config=config)
 app.add_middleware(ReqContextMiddleware)
+if config.SENTRY_CONFIG:
+    sentry_sdk.init(
+        dsn=config.SENTRY_CONFIG.dsn.value,
+        environment=config.SENTRY_CONFIG.environment,
+        release=config.SENTRY_CONFIG.release,
+    )
+    app.add_middleware(SentryAsgiMiddleware)
 
 
 @app.get("/health")
 async def get_health():
     return "OK"
+
+
+@app.get("/error")
+async def make_error():
+    raise Exception("testing deployed sentry integration")
 
 
 @app.on_event("startup")

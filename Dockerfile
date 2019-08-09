@@ -57,3 +57,6 @@ COPY migrations /home/migrations
 # Use a tmpfs mount to prevent heartbeat blocking event loop for EBS volumes
 # http://docs.gunicorn.org/en/stable/faq.html#how-do-i-avoid-gunicorn-excessively-blocking-in-os-fchmod
 CMD ["gunicorn", "--worker-tmp-dir", "/tmpfs", "-k", "uvicorn.workers.UvicornWorker", "-c", "./gunicorn_conf.py", "app.main:app"]
+
+ARG BUILD_NUMBER=unknown
+ENV BUILD_NUMBER ${BUILD_NUMBER}

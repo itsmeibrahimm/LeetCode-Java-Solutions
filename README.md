@@ -60,6 +60,8 @@ The following technologies/frameworks are used across the entire stack:
 
 - [CD pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-deploy.groovy/)
 - [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
+- [WafeFront Dashboard](https://metrics.wavefront.com/dashboard/payment-service-health)
+- [Sentry Issues](https://sentry.io/organizations/doordash/issues/?project=1381528)
 
 # Development
 

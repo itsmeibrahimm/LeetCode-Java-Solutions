@@ -31,9 +31,6 @@ class AppContext:
 
     async def close(self):
         try:
-            # shutdown the threadpool
-            self.stripe.shutdown(wait=False)
-        finally:
             await gather(
                 # Too many Databases here, we may need to create some "manager" to push them down
                 # Also current model assume each Database instance holds unique connection pool
@@ -45,6 +42,9 @@ class AppContext:
                 self.ledger_maindb.close(),
                 self.ledger_paymentdb.close(),
             )
+        finally:
+            # shutdown the threadpool
+            self.stripe.shutdown(wait=False)
 
 
 async def create_app_context(config: AppConfig) -> AppContext:

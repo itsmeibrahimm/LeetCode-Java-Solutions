@@ -39,6 +39,14 @@ class Secret:
 
 @final
 @dataclass(frozen=True)
+class SentryConfig:
+    dsn: Secret
+    environment: str
+    release: str
+
+
+@final
+@dataclass(frozen=True)
 class AppConfig:
     """
     A config class contains all necessary config key-values to bootstrap application.
@@ -77,4 +85,7 @@ class AppConfig:
 
     STATSD_SERVER: str = "prod-proxy-internal.doordash.com"
     STATSD_PREFIX: str = "payment-service"
+
+    SENTRY_CONFIG: Optional[SentryConfig] = None
+
     STRIPE_MAX_WORKERS: int = 10

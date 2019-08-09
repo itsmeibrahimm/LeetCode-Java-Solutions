@@ -20,6 +20,7 @@ endif
 .PHONY: build
 build:
 	docker build -t $(SERVICE_NAME):$(LOCAL_TAG) --cache-from $(CACHE_FROM) \
+	--build-arg BUILD_NUMBER="${BUILD_NUMBER}" \
 	--build-arg ARTIFACTORY_USERNAME="${ARTIFACTORY_USERNAME}" \
 	--build-arg ARTIFACTORY_PASSWORD="${ARTIFACTORY_PASSWORD}" \
 	--build-arg FURY_TOKEN="${FURY_TOKEN}" \
