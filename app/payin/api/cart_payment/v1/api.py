@@ -21,7 +21,9 @@ def create_cart_payments_router(cart_payment_repo: CartPaymentRepository) -> API
     router = APIRouter()
 
     @router.post("/api/v1/cart_payments", status_code=HTTP_201_CREATED)
-    async def create_payer(cart_payment_request: CartPaymentRequest, request: Request):
+    async def create_cart_payment(
+        cart_payment_request: CartPaymentRequest, request: Request
+    ):
         req_context = get_context_from_req(request)
         app_context = get_context_from_app(request.app)
         req_context.log.debug(
