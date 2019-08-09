@@ -54,39 +54,34 @@ class StripeTransferTable(TableDefinition):
     submitted_at: Column = no_init_field(Column("submitted_at", DateTime(True)))
 
 
-class StripeTransfer(DBEntity):
+class _StripeTransferPartial(DBEntity):
+    stripe_id: Optional[str]
+    stripe_request_id: Optional[str]
+    stripe_failure_code: Optional[str]
+    stripe_account_id: Optional[str]
+    stripe_account_type: Optional[str]
+    country_shortname: Optional[str]
+    bank_last_four: Optional[str]
+    bank_name: Optional[str]
+    submission_error_code: Optional[str]
+    submission_error_type: Optional[str]
+    submission_status: Optional[str]
+    submitted_at: Optional[datetime]
+
+
+class StripeTransfer(_StripeTransferPartial):
     id: Optional[int]  # server default generated
     created_at: Optional[datetime]  # client table definition default generated
 
     transfer_id: int
     stripe_status: str
 
-    stripe_id: Optional[str]
-    stripe_request_id: Optional[str]
-    stripe_failure_code: Optional[str]
-    stripe_account_id: Optional[str]
-    stripe_account_type: Optional[str]
-    country_shortname: Optional[str]
-    bank_last_four: Optional[str]
-    bank_name: Optional[str]
-    submission_error_code: Optional[str]
-    submission_error_type: Optional[str]
-    submission_status: Optional[str]
-    submitted_at: Optional[datetime]
+
+class StripeTransferCreate(_StripeTransferPartial):
+    transfer_id: int
+    stripe_status: str
 
 
-class StripeTransferUpdate(DBEntity):
+class StripeTransferUpdate(_StripeTransferPartial):
     stripe_status: Optional[str]
     transfer_id: Optional[int]
-    stripe_id: Optional[str]
-    stripe_request_id: Optional[str]
-    stripe_failure_code: Optional[str]
-    stripe_account_id: Optional[str]
-    stripe_account_type: Optional[str]
-    country_shortname: Optional[str]
-    bank_last_four: Optional[str]
-    bank_name: Optional[str]
-    submission_error_code: Optional[str]
-    submission_error_type: Optional[str]
-    submission_status: Optional[str]
-    submitted_at: Optional[datetime]

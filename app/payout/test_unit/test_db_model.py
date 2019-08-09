@@ -3,42 +3,44 @@ from typing import Type
 import pytest
 
 from app.commons.database.model import DBEntity, TableDefinition
+from app.commons.test_unit.database.utils import validation_db_entity_and_table_schema
 from app.payout.repository.maindb.model import PaymentAccountTable
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
     PaymentAccountUpdate,
+    PaymentAccountCreate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
     StripeManagedAccountTable,
-    StripeManagedAccount,
     StripeManagedAccountUpdate,
+    StripeManagedAccountCreate,
 )
 from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransfer,
     StripeTransferTable,
-    StripeTransfer,
     StripeTransferUpdate,
+    StripeTransferCreate,
 )
 from app.payout.repository.maindb.model.transfer import (
     Transfer,
     TransferTable,
-    Transfer,
     TransferUpdate,
+    TransferCreate,
 )
-from app.commons.test_unit.database.utils import validation_db_entity_and_table_schema
 
 test_db_entity_and_table_definition_data = [
     (PaymentAccount, PaymentAccountTable),
+    (PaymentAccountCreate, PaymentAccountTable),
     (PaymentAccountUpdate, PaymentAccountTable),
     (StripeManagedAccount, StripeManagedAccountTable),
-    (StripeManagedAccount, StripeManagedAccountTable),
+    (StripeManagedAccountCreate, StripeManagedAccountTable),
     (StripeManagedAccountUpdate, StripeManagedAccountTable),
     (Transfer, TransferTable),
-    (Transfer, TransferTable),
+    (TransferCreate, TransferTable),
     (TransferUpdate, TransferTable),
     (StripeTransfer, StripeTransferTable),
-    (StripeTransfer, StripeTransferTable),
+    (StripeTransferCreate, StripeTransferTable),
     (StripeTransferUpdate, StripeTransferTable),
 ]
 

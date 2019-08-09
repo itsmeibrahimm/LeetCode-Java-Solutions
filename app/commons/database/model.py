@@ -63,7 +63,7 @@ class Database:
 
     """
 
-    _POOL_SIZE: ClassVar[int] = 1
+    _POOL_SIZE: ClassVar[int] = 2
     _master: GinoEngine
     _replica: Optional[GinoEngine] = None
 

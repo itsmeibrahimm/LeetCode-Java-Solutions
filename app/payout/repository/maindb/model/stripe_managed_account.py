@@ -49,30 +49,29 @@ class StripeManagedAccountTable(TableDefinition):
     )
 
 
-class StripeManagedAccount(DBEntity):
-    id: Optional[int]  # server default generated
+class _StripeManagedAccountPartial(DBEntity):
+    stripe_last_updated_at: Optional[datetime]
+    bank_account_last_updated_at: Optional[datetime]
+    fingerprint: Optional[str]
+    default_bank_last_four: Optional[str]
+    default_bank_name: Optional[str]
+    verification_disabled_reason: Optional[str]
+    verification_due_by: Optional[datetime]
+    verification_fields_needed: Optional[str]
+
+
+class StripeManagedAccount(_StripeManagedAccountPartial):
+    id: int  # server default generated
 
     country_shortname: str
     stripe_id: str
 
-    stripe_last_updated_at: Optional[datetime]
-    bank_account_last_updated_at: Optional[datetime]
-    fingerprint: Optional[str]
-    default_bank_last_four: Optional[str]
-    default_bank_name: Optional[str]
-    verification_disabled_reason: Optional[str]
-    verification_due_by: Optional[datetime]
-    verification_fields_needed: Optional[str]
+
+class StripeManagedAccountCreate(_StripeManagedAccountPartial):
+    country_shortname: str
+    stripe_id: str
 
 
-class StripeManagedAccountUpdate(DBEntity):
-    stripe_id: Optional[str]
+class StripeManagedAccountUpdate(_StripeManagedAccountPartial):
     country_shortname: Optional[str]
-    stripe_last_updated_at: Optional[datetime]
-    bank_account_last_updated_at: Optional[datetime]
-    fingerprint: Optional[str]
-    default_bank_last_four: Optional[str]
-    default_bank_name: Optional[str]
-    verification_disabled_reason: Optional[str]
-    verification_due_by: Optional[datetime]
-    verification_fields_needed: Optional[str]
+    stripe_id: Optional[str]

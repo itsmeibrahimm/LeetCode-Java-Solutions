@@ -74,15 +74,7 @@ class TransferTable(TableDefinition):
     )
 
 
-class Transfer(DBEntity):
-    id: Optional[int]  # server default generated
-    created_at: Optional[datetime]  # client table definition default generated
-
-    subtotal: int
-    adjustments: str
-    amount: int
-    method: str
-
+class _TransferPartial(DBEntity):
     currency: Optional[str]
     submitted_at: Optional[datetime]
     deleted_at: Optional[datetime]
@@ -100,21 +92,25 @@ class Transfer(DBEntity):
     submitted_by_id: Optional[int]
 
 
-class TransferUpdate(DBEntity):
+class Transfer(_TransferPartial):
+    id: Optional[int]  # server default generated
+    created_at: Optional[datetime]  # client table definition default generated
+
+    subtotal: int
+    adjustments: str
+    amount: int
+    method: str
+
+
+class TransferCreate(_TransferPartial):
+    subtotal: int
+    adjustments: str
+    amount: int
+    method: str
+
+
+class TransferUpdate(_TransferPartial):
     subtotal: Optional[int]
     adjustments: Optional[str]
     amount: Optional[int]
     method: Optional[str]
-    currency: Optional[str]
-    submitted_at: Optional[datetime]
-    deleted_at: Optional[datetime]
-    manual_transfer_reason: Optional[str]
-    status: Optional[str]
-    status_code: Optional[str]
-    submitting_at: Optional[datetime]
-    should_retry_on_failure: Optional[bool]
-    statement_description: Optional[str]
-    created_by_id: Optional[int]
-    deleted_by_id: Optional[int]
-    payment_account_id: Optional[int]
-    submitted_by_id: Optional[int]

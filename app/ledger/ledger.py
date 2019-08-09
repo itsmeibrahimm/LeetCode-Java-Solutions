@@ -1,6 +1,7 @@
 from app.commons.applications import FastAPI
 
 from app.commons.context.app_context import AppContext, set_context_for_app
+from app.commons.error.errors import register_payment_exception_handler
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
@@ -24,5 +25,7 @@ def create_ledger_app(context: AppContext) -> FastAPI:
     )
 
     app.include_router(mx_transactions_router)
+
+    register_payment_exception_handler(app)
 
     return app

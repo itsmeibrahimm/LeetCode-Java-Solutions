@@ -66,33 +66,29 @@ class PaymentAccountTable(TableDefinition):
     )
 
 
-class PaymentAccount(DBEntity):
-    id: Optional[int]  # server default generated
-    created_at: Optional[datetime]  # client table definition default generated
+class _PaymentAccountPartial(DBEntity):
+    account_id: Optional[int]
+    account_type: Optional[str]
+    entity: Optional[str]
+    resolve_outstanding_balance_frequency: Optional[str]
+    payout_disabled: Optional[bool]
+    charges_enabled: Optional[bool]
+    old_account_id: Optional[int]
+    upgraded_to_managed_account_at: Optional[datetime]
+    is_verified_with_stripe: Optional[bool]
+    transfers_enabled: Optional[bool]
+
+
+class PaymentAccount(_PaymentAccountPartial):
+    id: int  # server default generated
+    created_at: datetime  # client table definition default generated
 
     statement_descriptor: str
 
-    account_id: Optional[int]
-    account_type: Optional[str]
-    entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
-    payout_disabled: Optional[bool]
-    charges_enabled: Optional[bool]
-    old_account_id: Optional[int]
-    upgraded_to_managed_account_at: Optional[datetime]
-    is_verified_with_stripe: Optional[bool]
-    transfers_enabled: Optional[bool]
+
+class PaymentAccountCreate(_PaymentAccountPartial):
+    statement_descriptor: str
 
 
-class PaymentAccountUpdate(DBEntity):
-    account_id: Optional[int]
-    account_type: Optional[str]
+class PaymentAccountUpdate(_PaymentAccountPartial):
     statement_descriptor: Optional[str]
-    entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
-    payout_disabled: Optional[bool]
-    charges_enabled: Optional[bool]
-    old_account_id: Optional[int]
-    upgraded_to_managed_account_at: Optional[datetime]
-    is_verified_with_stripe: Optional[bool]
-    transfers_enabled: Optional[bool]

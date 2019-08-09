@@ -41,7 +41,7 @@ run-ci-container: build-ci-container
 	CI_IMAGE_NAME="$(SERVICE_NAME):$(CI_TAG)" \
 	CI_BASE_IMAGE="$(CI_BASE_IMAGE)" \
 	CI_CONTAINER_NAME="$(CI_CONTAINER_NAME)" \
-	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate
+	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate --renew-anon-volumes
 
 .PHONY: tag
 tag:
