@@ -1,11 +1,8 @@
 import asyncio
-import os
 from asyncio import create_subprocess_exec
 
 from app.commons.config.app_config import AppConfig
 from app.commons.config.utils import init_app_config
-
-ENVIRONMENT_KEY = "ENVIRONMENT"
 
 
 async def run_alembic_command(db_url, config_name):
@@ -66,4 +63,4 @@ if __name__ == "__main__":
     print("Updating schemas")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
-    print(f"Schemas are ready for ENVIRONMENT={os.getenv(ENVIRONMENT_KEY)}")
+    print("Schemas are ready.")
