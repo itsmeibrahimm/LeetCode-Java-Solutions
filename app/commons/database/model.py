@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import gino
 from gino import Gino, GinoEngine
@@ -8,6 +8,7 @@ from sqlalchemy import Column, Table
 from sqlalchemy.sql.schema import SchemaItem
 
 from app.commons.config.app_config import Secret
+from app.commons.database.config import DatabaseConfig
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -51,7 +52,7 @@ class TableDefinition:
                 self.name,
                 self.db_metadata,
                 *sa_schema_positional_args,
-                **self.additional_schema_kwargs
+                **self.additional_schema_kwargs,
             ),
         )
 
@@ -63,33 +64,39 @@ class Database:
 
     """
 
-    _POOL_SIZE: ClassVar[int] = 5
     _master: GinoEngine
     _replica: Optional[GinoEngine] = None
 
     @classmethod
-    async def from_url(
-        cls, master_url: Secret, replica_url: Optional[Secret] = None
+    async def create(
+        cls,
+        *,
+        name: str,
+        db_config: DatabaseConfig,
+        master_url: Secret,
+        replica_url: Optional[Secret] = None,
     ) -> "Database":
-        # temporarily set poll size=1 here to unblock local dev
-        # TODO make pool sizing configurable per environment
         created_master = await gino.create_engine(
             # DO NOT use 'pool_size' here. Asyncpg currently only take in max_size and min_size.
             master_url.value,
-            max_size=cls._POOL_SIZE,
-            min_size=cls._POOL_SIZE,
+            max_size=db_config.master_pool_size,
+            min_size=db_config.master_pool_size,
+            echo=db_config.debug,
+            logging_name=f"{name}_master",
         )
 
         created_replica = None
         if replica_url:
-            # temporarily set poll size=1 here to unblock local dev
             created_replica = await gino.create_engine(
-                replica_url.value, max_size=cls._POOL_SIZE, min_size=cls._POOL_SIZE
+                replica_url.value,
+                max_size=db_config.replica_pool_size,
+                min_size=db_config.replica_pool_size,
+                echo=db_config.debug,
+                logging_name=f"{name}_replica",
             )
 
         return cls(_master=created_master, _replica=created_replica)
 
-    # TODO: may need to tune this to a reasonable number or even beef up a config object
     STATEMENT_TIMEOUT_SEC: int = no_init_field(5)
 
     def master(self) -> GinoEngine:

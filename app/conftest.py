@@ -84,7 +84,11 @@ async def payin_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayIn user
     """
-    db = await Database.from_url(master_url=app_config.PAYIN_MAINDB_URL)
+    db = await Database.create(
+        name="payin_maindb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.PAYIN_MAINDB_MASTER_URL,
+    )
     yield db
     await db.close()
 
@@ -94,7 +98,11 @@ async def payout_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayOut user
     """
-    db = await Database.from_url(master_url=app_config.PAYOUT_MAINDB_URL)
+    db = await Database.create(
+        name="payout_maindb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.PAYOUT_MAINDB_MASTER_URL,
+    )
     yield db
     await db.close()
 
@@ -104,7 +112,11 @@ async def payout_bankdb(app_config: AppConfig):
     """
     initialize the bankdb connection for PayOut user
     """
-    db = await Database.from_url(master_url=app_config.PAYOUT_BANKDB_URL)
+    db = await Database.create(
+        name="payout_bankdb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.PAYOUT_BANKDB_MASTER_URL,
+    )
     yield db
     await db.close()
 
@@ -114,7 +126,11 @@ async def ledger_paymentdb(app_config: AppConfig):
     """
     initialize the paymentdb connection for Ledger user
     """
-    db = await Database.from_url(master_url=app_config.LEDGER_PAYMENTDB_URL)
+    db = await Database.create(
+        name="ledger_paymentdb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.LEDGER_PAYMENTDB_MASTER_URL,
+    )
     yield db
     await db.close()
 

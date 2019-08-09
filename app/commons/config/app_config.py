@@ -4,6 +4,8 @@ from typing import Dict, Optional
 
 from typing_extensions import final
 
+from app.commons.database.config import DatabaseConfig
+
 
 @final
 @dataclass
@@ -66,12 +68,25 @@ class AppConfig:
     TEST_SECRET: Secret
 
     # DB configs
-    PAYOUT_MAINDB_URL: Secret
-    PAYOUT_BANKDB_URL: Secret
-    PAYIN_MAINDB_URL: Secret
-    PAYIN_PAYMENTDB_URL: Secret
-    LEDGER_MAINDB_URL: Secret
-    LEDGER_PAYMENTDB_URL: Secret
+    PAYOUT_MAINDB_MASTER_URL: Secret
+    PAYOUT_MAINDB_REPLICA_URL: Optional[Secret]
+
+    PAYOUT_BANKDB_MASTER_URL: Secret
+    PAYOUT_BANKDB_REPLICA_URL: Optional[Secret]
+
+    PAYIN_MAINDB_MASTER_URL: Secret
+    PAYIN_MAINDB_REPLICA_URL: Optional[Secret]
+
+    PAYIN_PAYMENTDB_MASTER_URL: Secret
+    PAYIN_PAYMENTDB_REPLICA_URL: Optional[Secret]
+
+    LEDGER_MAINDB_MASTER_URL: Secret
+    LEDGER_MAINDB_REPLICA_URL: Optional[Secret]
+
+    LEDGER_PAYMENTDB_MASTER_URL: Secret
+    LEDGER_PAYMENTDB_REPLICA_URL: Optional[Secret]
+
+    DEFAULT_DB_CONFIG: DatabaseConfig
 
     # Payment Service Provider
     STRIPE_US_SECRET_KEY: Secret

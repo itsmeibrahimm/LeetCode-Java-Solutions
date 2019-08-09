@@ -49,38 +49,66 @@ class AppContext:
 
 async def create_app_context(config: AppConfig) -> AppContext:
     try:
-        payout_maindb = await Database.from_url(master_url=config.PAYOUT_MAINDB_URL)
+        payout_maindb = await Database.create(
+            name="payout_maindb",
+            db_config=config.DEFAULT_DB_CONFIG,
+            master_url=config.PAYOUT_MAINDB_MASTER_URL,
+            replica_url=config.PAYIN_MAINDB_REPLICA_URL,
+        )
     except Exception:
         root_logger.exception("failed to connect to payout main db")
         raise
 
     try:
-        payout_bankdb = await Database.from_url(master_url=config.PAYOUT_BANKDB_URL)
+        payout_bankdb = await Database.create(
+            name="payout_bankdb",
+            db_config=config.DEFAULT_DB_CONFIG,
+            master_url=config.PAYOUT_BANKDB_MASTER_URL,
+            replica_url=config.PAYOUT_BANKDB_REPLICA_URL,
+        )
     except Exception:
         root_logger.exception("failed to connect to payout bank db")
         raise
 
     try:
-        payin_maindb = await Database.from_url(master_url=config.PAYIN_MAINDB_URL)
+        payin_maindb = await Database.create(
+            name="payin_maindb",
+            db_config=config.DEFAULT_DB_CONFIG,
+            master_url=config.PAYIN_MAINDB_MASTER_URL,
+            replica_url=config.PAYIN_MAINDB_REPLICA_URL,
+        )
     except Exception:
         root_logger.exception("failed to connect to payin main db")
         raise
 
     try:
-        payin_paymentdb = await Database.from_url(master_url=config.PAYIN_PAYMENTDB_URL)
+        payin_paymentdb = await Database.create(
+            name="payin_paymentdb",
+            db_config=config.DEFAULT_DB_CONFIG,
+            master_url=config.PAYIN_PAYMENTDB_MASTER_URL,
+            replica_url=config.PAYIN_PAYMENTDB_REPLICA_URL,
+        )
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
         raise
 
     try:
-        ledger_maindb = await Database.from_url(master_url=config.LEDGER_MAINDB_URL)
+        ledger_maindb = await Database.create(
+            name="ledger_maindb",
+            db_config=config.DEFAULT_DB_CONFIG,
+            master_url=config.LEDGER_MAINDB_MASTER_URL,
+            replica_url=config.LEDGER_MAINDB_REPLICA_URL,
+        )
     except Exception:
         root_logger.exception("failed to connect to ledger main db")
         raise
 
     try:
-        ledger_paymentdb = await Database.from_url(
-            master_url=config.LEDGER_PAYMENTDB_URL
+        ledger_paymentdb = await Database.create(
+            name="ledger_paymentdb",
+            db_config=config.DEFAULT_DB_CONFIG,
+            master_url=config.LEDGER_PAYMENTDB_MASTER_URL,
+            replica_url=config.LEDGER_PAYMENTDB_REPLICA_URL,
         )
     except Exception:
         root_logger.exception("failed to connect to ledger payment db")
