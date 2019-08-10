@@ -134,7 +134,7 @@ make local-server
   Any code changes will lead to a service reload and therefore be reflected in real-time.
 - Confirming local server is up running:
   ```bash
-  curl localhost:8081/health/ # port is defined in Makefile::local-server
+  curl localhost:8000/health # port is defined in Makefile::local-server
   ```
 
 #### Running tests in local environment
