@@ -1,5 +1,6 @@
 from pytest import fixture
 from starlette.testclient import TestClient
+from datetime import datetime
 
 TRANSFER_ENDPOINT = "/payout/api/v0/transfers"
 STRIPE_TRANSFER_ENDPOINT = "/payout/api/v0/transfers/stripe"
@@ -63,7 +64,7 @@ class TestTransferV0:
     def prepared_stripe_transfer(self, prepared_transfer: dict, client: TestClient):
         to_create = {
             "stripe_status": "default",
-            "stripe_id": "stripe_id",
+            "stripe_id": f"stripe_id-{datetime.utcnow()}",
             "transfer_id": prepared_transfer["id"],
         }
         response = client.post(create_stripe_transfer_url(), json=to_create)
@@ -111,7 +112,7 @@ class TestTransferV0:
     ):
         stripe_status_update = "newstatus"
         response = client.patch(
-            get_stripe_transfer_by_id_url(prepared_stripe_transfer["id"]),
+            update_stripe_transfer_by_id_url(prepared_stripe_transfer["id"]),
             json={"stripe_status": stripe_status_update},
         )
 

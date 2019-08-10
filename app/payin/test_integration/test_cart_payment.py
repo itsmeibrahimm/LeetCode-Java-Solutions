@@ -1,9 +1,8 @@
-import pytest
-from starlette.testclient import TestClient
 import uuid
 
+from starlette.testclient import TestClient
 
-@pytest.mark.skip("App context error - see comments in conftest")
+
 class TestCartPayment:
     def _get_payer_create_request(self):
         unique_value = str(uuid.uuid4())

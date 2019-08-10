@@ -4,6 +4,7 @@ from typing import Any, List
 
 import pytest
 from _pytest.nodes import Item
+from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import create_app_context
@@ -159,3 +160,11 @@ async def cart_payment_repository(app_config: AppConfig):
 async def payer_repository(app_config: AppConfig):
     app_context = await create_app_context(app_config)
     yield PayerRepository(app_context)
+
+
+@pytest.fixture(scope="session")
+def client():
+    from app.main import app
+
+    with TestClient(app) as client:
+        yield client
