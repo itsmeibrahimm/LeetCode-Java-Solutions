@@ -98,6 +98,10 @@ test-unit:
 test-integration: wait-test-dependency
 	python runtests.py -m "integration" app/
 
+.PHONY: test-pulse
+test-pulse: wait-test-dependency
+	ENVIRONMENT=testing python -m development.pulse_run
+
 .PHONY: test-external
 test-external:
 	python runtests.py -m "external" app/

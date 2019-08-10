@@ -65,8 +65,7 @@ pipeline {
         artifactoryLogin()
         script {
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          common.deployPulse(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging'
-          )
+          common.deployPulse(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
         }
       }
     }

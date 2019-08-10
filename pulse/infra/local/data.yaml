@@ -3,4 +3,4 @@ service_env:
   SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
   REPORT_ENABLED: false
   SERVICE_NAME: "payment-service"
-  SERVICE_URI: "http://localhost:8081"
+  SERVICE_URI: "http://localhost:8000"

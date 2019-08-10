@@ -61,6 +61,13 @@ pipeline {
         }
       }
     }
+    stage('Pulse tests') {
+      steps {
+        script {
+          common.runPulseTests(common.getServiceName())
+        }
+      }
+    }
     stage('Linting') {
       steps {
         script {

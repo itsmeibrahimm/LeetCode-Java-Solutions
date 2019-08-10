@@ -179,6 +179,33 @@ def runIntegrationTests(String serviceName) {
 
 
 /**
+ * Run Pulse Tests on the CI container and archive the report
+ */
+def runPulseTests(String serviceName) {
+  def outputFile = "pulse-test.xml"
+  github.doClosureWithStatus({
+    withCredentials([
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS_URLENCODED', variable: 'ARTIFACTORY_PASSWORD'),
+        string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
+      ]){
+    try {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker exec ${serviceName}-ci make test-pulse PYTEST_ADDOPTS="--junitxml ${outputFile}"
+            |""".stripMargin()
+    } finally {
+      sh """|#!/bin/bash
+            |set -eox
+            |docker cp ${serviceName}-ci:/home/pulse/${outputFile} ${outputFile}
+            |""".stripMargin()
+      loadJunit(outputFile)
+    }}
+  }, gitUrl, sha, "Pulse Tests", "${BUILD_URL}testReport")
+}
+
+
+/**
  * Run the linter on the CI container and archive the report
  */
 def runLinter(String serviceName) {
@@ -354,6 +381,35 @@ def deployPulse(Map optArgs = [:], String gitUrl, String sha, String branch, Str
     String doorctlPath = doorctl.installIntoWorkspace(DOORCTL_VERSION)
     // deploy Pulse
     pulse.deploy(PULSE_VERSION, SERVICE_NAME, KUBERNETES_CLUSTER, doorctlPath, PULSE_DIR)
+  }
+}
+
+
+/**
+ * Deploy Blocking Pulse for a Microservice.
+ */
+def deployBlockingPulse(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName, String env) {
+  Map o = [
+          k8sNamespace: env,
+          pulseVersion: '2.1',
+          pulseDoorctlVersion: 'v0.0.118',
+          pulseRootDir: 'pulse'
+  ] << serviceNameEnvToOptArgs(serviceName, env) << optArgs
+
+  String PULSE_VERSION = o.pulseVersion
+  String SERVICE_NAME = serviceName
+  String SERVICE_SHA = sha
+  String KUBERNETES_CLUSTER = o.k8sNamespace
+  String DOORCTL_VERSION = o.pulseDoorctlVersion
+  String PULSE_DIR = o.pulseRootDir
+  Integer TIMEOUT_S = 360
+  Integer SLEEP_S = 5
+
+  sshagent(credentials: ['DDGHMACHINEUSER_PRIVATE_KEY']) {
+    // install doorctl and grab its executable path
+    String doorctlPath = doorctl.installIntoWorkspace(DOORCTL_VERSION)
+    // deploy Pulse
+    pulse.blockingDeploy(PULSE_VERSION, SERVICE_NAME, SERVICE_SHA, KUBERNETES_CLUSTER, doorctlPath, PULSE_DIR, TIMEOUT_S, SLEEP_S)
   }
 }
 

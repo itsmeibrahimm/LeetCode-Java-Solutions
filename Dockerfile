@@ -53,6 +53,7 @@ COPY _infra/web/gunicorn_conf.py /home/
 COPY app /home/app
 COPY development /home/development
 COPY migrations /home/migrations
+COPY pulse /home/pulse
 
 # Use a tmpfs mount to prevent heartbeat blocking event loop for EBS volumes
 # http://docs.gunicorn.org/en/stable/faq.html#how-do-i-avoid-gunicorn-excessively-blocking-in-os-fchmod

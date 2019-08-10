@@ -1,3 +1,6 @@
+service_name: payment-service
+cron_schedule: "0 */1 * * *"
+
 service_runtime_config:
   example_service_runtime_config: "this is a runtime config"
 
