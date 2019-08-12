@@ -1,10 +1,11 @@
 from datetime import datetime
-from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
+from pydantic import Json
 from typing_extensions import final
 
+from app.commons.database.model import DBEntity
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.types import (
     MxTransactionType,
@@ -15,13 +16,12 @@ from app.ledger.core.mx_transaction.types import (
 
 
 @final
-@dataclass(frozen=True)
-class MxTransaction:
+class MxTransaction(DBEntity):
     id: UUID
     payment_account_id: str
     amount: int
     currency: str
-    ledger_id: str
+    ledger_id: UUID
     idempotency_key: str
     routing_key: datetime
     target_type: MxTransactionType
@@ -29,14 +29,13 @@ class MxTransaction:
     target_id: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
-    context: Optional[str] = None
-    metadata: Optional[str] = None
+    context: Optional[Json]
+    metadata: Optional[Json]
 
 
 # todo：refactor this into new folder later
 @final
-@dataclass(frozen=True)
-class MxLedger:
+class MxLedger(DBEntity):
     id: UUID
     type: MxLedgerType
     currency: CurrencyType
@@ -48,15 +47,14 @@ class MxLedger:
     submitted_at: Optional[datetime]
     amount_paid: Optional[int]
     legacy_transfer_id: Optional[str]
-    finalized_at: Optional[datetime] = None
-    created_by_employee_id: Optional[str] = None
-    submitted_by_employee_id: Optional[str] = None
-    rolled_to_ledger_id: Optional[str] = None
+    finalized_at: Optional[datetime]
+    created_by_employee_id: Optional[str]
+    submitted_by_employee_id: Optional[str]
+    rolled_to_ledger_id: Optional[str]
 
 
 @final
-@dataclass(frozen=True)
-class MxScheduledLedger:
+class MxScheduledLedger(DBEntity):
     id: UUID
     payment_account_id: str
     ledger_id: UUID

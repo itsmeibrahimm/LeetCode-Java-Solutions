@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from gino import GinoConnection
+from sqlalchemy import and_
 
 from app.commons.database.model import DBRequestModel, DBEntity
-from app.ledger.core.mx_transaction.types import MxTransactionType
+from app.ledger.core.mx_transaction.types import MxTransactionType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_ledgers, mx_transactions
 
 
@@ -42,10 +43,10 @@ class MxLedgerDbEntity(DBEntity):
     updated_at: Optional[datetime]
     submitted_at: Optional[datetime]
     amount_paid: Optional[int]
-    finalized_at: Optional[datetime] = None
-    created_by_employee_id: Optional[str] = None
-    submitted_by_employee_id: Optional[str] = None
-    rolled_to_ledger_id: Optional[str] = None
+    finalized_at: Optional[datetime]
+    created_by_employee_id: Optional[str]
+    submitted_by_employee_id: Optional[str]
+    rolled_to_ledger_id: Optional[str]
 
 
 class InsertMxLedgerInput(MxLedgerDbEntity):
@@ -72,6 +73,30 @@ class UpdateMxLedgerOutput(MxLedgerDbEntity):
     pass
 
 
+class GetMxLedgerByAccountInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    payment_account_id: str
+
+
+class GetMxLedgerByAccountOutput(MxLedgerDbEntity):
+    pass
+
+
+class GetMxLedgerByIdInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
+
+
+class GetMxLedgerByIdOutput(MxLedgerDbEntity):
+    pass
+
+
 class MxLedgerRepositoryInterface:
     @abstractmethod
     async def insert_mx_ledger(
@@ -88,6 +113,18 @@ class MxLedgerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def get_ledger_by_id(
+        self, request: GetMxLedgerByIdInput
+    ) -> Optional[GetMxLedgerByIdOutput]:
+        ...
+
+    @abstractmethod
+    async def get_open_ledger_for_payment_account(
+        self, request: GetMxLedgerByAccountInput
+    ) -> Optional[GetMxLedgerByAccountOutput]:
+        ...
+
+    @abstractmethod
     async def create_one_off_mx_ledger(
         self, request_ledger: InsertMxLedgerInput
     ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:
@@ -100,7 +137,6 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         self, request: InsertMxLedgerInput
     ) -> InsertMxLedgerOutput:
         async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-
             stmt = (
                 mx_ledgers.table.insert()
                 .values(request.dict(skip_defaults=True))
@@ -125,6 +161,39 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
                 timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
             ).first(stmt)
             return UpdateMxLedgerOutput.from_orm(row)
+
+    async def get_ledger_by_id(
+        self, request: GetMxLedgerByIdInput
+    ) -> Optional[GetMxLedgerByIdOutput]:
+        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
+            stmt = mx_ledgers.table.select().where(mx_ledgers.id == request.id)
+            row = await conn.execution_options(
+                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
+            ).first(stmt)
+            # if no result found, return nothing
+            if not row:
+                return None
+            return GetMxLedgerByIdOutput.from_orm(row)
+
+    # todo: do we have constriant for how many can be returned?
+    async def get_open_ledger_for_payment_account(
+        self, request: GetMxLedgerByAccountInput
+    ) -> Optional[GetMxLedgerByAccountOutput]:
+        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
+            stmt = mx_ledgers.table.select().where(
+                and_(
+                    mx_ledgers.payment_account_id
+                    == request.payment_account_id,  # noqa: W503
+                    mx_ledgers.state == MxLedgerStateType.OPEN,
+                )
+            )
+            row = await conn.execution_options(
+                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
+            ).first(stmt)
+            # if no result found, return nothing
+            if not row:
+                return None
+            return GetMxLedgerByAccountOutput.from_orm(row)
 
     async def create_one_off_mx_ledger(
         self, request_ledger: InsertMxLedgerInput
@@ -153,6 +222,6 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             row = await conn.first(stmt)
             mx_transaction = InsertMxTransactionOutput.from_orm(row)
 
-        # todo: call payout service to payout the ledger
+        # todo: call payout service to payout the ledger and update corresponding status
 
         return one_off_mx_ledger, mx_transaction

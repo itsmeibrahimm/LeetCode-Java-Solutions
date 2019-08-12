@@ -1,6 +1,12 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel
 
-from app.ledger.core.mx_transaction.types import MxTransactionType
+from app.ledger.core.mx_transaction.types import (
+    MxTransactionType,
+    MxScheduledLedgerIntervalType,
+)
 
 
 class CreateMxTransactionRequest(BaseModel):
@@ -9,10 +15,12 @@ class CreateMxTransactionRequest(BaseModel):
     amount: str
     currency: str
     idempotency_key: str
-    routing_key: str
-    target_id: str
-    context: str
-    metadata: str
+    routing_key: datetime
+    interval_type: MxScheduledLedgerIntervalType
+    target_id: Optional[str]
+    context: Optional[str]
+    metadata: Optional[str]
+    legacy_transaction_id: Optional[str]
 
 
 # https://pydantic-docs.helpmanual.io/#self-referencing-models

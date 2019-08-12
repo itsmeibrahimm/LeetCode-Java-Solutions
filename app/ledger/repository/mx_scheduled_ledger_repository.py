@@ -46,6 +46,18 @@ class InsertMxScheduledLedgerOutput(MxScheduledLedgerDbEntity):
     pass
 
 
+class GetMxScheduledLedgerByLedgerInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
+
+
+class GetMxScheduledLedgerByLedgerOutput(MxScheduledLedgerDbEntity):
+    pass
+
+
 class GetMxScheduledLedgerInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
@@ -65,6 +77,12 @@ class MxScheduledLedgerRepositoryInterface:
     async def insert_mx_scheduled_ledger(
         self, request: InsertMxScheduledLedgerInput
     ) -> InsertMxScheduledLedgerOutput:
+        ...
+
+    @abstractmethod
+    async def get_mx_scheduled_ledger_by_ledger_id(
+        self, request: GetMxScheduledLedgerByLedgerInput
+    ) -> Optional[GetMxScheduledLedgerByLedgerOutput]:
         ...
 
     @abstractmethod
@@ -91,6 +109,21 @@ class MxScheduledLedgerRepository(
                 timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
             ).first(stmt)
             return InsertMxScheduledLedgerOutput.from_orm(row)
+
+    async def get_mx_scheduled_ledger_by_ledger_id(
+        self, request: GetMxScheduledLedgerByLedgerInput
+    ) -> Optional[GetMxScheduledLedgerByLedgerOutput]:
+        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
+            stmt = mx_scheduled_ledgers.table.select().where(
+                mx_scheduled_ledgers.ledger_id == request.id
+            )
+            row = await conn.execution_options(
+                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
+            ).first(stmt)
+            # if no result found, return nothing
+            if not row:
+                return None
+            return GetMxScheduledLedgerByLedgerOutput.from_orm(row)
 
     async def get_open_mx_scheduled_ledger_for_period(
         self, request: GetMxScheduledLedgerInput
@@ -122,7 +155,7 @@ class MxScheduledLedgerRepository(
             return GetMxScheduledLedgerOutput.from_orm(row)
 
     def pacific_start_time_for_current_interval(
-        self, routing_key: datetime, interval: MxScheduledLedgerIntervalType
+        self, routing_key: datetime, interval: Optional[MxScheduledLedgerIntervalType]
     ) -> datetime:
         """
         Calculate the start_time(in UTC time but without tz info) for current interval based on given routing_key and interval
@@ -140,4 +173,18 @@ class MxScheduledLedgerRepository(
         base_timestamp = timezone("US/Pacific").localize(datetime(2019, 7, 1))
         num_intervals = ceil((routing_key_utc - base_timestamp) / interval_in_timedelta)
         start_time = base_timestamp + interval_in_timedelta * (num_intervals - 1)
+        return start_time.astimezone(timezone("UTC")).replace(tzinfo=None)
+
+    def pacific_end_time_for_current_interval(
+        self, routing_key: datetime, interval: Optional[MxScheduledLedgerIntervalType]
+    ) -> datetime:
+        interval_in_timedelta = (
+            timedelta(days=7)
+            if interval == MxScheduledLedgerIntervalType.WEEKLY
+            else timedelta(days=1)
+        )
+        routing_key_utc = routing_key.astimezone(timezone("UTC"))
+        base_timestamp = timezone("US/Pacific").localize(datetime(2019, 7, 1))
+        num_intervals = ceil((routing_key_utc - base_timestamp) / interval_in_timedelta)
+        start_time = base_timestamp + interval_in_timedelta * num_intervals
         return start_time.astimezone(timezone("UTC")).replace(tzinfo=None)

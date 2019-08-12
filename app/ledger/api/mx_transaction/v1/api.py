@@ -18,28 +18,38 @@ from starlette.status import (
     HTTP_501_NOT_IMPLEMENTED,
 )
 
+from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
+from app.ledger.repository.mx_scheduled_ledger_repository import (
+    MxScheduledLedgerRepository,
+)
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 
 
 def create_mx_transactions_router(
-    mx_transaction_repository: MxTransactionRepository
+    mx_transaction_repository: MxTransactionRepository,
+    mx_ledger_repository: MxLedgerRepository,
+    mx_scheduled_repository: MxScheduledLedgerRepository,
 ) -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/v1/mx_transactions", status_code=HTTP_201_CREATED)
-    async def create_mx_transaction_api(
+    async def create_mx_transaction(
         mx_transaction_request: CreateMxTransactionRequest, request: Request
     ):
         """
             Create a mx_transaction on DoorDash payments platform
 
-            - **payment_account_id**: DoorDash consumer_id, store_id, or business_id
-            - **target_type**: type that specifies the type of mx_transaction
-            - **amount**: mx_transaction amount
-            - **currency**: mx_transaction currency
-            - **idempotency_key**: mx_transaction idempotency_key.
-            - **context**: a context of mx_transaction
-            - **metadata**: a metadata of mx_transaction
+            - **payment_account_id**: str
+            - **target_type**: MxTransactionType, type of mx_transaction
+            - **amount**: int, mx_transaction amount
+            - **currency**: CurrencyType, mx_transaction currency
+            - **idempotency_key**: str, mx_transaction idempotency_key.
+            - **routing_key**: datetime, created_at of txn in DSJ or POS confirmation time
+            - **interval_type**: MxLedgerIntervalType, specify how long the mx_ledger will be opened
+            - **target_id**: Optional[str], id corresponding to mx_transaction type, e.g. delivery_id
+            - **context**: Optional[Json], a context of mx_transaction
+            - **metadata**: Optional[Json], metadata of mx_transaction
+            - **legacy_transaction_id**: Optional[str], points to the corresponding txn in DSJ, used for double writing purpose
         """
         req_context = get_context_from_req(request)
         app_context = get_context_from_app(request.app)
@@ -49,23 +59,27 @@ def create_mx_transactions_router(
 
         try:
             mx_transaction: MxTransaction = await create_mx_transaction_impl(
-                app_context,
-                req_context,
-                mx_transaction_repository,
-                mx_transaction_request.payment_account_id,
-                mx_transaction_request.target_type,
-                mx_transaction_request.amount,
-                mx_transaction_request.currency,
-                mx_transaction_request.idempotency_key,
-                mx_transaction_request.routing_key,
-                mx_transaction_request.target_id,
-                mx_transaction_request.context,
-                mx_transaction_request.metadata,
+                app_context=app_context,
+                req_context=req_context,
+                mx_transaction_repository=mx_transaction_repository,
+                mx_ledger_repository=mx_ledger_repository,
+                mx_scheduled_repository=mx_scheduled_repository,
+                payment_account_id=mx_transaction_request.payment_account_id,
+                target_type=mx_transaction_request.target_type,
+                amount=mx_transaction_request.amount,
+                currency=mx_transaction_request.currency,
+                idempotency_key=mx_transaction_request.idempotency_key,
+                routing_key=mx_transaction_request.routing_key,
+                interval_type=mx_transaction_request.interval_type,
+                target_id=mx_transaction_request.target_id,
+                context=mx_transaction_request.context,
+                metadata=mx_transaction_request.metadata,
+                legacy_transaction_id=mx_transaction_request.legacy_transaction_id,
             )
             req_context.log.info("create_mx_transaction() completed. ")
         except Exception as e:
             req_context.log.error(
-                "[create_mx_transaction][{}][{}] exception.".format(
+                "[create_mx_transaction][{}] exception.".format(
                     mx_transaction_request.payment_account_id
                 ),
                 e,

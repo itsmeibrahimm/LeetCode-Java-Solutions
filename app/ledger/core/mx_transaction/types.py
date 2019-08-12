@@ -9,7 +9,6 @@ class MxTransactionType(str, Enum):
     MERCHANT_DELIVERY = "merchant_delivery"
     STORE_PAYMENT = "store_payment"
     DELIVERY_ERROR = "delivery_error"
-    DELIVERY_RECEIPT = "delivery_receipt"
     MICRO_DEPOSIT = "micro_deposit"
 
 
@@ -18,6 +17,7 @@ class MxLedgerType(str, Enum):
     Enum definition of mx_ledger type.
     """
 
+    SCHEDULED = "scheduled"
     MICRO_DEPOSIT = "micro_deposit"
     MANUAL = "manual"
 

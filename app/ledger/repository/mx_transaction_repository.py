@@ -35,8 +35,8 @@ class MxTransactionDbEntity(DBEntity):
     legacy_transaction_id: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
-    context: Optional[str] = None
-    metadata: Optional[str] = None
+    context: Optional[str]
+    metadata: Optional[str]
 
 
 class InsertMxTransactionInput(MxTransactionDbEntity):

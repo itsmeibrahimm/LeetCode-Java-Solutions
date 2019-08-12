@@ -22,7 +22,9 @@ class MxTransactionTable(TableDefinition):
     # created_at for transaction from DSJ or POS confirmation time
     routing_key: Column = no_init_field(Column("routing_key", DateTime(False)))
     target_id: Column = no_init_field(Column("target_id", Text))
-    legacy_transaction_id: Column = no_init_field(Column("legacy_transaction_id", Text))
+    legacy_transaction_id: Column = no_init_field(
+        Column("legacy_transaction_id", Text)
+    )  # only exists for mirgration purpose
     context: Column = no_init_field(Column("context", JSON))
     metadata: Column = no_init_field(Column("metadata", JSON))
     created_at: Column = no_init_field(

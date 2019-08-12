@@ -21,7 +21,9 @@ def create_ledger_app(context: AppContext) -> FastAPI:
 
     # Init routers
     mx_transactions_router = create_mx_transactions_router(
-        MxTransactionRepository(context=context)
+        MxTransactionRepository(context=context),
+        MxLedgerRepository(context=context),
+        MxScheduledLedgerRepository(context=context),
     )
 
     app.include_router(mx_transactions_router)
