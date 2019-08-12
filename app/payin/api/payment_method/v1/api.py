@@ -27,11 +27,13 @@ from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PayerReadError,
     PayinErrorCode,
+    PaymentMethodDeleteError,
 )
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import (
     create_payment_method_impl,
     get_payment_method_impl,
+    delete_payment_method_impl,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -210,20 +212,76 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         request: Request,
         payer_id: str,
         payment_method_id: str,
-        payer_type: str = None,
-        payment_method_object_type: str = None,
+        payer_id_type: str = None,
+        payment_method_id_type: str = None,
     ):
-        # app_ctxt: AppContext = get_context_from_app(request.app)
-        req_ctxt: ReqContext = get_context_from_req(request)
-        req_ctxt.log.info("[create_payment_method] receive request")
+        """
+        Detach a payment method for payer on DoorDash payments platform
 
-        return create_payment_error_response_blob(
-            HTTP_501_NOT_IMPLEMENTED,
-            PaymentErrorResponseBody(
-                error_code="not implemented",
-                error_message="not implemented",
-                retryable=False,
-            ),
-        )
+        - **payer_id**: [string] DoorDash payer id. For backward compatibility, payer_id can be payer_id,
+                        stripe_customer_id, or stripe_customer_serial_id
+        - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id can
+                                 be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+        - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
+                             "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+        - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values including
+                                      "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
+                                      (default is "dd_payment_method_id")
+        """
+        app_ctxt: AppContext = get_context_from_app(request.app)
+        req_ctxt: ReqContext = get_context_from_req(request)
+        req_ctxt.log.info("[delete_payment_method] receive request")
+
+        try:
+            payment_method: PaymentMethod = await delete_payment_method_impl(
+                payment_method_repository=payment_method_repository,
+                app_ctxt=app_ctxt,
+                req_ctxt=req_ctxt,
+                payer_id=payer_id,
+                payment_method_id=payment_method_id,
+                payer_id_type=payer_id_type,
+                payment_method_id_type=payment_method_id_type,
+            )
+        except PaymentMethodReadError as e:
+            req_ctxt.log.error(
+                "[delete_payment_method][{}][{}] PaymentMethodReadError.".format(
+                    payer_id, payment_method_id
+                ),
+                e,
+            )
+            if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
+                http_status = HTTP_404_NOT_FOUND
+            elif e.error_code in (
+                PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
+                PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
+            ):
+                http_status = HTTP_400_BAD_REQUEST
+            else:
+                http_status = HTTP_500_INTERNAL_SERVER_ERROR
+            return create_payment_error_response_blob(
+                http_status,
+                PaymentErrorResponseBody(
+                    error_code=e.error_code,
+                    error_message=e.error_message,
+                    retryable=e.retryable,
+                ),
+            )
+        except PaymentMethodDeleteError as e:
+            req_ctxt.log.error(
+                "[delete_payment_method][{}][{}] PaymentMethodDeleteError.".format(
+                    payer_id, payment_method_id
+                ),
+                e,
+            )
+            return create_payment_error_response_blob(
+                HTTP_500_INTERNAL_SERVER_ERROR,
+                PaymentErrorResponseBody(
+                    error_code=e.error_code,
+                    error_message=e.error_message,
+                    retryable=e.retryable,
+                ),
+            )
+
+        return payment_method
 
     return router

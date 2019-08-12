@@ -32,7 +32,7 @@ def test_payer_retrieval():
     )
 
     # get_payer api
-    payer_id = test_payer.json()["payer_id"]
+    payer_id = test_payer.json()["id"]
     verify_payer = requests.get(
         url=SERVICE_URI + "/payin/api/v1/payers/{}".format(payer_id)
     )
@@ -53,7 +53,7 @@ def test_payer_payment_method_update():
     )
 
     # update_payer api
-    payer_id = test_payer.json()["payer_id"]
+    payer_id = test_payer.json()["id"]
     update_payer = requests.patch(
         url=SERVICE_URI + "/payin/api/v1/payers/{}".format(payer_id),
         json={"default_payment_method_id": "fake_id"},

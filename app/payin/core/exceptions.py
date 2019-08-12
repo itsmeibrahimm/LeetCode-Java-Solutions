@@ -14,9 +14,13 @@ payin_error_message_maps = {
     "payin_20": "Invalid data types. Please verify your input again!",
     "payin_21": "Data I/O error. Please retry again!",
     "payin_22": "Invalid input payment method type!",
-    "payin_23": "Payment method not found. Please ensure your payment_method_id is correct",
-    "payin_24": "Error returned from Payment Provider. Please make sure your token is correct!",
-    "payin_25": "Invalid input. Please ensure valid id is provided!",
+    "payin_23": "payer_id and payment_method_id mismatch! Please ensure payer owns the payment_method!!",
+    "payin_24": "Payment method not found. Please ensure your payment_method_id is correct",
+    "payin_25": "Data I/O error. Please retry again!",
+    "payin_26": "Error returned from Payment Provider. Please make sure your token is correct!",
+    "payin_27": "Invalid input. Please ensure valid id is provided!",
+    "payin_28": "Error returned from Payment Provider. Please make sure your payment_method_id is correct!",
+    "payin_29": "Data I/O error. Please retry again!",
 }
 
 
@@ -31,9 +35,13 @@ class PayinErrorCode(str, Enum):
     PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
     PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
     PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"
-    PAYMENT_METHOD_GET_NOT_FOUND = "payin_23"
-    PAYMENT_METHOD_CREATE_STRIPE_ERROR = "payin_24"
-    PAYMENT_METHOD_CREATE_INVALID_INPUT = "payin_25"
+    PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH = "payin_23"
+    PAYMENT_METHOD_GET_NOT_FOUND = "payin_24"
+    PAYMENT_METHOD_GET_DB_ERROR = "payin_25"
+    PAYMENT_METHOD_CREATE_STRIPE_ERROR = "payin_26"
+    PAYMENT_METHOD_CREATE_INVALID_INPUT = "payin_27"
+    PAYMENT_METHOD_DELETE_STRIPE_ERROR = "payin_28"
+    PAYMENT_METHOD_DELETE_DB_ERROR = "payin_29"
 
 
 ###########################################################

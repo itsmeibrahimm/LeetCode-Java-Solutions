@@ -1,13 +1,17 @@
 import logging
 from datetime import datetime
 
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 
 from asyncpg import DataError
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
-from app.commons.providers.stripe_models import CreatePaymentMethod, AttachPaymentMethod
+from app.commons.providers.stripe_models import (
+    CreatePaymentMethod,
+    AttachPaymentMethod,
+    DetachPaymentMethod,
+)
 from app.commons.types import CountryCode
 from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
 from app.payin.core.exceptions import (
@@ -16,10 +20,11 @@ from app.payin.core.exceptions import (
     payin_error_message_maps,
     PaymentMethodReadError,
     PayerReadError,
+    PaymentMethodDeleteError,
 )
 
 from app.payin.core.payment_method.model import PaymentMethod, Card
-from app.payin.core.types import PaymentMethodIdType
+from app.payin.core.types import PaymentMethodIdType, PayerIdType
 from app.payin.repository.payer_repo import (
     PayerRepository,
     GetPayerByIdInput,
@@ -35,6 +40,10 @@ from app.payin.repository.payment_method_repo import (
     GetPgpPaymentMethodByPgpResourceIdInput,
     GetStripeCardByIdInput,
     PaymentMethodRepository,
+    DeletePgpPaymentMethodByIdSetInput,
+    DeletePgpPaymentMethodByIdWhereInput,
+    DeleteStripeCardByIdSetInput,
+    DeleteStripeCardByIdWhereInput,
 )
 
 logger = logging.getLogger(__name__)
@@ -224,73 +233,19 @@ async def get_payment_method_impl(
     :return: PaymentMethod object.
     """
 
-    # TODO: if force_update is true, we should retrieve the payment_method from GPG
+    # TODO: step 1: if force_update is true, we should retrieve the payment_method from GPG
 
     # step 2: retrieve data from DB
-    sc_entity: Optional[StripeCardDbEntity] = None
-    pm_entity: Optional[PgpPaymentMethodDbEntity] = None
-    not_found: bool = True
-    if (
-        payment_method_id_type == PaymentMethodIdType.DD_PAYMENT_PAYMENT_METHOD_ID.value
-    ) or (not payment_method_id_type):
-        # get pgp_payment_method object
-        pm_entity = await payment_method_repository.get_pgp_payment_method_by_payment_method_id(
-            input=GetPgpPaymentMethodByPaymentMethodIdInput(
-                payment_method_id=payment_method_id
-            )
-        )
-        # get stripe_card object
-        sc_entity = (
-            None
-            if not pm_entity
-            else await payment_method_repository.get_stripe_card_by_stripe_id(
-                GetStripeCardByStripeIdInput(stripe_id=pm_entity.pgp_resource_id)
-            )
-        )
-        not_found = True if (pm_entity and sc_entity) else False
-    elif payment_method_id_type == PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID.value:
-        # get pgp_payment_method object
-        pm_entity = await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
-            input=GetPgpPaymentMethodByPgpResourceIdInput(
-                pgp_resource_id=payment_method_id
-            )
-        )
-        # get stripe_card object
-        sc_entity = await payment_method_repository.get_stripe_card_by_stripe_id(
-            GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
-        )
-        not_found = True if sc_entity else False
-    elif payment_method_id_type == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID.value:
-        # get stripe_card object
-        sc_entity = await payment_method_repository.get_stripe_card_by_id(
-            GetStripeCardByIdInput(id=payment_method_id)
-        )
-        # get pgp_payment_method object
-        pm_entity = (
-            None
-            if not sc_entity
-            else await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
-                input=GetPgpPaymentMethodByPgpResourceIdInput(
-                    pgp_resource_id=sc_entity.stripe_id
-                )
-            )
-        )
-        not_found = True if sc_entity else False
-    else:
-        req_ctxt.log.error(
-            "[get_payment_method_impl][%s] invalid payment_method_id_type %s",
-            payment_method_id,
-            payment_method_id_type,
-        )
-        raise PaymentMethodCreateError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE.value
-            ],
-            retryable=False,
-        )
+    (pm_entity, sc_entity, is_found, is_owner) = await get_payment_method(
+        payment_method_repository=payment_method_repository,
+        req_ctxt=req_ctxt,
+        payer_id=payer_id,
+        payment_method_id=payment_method_id,
+        payer_id_type=payer_id_type,
+        payment_method_id_type=payment_method_id_type,
+    )
 
-    if not_found is False:
+    if is_found is False:
         req_ctxt.log.error(
             "[get_payment_method_impl][%s] cant retrieve data from pgp_payment_method and stripe_card tables!",
             payment_method_id,
@@ -301,8 +256,22 @@ async def get_payment_method_impl(
             error_message=payin_error_message_maps[err_code],
             retryable=False,
         )
+    if is_owner is False:
+        req_ctxt.log.error(
+            "[get_payment_method_impl][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
+            payer_id,
+            payment_method_id,
+            payer_id_type,
+            payment_method_id_type,
+        )
+        raise PaymentMethodCreateError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH.value
+            ],
+            retryable=False,
+        )
 
-    # TODO: verify if payer actually owns this payment method
     # TODO: lazy create payer
 
     return _build_payment_method(
@@ -317,12 +286,280 @@ async def list_payment_methods_impl(
 
 
 async def delete_payment_method_impl(
+    payment_method_repository: PaymentMethodRepository,
+    app_ctxt: AppContext,
+    req_ctxt: ReqContext,
     payer_id: str,
     payment_method_id: str,
     payer_id_type: str = None,
-    payment_method_object_type: str = None,
+    payment_method_id_type: str = None,
 ) -> PaymentMethod:
-    ...
+    """
+    Implementation of delete/detach a payment method.
+
+    :param payment_method_repository:
+    :param app_ctxt:
+    :param req_ctxt:
+    :param payer_id:
+    :param payment_method_id:
+    :param payer_id_type:
+    :param payment_method_id_type:
+    :return:
+    """
+    # step 1: find payment_method.
+    (pm_entity, sc_entity, is_found, is_owner) = await get_payment_method(
+        payment_method_repository=payment_method_repository,
+        req_ctxt=req_ctxt,
+        payer_id=payer_id,
+        payment_method_id=payment_method_id,
+        payer_id_type=payer_id_type,
+        payment_method_id_type=payment_method_id_type,
+    )
+    pgp_payment_method_id = (
+        pm_entity.pgp_resource_id
+        if pm_entity
+        else (sc_entity.stripe_id if sc_entity else "")
+    )
+
+    # step 2: detach PGP payment method
+    try:
+        stripe_payment_method = await app_ctxt.stripe.detach_payment_method(
+            country=CountryCode("US"),  # TODO: get from payer
+            request=DetachPaymentMethod(sid=pgp_payment_method_id),
+        )
+        req_ctxt.log.info(
+            "[delete_payment_method_impl][%s][%s] detach payment method completed. customer in stripe response blob:",
+            payer_id,
+            payment_method_id,
+            stripe_payment_method.customer,
+        )
+    except Exception as e:
+        # req_ctxt.log.error(e)
+        # TODO Error logged below does not describe what the error is, meaning log statement cannot be used to diagnose the problem.
+        # Add additional details to the log statement and use this convention throughout.
+        req_ctxt.log.error(
+            "[delete_payment_method_impl][{}] error while detaching stripe payment method".format(
+                payer_id, e
+            )
+        )
+        raise PaymentMethodDeleteError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR.value
+            ],
+            retryable=False,
+        )
+
+    # step 3: update pgp_payment_method.detached_at
+    now = datetime.utcnow()
+    try:
+        if pm_entity:
+            updated_pm_entity = await payment_method_repository.delete_pgp_payment_method_by_id(
+                input_set=DeletePgpPaymentMethodByIdSetInput(
+                    detached_at=now, deleted_at=now, updated_at=now
+                ),
+                input_where=DeletePgpPaymentMethodByIdWhereInput(id=pm_entity.id),
+            )
+
+        # step 4: update stripe_card.active and remove_at
+        if sc_entity:
+            updated_sc_entity = await payment_method_repository.delete_stripe_card_by_id(
+                input_set=DeleteStripeCardByIdSetInput(removed_at=now),
+                input_where=DeleteStripeCardByIdWhereInput(id=sc_entity.id),
+            )
+    except DataError as e:
+        req_ctxt.log.error(
+            "[delete_payment_method_impl][{}][{}] DataError when read db.".format(
+                payer_id, payment_method_id
+            ),
+            e,
+        )
+        raise PaymentMethodDeleteError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR.value
+            ],
+            retryable=True,
+        )
+
+    # TODO: step 5: update payer and pgp_customers / stripe_customer to remove the default_payment_method.
+
+    return _build_payment_method(
+        pgp_payment_method_entity=updated_pm_entity,
+        stripe_card_entity=updated_sc_entity,
+    )
+
+
+async def get_payment_method(
+    payment_method_repository: PaymentMethodRepository,
+    req_ctxt: ReqContext,
+    payer_id: str,
+    payment_method_id: str,
+    payer_id_type: str = None,
+    payment_method_id_type: str = None,
+) -> Tuple[
+    Optional[PgpPaymentMethodDbEntity], Optional[StripeCardDbEntity], bool, bool
+]:
+    """
+    Utility function to get payment_method.
+
+    :param payment_method_repository: payment method repository.
+    :param req_ctxt: request context.
+    :param payer_id: DoorDash payer id. For backward compatibility, payer_id can be payer_id,
+           stripe_customer_id, or stripe_customer_serial_id
+    :param payment_method_id: DoorDash payment method id. For backward compatibility, payment_method_id can
+           be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+    :param payer_id_type: See: PayerIdType. identify the type of payer_id. Valid values include "dd_payer_id",
+           "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+    :param payment_method_id_type: See: PaymentMethodIdType. identify the type of payment_method_id. Valid values
+           including "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
+           (default is "dd_payment_method_id")
+    :return: (PgpPaymentMethodDbEntity, StripeCardDbEntity)
+    """
+    sc_entity: Optional[StripeCardDbEntity] = None
+    pm_entity: Optional[PgpPaymentMethodDbEntity] = None
+    is_found: bool = False
+    is_owner: bool = False
+    try:
+        if (
+            payment_method_id_type
+            == PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID.value  # noqa: W503
+        ) or (not payment_method_id_type):
+            # get pgp_payment_method object
+            pm_entity = await payment_method_repository.get_pgp_payment_method_by_payment_method_id(
+                input=GetPgpPaymentMethodByPaymentMethodIdInput(
+                    payment_method_id=payment_method_id
+                )
+            )
+            # get stripe_card object
+            sc_entity = (
+                None
+                if not pm_entity
+                else await payment_method_repository.get_stripe_card_by_stripe_id(
+                    GetStripeCardByStripeIdInput(stripe_id=pm_entity.pgp_resource_id)
+                )
+            )
+
+            is_found = True if (pm_entity and sc_entity) else False
+            if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID.value) or (
+                not payer_id_type
+            ):
+                is_owner = (payer_id == pm_entity.payer_id) if pm_entity else False
+            elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
+                is_owner = (
+                    (payer_id == pm_entity.pgp_resource_id) if pm_entity else False
+                )
+
+        elif (
+            payment_method_id_type == PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID.value
+        ):  # DSJ backward compatibility
+            # get pgp_payment_method object. Could be None if it's not created through Payin APIs.
+            pm_entity = await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
+                input=GetPgpPaymentMethodByPgpResourceIdInput(
+                    pgp_resource_id=payment_method_id
+                )
+            )
+            # get stripe_card object
+            sc_entity = await payment_method_repository.get_stripe_card_by_stripe_id(
+                GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
+            )
+
+            is_found = True if sc_entity else False
+            if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
+                is_owner = (
+                    (payer_id == sc_entity.external_stripe_customer_id)
+                    if sc_entity
+                    else False
+                )
+
+        elif (
+            payment_method_id_type == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID.value
+        ):  # DSJ backward compatibility
+            # get stripe_card object
+            sc_entity = await payment_method_repository.get_stripe_card_by_id(
+                GetStripeCardByIdInput(id=payment_method_id)
+            )
+            # get pgp_payment_method object
+            pm_entity = (
+                None
+                if not sc_entity
+                else await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
+                    input=GetPgpPaymentMethodByPgpResourceIdInput(
+                        pgp_resource_id=sc_entity.stripe_id
+                    )
+                )
+            )
+
+            is_found = True if sc_entity else False
+            if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
+                is_owner = (
+                    (payer_id == sc_entity.external_stripe_customer_id)
+                    if sc_entity
+                    else False
+                )
+
+        else:
+            req_ctxt.log.error(
+                "[get_payment_method][%s] invalid payment_method_id_type %s",
+                payment_method_id,
+                payment_method_id_type,
+            )
+            raise PaymentMethodReadError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
+                error_message=payin_error_message_maps[
+                    PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE.value
+                ],
+                retryable=False,
+            )
+    except DataError as e:
+        req_ctxt.log.error(
+            "[get_payment_method][{}][{}] DataError when read db.".format(
+                payer_id, payment_method_id
+            ),
+            e,
+        )
+        raise PaymentMethodReadError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR.value
+            ],
+            retryable=True,
+        )
+
+    if is_found is False:
+        req_ctxt.log.error(
+            "[get_payment_method][%s] cant retrieve data from pgp_payment_method and stripe_card tables!",
+            payment_method_id,
+        )
+        err_code = PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value
+        raise PaymentMethodReadError(
+            error_code=err_code,
+            error_message=payin_error_message_maps[err_code],
+            retryable=False,
+        )
+    if is_owner is False:
+        req_ctxt.log.error(
+            "[get_payment_method][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
+            payment_method_id,
+            payer_id,
+            payer_id_type,
+            payment_method_id_type,
+        )
+        raise PaymentMethodReadError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH.value
+            ],
+            retryable=False,
+        )
+
+    req_ctxt.log.info(
+        "[get_payment_method][%s][%s] find payment_method!!",
+        payment_method_id,
+        payer_id,
+    )
+
+    return (pm_entity, sc_entity, is_found, is_owner)
 
 
 def _build_payment_method(

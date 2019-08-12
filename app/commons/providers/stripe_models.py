@@ -153,6 +153,10 @@ class AttachPaymentMethod(BaseModel):
     customer: str
 
 
+class DetachPaymentMethod(BaseModel):
+    sid: str
+
+
 class RetrievePaymentMethod(BaseModel):
     id: str
 

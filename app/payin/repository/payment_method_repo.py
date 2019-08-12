@@ -56,6 +56,21 @@ class GetPgpPaymentMethodByPgpResourceIdInput(DBRequestModel):
     pgp_resource_id: str
 
 
+class GetPgpPaymentMethodByIdInput(DBRequestModel):
+    id: Optional[str]
+    pgp_resource_id: Optional[str]
+
+
+class DeletePgpPaymentMethodByIdSetInput(DBRequestModel):
+    detached_at: datetime
+    deleted_at: datetime
+    updated_at: datetime
+
+
+class DeletePgpPaymentMethodByIdWhereInput(DBRequestModel):
+    id: str
+
+
 ###########################################################
 # StripeCard DBEntity and CRUD operations                 #
 ###########################################################
@@ -101,6 +116,14 @@ class GetStripeCardByStripeIdInput(DBRequestModel):
 
 
 class GetStripeCardByIdInput(DBRequestModel):
+    id: int
+
+
+class DeleteStripeCardByIdSetInput(DBRequestModel):
+    removed_at: datetime
+
+
+class DeleteStripeCardByIdWhereInput(DBRequestModel):
     id: int
 
 
@@ -235,6 +258,40 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             ).first(stmt)
             return PgpPaymentMethodDbEntity.from_orm(row) if row else None
 
+    async def get_pgp_payment_method_by_id(
+        self, input: GetPgpPaymentMethodByIdInput
+    ) -> Optional[PgpPaymentMethodDbEntity]:
+        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
+            if input.id:
+                stmt = pgp_payment_methods.table.select().where(
+                    pgp_payment_methods.id == input.id
+                )
+            else:
+                stmt = pgp_payment_methods.table.select().where(
+                    pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
+                )
+            row = await conn.execution_options(
+                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
+            ).first(stmt)
+            return PgpPaymentMethodDbEntity.from_orm(row) if row else None
+
+    async def delete_pgp_payment_method_by_id(
+        self,
+        input_set: DeletePgpPaymentMethodByIdSetInput,
+        input_where: DeletePgpPaymentMethodByIdWhereInput,
+    ):
+        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
+            stmt = (
+                pgp_payment_methods.table.update()
+                .where(pgp_payment_methods.id == input_where.id)
+                .values(input_set.dict(skip_defaults=True))
+                .returning(*pgp_payment_methods.table.columns.values())
+            )
+            row = await conn.execution_options(
+                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
+            ).first(stmt)
+            return PgpPaymentMethodDbEntity.from_orm(row)
+
     async def get_stripe_card_by_stripe_id(
         self, input: GetStripeCardByStripeIdInput
     ) -> Optional[StripeCardDbEntity]:
@@ -256,3 +313,20 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                 timeout=self.main_database.STATEMENT_TIMEOUT_SEC
             ).first(stmt)
             return StripeCardDbEntity.from_orm(row) if row else None
+
+    async def delete_stripe_card_by_id(
+        self,
+        input_set: DeleteStripeCardByIdSetInput,
+        input_where: DeleteStripeCardByIdWhereInput,
+    ):
+        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
+            stmt = (
+                stripe_cards.table.update()
+                .where(stripe_cards.id == input_where.id)
+                .values(input_set.dict(skip_defaults=True))
+                .returning(*stripe_cards.table.columns.values())
+            )
+            row = await conn.execution_options(
+                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
+            ).first(stmt)
+            return StripeCardDbEntity.from_orm(row)

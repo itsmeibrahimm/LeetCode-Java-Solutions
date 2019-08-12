@@ -484,7 +484,7 @@ def _build_payer(
     )
 
     return Payer(
-        payer_id=payer_entity.id,
+        id=payer_entity.id,
         payer_type=payer_entity.payer_type,
         payment_gateway_provider_customers=[provider_customer],
         country=payer_entity.country,

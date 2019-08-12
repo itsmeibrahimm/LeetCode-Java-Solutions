@@ -20,7 +20,7 @@ PaymentGatewayProviderCustomer.update_forward_refs()
 @final
 @dataclass(frozen=True)
 class Payer:
-    payer_id: str
+    id: str
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None

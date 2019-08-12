@@ -54,6 +54,18 @@ class StripeClientInterface:
         """
         ...
 
+    def detach_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.DetachPaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        """
+        Attach a Stripe Payment Method to existing Stripe Customer
+        https://stripe.com/docs/api/payment_methods/detach
+        """
+        ...
+
     def retrieve_payment_method(
         self,
         country: models.CountryCode,
@@ -162,6 +174,19 @@ class StripeClient(StripeClientInterface):
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.attach(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payment_method
+
+    def detach_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.DetachPaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        payment_method = stripe.PaymentMethod.detach(
             idempotency_key=idempotency_key,
             **self.settings_for(country),
             **request.dict(skip_defaults=True),
@@ -310,6 +335,19 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> models.PaymentMethod:
         return await self.submit(
             self.client.attach_payment_method,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def detach_payment_method(
+        self,
+        country: models.CountryCode,
+        request: models.DetachPaymentMethod,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentMethod:
+        return await self.submit(
+            self.client.detach_payment_method,
             country,
             request,
             idempotency_key=idempotency_key,

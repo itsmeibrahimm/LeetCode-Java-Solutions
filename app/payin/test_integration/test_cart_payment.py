@@ -18,7 +18,7 @@ class TestCartPayment:
     def _get_payer_payment_method_request(self, payer):
         # TODO remove use of stripe_customer_id once create payment method api supports lookup of provider id based on payer id
         request_body = {
-            "payer_id": payer["payer_id"],
+            "payer_id": payer["id"],
             "payment_gateway": "stripe",
             "token": "tok_mastercard",
             "legacy_payment_info": {
@@ -33,14 +33,14 @@ class TestCartPayment:
         self, payer, payment_method, idempotency_key=None
     ):
         request_body = {
-            "payer_id": payer["payer_id"],
+            "payer_id": payer["id"],
             "amount": 500,
             "country": "US",
             "currency": "USD",
             "payment_method_id": "pm_card_visa",
             "capture_method": "manual",
-            "client_description": f"{payer['payer_id']} description",
-            "payer_statement_description": f"{payer['payer_id'][0:10]} statement",
+            "client_description": f"{payer['id']} description",
+            "payer_statement_description": f"{payer['id'][0:10]} statement",
             "metadata": {
                 "reference_id": 123,
                 "ct_reference_id": 5,
@@ -60,7 +60,7 @@ class TestCartPayment:
 
         payer = response.json()
         assert payer
-        assert payer["payer_id"]
+        assert payer["id"]
         assert payer["payer_type"] == request_body["payer_type"]
         assert payer["country"] == request_body["country"]
         assert payer["dd_payer_id"] == request_body["dd_payer_id"]
@@ -92,7 +92,7 @@ class TestCartPayment:
         assert payment_method["card"]["country"]
         assert payment_method["card"]["brand"]
         assert payment_method["card"]["payment_provider_card_id"]
-        assert payment_method["payer_id"] == payer["payer_id"]
+        assert payment_method["payer_id"] == payer["id"]
         assert payment_method["type"] == "card"
         assert payment_method["dd_consumer_id"] is None
         assert payment_method["payment_provider_customer_id"] is None  # TODO
@@ -109,7 +109,7 @@ class TestCartPayment:
         assert cart_payment
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
-        assert cart_payment["payer_id"] == payer["payer_id"]
+        assert cart_payment["payer_id"] == payer["id"]
         assert cart_payment["payment_method_id"] == request_body["payment_method_id"]
         assert cart_payment["capture_method"] == request_body["capture_method"]
         assert cart_payment["cart_metadata"]
