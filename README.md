@@ -1,7 +1,3 @@
-| **This README is currently under construction, please keep in mind the content could be dramtically changed before this message is removed.** |
-| --------------------------------------------------------------------------------------------------------------------------------------------- |
-
-
 # Payment services mono repo
 
 This repo contains micros services including:
@@ -28,11 +24,13 @@ The repo was created through python-flask-service-template [link to specific SHA
 
 # Architecture and Tech Stack
 
-The `payment-service` is a Kubernetes pod with at least two containers:
+The `payment-service` is a Kubernetes pod with two containers:
 
-- the `web` container, which runs a `flask` app behind a `uwsgi` web server
-- the `nginx` sidecar, which shares a `socket` with the `web` container to perform reverse proxying and queuing
-- (optional) the `runtime` sidecar, used for configuration management
+- The `web` container running gunicorn-uviron-fastapi asyncio web service where
+    - `fastapi` running asyncio supported web application
+    - `uvicorn` running on top of `fastapi` web app as an ASGI web server and providing event loop implementation
+    - `gunicorn` running as process manager spawning up multiple uvicorn workers for parallelism
+- The `runtime` sidecar, used for configuration management
 
 The following technologies/frameworks are used across the entire stack:
 
@@ -40,9 +38,9 @@ The following technologies/frameworks are used across the entire stack:
 - **docker** as container engine
 - **kubernetes** as container orchestrator
 - **python3.7** for application code
-- **nginx** as reverse proxy
-- **uwsgi** as WSGI web server
-- **flask** as web framework
+- **fastapi** as web framework for building asyncio web service
+- **uvicorn** as ASGI web server / interface for contained fastapi service
+- **gunicorn** as process manager of uvicorn worker
 - **pipenv** for dependency management and [deterministic builds](https://realpython.com/pipenv-guide/)
 - **pytest** for unit testing
 - **mypy** for static type checking
@@ -60,7 +58,7 @@ The following technologies/frameworks are used across the entire stack:
 
 - [CD pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-deploy.groovy/)
 - [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
-- [WafeFront Dashboard](https://metrics.wavefront.com/dashboard/payment-service-health)
+- [Wavefront Dashboard](https://metrics.wavefront.com/dashboard/payment-service-health)
 - [Sentry Issues](https://sentry.io/organizations/doordash/issues/?project=1381528)
 
 # Development
