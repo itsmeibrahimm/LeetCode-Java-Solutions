@@ -1,0 +1,5 @@
+env:
+  ENVIRONMENT: staging
+
+# aws_iam_role of payment-service staging deployments, created at https://github.com/doordash/infrastructure/pull/1669
+aws_iam_role: arn:aws:iam::914801092467:role/payment-service.services.staging.cluster.doorcrawl.com

@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-job
+  labels:
+    service: {{ .Chart.Name }}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      annotations:
+        iam.amazonaws.com/role: {{ .Values.aws_iam_role | default "none" }}
+      labels:
+        service: {{ .Chart.Name }}
+        app: migration
+        # https://docs.helm.sh/chart_best_practices/#labels
+        helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    spec:
+      restartPolicy: Never
+      volumes:
+      - name: tmpfs
+        # Use a tmpfs mount to prevent heartbeat blocking event loop for EBS volumes
+        # http://docs.gunicorn.org/en/stable/faq.html#how-do-i-avoid-gunicorn-excessively-blocking-in-os-fchmod
+        # https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
+        emptyDir:
+          medium: Memory
+      containers:
+      - name: migration
+        image: "{{ .Values.job.repository }}:latest"
+        imagePullPolicy: {{ .Values.job.pullPolicy | default "IfNotPresent" }}
+        command: ["python"]
+        args:
+          - -m
+          - development.update_db_schemas
+        resources:
+          {{- toYaml .Values.job.resources | nindent 10 }}
+        ports:
+          - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: {{ .Chart.Name }}-environment
