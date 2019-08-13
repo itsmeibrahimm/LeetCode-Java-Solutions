@@ -1,8 +1,6 @@
 import uuid
 from typing import Any, Tuple, List, Optional
 
-from fastapi import HTTPException
-
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
 from app.commons.providers.stripe_models import (
@@ -11,17 +9,26 @@ from app.commons.providers.stripe_models import (
 )
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
+from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentIntent,
     PgpPaymentIntent,
+)
+from app.payin.core.exceptions import (
+    PayinErrorCode,
+    CartPaymentCreateError,
+    PaymentIntentCaptureError,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
     ConfirmationMethod,
     IntentStatus,
 )
+from app.payin.core.payment_method.processor import get_payment_method
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.payment_method_repo import PaymentMethodRepository
+from app.payin.repository.payer_repo import PayerRepository, GetPgpCustomerInput
 
 
 class CartPaymentInterface:
@@ -79,7 +86,11 @@ class CartPaymentInterface:
         return CreatePaymentIntent.SetupFutureUsage.off_session
 
     async def _create_provider_payment(
-        self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        provider_payment_resource_id: str,
+        provider_customer_resource_id: str,
     ):
         # Call to stripe payment intent API
         assert pgp_payment_intent.idempotency_key
@@ -95,7 +106,8 @@ class CartPaymentInterface:
                 ),
                 on_behalf_of=pgp_payment_intent.payout_account_id,
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
-                payment_method=pgp_payment_intent.payment_method_resource_id,
+                payment_method=provider_payment_resource_id,
+                customer=provider_customer_resource_id,
                 statement_descriptor=payment_intent.statement_descriptor,
             )
 
@@ -104,13 +116,15 @@ class CartPaymentInterface:
                 request=intent_request,
                 idempotency_key=pgp_payment_intent.idempotency_key,
             )
-            # self.req_context.log.info("Provider response: ")
-            # self.req_context.log.info(response)
             return response
         except Exception as e:
-            # TODO Add better error handling here
-            self.req_context.log.error(f"Error invoking provider: {e}")
-            raise HTTPException(status_code=500, detail="Internal error")
+            self.req_context.log.error(
+                f"Error invoking provider to create a payment intent: {e}"
+            )
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+            )
 
     # req_context, payin_repos, pgp_intent_id, provider_payment_response
     async def _update_pgp_intent_from_provider(
@@ -126,13 +140,20 @@ class CartPaymentInterface:
         )
 
     async def _submit_payment_to_provider(
-        self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        provider_payment_resource_id: str,
+        provider_customer_resource_id: str,
     ):
         # Call out to provider to create the payment intent in their system.  The payment_intent
         # instance includes the idempotency_key, which is passed to provider to ensure records already
         # submitted are actually processed only once.
         provider_payment_response = await self._create_provider_payment(
-            payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_resource_id=provider_payment_resource_id,
+            provider_customer_resource_id=provider_customer_resource_id,
         )
 
         async with self.payment_repo.payment_database_transaction():
@@ -170,6 +191,8 @@ class CartPaymentInterface:
     async def submit_new_payment(
         self,
         request_cart_payment: CartPayment,
+        provider_payment_resource_id: str,
+        provider_customer_resource_id: str,
         idempotency_key: str,
         country: str,
         currency: str,
@@ -240,7 +263,12 @@ class CartPaymentInterface:
                 statement_descriptor=request_cart_payment.payer_statement_description,
             )
 
-        await self._submit_payment_to_provider(payment_intent, pgp_payment_intent)
+        await self._submit_payment_to_provider(
+            payment_intent,
+            pgp_payment_intent,
+            provider_payment_resource_id,
+            provider_customer_resource_id,
+        )
         self._populate_cart_payment_for_response(
             cart_payment, payment_intent, pgp_payment_intent
         )
@@ -269,7 +297,11 @@ class CartPaymentInterface:
         return pgp_payment_intent.status != IntentStatus.INIT
 
     async def resubmit_existing_payment(
-        self, cart_payment: CartPayment, payment_intent: PaymentIntent
+        self,
+        cart_payment: CartPayment,
+        payment_intent: PaymentIntent,
+        provider_payment_resource_id: str,
+        provider_customer_resource_id: str,
     ) -> CartPayment:
         """
         Resubmit an existing cart payment.  Intended to be used for second calls to create a cart payment for the same idempotency key.
@@ -299,7 +331,12 @@ class CartPaymentInterface:
         self.req_context.log.info(
             f"Attempting resubmission of payment to provider for cart_payment {cart_payment.id}, payment_intent {payment_intent.id}, pgp_payment_intent {pgp_intent.id if pgp_intent else 'None'}"
         )
-        await self._submit_payment_to_provider(payment_intent, pgp_intent)
+        await self._submit_payment_to_provider(
+            payment_intent,
+            pgp_intent,
+            provider_payment_resource_id,
+            provider_customer_resource_id,
+        )
         self._populate_cart_payment_for_response(
             cart_payment, payment_intent, pgp_intent
         )
@@ -324,11 +361,11 @@ class CartPaymentInterface:
             self.req_context.log.info(response)
             return response
         except Exception as e:
-            # TODO Add better error handling here
-            self.req_context.log.error(f"Error invoking provider: {e}")
-            print(dir(e))
-            print(e.__traceback__)
-            raise HTTPException(status_code=500, detail="Internal error")
+            self.req_context.log.error(f"Error capturing intent with provider: {e}")
+            raise PaymentIntentCaptureError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CAPTURE_STRIPE_ERROR,
+                retryable=False,
+            )
 
     async def capture_payment(self, payment_intent: PaymentIntent) -> None:
         """Capture a payment intent.
@@ -389,6 +426,8 @@ async def submit_payment(
     country: str,
     currency: str,
     client_description: str,
+    payer_id_type: PayerIdType,
+    payment_method_id_type: PaymentMethodIdType,
 ) -> CartPayment:
     """Submit a cart payment creation request.
 
@@ -405,6 +444,44 @@ async def submit_payment(
     Returns:
         CartPayment -- A CartPayment model for the created payment.
     """
+    # TODO: Validate amount does not exceed configured max for specified currency
+
+    # TODO Refactor repos
+    payment_method_repo = PaymentMethodRepository(context=app_context)
+    payer_repo = PayerRepository(context=app_context)
+
+    if not request_cart_payment.payment_method_id:
+        raise CartPaymentCreateError(
+            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA, retryable=False
+        )
+
+    # Lookup payment method, stripe card
+    # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
+    # our exception handling middleware.
+    payment_method, stripe_card, is_found, is_owner = await get_payment_method(
+        payment_method_repository=payment_method_repo,
+        req_ctxt=req_context,
+        payer_id=request_cart_payment.payer_id,
+        payment_method_id=request_cart_payment.payment_method_id,
+        payer_id_type=payer_id_type.value,
+        payment_method_id_type=payment_method_id_type.value,
+    )
+
+    # TODO add more error_code values to help client distinguish error cases
+    if not payment_method or not payment_method.pgp_resource_id:
+        raise CartPaymentCreateError(
+            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA, retryable=False
+        )
+
+    # TODO Get customer ID from payer processor
+    pgp_customer = await payer_repo.get_pgp_customer(
+        GetPgpCustomerInput(payer_id=request_cart_payment.payer_id)
+    )
+    if not pgp_customer:
+        raise CartPaymentCreateError(
+            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA, retryable=False
+        )
+
     # Check for resubmission by client
     cart_payment_interface = CartPaymentInterface(
         app_context, req_context, payment_repo
@@ -416,11 +493,20 @@ async def submit_payment(
     if cart_payment:
         assert payment_intent
         return await cart_payment_interface.resubmit_existing_payment(
-            cart_payment, payment_intent
+            cart_payment,
+            payment_intent,
+            payment_method.pgp_resource_id,
+            pgp_customer.pgp_resource_id,
         )
 
     cart_payment = await cart_payment_interface.submit_new_payment(
-        request_cart_payment, idempotency_key, country, currency, client_description
+        request_cart_payment,
+        payment_method.pgp_resource_id,
+        pgp_customer.pgp_resource_id,
+        idempotency_key,
+        country,
+        currency,
+        client_description,
     )
 
     # TODO For demo/test only, to be removed later

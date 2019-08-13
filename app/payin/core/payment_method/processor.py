@@ -423,7 +423,7 @@ async def get_payment_method(
     try:
         if (
             payment_method_id_type
-            == PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID.value  # noqa: W503
+            == PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID.value
         ) or (not payment_method_id_type):
             # get pgp_payment_method object
             pm_entity = await payment_method_repository.get_pgp_payment_method_by_payment_method_id(

@@ -1,8 +1,10 @@
+import pytest
 import uuid
 
 from starlette.testclient import TestClient
 
 
+@pytest.mark.external
 class TestCartPayment:
     def _get_payer_create_request(self):
         unique_value = str(uuid.uuid4())
@@ -37,7 +39,7 @@ class TestCartPayment:
             "amount": 500,
             "country": "US",
             "currency": "USD",
-            "payment_method_id": "pm_card_visa",
+            "payment_method_id": payment_method["id"],
             "capture_method": "manual",
             "client_description": f"{payer['id']} description",
             "payer_statement_description": f"{payer['id'][0:10]} statement",
@@ -99,6 +101,7 @@ class TestCartPayment:
         assert payer["created_at"]
         assert payer["updated_at"]
         assert payer["deleted_at"] is None
+        return payment_method
 
     def _test_cart_payment_creation(self, stripe_api, client, payer, payment_method):
         request_body = self._get_cart_payment_create_request(payer, payment_method)
@@ -128,10 +131,43 @@ class TestCartPayment:
         assert payer["updated_at"]
         assert payer["deleted_at"] is None
 
+    def _test_cart_payment_creation_error(
+        self,
+        stripe_api,
+        client,
+        payer,
+        payment_method,
+        expected_http_status_status_code,
+        expected_body_error_code,
+        expected_retryable,
+    ):
+        request_body = self._get_cart_payment_create_request(payer, payment_method)
+        response = client.post("/payin/api/v1/cart_payments", json=request_body)
+        body = response.json()
+        print("**** Body")
+        print(body)
+        assert response.status_code == expected_http_status_status_code
+        assert "error_code" in body
+        assert body["error_code"] == expected_body_error_code
+        assert "error_message" in body
+        assert "retryable" in body
+        assert body["retryable"] == expected_retryable
+
     def test_cart_payment(self, stripe_api, client: TestClient):
-        stripe_api.enable_mock()
-        # stripe_api.enable_outbound()
+        # Since this test requires a sequence of calls to stripe in order to set up a payment intent
+        # creation attempt, we need to use the actual test stripe system.  As a result this test class
+        # is marked as external.  The stripe simulator does not return the correct result since it does
+        # persiste state.
+        stripe_api.enable_outbound()
 
         payer = self._test_payer_creation(stripe_api, client)
         payment_method = self._test_payment_method_creation(stripe_api, client, payer)
+
+        # Success case
         self._test_cart_payment_creation(stripe_api, client, payer, payment_method)
+
+        # Other payer cannot use some else's payment method
+        other_payer = payer = self._test_payer_creation(stripe_api, client)
+        self._test_cart_payment_creation_error(
+            stripe_api, client, other_payer, payment_method, 403, "payin_23", False
+        )

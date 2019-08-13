@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Schema
 
+from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.core.cart_payment.types import CaptureMethod, CartType
 
 
@@ -34,9 +35,13 @@ class CartMetadata(BaseModel):
     type: CartType = Schema(CartType.ORDER_CART, title="Type of payment.")
 
 
-class CartPaymentRequest(BaseModel):
+class CreateCartPaymentRequest(BaseModel):
     payer_id: str = Schema(
         ..., title="Payment system account ID associated with entity to charge."
+    )
+
+    payer_id_type: PayerIdType = Schema(
+        PayerIdType.DD_PAYMENT_PAYER_ID, title="Type of payer ID provided."
     )
 
     amount: int = Schema(..., title="Amount to charge.")
@@ -47,6 +52,11 @@ class CartPaymentRequest(BaseModel):
 
     payment_method_id: str = Schema(
         ..., title="ID of payment method to use for the payment."
+    )
+
+    payment_method_id_type: PaymentMethodIdType = Schema(
+        PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+        title="Type of payer ID provided.",
     )
 
     capture_method: CaptureMethod = Schema(

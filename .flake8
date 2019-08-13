@@ -6,5 +6,5 @@ max-line-length = 88
 # H202 needed in testing
 # F811 needed in fixture testing
 show-source = True
-ignore = E123,E125,E501,H202,F811
+ignore = E123,E125,E501,H202,F811,W503
 exclude = .venv,.git,.tox,dist,doc,*lib/python*,*egg,build,venv,*release.json.py,*.xml
