@@ -5,7 +5,7 @@ import pytest
 import pytest_mock
 
 from app.commons.context.app_context import AppContext
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.data_types import GetMxLedgerByIdInput
 from app.ledger.core.mx_transaction.processor import (
@@ -33,7 +33,7 @@ class TestMxTransactionProcessor:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_get_open_mx_scheduled_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -107,7 +107,7 @@ class TestMxTransactionProcessor:
         assert mx_ledger.balance == 4000
 
     async def test_get_open_mx_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -186,7 +186,7 @@ class TestMxTransactionProcessor:
         assert mx_ledger.balance == 4000
 
     async def test_create_mx_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),

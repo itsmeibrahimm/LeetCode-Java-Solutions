@@ -1,22 +1,22 @@
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, List, Optional, ClassVar
 
 from typing_extensions import final
 
-from app.commons.database.config import DatabaseConfig
-
 
 @final
-@dataclass
+@dataclass(frozen=True)
 class Secret:
     """
     Holds a string secret config value that should not be revealed in logging and etc.
     """
 
+    _UNDEFINED: ClassVar[str] = "undefined_secret"
+
     name: str
     version: Optional[int] = None
-    value: Optional[str] = None
+    value: str = _UNDEFINED
 
     def __post_init__(self):
         assert self.name.islower(), "name of secret should always be lower cased"
@@ -38,6 +38,10 @@ class Secret:
             raise KeyError(f"Environment variable={name} not defined")
         return cls(name=name, version=None, value=value)
 
+    @classmethod
+    def is_undefined(cls, secret: "Secret") -> bool:
+        return secret.value == cls._UNDEFINED
+
 
 @final
 @dataclass(frozen=True)
@@ -45,6 +49,25 @@ class SentryConfig:
     dsn: Secret
     environment: str
     release: str
+
+
+@dataclass(frozen=True)
+class DBConfig:
+    debug: bool
+    master_pool_size: int
+    replica_pool_size: int
+    statement_timeout = 1.0
+    force_rollback: bool = False
+
+    def __post_init__(self):
+        if self.master_pool_size <= 0:
+            raise ValueError(
+                f"master_pool_size should be > 0 but found={self.master_pool_size}"
+            )
+        if self.replica_pool_size <= 0:
+            raise ValueError(
+                f"replica_pool_size should be > 0 but found={self.replica_pool_size}"
+            )
 
 
 @final
@@ -69,24 +92,25 @@ class AppConfig:
 
     # DB configs
     PAYOUT_MAINDB_MASTER_URL: Secret
-    PAYOUT_MAINDB_REPLICA_URL: Optional[Secret]
+    PAYOUT_MAINDB_REPLICA_URL: Secret
 
     PAYOUT_BANKDB_MASTER_URL: Secret
-    PAYOUT_BANKDB_REPLICA_URL: Optional[Secret]
+    PAYOUT_BANKDB_REPLICA_URL: Secret
 
     PAYIN_MAINDB_MASTER_URL: Secret
-    PAYIN_MAINDB_REPLICA_URL: Optional[Secret]
+    PAYIN_MAINDB_REPLICA_URL: Secret
 
     PAYIN_PAYMENTDB_MASTER_URL: Secret
-    PAYIN_PAYMENTDB_REPLICA_URL: Optional[Secret]
+    PAYIN_PAYMENTDB_REPLICA_URL: Secret
 
     LEDGER_MAINDB_MASTER_URL: Secret
-    LEDGER_MAINDB_REPLICA_URL: Optional[Secret]
+    LEDGER_MAINDB_REPLICA_URL: Secret
 
     LEDGER_PAYMENTDB_MASTER_URL: Secret
-    LEDGER_PAYMENTDB_REPLICA_URL: Optional[Secret]
+    LEDGER_PAYMENTDB_REPLICA_URL: Secret
 
-    DEFAULT_DB_CONFIG: DatabaseConfig
+    DEFAULT_DB_CONFIG: DBConfig
+    AVAILABLE_MAINDB_REPLICAS: List[str]
 
     # Payment Service Provider
     STRIPE_US_SECRET_KEY: Secret

@@ -8,7 +8,7 @@ from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, create_app_context
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 
@@ -85,10 +85,11 @@ async def payin_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayIn user
     """
-    async with Database.create(
-        name="payin_maindb",
+    async with DB.create(
+        db_id="payin_maindb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.PAYIN_MAINDB_MASTER_URL,
+        replica_url=app_config.PAYIN_MAINDB_MASTER_URL,
     ) as db:
         yield db
 
@@ -98,10 +99,11 @@ async def payout_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayOut user
     """
-    async with Database.create(
-        name="payout_maindb",
+    async with DB.create(
+        db_id="payout_maindb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.PAYOUT_MAINDB_MASTER_URL,
+        replica_url=app_config.PAYOUT_MAINDB_MASTER_URL,
     ) as db:
         yield db
 
@@ -111,10 +113,11 @@ async def payout_bankdb(app_config: AppConfig):
     """
     initialize the bankdb connection for PayOut user
     """
-    async with Database.create(
-        name="payout_bankdb",
+    async with DB.create(
+        db_id="payout_bankdb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.PAYOUT_BANKDB_MASTER_URL,
+        replica_url=app_config.PAYOUT_BANKDB_MASTER_URL,
     ) as db:
         yield db
 
@@ -124,10 +127,11 @@ async def ledger_paymentdb(app_config: AppConfig):
     """
     initialize the paymentdb connection for Ledger user
     """
-    async with Database.create(
-        name="ledger_paymentdb",
+    async with DB.create(
+        db_id="ledger_paymentdb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.LEDGER_PAYMENTDB_MASTER_URL,
+        replica_url=app_config.LEDGER_PAYMENTDB_MASTER_URL,
     ) as db:
         yield db
 

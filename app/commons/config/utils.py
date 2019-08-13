@@ -1,3 +1,4 @@
+import dataclasses
 import os
 from typing import Callable, Mapping
 
@@ -42,18 +43,20 @@ def init_app_config() -> AppConfig:
             config = app_config.__getattribute__(key)
             if isinstance(config, Secret):
                 try:
-                    secret = str(ninox.get(config.name, version=config.version))
+                    secret_val = str(ninox.get(config.name, version=config.version))
                 except Helper.SecretNotFoundError:
                     raise Helper.SecretNotFoundError(
                         f"config name={config.name} is not found"
                     )
-                config.value = secret
+                updated_secret_config = dataclasses.replace(config, value=secret_val)
+                object.__setattr__(app_config, key, updated_secret_config)
+
     else:
         # When working with Ninox disabled, should also make sure all "secrets" are actually configured
         for key in dir(app_config):
             config = app_config.__getattribute__(key)
             if isinstance(config, Secret):
-                if config.value is None:
+                if Secret.is_undefined(config):
                     raise KeyError(f"config name={config.name} is not defined")
 
     return app_config

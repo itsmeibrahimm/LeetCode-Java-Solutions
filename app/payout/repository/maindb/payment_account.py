@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy import and_
 from typing_extensions import final
 
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import payment_accounts, stripe_managed_accounts
 from app.payout.repository.maindb.model.payment_account import (
@@ -68,7 +68,7 @@ class PaymentAccountRepositoryInterface(ABC):
 class PaymentAccountRepository(
     PayoutMainDBRepository, PaymentAccountRepositoryInterface
 ):
-    def __init__(self, database: Database):
+    def __init__(self, database: DB):
         super().__init__(_database=database)
 
     async def create_payment_account(

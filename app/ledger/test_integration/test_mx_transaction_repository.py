@@ -6,7 +6,7 @@ import pytest_mock
 from asyncpg import UniqueViolationError
 
 from app.commons.context.app_context import AppContext
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.data_types import (
     InsertMxTransactionWithLedgerInput,
@@ -37,7 +37,7 @@ class TestMxTransactionRepository:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_insert_mx_transaction_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -85,7 +85,7 @@ class TestMxTransactionRepository:
         assert mx_transaction.idempotency_key == ide_key
 
     async def test_insert_mx_transaction_raise_exception(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -129,7 +129,7 @@ class TestMxTransactionRepository:
             await repo.insert_mx_transaction(mx_transaction_to_insert)
 
     async def test_create_ledger_and_insert_mx_transaction_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -183,7 +183,7 @@ class TestMxTransactionRepository:
         assert mx_ledger.balance == 2000
 
     async def test_create_ledger_and_insert_mx_transaction_raise_exception(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -252,7 +252,7 @@ class TestMxTransactionRepository:
             assert mx_ledger_retrieved is None
 
     async def test_insert_mx_transaction_and_update_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -307,7 +307,7 @@ class TestMxTransactionRepository:
         assert mx_ledger_retrieved.balance == 4000
 
     async def test_insert_mx_transaction_and_update_ledger_raise_exception(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),

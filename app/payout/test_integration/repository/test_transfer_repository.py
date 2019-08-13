@@ -1,6 +1,6 @@
 import pytest
 
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransferCreate,
     StripeTransferUpdate,
@@ -13,7 +13,7 @@ class TestTransferRepository:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture
-    def transfer_repo(self, payout_maindb: Database) -> TransferRepository:
+    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
         return TransferRepository(database=payout_maindb)
 
     async def test_create_update_get_transfer(self, transfer_repo: TransferRepository):

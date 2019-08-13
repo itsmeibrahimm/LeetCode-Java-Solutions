@@ -1,7 +1,6 @@
 import os
 
-from app.commons.config.app_config import AppConfig, Secret, SentryConfig
-from app.commons.database.config import DatabaseConfig
+from app.commons.config.app_config import AppConfig, Secret, SentryConfig, DBConfig
 
 
 def create_app_config() -> AppConfig:
@@ -17,18 +16,24 @@ def create_app_config() -> AppConfig:
         PAYIN_MAINDB_MASTER_URL=Secret(name="payin_maindb_url"),
         PAYIN_MAINDB_REPLICA_URL=Secret(name="payin_maindb_replica_url"),
         PAYIN_PAYMENTDB_MASTER_URL=Secret(name="payin_paymentdb_url"),
-        PAYIN_PAYMENTDB_REPLICA_URL=None,
+        PAYIN_PAYMENTDB_REPLICA_URL=Secret(name="payin_paymentdb_url"),
         PAYOUT_MAINDB_MASTER_URL=Secret(name="payout_maindb_url"),
         PAYOUT_MAINDB_REPLICA_URL=Secret(name="payout_maindb_replica_url"),
         PAYOUT_BANKDB_MASTER_URL=Secret(name="payout_bankdb_url"),
         PAYOUT_BANKDB_REPLICA_URL=Secret(name="payout_bankdb_replica_url"),
         LEDGER_MAINDB_MASTER_URL=Secret(name="ledger_maindb_url"),
-        LEDGER_MAINDB_REPLICA_URL=None,
+        LEDGER_MAINDB_REPLICA_URL=Secret(name="ledger_maindb_url"),
         LEDGER_PAYMENTDB_MASTER_URL=Secret(name="ledger_paymentdb_url"),
-        LEDGER_PAYMENTDB_REPLICA_URL=None,
-        DEFAULT_DB_CONFIG=DatabaseConfig(
-            replica_pool_size=5, master_pool_size=5, debug=False
+        LEDGER_PAYMENTDB_REPLICA_URL=Secret(name="ledger_paymentdb_url"),
+        DEFAULT_DB_CONFIG=DBConfig(
+            replica_pool_size=2, master_pool_size=2, debug=False
         ),
+        AVAILABLE_MAINDB_REPLICAS=[
+            "doordash_replica1",
+            "doordash_replica2",
+            "doordash_replica3",
+            "doordash_replica4",
+        ],
         STRIPE_US_SECRET_KEY=Secret(name="stripe_us_secret_key"),
         STRIPE_US_PUBLIC_KEY=Secret(name="stripe_us_public_key"),
         DSJ_API_BASE_URL="",

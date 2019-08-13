@@ -1,29 +1,29 @@
 from asyncio import gather
 from dataclasses import dataclass
+from random import choice
 from typing import Any, cast
-
-from app.commons.applications import FastAPI
 
 from structlog import BoundLogger
 
+from app.commons.applications import FastAPI
 from app.commons.config.app_config import AppConfig
 from app.commons.context.logger import root_logger
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
+from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe_client import StripeClientPool
 from app.commons.providers.stripe_models import StripeClientSettings
-from app.commons.providers.dsj_client import DSJClient
 
 
 @dataclass(frozen=True)
 class AppContext:
     log: BoundLogger
 
-    payout_maindb: Database
-    payout_bankdb: Database
-    payin_maindb: Database
-    payin_paymentdb: Database
-    ledger_maindb: Database
-    ledger_paymentdb: Database
+    payout_maindb: DB
+    payout_bankdb: DB
+    payin_maindb: DB
+    payin_paymentdb: DB
+    ledger_maindb: DB
+    ledger_paymentdb: DB
 
     stripe: StripeClientPool
 
@@ -48,41 +48,56 @@ class AppContext:
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
-    payout_maindb = Database.create(
-        name="payout_maindb",
+
+    # Pick up a maindb replica upfront and use it for all instances targeting maindb
+    # Not do randomization separately in each creation to reduce the chance that
+    # app_context initialization fails due to any one of the replicas has outage
+    selected_maindb_replica = (
+        choice(config.AVAILABLE_MAINDB_REPLICAS)
+        if config.AVAILABLE_MAINDB_REPLICAS
+        else None
+    )
+
+    payout_maindb = DB.create_with_alternative_replica(
+        db_id="payout_maindb",
         db_config=config.DEFAULT_DB_CONFIG,
         master_url=config.PAYOUT_MAINDB_MASTER_URL,
-        replica_url=config.PAYIN_MAINDB_REPLICA_URL,
+        replica_url=config.PAYOUT_MAINDB_REPLICA_URL,
+        alternative_replica=selected_maindb_replica,
     )
-    payout_bankdb = Database.create(
-        name="payout_bankdb",
+
+    payin_maindb = DB.create_with_alternative_replica(
+        db_id="payin_maindb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PAYIN_MAINDB_MASTER_URL,
+        replica_url=config.PAYIN_MAINDB_REPLICA_URL,
+        alternative_replica=selected_maindb_replica,
+    )
+
+    ledger_maindb = DB.create_with_alternative_replica(
+        db_id="ledger_maindb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.LEDGER_MAINDB_MASTER_URL,
+        replica_url=config.LEDGER_MAINDB_REPLICA_URL,
+        alternative_replica=selected_maindb_replica,
+    )
+
+    payout_bankdb = DB.create(
+        db_id="payout_bankdb",
         db_config=config.DEFAULT_DB_CONFIG,
         master_url=config.PAYOUT_BANKDB_MASTER_URL,
         replica_url=config.PAYOUT_BANKDB_REPLICA_URL,
     )
 
-    payin_maindb = Database.create(
-        name="payin_maindb",
-        db_config=config.DEFAULT_DB_CONFIG,
-        master_url=config.PAYIN_MAINDB_MASTER_URL,
-        replica_url=config.PAYIN_MAINDB_REPLICA_URL,
-    )
-
-    payin_paymentdb = Database.create(
-        name="payin_paymentdb",
+    payin_paymentdb = DB.create(
+        db_id="payin_paymentdb",
         db_config=config.DEFAULT_DB_CONFIG,
         master_url=config.PAYIN_PAYMENTDB_MASTER_URL,
         replica_url=config.PAYIN_PAYMENTDB_REPLICA_URL,
     )
-    ledger_maindb = Database.create(
-        name="ledger_maindb",
-        db_config=config.DEFAULT_DB_CONFIG,
-        master_url=config.LEDGER_MAINDB_MASTER_URL,
-        replica_url=config.LEDGER_MAINDB_REPLICA_URL,
-    )
 
-    ledger_paymentdb = Database.create(
-        name="ledger_paymentdb",
+    ledger_paymentdb = DB.create(
+        db_id="ledger_paymentdb",
         db_config=config.DEFAULT_DB_CONFIG,
         master_url=config.LEDGER_PAYMENTDB_MASTER_URL,
         replica_url=config.LEDGER_PAYMENTDB_REPLICA_URL,

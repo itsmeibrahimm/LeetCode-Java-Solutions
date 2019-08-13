@@ -5,7 +5,7 @@ import pytest
 import pytest_mock
 
 from app.commons.context.app_context import AppContext
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.types import (
     MxScheduledLedgerIntervalType,
@@ -27,7 +27,7 @@ class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_insert_mx_scheduled_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -74,7 +74,7 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.end_time == datetime(2019, 8, 12)
 
     async def test_get_open_mx_scheduled_ledger_for_period_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),
@@ -130,7 +130,7 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.end_time == datetime(2019, 8, 5, 7)
 
     async def test_get_open_mx_scheduled_ledger_for_period_not_exist_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: Database
+        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
     ):
         app_context: AppContext = AppContext(
             log=mocker.Mock(),

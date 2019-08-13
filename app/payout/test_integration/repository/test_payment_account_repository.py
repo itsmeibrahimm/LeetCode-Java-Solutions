@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccountCreate,
     PaymentAccountUpdate,
@@ -18,7 +18,7 @@ class TestPaymentAccountRepository:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture
-    def payment_account_repo(self, payout_maindb: Database) -> PaymentAccountRepository:
+    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
         return PaymentAccountRepository(database=payout_maindb)
 
     async def test_create_update_get_payment_account(

@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from typing_extensions import final
 
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import stripe_transfers, transfers
 from app.payout.repository.maindb.model.stripe_transfer import (
@@ -71,7 +71,7 @@ class TransferRepositoryInterface(ABC):
 
 @final
 class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
-    def __init__(self, database: Database):
+    def __init__(self, database: DB):
         super().__init__(_database=database)
 
     async def get_transfer_by_id(self, transfer_id: int) -> Optional[Transfer]:

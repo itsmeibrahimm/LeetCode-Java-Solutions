@@ -1,7 +1,6 @@
 import os
 
-from app.commons.config.app_config import AppConfig, Secret
-from app.commons.database.config import DatabaseConfig
+from app.commons.config.app_config import AppConfig, Secret, DBConfig
 
 
 def create_app_config() -> AppConfig:
@@ -21,35 +20,52 @@ def create_app_config() -> AppConfig:
             name="payin_maindb_url",
             value=f"postgresql://payin_user@{dsj_db_endpoint}/maindb_dev",
         ),
-        PAYIN_MAINDB_REPLICA_URL=None,
+        PAYIN_MAINDB_REPLICA_URL=Secret(
+            name="payin_maindb_url",
+            value=f"postgresql://payin_user@{dsj_db_endpoint}/maindb_dev",
+        ),
         PAYIN_PAYMENTDB_MASTER_URL=Secret(
             name="payin_paymentdb_url",
             value=f"postgresql://payin_user@{dsj_db_endpoint}/paymentdb_dev",
         ),
-        PAYIN_PAYMENTDB_REPLICA_URL=None,
+        PAYIN_PAYMENTDB_REPLICA_URL=Secret(
+            name="payin_paymentdb_url",
+            value=f"postgresql://payin_user@{dsj_db_endpoint}/paymentdb_dev",
+        ),
         PAYOUT_MAINDB_MASTER_URL=Secret(
             name="payout_maindb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
         ),
-        PAYOUT_MAINDB_REPLICA_URL=None,
+        PAYOUT_MAINDB_REPLICA_URL=Secret(
+            name="payout_maindb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
+        ),
         PAYOUT_BANKDB_MASTER_URL=Secret(
             name="payout_bankdb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/bankdb_dev",
         ),
-        PAYOUT_BANKDB_REPLICA_URL=None,
+        PAYOUT_BANKDB_REPLICA_URL=Secret(
+            name="payout_bankdb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/bankdb_dev",
+        ),
         LEDGER_MAINDB_MASTER_URL=Secret(
             name="ledger_maindb_url",
             value=f"postgresql://ledger_user@{dsj_db_endpoint}/maindb_dev",
         ),
-        LEDGER_MAINDB_REPLICA_URL=None,
+        LEDGER_MAINDB_REPLICA_URL=Secret(
+            name="ledger_maindb_url",
+            value=f"postgresql://ledger_user@{dsj_db_endpoint}/maindb_dev",
+        ),
         LEDGER_PAYMENTDB_MASTER_URL=Secret(
             name="ledger_paymentdb_url",
             value=f"postgresql://ledger_user@{dsj_db_endpoint}/paymentdb_dev",
         ),
-        LEDGER_PAYMENTDB_REPLICA_URL=None,
-        DEFAULT_DB_CONFIG=DatabaseConfig(
-            replica_pool_size=None, master_pool_size=5, debug=True
+        LEDGER_PAYMENTDB_REPLICA_URL=Secret(
+            name="ledger_paymentdb_url",
+            value=f"postgresql://ledger_user@{dsj_db_endpoint}/paymentdb_dev",
         ),
+        DEFAULT_DB_CONFIG=DBConfig(replica_pool_size=1, master_pool_size=5, debug=True),
+        AVAILABLE_MAINDB_REPLICAS=["maindb_dev"],
         STRIPE_US_SECRET_KEY=Secret(
             name="stripe_us_secret_key", value="sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
         ),

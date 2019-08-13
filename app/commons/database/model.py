@@ -1,6 +1,5 @@
-import databases
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Mapping
+from typing import Any, Dict, List, Mapping
 
 import sqlalchemy
 from pydantic import BaseModel, validate_model
@@ -9,8 +8,6 @@ from sqlalchemy import Column, Table
 from sqlalchemy.sql.schema import SchemaItem
 from sqlalchemy.exc import ArgumentError
 
-from app.commons.config.app_config import Secret
-from app.commons.database.config import DatabaseConfig
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -67,83 +64,6 @@ class TableDefinition:
                 **self.additional_schema_kwargs,
             ),
         )
-
-
-@dataclass(frozen=True)
-class Database:
-    """
-    Encapsulate connections pools for a database.
-
-    """
-
-    _master: databases.Database
-    _replica: Optional[databases.Database] = None
-
-    @classmethod
-    def create(
-        cls,
-        *,
-        name: str,
-        db_config: DatabaseConfig,
-        master_url: Secret,
-        replica_url: Optional[Secret] = None,
-    ) -> "Database":
-        # https://magicstack.github.io/asyncpg/current/faq.html#why-am-i-getting-prepared-statement-errors
-        # note when running under pgbouncer, we need to disable
-        # named prepared statements. we also do not benefit from
-        # prepared statement caching
-        # https://github.com/MagicStack/asyncpg/issues/339
-        statement_cache_size = 0
-
-        assert master_url.value is not None
-        master = databases.Database(
-            master_url.value,
-            max_size=db_config.master_pool_size,
-            min_size=0,
-            # echo=db_config.debug,
-            # logging_name=f"{name}_master",
-            command_timeout=db_config.statement_timeout,
-            force_rollback=db_config.force_rollback,
-            statement_cache_size=statement_cache_size,
-        )
-
-        replica = None
-        if replica_url and replica_url.value is not None:
-            replica = databases.Database(
-                replica_url.value,
-                max_size=db_config.replica_pool_size,
-                min_size=0,
-                # echo=db_config.debug,
-                # logging_name=f"{name}_replica",
-                command_timeout=db_config.statement_timeout,
-                force_rollback=db_config.force_rollback,
-                statement_cache_size=statement_cache_size,
-            )
-
-        return cls(_master=master, _replica=replica)
-
-    def master(self) -> databases.Database:
-        return self._master
-
-    def replica(self) -> databases.Database:
-        return self._replica or self._master
-
-    async def __aenter__(self):
-        await self.connect()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.disconnect()
-
-    async def connect(self):
-        await self._master.connect()
-        if self._replica:
-            await self._replica.connect()
-
-    async def disconnect(self):
-        await self._master.disconnect()
-        if self._replica:
-            await self._replica.disconnect()
 
 
 class RecordDict(GetterDict):

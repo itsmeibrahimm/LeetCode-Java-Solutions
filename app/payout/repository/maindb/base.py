@@ -1,6 +1,6 @@
 from abc import ABC
 
-from app.commons.database.model import Database
+from app.commons.database.infra import DB
 
 
 class PayoutMainDBRepository(ABC):
@@ -8,7 +8,7 @@ class PayoutMainDBRepository(ABC):
     Base repository containing Payout_MainDB connection resources
     """
 
-    _database: Database
+    _database: DB
 
-    def __init__(self, *, _database: Database):
+    def __init__(self, *, _database: DB):
         self._database = _database
