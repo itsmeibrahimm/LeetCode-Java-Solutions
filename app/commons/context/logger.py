@@ -8,7 +8,7 @@ from pythonjsonlogger import jsonlogger
 
 # see https://github.com/madzak/python-json-logger/blob/master/src/pythonjsonlogger/jsonlogger.py#L18
 # for a list of supported fields and reserved attributes for logging
-INCLUDED_LOG_FIELDS = "(message) (timestamp) (name)"
+INCLUDED_LOG_FIELDS = "(req_id) (timestamp) (name) (message)"
 
 _handler = logging.StreamHandler(sys.stdout)
 _formatter = jsonlogger.JsonFormatter(INCLUDED_LOG_FIELDS)

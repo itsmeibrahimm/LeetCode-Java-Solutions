@@ -56,7 +56,7 @@ def init_app_config() -> AppConfig:
         for key in dir(app_config):
             config = app_config.__getattribute__(key)
             if isinstance(config, Secret):
-                if Secret.is_undefined(config):
+                if config.value is None:
                     raise KeyError(f"config name={config.name} is not defined")
 
     return app_config

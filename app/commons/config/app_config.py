@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional, ClassVar
+from typing import Dict, List, Optional
 
 from typing_extensions import final
 
@@ -12,11 +12,9 @@ class Secret:
     Holds a string secret config value that should not be revealed in logging and etc.
     """
 
-    _UNDEFINED: ClassVar[str] = "undefined_secret"
-
     name: str
     version: Optional[int] = None
-    value: str = _UNDEFINED
+    value: Optional[str] = None
 
     def __post_init__(self):
         assert self.name.islower(), "name of secret should always be lower cased"
@@ -37,10 +35,6 @@ class Secret:
         if value is None:
             raise KeyError(f"Environment variable={name} not defined")
         return cls(name=name, version=None, value=value)
-
-    @classmethod
-    def is_undefined(cls, secret: "Secret") -> bool:
-        return secret.value == cls._UNDEFINED
 
 
 @final

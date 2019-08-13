@@ -58,6 +58,7 @@ class DB:
         # https://github.com/MagicStack/asyncpg/issues/339
         statement_cache_size = 0
 
+        assert master_url.value
         master = Database(
             master_url.value,
             max_size=db_config.master_pool_size,
@@ -69,6 +70,7 @@ class DB:
             statement_cache_size=statement_cache_size,
         )
 
+        assert replica_url.value
         replica = Database(
             replica_url.value,
             max_size=db_config.replica_pool_size,
@@ -113,6 +115,7 @@ class DB:
                 replica_url=replica_url,
             )
 
+        assert replica_url.value
         parsed_replica_url = parse.urlparse(replica_url.value)
 
         #  TODO Maybe we don't want to directly import root logger here
