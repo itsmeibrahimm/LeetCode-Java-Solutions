@@ -23,7 +23,7 @@ class StripeTransferTable(TableDefinition):
     )
     created_at: Column = no_init_field(
         Column(
-            "created_at", DateTime(True), nullable=False, default=datetime.utcnow
+            "created_at", DateTime(True), nullable=False
         )  # come back and revisit this timeout to be consistent with DSJ
     )
     stripe_id: Column = no_init_field(Column("stripe_id", String(50), index=True))

@@ -104,17 +104,14 @@ class TestCartPaymentProcessor:
         cart_payment_interface.payment_repo.update_pgp_payment_intent = mock_db_function
 
         intent = generate_pgp_payment_intent("init")
-        connection = MagicMock()
         provider_payment_response = "ID From Provicer"
         await cart_payment_interface._update_pgp_intent_from_provider(
-            connection=connection,
             pgp_intent_id=intent.id,
             status=IntentStatus.PROCESSING,
             provider_payment_response=provider_payment_response,
         )
 
         mock_db_function.assert_called_with(
-            connection=connection,
             id=intent.id,
             status=IntentStatus.PROCESSING,
             provider_intent_id=provider_payment_response,

@@ -115,13 +115,11 @@ class CartPaymentInterface:
     # req_context, payin_repos, pgp_intent_id, provider_payment_response
     async def _update_pgp_intent_from_provider(
         self,
-        connection,
         pgp_intent_id: uuid.UUID,
         status: IntentStatus,
         provider_payment_response: Any,
     ) -> None:
         await self.payment_repo.update_pgp_payment_intent(
-            connection=connection,
             id=pgp_intent_id,
             status=status,
             provider_intent_id=provider_payment_response,
@@ -137,14 +135,13 @@ class CartPaymentInterface:
             payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
         )
 
-        async with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
+        async with self.payment_repo.payment_database_transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
             await self.payment_repo.update_payment_intent_status(
-                connection, payment_intent.id, IntentStatus.REQUIRES_CAPTURE
+                payment_intent.id, IntentStatus.REQUIRES_CAPTURE
             )
             await self._update_pgp_intent_from_provider(
-                connection,
                 pgp_payment_intent.id,
                 IntentStatus.REQUIRES_CAPTURE,
                 provider_payment_response,
@@ -187,10 +184,9 @@ class CartPaymentInterface:
         assert request_cart_payment.capture_method
         assert request_cart_payment.payment_method_id
 
-        async with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
+        async with self.payment_repo.payment_database_transaction():
             # Create CartPayment
             cart_payment: CartPayment = await self.payment_repo.insert_cart_payment(
-                connection=connection,
                 id=uuid.uuid4(),
                 payer_id=request_cart_payment.payer_id,
                 type=request_cart_payment.cart_metadata.type,
@@ -207,7 +203,6 @@ class CartPaymentInterface:
             # Create PaymentIntent
             assert cart_payment.id
             payment_intent: PaymentIntent = await self.payment_repo.insert_payment_intent(
-                connection=connection,
                 id=uuid.uuid4(),
                 cart_payment_id=cart_payment.id,
                 idempotency_key=idempotency_key,
@@ -226,7 +221,6 @@ class CartPaymentInterface:
 
             # Create PgpPaymentIntent
             pgp_payment_intent: PgpPaymentIntent = await self.payment_repo.insert_pgp_payment_intent(
-                connection=connection,
                 id=uuid.uuid4(),
                 payment_intent_id=payment_intent.id,
                 idempotency_key=idempotency_key,
@@ -377,15 +371,12 @@ class CartPaymentInterface:
         )
 
         # Update state
-        async with self.payment_repo.payment_database.master().acquire() as connection, connection.transaction():
+        async with self.payment_repo.payment_database_transaction():
             await self.payment_repo.update_payment_intent_status(
-                connection, payment_intent.id, new_status
+                payment_intent.id, new_status
             )
             await self._update_pgp_intent_from_provider(
-                connection,
-                pgp_payment_intent.id,
-                new_status,
-                pgp_payment_intent.resource_id,
+                pgp_payment_intent.id, new_status, pgp_payment_intent.resource_id
             )
 
 

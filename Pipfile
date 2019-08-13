@@ -37,7 +37,6 @@ ninox = {version = "*",index = "gemfury",extras = ["py3", "CLI"]}
 fastapi = "==0.33.0"
 uvicorn = "==0.8.4"
 gunicorn = "==19.9.0"
-gino = "==0.8.3"
 typing-extensions = "==3.7.4"
 tenacity = "==5.0.4"
 structlog = "==19.1.0"
@@ -49,6 +48,7 @@ setproctitle = "==1.1.10"
 email-validator = "==1.0.4"
 aiohttp = "==3.5.4"
 sentry-sdk = "==0.10.2"
+databases = {extras = ["postgresql"],version = "==0.2.5"}
 
 [requires]
 python_version = "3.7"

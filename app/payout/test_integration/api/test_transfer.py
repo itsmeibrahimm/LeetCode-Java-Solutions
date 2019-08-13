@@ -1,4 +1,4 @@
-from pytest import fixture
+import pytest
 from starlette.testclient import TestClient
 from datetime import datetime
 
@@ -45,7 +45,7 @@ def delete_stripe_transfer_by_stripe_id_url(stripe_id: str):
 
 
 class TestTransferV0:
-    @fixture
+    @pytest.fixture
     def prepared_transfer(self, client: TestClient) -> dict:
         transfer_to_create = {
             "subtotal": 123,
@@ -60,7 +60,7 @@ class TestTransferV0:
         assert transfer_to_create.items() <= created.items()
         return created
 
-    @fixture
+    @pytest.fixture
     def prepared_stripe_transfer(self, prepared_transfer: dict, client: TestClient):
         to_create = {
             "stripe_status": "default",

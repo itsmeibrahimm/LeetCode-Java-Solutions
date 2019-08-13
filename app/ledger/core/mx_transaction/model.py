@@ -2,10 +2,9 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import Json
+from pydantic import BaseModel, Json
 from typing_extensions import final
 
-from app.commons.database.model import DBEntity
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.types import (
     MxTransactionType,
@@ -15,8 +14,14 @@ from app.ledger.core.mx_transaction.types import (
 )
 
 
+class MxTransactionModel(BaseModel):
+    class Config:
+        allow_mutation = False
+        orm_mode = True
+
+
 @final
-class MxTransaction(DBEntity):
+class MxTransaction(MxTransactionModel):
     id: UUID
     payment_account_id: str
     amount: int
@@ -35,7 +40,7 @@ class MxTransaction(DBEntity):
 
 # todo：refactor this into new folder later
 @final
-class MxLedger(DBEntity):
+class MxLedger(MxTransactionModel):
     id: UUID
     type: MxLedgerType
     currency: CurrencyType
@@ -54,7 +59,7 @@ class MxLedger(DBEntity):
 
 
 @final
-class MxScheduledLedger(DBEntity):
+class MxScheduledLedger(MxTransactionModel):
     id: UUID
     payment_account_id: str
     ledger_id: UUID

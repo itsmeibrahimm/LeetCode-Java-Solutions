@@ -1,4 +1,5 @@
 from dataclasses import InitVar, dataclass
+from databases.core import Transaction
 
 from app.commons.context.app_context import AppContext
 from app.commons.database.model import Database
@@ -18,3 +19,9 @@ class PayinDBRepository:
     def __post_init__(self, context: AppContext):
         self.main_database = context.payin_maindb
         self.payment_database = context.payin_paymentdb
+
+    def main_database_transaction(self) -> Transaction:
+        return self.main_database.master().transaction()
+
+    def payment_database_transaction(self) -> Transaction:
+        return self.payment_database.master().transaction()

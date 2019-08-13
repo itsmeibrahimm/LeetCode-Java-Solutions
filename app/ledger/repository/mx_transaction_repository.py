@@ -6,8 +6,6 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from gino import GinoConnection
-
 from app.commons.database.model import DBEntity
 from app.ledger.models.paymentdb import mx_transactions
 
@@ -60,13 +58,11 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
     async def insert_mx_transaction(
         self, request: InsertMxTransactionInput
     ) -> InsertMxTransactionOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                mx_transactions.table.insert()
-                .values(request.dict(skip_defaults=True))
-                .returning(*mx_transactions.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return InsertMxTransactionOutput.from_orm(row)
+        stmt = (
+            mx_transactions.table.insert()
+            .values(request.dict(skip_defaults=True))
+            .returning(*mx_transactions.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return InsertMxTransactionOutput.from_row(row)

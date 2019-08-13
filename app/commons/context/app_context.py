@@ -35,12 +35,12 @@ class AppContext:
                 # Too many Databases here, we may need to create some "manager" to push them down
                 # Also current model assume each Database instance holds unique connection pool
                 # The way of closing will break if we have same connection pool assigned to different Database instance
-                self.payout_maindb.close(),
-                self.payout_bankdb.close(),
-                self.payin_maindb.close(),
-                self.payin_paymentdb.close(),
-                self.ledger_maindb.close(),
-                self.ledger_paymentdb.close(),
+                self.payout_maindb.disconnect(),
+                self.payout_bankdb.disconnect(),
+                self.payin_maindb.disconnect(),
+                self.payin_paymentdb.disconnect(),
+                self.ledger_maindb.disconnect(),
+                self.ledger_paymentdb.disconnect(),
             )
         finally:
             # shutdown the threadpool
@@ -48,68 +48,78 @@ class AppContext:
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
+    payout_maindb = Database.create(
+        name="payout_maindb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PAYOUT_MAINDB_MASTER_URL,
+        replica_url=config.PAYIN_MAINDB_REPLICA_URL,
+    )
+    payout_bankdb = Database.create(
+        name="payout_bankdb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PAYOUT_BANKDB_MASTER_URL,
+        replica_url=config.PAYOUT_BANKDB_REPLICA_URL,
+    )
+
+    payin_maindb = Database.create(
+        name="payin_maindb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PAYIN_MAINDB_MASTER_URL,
+        replica_url=config.PAYIN_MAINDB_REPLICA_URL,
+    )
+
+    payin_paymentdb = Database.create(
+        name="payin_paymentdb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PAYIN_PAYMENTDB_MASTER_URL,
+        replica_url=config.PAYIN_PAYMENTDB_REPLICA_URL,
+    )
+    ledger_maindb = Database.create(
+        name="ledger_maindb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.LEDGER_MAINDB_MASTER_URL,
+        replica_url=config.LEDGER_MAINDB_REPLICA_URL,
+    )
+
+    ledger_paymentdb = Database.create(
+        name="ledger_paymentdb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.LEDGER_PAYMENTDB_MASTER_URL,
+        replica_url=config.LEDGER_PAYMENTDB_REPLICA_URL,
+    )
+
     try:
-        payout_maindb = await Database.create(
-            name="payout_maindb",
-            db_config=config.DEFAULT_DB_CONFIG,
-            master_url=config.PAYOUT_MAINDB_MASTER_URL,
-            replica_url=config.PAYIN_MAINDB_REPLICA_URL,
-        )
+        await payout_maindb.connect()
     except Exception:
         root_logger.exception("failed to connect to payout main db")
         raise
 
     try:
-        payout_bankdb = await Database.create(
-            name="payout_bankdb",
-            db_config=config.DEFAULT_DB_CONFIG,
-            master_url=config.PAYOUT_BANKDB_MASTER_URL,
-            replica_url=config.PAYOUT_BANKDB_REPLICA_URL,
-        )
+        await payout_bankdb.connect()
     except Exception:
         root_logger.exception("failed to connect to payout bank db")
         raise
 
     try:
-        payin_maindb = await Database.create(
-            name="payin_maindb",
-            db_config=config.DEFAULT_DB_CONFIG,
-            master_url=config.PAYIN_MAINDB_MASTER_URL,
-            replica_url=config.PAYIN_MAINDB_REPLICA_URL,
-        )
+        await payin_maindb.connect()
     except Exception:
         root_logger.exception("failed to connect to payin main db")
         raise
 
     try:
-        payin_paymentdb = await Database.create(
-            name="payin_paymentdb",
-            db_config=config.DEFAULT_DB_CONFIG,
-            master_url=config.PAYIN_PAYMENTDB_MASTER_URL,
-            replica_url=config.PAYIN_PAYMENTDB_REPLICA_URL,
-        )
+        await payin_paymentdb.connect()
     except Exception:
         root_logger.exception("failed to connect to payin payment db")
         raise
 
     try:
-        ledger_maindb = await Database.create(
-            name="ledger_maindb",
-            db_config=config.DEFAULT_DB_CONFIG,
-            master_url=config.LEDGER_MAINDB_MASTER_URL,
-            replica_url=config.LEDGER_MAINDB_REPLICA_URL,
-        )
+        await ledger_maindb.connect()
     except Exception:
         root_logger.exception("failed to connect to ledger main db")
         raise
 
     try:
-        ledger_paymentdb = await Database.create(
-            name="ledger_paymentdb",
-            db_config=config.DEFAULT_DB_CONFIG,
-            master_url=config.LEDGER_PAYMENTDB_MASTER_URL,
-            replica_url=config.LEDGER_PAYMENTDB_REPLICA_URL,
-        )
+        await ledger_paymentdb.connect()
     except Exception:
         root_logger.exception("failed to connect to ledger payment db")
         raise
@@ -159,3 +169,9 @@ def get_context_from_app(app: FastAPI) -> AppContext:
     assert context is not None, "app context is set"
     assert isinstance(context, AppContext), "app context has correct type"
     return cast(AppContext, context)
+
+
+def remove_context_for_app(app: FastAPI, context: AppContext):
+    app_context = app.extra.pop("context", None)
+    assert app_context is not None, "app context is set"
+    assert app_context is context

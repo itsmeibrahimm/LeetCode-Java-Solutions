@@ -8,7 +8,6 @@ from math import ceil
 from typing import Optional
 from uuid import UUID
 
-from gino import GinoConnection
 from sqlalchemy import and_
 
 from app.commons.database.model import DBEntity, DBRequestModel
@@ -99,31 +98,26 @@ class MxScheduledLedgerRepository(
     async def insert_mx_scheduled_ledger(
         self, request: InsertMxScheduledLedgerInput
     ) -> InsertMxScheduledLedgerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                mx_scheduled_ledgers.table.insert()
-                .values(request.dict(skip_defaults=True))
-                .returning(*mx_scheduled_ledgers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return InsertMxScheduledLedgerOutput.from_orm(row)
+        stmt = (
+            mx_scheduled_ledgers.table.insert()
+            .values(request.dict(skip_defaults=True))
+            .returning(*mx_scheduled_ledgers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return InsertMxScheduledLedgerOutput.from_row(row)
 
     async def get_mx_scheduled_ledger_by_ledger_id(
         self, request: GetMxScheduledLedgerByLedgerInput
     ) -> Optional[GetMxScheduledLedgerByLedgerOutput]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = mx_scheduled_ledgers.table.select().where(
-                mx_scheduled_ledgers.ledger_id == request.id
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            # if no result found, return nothing
-            if not row:
-                return None
-            return GetMxScheduledLedgerByLedgerOutput.from_orm(row)
+        stmt = mx_scheduled_ledgers.table.select().where(
+            mx_scheduled_ledgers.ledger_id == request.id
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        # if no result found, return nothing
+        if not row:
+            return None
+        return GetMxScheduledLedgerByLedgerOutput.from_row(row)
 
     async def get_open_mx_scheduled_ledger_for_period(
         self, request: GetMxScheduledLedgerInput
@@ -133,26 +127,22 @@ class MxScheduledLedgerRepository(
         :param request: GetMxScheduledLedgerInput
         :return: GetMxScheduledLedgerOutput
         """
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = mx_scheduled_ledgers.table.select().where(
-                and_(
-                    mx_scheduled_ledgers.payment_account_id
-                    == request.payment_account_id,  # noqa: W503
-                    mx_scheduled_ledgers.start_time
-                    == self.pacific_start_time_for_current_interval(  # noqa: W503
-                        request.routing_key, request.interval_type
-                    ),
-                    mx_ledgers.state == MxLedgerStateType.OPEN,
-                    mx_ledgers.table.c.id == mx_scheduled_ledgers.ledger_id,
-                )
+        stmt = mx_scheduled_ledgers.table.select().where(
+            and_(
+                mx_scheduled_ledgers.payment_account_id
+                == request.payment_account_id,  # noqa: W503
+                mx_scheduled_ledgers.start_time
+                == self.pacific_start_time_for_current_interval(  # noqa: W503
+                    request.routing_key, request.interval_type
+                ),
+                mx_ledgers.state == MxLedgerStateType.OPEN,
+                mx_ledgers.table.c.id == mx_scheduled_ledgers.ledger_id,
             )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            # if no result found, return nothing
-            if not row:
-                return None
-            return GetMxScheduledLedgerOutput.from_orm(row)
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        if not row:
+            return None
+        return GetMxScheduledLedgerOutput.from_row(row)
 
     def pacific_start_time_for_current_interval(
         self, routing_key: datetime, interval: Optional[MxScheduledLedgerIntervalType]

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Any, List, Optional
 from uuid import UUID
 
-from gino import GinoConnection
 from typing_extensions import final
 
 from app.payin.core.cart_payment.model import (
@@ -25,7 +24,7 @@ from app.payin.repository.base import PayinDBRepository
 class CartPaymentRepository(PayinDBRepository):
     async def insert_cart_payment(
         self,
-        connection: GinoConnection,
+        *,
         id: UUID,
         payer_id: str,
         type: str,
@@ -54,7 +53,7 @@ class CartPaymentRepository(PayinDBRepository):
             .returning(*cart_payments.table.columns.values())
         )
 
-        row = await connection.first(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         return self.to_cart_payment(row)
 
     def to_cart_payment(self, row: Any) -> CartPayment:
@@ -78,25 +77,19 @@ class CartPaymentRepository(PayinDBRepository):
         statement = payment_intents.table.select().where(
             payment_intents.status == IntentStatus.REQUIRES_CAPTURE
         )
-        async with self.payment_database.master().acquire(
-            reuse=True, timeout=1
-        ) as connection:  # type: GinoConnection
-            results = await connection.all(statement)
-
+        results = await self.payment_database.master().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
     async def get_cart_payment_by_id(self, cart_payment_id: UUID) -> CartPayment:
         statement = cart_payments.table.select().where(
             cart_payments.id == cart_payment_id
         )
-        async with self.payment_database.master().acquire() as connection:  # type: GinoConnection
-            row = await connection.first(statement)
+        row = await self.payment_database.master().fetch_one(statement)
 
         return self.to_cart_payment(row)
 
     async def insert_payment_intent(
         self,
-        connection: GinoConnection,
         id: UUID,
         cart_payment_id: UUID,
         idempotency_key: str,
@@ -131,7 +124,7 @@ class CartPaymentRepository(PayinDBRepository):
             .returning(*payment_intents.table.columns.values())
         )
 
-        row = await connection.first(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         return self.to_payment_intent(row)
 
     def to_payment_intent(self, row: Any) -> PaymentIntent:
@@ -156,16 +149,14 @@ class CartPaymentRepository(PayinDBRepository):
             cancelled_at=row[payment_intents.cancelled_at],
         )
 
-    async def update_payment_intent_status(
-        self, connection: GinoConnection, id: UUID, status: str
-    ) -> None:
+    async def update_payment_intent_status(self, id: UUID, status: str) -> None:
         statement = (
             payment_intents.table.update()
             .where(payment_intents.id == id)
             .values(status=status)
         )
 
-        await connection.first(statement)
+        await self.payment_database.master().execute(statement)
 
     async def get_payment_intent_for_idempotency_key(
         self, idempotency_key: str
@@ -173,8 +164,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = payment_intents.table.select().where(
             payment_intents.idempotency_key == idempotency_key
         )
-        async with self.payment_database.master().acquire() as connection:  # type: GinoConnection
-            row = await connection.first(statement)
+        row = await self.payment_database.master().fetch_one(statement)
 
         if not row:
             return None
@@ -187,14 +177,12 @@ class CartPaymentRepository(PayinDBRepository):
         statement = payment_intents.table.select().where(
             payment_intents.cart_payment_id == cart_payment_id
         )
-        async with self.payment_database.master().acquire() as connection:  # type: GinoConnection
-            results = await connection.all(statement)
+        results = await self.payment_database.master().fetch_all(statement)
 
         return [self.to_payment_intent(row) for row in results]
 
     async def insert_pgp_payment_intent(
         self,
-        connection: GinoConnection,
         id: UUID,
         payment_intent_id: UUID,
         idempotency_key: str,
@@ -231,11 +219,11 @@ class CartPaymentRepository(PayinDBRepository):
             .returning(*pgp_payment_intents.table.columns.values())
         )
 
-        row = await connection.first(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         return self.to_pgp_payment_intent(row)
 
     async def update_pgp_payment_intent(
-        self, connection: GinoConnection, id: UUID, status: str, provider_intent_id: str
+        self, id: UUID, status: str, provider_intent_id: str
     ) -> None:
         statement = (
             pgp_payment_intents.table.update()
@@ -243,7 +231,7 @@ class CartPaymentRepository(PayinDBRepository):
             .values(status=status, resource_id=provider_intent_id)
         )
 
-        await connection.first(statement)
+        await self.payment_database.master().execute(statement)
 
     async def find_pgp_payment_intents(
         self, payment_intent_id: UUID
@@ -253,8 +241,7 @@ class CartPaymentRepository(PayinDBRepository):
             .where(pgp_payment_intents.payment_intent_id == payment_intent_id)
             .order_by(pgp_payment_intents.created_at.asc())
         )
-        async with self.payment_database.master().acquire() as connection:  # type: GinoConnection
-            query_results = await connection.all(statement)
+        query_results = await self.payment_database.master().fetch_all(statement)
 
         matched_intents = []
         for row in query_results:

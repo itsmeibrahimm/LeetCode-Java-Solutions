@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from gino import GinoConnection
 from typing_extensions import final
 
 from app.commons.database.model import DBRequestModel, DBEntity
@@ -241,122 +240,99 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
     """
 
     async def insert_payer(self, request: InsertPayerInput) -> InsertPayerOutput:
-        async with self.payment_database.master().acquire(
-            timeout=1
-        ) as conn:  # type: GinoConnection
-            stmt = (
-                payers.table.insert()
-                .values(request.dict(skip_defaults=True))
-                .returning(*payers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return InsertPayerOutput.from_orm(row)
+        stmt = (
+            payers.table.insert()
+            .values(request.dict(skip_defaults=True))
+            .returning(*payers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return InsertPayerOutput.from_row(row)
 
     async def get_payer_by_id(
         self, request: GetPayerByIdInput
     ) -> Optional[GetPayerByIdOutput]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            if request.id:
-                stmt = payers.table.select().where(payers.id == request.id)
-            elif request.legacy_stripe_customer_id:
-                # the "id" below is for the damn silly pre-commit-mypy formatter error
-                id = request.legacy_stripe_customer_id
-                stmt = payers.table.select().where(
-                    payers.legacy_stripe_customer_id == id
-                )
-            else:
-                stmt = payers.table.select().where(
-                    payers.dd_payer_id == request.dd_payer_id
-                )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return GetPayerByIdOutput.from_orm(row) if row else None
+        if request.id:
+            stmt = payers.table.select().where(payers.id == request.id)
+        elif request.legacy_stripe_customer_id:
+            stmt = payers.table.select().where(
+                payers.legacy_stripe_customer_id == request.legacy_stripe_customer_id
+            )
+        else:
+            stmt = payers.table.select().where(
+                payers.dd_payer_id == request.dd_payer_id
+            )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return GetPayerByIdOutput.from_row(row) if row else None
 
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput
     ) -> InsertPgpCustomerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                pgp_customers.table.insert()
-                .values(request.dict(skip_defaults=True))
-                .returning(*pgp_customers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return InsertPgpCustomerOutput.from_orm(row)
+        stmt = (
+            pgp_customers.table.insert()
+            .values(request.dict(skip_defaults=True))
+            .returning(*pgp_customers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return InsertPgpCustomerOutput.from_row(row)
 
     async def get_pgp_customer(
         self, request: GetPgpCustomerInput
     ) -> GetPgpCustomerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = pgp_customers.table.select().where(
-                pgp_customers.payer_id == request.payer_id
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return GetPgpCustomerOutput.from_orm(row)
+        stmt = pgp_customers.table.select().where(
+            pgp_customers.payer_id == request.payer_id
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return GetPgpCustomerOutput.from_row(row)
 
     async def update_pgp_customer(
         self,
         request_set: UpdatePgpCustomerSetInput,
         request_where: UpdatePgpCustomerWhereInput,
     ) -> UpdatePgpCustomerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                pgp_customers.table.update()
-                .where(pgp_customers.id == request_where.id)
-                .values(request_set.dict(skip_defaults=True))
-                .returning(*pgp_customers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return UpdatePgpCustomerOutput.from_orm(row)
+        stmt = (
+            pgp_customers.table.update()
+            .where(pgp_customers.id == request_where.id)
+            .values(request_set.dict(skip_defaults=True))
+            .returning(*pgp_customers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return UpdatePgpCustomerOutput.from_row(row)
 
     async def insert_stripe_customer(
         self, request: InsertStripeCustomerInput
     ) -> InsertStripeCustomerOutput:
-        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                stripe_customers.table.insert()
-                .values(request.dict(skip_defaults=True))
-                .returning(*stripe_customers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return InsertStripeCustomerOutput.from_orm(row)
+        stmt = (
+            stripe_customers.table.insert()
+            .values(request.dict(skip_defaults=True))
+            .returning(*stripe_customers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return InsertStripeCustomerOutput.from_row(row)
 
     async def get_stripe_customer(
         self, request: GetStripeCustomerInput
     ) -> GetStripeCustomerOutput:
-        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = stripe_customers.table.select().where(
-                stripe_customers.id == request.id
-            )
-            row = await conn.execution_options(
-                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return GetStripeCustomerOutput.from_orm(row)
+        stmt = stripe_customers.table.select().where(stripe_customers.id == request.id)
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return GetStripeCustomerOutput.from_row(row)
 
     async def update_stripe_customer(
         self,
         request_set: UpdateStripeCustomerSetInput,
         request_where: UpdateStripeCustomerWhereInput,
     ) -> UpdateStripeCustomerOutput:
-        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                stripe_customers.table.update()
-                .where(stripe_customers.id == request_where.id)
-                .values(request_set.dict(skip_defaults=True))
-                .returning(*stripe_customers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return UpdateStripeCustomerOutput.from_orm(row)
+        stmt = (
+            stripe_customers.table.update()
+            .where(stripe_customers.id == request_where.id)
+            .values(request_set.dict(skip_defaults=True))
+            .returning(*stripe_customers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return UpdateStripeCustomerOutput.from_row(row)

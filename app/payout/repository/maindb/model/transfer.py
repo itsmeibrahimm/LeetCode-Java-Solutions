@@ -39,7 +39,7 @@ class TransferTable(TableDefinition):
     currency: Column = no_init_field(Column("currency", Text))
     created_at: Column = no_init_field(
         Column(
-            "created_at", DateTime(True), nullable=False, default=datetime.utcnow
+            "created_at", DateTime(True), nullable=False
         )  # come back and revisit this timeout to be consistent with DSJ
     )
     submitted_at: Column = no_init_field(Column("submitted_at", DateTime(True)))

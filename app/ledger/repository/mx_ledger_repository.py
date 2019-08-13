@@ -7,7 +7,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from uuid import UUID
 
-from gino import GinoConnection
 from sqlalchemy import and_
 
 from app.commons.database.model import DBRequestModel, DBEntity
@@ -136,64 +135,55 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     async def insert_mx_ledger(
         self, request: InsertMxLedgerInput
     ) -> InsertMxLedgerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                mx_ledgers.table.insert()
-                .values(request.dict(skip_defaults=True))
-                .returning(*mx_ledgers.table.columns.values())
-            )
-            row = await conn.first(stmt)
-            return InsertMxLedgerOutput.from_orm(row)
+        stmt = (
+            mx_ledgers.table.insert()
+            .values(request.dict(skip_defaults=True))
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return InsertMxLedgerOutput.from_row(row)
 
     async def update_mx_ledger_balance(
         self,
         request_set: UpdateMxLedgerSetInput,
         request_where: UpdateMxLedgerWhereInput,
     ) -> UpdateMxLedgerOutput:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                mx_ledgers.table.update()
-                .where(mx_ledgers.id == request_where.id)
-                .values(request_set.dict(skip_defaults=True))
-                .returning(*mx_ledgers.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return UpdateMxLedgerOutput.from_orm(row)
+        stmt = (
+            mx_ledgers.table.update()
+            .where(mx_ledgers.id == request_where.id)
+            .values(request_set.dict(skip_defaults=True))
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return UpdateMxLedgerOutput.from_row(row)
 
     async def get_ledger_by_id(
         self, request: GetMxLedgerByIdInput
     ) -> Optional[GetMxLedgerByIdOutput]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = mx_ledgers.table.select().where(mx_ledgers.id == request.id)
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            # if no result found, return nothing
-            if not row:
-                return None
-            return GetMxLedgerByIdOutput.from_orm(row)
+        stmt = mx_ledgers.table.select().where(mx_ledgers.id == request.id)
+        row = await self.payment_database.master().fetch_one(stmt)
+        # if no result found, return nothing
+        if not row:
+            return None
+        return GetMxLedgerByIdOutput.from_row(row)
 
     # todo: do we have constriant for how many can be returned?
     async def get_open_ledger_for_payment_account(
         self, request: GetMxLedgerByAccountInput
     ) -> Optional[GetMxLedgerByAccountOutput]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = mx_ledgers.table.select().where(
-                and_(
-                    mx_ledgers.payment_account_id
-                    == request.payment_account_id,  # noqa: W503
-                    mx_ledgers.state == MxLedgerStateType.OPEN,
-                )
+        stmt = mx_ledgers.table.select().where(
+            and_(
+                mx_ledgers.payment_account_id == request.payment_account_id,
+                mx_ledgers.state == MxLedgerStateType.OPEN,
             )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            # if no result found, return nothing
-            if not row:
-                return None
-            return GetMxLedgerByAccountOutput.from_orm(row)
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        # if no result found, return nothing
+        if not row:
+            return None
+        return GetMxLedgerByAccountOutput.from_row(row)
 
     async def create_one_off_mx_ledger(
         self, request_ledger: InsertMxLedgerInput
@@ -213,14 +203,14 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             target_type=MxTransactionType.MICRO_DEPOSIT,
             routing_key=datetime.utcnow(),
         )
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                mx_transactions.table.insert()
-                .values(mx_transaction_to_insert.dict(skip_defaults=True))
-                .returning(*mx_transactions.table.columns.values())
-            )
-            row = await conn.first(stmt)
-            mx_transaction = InsertMxTransactionOutput.from_orm(row)
+        stmt = (
+            mx_transactions.table.insert()
+            .values(mx_transaction_to_insert.dict(skip_defaults=True))
+            .returning(*mx_transactions.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        mx_transaction = InsertMxTransactionOutput.from_row(row)
 
         # todo: call payout service to payout the ledger and update corresponding status
 

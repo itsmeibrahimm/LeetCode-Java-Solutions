@@ -10,6 +10,7 @@ from app.commons.context.app_context import (
     create_app_context,
     get_context_from_app,
     set_context_for_app,
+    remove_context_for_app,
 )
 from app.commons.context.logger import root_logger
 from app.example_v1.app import example_v1
@@ -87,3 +88,4 @@ async def startup():
 async def shutdown():
     context = get_context_from_app(app)
     await context.close()
+    remove_context_for_app(app, context)

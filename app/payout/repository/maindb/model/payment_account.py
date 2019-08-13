@@ -46,9 +46,7 @@ class PaymentAccountTable(TableDefinition):
     statement_descriptor: Column = no_init_field(
         Column("statement_descriptor", Text, nullable=False)
     )
-    created_at: Column = no_init_field(
-        Column("created_at", DateTime(True), default=datetime.utcnow)
-    )
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
     payout_disabled: Column = no_init_field(Column("payout_disabled", Boolean))
     resolve_outstanding_balance_frequency: Column = no_init_field(
         Column("resolve_outstanding_balance_frequency", Text)

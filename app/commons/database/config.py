@@ -7,6 +7,8 @@ class DatabaseConfig:
     debug: bool
     master_pool_size: int
     replica_pool_size: Optional[int]
+    statement_timeout = 1.0
+    force_rollback: bool = False
 
     def __post_init__(self):
         if self.master_pool_size <= 0:

@@ -7,7 +7,7 @@ from _pytest.nodes import Item
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
-from app.commons.context.app_context import create_app_context
+from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.database.model import Database
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
@@ -85,13 +85,12 @@ async def payin_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayIn user
     """
-    db = await Database.create(
+    async with Database.create(
         name="payin_maindb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.PAYIN_MAINDB_MASTER_URL,
-    )
-    yield db
-    await db.close()
+    ) as db:
+        yield db
 
 
 @pytest.fixture
@@ -99,13 +98,12 @@ async def payout_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayOut user
     """
-    db = await Database.create(
+    async with Database.create(
         name="payout_maindb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.PAYOUT_MAINDB_MASTER_URL,
-    )
-    yield db
-    await db.close()
+    ) as db:
+        yield db
 
 
 @pytest.fixture
@@ -113,13 +111,12 @@ async def payout_bankdb(app_config: AppConfig):
     """
     initialize the bankdb connection for PayOut user
     """
-    db = await Database.create(
+    async with Database.create(
         name="payout_bankdb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.PAYOUT_BANKDB_MASTER_URL,
-    )
-    yield db
-    await db.close()
+    ) as db:
+        yield db
 
 
 @pytest.fixture
@@ -127,13 +124,12 @@ async def ledger_paymentdb(app_config: AppConfig):
     """
     initialize the paymentdb connection for Ledger user
     """
-    db = await Database.create(
+    async with Database.create(
         name="ledger_paymentdb",
         db_config=app_config.DEFAULT_DB_CONFIG,
         master_url=app_config.LEDGER_PAYMENTDB_MASTER_URL,
-    )
-    yield db
-    await db.close()
+    ) as db:
+        yield db
 
 
 def pytest_collection_modifyitems(items: List[Item]):
@@ -145,20 +141,27 @@ def pytest_collection_modifyitems(items: List[Item]):
 
 
 # REPOSITORIES
-
-
-@pytest.yield_fixture
-async def cart_payment_repository(app_config: AppConfig):
+@pytest.fixture
+async def app_context(app_config: AppConfig):
+    """
+    ensure that the database connections for all apps are setup and torn down,
+    and that they share connections; this is needed for force_rollback=True
+    """
     app_context = await create_app_context(app_config)
-    yield CartPaymentRepository(app_context)
-    # TODO so hacky fix me
-    async with app_context.payin_paymentdb.master().acquire() as conn:
-        await conn.first("truncate payment_intents cascade")
+    yield app_context
+    await app_context.close()
 
 
 @pytest.fixture
-async def payer_repository(app_config: AppConfig):
-    app_context = await create_app_context(app_config)
+async def cart_payment_repository(app_context: AppContext):
+    await app_context.payin_paymentdb.master().execute(
+        "truncate payment_intents cascade"
+    )
+    yield CartPaymentRepository(app_context)
+
+
+@pytest.fixture
+async def payer_repository(app_context: AppContext):
     yield PayerRepository(app_context)
 
 

@@ -5,7 +5,6 @@ from typing import Optional, Tuple
 
 import logging
 
-from gino import GinoConnection
 from typing_extensions import final
 
 from app.commons.database.model import DBEntity, DBRequestModel
@@ -173,160 +172,129 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
     async def insert_payment_method_and_stripe_card(
         self, pm_input: InsertPgpPaymentMethodInput, sc_input: InsertStripeCardInput
     ) -> Tuple[InsertPgpPaymentMethodOutput, InsertStripeCardOutput]:
+        maindb_conn = self.main_database.master()
+        paymentdb_conn = self.payment_database.master()
+        async with maindb_conn.transaction(), paymentdb_conn.transaction():
+            # insert object into stripe_card table
+            try:
+                logger.info(
+                    "[insert_payment_method_and_stripe_card] ready to insert stripe_card table"
+                )
+                stmt = (
+                    stripe_cards.table.insert()
+                    .values(sc_input.dict(skip_defaults=True))
+                    .returning(*stripe_cards.table.columns.values())
+                )
+                row = await maindb_conn.fetch_one(stmt)
+                assert row
+                sc_output = InsertStripeCardOutput.from_row(row)
+                logger.info(
+                    "[insert_payment_method_and_stripe_card] insert stripe_card table completed."
+                )
+            except Exception as e:
+                logger.error(
+                    "[insert_payment_method_and_stripe_card] exception caught by inserting stripe_card table. rollback from stripe_card table",
+                    e,
+                )
+                raise e
 
-        # acquire connection.
-        async with self.main_database.master().acquire() as maindb_conn:  # type: GinoConnection
-            async with self.payment_database.master().acquire() as paymentdb_conn:  # type: GinoConnection
-                # acquire maindb transaction
-                async with maindb_conn.transaction() as maindb_txn:
-                    # insert object into stripe_card table
-                    try:
-                        logger.info(
-                            "[insert_payment_method_and_stripe_card] ready to insert stripe_card table"
-                        )
-                        stmt = (
-                            stripe_cards.table.insert()
-                            .values(sc_input.dict(skip_defaults=True))
-                            .returning(*stripe_cards.table.columns.values())
-                        )
-                        row = await maindb_conn.execution_options(
-                            timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-                        ).first(stmt)
-                        sc_output = InsertStripeCardOutput.from_orm(row)
-                        logger.info(
-                            "[insert_payment_method_and_stripe_card] insert stripe_card table completed."
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "[insert_payment_method_and_stripe_card] exception caught by inserting stripe_card table. rollback from stripe_card table",
-                            e,
-                        )
-                        await maindb_txn.raise_rollback()
-                        raise e
+            # insert object into pgp_payment_methods table
+            try:
+                logger.info(
+                    "[insert_payment_method_and_stripe_card] ready to insert pgp_payment_methods table"
+                )
+                stmt = (
+                    pgp_payment_methods.table.insert()
+                    .values(pm_input.dict(skip_defaults=True))
+                    .returning(*pgp_payment_methods.table.columns.values())
+                )
+                row = await self.payment_database.master().fetch_one(stmt)
+                assert row
+                pm_output = InsertPgpPaymentMethodOutput.from_row(row)
+                logger.info(
+                    "[insert_payment_method_and_stripe_card] insert pgp_payment_methods table completed."
+                )
+            except Exception as e:
+                logger.error(
+                    "[insert_payment_method_and_stripe_card] exception caught by inserting pgp_customers table. rollback both stripe_customer and pgp_payment_method",
+                    e,
+                )
+                raise e
 
-                    # acquire paymentdb transaction
-                    async with paymentdb_conn.transaction() as paymentdb_txn:
-                        # insert object into pgp_payment_methods table
-                        try:
-                            logger.info(
-                                "[insert_payment_method_and_stripe_card] ready to insert pgp_payment_methods table"
-                            )
-                            stmt = (
-                                pgp_payment_methods.table.insert()
-                                .values(pm_input.dict(skip_defaults=True))
-                                .returning(*pgp_payment_methods.table.columns.values())
-                            )
-                            row = await paymentdb_conn.execution_options(
-                                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-                            ).first(stmt)
-                            pm_output = InsertPgpPaymentMethodOutput.from_orm(row)
-                            logger.info(
-                                "[insert_payment_method_and_stripe_card] insert pgp_payment_methods table completed."
-                            )
-                        except Exception as e:
-                            logger.error(
-                                "[insert_payment_method_and_stripe_card] exception caught by inserting pgp_customers table. rollback both stripe_customer and pgp_payment_method",
-                                e,
-                            )
-                            await maindb_txn.raise_rollback()
-                            await paymentdb_txn.raise_rollback()
-                            raise e
-
-        return pm_output, sc_output
+            return pm_output, sc_output
 
     async def get_pgp_payment_method_by_payment_method_id(
         self, input: GetPgpPaymentMethodByPaymentMethodIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = pgp_payment_methods.table.select().where(
-                pgp_payment_methods.id == input.payment_method_id
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return PgpPaymentMethodDbEntity.from_orm(row) if row else None
+        stmt = pgp_payment_methods.table.select().where(
+            pgp_payment_methods.id == input.payment_method_id
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def get_pgp_payment_method_by_pgp_resource_id(
         self, input: GetPgpPaymentMethodByPgpResourceIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = pgp_payment_methods.table.select().where(
-                pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return PgpPaymentMethodDbEntity.from_orm(row) if row else None
+        stmt = pgp_payment_methods.table.select().where(
+            pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def get_pgp_payment_method_by_id(
         self, input: GetPgpPaymentMethodByIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            if input.id:
-                stmt = pgp_payment_methods.table.select().where(
-                    pgp_payment_methods.id == input.id
-                )
-            else:
-                stmt = pgp_payment_methods.table.select().where(
-                    pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
-                )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return PgpPaymentMethodDbEntity.from_orm(row) if row else None
+        if input.id:
+            stmt = pgp_payment_methods.table.select().where(
+                pgp_payment_methods.id == input.id
+            )
+        else:
+            stmt = pgp_payment_methods.table.select().where(
+                pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
+            )
+            row = await self.payment_database.master().fetch_one(stmt)
+        return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def delete_pgp_payment_method_by_id(
         self,
         input_set: DeletePgpPaymentMethodByIdSetInput,
         input_where: DeletePgpPaymentMethodByIdWhereInput,
     ):
-        async with self.payment_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                pgp_payment_methods.table.update()
-                .where(pgp_payment_methods.id == input_where.id)
-                .values(input_set.dict(skip_defaults=True))
-                .returning(*pgp_payment_methods.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.payment_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return PgpPaymentMethodDbEntity.from_orm(row)
+        stmt = (
+            pgp_payment_methods.table.update()
+            .where(pgp_payment_methods.id == input_where.id)
+            .values(input_set.dict(skip_defaults=True))
+            .returning(*pgp_payment_methods.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def get_stripe_card_by_stripe_id(
         self, input: GetStripeCardByStripeIdInput
     ) -> Optional[StripeCardDbEntity]:
-        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = stripe_cards.table.select().where(
-                stripe_cards.stripe_id == input.stripe_id
-            )
-            row = await conn.execution_options(
-                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return StripeCardDbEntity.from_orm(row) if row else None
+        stmt = stripe_cards.table.select().where(
+            stripe_cards.stripe_id == input.stripe_id
+        )
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCardDbEntity.from_row(row) if row else None
 
     async def get_stripe_card_by_id(
         self, input: GetStripeCardByIdInput
     ) -> Optional[StripeCardDbEntity]:
-        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = stripe_cards.table.select().where(stripe_cards.id == input.id)
-            row = await conn.execution_options(
-                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return StripeCardDbEntity.from_orm(row) if row else None
+        stmt = stripe_cards.table.select().where(stripe_cards.id == input.id)
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCardDbEntity.from_row(row) if row else None
 
     async def delete_stripe_card_by_id(
         self,
         input_set: DeleteStripeCardByIdSetInput,
         input_where: DeleteStripeCardByIdWhereInput,
     ):
-        async with self.main_database.master().acquire() as conn:  # type: GinoConnection
-            stmt = (
-                stripe_cards.table.update()
-                .where(stripe_cards.id == input_where.id)
-                .values(input_set.dict(skip_defaults=True))
-                .returning(*stripe_cards.table.columns.values())
-            )
-            row = await conn.execution_options(
-                timeout=self.main_database.STATEMENT_TIMEOUT_SEC
-            ).first(stmt)
-            return StripeCardDbEntity.from_orm(row)
+        stmt = (
+            stripe_cards.table.update()
+            .where(stripe_cards.id == input_where.id)
+            .values(input_set.dict(skip_defaults=True))
+            .returning(*stripe_cards.table.columns.values())
+        )
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCardDbEntity.from_row(row) if row else None

@@ -1,10 +1,11 @@
+import sqlalchemy
 from enum import Enum
 from typing import Dict, Type
 from uuid import UUID
 
-from gino import Gino
 from pydantic import Json
 
+from typing import Dict, Type
 from app.commons.database.model import DBEntity, TableDefinition
 
 _SPECIAL_TYPE_MAPPING: dict = {UUID: str, Json: dict}
@@ -39,7 +40,9 @@ def validation_db_entity_and_table_schema(
         f.name: f.type_ for f in db_entity_cls.__fields__.values()
     }
 
-    table_definition: TableDefinition = table_definition_cls(db_metadata=Gino())
+    table_definition: TableDefinition = table_definition_cls(
+        db_metadata=sqlalchemy.MetaData()
+    )
 
     table_definition_columns: Dict[str, type] = {
         c.name: c.type.python_type for c in table_definition.table.columns

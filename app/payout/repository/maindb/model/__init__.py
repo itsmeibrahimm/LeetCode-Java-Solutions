@@ -1,4 +1,4 @@
-from gino import Gino
+import sqlalchemy
 
 from app.payout.repository.maindb.model.payment_account import PaymentAccountTable
 from app.payout.repository.maindb.model.stripe_managed_account import (
@@ -7,7 +7,7 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
 from app.payout.repository.maindb.model.stripe_transfer import StripeTransferTable
 from app.payout.repository.maindb.model.transfer import TransferTable
 
-payout_maindb_metadata = Gino()
+payout_maindb_metadata = sqlalchemy.MetaData()
 
 payment_accounts = PaymentAccountTable(db_metadata=payout_maindb_metadata)
 stripe_managed_accounts = StripeManagedAccountTable(db_metadata=payout_maindb_metadata)

@@ -18,8 +18,6 @@ from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
 async def payment_intent(
     payer_repository: PayerRepository, cart_payment_repository: CartPaymentRepository
 ):
-    connection = await cart_payment_repository.payment_database.master().acquire()
-
     insert_payer_input = InsertPayerInput(
         id=str(uuid4()), payer_type=PayerType.STORE, country=CountryCode.US
     )
@@ -29,7 +27,6 @@ async def payment_intent(
     cart_payment_id = uuid4()
 
     await cart_payment_repository.insert_cart_payment(
-        connection=connection,
         id=cart_payment_id,
         payer_id=payer.id,
         type=CartType.ORDER_CART,
@@ -42,7 +39,6 @@ async def payment_intent(
     )
 
     payment_intent = await cart_payment_repository.insert_payment_intent(
-        connection=connection,
         id=uuid4(),
         cart_payment_id=cart_payment_id,
         idempotency_key=f"ik_{uuid4()}",
