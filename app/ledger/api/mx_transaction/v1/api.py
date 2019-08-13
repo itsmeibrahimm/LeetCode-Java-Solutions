@@ -28,7 +28,7 @@ from app.ledger.repository.mx_transaction_repository import MxTransactionReposit
 def create_mx_transactions_router(
     mx_transaction_repository: MxTransactionRepository,
     mx_ledger_repository: MxLedgerRepository,
-    mx_scheduled_repository: MxScheduledLedgerRepository,
+    mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -49,7 +49,7 @@ def create_mx_transactions_router(
             - **target_id**: Optional[str], id corresponding to mx_transaction type, e.g. delivery_id
             - **context**: Optional[Json], a context of mx_transaction
             - **metadata**: Optional[Json], metadata of mx_transaction
-            - **legacy_transaction_id**: Optional[str], points to the corresponding txn in DSJ, used for double writing purpose
+            - **legacy_transaction_id**: Optional[str], points to the corresponding txn in DSJ, used for migration purpose
         """
         req_context = get_context_from_req(request)
         app_context = get_context_from_app(request.app)
@@ -63,7 +63,7 @@ def create_mx_transactions_router(
                 req_context=req_context,
                 mx_transaction_repository=mx_transaction_repository,
                 mx_ledger_repository=mx_ledger_repository,
-                mx_scheduled_repository=mx_scheduled_repository,
+                mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
                 payment_account_id=mx_transaction_request.payment_account_id,
                 target_type=mx_transaction_request.target_type,
                 amount=mx_transaction_request.amount,

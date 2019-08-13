@@ -24,7 +24,7 @@ class MxTransactionTable(TableDefinition):
     target_id: Column = no_init_field(Column("target_id", Text))
     legacy_transaction_id: Column = no_init_field(
         Column("legacy_transaction_id", Text)
-    )  # only exists for mirgration purpose
+    )  # only exists for migration purpose
     context: Column = no_init_field(Column("context", JSON))
     metadata: Column = no_init_field(Column("metadata", JSON))
     created_at: Column = no_init_field(

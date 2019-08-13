@@ -5,95 +5,27 @@ from datetime import datetime
 from typing import Optional, Tuple
 from abc import abstractmethod
 from dataclasses import dataclass
-from uuid import UUID
 
 from sqlalchemy import and_
 
-from app.commons.database.model import DBRequestModel, DBEntity
+from app.ledger.core.mx_transaction.data_types import (
+    InsertMxLedgerInput,
+    InsertMxLedgerOutput,
+    UpdateMxLedgerSetInput,
+    UpdateMxLedgerWhereInput,
+    UpdateMxLedgerOutput,
+    GetMxLedgerByIdInput,
+    GetMxLedgerByIdOutput,
+    GetMxLedgerByAccountInput,
+    GetMxLedgerByAccountOutput,
+    InsertMxTransactionOutput,
+    InsertMxTransactionInput,
+)
 from app.ledger.core.mx_transaction.types import MxTransactionType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_ledgers, mx_transactions
 
 
 from app.ledger.repository.base import LedgerDBRepository
-
-
-###########################################################
-#       MxLedger DBEntity and CRUD operations             #
-###########################################################
-from app.ledger.repository.mx_transaction_repository import (
-    InsertMxTransactionInput,
-    InsertMxTransactionOutput,
-)
-
-
-class MxLedgerDbEntity(DBEntity):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    id: UUID
-    type: str
-    currency: str
-    state: str
-    balance: int
-    payment_account_id: str
-    legacy_transfer_id: Optional[str]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    submitted_at: Optional[datetime]
-    amount_paid: Optional[int]
-    finalized_at: Optional[datetime]
-    created_by_employee_id: Optional[str]
-    submitted_by_employee_id: Optional[str]
-    rolled_to_ledger_id: Optional[str]
-
-
-class InsertMxLedgerInput(MxLedgerDbEntity):
-    pass
-
-
-class InsertMxLedgerOutput(MxLedgerDbEntity):
-    pass
-
-
-class UpdateMxLedgerSetInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    balance: int
-
-
-class UpdateMxLedgerWhereInput(DBRequestModel):
-    id: UUID
-
-
-class UpdateMxLedgerOutput(MxLedgerDbEntity):
-    pass
-
-
-class GetMxLedgerByAccountInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    payment_account_id: str
-
-
-class GetMxLedgerByAccountOutput(MxLedgerDbEntity):
-    pass
-
-
-class GetMxLedgerByIdInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    id: UUID
-
-
-class GetMxLedgerByIdOutput(MxLedgerDbEntity):
-    pass
 
 
 class MxLedgerRepositoryInterface:

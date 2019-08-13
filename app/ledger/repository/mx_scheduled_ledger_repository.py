@@ -6,69 +6,23 @@ from datetime import datetime, timedelta
 from pytz import timezone
 from math import ceil
 from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import and_
 
-from app.commons.database.model import DBEntity, DBRequestModel
+from app.ledger.core.mx_transaction.data_types import (
+    InsertMxScheduledLedgerInput,
+    InsertMxScheduledLedgerOutput,
+    GetMxScheduledLedgerByLedgerInput,
+    GetMxScheduledLedgerByLedgerOutput,
+    GetMxScheduledLedgerInput,
+    GetMxScheduledLedgerOutput,
+)
 from app.ledger.core.mx_transaction.types import (
     MxScheduledLedgerIntervalType,
     MxLedgerStateType,
 )
 from app.ledger.models.paymentdb import mx_scheduled_ledgers, mx_ledgers
 from app.ledger.repository.base import LedgerDBRepository
-
-
-###########################################################
-#   MxScheduledLedger DBEntity and CRUD operations        #
-###########################################################
-class MxScheduledLedgerDbEntity(DBEntity):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    id: UUID
-    payment_account_id: str
-    ledger_id: UUID
-    interval_type: str
-    start_time: datetime
-    end_time: datetime
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-
-
-class InsertMxScheduledLedgerInput(MxScheduledLedgerDbEntity):
-    pass
-
-
-class InsertMxScheduledLedgerOutput(MxScheduledLedgerDbEntity):
-    pass
-
-
-class GetMxScheduledLedgerByLedgerInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    id: UUID
-
-
-class GetMxScheduledLedgerByLedgerOutput(MxScheduledLedgerDbEntity):
-    pass
-
-
-class GetMxScheduledLedgerInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    payment_account_id: str
-    routing_key: datetime
-    interval_type: MxScheduledLedgerIntervalType
-
-
-class GetMxScheduledLedgerOutput(MxScheduledLedgerDbEntity):
-    pass
 
 
 class MxScheduledLedgerRepositoryInterface:
