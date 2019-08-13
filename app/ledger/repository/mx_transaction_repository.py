@@ -73,6 +73,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         assert row
         return InsertMxTransactionOutput.from_row(row)
 
+    # todo: PAY-3402 add error handling
     async def create_ledger_and_insert_mx_transaction(
         self,
         request: InsertMxTransactionWithLedgerInput,
@@ -170,6 +171,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
 
         return mx_transaction
 
+    # todo: PAY-3402 add error handling
     async def insert_mx_transaction_and_update_ledger(
         self,
         request: InsertMxTransactionWithLedgerInput,
@@ -182,6 +184,18 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
             paymentdb_conn = self.payment_database.master()
             async with paymentdb_conn.transaction():
                 try:
+                    # construct update request and update mx_ledger balance
+                    updated_amount = mx_ledger.balance + request.amount
+                    request_balance = UpdateMxLedgerSetInput(balance=updated_amount)
+                    request_id = UpdateMxLedgerWhereInput(id=mx_ledger.id)
+                    stmt = (
+                        mx_ledgers.table.update()
+                        .where(mx_ledgers.id == request_id.id)
+                        .values(request_balance.dict(skip_defaults=True))
+                        .returning(*mx_ledgers.table.columns.values())
+                    )
+                    await self.payment_database.master().fetch_one(stmt)
+
                     # construct mx_transaction and insert
                     mx_transaction_to_insert = InsertMxTransactionInput(
                         id=uuid.uuid4(),
@@ -206,18 +220,6 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     mx_transaction = (
                         InsertMxTransactionOutput.from_row(txn_row) if txn_row else None
                     )
-
-                    # construct
-                    updated_amount = mx_ledger.balance + mx_transaction.amount
-                    request_balance = UpdateMxLedgerSetInput(balance=updated_amount)
-                    request_id = UpdateMxLedgerWhereInput(id=mx_ledger.id)
-                    stmt = (
-                        mx_ledgers.table.update()
-                        .where(mx_ledgers.id == request_id.id)
-                        .values(request_balance.dict(skip_defaults=True))
-                        .returning(*mx_ledgers.table.columns.values())
-                    )
-                    await self.payment_database.master().fetch_one(stmt)
                 except Exception as e:
                     logger.error(
                         "[create mx_txn_and_update_ledger] exception caught while create mx_txn/update mx_ledger, rolled back",
