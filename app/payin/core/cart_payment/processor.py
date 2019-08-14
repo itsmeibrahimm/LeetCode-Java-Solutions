@@ -345,9 +345,9 @@ class CartPaymentInterface:
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
     ) -> str:
         # Call to stripe payment intent API
-        try:
-            intent_request = CapturePaymentIntent(sid=pgp_payment_intent.resource_id)
+        intent_request = CapturePaymentIntent(sid=pgp_payment_intent.resource_id)
 
+        try:
             self.req_context.log.info(
                 f"Capturing payment intent: {payment_intent.country}, key: {pgp_payment_intent.idempotency_key}"
             )

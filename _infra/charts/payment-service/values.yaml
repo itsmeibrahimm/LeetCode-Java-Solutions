@@ -3,15 +3,16 @@ env:
   AWS_METADATA_SERVICE_TIMEOUT: 30
   AWS_METADATA_SERVICE_NUM_ATTEMPTS: 5
 replicaCount: 1
+
 web:
   repository: ddartifacts-docker.jfrog.io/doordash/payment-service
   resources:
     requests:
       cpu: 1
-      memory: 1024Mi
+      memory: 256Mi
     limits:
       cpu: 1
-      memory: 1024Mi
+      memory: 256Mi
   secretRef:
     awsCredentialsEnabled: true
   readinessProbe:
@@ -19,6 +20,24 @@ web:
   runtime:
     containerEnabled: true
     path: /srv/runtime
+
+cron:
+  repository: ddartifacts-docker.jfrog.io/doordash/payment-service
+  resources:
+    requests:
+      cpu: 1
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 256Mi
+  secretRef:
+    awsCredentialsEnabled: true
+  readinessProbe:
+    path: /health
+  runtime:
+    containerEnabled: true
+    path: /srv/runtime
+
 service:
   type: ClusterIP
   protocol: TCP

@@ -1,7 +1,10 @@
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, List
+from uuid import uuid4
 
+import factory
 import pytest
 from _pytest.nodes import Item
 from starlette.testclient import TestClient
@@ -9,6 +12,13 @@ from starlette.testclient import TestClient
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.database.infra import DB
+from app.commons.types import CountryCode, CurrencyType
+from app.payin.core.cart_payment.model import PaymentIntent
+from app.payin.core.cart_payment.types import (
+    CaptureMethod,
+    ConfirmationMethod,
+    IntentStatus,
+)
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 
@@ -81,6 +91,11 @@ def app_config():
 
 
 @pytest.fixture
+async def app_context(app_config: AppConfig):
+    return await create_app_context(app_config)
+
+
+@pytest.fixture
 async def payin_maindb(app_config: AppConfig):
     """
     initialize the maindb connection for PayIn user
@@ -145,23 +160,11 @@ def pytest_collection_modifyitems(items: List[Item]):
 
 
 # REPOSITORIES
-@pytest.fixture
-async def app_context(app_config: AppConfig):
-    """
-    ensure that the database connections for all apps are setup and torn down,
-    and that they share connections; this is needed for force_rollback=True
-    """
-    app_context = await create_app_context(app_config)
-    yield app_context
-    await app_context.close()
 
 
 @pytest.fixture
 async def cart_payment_repository(app_context: AppContext):
-    await app_context.payin_paymentdb.master().execute(
-        "truncate payment_intents cascade"
-    )
-    yield CartPaymentRepository(app_context)
+    return CartPaymentRepository(app_context)
 
 
 @pytest.fixture
@@ -175,3 +178,30 @@ def client():
 
     with TestClient(app) as client:
         yield client
+
+
+# Factories
+
+
+class PaymentIntentFactory(factory.Factory):
+    class Meta:
+        model = PaymentIntent
+
+    id = factory.LazyAttribute(lambda o: str(uuid4()))
+    cart_payment_id = factory.LazyAttribute(lambda o: str(uuid4()))
+    idempotency_key = factory.LazyAttribute(lambda o: str(uuid4()))
+    amount_initiated = 100
+    amount = 100
+    amount_capturable = 100
+    amount_received = 0
+    application_fee_amount = 0
+    capture_method = CaptureMethod.MANUAL
+    confirmation_method = ConfirmationMethod.MANUAL
+    country = CountryCode.US
+    currency = CurrencyType.USD
+    status = IntentStatus.INIT
+    statement_descriptor = str
+    created_at = factory.LazyFunction(datetime.utcnow)
+    updated_at = factory.LazyFunction(datetime.utcnow)
+    captured_at = None
+    cancelled_at = None

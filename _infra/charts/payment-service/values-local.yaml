@@ -8,3 +8,11 @@ web:
   runtime:
     containerEnabled: false
     path: /srv/runtime/current
+cron:
+  repository: payment-service
+  tag: localbuild
+  secretRef:
+    awsCredentialsEnabled: false
+  runtime:
+    containerEnabled: false
+    path: /srv/runtime/current

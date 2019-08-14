@@ -5,7 +5,7 @@ from starlette.requests import Request
 from structlog import BoundLogger
 from uuid import UUID, uuid4
 
-from app.commons.context.app_context import get_context_from_app
+from app.commons.context.app_context import get_context_from_app, AppContext
 
 
 @dataclass(frozen=True)
@@ -32,3 +32,8 @@ def get_context_from_req(request: Request) -> ReqContext:
     state = cast(Any, request.state)
     req_context = cast(ReqContext, state.context)
     return req_context
+
+
+def build_req_context(app_context: AppContext):
+    req_id = uuid4()
+    return ReqContext(req_id=req_id, log=app_context.log.bind(req_id=req_id))

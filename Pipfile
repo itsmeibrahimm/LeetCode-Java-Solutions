@@ -14,7 +14,9 @@ url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog
 verify_ssl = true
 
 [dev-packages]
+asynctest = "==0.13.0"
 coverage = "==4.5.3"
+factory_boy = "==2.12.0"
 flake8 = "==3.7.8"
 flake8-formatter-junit-xml = "==0.0.6"
 pepper8 = "==1.1.1"
@@ -51,7 +53,6 @@ sentry-sdk = "==0.10.2"
 databases = {extras = ["postgresql"],version = "==0.2.5"}
 protobuf-identity = {version = "==0.2.29", index="artifactory"}
 grpclib = "==0.3.0"
-
 
 [requires]
 python_version = "3.7"

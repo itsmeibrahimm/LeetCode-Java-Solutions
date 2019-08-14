@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-cron
+  labels:
+    service: {{ .Chart.Name }}
+    app: cron
+    # https://docs.helm.sh/chart_best_practices/#labels
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 10 }}
+  selector:
+    matchLabels:
+      service: {{ .Chart.Name }}
+      app: cron
+  template:
+    metadata:
+      annotations:
+        iam.amazonaws.com/role: {{ .Values.aws_iam_role | default "none" }}
+      labels:
+        service: {{ .Chart.Name }}
+        app: cron
+        # https://docs.helm.sh/chart_best_practices/#labels
+        helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    spec:
+      volumes:
+      - name: runtime-volume
+        {{- template "payment-service.volumes.runtime" . }}
+      - name: tmpfs
+        # Use a tmpfs mount to prevent heartbeat blocking event loop for EBS volumes
+        # http://docs.gunicorn.org/en/stable/faq.html#how-do-i-avoid-gunicorn-excessively-blocking-in-os-fchmod
+        # https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
+        emptyDir:
+          medium: Memory
+      containers:
+      - name: cron
+        image: "{{ .Values.cron.repository }}:{{ .Values.cron.tag }}"
+        imagePullPolicy: {{ .Values.cron.pullPolicy | default "IfNotPresent" }}
+        resources:
+          {{- toYaml .Values.cron.resources | nindent 10 }}
+        ports:
+          - containerPort: 80
+        volumeMounts:
+          - name: runtime-volume
+            mountPath: {{ .Values.cron.runtime.path }}
+            readOnly: true
+          - name: tmpfs
+            mountPath: /tmpfs
+        command: [python, app/cron.py]
+        envFrom:
+        - configMapRef:
+            name: {{ .Chart.Name }}-environment
+      {{- template "payment-service.containers.runtime" . }}

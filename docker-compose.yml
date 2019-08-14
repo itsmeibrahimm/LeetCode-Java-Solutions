@@ -1,13 +1,14 @@
 version: "3.2"
+
 services:
   web:
+    container_name: payment.web
     build:
       context: "."
       args:
         - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
         - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
         - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
-    container_name: payment.web
     volumes:
       - $PWD/app:/home/app
       - $PWD/development:/home/development
@@ -16,6 +17,22 @@ services:
     environment:
       - DSJ_DB_ENDPOINT=payment.dsj-postgres
     command: "./development/start-local-server.sh -e local -p ${WEB_PORT}"
+    tty: true
+    depends_on:
+      - payment.dsj-postgres
+
+  cron:
+    container_name: payment.cron
+    build:
+      context: "."
+      args:
+        - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+    volumes:
+      - $PWD/app:/home/app
+      - $PWD/development:/home/development
+    command: ["python", "app/cron.py"]
     tty: true
     depends_on:
       - payment.dsj-postgres

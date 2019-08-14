@@ -16,6 +16,7 @@ ENV FURY_TOKEN ${FURY_TOKEN}
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 ENV PY_IGNORE_IMPORTMISMATCH=1
+ENV PYTHONPATH /home
 
 # this directory needs to exist for gunicorn worker heartbeats
 # in production, a tmpfs will be mounted here

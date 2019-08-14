@@ -75,9 +75,13 @@ update-pipenv:
 .PHONY: dockerignore
 dockerignore: .dockerignore
 
-.PHONY: local-docker-server
-local-docker-server:
-	WEB_PORT=8001 docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml up --build -d web
+.PHONY: start-local-docker-server
+start-local-docker-server:
+	WEB_PORT=8001 docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml up --build -d
+
+.PHONY: stop-local-docker-server
+stop-local-docker-server:
+	WEB_PORT=8001 docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml down
 
 .PHONY: local-server
 local-server: local-dependency
@@ -130,7 +134,7 @@ wait-test-dependency:
 
 .PHONY: local-deploy
 local-deploy:
-	helm upgrade $(SERVICE_NAME) $(LOCAL_CHART) -i -f $(LOCAL_CHART)/values-local.yaml --set web.runtime.hostPath=$(LOCAL_RUNTIME_PATH)
+	helm upgrade $(SERVICE_NAME) $(LOCAL_CHART) -i --force -f $(LOCAL_CHART)/values-local.yaml --set web.runtime.hostPath=$(LOCAL_RUNTIME_PATH)
 
 .PHONY: local-status
 local-status:
