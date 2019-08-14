@@ -43,10 +43,6 @@ class InsertPgpPaymentMethodInput(PgpPaymentMethodDbEntity):
     pass
 
 
-class InsertPgpPaymentMethodOutput(PgpPaymentMethodDbEntity):
-    pass
-
-
 class GetPgpPaymentMethodByPaymentMethodIdInput(DBRequestModel):
     payment_method_id: str
 
@@ -106,10 +102,6 @@ class InsertStripeCardInput(StripeCardDbEntity):
     pass
 
 
-class InsertStripeCardOutput(StripeCardDbEntity):
-    pass
-
-
 class GetStripeCardByStripeIdInput(DBRequestModel):
     stripe_id: str
 
@@ -134,7 +126,7 @@ class PaymentMethodRepositoryInterface:
     @abstractmethod
     async def insert_payment_method_and_stripe_card(
         self, pm_input: InsertPgpPaymentMethodInput, sc_input: InsertStripeCardInput
-    ) -> Tuple[InsertPgpPaymentMethodOutput, InsertStripeCardOutput]:
+    ) -> Tuple[PgpPaymentMethodDbEntity, StripeCardDbEntity]:
         ...
 
     @abstractmethod
@@ -171,7 +163,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
 
     async def insert_payment_method_and_stripe_card(
         self, pm_input: InsertPgpPaymentMethodInput, sc_input: InsertStripeCardInput
-    ) -> Tuple[InsertPgpPaymentMethodOutput, InsertStripeCardOutput]:
+    ) -> Tuple[PgpPaymentMethodDbEntity, StripeCardDbEntity]:
         maindb_conn = self.main_database.master()
         paymentdb_conn = self.payment_database.master()
         async with maindb_conn.transaction(), paymentdb_conn.transaction():
@@ -187,7 +179,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                 )
                 row = await maindb_conn.fetch_one(stmt)
                 assert row
-                sc_output = InsertStripeCardOutput.from_row(row)
+                sc_output = StripeCardDbEntity.from_row(row)
                 logger.info(
                     "[insert_payment_method_and_stripe_card] insert stripe_card table completed."
                 )
@@ -210,7 +202,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                 )
                 row = await self.payment_database.master().fetch_one(stmt)
                 assert row
-                pm_output = InsertPgpPaymentMethodOutput.from_row(row)
+                pm_output = PgpPaymentMethodDbEntity.from_row(row)
                 logger.info(
                     "[insert_payment_method_and_stripe_card] insert pgp_payment_methods table completed."
                 )

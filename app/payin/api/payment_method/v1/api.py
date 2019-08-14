@@ -137,10 +137,15 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         """
         Get a payment method for payer on DoorDash payments platform
 
-        - **payer_id**: [string] DoorDash payer id. For backward compatibility, payer_id can be payer_id, stripe_customer_id, or stripe_customer_serial_id
-        - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
-        - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id", "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
-        - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values include "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id" (default is "dd_payment_method_id")
+        - **payer_id**: [string] DoorDash payer id. For backward compatibility, payer_id can be payer_id,
+                        stripe_customer_id, or stripe_customer_serial_id
+        - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
+                                 can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+        - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
+                            "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+        - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values include
+                                      "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
+                                      (default is "dd_payment_method_id")
         - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
         """
         app_ctxt: AppContext = get_context_from_app(request.app)

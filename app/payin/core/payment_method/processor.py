@@ -17,7 +17,6 @@ from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PayinErrorCode,
-    payin_error_message_maps,
     PaymentMethodReadError,
     PayerReadError,
     PaymentMethodDeleteError,
@@ -28,7 +27,7 @@ from app.payin.core.types import PaymentMethodIdType, PayerIdType
 from app.payin.repository.payer_repo import (
     PayerRepository,
     GetPayerByIdInput,
-    GetPayerByIdOutput,
+    PayerDbEntity,
 )
 from app.payin.repository.payment_method_repo import (
     InsertPgpPaymentMethodInput,
@@ -82,9 +81,7 @@ async def create_payment_method_impl(
         st_cus_id = stripe_customer_id
     elif payer_id or dd_consumer_id:
         payer_repository = PayerRepository(context=app_ctxt)
-        payer_entity: Optional[
-            GetPayerByIdOutput
-        ] = await payer_repository.get_payer_by_id(
+        payer_entity: Optional[PayerDbEntity] = await payer_repository.get_payer_by_id(
             request=(
                 GetPayerByIdInput(id=payer_id)
                 if payer_id
@@ -92,11 +89,8 @@ async def create_payment_method_impl(
             )
         )
         if not payer_entity:
-            err_code = PayinErrorCode.PAYER_READ_NOT_FOUND.value
             raise PayerReadError(
-                error_code=err_code,
-                error_message=payin_error_message_maps[err_code],
-                retryable=False,
+                error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
             )
         st_cus_id = payer_entity.legacy_stripe_customer_id
     else:
@@ -104,10 +98,8 @@ async def create_payment_method_impl(
             "[create_payment_method_impl][%s] invalid input. must provide id : %s",
             payer_id,
         )
-        err_code = PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value
         raise PaymentMethodCreateError(
-            error_code=err_code,
-            error_message=payin_error_message_maps[err_code],
+            error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
             retryable=False,
         )
 
@@ -147,9 +139,6 @@ async def create_payment_method_impl(
         )
         raise PaymentMethodCreateError(
             error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR.value
-            ],
             retryable=False,
         )
     req_ctxt.log.info(
@@ -195,11 +184,7 @@ async def create_payment_method_impl(
             "[update_payer_impl][{}] DataError when read db.".format(payer_id), e
         )
         raise PaymentMethodCreateError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_DB_ERROR,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_CREATE_DB_ERROR.value
-            ],
-            retryable=True,
+            error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_DB_ERROR, retryable=True
         )
 
     # TODO step 4: update default_payment_method _id in pgp_customers and stripe_customer tables
@@ -250,11 +235,8 @@ async def get_payment_method_impl(
             "[get_payment_method_impl][%s] cant retrieve data from pgp_payment_method and stripe_card tables!",
             payment_method_id,
         )
-        err_code = PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value
         raise PaymentMethodReadError(
-            error_code=err_code,
-            error_message=payin_error_message_maps[err_code],
-            retryable=False,
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
         )
     if is_owner is False:
         req_ctxt.log.error(
@@ -266,9 +248,6 @@ async def get_payment_method_impl(
         )
         raise PaymentMethodCreateError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH.value
-            ],
             retryable=False,
         )
 
@@ -344,9 +323,6 @@ async def delete_payment_method_impl(
         )
         raise PaymentMethodDeleteError(
             error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR.value
-            ],
             retryable=False,
         )
 
@@ -375,14 +351,12 @@ async def delete_payment_method_impl(
             e,
         )
         raise PaymentMethodDeleteError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR.value
-            ],
-            retryable=True,
+            error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR, retryable=True
         )
 
     # TODO: step 5: update payer and pgp_customers / stripe_customer to remove the default_payment_method.
+
+    # TODO: step 6: ensure to activate default payment method
 
     return _build_payment_method(
         pgp_payment_method_entity=updated_pm_entity,
@@ -447,7 +421,9 @@ async def get_payment_method(
                 is_owner = (payer_id == pm_entity.payer_id) if pm_entity else False
             elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
                 is_owner = (
-                    (payer_id == pm_entity.pgp_resource_id) if pm_entity else False
+                    (payer_id == sc_entity.external_stripe_customer_id)
+                    if sc_entity
+                    else False
                 )
 
         elif (
@@ -506,9 +482,6 @@ async def get_payment_method(
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-                error_message=payin_error_message_maps[
-                    PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE.value
-                ],
                 retryable=False,
             )
     except DataError as e:
@@ -519,11 +492,7 @@ async def get_payment_method(
             e,
         )
         raise PaymentMethodReadError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR.value
-            ],
-            retryable=True,
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
         )
 
     if is_found is False:
@@ -531,11 +500,8 @@ async def get_payment_method(
             "[get_payment_method][%s] cant retrieve data from pgp_payment_method and stripe_card tables!",
             payment_method_id,
         )
-        err_code = PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value
         raise PaymentMethodReadError(
-            error_code=err_code,
-            error_message=payin_error_message_maps[err_code],
-            retryable=False,
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
         )
     if is_owner is False:
         req_ctxt.log.error(
@@ -547,9 +513,6 @@ async def get_payment_method(
         )
         raise PaymentMethodReadError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH.value
-            ],
             retryable=False,
         )
 

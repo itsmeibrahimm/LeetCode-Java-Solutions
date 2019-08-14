@@ -2,10 +2,7 @@ from fastapi import APIRouter
 
 from app.commons.context.app_context import get_context_from_app, AppContext
 from app.commons.context.req_context import get_context_from_req, ReqContext
-from app.commons.error.errors import (
-    PaymentErrorResponseBody,
-    create_payment_error_response_blob,
-)
+from app.commons.error.errors import PaymentException
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
 from app.payin.core.exceptions import (
     PayerCreationError,
@@ -67,22 +64,19 @@ def create_payer_router(payer_repository: PayerRepository):
             )
             req_ctxt.log.info("[create_payer] onboard_payer() completed.")
         except PayerCreationError as e:
-            return create_payment_error_response_blob(
-                HTTP_500_INTERNAL_SERVER_ERROR,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
+            raise PaymentException(
+                http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                error_code=e.error_code,
+                error_message=e.error_message,
+                retryable=e.retryable,
             )
-
         return payer
 
     @router.get("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
     async def get_payer(
         request: Request,
         payer_id: str,
-        payer_type: str = None,
+        payer_id_type: str = None,
         force_update: bool = False,
     ) -> Payer:
         """
@@ -91,6 +85,8 @@ def create_payer_router(payer_repository: PayerRepository):
         - **payer_id**: DoorDash payer_id or stripe_customer_id
         - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",
                           "drive", "merchant", "store", "business" (default is "marketplace")
+        - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
+                            "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
         - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
         """
         app_ctxt: AppContext = get_context_from_app(request.app)
@@ -103,24 +99,21 @@ def create_payer_router(payer_repository: PayerRepository):
                 app_ctxt=app_ctxt,
                 req_ctxt=req_ctxt,
                 payer_id=payer_id,
-                payer_type=payer_type,
+                payer_id_type=payer_id_type,
                 force_update=force_update,
             )
             req_ctxt.log.info("[get_payer] retrieve_payer completed")
         except PayerReadError as e:
-            return create_payment_error_response_blob(
-                (
+            raise PaymentException(
+                http_status_code=(
                     HTTP_404_NOT_FOUND
                     if e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value
                     else HTTP_500_INTERNAL_SERVER_ERROR
                 ),
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
+                error_code=e.error_code,
+                error_message=e.error_message,
+                retryable=e.retryable,
             )
-
         return payer
 
     @router.patch("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
@@ -153,16 +146,12 @@ def create_payer_router(payer_repository: PayerRepository):
                 status = HTTP_400_BAD_REQUEST
             else:
                 status = HTTP_500_INTERNAL_SERVER_ERROR
-
-            return create_payment_error_response_blob(
-                status,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
+            raise PaymentException(
+                http_status_code=status,
+                error_code=e.error_code,
+                error_message=e.error_message,
+                retryable=e.retryable,
             )
-
         return payer
 
     return router

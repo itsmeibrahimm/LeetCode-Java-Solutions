@@ -7,10 +7,11 @@ payin_error_message_maps = {
     "payin_1": "Invalid data types. Please verify your input again!",
     "payin_2": "Invalid data types. Please verify your input again!",
     "payin_3": "Payer not found. Please ensure your payer_id is correct",
-    "payin_4": "Payer not found. Please ensure your payer_id is correct",
-    "payin_5": "Invalid data types. Please verify your input again!",
-    "payin_6": "Invalid payer type",
-    "payin_7": "Error returned from Payment Provider.",
+    "payin_4": "Data I/O error. Please retry again!",
+    "payin_5": "Payer not found. Please ensure your payer_id is correct",
+    "payin_6": "Invalid data types. Please verify your input again!",
+    "payin_7": "Invalid payer type",
+    "payin_8": "Error returned from Payment Provider.",
     "payin_20": "Invalid data types. Please verify your input again!",
     "payin_21": "Data I/O error. Please retry again!",
     "payin_22": "Invalid input payment method type!",
@@ -32,10 +33,11 @@ class PayinErrorCode(str, Enum):
     PAYER_CREATE_INVALID_DATA = "payin_1"
     PAYER_READ_INVALID_DATA = "payin_2"
     PAYER_READ_NOT_FOUND = "payin_3"
-    PAYER_UPDATE_NOT_FOUND = "payin_4"
-    PAYER_UPDATE_DB_ERROR_INVALID_DATA = "payin_5"
-    PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_6"
-    PAYER_CREATE_STRIPE_ERROR = "payin_7"
+    PAYER_READ_DB_ERROR = "payin_4"
+    PAYER_UPDATE_NOT_FOUND = "payin_5"
+    PAYER_UPDATE_DB_ERROR_INVALID_DATA = "payin_6"
+    PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_7"
+    PAYER_CREATE_STRIPE_ERROR = "payin_8"
     PAYMENT_INTENT_CREATE_STRIPE_ERROR = "payin_40"
     PAYMENT_INTENT_CAPTURE_STRIPE_ERROR = "payin_41"
     PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
@@ -73,34 +75,34 @@ class PayinError(PaymentError):
 ###########################################################
 # Payer Errors                                            #
 ###########################################################
-class PayerReadError(PaymentError):
+class PayerReadError(PayinError):
     pass
 
 
-class PayerCreationError(PaymentError):
+class PayerCreationError(PayinError):
     pass
 
 
-class PayerUpdateError(PaymentError):
+class PayerUpdateError(PayinError):
     pass
 
 
 ###########################################################
 # PaymentMethod Errors                                    #
 ###########################################################
-class PaymentMethodCreateError(PaymentError):
+class PaymentMethodCreateError(PayinError):
     pass
 
 
-class PaymentMethodReadError(PaymentError):
+class PaymentMethodReadError(PayinError):
     pass
 
 
-class PaymentMethodDeleteError(PaymentError):
+class PaymentMethodDeleteError(PayinError):
     pass
 
 
-class PaymentMethodListError(PaymentError):
+class PaymentMethodListError(PayinError):
     pass
 
 

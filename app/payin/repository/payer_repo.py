@@ -1,8 +1,9 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
+from sqlalchemy import select
 from typing_extensions import final
 
 from app.commons.database.model import DBRequestModel, DBEntity
@@ -36,10 +37,6 @@ class InsertPayerInput(PayerDbEntity):
     pass
 
 
-class InsertPayerOutput(PayerDbEntity):
-    pass
-
-
 class GetPayerByIdInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
@@ -48,10 +45,6 @@ class GetPayerByIdInput(DBRequestModel):
     id: Optional[str]
     legacy_stripe_customer_id: Optional[str]
     dd_payer_id: Optional[str]
-
-
-class GetPayerByIdOutput(PayerDbEntity):
-    pass
 
 
 ###########################################################
@@ -81,17 +74,9 @@ class InsertPgpCustomerInput(PgpCustomerDbEntity):
     pass
 
 
-class InsertPgpCustomerOutput(PgpCustomerDbEntity):
-    pass
-
-
 class GetPgpCustomerInput(DBRequestModel):
     payer_id: str
     pgp_code: Optional[str]
-
-
-class GetPgpCustomerOutput(PgpCustomerDbEntity):
-    pass
 
 
 class UpdatePgpCustomerSetInput(DBRequestModel):
@@ -106,10 +91,6 @@ class UpdatePgpCustomerSetInput(DBRequestModel):
 
 class UpdatePgpCustomerWhereInput(DBRequestModel):
     id: str
-
-
-class UpdatePgpCustomerOutput(PgpCustomerDbEntity):
-    pass
 
 
 ###########################################################
@@ -142,10 +123,6 @@ class InsertStripeCustomerInput(DBRequestModel):
     default_source: Optional[str]
 
 
-class InsertStripeCustomerOutput(StripeCustomerDbEntity):
-    pass
-
-
 class GetStripeCustomerInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
@@ -153,10 +130,6 @@ class GetStripeCustomerInput(DBRequestModel):
 
     id: Optional[int]
     stripe_id: Optional[str]
-
-
-class GetStripeCustomerOutput(StripeCustomerDbEntity):
-    pass
 
 
 class UpdateStripeCustomerSetInput(DBRequestModel):
@@ -172,35 +145,37 @@ class UpdateStripeCustomerWhereInput(DBRequestModel):
     id: int
 
 
-class UpdateStripeCustomerOutput(StripeCustomerDbEntity):
-    pass
-
-
 class PayerRepositoryInterface:
     """
     Payer repository interface class that exposes complicated CRUD operations APIs for business layer.
     """
 
     @abstractmethod
-    async def insert_payer(self, request: InsertPayerInput) -> InsertPayerOutput:
+    async def insert_payer(self, request: InsertPayerInput) -> PayerDbEntity:
         ...
 
     @abstractmethod
     async def get_payer_by_id(
         self, request: GetPayerByIdInput
-    ) -> Optional[GetPayerByIdOutput]:
+    ) -> Optional[PayerDbEntity]:
+        ...
+
+    @abstractmethod
+    async def get_payer_and_pgp_customer_by_id(
+        self, input: GetPayerByIdInput
+    ) -> Tuple[Optional[PayerDbEntity], Optional[PgpCustomerDbEntity]]:
         ...
 
     @abstractmethod
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput
-    ) -> InsertPgpCustomerOutput:
+    ) -> PgpCustomerDbEntity:
         ...
 
     @abstractmethod
     async def get_pgp_customer(
         self, request: GetPgpCustomerInput
-    ) -> GetPgpCustomerOutput:
+    ) -> PgpCustomerDbEntity:
         ...
 
     @abstractmethod
@@ -208,19 +183,19 @@ class PayerRepositoryInterface:
         self,
         request_set: UpdatePgpCustomerSetInput,
         request_where: UpdatePgpCustomerWhereInput,
-    ) -> UpdatePgpCustomerOutput:
+    ) -> PgpCustomerDbEntity:
         ...
 
     @abstractmethod
     async def insert_stripe_customer(
         self, request: InsertStripeCustomerInput
-    ) -> InsertStripeCustomerOutput:
+    ) -> StripeCustomerDbEntity:
         ...
 
     @abstractmethod
     async def get_stripe_customer(
         self, request: GetStripeCustomerInput
-    ) -> GetStripeCustomerOutput:
+    ) -> StripeCustomerDbEntity:
         ...
 
     @abstractmethod
@@ -228,7 +203,7 @@ class PayerRepositoryInterface:
         self,
         request_set: UpdateStripeCustomerSetInput,
         request_where: UpdateStripeCustomerWhereInput,
-    ) -> UpdateStripeCustomerOutput:
+    ) -> StripeCustomerDbEntity:
         ...
 
 
@@ -239,7 +214,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
     Payer repository class that exposes complicated CRUD operations APIs for business layer.
     """
 
-    async def insert_payer(self, request: InsertPayerInput) -> InsertPayerOutput:
+    async def insert_payer(self, request: InsertPayerInput) -> PayerDbEntity:
         stmt = (
             payers.table.insert()
             .values(request.dict(skip_defaults=True))
@@ -247,11 +222,11 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return InsertPayerOutput.from_row(row)
+        return PayerDbEntity.from_row(row)
 
     async def get_payer_by_id(
         self, request: GetPayerByIdInput
-    ) -> Optional[GetPayerByIdOutput]:
+    ) -> Optional[PayerDbEntity]:
         if request.id:
             stmt = payers.table.select().where(payers.id == request.id)
         elif request.legacy_stripe_customer_id:
@@ -263,11 +238,39 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 payers.dd_payer_id == request.dd_payer_id
             )
         row = await self.payment_database.master().fetch_one(stmt)
-        return GetPayerByIdOutput.from_row(row) if row else None
+        return PayerDbEntity.from_row(row) if row else None
+
+    async def get_payer_and_pgp_customer_by_id(
+        self, input: GetPayerByIdInput
+    ) -> Tuple[Optional[PayerDbEntity], Optional[PgpCustomerDbEntity]]:
+        join_stmt = payers.table.join(
+            pgp_customers.table, payers.id == pgp_customers.payer_id
+        )
+        if input.id:
+            stmt = (
+                select([payers.table, pgp_customers.table])
+                .select_from(join_stmt)
+                .where(payers.id == input.id)
+            )
+        elif input.dd_payer_id:
+            stmt = (
+                select([payers.table, pgp_customers.table])
+                .select_from(join_stmt)
+                .where(payers.dd_payer_id == input.dd_payer_id)
+            )
+        row = await self.payment_database.master().fetch_one(stmt)
+        if not row:
+            return None, None
+        return (
+            PayerDbEntity.from_row(payers._extract_columns_from_row_record(row)),
+            PgpCustomerDbEntity.from_row(
+                pgp_customers._extract_columns_from_row_record(row)
+            ),
+        )
 
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput
-    ) -> InsertPgpCustomerOutput:
+    ) -> PgpCustomerDbEntity:
         stmt = (
             pgp_customers.table.insert()
             .values(request.dict(skip_defaults=True))
@@ -275,23 +278,23 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return InsertPgpCustomerOutput.from_row(row)
+        return PgpCustomerDbEntity.from_row(row)
 
     async def get_pgp_customer(
         self, request: GetPgpCustomerInput
-    ) -> GetPgpCustomerOutput:
+    ) -> PgpCustomerDbEntity:
         stmt = pgp_customers.table.select().where(
             pgp_customers.payer_id == request.payer_id
         )
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return GetPgpCustomerOutput.from_row(row)
+        return PgpCustomerDbEntity.from_row(row)
 
     async def update_pgp_customer(
         self,
         request_set: UpdatePgpCustomerSetInput,
         request_where: UpdatePgpCustomerWhereInput,
-    ) -> UpdatePgpCustomerOutput:
+    ) -> PgpCustomerDbEntity:
         stmt = (
             pgp_customers.table.update()
             .where(pgp_customers.id == request_where.id)
@@ -300,11 +303,11 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return UpdatePgpCustomerOutput.from_row(row)
+        return PgpCustomerDbEntity.from_row(row)
 
     async def insert_stripe_customer(
         self, request: InsertStripeCustomerInput
-    ) -> InsertStripeCustomerOutput:
+    ) -> StripeCustomerDbEntity:
         stmt = (
             stripe_customers.table.insert()
             .values(request.dict(skip_defaults=True))
@@ -312,21 +315,21 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return InsertStripeCustomerOutput.from_row(row)
+        return StripeCustomerDbEntity.from_row(row)
 
     async def get_stripe_customer(
         self, request: GetStripeCustomerInput
-    ) -> GetStripeCustomerOutput:
+    ) -> StripeCustomerDbEntity:
         stmt = stripe_customers.table.select().where(stripe_customers.id == request.id)
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return GetStripeCustomerOutput.from_row(row)
+        return StripeCustomerDbEntity.from_row(row)
 
     async def update_stripe_customer(
         self,
         request_set: UpdateStripeCustomerSetInput,
         request_where: UpdateStripeCustomerWhereInput,
-    ) -> UpdateStripeCustomerOutput:
+    ) -> StripeCustomerDbEntity:
         stmt = (
             stripe_customers.table.update()
             .where(stripe_customers.id == request_where.id)
@@ -335,4 +338,4 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
-        return UpdateStripeCustomerOutput.from_row(row)
+        return StripeCustomerDbEntity.from_row(row)

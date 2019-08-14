@@ -65,6 +65,15 @@ class TableDefinition:
             ),
         )
 
+    def _extract_columns_from_row_record(self, row) -> Mapping:
+        """
+        Extract row Record fields to table fields.
+
+        :param row:
+        :return:
+        """
+        return {k.name: row[k] for k in self.table.columns if k in row}
+
 
 class RecordDict(GetterDict):
     """
