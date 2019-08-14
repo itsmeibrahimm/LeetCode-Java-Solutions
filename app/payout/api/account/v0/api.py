@@ -49,10 +49,9 @@ async def get_payment_account_by_account_type_account_id(
 
 @router.get(
     "/{account_id}",
-    responses={
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_200_OK: {"model": PaymentAccount},
-    },
+    response_model=PaymentAccount,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def get_payment_account_by_id(
     account_id: int,
@@ -66,10 +65,9 @@ async def get_payment_account_by_id(
 
 @router.patch(
     "/{account_id}",
-    responses={
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_200_OK: {"model": PaymentAccount},
-    },
+    response_model=PaymentAccount,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def update_payment_account_by_id(
     account_id: int,
@@ -88,10 +86,9 @@ async def update_payment_account_by_id(
 
 @router.get(
     "/stripe/{stripe_managed_account_id}",
-    responses={
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_200_OK: {"model": StripeManagedAccount},
-    },
+    response_model=StripeManagedAccount,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def get_stripe_managed_account_by_id(
     stripe_managed_account_id: int,
@@ -118,10 +115,9 @@ async def create_stripe_managed_account(
 
 @router.patch(
     "/stripe/{stripe_managed_account_id}",
-    responses={
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_200_OK: {"model": StripeManagedAccount},
-    },
+    response_model=StripeManagedAccount,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def update_stripe_managed_account_by_id(
     stripe_managed_account_id: int,

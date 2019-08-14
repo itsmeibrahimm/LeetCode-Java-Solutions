@@ -31,10 +31,9 @@ async def create_transfer(
 
 @router.get(
     "/{transfer_id}",
-    responses={
-        HTTP_200_OK: {"model": Transfer},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-    },
+    response_model=Transfer,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def get_transfer_by_id(
     transfer_id: int,
@@ -49,10 +48,9 @@ async def get_transfer_by_id(
 
 @router.patch(
     "/{transfer_id}",
-    responses={
-        HTTP_200_OK: {"model": Transfer},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-    },
+    response_model=Transfer,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def update_transfer_by_id(
     transfer_id: int,
@@ -103,10 +101,9 @@ async def get_stripe_transfer_by_transfer_id(
 
 @router.get(
     "/stripe/{stripe_transfer_id}",
-    responses={
-        HTTP_200_OK: {"model": StripeTransfer},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-    },
+    response_model=StripeTransfer,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def get_stripe_transfer_by_id(
     stripe_transfer_id: int,
@@ -124,10 +121,9 @@ async def get_stripe_transfer_by_id(
 
 @router.patch(
     "/stripe/{stripe_transfer_id}",
-    responses={
-        HTTP_200_OK: {"model": StripeTransfer},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-    },
+    response_model=StripeTransfer,
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
 )
 async def update_stripe_transfer_by_id(
     stripe_transfer_id: int,
