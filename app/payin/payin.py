@@ -16,7 +16,9 @@ def create_payin_app(context: AppContext) -> FastAPI:
 
     # Init routers
     cart_payments_router = create_cart_payments_router(
-        CartPaymentRepository(context=context)
+        cart_payment_repo=CartPaymentRepository(context=context),
+        payer_repo=PayerRepository(context=context),
+        payment_method_repo=PaymentMethodRepository(context=context),
     )
     payer_router = create_payer_router(
         payer_repository=PayerRepository(context=context)

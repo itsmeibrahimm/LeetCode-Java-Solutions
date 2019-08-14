@@ -79,7 +79,7 @@ class CartPaymentInterface:
         )
         return CreatePaymentIntent.ConfirmationMethod(target_method)
 
-    def _get_provider_future_usage(self, payment_intent: PaymentIntent):
+    def _get_provider_future_usage(self, payment_intent: PaymentIntent) -> str:
         if payment_intent.capture_method == CaptureMethod.AUTO:
             return CreatePaymentIntent.SetupFutureUsage.on_session
 
@@ -91,7 +91,7 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
-    ):
+    ) -> str:
         # Call to stripe payment intent API
         assert pgp_payment_intent.idempotency_key
         try:
@@ -145,7 +145,7 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
-    ):
+    ) -> None:
         # Call out to provider to create the payment intent in their system.  The payment_intent
         # instance includes the idempotency_key, which is passed to provider to ensure records already
         # submitted are actually processed only once.
@@ -160,12 +160,12 @@ class CartPaymentInterface:
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
             await self.payment_repo.update_payment_intent_status(
-                payment_intent.id, IntentStatus.REQUIRES_CAPTURE
+                id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
             )
             await self._update_pgp_intent_from_provider(
-                pgp_payment_intent.id,
-                IntentStatus.REQUIRES_CAPTURE,
-                provider_payment_response,
+                pgp_intent_id=pgp_payment_intent.id,
+                status=IntentStatus.REQUIRES_CAPTURE,
+                provider_payment_response=provider_payment_response,
             )
 
     def _populate_cart_payment_for_response(
@@ -313,7 +313,6 @@ class CartPaymentInterface:
         Returns:
             CartPayment -- The (resubmitted) CartPayment.
         """
-        assert cart_payment.id == payment_intent.cart_payment_id
         # Handle creation attempts of the same cart_payment/payment_intent
         if self._is_payment_intent_submitted(payment_intent):
             # Already submitted, nothing left to do.
@@ -421,6 +420,8 @@ async def submit_payment(
     app_context: AppContext,
     req_context: ReqContext,
     payment_repo: CartPaymentRepository,
+    payer_repo: PayerRepository,
+    payment_method_repo: PaymentMethodRepository,
     request_cart_payment: CartPayment,
     idempotency_key: str,
     country: str,
@@ -445,10 +446,6 @@ async def submit_payment(
         CartPayment -- A CartPayment model for the created payment.
     """
     # TODO: Validate amount does not exceed configured max for specified currency
-
-    # TODO Refactor repos
-    payment_method_repo = PaymentMethodRepository(context=app_context)
-    payer_repo = PayerRepository(context=app_context)
 
     if not request_cart_payment.payment_method_id:
         raise CartPaymentCreateError(

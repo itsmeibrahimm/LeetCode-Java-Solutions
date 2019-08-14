@@ -14,6 +14,8 @@ from app.payin.core.cart_payment.model import (
     LegacyPayment,
 )
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.payer_repo import PayerRepository
+from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
 from starlette.status import (
     HTTP_201_CREATED,
@@ -24,7 +26,11 @@ from starlette.status import (
 from starlette.requests import Request
 
 
-def create_cart_payments_router(cart_payment_repo: CartPaymentRepository) -> APIRouter:
+def create_cart_payments_router(
+    cart_payment_repo: CartPaymentRepository,
+    payer_repo: PayerRepository,
+    payment_method_repo: PaymentMethodRepository,
+) -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/v1/cart_payments", status_code=HTTP_201_CREATED)
@@ -42,6 +48,8 @@ def create_cart_payments_router(cart_payment_repo: CartPaymentRepository) -> API
                 app_context,
                 req_context,
                 cart_payment_repo,
+                payer_repo,
+                payment_method_repo,
                 request_to_model(cart_payment_request),
                 cart_payment_request.idempotency_key,
                 cart_payment_request.country,
