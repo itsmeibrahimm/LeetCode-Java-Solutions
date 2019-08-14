@@ -29,6 +29,8 @@ from app.payout.repository.maindb.model.transfer import (
     TransferCreate,
 )
 
+# from app.payout.repository.bankdb.model.payout import Payout, PayoutTable, PayoutCreate
+
 test_db_entity_and_table_definition_data = [
     (PaymentAccount, PaymentAccountTable),
     (PaymentAccountCreate, PaymentAccountTable),
@@ -42,6 +44,8 @@ test_db_entity_and_table_definition_data = [
     (StripeTransfer, StripeTransferTable),
     (StripeTransferCreate, StripeTransferTable),
     (StripeTransferUpdate, StripeTransferTable),
+    # (Payout, PayoutTable),
+    # (PayoutCreate, PayoutTable),
 ]
 
 
