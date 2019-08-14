@@ -1,7 +1,8 @@
 import os
 
 from app.commons.config.app_config import DBConfig
-from .app_config import AppConfig, Secret
+from .app_config import AppConfig
+from app.commons.config.secrets import Secret
 
 
 def create_app_config() -> AppConfig:
@@ -14,7 +15,7 @@ def create_app_config() -> AppConfig:
     return AppConfig(
         ENVIRONMENT="testing",
         DEBUG=True,
-        NINOX_ENABLED=False,
+        REMOTE_SECRET_ENABLED=False,
         METRICS_CONFIG={"service_name": "payment-service", "cluster": "testing"},
         TEST_SECRET=Secret(name="test_secret", value="hello_world_secret"),
         PAYIN_MAINDB_MASTER_URL=Secret(

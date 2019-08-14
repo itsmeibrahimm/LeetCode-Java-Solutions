@@ -1,45 +1,14 @@
-import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from typing_extensions import final
 
-
-@final
-@dataclass(frozen=True)
-class Secret:
-    """
-    Holds a string secret config value that should not be revealed in logging and etc.
-    """
-
-    name: str
-    version: Optional[int] = None
-    value: Optional[str] = None
-
-    def __post_init__(self):
-        assert self.name.islower(), "name of secret should always be lower cased"
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}-{self.name}-Ver[{self.version}]('**********')"
-        )
-
-    def __str__(self) -> str:
-        return (
-            f"{self.__class__.__name__}-{self.name}-Ver[{self.version}]('**********')"
-        )
-
-    @classmethod
-    def from_env(cls, name: str, env: str, default: str = None):
-        value = os.getenv(env, default)
-        if value is None:
-            raise KeyError(f"Environment variable={name} not defined")
-        return cls(name=name, version=None, value=value)
+from app.commons.config.secrets import SecretAware, Secret
 
 
 @final
 @dataclass(frozen=True)
-class SentryConfig:
+class SentryConfig(SecretAware):
     dsn: Secret
     environment: str
     release: str
@@ -66,7 +35,7 @@ class DBConfig:
 
 @final
 @dataclass(frozen=True)
-class AppConfig:
+class AppConfig(SecretAware):
     """
     A config class contains all necessary config key-values to bootstrap application.
     For local/staging/prod application environments, there are corresponding instances
@@ -78,7 +47,7 @@ class AppConfig:
 
     ENVIRONMENT: str
     DEBUG: bool
-    NINOX_ENABLED: bool
+    REMOTE_SECRET_ENABLED: bool
     METRICS_CONFIG: Dict[str, str]
 
     # Test secret

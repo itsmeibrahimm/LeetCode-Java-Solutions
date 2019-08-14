@@ -1,12 +1,10 @@
-import dataclasses
 import os
 from typing import Callable, Mapping
 
-from ninox.interface.helper import Helper
-
-from app.commons.config.app_config import AppConfig, Secret
+from app.commons.config.app_config import AppConfig
 from app.commons.config.local import create_app_config as LOCAL
 from app.commons.config.prod import create_app_config as PROD
+from app.commons.config.secrets import SecretLoader, load_up_secret_aware_recursively
 from app.commons.config.staging import create_app_config as STAGING
 from app.commons.config.testing import create_app_config as TESTING
 
@@ -32,31 +30,12 @@ def init_app_config() -> AppConfig:
 
     app_config = _CONFIG_MAP[config_key]()
 
-    if app_config.NINOX_ENABLED:
-        ninox = Helper(config_section=environment)
-        if ninox.disabled:
-            # Ninox helper internally set itself to disabled when init fails without raising exception.
-            # We should fail fast here to prevent unknown service state at runtime.
-            raise Helper.DisabledError("Ninox initialization failed")
+    secret_loader = None
+    if app_config.REMOTE_SECRET_ENABLED:
+        secret_loader = SecretLoader(environment=config_key)
 
-        for key in dir(app_config):
-            config = app_config.__getattribute__(key)
-            if isinstance(config, Secret):
-                try:
-                    secret_val = str(ninox.get(config.name, version=config.version))
-                except Helper.SecretNotFoundError:
-                    raise Helper.SecretNotFoundError(
-                        f"config name={config.name} is not found"
-                    )
-                updated_secret_config = dataclasses.replace(config, value=secret_val)
-                object.__setattr__(app_config, key, updated_secret_config)
-
-    else:
-        # When working with Ninox disabled, should also make sure all "secrets" are actually configured
-        for key in dir(app_config):
-            config = app_config.__getattribute__(key)
-            if isinstance(config, Secret):
-                if config.value is None:
-                    raise KeyError(f"config name={config.name} is not defined")
+    load_up_secret_aware_recursively(
+        secret_aware=app_config, secret_loader=secret_loader
+    )
 
     return app_config

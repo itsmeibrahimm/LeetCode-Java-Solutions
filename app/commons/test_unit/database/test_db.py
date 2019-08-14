@@ -1,6 +1,7 @@
 from urllib import parse
 
-from app.commons.config.app_config import Secret, DBConfig
+from app.commons.config.app_config import DBConfig
+from app.commons.config.secrets import Secret
 from app.commons.database.infra import DB
 
 
