@@ -13,12 +13,6 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class PayoutTable(TableDefinition):
-    """
-    PayoutTable
-
-    Note: remember to update Entity classes below whenever schema changes
-    """
-
     name: str = no_init_field("payouts")
     id: Column = no_init_field(
         Column(
@@ -56,35 +50,7 @@ class PayoutTable(TableDefinition):
     error: Column = no_init_field(Column("error", JSON))
 
 
-class _PayoutEntityBase(DBEntity):
-    """
-    Base Entity type for the table (schema fields are all optional)
-    Concrete Entity should override the fields required by dropping `Optional`
-    """
-
-    id: Optional[int]
-    amount: Optional[int]
-    payment_account_id: Optional[int]
-    status: Optional[str]
-    currency: Optional[str]
-    fee: Optional[int]
-    type: Optional[str]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    idempotency_key: Optional[str]
-    payout_method_id: Optional[int]
-    transaction_ids: Optional[List[int]]
-    token: Optional[str]
-    fee_transaction_id: Optional[int]
-    error: Optional[Json]
-
-
-class PayoutEntity(_PayoutEntityBase):
-    """
-    NOT NULL columns
-    """
-
-    id: int
+class _PayoutPartial(DBEntity):
     amount: int
     payment_account_id: int
     status: str
@@ -94,9 +60,16 @@ class PayoutEntity(_PayoutEntityBase):
     created_at: datetime
     updated_at: datetime
     idempotency_key: str
+    payout_method_id: int
     transaction_ids: List[int]
     token: str
+    fee_transaction_id: Optional[int]
+    error: Optional[Json]
 
 
-class PayoutCreate(_PayoutEntityBase):
-    id: DBEntity.NotAllowed = None
+class Payout(_PayoutPartial):
+    id: Optional[int]  # server default generated
+
+
+class PayoutCreate(_PayoutPartial):
+    pass

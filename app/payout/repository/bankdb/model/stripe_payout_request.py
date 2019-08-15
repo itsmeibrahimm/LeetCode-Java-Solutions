@@ -13,12 +13,6 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class StripePayoutRequestTable(TableDefinition):
-    """
-    StripePayoutRequestTable
-
-    Note: remember to update Entity classes below whenever schema changes
-    """
-
     name: str = no_init_field("stripe_payout_requests")
     id: Column = no_init_field(
         Column(
@@ -64,40 +58,24 @@ class StripePayoutRequestTable(TableDefinition):
     )
 
 
-class _StripePayoutRequestEntityBase(DBEntity):
-    """
-    Base Entity type for the table (schema fields are all optional)
-    Concrete Entity should override the fields required by dropping `Optional`
-    """
-
-    id: Optional[int]
-    payout_id: Optional[int]
-    idempotency_key: Optional[str]
-    payout_method_id: Optional[int]
+class _StripePayoutRequestPartial(DBEntity):
+    payout_id: int
+    idempotency_key: str
+    payout_method_id: int
     response: Optional[Json]
-    created_at: Optional[datetime]
+    created_at: datetime
     received_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    updated_at: datetime
     stripe_payout_id: Optional[str]
     request: Optional[Json]
-    status: Optional[str]
+    status: str
     events: Optional[Json]
     stripe_account_id: Optional[str]
 
 
-class StripePayoutRequestEntity(_StripePayoutRequestEntityBase):
-    """
-    NOT NULL columns
-    """
-
-    id: int
-    payout_id: int
-    idempotency_key: str
-    payout_method_id: int
-    created_at: datetime
-    updated_at: datetime
-    status: str
+class StripePayoutRequest(_StripePayoutRequestPartial):
+    id: Optional[int]  # server default generated
 
 
-class StripePayoutRequestCreate(_StripePayoutRequestEntityBase):
-    id: DBEntity.NotAllowed = None
+class StripePayoutRequestCreate(_StripePayoutRequestPartial):
+    pass

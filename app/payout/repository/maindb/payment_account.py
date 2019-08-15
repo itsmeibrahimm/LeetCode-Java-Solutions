@@ -9,12 +9,12 @@ from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import payment_accounts, stripe_managed_accounts
 from app.payout.repository.maindb.model.payment_account import (
-    PaymentAccountEntity,
+    PaymentAccount,
     PaymentAccountUpdate,
     PaymentAccountCreate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
-    StripeManagedAccountEntity,
+    StripeManagedAccount,
     StripeManagedAccountUpdate,
     StripeManagedAccountCreate,
 )
@@ -24,43 +24,43 @@ class PaymentAccountRepositoryInterface(ABC):
     @abstractmethod
     async def create_payment_account(
         self, data: PaymentAccountCreate
-    ) -> PaymentAccountEntity:
+    ) -> PaymentAccount:
         pass
 
     @abstractmethod
     async def get_payment_account_by_id(
         self, payment_account_id: int
-    ) -> Optional[PaymentAccountEntity]:
+    ) -> Optional[PaymentAccount]:
         pass
 
     @abstractmethod
     async def get_all_payment_accounts_by_account_id_account_type(
         self, *, account_id: int, account_type: str
-    ) -> List[PaymentAccountEntity]:
+    ) -> List[PaymentAccount]:
         pass
 
     @abstractmethod
     async def update_payment_account_by_id(
         self, payment_account_id: int, data: PaymentAccountUpdate
-    ) -> Optional[PaymentAccountEntity]:
+    ) -> Optional[PaymentAccount]:
         pass
 
     @abstractmethod
     async def get_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int
-    ) -> Optional[StripeManagedAccountEntity]:
+    ) -> Optional[StripeManagedAccount]:
         pass
 
     @abstractmethod
     async def create_stripe_managed_account(
         self, data: StripeManagedAccountCreate
-    ) -> StripeManagedAccountEntity:
+    ) -> StripeManagedAccount:
         pass
 
     @abstractmethod
     async def update_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int, data: StripeManagedAccountUpdate
-    ) -> Optional[StripeManagedAccountEntity]:
+    ) -> Optional[StripeManagedAccount]:
         pass
 
 
@@ -73,7 +73,7 @@ class PaymentAccountRepository(
 
     async def create_payment_account(
         self, data: PaymentAccountCreate
-    ) -> PaymentAccountEntity:
+    ) -> PaymentAccount:
         stmt = (
             payment_accounts.table.insert()
             .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
@@ -81,20 +81,20 @@ class PaymentAccountRepository(
         )
         row = await self._database.master().fetch_one(stmt)
         assert row is not None
-        return PaymentAccountEntity.from_row(row)
+        return PaymentAccount.from_row(row)
 
     async def get_payment_account_by_id(
         self, payment_account_id: int
-    ) -> Optional[PaymentAccountEntity]:
+    ) -> Optional[PaymentAccount]:
         stmt = payment_accounts.table.select().where(
             payment_accounts.id == payment_account_id
         )
         row = await self._database.master().fetch_one(stmt)
-        return PaymentAccountEntity.from_row(row) if row else None
+        return PaymentAccount.from_row(row) if row else None
 
     async def get_all_payment_accounts_by_account_id_account_type(
         self, *, account_id: int, account_type: str
-    ) -> List[PaymentAccountEntity]:
+    ) -> List[PaymentAccount]:
         stmt = payment_accounts.table.select().where(
             and_(
                 payment_accounts.account_id == account_id,
@@ -104,13 +104,13 @@ class PaymentAccountRepository(
 
         rows = await self._database.master().fetch_all(stmt)
         if rows:
-            return [PaymentAccountEntity.from_row(row) for row in rows]
+            return [PaymentAccount.from_row(row) for row in rows]
         else:
             return []
 
     async def update_payment_account_by_id(
         self, payment_account_id: int, data: PaymentAccountUpdate
-    ) -> Optional[PaymentAccountEntity]:
+    ) -> Optional[PaymentAccount]:
         stmt = (
             payment_accounts.table.update()
             .where(payment_accounts.id == payment_account_id)
@@ -119,21 +119,21 @@ class PaymentAccountRepository(
         )
 
         row = await self._database.master().fetch_one(stmt)
-        return PaymentAccountEntity.from_row(row) if row else None
+        return PaymentAccount.from_row(row) if row else None
 
     async def get_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int
-    ) -> Optional[StripeManagedAccountEntity]:
+    ) -> Optional[StripeManagedAccount]:
         stmt = stripe_managed_accounts.table.select().where(
             stripe_managed_accounts.id == stripe_managed_account_id
         )
 
         row = await self._database.master().fetch_one(stmt)
-        return StripeManagedAccountEntity.from_row(row) if row else None
+        return StripeManagedAccount.from_row(row) if row else None
 
     async def create_stripe_managed_account(
         self, data: StripeManagedAccountCreate
-    ) -> StripeManagedAccountEntity:
+    ) -> StripeManagedAccount:
         stmt = (
             stripe_managed_accounts.table.insert()
             .values(data.dict(skip_defaults=True))
@@ -141,11 +141,11 @@ class PaymentAccountRepository(
         )
         row = await self._database.master().fetch_one(stmt)
         assert row is not None
-        return StripeManagedAccountEntity.from_row(row)
+        return StripeManagedAccount.from_row(row)
 
     async def update_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int, data: StripeManagedAccountUpdate
-    ) -> Optional[StripeManagedAccountEntity]:
+    ) -> Optional[StripeManagedAccount]:
         stmt = (
             stripe_managed_accounts.table.update()
             .where(stripe_managed_accounts.id == stripe_managed_account_id)
@@ -153,4 +153,4 @@ class PaymentAccountRepository(
             .returning(*stripe_managed_accounts.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)
-        return StripeManagedAccountEntity.from_row(row) if row else None
+        return StripeManagedAccount.from_row(row) if row else None

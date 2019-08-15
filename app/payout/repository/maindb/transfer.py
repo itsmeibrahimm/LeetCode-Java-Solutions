@@ -8,12 +8,12 @@ from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import stripe_transfers, transfers
 from app.payout.repository.maindb.model.stripe_transfer import (
-    StripeTransferEntity,
+    StripeTransfer,
     StripeTransferCreate,
     StripeTransferUpdate,
 )
 from app.payout.repository.maindb.model.transfer import (
-    TransferEntity,
+    Transfer,
     TransferCreate,
     TransferUpdate,
 )
@@ -21,47 +21,47 @@ from app.payout.repository.maindb.model.transfer import (
 
 class TransferRepositoryInterface(ABC):
     @abstractmethod
-    async def create_transfer(self, data: TransferCreate) -> TransferEntity:
+    async def create_transfer(self, data: TransferCreate) -> Transfer:
         pass
 
     @abstractmethod
-    async def get_transfer_by_id(self, transfer_id: int) -> Optional[TransferEntity]:
+    async def get_transfer_by_id(self, transfer_id: int) -> Optional[Transfer]:
         pass
 
     @abstractmethod
     async def update_transfer_by_id(
         self, transfer_id: int, data: TransferUpdate
-    ) -> Optional[TransferEntity]:
+    ) -> Optional[Transfer]:
         pass
 
     @abstractmethod
     async def create_stripe_transfer(
         self, data: StripeTransferCreate
-    ) -> StripeTransferEntity:
+    ) -> StripeTransfer:
         pass
 
     @abstractmethod
     async def get_stripe_transfer_by_id(
         self, stripe_transfer_id: int
-    ) -> Optional[StripeTransferEntity]:
+    ) -> Optional[StripeTransfer]:
         pass
 
     @abstractmethod
     async def get_stripe_transfer_by_stripe_id(
         self, stripe_id: str
-    ) -> Optional[StripeTransferEntity]:
+    ) -> Optional[StripeTransfer]:
         pass
 
     @abstractmethod
     async def get_stripe_transfers_by_transfer_id(
         self, transfer_id: int
-    ) -> List[StripeTransferEntity]:
+    ) -> List[StripeTransfer]:
         pass
 
     @abstractmethod
     async def update_stripe_transfer_by_id(
         self, stripe_transfer_id: int, data: StripeTransferUpdate
-    ) -> Optional[StripeTransferEntity]:
+    ) -> Optional[StripeTransfer]:
         pass
 
     @abstractmethod
@@ -74,12 +74,12 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     def __init__(self, database: DB):
         super().__init__(_database=database)
 
-    async def get_transfer_by_id(self, transfer_id: int) -> Optional[TransferEntity]:
+    async def get_transfer_by_id(self, transfer_id: int) -> Optional[Transfer]:
         stmt = transfers.table.select().where(transfers.id == transfer_id)
         row = await self._database.master().fetch_one(stmt)
-        return TransferEntity.from_row(row) if row else None
+        return Transfer.from_row(row) if row else None
 
-    async def create_transfer(self, data: TransferCreate) -> TransferEntity:
+    async def create_transfer(self, data: TransferCreate) -> Transfer:
         stmt = (
             transfers.table.insert()
             .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
@@ -87,11 +87,11 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         )
         row = await self._database.master().fetch_one(stmt)
         assert row is not None
-        return TransferEntity.from_row(row)
+        return Transfer.from_row(row)
 
     async def update_transfer_by_id(
         self, transfer_id: int, data: TransferUpdate
-    ) -> Optional[TransferEntity]:
+    ) -> Optional[Transfer]:
         stmt = (
             transfers.table.update()
             .where(transfers.id == transfer_id)
@@ -99,29 +99,29 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
             .returning(*transfers.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)
-        return TransferEntity.from_row(row) if row else None
+        return Transfer.from_row(row) if row else None
 
     async def get_stripe_transfer_by_id(
         self, stripe_transfer_id: int
-    ) -> Optional[StripeTransferEntity]:
+    ) -> Optional[StripeTransfer]:
         stmt = stripe_transfers.table.select().where(
             stripe_transfers.id == stripe_transfer_id
         )
         row = await self._database.master().fetch_one(stmt)
-        return StripeTransferEntity.from_row(row) if row else None
+        return StripeTransfer.from_row(row) if row else None
 
     async def get_stripe_transfer_by_stripe_id(
         self, stripe_id: str
-    ) -> Optional[StripeTransferEntity]:
+    ) -> Optional[StripeTransfer]:
         stmt = stripe_transfers.table.select().where(
             stripe_transfers.stripe_id == stripe_id
         )
         row = await self._database.master().fetch_one(stmt)
-        return StripeTransferEntity.from_row(row) if row else None
+        return StripeTransfer.from_row(row) if row else None
 
     async def create_stripe_transfer(
         self, data: StripeTransferCreate
-    ) -> StripeTransferEntity:
+    ) -> StripeTransfer:
         stmt = (
             stripe_transfers.table.insert()
             .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
@@ -130,11 +130,11 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
 
         row = await self._database.master().fetch_one(stmt)
         assert row is not None
-        return StripeTransferEntity.from_row(row)
+        return StripeTransfer.from_row(row)
 
     async def update_stripe_transfer_by_id(
         self, stripe_transfer_id: int, data: StripeTransferUpdate
-    ) -> Optional[StripeTransferEntity]:
+    ) -> Optional[StripeTransfer]:
         stmt = (
             stripe_transfers.table.update()
             .where(stripe_transfers.id == stripe_transfer_id)
@@ -143,17 +143,17 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         )
 
         row = await self._database.master().fetch_one(stmt)
-        return StripeTransferEntity.from_row(row) if row else None
+        return StripeTransfer.from_row(row) if row else None
 
     async def get_stripe_transfers_by_transfer_id(
         self, transfer_id: int
-    ) -> List[StripeTransferEntity]:
+    ) -> List[StripeTransfer]:
         stmt = stripe_transfers.table.select().where(
             stripe_transfers.transfer_id == transfer_id
         )
 
         rows = await self._database.master().fetch_all(stmt)
-        return [StripeTransferEntity.from_row(row) for row in rows]
+        return [StripeTransfer.from_row(row) for row in rows]
 
     async def delete_stripe_transfer_by_stripe_id(self, stripe_id: str):
         stmt = stripe_transfers.table.delete().where(

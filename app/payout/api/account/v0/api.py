@@ -9,12 +9,12 @@ from app.payout.service import (
 )
 from app.commons.error.errors import PaymentErrorResponseBody, PaymentException
 from app.payout.repository.maindb.model.payment_account import (
-    PaymentAccountEntity,
+    PaymentAccount,
     PaymentAccountCreate,
     PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
-    StripeManagedAccountEntity,
+    StripeManagedAccount,
     StripeManagedAccountCreate,
     StripeManagedAccountUpdate,
 )
@@ -26,7 +26,7 @@ router = APIRouter()
 @router.post(
     "/",
     status_code=HTTP_201_CREATED,
-    response_model=PaymentAccountEntity,
+    response_model=PaymentAccount,
     operation_id="CreatePaymentAccount",
 )
 async def create_payment_account(
@@ -39,7 +39,7 @@ async def create_payment_account(
 @router.get(
     "/_get-by-stripe-account-type-account-id",
     status_code=HTTP_200_OK,
-    response_model=List[PaymentAccountEntity],
+    response_model=List[PaymentAccount],
     operation_id="GetPaymentAccountsByAccountTypeAccountId",
 )
 async def get_payment_account_by_account_type_account_id(
@@ -55,7 +55,7 @@ async def get_payment_account_by_account_type_account_id(
 
 @router.get(
     "/{account_id}",
-    response_model=PaymentAccountEntity,
+    response_model=PaymentAccount,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="GetPaymentAccountById",
@@ -72,7 +72,7 @@ async def get_payment_account_by_id(
 
 @router.patch(
     "/{account_id}",
-    response_model=PaymentAccountEntity,
+    response_model=PaymentAccount,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="UpdatePaymentAccountById",
@@ -94,7 +94,7 @@ async def update_payment_account_by_id(
 
 @router.get(
     "/stripe/{stripe_managed_account_id}",
-    response_model=StripeManagedAccountEntity,
+    response_model=StripeManagedAccount,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="GetStripeManagedAccountById",
@@ -115,7 +115,7 @@ async def get_stripe_managed_account_by_id(
 @router.post(
     "/stripe/",
     status_code=HTTP_201_CREATED,
-    response_model=StripeManagedAccountEntity,
+    response_model=StripeManagedAccount,
     operation_id="CreateStripeManagedAccount",
 )
 async def create_stripe_managed_account(
@@ -127,7 +127,7 @@ async def create_stripe_managed_account(
 
 @router.patch(
     "/stripe/{stripe_managed_account_id}",
-    response_model=StripeManagedAccountEntity,
+    response_model=StripeManagedAccount,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="UpdateStripeManagedAccountById",

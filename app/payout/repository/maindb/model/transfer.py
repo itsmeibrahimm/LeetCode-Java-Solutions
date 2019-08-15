@@ -23,12 +23,6 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class TransferTable(TableDefinition):
-    """
-    TransferTable
-
-    Note: remember to update Entity classes below whenever schema changes
-    """
-
     name: str = no_init_field("transfer")
     id: Column = no_init_field(
         Column(
@@ -80,22 +74,10 @@ class TransferTable(TableDefinition):
     )
 
 
-class _TransferEntityBase(DBEntity):
-    """
-    Base Entity type for the table (schema fields are all optional)
-    Concrete Entity should override the fields required by dropping `Optional`
-    """
-
-    id: Optional[int]
-    recipient_id: Optional[int]
-    subtotal: Optional[int]
-    adjustments: Optional[str]
-    amount: Optional[int]
+class _TransferPartial(DBEntity):
     currency: Optional[str]
-    created_at: Optional[datetime]
     submitted_at: Optional[datetime]
     deleted_at: Optional[datetime]
-    method: Optional[str]
     manual_transfer_reason: Optional[str]
     status: Optional[str]
     status_code: Optional[str]
@@ -105,30 +87,30 @@ class _TransferEntityBase(DBEntity):
     created_by_id: Optional[int]
     deleted_by_id: Optional[int]
     payment_account_id: Optional[int]
+    recipient_id: Optional[int]
     recipient_ct_id: Optional[int]
     submitted_by_id: Optional[int]
 
 
-class TransferEntity(_TransferEntityBase):
-    """
-    NOT NULL columns
-    """
+class Transfer(_TransferPartial):
+    id: Optional[int]  # server default generated
+    created_at: Optional[datetime]  # client table definition default generated
 
-    id: int
-    subtotal: int
-    adjustments: str
-    amount: int
-    created_at: datetime
-    method: str
-
-
-class TransferCreate(_TransferEntityBase):
-    id: DBEntity.NotAllowed = None
     subtotal: int
     adjustments: str
     amount: int
     method: str
 
 
-class TransferUpdate(_TransferEntityBase):
-    pass
+class TransferCreate(_TransferPartial):
+    subtotal: int
+    adjustments: str
+    amount: int
+    method: str
+
+
+class TransferUpdate(_TransferPartial):
+    subtotal: Optional[int]
+    adjustments: Optional[str]
+    amount: Optional[int]
+    method: Optional[str]
