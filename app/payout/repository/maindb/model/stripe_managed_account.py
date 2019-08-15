@@ -12,6 +12,12 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class StripeManagedAccountTable(TableDefinition):
+    """
+    StripeManagedAccountTable
+
+    Note: remember to update Entity classes below whenever schema changes
+    """
+
     name: str = no_init_field("stripe_managed_account")
     id: Column = no_init_field(
         Column(
@@ -49,7 +55,15 @@ class StripeManagedAccountTable(TableDefinition):
     )
 
 
-class _StripeManagedAccountPartial(DBEntity):
+class _StripeManagedAccountEntityBase(DBEntity):
+    """
+    Base Entity type for the table (schema fields are all optional)
+    Concrete Entity should override the fields required by dropping `Optional`
+    """
+
+    id: Optional[int]
+    stripe_id: Optional[str]
+    country_shortname: Optional[str]
     stripe_last_updated_at: Optional[datetime]
     bank_account_last_updated_at: Optional[datetime]
     fingerprint: Optional[str]
@@ -60,18 +74,21 @@ class _StripeManagedAccountPartial(DBEntity):
     verification_fields_needed: Optional[str]
 
 
-class StripeManagedAccount(_StripeManagedAccountPartial):
-    id: int  # server default generated
+class StripeManagedAccountEntity(_StripeManagedAccountEntityBase):
+    """
+    NOT NULL columns
+    """
 
+    id: int
+    stripe_id: str
+    country_shortname: str
+
+
+class StripeManagedAccountCreate(_StripeManagedAccountEntityBase):
+    id: DBEntity.NotAllowed = None
     country_shortname: str
     stripe_id: str
 
 
-class StripeManagedAccountCreate(_StripeManagedAccountPartial):
-    country_shortname: str
-    stripe_id: str
-
-
-class StripeManagedAccountUpdate(_StripeManagedAccountPartial):
-    country_shortname: Optional[str]
-    stripe_id: Optional[str]
+class StripeManagedAccountUpdate(_StripeManagedAccountEntityBase):
+    pass

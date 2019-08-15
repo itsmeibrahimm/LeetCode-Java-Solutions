@@ -22,6 +22,12 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class PaymentAccountTable(TableDefinition):
+    """
+    PaymentAccountTable
+
+    Note: remember to update Entity classes below whenever schema changes
+    """
+
     name: str = no_init_field("payment_account")
     id: Column = no_init_field(
         Column(
@@ -64,29 +70,40 @@ class PaymentAccountTable(TableDefinition):
     )
 
 
-class _PaymentAccountPartial(DBEntity):
-    account_id: Optional[int]
+class _PaymentAccountEntityBase(DBEntity):
+    """
+    Base Entity type for the table (schema fields are all optional)
+    Concrete Entity should override the fields required by dropping `Optional`
+    """
+
+    id: Optional[int]
     account_type: Optional[str]
+    account_id: Optional[int]
     entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
-    payout_disabled: Optional[bool]
-    charges_enabled: Optional[bool]
     old_account_id: Optional[int]
     upgraded_to_managed_account_at: Optional[datetime]
     is_verified_with_stripe: Optional[bool]
     transfers_enabled: Optional[bool]
-
-
-class PaymentAccount(_PaymentAccountPartial):
-    id: int  # server default generated
-    created_at: datetime  # client table definition default generated
-
-    statement_descriptor: str
-
-
-class PaymentAccountCreate(_PaymentAccountPartial):
-    statement_descriptor: str
-
-
-class PaymentAccountUpdate(_PaymentAccountPartial):
+    charges_enabled: Optional[bool]
     statement_descriptor: Optional[str]
+    created_at: Optional[datetime]
+    payout_disabled: Optional[bool]
+    resolve_outstanding_balance_frequency: Optional[str]
+
+
+class PaymentAccountEntity(_PaymentAccountEntityBase):
+    """
+    NOT NULL columns
+    """
+
+    id: int
+    statement_descriptor: str
+
+
+class PaymentAccountCreate(_PaymentAccountEntityBase):
+    id: DBEntity.NotAllowed = None
+    statement_descriptor: str
+
+
+class PaymentAccountUpdate(_PaymentAccountEntityBase):
+    pass

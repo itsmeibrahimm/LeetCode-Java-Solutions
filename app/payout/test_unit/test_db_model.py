@@ -6,53 +6,53 @@ from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.test_unit.database.utils import validation_db_entity_and_table_schema
 from app.payout.repository.maindb.model import PaymentAccountTable
 from app.payout.repository.maindb.model.payment_account import (
-    PaymentAccount,
+    PaymentAccountEntity,
+    # PaymentAccountCreate,
     PaymentAccountUpdate,
-    PaymentAccountCreate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
-    StripeManagedAccount,
+    StripeManagedAccountEntity,
     StripeManagedAccountTable,
+    # StripeManagedAccountCreate,
     StripeManagedAccountUpdate,
-    StripeManagedAccountCreate,
 )
 from app.payout.repository.maindb.model.stripe_transfer import (
-    StripeTransfer,
+    StripeTransferEntity,
     StripeTransferTable,
+    # StripeTransferCreate,
     StripeTransferUpdate,
-    StripeTransferCreate,
 )
 from app.payout.repository.maindb.model.transfer import (
-    Transfer,
+    TransferEntity,
     TransferTable,
+    # TransferCreate,
     TransferUpdate,
-    TransferCreate,
 )
 
 # from app.payout.repository.bankdb.model.payout import Payout, PayoutTable, PayoutCreate
 from app.payout.repository.bankdb.model.stripe_payout_request import (
-    StripePayoutRequest,
+    StripePayoutRequestEntity,
+    # StripePayoutRequestCreate,
     StripePayoutRequestTable,
-    StripePayoutRequestCreate,
 )
 
 test_db_entity_and_table_definition_data = [
-    (PaymentAccount, PaymentAccountTable),
-    (PaymentAccountCreate, PaymentAccountTable),
+    (PaymentAccountEntity, PaymentAccountTable),
+    # (PaymentAccountCreate, PaymentAccountTable),
     (PaymentAccountUpdate, PaymentAccountTable),
-    (StripeManagedAccount, StripeManagedAccountTable),
-    (StripeManagedAccountCreate, StripeManagedAccountTable),
+    (StripeManagedAccountEntity, StripeManagedAccountTable),
+    # (StripeManagedAccountCreate, StripeManagedAccountTable),
     (StripeManagedAccountUpdate, StripeManagedAccountTable),
-    (Transfer, TransferTable),
-    (TransferCreate, TransferTable),
+    (TransferEntity, TransferTable),
+    # (TransferCreate, TransferTable),
     (TransferUpdate, TransferTable),
-    (StripeTransfer, StripeTransferTable),
-    (StripeTransferCreate, StripeTransferTable),
+    (StripeTransferEntity, StripeTransferTable),
+    # (StripeTransferCreate, StripeTransferTable),
     (StripeTransferUpdate, StripeTransferTable),
     # (Payout, PayoutTable),
     # (PayoutCreate, PayoutTable),
-    (StripePayoutRequest, StripePayoutRequestTable),
-    (StripePayoutRequestCreate, StripePayoutRequestTable),
+    (StripePayoutRequestEntity, StripePayoutRequestTable),
+    # (StripePayoutRequestCreate, StripePayoutRequestTable),
 ]
 
 

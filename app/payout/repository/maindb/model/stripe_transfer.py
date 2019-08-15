@@ -12,6 +12,12 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @final
 @dataclass(frozen=True)
 class StripeTransferTable(TableDefinition):
+    """
+    StripeTransferTable
+
+    Note: remember to update Entity classes below whenever schema changes
+    """
+
     name: str = no_init_field("stripe_transfer")
     id: Column = no_init_field(
         Column(
@@ -54,34 +60,46 @@ class StripeTransferTable(TableDefinition):
     submitted_at: Column = no_init_field(Column("submitted_at", DateTime(True)))
 
 
-class _StripeTransferPartial(DBEntity):
+class _StripeTransferEntityBase(DBEntity):
+    """
+    Base Entity type for the table (schema fields are all optional)
+    Concrete Entity should override the fields required by dropping `Optional`
+    """
+
+    id: Optional[int]
+    created_at: Optional[datetime]
     stripe_id: Optional[str]
     stripe_request_id: Optional[str]
+    stripe_status: Optional[str]
     stripe_failure_code: Optional[str]
     stripe_account_id: Optional[str]
     stripe_account_type: Optional[str]
     country_shortname: Optional[str]
     bank_last_four: Optional[str]
     bank_name: Optional[str]
+    transfer_id: Optional[int]
     submission_error_code: Optional[str]
     submission_error_type: Optional[str]
     submission_status: Optional[str]
     submitted_at: Optional[datetime]
 
 
-class StripeTransfer(_StripeTransferPartial):
-    id: Optional[int]  # server default generated
-    created_at: Optional[datetime]  # client table definition default generated
+class StripeTransferEntity(_StripeTransferEntityBase):
+    """
+    NOT NULL columns
+    """
 
+    id: int
+    created_at: datetime
+    stripe_status: str
+    transfer_id: int
+
+
+class StripeTransferCreate(_StripeTransferEntityBase):
+    id: DBEntity.NotAllowed = None
     transfer_id: int
     stripe_status: str
 
 
-class StripeTransferCreate(_StripeTransferPartial):
-    transfer_id: int
-    stripe_status: str
-
-
-class StripeTransferUpdate(_StripeTransferPartial):
-    stripe_status: Optional[str]
-    transfer_id: Optional[int]
+class StripeTransferUpdate(_StripeTransferEntityBase):
+    pass

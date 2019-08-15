@@ -99,6 +99,9 @@ class DBEntity(BaseModel):
     via :func:`app.tests.commons.database.model.validation_db_entity_and_table_schema`
     """
 
+    # new type to restrict field access/update
+    NotAllowed = type(None)
+
     @classmethod
     def from_row(cls, row: Mapping):
         """

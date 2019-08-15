@@ -8,7 +8,7 @@ from app.commons.database.infra import DB
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import stripe_payout_requests
 from app.payout.repository.bankdb.model.stripe_payout_request import (
-    StripePayoutRequest,
+    StripePayoutRequestEntity,
     StripePayoutRequestCreate,
 )
 
@@ -17,13 +17,13 @@ class StripePayoutRequestRepositoryInterface(ABC):
     @abstractmethod
     async def create_stripe_payout_request(
         self, data: StripePayoutRequestCreate
-    ) -> StripePayoutRequest:
+    ) -> StripePayoutRequestEntity:
         pass
 
     @abstractmethod
     async def get_stripe_payout_request_by_payout_id(
         self, payout_id: int
-    ) -> Optional[StripePayoutRequest]:
+    ) -> Optional[StripePayoutRequestEntity]:
         pass
 
 
@@ -36,7 +36,7 @@ class StripePayoutRequestRepository(
 
     async def create_stripe_payout_request(
         self, data: StripePayoutRequestCreate
-    ) -> StripePayoutRequest:
+    ) -> StripePayoutRequestEntity:
         stmt = (
             stripe_payout_requests.table.insert()
             .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
@@ -44,11 +44,11 @@ class StripePayoutRequestRepository(
         )
         row = await self._database.master().fetch_one(stmt)
         assert row is not None
-        return StripePayoutRequest.from_row(row)
+        return StripePayoutRequestEntity.from_row(row)
 
     async def get_stripe_payout_request_by_payout_id(
         self, payout_id: int
-    ) -> Optional[StripePayoutRequest]:
+    ) -> Optional[StripePayoutRequestEntity]:
         stmt = stripe_payout_requests.table.select().where(
             stripe_payout_requests.payout_id == payout_id
         )
@@ -56,6 +56,6 @@ class StripePayoutRequestRepository(
         if rows:
             # since we have one-to-one mapping to payout
             assert len(rows) == 1
-            return StripePayoutRequest.from_row(rows[0])
+            return StripePayoutRequestEntity.from_row(rows[0])
 
         return None
