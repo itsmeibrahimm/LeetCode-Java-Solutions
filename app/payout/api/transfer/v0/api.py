@@ -21,7 +21,12 @@ from app.payout.repository.maindb.model.transfer import (
 router = APIRouter()
 
 
-@router.post("/", status_code=HTTP_201_CREATED, response_model=Transfer)
+@router.post(
+    "/",
+    status_code=HTTP_201_CREATED,
+    response_model=Transfer,
+    operation_id="CreateTransfer",
+)
 async def create_transfer(
     data: TransferCreate,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
@@ -34,6 +39,7 @@ async def create_transfer(
     response_model=Transfer,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
+    operation_id="GetTransferById",
 )
 async def get_transfer_by_id(
     transfer_id: int,
@@ -51,6 +57,7 @@ async def get_transfer_by_id(
     response_model=Transfer,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
+    operation_id="UpdateTransferById",
 )
 async def update_transfer_by_id(
     transfer_id: int,
@@ -67,7 +74,12 @@ async def update_transfer_by_id(
     return updated_transfer
 
 
-@router.post("/stripe/", status_code=HTTP_201_CREATED, response_model=StripeTransfer)
+@router.post(
+    "/stripe/",
+    status_code=HTTP_201_CREATED,
+    response_model=StripeTransfer,
+    operation_id="CreateStripeTransfer",
+)
 async def create_stripe_transfer(
     data: StripeTransferCreate,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
@@ -79,6 +91,7 @@ async def create_stripe_transfer(
     "/stripe/_get-by-stripe-id",
     status_code=HTTP_200_OK,
     response_model=Optional[StripeTransfer],
+    operation_id="GetStripeTransferByStripeId",
 )
 async def get_stripe_transfer_by_stripe_id(
     stripe_id: str,
@@ -91,6 +104,7 @@ async def get_stripe_transfer_by_stripe_id(
     "/stripe/_get-by-transfer-id",
     status_code=HTTP_200_OK,
     response_model=List[StripeTransfer],
+    operation_id="GetStripeTransfersByTransferId",
 )
 async def get_stripe_transfer_by_transfer_id(
     transfer_id: int,
@@ -104,6 +118,7 @@ async def get_stripe_transfer_by_transfer_id(
     response_model=StripeTransfer,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
+    operation_id="GetStripeTransferById",
 )
 async def get_stripe_transfer_by_id(
     stripe_transfer_id: int,
@@ -124,6 +139,7 @@ async def get_stripe_transfer_by_id(
     response_model=StripeTransfer,
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
+    operation_id="UpdateStripeTransferById",
 )
 async def update_stripe_transfer_by_id(
     stripe_transfer_id: int,
@@ -144,6 +160,7 @@ async def update_stripe_transfer_by_id(
     "/stripe/_delete-by-stripe-id",
     status_code=HTTP_200_OK,
     response_model=Acknowledgement,
+    operation_id="DeleteStripeTransferByStripeId",
 )
 async def delete_stripe_transfer_by_stripe_id(
     stripe_id: str,
