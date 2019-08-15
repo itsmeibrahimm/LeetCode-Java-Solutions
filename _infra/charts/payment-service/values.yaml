@@ -9,10 +9,10 @@ web:
   resources:
     requests:
       cpu: 1
-      memory: 256Mi
+      memory: 1024Mi
     limits:
       cpu: 1
-      memory: 256Mi
+      memory: 1024Mi
   secretRef:
     awsCredentialsEnabled: true
   readinessProbe:

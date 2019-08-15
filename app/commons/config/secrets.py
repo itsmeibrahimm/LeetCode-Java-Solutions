@@ -6,6 +6,8 @@ from typing import Optional
 from ninox.interface.helper import Helper
 from typing_extensions import final
 
+from app.commons.context.logger import root_logger
+
 
 @final
 @dataclass(frozen=True)
@@ -49,11 +51,15 @@ class SecretLoader:
     ninox: Helper
 
     def __init__(self, *, environment: str):
-        self.ninox = Helper(config_section=environment)
+        try:
+            self.ninox = Helper(config_section=environment)
+        except Exception:
+            root_logger.exception("Ninox initialization failed with reason:")
+            raise
         if self.ninox.disabled:
             # Ninox helper internally set itself to disabled when init fails without raising exception.
             # We should fail fast here to prevent unknown service state at runtime.
-            Helper.DisabledError("Ninox initialization failed")
+            raise Helper.DisabledError("Ninox initialization failed")
 
     def fetch_secret(self, *, secret_holder: Secret) -> Secret:
         try:
