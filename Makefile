@@ -134,7 +134,7 @@ wait-test-dependency:
 
 .PHONY: local-deploy
 local-deploy:
-	helm upgrade $(SERVICE_NAME) $(LOCAL_CHART) -i --force -f $(LOCAL_CHART)/values-local.yaml --set web.runtime.hostPath=$(LOCAL_RUNTIME_PATH)
+	helm upgrade $(SERVICE_NAME) $(LOCAL_CHART) -i --force -f $(LOCAL_CHART)/values-local.yaml --set web.runtime.hostPath=$(LOCAL_RUNTIME_PATH) --recreate-pods
 
 .PHONY: local-status
 local-status:
