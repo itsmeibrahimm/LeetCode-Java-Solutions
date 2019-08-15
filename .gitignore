@@ -112,3 +112,4 @@ venv.bak/
 # Visual Studio Code ide
 .vscode
 *.code-workspace
+tmp/
