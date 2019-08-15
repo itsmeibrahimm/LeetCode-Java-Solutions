@@ -346,7 +346,7 @@ def deployHelm(Map optArgs = [:], String gitUrl, String sha, String branch, Stri
           |
           |helm="docker run --rm -v ${k8sCredsFile}:/root/.kube/config -v ${WORKSPACE}:/apps alpine/helm:2.10.0"
           |HELM_OPTIONS="${o.helmCommand} ${o.helmRelease} ${o.helmChartPath} \\
-          | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${sha} ${o.helmFlags} \\
+          | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${sha} --set cron.tag=${sha} ${o.helmFlags} \\
           | --tiller-namespace ${o.tillerNamespace} --namespace ${o.k8sNamespace} \\
           | --wait --timeout ${o.timeoutSeconds}"
           |

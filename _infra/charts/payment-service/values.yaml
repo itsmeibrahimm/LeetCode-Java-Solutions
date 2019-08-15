@@ -32,8 +32,6 @@ cron:
       memory: 256Mi
   secretRef:
     awsCredentialsEnabled: true
-  readinessProbe:
-    path: /health
   runtime:
     containerEnabled: true
     path: /srv/runtime
