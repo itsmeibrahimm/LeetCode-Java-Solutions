@@ -88,18 +88,6 @@ class InsertMxScheduledLedgerOutput(MxScheduledLedgerDbEntity):
     pass
 
 
-class GetMxScheduledLedgerByLedgerInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    id: UUID
-
-
-class GetMxScheduledLedgerByLedgerOutput(MxScheduledLedgerDbEntity):
-    pass
-
-
 class GetMxScheduledLedgerInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name

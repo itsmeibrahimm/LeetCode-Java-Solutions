@@ -10,9 +10,9 @@ from app.commons.database.infra import DB
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.data_types import (
     InsertMxTransactionWithLedgerInput,
-    GetMxScheduledLedgerByLedgerInput,
     GetMxLedgerByIdInput,
     InsertMxScheduledLedgerInput,
+    GetMxScheduledLedgerInput,
 )
 from app.ledger.core.mx_transaction.types import (
     MxTransactionType,
@@ -147,13 +147,14 @@ class TestMxTransactionRepository:
         mx_scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
 
         payment_account_id = str(uuid.uuid4())
+        routing_key = datetime(2019, 8, 1)
         request_input = InsertMxTransactionWithLedgerInput(
             currency=CurrencyType.USD,
             amount=2000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
@@ -168,11 +169,13 @@ class TestMxTransactionRepository:
         assert mx_transaction.routing_key == datetime(2019, 8, 1)
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
-        mx_scheduled_ledger_request = GetMxScheduledLedgerByLedgerInput(
-            id=mx_transaction.ledger_id
+        get_scheduled_ledger_request = GetMxScheduledLedgerInput(
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        mx_scheduled_ledger = await mx_scheduled_ledger_repo.get_mx_scheduled_ledger_by_ledger_id(
-            mx_scheduled_ledger_request
+        mx_scheduled_ledger = await mx_scheduled_ledger_repo.get_open_mx_scheduled_ledger_for_period(
+            get_scheduled_ledger_request
         )
         assert mx_scheduled_ledger is not None
         assert mx_scheduled_ledger.ledger_id == mx_transaction.ledger_id

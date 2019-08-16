@@ -12,8 +12,6 @@ from sqlalchemy import and_
 from app.ledger.core.mx_transaction.data_types import (
     InsertMxScheduledLedgerInput,
     InsertMxScheduledLedgerOutput,
-    GetMxScheduledLedgerByLedgerInput,
-    GetMxScheduledLedgerByLedgerOutput,
     GetMxScheduledLedgerInput,
     GetMxScheduledLedgerOutput,
 )
@@ -30,12 +28,6 @@ class MxScheduledLedgerRepositoryInterface:
     async def insert_mx_scheduled_ledger(
         self, request: InsertMxScheduledLedgerInput
     ) -> InsertMxScheduledLedgerOutput:
-        ...
-
-    @abstractmethod
-    async def get_mx_scheduled_ledger_by_ledger_id(
-        self, request: GetMxScheduledLedgerByLedgerInput
-    ) -> Optional[GetMxScheduledLedgerByLedgerOutput]:
         ...
 
     @abstractmethod
@@ -60,15 +52,6 @@ class MxScheduledLedgerRepository(
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
         return InsertMxScheduledLedgerOutput.from_row(row)
-
-    async def get_mx_scheduled_ledger_by_ledger_id(
-        self, request: GetMxScheduledLedgerByLedgerInput
-    ) -> Optional[GetMxScheduledLedgerByLedgerOutput]:
-        stmt = mx_scheduled_ledgers.table.select().where(
-            mx_scheduled_ledgers.ledger_id == request.id
-        )
-        row = await self.payment_database.master().fetch_one(stmt)
-        return GetMxScheduledLedgerByLedgerOutput.from_row(row) if row else None
 
     async def get_open_mx_scheduled_ledger_for_period(
         self, request: GetMxScheduledLedgerInput

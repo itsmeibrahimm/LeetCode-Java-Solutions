@@ -12,6 +12,7 @@ from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.data_types import (
     GetMxLedgerByIdInput,
     GetMxScheduledLedgerOutput,
+    GetMxScheduledLedgerInput,
 )
 from app.ledger.core.mx_transaction.exceptions import (
     MxTransactionCreationError,
@@ -32,7 +33,6 @@ from app.ledger.repository.mx_ledger_repository import (
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     InsertMxScheduledLedgerInput,
     MxScheduledLedgerRepository,
-    GetMxScheduledLedgerByLedgerInput,
 )
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 
@@ -104,8 +104,12 @@ class TestMxTransactionProcessor:
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
-        get_scheduled_ledger_request = GetMxScheduledLedgerByLedgerInput(id=ledger_id)
-        mx_scheduled_ledger = await scheduled_ledger_repo.get_mx_scheduled_ledger_by_ledger_id(
+        get_scheduled_ledger_request = GetMxScheduledLedgerInput(
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY,
+        )
+        mx_scheduled_ledger = await scheduled_ledger_repo.get_open_mx_scheduled_ledger_for_period(
             get_scheduled_ledger_request
         )
         assert mx_scheduled_ledger is not None
@@ -210,6 +214,7 @@ class TestMxTransactionProcessor:
             dsj_client=mocker.Mock(),
         )
         payment_account_id = str(uuid.uuid4())
+        routing_key = datetime(2019, 8, 1)
         mx_ledger_repository = MxLedgerRepository(context=app_context)
         mx_scheduled_repository = MxScheduledLedgerRepository(context=app_context)
         transaction_repo = MxTransactionRepository(context=app_context)
@@ -220,7 +225,7 @@ class TestMxTransactionProcessor:
             payment_account_id=payment_account_id,
             amount=2000,
             currency=CurrencyType.USD,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             mx_ledger_repository=mx_ledger_repository,
             mx_scheduled_ledger_repository=mx_scheduled_repository,
@@ -235,11 +240,13 @@ class TestMxTransactionProcessor:
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
-        mx_scheduled_ledger_request = GetMxScheduledLedgerByLedgerInput(
-            id=mx_transaction.ledger_id
+        get_scheduled_ledger_request = GetMxScheduledLedgerInput(
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        mx_scheduled_ledger = await mx_scheduled_repository.get_mx_scheduled_ledger_by_ledger_id(
-            mx_scheduled_ledger_request
+        mx_scheduled_ledger = await mx_scheduled_repository.get_open_mx_scheduled_ledger_for_period(
+            get_scheduled_ledger_request
         )
         assert mx_scheduled_ledger is not None
         assert mx_scheduled_ledger.ledger_id == mx_transaction.ledger_id
