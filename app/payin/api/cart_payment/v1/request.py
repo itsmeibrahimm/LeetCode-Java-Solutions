@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Schema
+from typing import Optional
 
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.core.cart_payment.types import CaptureMethod, CartType
@@ -100,3 +101,14 @@ class CreateCartPaymentRequest(BaseModel):
     metadata: CartMetadata = Schema(
         ..., title="Optional structure that describes additional properites of payment."
     )
+
+
+class UpdateCartPaymentRequest(BaseModel):
+    idempotency_key: str
+    payer_id: str
+    payer_id_type: PayerIdType = PayerIdType.DD_PAYMENT_PAYER_ID
+    amount: int
+    metadata: Optional[CartMetadata] = None
+    legacy_payment: Optional[LegacyPayment] = None
+    client_description: Optional[str] = None
+    payer_statement_description: Optional[str] = None

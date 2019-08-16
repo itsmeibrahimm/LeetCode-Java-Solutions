@@ -6,6 +6,7 @@ from app.commons.providers import errors
 
 
 class StripeClientInterface:
+    # TODO: Require idempotency key
     def create_connected_account_token(
         self,
         country: models.CountryCode,
@@ -110,6 +111,18 @@ class StripeClientInterface:
     ) -> models.PaymentIntentStatus:
         """
         Capture a PaymentIntent
+        https://stripe.com/docs/api/payment_intents
+        """
+        ...
+
+    def cancel_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.CancelPaymentIntent,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentIntentId:
+        """
+        Cancel a PaymentIntent
         https://stripe.com/docs/api/payment_intents
         """
         ...
@@ -256,6 +269,19 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return payment_intent.status
+
+    def cancel_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.CancelPaymentIntent,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentIntentId:
+        payment_intent = stripe.PaymentIntent.cancel(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payment_intent.id
 
 
 class StripeTestClient(StripeClient):
@@ -425,6 +451,20 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> models.PaymentIntentStatus:
         return await self.submit(
             self.client.capture_payment_intent,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def cancel_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.CancelPaymentIntent,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.PaymentIntentId:
+        # TODO refactor intent API to return full intent
+        return await self.submit(
+            self.client.cancel_payment_intent,
             country,
             request,
             idempotency_key=idempotency_key,

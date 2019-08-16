@@ -27,11 +27,15 @@ payin_error_message_maps = {
     "payin_40": "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
     "payin_41": "Error returned from Payment Provider. Please verify parameters of capture.",
     "payin_60": "Invalid data provided. Please verify parameters.",
+    "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
+    "payin_62": "Cart Payment not accessible by caller.",
 }
 
 
 class PayinErrorCode(str, Enum):
     CART_PAYMENT_CREATE_INVALID_DATA = "payin_60"
+    CART_PAYMENT_NOT_FOUND = "payin_61"
+    CART_PAYMENT_OWNER_MISMATCH = "payin_62"
     PAYER_CREATE_INVALID_DATA = "payin_1"
     PAYER_CREATE_STRIPE_ERROR = "payin_2"
     PAYER_CREATE_PAYER_ALREADY_EXIST = "payin_3"
@@ -117,8 +121,16 @@ class CartPaymentCreateError(PayinError):
     pass
 
 
+class CartPaymentReadError(PayinError):
+    pass
+
+
 ###########################################################
 # PaymentIntentrrors                                      #
 ###########################################################
 class PaymentIntentCaptureError(PayinError):
+    pass
+
+
+class PaymentIntentCancelError(PayinError):
     pass

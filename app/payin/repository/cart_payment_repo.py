@@ -88,6 +88,19 @@ class CartPaymentRepository(PayinDBRepository):
 
         return self.to_cart_payment(row)
 
+    async def update_cart_payment_details(
+        self, cart_payment_id: UUID, amount
+    ) -> CartPayment:
+        statement = (
+            cart_payments.table.update()
+            .where(cart_payments.id == cart_payment_id)
+            .values(amount_total=amount)
+            .returning(*cart_payments.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_cart_payment(row)
+
     async def insert_payment_intent(
         self,
         id: UUID,

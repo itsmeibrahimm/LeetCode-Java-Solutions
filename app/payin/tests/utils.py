@@ -53,11 +53,13 @@ def generate_payment_intent(
 
 
 def generate_pgp_payment_intent(
-    status: str = "init", capture_method: str = "manual"
+    payment_intent_id: uuid.UUID = uuid.uuid4(),
+    status: str = "init",
+    capture_method: str = "manual",
 ) -> PgpPaymentIntent:
     return PgpPaymentIntent(
         id=uuid.uuid4(),
-        payment_intent_id=uuid.uuid4(),
+        payment_intent_id=payment_intent_id,
         idempotency_key=str(uuid.uuid4()),
         provider="Stripe",
         resource_id=str(uuid.uuid4()),

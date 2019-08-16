@@ -89,6 +89,7 @@ class CreatePaymentIntent(BaseModel):
     """
 
     class CaptureMethod(str, Enum):
+        # TODO upper case keys
         automatic = "automatic"
         manual = "manual"
 
@@ -146,6 +147,17 @@ class CapturePaymentIntent(BaseModel):
     application_fee_amount: Optional[int]
     statement_descriptor: Optional[str]
     transfer_data: Optional[TransferData]
+
+
+class CancelPaymentIntent(BaseModel):
+    class CancellationReason(str, Enum):
+        abandoned = "abandoned"
+        duplicate = "duplicate"
+        fraudulent = "fraudulent"
+        requested_by_customer = "requested_by_customer"
+
+    sid: PaymentIntentId
+    cancellation_reason: str
 
 
 class CreatePaymentMethod(BaseModel):
