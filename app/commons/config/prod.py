@@ -27,7 +27,7 @@ def create_app_config() -> AppConfig:
         LEDGER_PAYMENTDB_MASTER_URL=Secret(name="ledger_paymentdb_url"),
         LEDGER_PAYMENTDB_REPLICA_URL=Secret(name="ledger_paymentdb_url"),
         DEFAULT_DB_CONFIG=DBConfig(
-            replica_pool_size=2, master_pool_size=2, debug=False
+            replica_pool_max_size=2, master_pool_max_size=2, debug=False
         ),
         AVAILABLE_MAINDB_REPLICAS=[
             "doordash_replica1",

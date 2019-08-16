@@ -17,19 +17,31 @@ class SentryConfig(SecretAware):
 @dataclass(frozen=True)
 class DBConfig:
     debug: bool
-    master_pool_size: int
-    replica_pool_size: int
+    master_pool_max_size: int
+    replica_pool_max_size: int
+    master_pool_min_size: int = 1
+    replica_pool_min_size: int = 1
     statement_timeout = 1.0
     force_rollback: bool = False
 
     def __post_init__(self):
-        if self.master_pool_size <= 0:
+        if self.master_pool_max_size <= 0:
             raise ValueError(
-                f"master_pool_size should be > 0 but found={self.master_pool_size}"
+                f"master_pool_size should be > 0 but found={self.master_pool_max_size}"
             )
-        if self.replica_pool_size <= 0:
+        if self.replica_pool_max_size <= 0:
             raise ValueError(
-                f"replica_pool_size should be > 0 but found={self.replica_pool_size}"
+                f"replica_pool_size should be > 0 but found={self.replica_pool_max_size}"
+            )
+        if self.master_pool_min_size not in range(0, self.master_pool_max_size + 1):
+            raise ValueError(
+                f"master_pool_min_size should be within "
+                f"[0, master_pool_max_size={self.master_pool_max_size}], but found {self.master_pool_min_size}"
+            )
+        if self.replica_pool_min_size not in range(0, self.replica_pool_max_size + 1):
+            raise ValueError(
+                f"replica_pool_min_size should be within "
+                f"[0, replica_pool_max_size={self.replica_pool_max_size}], but found {self.replica_pool_min_size}"
             )
 
 

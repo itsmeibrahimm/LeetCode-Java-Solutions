@@ -27,7 +27,7 @@ def create_app_config() -> AppConfig:
         LEDGER_PAYMENTDB_MASTER_URL=Secret(name="ledger_paymentdb_url"),
         LEDGER_PAYMENTDB_REPLICA_URL=Secret(name="ledger_paymentdb_url"),
         DEFAULT_DB_CONFIG=DBConfig(
-            replica_pool_size=5, master_pool_size=5, debug=False
+            replica_pool_max_size=5, master_pool_max_size=5, debug=False
         ),
         AVAILABLE_MAINDB_REPLICAS=[],
         STRIPE_US_SECRET_KEY=Secret(name="stripe_us_secret_key"),

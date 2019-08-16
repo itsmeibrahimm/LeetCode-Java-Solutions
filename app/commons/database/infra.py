@@ -62,8 +62,8 @@ class DB:
         assert master_url.value
         master = Database(
             master_url.value,
-            max_size=db_config.master_pool_size,
-            min_size=0,
+            max_size=db_config.master_pool_max_size,
+            min_size=db_config.master_pool_min_size,
             # echo=db_config.debug,
             # logging_name=f"{name}_master",
             command_timeout=db_config.statement_timeout,
@@ -74,8 +74,8 @@ class DB:
         assert replica_url.value
         replica = Database(
             replica_url.value,
-            max_size=db_config.replica_pool_size,
-            min_size=0,
+            max_size=db_config.replica_pool_max_size,
+            min_size=db_config.replica_pool_min_size,
             # echo=db_config.debug,
             # logging_name=f"{name}_replica",
             command_timeout=db_config.statement_timeout,

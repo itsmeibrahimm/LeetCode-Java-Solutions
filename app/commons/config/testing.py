@@ -73,8 +73,8 @@ def create_app_config() -> AppConfig:
             name="stripe_us_public_key", value="pk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
         ),
         DEFAULT_DB_CONFIG=DBConfig(
-            replica_pool_size=2,
-            master_pool_size=2,
+            replica_pool_max_size=2,
+            master_pool_max_size=2,
             debug=True,
             # roll back all database transactions before shutting down
             force_rollback=True,

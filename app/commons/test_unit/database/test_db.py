@@ -10,7 +10,7 @@ def test_create_db_with_alternative_replica():
     replica_url_obj = parse.urlparse("postgresql://user:pwd@host:123/rp0")
     master_url = Secret(name="master_url", value=master_url_obj.geturl())
     replica_url = Secret(name="replica_url", value=replica_url_obj.geturl())
-    db_config = DBConfig(debug=True, replica_pool_size=1, master_pool_size=1)
+    db_config = DBConfig(debug=True, replica_pool_max_size=1, master_pool_max_size=1)
     available_replica = "rp1"
 
     original_replica_dbname = replica_url_obj.path[1:]
