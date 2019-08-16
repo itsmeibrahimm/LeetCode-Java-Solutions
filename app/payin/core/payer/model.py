@@ -5,12 +5,11 @@ from typing import List, Optional
 from pydantic import BaseModel
 from typing_extensions import final
 
-from app.payin.core.payer.types import PayerType
-
 
 class PaymentGatewayProviderCustomer(BaseModel):
     payment_provider: str
     payment_provider_customer_id: str
+    default_payment_method_id: Optional[str] = None
 
 
 # https://pydantic-docs.helpmanual.io/#self-referencing-models
@@ -24,7 +23,7 @@ class Payer:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None
-    payer_type: Optional[PayerType] = None
+    payer_type: Optional[str] = None
     country: Optional[str] = None
     dd_payer_id: Optional[str] = None
     description: Optional[str] = None

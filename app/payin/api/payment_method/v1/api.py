@@ -5,10 +5,7 @@ from fastapi import APIRouter
 
 from app.commons.context.app_context import get_context_from_app, AppContext
 from app.commons.context.req_context import get_context_from_req, ReqContext
-from app.commons.error.errors import (
-    PaymentErrorResponseBody,
-    create_payment_error_response_blob,
-)
+from app.commons.error.errors import PaymentError, PaymentException
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
 
 from starlette.requests import Request
@@ -22,13 +19,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 
-from app.payin.core.exceptions import (
-    PaymentMethodReadError,
-    PaymentMethodCreateError,
-    PayerReadError,
-    PayinErrorCode,
-    PaymentMethodDeleteError,
-)
+from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import (
     create_payment_method_impl,
@@ -87,38 +78,21 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                 dd_consumer_id,
                 stripe_customer_id,
             )
-        except PaymentMethodCreateError as e:
+        except PaymentError as e:
             req_ctxt.log.error(
-                "[create_payment_method][{}][{}][{}] PaymentMethodCreateError.".format(
-                    req_body.payer_id, dd_consumer_id, stripe_customer_id
-                ),
-                e,
+                f"[create_payment_method][{req_body.payer_id}][{dd_consumer_id}][{stripe_customer_id}] PaymentError."
             )
             if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
                 http_status = HTTP_400_BAD_REQUEST
+            elif e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value:
+                http_status = HTTP_404_NOT_FOUND
             else:
                 http_status = HTTP_500_INTERNAL_SERVER_ERROR
-            return create_payment_error_response_blob(
-                http_status,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
-            )
-        except PayerReadError as e:
-            req_ctxt.log.error(
-                "[create_payment_method][{}][{}][{}] PayerReadError.".format(
-                    req_body.payer_id, dd_consumer_id, stripe_customer_id
-                )
-            )
-            return create_payment_error_response_blob(
-                HTTP_404_NOT_FOUND,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
+            raise PaymentException(
+                http_status_code=http_status,
+                error_code=e.error_code,
+                error_message=e.error_message,
+                retryable=e.retryable,
             )
         return payment_method
 
@@ -170,20 +144,15 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                 payment_method_id_type=payment_method_id_type,
                 force_update=force_update,
             )
-        except PaymentMethodReadError as e:
+        except PaymentError as e:
             req_ctxt.log.error(
-                "[create_payment_method][{}][{}] PaymentMethodReadError.".format(
-                    payer_id, payment_method_id
-                ),
-                e,
+                f"[create_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
             )
-            return create_payment_error_response_blob(
-                HTTP_500_INTERNAL_SERVER_ERROR,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
+            raise PaymentException(
+                http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                error_code=e.error_code,
+                error_message=e.error_message,
+                retryable=e.retryable,
             )
         return payment_method
 
@@ -200,13 +169,11 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         req_ctxt: ReqContext = get_context_from_req(request)
         req_ctxt.log.info("[list_payment_method] receive request")
 
-        return create_payment_error_response_blob(
-            HTTP_501_NOT_IMPLEMENTED,
-            PaymentErrorResponseBody(
-                error_code="not implemented",
-                error_message="not implemented",
-                retryable=False,
-            ),
+        raise PaymentException(
+            http_status_code=HTTP_501_NOT_IMPLEMENTED,
+            error_code="not implemented",
+            error_message="not implemented",
+            retryable=False,
         )
 
     @router.delete(
@@ -247,12 +214,9 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                 payer_id_type=payer_id_type,
                 payment_method_id_type=payment_method_id_type,
             )
-        except PaymentMethodReadError as e:
+        except PaymentError as e:
             req_ctxt.log.error(
-                "[delete_payment_method][{}][{}] PaymentMethodReadError.".format(
-                    payer_id, payment_method_id
-                ),
-                e,
+                f"[delete_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
             )
             if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
                 http_status = HTTP_404_NOT_FOUND
@@ -263,28 +227,11 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                 http_status = HTTP_400_BAD_REQUEST
             else:
                 http_status = HTTP_500_INTERNAL_SERVER_ERROR
-            return create_payment_error_response_blob(
-                http_status,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
-            )
-        except PaymentMethodDeleteError as e:
-            req_ctxt.log.error(
-                "[delete_payment_method][{}][{}] PaymentMethodDeleteError.".format(
-                    payer_id, payment_method_id
-                ),
-                e,
-            )
-            return create_payment_error_response_blob(
-                HTTP_500_INTERNAL_SERVER_ERROR,
-                PaymentErrorResponseBody(
-                    error_code=e.error_code,
-                    error_message=e.error_message,
-                    retryable=e.retryable,
-                ),
+            raise PaymentException(
+                http_status_code=http_status,
+                error_code=e.error_code,
+                error_message=e.error_message,
+                retryable=e.retryable,
             )
 
         return payment_method

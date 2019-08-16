@@ -70,6 +70,14 @@ class CreateCustomer(BaseModel):
     description: str
 
 
+class UpdateCustomer(BaseModel):
+    class InvoiceSettings(BaseModel):
+        default_payment_method: str
+
+    sid: str
+    invoice_settings: InvoiceSettings
+
+
 class TransferData(BaseModel):
     destination: ConnectedAccountId
     amount: Optional[int]

@@ -221,7 +221,7 @@ async def get_payment_method_impl(
     # TODO: step 1: if force_update is true, we should retrieve the payment_method from GPG
 
     # step 2: retrieve data from DB
-    (pm_entity, sc_entity, is_found, is_owner) = await get_payment_method(
+    pm_entity, sc_entity = await get_payment_method(
         payment_method_repository=payment_method_repository,
         req_ctxt=req_ctxt,
         payer_id=payer_id,
@@ -229,27 +229,6 @@ async def get_payment_method_impl(
         payer_id_type=payer_id_type,
         payment_method_id_type=payment_method_id_type,
     )
-
-    if is_found is False:
-        req_ctxt.log.error(
-            "[get_payment_method_impl][%s] cant retrieve data from pgp_payment_method and stripe_card tables!",
-            payment_method_id,
-        )
-        raise PaymentMethodReadError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
-        )
-    if is_owner is False:
-        req_ctxt.log.error(
-            "[get_payment_method_impl][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
-            payer_id,
-            payment_method_id,
-            payer_id_type,
-            payment_method_id_type,
-        )
-        raise PaymentMethodCreateError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-            retryable=False,
-        )
 
     # TODO: lazy create payer
 
@@ -286,7 +265,7 @@ async def delete_payment_method_impl(
     :return:
     """
     # step 1: find payment_method.
-    (pm_entity, sc_entity, is_found, is_owner) = await get_payment_method(
+    pm_entity, sc_entity = await get_payment_method(
         payment_method_repository=payment_method_repository,
         req_ctxt=req_ctxt,
         payer_id=payer_id,
@@ -317,9 +296,7 @@ async def delete_payment_method_impl(
         # TODO Error logged below does not describe what the error is, meaning log statement cannot be used to diagnose the problem.
         # Add additional details to the log statement and use this convention throughout.
         req_ctxt.log.error(
-            "[delete_payment_method_impl][{}] error while detaching stripe payment method".format(
-                payer_id, e
-            )
+            f"[delete_payment_method_impl][{payer_id}] error while detaching stripe payment method {e}"
         )
         raise PaymentMethodDeleteError(
             error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR,
@@ -369,11 +346,9 @@ async def get_payment_method(
     req_ctxt: ReqContext,
     payer_id: str,
     payment_method_id: str,
-    payer_id_type: str = None,
-    payment_method_id_type: str = None,
-) -> Tuple[
-    Optional[PgpPaymentMethodDbEntity], Optional[StripeCardDbEntity], bool, bool
-]:
+    payer_id_type: Optional[str] = None,
+    payment_method_id_type: Optional[str] = None,
+) -> Tuple[Optional[PgpPaymentMethodDbEntity], StripeCardDbEntity]:
     """
     Utility function to get payment_method.
 
@@ -390,7 +365,8 @@ async def get_payment_method(
            (default is "dd_payment_method_id")
     :return: (PgpPaymentMethodDbEntity, StripeCardDbEntity)
     """
-    sc_entity: Optional[StripeCardDbEntity] = None
+    resp_sc_entity: StripeCardDbEntity  # hate this way, temporarily solution to get rid of compilation error
+    sc_entity: Optional[StripeCardDbEntity]
     pm_entity: Optional[PgpPaymentMethodDbEntity] = None
     is_found: bool = False
     is_owner: bool = False
@@ -406,15 +382,14 @@ async def get_payment_method(
                 )
             )
             # get stripe_card object
-            sc_entity = (
-                None
-                if not pm_entity
-                else await payment_method_repository.get_stripe_card_by_stripe_id(
+            if pm_entity:
+                sc_entity = await payment_method_repository.get_stripe_card_by_stripe_id(
                     GetStripeCardByStripeIdInput(stripe_id=pm_entity.pgp_resource_id)
                 )
-            )
 
-            is_found = True if (pm_entity and sc_entity) else False
+            if pm_entity and sc_entity:
+                is_found = True
+                resp_sc_entity = sc_entity
             if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID.value) or (
                 not payer_id_type
             ):
@@ -425,7 +400,6 @@ async def get_payment_method(
                     if sc_entity
                     else False
                 )
-
         elif (
             payment_method_id_type == PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID.value
         ):  # DSJ backward compatibility
@@ -440,14 +414,15 @@ async def get_payment_method(
                 GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
             )
 
-            is_found = True if sc_entity else False
+            if sc_entity:
+                is_found = True
+                resp_sc_entity = sc_entity
             if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
                 is_owner = (
                     (payer_id == sc_entity.external_stripe_customer_id)
                     if sc_entity
                     else False
                 )
-
         elif (
             payment_method_id_type == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID.value
         ):  # DSJ backward compatibility
@@ -466,14 +441,15 @@ async def get_payment_method(
                 )
             )
 
-            is_found = True if sc_entity else False
+            if sc_entity:
+                is_found = True
+                resp_sc_entity = sc_entity
             if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
                 is_owner = (
                     (payer_id == sc_entity.external_stripe_customer_id)
                     if sc_entity
                     else False
                 )
-
         else:
             req_ctxt.log.error(
                 "[get_payment_method][%s] invalid payment_method_id_type %s",
@@ -486,10 +462,7 @@ async def get_payment_method(
             )
     except DataError as e:
         req_ctxt.log.error(
-            "[get_payment_method][{}][{}] DataError when read db.".format(
-                payer_id, payment_method_id
-            ),
-            e,
+            f"[get_payment_method][{payer_id}][{payment_method_id}] DataError when read db: {e}"
         )
         raise PaymentMethodReadError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
@@ -522,7 +495,7 @@ async def get_payment_method(
         payer_id,
     )
 
-    return (pm_entity, sc_entity, is_found, is_owner)
+    return pm_entity, resp_sc_entity
 
 
 def _build_payment_method(

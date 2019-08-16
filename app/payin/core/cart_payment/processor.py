@@ -455,7 +455,7 @@ async def submit_payment(
     # Lookup payment method, stripe card
     # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
     # our exception handling middleware.
-    payment_method, stripe_card, is_found, is_owner = await get_payment_method(
+    payment_method, stripe_card = await get_payment_method(
         payment_method_repository=payment_method_repo,
         req_ctxt=req_context,
         payer_id=request_cart_payment.payer_id,

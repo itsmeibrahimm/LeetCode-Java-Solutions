@@ -2,14 +2,9 @@ from fastapi import APIRouter
 
 from app.commons.context.app_context import get_context_from_app, AppContext
 from app.commons.context.req_context import get_context_from_req, ReqContext
-from app.commons.error.errors import PaymentException
+from app.commons.error.errors import PaymentException, PaymentError
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
-from app.payin.core.exceptions import (
-    PayerCreationError,
-    PayinErrorCode,
-    PayerUpdateError,
-    PayerReadError,
-)
+from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.processor import (
     create_payer_impl,
@@ -63,7 +58,7 @@ def create_payer_router(payer_repository: PayerRepository):
                 description=req_body.description,
             )
             req_ctxt.log.info("[create_payer] onboard_payer() completed.")
-        except PayerCreationError as e:
+        except PaymentError as e:
             raise PaymentException(
                 http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
                 error_code=e.error_code,
@@ -77,6 +72,7 @@ def create_payer_router(payer_repository: PayerRepository):
         request: Request,
         payer_id: str,
         payer_id_type: str = None,
+        payer_type: str = None,
         force_update: bool = False,
     ) -> Payer:
         """
@@ -95,15 +91,15 @@ def create_payer_router(payer_repository: PayerRepository):
         req_ctxt.log.info("[get_payer] payer_id=%s", payer_id)
         try:
             payer: Payer = await get_payer_impl(
-                payer_repository=payer_repository,
                 app_ctxt=app_ctxt,
                 req_ctxt=req_ctxt,
                 payer_id=payer_id,
                 payer_id_type=payer_id_type,
+                payer_type=payer_type,
                 force_update=force_update,
             )
             req_ctxt.log.info("[get_payer] retrieve_payer completed")
-        except PayerReadError as e:
+        except PaymentError as e:
             raise PaymentException(
                 http_status_code=(
                     HTTP_404_NOT_FOUND
@@ -123,7 +119,11 @@ def create_payer_router(payer_repository: PayerRepository):
         """
         Update payer's default payment method
 
-        - **default_payment_method_id**: payer's payment method (source) on authorized Payment Provider
+        - **default_payment_method**: payer's payment method (source) on authorized Payment Provider
+        - **default_payment_method.id**: [string] identity of the payment method.
+        - **default_payment_method.payment_method_id_type**: [string] identify the type of payment_method_id.
+            Valid values include "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
+            (default is "dd_payment_method_id")
         """
         app_ctxt: AppContext = get_context_from_app(request.app)
         req_ctxt: ReqContext = get_context_from_req(request)
@@ -135,13 +135,10 @@ def create_payer_router(payer_repository: PayerRepository):
                 app_ctxt=app_ctxt,
                 req_ctxt=req_ctxt,
                 payer_id=payer_id,
-                default_payment_method_id=req_body.default_payment_method_id,
-                default_source_id=req_body.default_source_id,
-                default_card_id=req_body.default_card_id,
-                payer_id_type=req_body.payer_id_type,
-                payer_type=req_body.payer_type,
+                default_payment_method_id=req_body.default_payment_method.id,
+                payment_method_id_type=req_body.default_payment_method.payment_method_id_type,
             )
-        except PayerUpdateError as e:
+        except PaymentError as e:
             if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value:
                 status = HTTP_400_BAD_REQUEST
             else:

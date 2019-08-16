@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from typing_extensions import final
 
 from app.commons.database.model import DBRequestModel, DBEntity
@@ -47,6 +47,15 @@ class GetPayerByIdInput(DBRequestModel):
     dd_payer_id: Optional[str]
 
 
+class GetPayerByDDPayerIdAndTypeInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    dd_payer_id: str
+    payer_type: str
+
+
 ###########################################################
 # PgpCustomer DBEntity and CRUD operations                #
 ###########################################################
@@ -61,10 +70,10 @@ class PgpCustomerDbEntity(DBEntity):
     currency: Optional[str] = None
     pgp_code: Optional[str] = None
     legacy_id: Optional[int] = None
-    legacy_stripe_customer_id: Optional[str] = None
     account_balance: Optional[int] = None
-    description: Optional[str] = None
-    metadata: Optional[dict] = None
+    default_payment_method_id: Optional[str] = None
+    legacy_default_source_id: Optional[str] = None
+    legacy_default_card_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
@@ -155,6 +164,18 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def insert_payer_and_pgp_customer(
+        self, payer_input: InsertPayerInput, pgp_customer_input: InsertPgpCustomerInput
+    ) -> Tuple[PayerDbEntity, PgpCustomerDbEntity]:
+        ...
+
+    @abstractmethod
+    async def get_payer_by_dd_payer_id_and_payer_type(
+        self, input: GetPayerByDDPayerIdAndTypeInput
+    ) -> Optional[PayerDbEntity]:
+        ...
+
+    @abstractmethod
     async def get_payer_by_id(
         self, request: GetPayerByIdInput
     ) -> Optional[PayerDbEntity]:
@@ -224,6 +245,44 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         assert row
         return PayerDbEntity.from_row(row)
 
+    async def insert_payer_and_pgp_customer(
+        self, payer_input: InsertPayerInput, pgp_customer_input: InsertPgpCustomerInput
+    ) -> Tuple[PayerDbEntity, PgpCustomerDbEntity]:
+        paymentdb_conn = self.payment_database.master()
+        async with paymentdb_conn.transaction():
+            # insert payers table
+            stmt = (
+                payers.table.insert()
+                .values(payer_input.dict(skip_defaults=True))
+                .returning(*payers.table.columns.values())
+            )
+            payer_row = await self.payment_database.master().fetch_one(stmt)
+            assert payer_row
+            # insert pgp_customers table
+            stmt = (
+                pgp_customers.table.insert()
+                .values(pgp_customer_input.dict(skip_defaults=True))
+                .returning(*pgp_customers.table.columns.values())
+            )
+            pgp_cus_row = await self.payment_database.master().fetch_one(stmt)
+            assert pgp_cus_row
+            return (
+                PayerDbEntity.from_row(payer_row),
+                PgpCustomerDbEntity.from_row(pgp_cus_row),
+            )
+
+    async def get_payer_by_dd_payer_id_and_payer_type(
+        self, input: GetPayerByDDPayerIdAndTypeInput
+    ) -> Optional[PayerDbEntity]:
+        stmt = payers.table.select().where(
+            and_(
+                payers.dd_payer_id == input.dd_payer_id,
+                payers.payer_type == input.payer_type,
+            )
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return PayerDbEntity.from_row(row) if row else None
+
     async def get_payer_by_id(
         self, request: GetPayerByIdInput
     ) -> Optional[PayerDbEntity]:
@@ -238,6 +297,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 payers.dd_payer_id == request.dd_payer_id
             )
         row = await self.payment_database.master().fetch_one(stmt)
+        assert row
         return PayerDbEntity.from_row(row) if row else None
 
     async def get_payer_and_pgp_customer_by_id(

@@ -1,4 +1,5 @@
 import logging
+
 import requests
 
 from . import payin_crud_client
@@ -31,6 +32,7 @@ def test_payer_retrieval():
     test_payer = requests.post(
         url=SERVICE_URI + "/payin/api/v1/payers", json=payer_info()
     )
+    assert test_payer.status_code == 201
 
     # get_payer api
     payer_id = test_payer.json()["id"]
@@ -47,16 +49,17 @@ def test_payer_retrieval():
     assert verify_payer.status_code != 200
 
 
-def test_payer_payment_method_update():
-    # setup
-    test_payer = requests.post(
-        url=SERVICE_URI + "/payin/api/v1/payers", json=payer_info()
-    )
-
-    # update_payer api
-    payer_id = test_payer.json()["id"]
-    update_payer = requests.patch(
-        url=SERVICE_URI + "/payin/api/v1/payers/{}".format(payer_id),
-        json={"default_payment_method_id": "fake_id"},
-    )
-    assert update_payer.status_code == 200
+# def test_payer_payment_method_update():
+#     # setup
+#     test_payer = requests.post(
+#         url=SERVICE_URI + "/payin/api/v1/payers", json=payer_info()
+#     )
+#     assert test_payer.status_code == 201
+#
+#     # update_payer api
+#     payer_id = test_payer.json()["id"]
+#     update_payer = requests.patch(
+#         url=SERVICE_URI + "/payin/api/v1/payers/{}".format(payer_id),
+#         json={"default_payment_method_id": "fake_id"},
+#     )
+#     assert update_payer.status_code == 200

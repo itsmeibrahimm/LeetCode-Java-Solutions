@@ -1,5 +1,5 @@
 import stripe
-from typing import Optional
+from typing import Optional, Any
 from app.commons.utils.pool import ThreadPoolHelper
 from app.commons.providers import stripe_models as models
 from app.commons.providers import errors
@@ -27,6 +27,18 @@ class StripeClientInterface:
         """
         Create a new Stripe Customer
         https://stripe.com/docs/api/customers
+        """
+        ...
+
+    def update_customer(
+        self,
+        country: models.CountryCode,
+        request: models.UpdateCustomer,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> Any:
+        """
+        Update a Stripe Customer
+        https://stripe.com/docs/api/customers/update
         """
         ...
 
@@ -153,6 +165,19 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return customer.id
+
+    def update_customer(
+        self,
+        country: models.CountryCode,
+        request: models.UpdateCustomer,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> Any:
+        customer = stripe.Customer.modify(
+            # idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return customer
 
     def create_payment_method(
         self,
@@ -309,6 +334,19 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> models.CustomerId:
         return await self.submit(
             self.client.create_customer,
+            country,
+            request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def update_customer(
+        self,
+        country: models.CountryCode,
+        request: models.UpdateCustomer,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> Any:
+        return await self.submit(
+            self.client.update_customer,
             country,
             request,
             idempotency_key=idempotency_key,
