@@ -174,16 +174,6 @@ class TestMxLedgerRepository:
             dsj_client=mocker.Mock(),
         )
         repo = MxLedgerRepository(context=app_context)
-        mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
-        )
-        await repo.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByIdInput(id=uuid.uuid4())
         retrieved_mx_ledger = await repo.get_ledger_by_id(mx_ledger_request)
 

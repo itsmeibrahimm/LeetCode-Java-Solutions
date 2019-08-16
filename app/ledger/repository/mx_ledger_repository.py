@@ -96,12 +96,9 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     ) -> Optional[GetMxLedgerByIdOutput]:
         stmt = mx_ledgers.table.select().where(mx_ledgers.id == request.id)
         row = await self.payment_database.master().fetch_one(stmt)
-        # if no result found, return nothing
-        if not row:
-            return None
-        return GetMxLedgerByIdOutput.from_row(row)
+        return GetMxLedgerByIdOutput.from_row(row) if row else None
 
-    # todo: do we have constriant for how many can be returned?
+    # todo: update this to select from multiple returned mx_scheduled_ledger after state field is added to mx_scheduled_ledger table
     async def get_open_ledger_for_payment_account(
         self, request: GetMxLedgerByAccountInput
     ) -> Optional[GetMxLedgerByAccountOutput]:
@@ -112,11 +109,9 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             )
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        # if no result found, return nothing
-        if not row:
-            return None
-        return GetMxLedgerByAccountOutput.from_row(row)
+        return GetMxLedgerByAccountOutput.from_row(row) if row else None
 
+    # todo: lock db transaction here as well
     async def create_one_off_mx_ledger(
         self, request_ledger: InsertMxLedgerInput
     ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:

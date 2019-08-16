@@ -68,10 +68,7 @@ class MxScheduledLedgerRepository(
             mx_scheduled_ledgers.ledger_id == request.id
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        # if no result found, return nothing
-        if not row:
-            return None
-        return GetMxScheduledLedgerByLedgerOutput.from_row(row)
+        return GetMxScheduledLedgerByLedgerOutput.from_row(row) if row else None
 
     async def get_open_mx_scheduled_ledger_for_period(
         self, request: GetMxScheduledLedgerInput
@@ -94,9 +91,7 @@ class MxScheduledLedgerRepository(
             )
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        if not row:
-            return None
-        return GetMxScheduledLedgerOutput.from_row(row)
+        return GetMxScheduledLedgerOutput.from_row(row) if row else None
 
     def pacific_start_time_for_current_interval(
         self, routing_key: datetime, interval: Optional[MxScheduledLedgerIntervalType]

@@ -159,7 +159,7 @@ class TestMxTransactionRepository:
         )
 
         mx_transaction = await mx_txn_repo.create_ledger_and_insert_mx_transaction(
-            request_input, mx_scheduled_ledger_repo
+            request_input, mx_scheduled_ledger_repo, req_context=mocker.Mock()
         )
         assert mx_transaction is not None
         assert mx_transaction.currency == CurrencyType.USD
@@ -244,7 +244,7 @@ class TestMxTransactionRepository:
 
         with pytest.raises(Exception):
             await mx_txn_repo.create_ledger_and_insert_mx_transaction(
-                request_input, mx_scheduled_ledger_repo
+                request_input, mx_scheduled_ledger_repo, req_context=mocker.Mock()
             )
             # the mx_ledger created before should be rolled back
             get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger.id)
@@ -292,7 +292,7 @@ class TestMxTransactionRepository:
         )
 
         mx_transaction = await mx_txn_repo.insert_mx_transaction_and_update_ledger(
-            request_input, ledger_repo, mx_ledger.id
+            request_input, ledger_repo, mx_ledger.id, req_context=mocker.Mock()
         )
         assert mx_transaction is not None
         assert mx_transaction.currency == CurrencyType.USD
@@ -361,7 +361,7 @@ class TestMxTransactionRepository:
         )
         with pytest.raises(Exception):
             await mx_txn_repo.insert_mx_transaction_and_update_ledger(
-                request_input, ledger_repo, mx_ledger_id
+                request_input, ledger_repo, mx_ledger_id, req_context=mocker.Mock()
             )
             # the mx_ledger that needs to be updated should not be updated
             get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger_id)

@@ -7,6 +7,7 @@ from app.commons.error.errors import (
     PaymentErrorResponseBody,
 )
 from app.ledger.api.mx_transaction.v1.request import CreateMxTransactionRequest
+from app.ledger.core.mx_transaction.exceptions import MxTransactionCreationError
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.mx_transaction.processor import create_mx_transaction_impl
 
@@ -77,9 +78,9 @@ def create_mx_transactions_router(
                 legacy_transaction_id=mx_transaction_request.legacy_transaction_id,
             )
             req_context.log.info("create_mx_transaction() completed. ")
-        except Exception as e:
+        except MxTransactionCreationError as e:
             req_context.log.error(
-                "[create_mx_transaction][{}] exception.".format(
+                "[create_mx_transaction][{}] Exception caught when creating txn.".format(
                     mx_transaction_request.payment_account_id
                 ),
                 e,
@@ -87,9 +88,9 @@ def create_mx_transactions_router(
             return create_payment_error_response_blob(
                 HTTP_500_INTERNAL_SERVER_ERROR,
                 PaymentErrorResponseBody(
-                    error_code="TODO: specific payment error_code",
-                    error_message="TODO: specific payment error_message",
-                    retryable="TODO: specific payment error retryable",
+                    error_code=e.error_code,
+                    error_message=e.error_message,
+                    retryable=e.retryable,
                 ),
             )
 
