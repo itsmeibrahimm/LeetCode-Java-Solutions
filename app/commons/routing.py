@@ -30,6 +30,16 @@ def add_breadcrumb(scope: Scope, crumb: str):
     breadcrumbs.append(crumb)
 
 
+def group_routers(
+    routers: List[fastapi_routing.APIRouter]
+) -> fastapi_routing.APIRouter:
+    grouped_router = APIRouter()
+    for router in routers:
+        grouped_router.include_router(router)
+
+    return grouped_router
+
+
 class APIRouter(fastapi_routing.APIRouter):
     def add_api_route(self, path: str, endpoint: Callable, **kwargs) -> None:
         # ensure we use our subclassed APIRoute

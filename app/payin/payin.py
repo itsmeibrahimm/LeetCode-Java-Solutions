@@ -1,5 +1,10 @@
+from fastapi import Depends
+
 from app.commons.applications import FastAPI
+from app.commons.auth.service_auth import RouteAuthorizer
+from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
+from app.commons.routing import group_routers
 from app.payin.api.payer.v1.api import create_payer_router
 from app.payin.api.payment_method.v1.api import create_payment_method_router
 from app.commons.error.errors import register_payment_exception_handler
@@ -9,7 +14,7 @@ from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
 
-def create_payin_app(context: AppContext) -> FastAPI:
+def create_payin_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Declare sub app
     app = FastAPI(openapi_prefix="/payin", description="Payin service")
     set_context_for_app(app, context)
@@ -27,9 +32,13 @@ def create_payin_app(context: AppContext) -> FastAPI:
         payment_method_repository=PaymentMethodRepository(context=context)
     )
 
-    app.include_router(payer_router)
-    app.include_router(cart_payments_router)
-    app.include_router(payment_method_router)
+    router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
+
+    grouped_routers = group_routers(
+        [payer_router, cart_payments_router, payment_method_router]
+    )
+
+    app.include_router(grouped_routers, dependencies=[Depends(router_authorizer)])
 
     register_payment_exception_handler(app)
 

@@ -88,13 +88,13 @@ async def startup():
         fixed_tags={"env": config.ENVIRONMENT},
     )
 
-    payout_app = create_payout_app(context)
+    payout_app = create_payout_app(context, config)
     app.mount(payout_app.openapi_prefix, payout_app)
 
-    payin_app = create_payin_app(context)
+    payin_app = create_payin_app(context, config)
     app.mount(payin_app.openapi_prefix, payin_app)
 
-    ledger_app = create_ledger_app(context)
+    ledger_app = create_ledger_app(context, config)
     app.mount(ledger_app.openapi_prefix, ledger_app)
 
     app.mount(example_v1.openapi_prefix, example_v1)

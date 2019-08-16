@@ -7,6 +7,7 @@ from uuid import uuid4
 import factory
 import pytest
 from _pytest.nodes import Item
+from pytest_mock import MockFixture
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
@@ -149,6 +150,38 @@ async def ledger_paymentdb(app_config: AppConfig):
         replica_url=app_config.LEDGER_PAYMENTDB_MASTER_URL,
     ) as db:
         yield db
+
+
+@pytest.fixture
+def dummy_app_context(mocker: MockFixture):
+    return AppContext(
+        log=mocker.Mock(),
+        payout_bankdb=mocker.Mock(),
+        payin_maindb=mocker.Mock(),
+        payin_paymentdb=mocker.Mock(),
+        payout_maindb=mocker.Mock(),
+        ledger_maindb=mocker.Mock(),
+        ledger_paymentdb=mocker.Mock(),
+        stripe=mocker.Mock(),
+        dsj_client=mocker.Mock(),
+        identity_client=mocker.Mock(),
+    )
+
+
+@pytest.fixture
+async def ledger_app_context(mocker: MockFixture, ledger_paymentdb: DB):
+    return AppContext(
+        log=mocker.Mock(),
+        payout_bankdb=mocker.Mock(),
+        payin_maindb=mocker.Mock(),
+        payin_paymentdb=mocker.Mock(),
+        payout_maindb=mocker.Mock(),
+        ledger_maindb=mocker.Mock(),
+        ledger_paymentdb=ledger_paymentdb,
+        stripe=mocker.Mock(),
+        dsj_client=mocker.Mock(),
+        identity_client=mocker.Mock(),
+    )
 
 
 def pytest_collection_modifyitems(items: List[Item]):

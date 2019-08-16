@@ -10,6 +10,11 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.logger import root_logger
 from app.commons.database.infra import DB
 from app.commons.providers.dsj_client import DSJClient
+from app.commons.providers.identity_client import (
+    IdentityClientInterface,
+    IdentityClient,
+    StubbedIdentityClient,
+)
 from app.commons.providers.stripe_client import StripeClientPool
 from app.commons.providers.stripe_models import StripeClientSettings
 
@@ -28,6 +33,8 @@ class AppContext:
     stripe: StripeClientPool
 
     dsj_client: DSJClient
+
+    identity_client: IdentityClientInterface
 
     async def close(self):
         try:
@@ -157,6 +164,16 @@ async def create_app_context(config: AppConfig) -> AppContext:
         }
     )
 
+    identity_client: IdentityClientInterface
+    if config.ENVIRONMENT in ["testing"]:
+        # disable testing
+        identity_client = StubbedIdentityClient()
+    else:
+        identity_client = IdentityClient(
+            http_endpoint=config.IDENTITY_SERVICE_HTTP_ENDPOINT,
+            grpc_endpoint=config.IDENTITY_SERVICE_GRPC_ENDPOINT,
+        )
+
     context = AppContext(
         log=root_logger,
         payout_maindb=payout_maindb,
@@ -167,6 +184,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         ledger_paymentdb=ledger_paymentdb,
         stripe=stripe,
         dsj_client=dsj_client,
+        identity_client=identity_client,
     )
 
     context.log.debug("app context created")

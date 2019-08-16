@@ -62,6 +62,13 @@ class AppConfig(SecretAware):
     REMOTE_SECRET_ENABLED: bool
     METRICS_CONFIG: Dict[str, str]
 
+    # IDS
+    IDENTITY_SERVICE_HTTP_ENDPOINT: str
+    IDENTITY_SERVICE_GRPC_ENDPOINT: str
+    PAYIN_SERVICE_ID: int
+    PAYOUT_SERVICE_ID: int
+    LEDGER_SERVICE_ID: int
+
     # Test secret
     TEST_SECRET: Secret
 

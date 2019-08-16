@@ -51,9 +51,9 @@ email-validator = "==1.0.4"
 aiohttp = "==3.5.4"
 sentry-sdk = "==0.10.2"
 databases = {extras = ["postgresql"],version = "==0.2.5"}
-protobuf-identity = {version = "==0.2.29",index = "artifactory"}
-grpclib = "==0.3.0"
 apscheduler = "==3.6.1"
+protobuf-identity = {version = "==0.2.29", index="artifactory"}
+cachetools = "==3.1.1"
 
 [requires]
 python_version = "3.7"

@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime
 
 import pytest
-import pytest_mock
 from asyncpg import UniqueViolationError
+from pytest_mock import MockFixture
 
 from app.commons.context.app_context import AppContext
 from app.commons.database.infra import DB
@@ -37,21 +37,10 @@ class TestMxTransactionRepository:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_insert_mx_transaction_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        repo = MxTransactionRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        repo = MxTransactionRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_transaction_id = uuid.uuid4()
         ide_key = str(uuid.uuid4())
@@ -85,21 +74,10 @@ class TestMxTransactionRepository:
         assert mx_transaction.idempotency_key == ide_key
 
     async def test_insert_mx_transaction_raise_exception(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        repo = MxTransactionRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        repo = MxTransactionRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_transaction_id = uuid.uuid4()
         ide_key = str(uuid.uuid4())
@@ -129,22 +107,13 @@ class TestMxTransactionRepository:
             await repo.insert_mx_transaction(mx_transaction_to_insert)
 
     async def test_create_ledger_and_insert_mx_transaction_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, mocker: MockFixture, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
+        mx_txn_repo = MxTransactionRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
+        mx_scheduled_ledger_repo = MxScheduledLedgerRepository(
+            context=ledger_app_context
         )
-        mx_txn_repo = MxTransactionRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
-        mx_scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
 
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
@@ -186,22 +155,13 @@ class TestMxTransactionRepository:
         assert mx_ledger.balance == 2000
 
     async def test_create_ledger_and_insert_mx_transaction_raise_exception(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, mocker: MockFixture, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
+        mx_txn_repo = MxTransactionRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
+        mx_scheduled_ledger_repo = MxScheduledLedgerRepository(
+            context=ledger_app_context
         )
-        mx_txn_repo = MxTransactionRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
-        mx_scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
 
         # test roll back created_mx_ledger if insert mx_scheduled_ledger failed due to duplicate [payment_account_id, start_time, end_time]
         payment_account_id = str(uuid.uuid4())
@@ -255,21 +215,10 @@ class TestMxTransactionRepository:
             assert mx_ledger_retrieved is None
 
     async def test_insert_mx_transaction_and_update_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, mocker: MockFixture, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        mx_txn_repo = MxTransactionRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        mx_txn_repo = MxTransactionRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
 
         # create a new mx_ledger which needs to be updated later
         payment_account_id = str(uuid.uuid4())
@@ -310,21 +259,10 @@ class TestMxTransactionRepository:
         assert mx_ledger_retrieved.balance == 4000
 
     async def test_insert_mx_transaction_and_update_ledger_raise_exception(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, mocker: MockFixture, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        mx_txn_repo = MxTransactionRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        mx_txn_repo = MxTransactionRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
 
         # test roll back created_mx_ledger if insert mx_txn failed due to duplicate [payment_account_id, idempotency_key]
         payment_account_id = str(uuid.uuid4())

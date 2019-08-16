@@ -2,7 +2,6 @@ from datetime import datetime
 import uuid
 
 import pytest
-import pytest_mock
 
 from app.commons.context.app_context import AppContext
 from app.commons.database.infra import DB
@@ -27,21 +26,10 @@ class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_insert_mx_scheduled_ledger_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, ledger_paymentdb: DB, ledger_app_context: AppContext
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        scheduled_ledger_repo = MxScheduledLedgerRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         mx_scheduled_ledger_id = uuid.uuid4()
         ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
@@ -74,21 +62,10 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.end_time == datetime(2019, 8, 12)
 
     async def test_get_open_mx_scheduled_ledger_for_period_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        scheduled_ledger_repo = MxScheduledLedgerRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
         request = GetMxScheduledLedgerInput(
@@ -130,21 +107,10 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.end_time == datetime(2019, 8, 5, 7)
 
     async def test_get_open_mx_scheduled_ledger_for_period_not_exist_success(
-        self, mocker: pytest_mock.MockFixture, ledger_paymentdb: DB
+        self, ledger_app_context: AppContext, ledger_paymentdb: DB
     ):
-        app_context: AppContext = AppContext(
-            log=mocker.Mock(),
-            payout_bankdb=mocker.Mock(),
-            payin_maindb=mocker.Mock(),
-            payin_paymentdb=mocker.Mock(),
-            payout_maindb=mocker.Mock(),
-            ledger_maindb=mocker.Mock(),
-            ledger_paymentdb=ledger_paymentdb,
-            stripe=mocker.Mock(),
-            dsj_client=mocker.Mock(),
-        )
-        scheduled_ledger_repo = MxScheduledLedgerRepository(context=app_context)
-        ledger_repo = MxLedgerRepository(context=app_context)
+        scheduled_ledger_repo = MxScheduledLedgerRepository(context=ledger_app_context)
+        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
         request = GetMxScheduledLedgerInput(
