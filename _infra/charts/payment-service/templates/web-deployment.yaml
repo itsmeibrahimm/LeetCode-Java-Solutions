@@ -8,7 +8,12 @@ metadata:
     # https://docs.helm.sh/chart_best_practices/#labels
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.web.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 200%
+      maxUnavailable: 0%
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 10 }}
   selector:
     matchLabels:
@@ -41,6 +46,15 @@ spec:
           {{- toYaml .Values.web.resources | nindent 10 }}
         ports:
           - containerPort: 80
+        readinessProbe:
+          httpGet:
+            scheme: HTTP
+            path: /health
+            port: {{ .Values.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
         volumeMounts:
           - name: runtime-volume
             mountPath: {{ .Values.web.runtime.path }}

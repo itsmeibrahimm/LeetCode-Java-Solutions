@@ -2,9 +2,9 @@ env:
   ENVIRONMENT: local
   AWS_METADATA_SERVICE_TIMEOUT: 30
   AWS_METADATA_SERVICE_NUM_ATTEMPTS: 5
-replicaCount: 1
 
 web:
+  replicaCount: 1
   repository: ddartifacts-docker.jfrog.io/doordash/payment-service
   resources:
     requests:
@@ -15,13 +15,12 @@ web:
       memory: 1024Mi
   secretRef:
     awsCredentialsEnabled: true
-  readinessProbe:
-    path: /health
   runtime:
     containerEnabled: true
     path: /srv/runtime
 
 cron:
+  replicaCount: 1
   repository: ddartifacts-docker.jfrog.io/doordash/payment-service
   resources:
     requests:

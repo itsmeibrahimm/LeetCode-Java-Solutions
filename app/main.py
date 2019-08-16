@@ -1,18 +1,24 @@
-import logging
 import os
 
 import sentry_sdk
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from starlette.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from app.commons.applications import FastAPI
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import (
+    app_context_exists,
     create_app_context,
     get_context_from_app,
-    set_context_for_app,
     remove_context_for_app,
+    set_context_for_app,
 )
 from app.commons.context.logger import root_logger
+from app.commons.error.errors import (
+    PaymentErrorResponseBody,
+    PaymentException,
+    register_payment_exception_handler,
+)
 from app.example_v1.app import example_v1
 from app.ledger.ledger import create_ledger_app
 from app.middleware.doordash_metrics import (
@@ -22,8 +28,6 @@ from app.middleware.doordash_metrics import (
 from app.middleware.req_context import ReqContextMiddleware
 from app.payin.payin import create_payin_app
 from app.payout.payout import create_payout_app
-
-logger = logging.getLogger(__name__)
 
 if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
     from development import debug
@@ -44,11 +48,23 @@ if config.SENTRY_CONFIG:
         release=config.SENTRY_CONFIG.release,
     )
     app.add_middleware(SentryAsgiMiddleware)
+register_payment_exception_handler(app)
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    status_code=HTTP_200_OK,
+    responses={HTTP_503_SERVICE_UNAVAILABLE: {"model": PaymentErrorResponseBody}},
+)
 async def get_health():
-    return "OK"
+    if app_context_exists(app):
+        return "OK"
+    raise PaymentException(
+        http_status_code=HTTP_503_SERVICE_UNAVAILABLE,
+        error_code="payment_service_unavailable",
+        error_message="payment-service is not available or in progress of bootstrapping",
+        retryable=True,
+    )
 
 
 @app.get("/error")
@@ -82,6 +98,8 @@ async def startup():
     app.mount(ledger_app.openapi_prefix, ledger_app)
 
     app.mount(example_v1.openapi_prefix, example_v1)
+
+    root_logger.info("====== Finished running application startup hooks. ======")
 
 
 @app.on_event("shutdown")

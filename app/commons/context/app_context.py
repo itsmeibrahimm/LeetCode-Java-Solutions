@@ -181,12 +181,17 @@ def set_context_for_app(app: FastAPI, context: AppContext):
 
 def get_context_from_app(app: FastAPI) -> AppContext:
     context = app.extra.get("context")
-    assert context is not None, "app context is set"
+    assert context is not None, "app context is not set"
     assert isinstance(context, AppContext), "app context has correct type"
     return cast(AppContext, context)
 
 
+def app_context_exists(app: FastAPI) -> bool:
+    context = app.extra.get("context")
+    return context is not None
+
+
 def remove_context_for_app(app: FastAPI, context: AppContext):
     app_context = app.extra.pop("context", None)
-    assert app_context is not None, "app context is set"
+    assert app_context is not None, "app context is not set"
     assert app_context is context

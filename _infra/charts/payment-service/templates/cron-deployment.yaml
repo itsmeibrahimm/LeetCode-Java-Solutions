@@ -8,7 +8,7 @@ metadata:
     # https://docs.helm.sh/chart_best_practices/#labels
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.cron.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 10 }}
   selector:
     matchLabels:

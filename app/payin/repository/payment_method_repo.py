@@ -1,9 +1,8 @@
+import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Tuple
-
-import logging
 
 from typing_extensions import final
 

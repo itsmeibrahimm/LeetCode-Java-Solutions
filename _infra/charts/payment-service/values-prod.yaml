@@ -1,6 +1,11 @@
 env:
   ENVIRONMENT: prod
-replicaCount: 0
+
+web:
+  replicaCount: 0
+
+cron:
+  replicaCount: 0
 
 # aws_iam_role of payment-service prod deployments, created at https://github.com/doordash/infrastructure/pull/1670
 aws_iam_role: arn:aws:iam::611706558220:role/payment-service.services.prod.cluster.doordash.com
