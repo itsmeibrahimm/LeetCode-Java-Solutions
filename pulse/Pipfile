@@ -11,6 +11,7 @@ verify_ssl= false
 [dev-packages]
 
 [packages]
+payin_client = "==0.0.1"
 
 [requires]
 python_version = "3.6"

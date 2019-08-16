@@ -1,6 +1,7 @@
 import logging
 import requests
 
+from . import payin_crud_client
 from ..utils import SERVICE_URI
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,10 @@ def payer_info():
 
 def test_payer_creation():  # hit create_payer API and get_payer api
     # create_payer api
-    test_payer = requests.post(
-        url=SERVICE_URI + "/payin/api/v1/payers", json=payer_info()
+    test_payer = payin_crud_client.create_payer_api_v1_payers_post(
+        create_payer_request=payer_info()
     )
-    assert test_payer.status_code == 201
+    assert test_payer["dd_payer_id"] == "test_01"
 
 
 def test_payer_retrieval():
