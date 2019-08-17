@@ -1,5 +1,5 @@
 from fastapi import routing as fastapi_routing
-from typing import Callable, List
+from typing import Callable, List, Mapping
 from starlette import routing as starlette_routing
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -36,6 +36,16 @@ def group_routers(
     grouped_router = APIRouter()
     for router in routers:
         grouped_router.include_router(router)
+
+    return grouped_router
+
+
+def group_routers_with_path_prefix(
+    prefix_to_routers: Mapping[str, fastapi_routing.APIRouter]
+) -> fastapi_routing.APIRouter:
+    grouped_router = APIRouter()
+    for prefix, router in prefix_to_routers.items():
+        grouped_router.include_router(router, prefix=prefix)
 
     return grouped_router
 
