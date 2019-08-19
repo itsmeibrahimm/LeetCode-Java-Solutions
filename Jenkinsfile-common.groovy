@@ -18,6 +18,8 @@ docker = new org.doordash.Docker()
 doorctl = new org.doordash.Doorctl()
 github = new org.doordash.Github()
 pulse = new org.doordash.Pulse()
+slack = new org.doordash.Slack()
+JenkinsDd = org.doordash.JenkinsDd
 
 gitUrl = params["GITHUB_REPOSITORY"]
 sha = params["SHA"]
@@ -27,8 +29,17 @@ sha = params["SHA"]
  * Returns the service name which is useful for builds and deployments.
  */
 def getServiceName() {
-  return 'payment-service'
+  return "payment-service"
 }
+
+
+/**
+ * Returns slack CD channel name.
+ */
+def getCDSlackChannel() {
+  return "#eng-payment-cd"
+}
+
 
 
 /**
@@ -342,21 +353,21 @@ def deployHelm(Map optArgs = [:], String gitUrl, String sha, String branch, Stri
   ] << serviceNameEnvToOptArgs(serviceName, env) << optArgs
   withCredentials([file(credentialsId: o.k8sCredFileCredentialId, variable: 'k8sCredsFile')]) {
     sh """|#!/bin/bash
-          |set -ex
-          |
-          |# use --wait flag for helm to wait until all pod and services are in "ready" state.
-          |# working together with k8s readiness probe to prevent uninitialized pod serving traffic
-          |helm="docker run --rm -v ${k8sCredsFile}:/root/.kube/config -v ${WORKSPACE}:/apps alpine/helm:2.10.0"
-          |HELM_OPTIONS="${o.helmCommand} ${o.helmRelease} ${o.helmChartPath} \\
-          | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${sha} --set cron.tag=${sha} ${o.helmFlags} \\
-          | --tiller-namespace ${o.tillerNamespace} --namespace ${o.k8sNamespace} \\
-          | --wait --timeout ${o.timeoutSeconds}"
-          |
-          |# log manifest to CI/CD
-          |\${helm} \${HELM_OPTIONS} --debug --dry-run
-          |
-          |\${helm} \${HELM_OPTIONS}
-          |""".stripMargin()
+      |set -ex
+      |
+      |# use --wait flag for helm to wait until all pod and services are in "ready" state.
+      |# working together with k8s readiness probe to prevent uninitialized pod serving traffic
+      |helm="docker run --rm -v ${k8sCredsFile}:/root/.kube/config -v ${WORKSPACE}:/apps alpine/helm:2.10.0"
+      |HELM_OPTIONS="${o.helmCommand} ${o.helmRelease} ${o.helmChartPath} \\
+      | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${sha} --set cron.tag=${sha} ${o.helmFlags} \\
+      | --tiller-namespace ${o.tillerNamespace} --namespace ${o.k8sNamespace} \\
+      | --wait --timeout ${o.timeoutSeconds}"
+      |
+      |# log manifest to CI/CD
+      |\${helm} \${HELM_OPTIONS} --debug --dry-run
+      |
+      |\${helm} \${HELM_OPTIONS}
+      |""".stripMargin()
   }
 }
 
@@ -485,5 +496,25 @@ def inputCanDeployToProd() {
   return canDeployToProd
 }
 
+
+/**
+ * Notification utilities
+ */
+
+def determineSlackMentions(branch) {
+    if (branch) {
+        GIT_DIFF_SUMMARY_SLACK_MENTIONS = github.summarizeChangesInGit(params['GITHUB_REPOSITORY'], 'master', "origin/${params['BRANCH_NAME']}", true)["plainText"]
+        return slack.slackify(slack.scrapeUniqueSlackMentionsFromString(GIT_DIFF_SUMMARY_SLACK_MENTIONS))
+    } else {
+        return "@here"
+    }
+}
+
+def notifySlackChannelDeploymentStatus(stage, branch, buildNumber, status) {
+    def slackMentions = determineSlackMentions(branch)
+    def slackChannel = getCDSlackChannel()
+    def serviceName = getServiceName()
+    slack.notifySlackChannel("[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]> ${slackMentions}", slackChannel)
+}
 
 return this

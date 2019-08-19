@@ -31,12 +31,25 @@ pipeline {
     label 'universal'
   }
   stages {
+    stage('Load pipeline dependencies') {
+      steps {
+        script {
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+        }
+      }
+    }
     stage('Docker Build Tag Push') {
       steps {
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
           common.buildTagPush(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName())
+        }
+      }
+      post {
+        failure {
+          script {
+            common.notifySlackChannelDeploymentStatus("Build", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+          }
         }
       }
     }
@@ -44,19 +57,37 @@ pipeline {
       steps {
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
           common.runCIcontainer(common.getServiceName(), params['SHA'])
           common.runUnitTests(common.getServiceName())
+        }
+      }
+      post {
+        failure {
+          script {
+            common.notifySlackChannelDeploymentStatus("Unit Tests", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+          }
         }
       }
     }
     stage('Deploy to staging') {
       steps {
+
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          common.deployHelm(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging'
-          )
+          common.notifySlackChannelDeploymentStatus("Staging", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "starting")
+          common.deployHelm(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
+        }
+      }
+      post {
+        failure {
+          script {
+            common.notifySlackChannelDeploymentStatus("Staging", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+          }
+        }
+        success {
+          script {
+            common.notifySlackChannelDeploymentStatus("Staging", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "success")
+          }
         }
       }
     }
@@ -64,7 +95,6 @@ pipeline {
       steps {
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
           common.deployPulse(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
         }
       }
@@ -87,10 +117,22 @@ pipeline {
       steps {
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.notifySlackChannelDeploymentStatus("Prod", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "starting")
           common.deployHelm(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'prod')
         }
         sendSlackMessage 'eng-deploy-manifest', "Successfully deployed ${common.getServiceName()}: <${JenkinsDd.instance.getBlueOceanJobUrl()}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
+      }
+      post {
+        failure {
+          script {
+            common.notifySlackChannelDeploymentStatus("Prod", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+          }
+        }
+        success {
+          script {
+            common.notifySlackChannelDeploymentStatus("Prod", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "success")
+          }
+        }
       }
     }
     stage('Deploy Pulse to prod') {
@@ -101,7 +143,6 @@ pipeline {
       steps {
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
           common.deployPulse(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'prod')
         }
       }
@@ -111,6 +152,16 @@ pipeline {
     always {
       script {
         common.removeAllContainers()
+      }
+    }
+    success {
+      script {
+        common.notifySlackChannelDeploymentStatus("Finalization", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "success")
+      }
+    }
+    aborted {
+      script {
+        common.notifySlackChannelDeploymentStatus("Finalization", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "aborted")
       }
     }
   }
