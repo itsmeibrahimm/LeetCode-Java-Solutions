@@ -17,7 +17,7 @@ from app.payout.repository.maindb.model.transfer import (
     TransferUpdate,
 )
 
-
+api_tags = ["TransfersV0"]
 router = APIRouter()
 
 
@@ -26,6 +26,7 @@ router = APIRouter()
     status_code=HTTP_201_CREATED,
     response_model=Transfer,
     operation_id="CreateTransfer",
+    tags=api_tags,
 )
 async def create_transfer(
     data: TransferCreate,
@@ -40,6 +41,7 @@ async def create_transfer(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="GetTransferById",
+    tags=api_tags,
 )
 async def get_transfer_by_id(
     transfer_id: int,
@@ -58,6 +60,7 @@ async def get_transfer_by_id(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="UpdateTransferById",
+    tags=api_tags,
 )
 async def update_transfer_by_id(
     transfer_id: int,
@@ -79,6 +82,7 @@ async def update_transfer_by_id(
     status_code=HTTP_201_CREATED,
     response_model=StripeTransfer,
     operation_id="CreateStripeTransfer",
+    tags=api_tags,
 )
 async def create_stripe_transfer(
     data: StripeTransferCreate,
@@ -92,6 +96,7 @@ async def create_stripe_transfer(
     status_code=HTTP_200_OK,
     response_model=Optional[StripeTransfer],
     operation_id="GetStripeTransferByStripeId",
+    tags=api_tags,
 )
 async def get_stripe_transfer_by_stripe_id(
     stripe_id: str,
@@ -105,6 +110,7 @@ async def get_stripe_transfer_by_stripe_id(
     status_code=HTTP_200_OK,
     response_model=List[StripeTransfer],
     operation_id="GetStripeTransfersByTransferId",
+    tags=api_tags,
 )
 async def get_stripe_transfer_by_transfer_id(
     transfer_id: int,
@@ -119,6 +125,7 @@ async def get_stripe_transfer_by_transfer_id(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="GetStripeTransferById",
+    tags=api_tags,
 )
 async def get_stripe_transfer_by_id(
     stripe_transfer_id: int,
@@ -140,6 +147,7 @@ async def get_stripe_transfer_by_id(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="UpdateStripeTransferById",
+    tags=api_tags,
 )
 async def update_stripe_transfer_by_id(
     stripe_transfer_id: int,
@@ -161,6 +169,7 @@ async def update_stripe_transfer_by_id(
     status_code=HTTP_200_OK,
     response_model=Acknowledgement,
     operation_id="DeleteStripeTransferByStripeId",
+    tags=api_tags,
 )
 async def delete_stripe_transfer_by_stripe_id(
     stripe_id: str,

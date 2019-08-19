@@ -19,7 +19,7 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountUpdate,
 )
 
-
+api_tags = ["AccountsV0"]
 router = APIRouter()
 
 
@@ -28,6 +28,7 @@ router = APIRouter()
     status_code=HTTP_201_CREATED,
     response_model=PaymentAccount,
     operation_id="CreatePaymentAccount",
+    tags=api_tags,
 )
 async def create_payment_account(
     body: PaymentAccountCreate,
@@ -41,8 +42,9 @@ async def create_payment_account(
     status_code=HTTP_200_OK,
     response_model=List[PaymentAccount],
     operation_id="GetPaymentAccountsByAccountTypeAccountId",
+    tags=api_tags,
 )
-async def get_payment_account_by_account_type_account_id(
+async def get_payment_accounts_by_account_type_account_id(
     stripe_account_type: str,
     stripe_account_id: int,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
@@ -59,6 +61,7 @@ async def get_payment_account_by_account_type_account_id(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="GetPaymentAccountById",
+    tags=api_tags,
 )
 async def get_payment_account_by_id(
     account_id: int,
@@ -76,6 +79,7 @@ async def get_payment_account_by_id(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="UpdatePaymentAccountById",
+    tags=api_tags,
 )
 async def update_payment_account_by_id(
     account_id: int,
@@ -98,6 +102,7 @@ async def update_payment_account_by_id(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="GetStripeManagedAccountById",
+    tags=api_tags,
 )
 async def get_stripe_managed_account_by_id(
     stripe_managed_account_id: int,
@@ -117,6 +122,7 @@ async def get_stripe_managed_account_by_id(
     status_code=HTTP_201_CREATED,
     response_model=StripeManagedAccount,
     operation_id="CreateStripeManagedAccount",
+    tags=api_tags,
 )
 async def create_stripe_managed_account(
     body: StripeManagedAccountCreate,
@@ -131,6 +137,7 @@ async def create_stripe_managed_account(
     status_code=HTTP_200_OK,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     operation_id="UpdateStripeManagedAccountById",
+    tags=api_tags,
 )
 async def update_stripe_managed_account_by_id(
     stripe_managed_account_id: int,
