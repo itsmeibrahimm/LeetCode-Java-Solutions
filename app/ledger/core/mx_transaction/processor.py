@@ -65,9 +65,25 @@ async def create_mx_transaction_impl(
         routing_key=routing_key,
         interval_type=interval_type,
     )
+    request_input = InsertMxTransactionWithLedgerInput(
+        currency=currency,
+        amount=amount,
+        type=MxLedgerType.SCHEDULED,
+        payment_account_id=payment_account_id,
+        interval_type=interval_type,
+        routing_key=routing_key,
+        idempotency_key=idempotency_key,
+        target_type=target_type,
+        legacy_transaction_id=legacy_transaction_id,
+        target_id=target_id,
+        context=context,
+        metadata=metadata,
+    )
     mx_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
         get_scheduled_ledger_request
     )
+    mx_ledger_id = mx_scheduled_ledger.ledger_id if mx_scheduled_ledger else None
+
     # if not found, retrieve open ledger for current payment_account
     if not mx_scheduled_ledger:
         get_mx_ledger_request = GetMxLedgerByAccountInput(
@@ -76,27 +92,14 @@ async def create_mx_transaction_impl(
         mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
             get_mx_ledger_request
         )
+        mx_ledger_id = mx_ledger.id if mx_ledger else None
         # if not found, create new mx_scheduled_ledger and mx_ledger
         if not mx_ledger:
-            # construct input and insert
-            request_input = InsertMxTransactionWithLedgerInput(
-                currency=currency,
-                amount=amount,
-                type=MxLedgerType.SCHEDULED,
-                payment_account_id=payment_account_id,
-                interval_type=interval_type,
-                routing_key=routing_key,
-                idempotency_key=idempotency_key,
-                target_type=target_type,
-                legacy_transaction_id=legacy_transaction_id,
-                target_id=target_id,
-                context=context,
-                metadata=metadata,
-            )
             try:
                 created_mx_txn = await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                     request_input, mx_scheduled_ledger_repository, req_context
                 )
+                return to_mx_transaction(created_mx_txn)
             except DataError as e:
                 req_context.log.error(
                     "[create_ledger_and_insert_mx_transaction] Invalid input data while inserting mx transaction and creating ledger",
@@ -111,18 +114,18 @@ async def create_mx_transaction_impl(
                     retryable=True,
                 )
             except UniqueViolationError as e:
-                req_context.log.error(
-                    "[create_ledger_and_insert_mx_transaction] Unique constriants violated while inserting mx_ledger",
+                req_context.log.warn(
+                    "[create_ledger_and_insert_mx_transaction] Retry to update ledger balance instead of insert due to unique constraints violation",
                     e,
                 )
-                # todo: retry with insert_mx_txn_and_update_ledger
-                raise MxTransactionCreationError(
-                    error_code=LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR,
-                    error_message=ledger_error_message_maps[
-                        LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR.value
-                    ],
-                    retryable=True,
+                # retry with insert_mx_txn_and_update_ledger
+                mx_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
+                    get_scheduled_ledger_request
                 )
+                # no exceptions should be raised from the assertion
+                assert mx_scheduled_ledger
+                mx_ledger_id = mx_scheduled_ledger.ledger_id
+
             except Exception as e:
                 req_context.log.error(
                     "[create_ledger_and_insert_mx_transaction] Exception caught while inserting mx transaction and creating ledger",
@@ -130,56 +133,19 @@ async def create_mx_transaction_impl(
                 )
                 raise e
 
-            return to_mx_transaction(created_mx_txn)
-        # found open ledger, create transaction attach to it and update balance
-        request_input = InsertMxTransactionWithLedgerInput(
-            currency=currency,
-            amount=amount,
-            type=MxLedgerType.SCHEDULED,
-            payment_account_id=payment_account_id,
-            interval_type=interval_type,
-            routing_key=routing_key,
-            idempotency_key=idempotency_key,
-            target_type=target_type,
-            legacy_transaction_id=legacy_transaction_id,
-            target_id=target_id,
-            context=context,
-            metadata=metadata,
-        )
-        created_mx_txn = await insert_mx_txn_and_update_ledger(
-            mx_ledger_repository,
-            mx_transaction_repository,
-            mx_ledger.id,
-            request_input,
-            req_context,
-        )
-        return to_mx_transaction(created_mx_txn)
-
-    # if mx_scheduled_ledger found, retrieve the corresponding mx_ledger, create transaction attached and update balance
-    request_input = InsertMxTransactionWithLedgerInput(
-        currency=currency,
-        amount=amount,
-        type=MxLedgerType.SCHEDULED,
-        payment_account_id=payment_account_id,
-        interval_type=interval_type,
-        routing_key=routing_key,
-        idempotency_key=idempotency_key,
-        target_type=target_type,
-        target_id=target_id,
-        context=context,
-        metadata=metadata,
-    )
-    created_mx_txn = await insert_mx_txn_and_update_ledger(
+    # create transaction attached and update balance with given mx_ledger_id
+    assert mx_ledger_id  # no exceptions should be raised from the assertion
+    created_mx_txn = await insert_mx_txn_and_update_ledger_balance(
         mx_ledger_repository,
         mx_transaction_repository,
-        mx_scheduled_ledger.ledger_id,
+        mx_ledger_id,
         request_input,
         req_context,
     )
     return to_mx_transaction(created_mx_txn)
 
 
-async def insert_mx_txn_and_update_ledger(
+async def insert_mx_txn_and_update_ledger_balance(
     mx_ledger_repository: MxLedgerRepository,
     mx_transaction_repository: MxTransactionRepository,
     ledger_id: UUID,
