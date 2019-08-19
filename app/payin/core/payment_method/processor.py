@@ -292,9 +292,6 @@ async def delete_payment_method_impl(
             stripe_payment_method.customer,
         )
     except Exception as e:
-        # req_ctxt.log.error(e)
-        # TODO Error logged below does not describe what the error is, meaning log statement cannot be used to diagnose the problem.
-        # Add additional details to the log statement and use this convention throughout.
         req_ctxt.log.error(
             f"[delete_payment_method_impl][{payer_id}] error while detaching stripe payment method {e}"
         )
@@ -322,10 +319,7 @@ async def delete_payment_method_impl(
             )
     except DataError as e:
         req_ctxt.log.error(
-            "[delete_payment_method_impl][{}][{}] DataError when read db.".format(
-                payer_id, payment_method_id
-            ),
-            e,
+            f"[delete_payment_method_impl][{payer_id}][{payment_method_id}] DataError when read db. {e}"
         )
         raise PaymentMethodDeleteError(
             error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR, retryable=True

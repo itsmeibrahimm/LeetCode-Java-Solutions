@@ -154,6 +154,10 @@ class UpdateStripeCustomerWhereInput(DBRequestModel):
     id: int
 
 
+class UpdateStripeCustomerByStripeIdWhereInput(DBRequestModel):
+    stripe_id: str
+
+
 class PayerRepositoryInterface:
     """
     Payer repository interface class that exposes complicated CRUD operations APIs for business layer.
@@ -227,6 +231,14 @@ class PayerRepositoryInterface:
     ) -> StripeCustomerDbEntity:
         ...
 
+    @abstractmethod
+    async def update_stripe_customer_by_stripe_id(
+        self,
+        request_set: UpdateStripeCustomerSetInput,
+        request_where: UpdateStripeCustomerByStripeIdWhereInput,
+    ) -> StripeCustomerDbEntity:
+        ...
+
 
 @final
 @dataclass
@@ -242,8 +254,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             .returning(*payers.table.columns.values())
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return PayerDbEntity.from_row(row)
+        return PayerDbEntity.from_row(row) if row else None
 
     async def insert_payer_and_pgp_customer(
         self, payer_input: InsertPayerInput, pgp_customer_input: InsertPgpCustomerInput
@@ -257,7 +268,6 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 .returning(*payers.table.columns.values())
             )
             payer_row = await self.payment_database.master().fetch_one(stmt)
-            assert payer_row
             # insert pgp_customers table
             stmt = (
                 pgp_customers.table.insert()
@@ -265,7 +275,8 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 .returning(*pgp_customers.table.columns.values())
             )
             pgp_cus_row = await self.payment_database.master().fetch_one(stmt)
-            assert pgp_cus_row
+            if not payer_row or not pgp_cus_row:
+                return Tuple[None, None]
             return (
                 PayerDbEntity.from_row(payer_row),
                 PgpCustomerDbEntity.from_row(pgp_cus_row),
@@ -297,7 +308,6 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 payers.dd_payer_id == request.dd_payer_id
             )
         row = await self.payment_database.master().fetch_one(stmt)
-        assert row
         return PayerDbEntity.from_row(row) if row else None
 
     async def get_payer_and_pgp_customer_by_id(
@@ -337,8 +347,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             .returning(*pgp_customers.table.columns.values())
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return PgpCustomerDbEntity.from_row(row)
+        return PgpCustomerDbEntity.from_row(row) if row else None
 
     async def get_pgp_customer(
         self, request: GetPgpCustomerInput
@@ -347,8 +356,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             pgp_customers.payer_id == request.payer_id
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return PgpCustomerDbEntity.from_row(row)
+        return PgpCustomerDbEntity.from_row(row) if row else None
 
     async def update_pgp_customer(
         self,
@@ -362,8 +370,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             .returning(*pgp_customers.table.columns.values())
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return PgpCustomerDbEntity.from_row(row)
+        return PgpCustomerDbEntity.from_row(row) if row else None
 
     async def insert_stripe_customer(
         self, request: InsertStripeCustomerInput
@@ -373,17 +380,15 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             .values(request.dict(skip_defaults=True))
             .returning(*stripe_customers.table.columns.values())
         )
-        row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return StripeCustomerDbEntity.from_row(row)
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCustomerDbEntity.from_row(row) if row else None
 
     async def get_stripe_customer(
         self, request: GetStripeCustomerInput
     ) -> StripeCustomerDbEntity:
         stmt = stripe_customers.table.select().where(stripe_customers.id == request.id)
-        row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return StripeCustomerDbEntity.from_row(row)
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCustomerDbEntity.from_row(row) if row else None
 
     async def update_stripe_customer(
         self,
@@ -396,6 +401,19 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             .values(request_set.dict(skip_defaults=True))
             .returning(*stripe_customers.table.columns.values())
         )
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCustomerDbEntity.from_row(row) if row else None
+
+    async def update_stripe_customer_by_stripe_id(
+        self,
+        request_set: UpdateStripeCustomerSetInput,
+        request_where: UpdateStripeCustomerByStripeIdWhereInput,
+    ) -> StripeCustomerDbEntity:
+        stmt = (
+            stripe_customers.table.update()
+            .where(stripe_customers.stripe_id == request_where.stripe_id)
+            .values(request_set.dict(skip_defaults=True))
+            .returning(*stripe_customers.table.columns.values())
+        )
         row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return StripeCustomerDbEntity.from_row(row)
+        return StripeCustomerDbEntity.from_row(row) if row else None
