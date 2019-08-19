@@ -1,4 +1,4 @@
+--extra-index-url https://pypi.fury.io/${FURY_TOKEN}/doordash/
 --extra-index-url https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/
 
-payin-client==0.0.1
-payout-v0-client==0.0.3
+doordash-pulse==2.2.3

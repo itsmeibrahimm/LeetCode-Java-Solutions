@@ -110,5 +110,5 @@ venv.bak/
 # jetbrain ide
 .idea/
 
-# ignore Pipfile.lock for now as Pulse build doesn't support it yet
-Pipfile.lock
+# ignore Pipfile for now as Pulse build doesn't support it yet
+Pipfile*
