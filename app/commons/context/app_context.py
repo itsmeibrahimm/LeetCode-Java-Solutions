@@ -165,7 +165,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
     )
 
     identity_client: IdentityClientInterface
-    if config.ENVIRONMENT in ["testing"]:
+    if config.ENVIRONMENT in ["testing", "local"]:
         # disable testing
         identity_client = StubbedIdentityClient()
     else:
