@@ -1,4 +1,4 @@
-@Library('common-pipelines@v10.0.109') _
+@Library('common-pipelines@10.12.0') _
 
 import java.util.Arrays
 
@@ -501,17 +501,17 @@ def inputCanDeployToProd() {
  * Notification utilities
  */
 
-def determineSlackMentions(branch) {
-    if (branch) {
-        GIT_DIFF_SUMMARY_SLACK_MENTIONS = github.summarizeChangesInGit(params['GITHUB_REPOSITORY'], 'master', "origin/${params['BRANCH_NAME']}", true)["plainText"]
+def determineSlackMentions(sha) {
+    if (sha) {
+        GIT_DIFF_SUMMARY_SLACK_MENTIONS = github.summarizeChangesInGit(params['GITHUB_REPOSITORY'], sha, "origin/master", true)["plainText"]
         return slack.slackify(slack.scrapeUniqueSlackMentionsFromString(GIT_DIFF_SUMMARY_SLACK_MENTIONS))
     } else {
         return "@here"
     }
 }
 
-def notifySlackChannelDeploymentStatus(stage, branch, buildNumber, status) {
-    def slackMentions = determineSlackMentions(branch)
+def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status) {
+    def slackMentions = determineSlackMentions(sha)
     def slackChannel = getCDSlackChannel()
     def serviceName = getServiceName()
     slack.notifySlackChannel("[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]> ${slackMentions}", slackChannel)

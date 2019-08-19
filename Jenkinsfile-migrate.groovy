@@ -1,4 +1,4 @@
-@Library('common-pipelines@v10.0.109') _
+@Library('common-pipelines@10.12.0') _
 
 import groovy.transform.Field
 import org.doordash.JenkinsDd

@@ -1,4 +1,4 @@
-@Library('common-pipelines@v10.0.109') _
+@Library('common-pipelines@10.12.0') _
 
 import groovy.transform.Field
 import org.doordash.JenkinsDd
@@ -48,7 +48,7 @@ pipeline {
       post {
         failure {
           script {
-            common.notifySlackChannelDeploymentStatus("Build", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+            common.notifySlackChannelDeploymentStatus("Build", params['SHA'], "${env.BUILD_NUMBER}", "failure")
           }
         }
       }
@@ -64,7 +64,7 @@ pipeline {
       post {
         failure {
           script {
-            common.notifySlackChannelDeploymentStatus("Unit Tests", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+            common.notifySlackChannelDeploymentStatus("Unit Tests", params['SHA'], "${env.BUILD_NUMBER}", "failure")
           }
         }
       }
@@ -74,19 +74,19 @@ pipeline {
 
         artifactoryLogin()
         script {
-          common.notifySlackChannelDeploymentStatus("Staging", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "starting")
+          common.notifySlackChannelDeploymentStatus("Staging", params['SHA'], "${env.BUILD_NUMBER}", "starting")
           common.deployHelm(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
         }
       }
       post {
         failure {
           script {
-            common.notifySlackChannelDeploymentStatus("Staging", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+            common.notifySlackChannelDeploymentStatus("Staging", params['SHA'], "${env.BUILD_NUMBER}", "failure")
           }
         }
         success {
           script {
-            common.notifySlackChannelDeploymentStatus("Staging", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "success")
+            common.notifySlackChannelDeploymentStatus("Staging", params['SHA'], "${env.BUILD_NUMBER}", "success")
           }
         }
       }
@@ -106,6 +106,9 @@ pipeline {
       steps {
         script {
           canDeployToProd = common.inputCanDeployToProd()
+          if (!canDeployToProd) {
+            currentBuild.result = "ABORTED" /* Set current deployment to aborted */
+          }
         }
       }
     }
@@ -117,7 +120,7 @@ pipeline {
       steps {
         artifactoryLogin()
         script {
-          common.notifySlackChannelDeploymentStatus("Prod", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "starting")
+          common.notifySlackChannelDeploymentStatus("Prod", params['SHA'], "${env.BUILD_NUMBER}", "starting")
           common.deployHelm(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'prod')
         }
         sendSlackMessage 'eng-deploy-manifest', "Successfully deployed ${common.getServiceName()}: <${JenkinsDd.instance.getBlueOceanJobUrl()}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
@@ -125,12 +128,12 @@ pipeline {
       post {
         failure {
           script {
-            common.notifySlackChannelDeploymentStatus("Prod", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "failure")
+            common.notifySlackChannelDeploymentStatus("Prod", params['SHA'], "${env.BUILD_NUMBER}", "failure")
           }
         }
         success {
           script {
-            common.notifySlackChannelDeploymentStatus("Prod", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "success")
+            common.notifySlackChannelDeploymentStatus("Prod", params['SHA'], "${env.BUILD_NUMBER}", "success")
           }
         }
       }
@@ -156,12 +159,12 @@ pipeline {
     }
     success {
       script {
-        common.notifySlackChannelDeploymentStatus("Finalization", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "success")
+        common.notifySlackChannelDeploymentStatus("Successful Deployment", params['SHA'], "${env.BUILD_NUMBER}", "success")
       }
     }
     aborted {
       script {
-        common.notifySlackChannelDeploymentStatus("Finalization", params['BRANCH_NAME'], "${env.BUILD_NUMBER}", "aborted")
+        common.notifySlackChannelDeploymentStatus("Aborted Deployment", params['SHA'], "${env.BUILD_NUMBER}", "aborted")
       }
     }
   }
