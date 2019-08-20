@@ -103,9 +103,9 @@ class CartPaymentInterface:
 
     def _get_provider_future_usage(self, payment_intent: PaymentIntent) -> str:
         if payment_intent.capture_method == CaptureMethod.AUTO:
-            return CreatePaymentIntent.SetupFutureUsage.on_session
+            return CreatePaymentIntent.SetupFutureUsage.ON_SESSION
 
-        return CreatePaymentIntent.SetupFutureUsage.off_session
+        return CreatePaymentIntent.SetupFutureUsage.OFF_SESSION
 
     def _get_cart_payment_submission_pgp_intent(
         self, pgp_intents: List[PgpPaymentIntent]
@@ -172,7 +172,6 @@ class CartPaymentInterface:
         provider_customer_resource_id: str,
     ) -> str:
         # Call to stripe payment intent API
-        assert pgp_payment_intent.idempotency_key
         try:
             intent_request = CreatePaymentIntent(
                 amount=pgp_payment_intent.amount,
@@ -346,7 +345,6 @@ class CartPaymentInterface:
         payer_statement_description: Optional[str] = None,
     ):
         # Create PaymentIntent
-        assert cart_payment.id
         payment_intent: PaymentIntent = await self.payment_repo.insert_payment_intent(
             id=uuid.uuid4(),
             cart_payment_id=cart_payment.id,
@@ -416,7 +414,7 @@ class CartPaymentInterface:
         async with self.payment_repo.payment_database_transaction():
             # Create CartPayment
             cart_payment = await self.payment_repo.insert_cart_payment(
-                id=uuid.uuid4(),
+                id=request_cart_payment.id,
                 payer_id=request_cart_payment.payer_id,
                 type=request_cart_payment.cart_metadata.type,
                 client_description=request_cart_payment.client_description,
@@ -505,14 +503,13 @@ class CartPaymentInterface:
         await self._cancel_provider_payment(
             payment_intent,
             pgp_payment_intent,
-            CancelPaymentIntent.CancellationReason.abandoned,
+            CancelPaymentIntent.CancellationReason.ABANDONED,
         )
 
         async with self.payment_repo.payment_database_transaction():
             await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id, status=IntentStatus.CANCELLED
             )
-            assert pgp_payment_intent.resource_id  # TODO remove need for assertion
             await self.payment_repo.update_pgp_payment_intent(
                 id=pgp_payment_intent.id,
                 status=IntentStatus.CANCELLED,
@@ -529,8 +526,9 @@ class CartPaymentInterface:
         payment_method_id,
         payment_method_id_type: PaymentMethodIdType,
     ) -> Tuple[str, str]:
+        assert self.payer_repo
+        assert self.payment_method_repo
         # Get payment method, in order to submit new intent to the provider
-        assert self.payment_method_repo  # TODO remove need for assertion
         payment_method, stripe_card = await get_payment_method(
             payment_method_repository=self.payment_method_repo,
             req_ctxt=self.req_context,
@@ -548,7 +546,6 @@ class CartPaymentInterface:
             )
 
         # TODO Get customer ID from payer processor
-        assert self.payer_repo
         pgp_customer = await self.payer_repo.get_pgp_customer(
             GetPgpCustomerInput(payer_id=payer_id)
         )
@@ -619,7 +616,16 @@ class CartPaymentInterface:
                 payer_statement_description=most_recent_intent.statement_descriptor,
             )
 
-            # TODO insert adjustment history record
+            # Insert adjustment history record
+            await self.payment_repo.insert_payment_intent_adjustment_history(
+                id=uuid.uuid4(),
+                payer_id=cart_payment.payer_id,
+                payment_intent_id=payment_intent_for_submit.id,
+                amount=amount,
+                amount_original=cart_payment.amount,
+                amount_delta=(amount - cart_payment.amount),
+                currency=payment_intent_for_submit.currency,
+            )
 
             self.req_context.log.info(
                 f"Created intent pair {payment_intent_for_submit.id}, {pgp_intent_for_submit.id}"
@@ -680,10 +686,10 @@ class CartPaymentInterface:
         await gather(*cancellations)
 
         # Update properties of the cart payment
-        # TODO remove assertion, update other properties of the cart_payment that may have been provided in the request.
-        assert cart_payment.id
         updated_cart_payment = await self.payment_repo.update_cart_payment_details(
-            cart_payment.id, amount
+            cart_payment_id=cart_payment.id,
+            amount=amount,
+            client_description=client_description,
         )
         self._populate_cart_payment_for_response(
             updated_cart_payment, payment_intent, pgp_payment_intent
@@ -938,8 +944,7 @@ async def submit_payment(
     cart_payment, payment_intent = await cart_payment_interface._find_existing(
         request_cart_payment.payer_id, idempotency_key
     )
-    if cart_payment:
-        assert payment_intent
+    if cart_payment and payment_intent:
         return await cart_payment_interface.resubmit_existing_payment(
             cart_payment,
             payment_intent,

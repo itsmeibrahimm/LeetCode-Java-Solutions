@@ -29,7 +29,7 @@ from starlette.status import (
 )
 from starlette.requests import Request
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 def create_cart_payments_router(
@@ -123,7 +123,7 @@ def create_cart_payments_router(
 
 def request_to_model(cart_payment_request: CreateCartPaymentRequest) -> CartPayment:
     return CartPayment(
-        id=None,
+        id=uuid4(),
         payer_id=cart_payment_request.payer_id,
         amount=cart_payment_request.amount,
         payment_method_id=cart_payment_request.payment_method_id,

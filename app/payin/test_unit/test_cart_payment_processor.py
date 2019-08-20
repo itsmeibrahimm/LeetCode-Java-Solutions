@@ -270,6 +270,9 @@ class TestCartPaymentProcessor:
         cart_payment_repo.update_cart_payment_details = FunctionMock(
             return_value=updated_cart_payment
         )
+        cart_payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
+        )
 
         result = await processor.update_payment(
             app_context=app_context,

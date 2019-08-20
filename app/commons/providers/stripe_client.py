@@ -95,7 +95,7 @@ class StripeClientInterface:
         self,
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         """
         Create a new PaymentIntent
@@ -107,7 +107,7 @@ class StripeClientInterface:
         self,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentStatus:
         """
         Capture a PaymentIntent
@@ -119,7 +119,7 @@ class StripeClientInterface:
         self,
         country: models.CountryCode,
         request: models.CancelPaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         """
         Cancel a PaymentIntent
@@ -248,7 +248,7 @@ class StripeClient(StripeClientInterface):
         self,
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         payment_intent = stripe.PaymentIntent.create(
             idempotency_key=idempotency_key,
@@ -261,7 +261,7 @@ class StripeClient(StripeClientInterface):
         self,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentStatus:
         payment_intent = stripe.PaymentIntent.capture(
             idempotency_key=idempotency_key,
@@ -274,7 +274,7 @@ class StripeClient(StripeClientInterface):
         self,
         country: models.CountryCode,
         request: models.CancelPaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         payment_intent = stripe.PaymentIntent.cancel(
             idempotency_key=idempotency_key,
@@ -434,7 +434,7 @@ class StripeClientPool(ThreadPoolHelper):
         self,
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         return await self.submit(
             self.client.create_payment_intent,
@@ -447,7 +447,7 @@ class StripeClientPool(ThreadPoolHelper):
         self,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentStatus:
         return await self.submit(
             self.client.capture_payment_intent,
@@ -460,7 +460,7 @@ class StripeClientPool(ThreadPoolHelper):
         self,
         country: models.CountryCode,
         request: models.CancelPaymentIntent,
-        idempotency_key: models.IdempotencyKey = None,
+        idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         # TODO refactor intent API to return full intent
         return await self.submit(

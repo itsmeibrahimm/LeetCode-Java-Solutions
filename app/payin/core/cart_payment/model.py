@@ -31,7 +31,7 @@ class CartMetadata:
 
 @dataclass
 class CartPayment:
-    id: Optional[UUID]
+    id: UUID
     amount: int
     payer_id: str
     payment_method_id: Optional[str]
@@ -76,7 +76,7 @@ class PgpPaymentIntent:
     payment_intent_id: UUID
     idempotency_key: str
     provider: str
-    resource_id: Optional[str]
+    resource_id: str
     status: IntentStatus
     invoice_resource_id: Optional[str]
     charge_resource_id: Optional[str]
@@ -93,3 +93,16 @@ class PgpPaymentIntent:
     updated_at: datetime
     captured_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+
+
+@final
+@dataclass(frozen=True)
+class PaymentIntentAdjustmentHistory:
+    id: UUID
+    payer_id: str
+    payment_intent_id: UUID
+    amount: int
+    amount_original: int
+    amount_delta: int
+    currency: str
+    created_at: datetime

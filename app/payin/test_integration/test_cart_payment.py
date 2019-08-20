@@ -56,9 +56,13 @@ class TestCartPayment:
         return request_body
 
     def _get_cart_payment_update_request(
-        self, cart_payment, amount, idempotency_key=None
+        self, cart_payment, amount, client_description, idempotency_key=None
     ):
-        request_body = {"amount": amount, "payer_id": cart_payment["payer_id"]}
+        request_body = {
+            "amount": amount,
+            "payer_id": cart_payment["payer_id"],
+            "client_description": client_description,
+        }
         idempotency = idempotency_key if idempotency_key else str(uuid.uuid4())
         request_body["idempotency_key"] = idempotency
         return request_body
@@ -161,7 +165,11 @@ class TestCartPayment:
         assert body["retryable"] == expected_retryable
 
     def _test_cart_payment_adjustment(self, stripe_api, client, cart_payment):
-        request_body = self._get_cart_payment_update_request(cart_payment, 800)
+        request_body = self._get_cart_payment_update_request(
+            cart_payment=cart_payment,
+            amount=800,
+            client_description=f"{cart_payment['client_description']}-updated",
+        )
         response = client.post(
             f"/payin/api/v1/cart_payments/{str(cart_payment['id'])}/adjust",
             json=request_body,
@@ -172,12 +180,12 @@ class TestCartPayment:
         # print(body)
         assert response.status_code == 200
         assert body["id"] == cart_payment["id"]
-        assert body["amount"] == 800
+        assert body["amount"] == request_body["amount"]
         assert body["payer_id"] == cart_payment["payer_id"]
         assert body["payment_method_id"] == cart_payment["payment_method_id"]
         assert body["capture_method"] == cart_payment["capture_method"]
         assert body["cart_metadata"] == cart_payment["cart_metadata"]
-        assert body["client_description"] == cart_payment["client_description"]
+        assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
 

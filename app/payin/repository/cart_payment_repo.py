@@ -9,12 +9,14 @@ from app.payin.core.cart_payment.model import (
     CartMetadata,
     PaymentIntent,
     PgpPaymentIntent,
+    PaymentIntentAdjustmentHistory,
 )
 from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.models.paymentdb import (
     cart_payments,
     payment_intents,
     pgp_payment_intents,
+    payment_intents_adjustment_history,
 )
 from app.payin.repository.base import PayinDBRepository
 
@@ -89,12 +91,12 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_cart_payment(row)
 
     async def update_cart_payment_details(
-        self, cart_payment_id: UUID, amount
+        self, cart_payment_id: UUID, amount: int, client_description: Optional[str]
     ) -> CartPayment:
         statement = (
             cart_payments.table.update()
             .where(cart_payments.id == cart_payment_id)
-            .values(amount_total=amount)
+            .values(amount_total=amount, client_description=client_description)
             .returning(*cart_payments.table.columns.values())
         )
 
@@ -185,7 +187,7 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_payment_intent(row)
 
     async def get_payment_intents_for_cart_payment(
-        self, cart_payment_id: Optional[UUID]
+        self, cart_payment_id: UUID
     ) -> List[PaymentIntent]:
         statement = payment_intents.table.select().where(
             payment_intents.cart_payment_id == cart_payment_id
@@ -286,4 +288,47 @@ class CartPaymentRepository(PayinDBRepository):
             updated_at=row[pgp_payment_intents.updated_at],
             captured_at=row[pgp_payment_intents.captured_at],
             cancelled_at=row[pgp_payment_intents.cancelled_at],
+        )
+
+    async def insert_payment_intent_adjustment_history(
+        self,
+        id: UUID,
+        payer_id: str,
+        payment_intent_id: UUID,
+        amount: int,
+        amount_original: int,
+        amount_delta: int,
+        currency: str,
+    ) -> PaymentIntentAdjustmentHistory:
+        data = {
+            payment_intents_adjustment_history.id: id,
+            payment_intents_adjustment_history.payer_id: payer_id,
+            payment_intents_adjustment_history.payment_intent_id: payment_intent_id,
+            payment_intents_adjustment_history.amount: amount,
+            payment_intents_adjustment_history.amount_original: amount_original,
+            payment_intents_adjustment_history.amount_delta: amount_delta,
+            payment_intents_adjustment_history.currency: currency,
+        }
+
+        statement = (
+            payment_intents_adjustment_history.table.insert()
+            .values(data)
+            .returning(*payment_intents_adjustment_history.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_intent_adjustment_history(row)
+
+    def to_payment_intent_adjustment_history(
+        self, row: Any
+    ) -> PaymentIntentAdjustmentHistory:
+        return PaymentIntentAdjustmentHistory(
+            id=row[payment_intents_adjustment_history.id],
+            payer_id=row[payment_intents_adjustment_history.payer_id],
+            payment_intent_id=row[payment_intents_adjustment_history.payment_intent_id],
+            amount=row[payment_intents_adjustment_history.amount],
+            amount_original=row[payment_intents_adjustment_history.amount_original],
+            amount_delta=row[payment_intents_adjustment_history.amount_delta],
+            currency=row[payment_intents_adjustment_history.currency],
+            created_at=row[payment_intents_adjustment_history.created_at],
         )

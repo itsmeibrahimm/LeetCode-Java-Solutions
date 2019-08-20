@@ -89,23 +89,22 @@ class CreatePaymentIntent(BaseModel):
     """
 
     class CaptureMethod(str, Enum):
-        # TODO upper case keys
-        automatic = "automatic"
-        manual = "manual"
+        AUTOMATIC = "automatic"
+        MANUAL = "manual"
 
     class ConfirmationMethod(str, Enum):
-        automatic = "automatic"
-        manual = "manual"
+        AUTOMATIC = "automatic"
+        MANUAL = "manual"
 
     class SetupFutureUsage(str, Enum):
-        on_session = "on_session"
-        off_session = "off_session"
+        ON_SESSION = "on_session"
+        OFF_SESSION = "off_session"
 
     class PaymentMethodOptions(BaseModel):
         class CardOptions(BaseModel):
             class RequestThreeDSecure(str, Enum):
-                automatic = "automatic"
-                any = "any"
+                AUTOMATIC = "automatic"
+                ANY = "any"
 
             request_three_d_secure: Optional[RequestThreeDSecure]
 
@@ -151,10 +150,10 @@ class CapturePaymentIntent(BaseModel):
 
 class CancelPaymentIntent(BaseModel):
     class CancellationReason(str, Enum):
-        abandoned = "abandoned"
-        duplicate = "duplicate"
-        fraudulent = "fraudulent"
-        requested_by_customer = "requested_by_customer"
+        ABANDONED = "abandoned"
+        DUPLICATE = "duplicate"
+        FRAUDULENT = "fraudulent"
+        REQUESTED_BY_CONSUMER = "requested_by_customer"
 
     sid: PaymentIntentId
     cancellation_reason: str

@@ -113,29 +113,29 @@ class TestCartPaymentInterface:
     def test_get_provider_capture_method(self, cart_payment_interface):
         intent = generate_payment_intent(capture_method="manual")
         result = cart_payment_interface._get_provider_capture_method(intent)
-        assert result == CreatePaymentIntent.CaptureMethod.manual
+        assert result == CreatePaymentIntent.CaptureMethod.MANUAL
 
         intent = generate_payment_intent(capture_method="auto")
         result = cart_payment_interface._get_provider_capture_method(intent)
-        assert result == CreatePaymentIntent.CaptureMethod.automatic
+        assert result == CreatePaymentIntent.CaptureMethod.AUTOMATIC
 
     def test_get_provider_confirmation_method(self, cart_payment_interface):
         intent = generate_payment_intent(confirmation_method="manual")
         result = cart_payment_interface._get_provider_confirmation_method(intent)
-        assert result == CreatePaymentIntent.ConfirmationMethod.manual
+        assert result == CreatePaymentIntent.ConfirmationMethod.MANUAL
 
         intent = generate_payment_intent(confirmation_method="auto")
         result = cart_payment_interface._get_provider_confirmation_method(intent)
-        assert result == CreatePaymentIntent.ConfirmationMethod.automatic
+        assert result == CreatePaymentIntent.ConfirmationMethod.AUTOMATIC
 
     def test_get_provider_future_usage(self, cart_payment_interface):
         intent = generate_payment_intent(capture_method="manual")
         result = cart_payment_interface._get_provider_future_usage(intent)
-        assert result == CreatePaymentIntent.SetupFutureUsage.off_session
+        assert result == CreatePaymentIntent.SetupFutureUsage.OFF_SESSION
 
         intent = generate_payment_intent(capture_method="auto")
         result = cart_payment_interface._get_provider_future_usage(intent)
-        assert result == CreatePaymentIntent.SetupFutureUsage.on_session
+        assert result == CreatePaymentIntent.SetupFutureUsage.ON_SESSION
 
     def test_intent_submit_status_evaluation(self, cart_payment_interface):
         intent = generate_payment_intent(status="init")
@@ -611,6 +611,9 @@ class TestCartPaymentInterface:
         cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
             return_value=[generate_pgp_payment_intent()]
         )
+        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
+        )
 
         result_intent, result_pgp_intent = await cart_payment_interface._submit_amount_increase_to_cart_payment(
             cart_payment=cart_payment,
@@ -652,8 +655,14 @@ class TestCartPaymentInterface:
         )
         updated_cart_payment = deepcopy(cart_payment)
         updated_cart_payment.amount = 850
+        updated_cart_payment.client_description = (
+            f"{cart_payment.client_description}-updated"
+        )
         cart_payment_interface.payment_repo.update_cart_payment_details = FunctionMock(
             return_value=updated_cart_payment
+        )
+        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
         )
 
         result_cart_payment = await cart_payment_interface._add_amount_to_cart_payment(
