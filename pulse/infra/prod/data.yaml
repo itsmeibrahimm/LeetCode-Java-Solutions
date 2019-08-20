@@ -1,3 +1,6 @@
+service_name: payment-service
+cron_schedule: "*/10 * * * *"
+
 service_runtime_config:
   example_service_runtime_config: "this is a runtime config"
 
@@ -7,3 +10,6 @@ service_env:
   SERVICE_URI: "http://payment-service-web.prod.svc.cluster.local"
   REPORT_ENABLED: true
   TEST_ENV: "prod"
+
+secret_sources:
+  - payment-service-pulse
