@@ -1,6 +1,4 @@
-import asyncio
-import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 from urllib import parse
 
@@ -20,12 +18,21 @@ class DB:
 
     _master: Database
     _replica: Database
+    _id: str
+
+    @property
+    def id(self):
+        return self._id
 
     def master(self) -> Database:
         return self._master
 
     def replica(self) -> Database:
         return self._replica
+
+    @property
+    def connected(self) -> bool:
+        return self._replica.is_connected and self._master.is_connected
 
     async def __aenter__(self):
         await self.connect()
@@ -35,10 +42,26 @@ class DB:
         await self.disconnect()
 
     async def connect(self):
-        await asyncio.gather(self._master.connect(), self._replica.connect())
+        try:
+            if not self._master.is_connected:
+                await self._master.connect()
+            if not self._replica.is_connected:
+                await self._replica.connect()
+        except Exception:
+            root_logger.exception(f"{self.id} failed to connect!")
+            raise
+        root_logger.info(f"{self.id} connected")
 
     async def disconnect(self):
-        await asyncio.gather(self._master.disconnect(), self._replica.disconnect())
+        try:
+            if self._master.is_connected:
+                await self._master.disconnect()
+            if self._replica.is_connected:
+                await self._replica.disconnect()
+        except Exception:
+            root_logger.exception(f"{self.id} failed to disconnect!")
+            raise
+        root_logger.info(f"{self.id} discounted")
 
     @classmethod
     def create(
@@ -83,7 +106,7 @@ class DB:
             statement_cache_size=statement_cache_size,
         )
 
-        return cls(_master=master, _replica=replica)
+        return cls(_master=master, _replica=replica, _id=db_id)
 
     @staticmethod
     def create_with_alternative_replica(
@@ -128,9 +151,7 @@ class DB:
             path=f"/{alternative_replica}"
         ).geturl()
 
-        new_replica_url_secret = dataclasses.replace(
-            replica_url, value=updated_replica_url_str
-        )
+        new_replica_url_secret = replace(replica_url, value=updated_replica_url_str)
 
         return DB.create(
             db_id=db_id,

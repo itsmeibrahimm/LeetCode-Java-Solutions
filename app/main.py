@@ -88,14 +88,20 @@ async def startup():
         fixed_tags={"env": config.ENVIRONMENT},
     )
 
-    payout_app = create_payout_app(context, config)
-    app.mount(payout_app.openapi_prefix, payout_app)
+    if "payout" in config.INCLUDED_APPS:
+        payout_app = create_payout_app(context, config)
+        app.mount(payout_app.openapi_prefix, payout_app)
+        root_logger.info("Mounted payout app")
 
-    payin_app = create_payin_app(context, config)
-    app.mount(payin_app.openapi_prefix, payin_app)
+    if "payin" in config.INCLUDED_APPS:
+        payin_app = create_payin_app(context, config)
+        app.mount(payin_app.openapi_prefix, payin_app)
+        root_logger.info("Mounted payin app")
 
-    ledger_app = create_ledger_app(context, config)
-    app.mount(ledger_app.openapi_prefix, ledger_app)
+    if "ledger" in config.INCLUDED_APPS:
+        ledger_app = create_ledger_app(context, config)
+        app.mount(ledger_app.openapi_prefix, ledger_app)
+        root_logger.info("Mounted ledger app")
 
     app.mount(example_v1.openapi_prefix, example_v1)
 

@@ -1,3 +1,4 @@
+import asyncio
 from asyncio import gather
 from dataclasses import dataclass
 from random import choice
@@ -110,41 +111,14 @@ async def create_app_context(config: AppConfig) -> AppContext:
         replica_url=config.LEDGER_PAYMENTDB_REPLICA_URL,
     )
 
-    try:
-        await payout_maindb.connect()
-    except Exception:
-        root_logger.exception("failed to connect to payout main db")
-        raise
+    if "payout" in config.INCLUDED_APPS:
+        await asyncio.gather(payout_maindb.connect(), payout_bankdb.connect())
 
-    try:
-        await payout_bankdb.connect()
-    except Exception:
-        root_logger.exception("failed to connect to payout bank db")
-        raise
+    if "payin" in config.INCLUDED_APPS:
+        await asyncio.gather(payin_maindb.connect(), payin_paymentdb.connect())
 
-    try:
-        await payin_maindb.connect()
-    except Exception:
-        root_logger.exception("failed to connect to payin main db")
-        raise
-
-    try:
-        await payin_paymentdb.connect()
-    except Exception:
-        root_logger.exception("failed to connect to payin payment db")
-        raise
-
-    try:
-        await ledger_maindb.connect()
-    except Exception:
-        root_logger.exception("failed to connect to ledger main db")
-        raise
-
-    try:
-        await ledger_paymentdb.connect()
-    except Exception:
-        root_logger.exception("failed to connect to ledger payment db")
-        raise
+    if "ledger" in config.INCLUDED_APPS:
+        await asyncio.gather(ledger_maindb.connect(), ledger_paymentdb.connect())
 
     stripe = StripeClientPool(
         settings_list=[

@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 from typing_extensions import final
 
-from app.commons.config.secrets import SecretAware, Secret
+from app.commons.config.secrets import Secret, SecretAware
 
 
 @final
@@ -110,3 +110,5 @@ class AppConfig(SecretAware):
     SENTRY_CONFIG: Optional[SentryConfig] = None
 
     STRIPE_MAX_WORKERS: int = 10
+
+    INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger"})
