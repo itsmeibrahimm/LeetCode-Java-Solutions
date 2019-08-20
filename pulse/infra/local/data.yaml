@@ -4,3 +4,4 @@ service_env:
   REPORT_ENABLED: false
   SERVICE_NAME: "payment-service"
   SERVICE_URI: "http://localhost:8082"
+  TEST_ENV: "local"

@@ -6,3 +6,4 @@ service_env:
   SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
   SERVICE_URI: "http://payment-service-web.prod.svc.cluster.local"
   REPORT_ENABLED: true
+  TEST_ENV: "prod"
