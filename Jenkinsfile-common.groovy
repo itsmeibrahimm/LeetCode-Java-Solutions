@@ -501,20 +501,10 @@ def inputCanDeployToProd() {
  * Notification utilities
  */
 
-def determineSlackMentions(sha) {
-    if (sha) {
-        GIT_DIFF_SUMMARY_SLACK_MENTIONS = github.summarizeChangesInGit(params['GITHUB_REPOSITORY'], sha, "origin/master", true)["plainText"]
-        return slack.slackify(slack.scrapeUniqueSlackMentionsFromString(GIT_DIFF_SUMMARY_SLACK_MENTIONS))
-    } else {
-        return "@here"
-    }
-}
-
 def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status) {
-    def slackMentions = determineSlackMentions(sha)
     def slackChannel = getCDSlackChannel()
     def serviceName = getServiceName()
-    slack.notifySlackChannel("[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]> ${slackMentions}", slackChannel)
+    slack.notifySlackChannel("[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
 }
 
 return this
