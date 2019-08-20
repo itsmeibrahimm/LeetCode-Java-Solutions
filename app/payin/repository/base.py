@@ -1,7 +1,8 @@
 from dataclasses import InitVar, dataclass
 from databases.core import Transaction
+from starlette.requests import Request
 
-from app.commons.context.app_context import AppContext
+from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.database.infra import DB
 from app.commons.utils.dataclass_extensions import no_init_field
 
@@ -25,3 +26,8 @@ class PayinDBRepository:
 
     def payment_database_transaction(self) -> Transaction:
         return self.payment_database.master().transaction()
+
+    @classmethod
+    def get_repository(cls, request: Request):
+        app_context: AppContext = get_global_app_context(request)
+        return cls(context=app_context)

@@ -2,8 +2,10 @@ from asyncio import gather
 import uuid
 from typing import Any, Tuple, List, Optional
 
-from app.commons.context.app_context import AppContext
-from app.commons.context.req_context import ReqContext
+from fastapi import Depends
+
+from app.commons.context.app_context import AppContext, get_global_app_context
+from app.commons.context.req_context import ReqContext, get_context_from_req
 from app.commons.providers.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
@@ -31,7 +33,7 @@ from app.payin.core.cart_payment.types import (
     ConfirmationMethod,
     IntentStatus,
 )
-from app.payin.core.payment_method.processor import get_payment_method
+from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 from app.payin.repository.payer_repo import PayerRepository, GetPgpCustomerInput
@@ -40,17 +42,23 @@ from app.payin.repository.payer_repo import PayerRepository, GetPgpCustomerInput
 class CartPaymentInterface:
     def __init__(
         self,
-        app_context: AppContext,
-        req_context: ReqContext,
-        payment_repo: CartPaymentRepository,
-        payer_repo: Optional[PayerRepository] = None,
-        payment_method_repo: Optional[PaymentMethodRepository] = None,
+        app_context: AppContext = Depends(get_global_app_context),
+        req_context: ReqContext = Depends(get_context_from_req),
+        payment_repo: CartPaymentRepository = Depends(
+            CartPaymentRepository.get_repository
+        ),
+        payer_repo: PayerRepository = Depends(PayerRepository.get_repository),
+        payment_method_repo: PaymentMethodRepository = Depends(
+            PaymentMethodRepository.get_repository
+        ),
+        payment_method_client: PaymentMethodClient = Depends(PaymentMethodClient),
     ):
         self.app_context = app_context
         self.req_context = req_context
         self.payment_repo = payment_repo
         self.payer_repo = payer_repo
         self.payment_method_repo = payment_method_repo
+        self.payment_method_client = payment_method_client
 
     async def _find_existing(
         self, payer_id: str, idempotency_key: str
@@ -529,9 +537,8 @@ class CartPaymentInterface:
         assert self.payer_repo
         assert self.payment_method_repo
         # Get payment method, in order to submit new intent to the provider
-        payment_method, stripe_card = await get_payment_method(
-            payment_method_repository=self.payment_method_repo,
-            req_ctxt=self.req_context,
+
+        payment_method, stripe_card = await self.payment_method_client.get_payment_method(
             payer_id=payer_id,
             payment_method_id=payment_method_id,
             payer_id_type=payer_id_type,
@@ -819,150 +826,135 @@ class CartPaymentInterface:
             )
 
 
-async def update_payment(
-    app_context: AppContext,
-    req_context: ReqContext,
-    payment_repo: CartPaymentRepository,
-    payer_repo: PayerRepository,
-    payment_method_repo: PaymentMethodRepository,
-    idempotency_key: str,
-    cart_payment_id: uuid.UUID,
-    payer_id: str,
-    amount: int,
-    legacy_payment: Optional[LegacyPayment],
-    client_description: Optional[str],
-    payer_statement_description: Optional[str],
-    metadata: Optional[CartMetadata],
-) -> CartPayment:
-    """Update an existing payment.
+class CartPaymentProcessor:
+    def __init__(
+        self,
+        cart_payment_interface: CartPaymentInterface = Depends(CartPaymentInterface),
+    ):
+        self.cart_payment_interface = cart_payment_interface
 
-    Arguments:
-        app_context {AppContext} -- Application context.
-        req_context {ReqContext} -- Request context.
-        payment_repo {CartPaymentRepository} -- Repo for accessing CartPayment and associated models.
-        payer_repo {PayerRepository} -- Repo for accessing Payer and associated models.
-        payment_method_repo {PaymentMethodRepository} -- Repo for accessing PaymentMethod and associated models.
-        idempotency_key {str} -- Client specified value for ensuring idempotency.
-        cart_payment_id {uuid.UUID} -- ID of the cart payment to adjust.
-        payer_id {str} -- ID of the payer who owns the specified cart payment.
-        amount {int} -- New amount to use for cart payment.
-        legacy_payment {Optional[LegacyPayment]} -- Legacy payment, for support legacy clients.
-        client_description {Optional[str]} -- New client description to use for cart payment.
-        payer_statement_description {Optional[str]} -- New payer statement description to use for cart payment.
-        metadata {Optional[CartMetadata]} -- Metadata of cart payment.
+    async def update_payment(
+        self,
+        idempotency_key: str,
+        cart_payment_id: uuid.UUID,
+        payer_id: str,
+        amount: int,
+        legacy_payment: Optional[LegacyPayment],
+        client_description: Optional[str],
+        payer_statement_description: Optional[str],
+        metadata: Optional[CartMetadata],
+    ) -> CartPayment:
+        """Update an existing payment.
 
-    Raises:
-        CartPaymentReadError: Raised when there is an error retrieving the specified cart payment.
+        Arguments:
+            payment_method_repo {PaymentMethodRepository} -- Repo for accessing PaymentMethod and associated models.
+            idempotency_key {str} -- Client specified value for ensuring idempotency.
+            cart_payment_id {uuid.UUID} -- ID of the cart payment to adjust.
+            payer_id {str} -- ID of the payer who owns the specified cart payment.
+            amount {int} -- New amount to use for cart payment.
+            legacy_payment {Optional[LegacyPayment]} -- Legacy payment, for support legacy clients.
+            client_description {Optional[str]} -- New client description to use for cart payment.
+            payer_statement_description {Optional[str]} -- New payer statement description to use for cart payment.
+            metadata {Optional[CartMetadata]} -- Metadata of cart payment.
 
-    Returns:
-        CartPayment -- An updated CartPayment instance, reflecting changes requested by the client.
-    """
+        Raises:
+            CartPaymentReadError: Raised when there is an error retrieving the specified cart payment.
 
-    cart_payment_interface = CartPaymentInterface(
-        app_context, req_context, payment_repo, payer_repo, payment_method_repo
-    )
+        Returns:
+            CartPayment -- An updated CartPayment instance, reflecting changes requested by the client.
+        """
 
-    # Get the payment intent by ID
-    cart_payment = await cart_payment_interface._get_cart_payment(cart_payment_id)
-    if not cart_payment:
-        raise CartPaymentReadError(
-            error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+        # Get the payment intent by ID
+        cart_payment = await self.cart_payment_interface._get_cart_payment(
+            cart_payment_id
         )
+        if not cart_payment:
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
 
-    # Ensure the caller can access the cart payment being modified
-    if not cart_payment_interface.is_accessible(cart_payment, payer_id, ""):
-        raise CartPaymentReadError(
-            error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
-        )
+        # Ensure the caller can access the cart payment being modified
+        if not self.cart_payment_interface.is_accessible(cart_payment, payer_id, ""):
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
+            )
 
-    # Update the cart payment
-    return await cart_payment_interface.update_payment(
-        cart_payment,
-        idempotency_key,
-        amount,
-        legacy_payment,
-        client_description,
-        payer_statement_description,
-        metadata,
-    )
-
-
-async def submit_payment(
-    app_context: AppContext,
-    req_context: ReqContext,
-    payment_repo: CartPaymentRepository,
-    payer_repo: PayerRepository,
-    payment_method_repo: PaymentMethodRepository,
-    request_cart_payment: CartPayment,
-    idempotency_key: str,
-    country: str,
-    currency: str,
-    client_description: str,
-    payer_id_type: PayerIdType,
-    payment_method_id_type: PaymentMethodIdType,
-) -> CartPayment:
-    """Submit a cart payment creation request.
-
-    Arguments:
-        app_context {AppContext} -- Application context.
-        req_context {ReqContext} -- Request context.
-        payment_repo {CartPaymentRepository} -- Repo for accessing CartPayment and associated models.
-        payer_repo {PayerRepository} -- Repo for accessing Payer and associated models.
-        payment_method_repo {PaymentMethodRepository} -- Repo for accessing PaymentMethod and associated models.
-        request_cart_payment {CartPayment} -- CartPayment model containing request paramters provided by client.
-        idempotency_key {str} -- Client specified value for ensuring idempotency.
-        country {str} -- ISO country code.
-        currency {str} -- Currency for cart payment request.
-        client_description {str} -- Pass through value clients may associated with the cart payment.
-        payer_id_type {PayerIdType} -- Type for payer ID, to support legacy clients.
-        payment_method_id_type {PaymentMethodIdType} -- Type for payment method ID, to support legacy clients.
-
-    Returns:
-        CartPayment -- A CartPayment model for the created payment.
-    """
-    # TODO: Validate amount does not exceed configured max for specified currency
-
-    if not request_cart_payment.payment_method_id:
-        raise CartPaymentCreateError(
-            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA, retryable=False
-        )
-
-    cart_payment_interface = CartPaymentInterface(
-        app_context, req_context, payment_repo, payer_repo, payment_method_repo
-    )
-
-    # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
-    # our exception handling middleware.
-    payment_method_resource_id, customer_resource_id = await cart_payment_interface._get_required_payment_resource_ids(
-        payer_id=request_cart_payment.payer_id,
-        payer_id_type=payer_id_type,
-        payment_method_id=request_cart_payment.payment_method_id,
-        payment_method_id_type=payment_method_id_type,
-    )
-
-    # Check for resubmission by client
-    cart_payment, payment_intent = await cart_payment_interface._find_existing(
-        request_cart_payment.payer_id, idempotency_key
-    )
-    if cart_payment and payment_intent:
-        return await cart_payment_interface.resubmit_existing_payment(
+        # Update the cart payment
+        return await self.cart_payment_interface.update_payment(
             cart_payment,
-            payment_intent,
+            idempotency_key,
+            amount,
+            legacy_payment,
+            client_description,
+            payer_statement_description,
+            metadata,
+        )
+
+    async def submit_payment(
+        self,
+        request_cart_payment: CartPayment,
+        idempotency_key: str,
+        country: str,
+        currency: str,
+        client_description: str,
+        payer_id_type: PayerIdType,
+        payment_method_id_type: PaymentMethodIdType,
+    ) -> CartPayment:
+        """Submit a cart payment creation request.
+
+        Arguments:
+            request_cart_payment {CartPayment} -- CartPayment model containing request paramters provided by client.
+            idempotency_key {str} -- Client specified value for ensuring idempotency.
+            country {str} -- ISO country code.
+            currency {str} -- Currency for cart payment request.
+            client_description {str} -- Pass through value clients may associated with the cart payment.
+            payer_id_type {PayerIdType} -- Type for payer ID, to support legacy clients.
+            payment_method_id_type {PaymentMethodIdType} -- Type for payment method ID, to support legacy clients.
+
+        Returns:
+            CartPayment -- A CartPayment model for the created payment.
+        """
+        # TODO: Validate amount does not exceed configured max for specified currency
+
+        if not request_cart_payment.payment_method_id:
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+                retryable=False,
+            )
+
+        # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
+        # our exception handling middleware.
+        payment_method_resource_id, customer_resource_id = await self.cart_payment_interface._get_required_payment_resource_ids(
+            payer_id=request_cart_payment.payer_id,
+            payer_id_type=payer_id_type,
+            payment_method_id=request_cart_payment.payment_method_id,
+            payment_method_id_type=payment_method_id_type,
+        )
+
+        # Check for resubmission by client
+        cart_payment, payment_intent = await self.cart_payment_interface._find_existing(
+            request_cart_payment.payer_id, idempotency_key
+        )
+        if cart_payment:
+            assert payment_intent
+            return await self.cart_payment_interface.resubmit_existing_payment(
+                cart_payment,
+                payment_intent,
+                payment_method_resource_id,
+                customer_resource_id,
+            )
+
+        cart_payment, payment_intent = await self.cart_payment_interface.submit_new_payment(
+            request_cart_payment,
             payment_method_resource_id,
             customer_resource_id,
+            idempotency_key,
+            country,
+            currency,
+            client_description,
         )
 
-    cart_payment, payment_intent = await cart_payment_interface.submit_new_payment(
-        request_cart_payment,
-        payment_method_resource_id,
-        customer_resource_id,
-        idempotency_key,
-        country,
-        currency,
-        client_description,
-    )
+        if self.cart_payment_interface.is_capture_immediate(payment_intent):
+            await self.cart_payment_interface.capture_payment(payment_intent)
 
-    if cart_payment_interface.is_capture_immediate(payment_intent):
-        await cart_payment_interface.capture_payment(payment_intent)
-
-    return cart_payment
+        return cart_payment

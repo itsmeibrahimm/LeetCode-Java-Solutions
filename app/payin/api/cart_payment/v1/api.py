@@ -1,14 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from structlog import BoundLogger
 
-from app.commons.context.req_context import get_context_from_req
-from app.commons.context.app_context import get_context_from_app
+from app.commons.context.req_context import get_logger_from_req
 from app.commons.error.errors import PaymentError, PaymentException
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
 )
 from app.payin.core.exceptions import PayinErrorCode
-from app.payin.core.cart_payment.processor import submit_payment, update_payment
+from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CartMetadata,
@@ -16,9 +16,6 @@ from app.payin.core.cart_payment.model import (
     SplitPayment,
     LegacyPayment,
 )
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
-from app.payin.repository.payer_repo import PayerRepository
-from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
 from starlette.status import (
     HTTP_200_OK,
@@ -27,35 +24,23 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
-from starlette.requests import Request
 from typing import Optional
 from uuid import UUID, uuid4
 
 
-def create_cart_payments_router(
-    cart_payment_repo: CartPaymentRepository,
-    payer_repo: PayerRepository,
-    payment_method_repo: PaymentMethodRepository,
-) -> APIRouter:
+def create_cart_payments_router() -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/v1/cart_payments", status_code=HTTP_201_CREATED)
     async def create_cart_payment(
-        cart_payment_request: CreateCartPaymentRequest, request: Request
+        cart_payment_request: CreateCartPaymentRequest,
+        log: BoundLogger = Depends(get_logger_from_req),
+        cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
     ):
-        req_context = get_context_from_req(request)
-        app_context = get_context_from_app(request.app)
-        req_context.log.debug(
-            f"Creating cart_payment for payer {cart_payment_request.payer_id}"
-        )
+        log.debug(f"Creating cart_payment for payer {cart_payment_request.payer_id}")
 
         try:
-            cart_payment = await submit_payment(
-                app_context=app_context,
-                req_context=req_context,
-                payment_repo=cart_payment_repo,
-                payer_repo=payer_repo,
-                payment_method_repo=payment_method_repo,
+            cart_payment = await cart_payment_processor.submit_payment(
                 request_cart_payment=request_to_model(cart_payment_request),
                 idempotency_key=cart_payment_request.idempotency_key,
                 country=cart_payment_request.country,
@@ -65,7 +50,7 @@ def create_cart_payments_router(
                 payment_method_id_type=cart_payment_request.payment_method_id_type,
             )
 
-            req_context.log.info(
+            log.info(
                 f"Created cart_payment {cart_payment.id} of type {cart_payment.cart_metadata.type} for payer {cart_payment.payer_id}"
             )
             return cart_payment
@@ -92,18 +77,12 @@ def create_cart_payments_router(
     async def update_cart_payment(
         cart_payment_id: UUID,
         cart_payment_request: UpdateCartPaymentRequest,
-        request: Request,
+        log: BoundLogger = Depends(get_logger_from_req),
+        cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
     ):
-        req_context = get_context_from_req(request)
-        app_context = get_context_from_app(request.app)
-        req_context.log.info(f"Updating cart_payment {cart_payment_id}")
+        log.info(f"Updating cart_payment {cart_payment_id}")
 
-        cart_payment: CartPayment = await update_payment(
-            app_context=app_context,
-            req_context=req_context,
-            payment_repo=cart_payment_repo,
-            payer_repo=payer_repo,
-            payment_method_repo=payment_method_repo,
+        cart_payment: CartPayment = await cart_payment_processor.update_payment(
             idempotency_key=cart_payment_request.idempotency_key,
             cart_payment_id=cart_payment_id,
             payer_id=cart_payment_request.payer_id,
@@ -113,7 +92,7 @@ def create_cart_payments_router(
             payer_statement_description=cart_payment_request.payer_statement_description,
             metadata=get_cart_payment_metadata_model(cart_payment_request),
         )
-        req_context.log.info(
+        log.info(
             f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
         )
         return cart_payment

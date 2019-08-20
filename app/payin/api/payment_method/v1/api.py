@@ -1,9 +1,8 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.commons.context.app_context import get_context_from_app, AppContext
 from app.commons.context.req_context import get_context_from_req, ReqContext
 from app.commons.error.errors import PaymentError, PaymentException
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
@@ -21,22 +20,21 @@ from starlette.status import (
 
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod
-from app.payin.core.payment_method.processor import (
-    create_payment_method_impl,
-    get_payment_method_impl,
-    delete_payment_method_impl,
-)
-from app.payin.repository.payment_method_repo import PaymentMethodRepository
+from app.payin.core.payment_method.processor import PaymentMethodProcessor
 
 logger = logging.getLogger(__name__)
 
 
-def create_payment_method_router(payment_method_repository: PaymentMethodRepository):
+def create_payment_method_router():
     router = APIRouter()
 
     @router.post("/api/v1/payment_methods", status_code=HTTP_201_CREATED)
     async def create_payment_method(
-        request: Request, req_body: CreatePaymentMethodRequest
+        request: Request,
+        req_body: CreatePaymentMethodRequest,
+        payment_method_processor: PaymentMethodProcessor = Depends(
+            PaymentMethodProcessor
+        ),
     ):
         """
         Create a payment method for payer on DoorDash payments platform
@@ -49,7 +47,6 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         - **dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
         - **stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
         """
-        app_ctxt: AppContext = get_context_from_app(request.app)
         req_ctxt: ReqContext = get_context_from_req(request)
         req_ctxt.log.info(
             "[create_payment_method] receive request. payer_id:%s", req_body.payer_id
@@ -62,10 +59,7 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
             str
         ] = req_body.legacy_payment_info.stripe_customer_id if req_body.legacy_payment_info else None
         try:
-            payment_method: PaymentMethod = await create_payment_method_impl(
-                payment_method_repository=payment_method_repository,
-                app_ctxt=app_ctxt,
-                req_ctxt=req_ctxt,
+            payment_method: PaymentMethod = await payment_method_processor.create_payment_method_impl(
                 payer_id=req_body.payer_id,
                 payment_gateway=req_body.payment_gateway,
                 token=req_body.token,
@@ -107,6 +101,9 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         payer_id_type: str = None,
         payment_method_id_type: str = None,
         force_update: bool = False,
+        payment_method_processor: PaymentMethodProcessor = Depends(
+            PaymentMethodProcessor
+        ),
     ):
         """
         Get a payment method for payer on DoorDash payments platform
@@ -122,7 +119,6 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                                       (default is "dd_payment_method_id")
         - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
         """
-        app_ctxt: AppContext = get_context_from_app(request.app)
         req_ctxt: ReqContext = get_context_from_req(request)
         req_ctxt.log.info(
             "[get_payment_method] receive request: payer_id=%s, payment_method_id=%s, payer_id_type=%s, payment_method_id_type=%s, force_update=%s",
@@ -134,10 +130,7 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         )
 
         try:
-            payment_method: PaymentMethod = await get_payment_method_impl(
-                payment_method_repository=payment_method_repository,
-                app_ctxt=app_ctxt,
-                req_ctxt=req_ctxt,
+            payment_method: PaymentMethod = await payment_method_processor.get_payment_method_impl(
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
                 payer_id_type=payer_id_type,
@@ -186,6 +179,9 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
         payment_method_id: str,
         payer_id_type: str = None,
         payment_method_id_type: str = None,
+        payment_method_processor: PaymentMethodProcessor = Depends(
+            PaymentMethodProcessor
+        ),
     ):
         """
         Detach a payment method for payer on DoorDash payments platform
@@ -200,15 +196,11 @@ def create_payment_method_router(payment_method_repository: PaymentMethodReposit
                                       "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
                                       (default is "dd_payment_method_id")
         """
-        app_ctxt: AppContext = get_context_from_app(request.app)
         req_ctxt: ReqContext = get_context_from_req(request)
         req_ctxt.log.info("[delete_payment_method] receive request")
 
         try:
-            payment_method: PaymentMethod = await delete_payment_method_impl(
-                payment_method_repository=payment_method_repository,
-                app_ctxt=app_ctxt,
-                req_ctxt=req_ctxt,
+            payment_method: PaymentMethod = await payment_method_processor.delete_payment_method_impl(
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
                 payer_id_type=payer_id_type,

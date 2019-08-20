@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from random import choice
 from typing import Any, cast
 
+from starlette.requests import Request
 from structlog import BoundLogger
 
 from app.commons.applications import FastAPI
@@ -176,6 +177,15 @@ def get_context_from_app(app: FastAPI) -> AppContext:
     assert context is not None, "app context is not set"
     assert isinstance(context, AppContext), "app context has correct type"
     return cast(AppContext, context)
+
+
+def get_global_app_context(request: Request) -> AppContext:
+    """
+    Wrapper function so that client code does not need to make assumptions that context is tied to app.
+    :param request:
+    :return:
+    """
+    return get_context_from_app(request.app)
 
 
 def app_context_exists(app: FastAPI) -> bool:

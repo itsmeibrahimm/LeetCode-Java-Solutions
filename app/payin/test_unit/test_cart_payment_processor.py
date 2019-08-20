@@ -6,6 +6,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
 )
+from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 import app.payin.core.cart_payment.processor as processor
 from app.payin.tests.utils import (
@@ -73,21 +74,35 @@ class TestCartPaymentProcessor:
         cart_payment_repo.update_pgp_payment_intent = FunctionMock()
         return cart_payment_repo
 
+    @pytest.fixture
+    def payment_method_client(self, payment_method_repo):
+        return PaymentMethodClient(
+            payment_method_repository=payment_method_repo, log=MagicMock()
+        )
+
     async def test_submit_with_no_payment_method(
-        self, request_cart_payment, payment_method_repo
+        self, request_cart_payment, payment_method_repo, payment_method_client
     ):
+        cart_payment_interface = processor.CartPaymentInterface(
+            app_context=MagicMock(),
+            req_context=MagicMock(),
+            payment_repo=MagicMock(),
+            payer_repo=MagicMock(),
+            payment_method_repo=payment_method_repo,
+            payment_method_client=payment_method_client,
+        )
 
         # No payment method found
         payment_method_repo.get_pgp_payment_method_by_payment_method_id = FunctionMock(
             return_value=None
         )
+
+        cart_payment_processor = processor.CartPaymentProcessor(
+            cart_payment_interface=cart_payment_interface
+        )
+
         with pytest.raises(PaymentMethodReadError) as payment_error:
-            await processor.submit_payment(
-                app_context=MagicMock(),
-                req_context=MagicMock(),
-                payment_repo=MagicMock(),
-                payer_repo=MagicMock(),
-                payment_method_repo=payment_method_repo,
+            await cart_payment_processor.submit_payment(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=uuid.uuid4(),
                 country="US",
@@ -102,17 +117,25 @@ class TestCartPaymentProcessor:
         )
 
     async def test_submit_with_other_owner(
-        self, request_cart_payment, payment_method_repo
+        self, request_cart_payment, payment_method_repo, payment_method_client
     ):
         request_cart_payment.payer_id = f"changed-{request_cart_payment.payer_id}"
 
+        cart_payment_interface = processor.CartPaymentInterface(
+            app_context=MagicMock(),
+            req_context=MagicMock(),
+            payment_repo=MagicMock(),
+            payer_repo=MagicMock(),
+            payment_method_repo=payment_method_repo,
+            payment_method_client=payment_method_client,
+        )
+
+        cart_payment_processor = processor.CartPaymentProcessor(
+            cart_payment_interface=cart_payment_interface
+        )
+
         with pytest.raises(PaymentMethodReadError) as payment_error:
-            await processor.submit_payment(
-                app_context=MagicMock(),
-                req_context=MagicMock(),
-                payment_repo=MagicMock(),
-                payer_repo=MagicMock(),
-                payment_method_repo=payment_method_repo,
+            await cart_payment_processor.submit_payment(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=uuid.uuid4(),
                 country="US",
@@ -137,17 +160,31 @@ class TestCartPaymentProcessor:
         pass
 
     async def test_submit(
-        self, request_cart_payment, cart_payment_repo, payer_repo, payment_method_repo
+        self,
+        request_cart_payment,
+        cart_payment_repo,
+        payer_repo,
+        payment_method_repo,
+        payment_method_client,
     ):
         app_context = MagicMock()
         app_context.stripe = MagicMock()
         app_context.stripe.create_payment_intent = FunctionMock()
-        result = await processor.submit_payment(
+
+        cart_payment_interface = processor.CartPaymentInterface(
             app_context=app_context,
             req_context=MagicMock(),
             payment_repo=cart_payment_repo,
             payer_repo=payer_repo,
             payment_method_repo=payment_method_repo,
+            payment_method_client=payment_method_client,
+        )
+
+        cart_payment_processor = processor.CartPaymentProcessor(
+            cart_payment_interface=cart_payment_interface
+        )
+
+        result = await cart_payment_processor.submit_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=uuid.uuid4(),
             country="US",
@@ -160,7 +197,12 @@ class TestCartPaymentProcessor:
         assert result.id
 
     async def test_resubmit(
-        self, request_cart_payment, cart_payment_repo, payer_repo, payment_method_repo
+        self,
+        request_cart_payment,
+        cart_payment_repo,
+        payer_repo,
+        payment_method_repo,
+        payment_method_client,
     ):
         app_context = MagicMock()
         app_context.stripe = MagicMock()
@@ -173,13 +215,21 @@ class TestCartPaymentProcessor:
             return_value=request_cart_payment
         )
 
-        # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
-        result = await processor.submit_payment(
+        cart_payment_interface = processor.CartPaymentInterface(
             app_context=app_context,
             req_context=MagicMock(),
             payment_repo=cart_payment_repo,
             payer_repo=payer_repo,
             payment_method_repo=payment_method_repo,
+            payment_method_client=payment_method_client,
+        )
+
+        cart_payment_processor = processor.CartPaymentProcessor(
+            cart_payment_interface=cart_payment_interface
+        )
+
+        # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
+        result = await cart_payment_processor.submit_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=uuid.uuid4(),
             country="US",
@@ -191,12 +241,7 @@ class TestCartPaymentProcessor:
         assert result
 
         # Second submission attempt
-        result = await processor.submit_payment(
-            app_context=app_context,
-            req_context=MagicMock(),
-            payment_repo=cart_payment_repo,
-            payer_repo=payer_repo,
-            payment_method_repo=payment_method_repo,
+        result = await cart_payment_processor.submit_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=uuid.uuid4(),
             country="US",
@@ -211,13 +256,22 @@ class TestCartPaymentProcessor:
     async def test_update_fake_cart_payment(self, cart_payment_repo):
         payment_repo = MagicMock()
         payment_repo.get_cart_payment_by_id = FunctionMock(return_value=None)
+
+        cart_payment_interface = processor.CartPaymentInterface(
+            app_context=MagicMock(),
+            req_context=MagicMock(),
+            payment_repo=payment_repo,
+            payer_repo=MagicMock(),
+            payment_method_repo=MagicMock(),
+            payment_method_client=MagicMock(),
+        )
+
+        cart_payment_processor = processor.CartPaymentProcessor(
+            cart_payment_interface=cart_payment_interface
+        )
+
         with pytest.raises(CartPaymentReadError) as payment_error:
-            await processor.update_payment(
-                app_context=MagicMock(),
-                req_context=MagicMock(),
-                payment_repo=payment_repo,
-                payer_repo=MagicMock(),
-                payment_method_repo=MagicMock(),
+            await cart_payment_processor.update_payment(
                 idempotency_key=uuid.uuid4(),
                 cart_payment_id=uuid.uuid4(),
                 payer_id="payer_id",
@@ -234,7 +288,12 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.asyncio
     async def test_update_payment_higher(
-        self, request_cart_payment, cart_payment_repo, payer_repo, payment_method_repo
+        self,
+        request_cart_payment,
+        cart_payment_repo,
+        payer_repo,
+        payment_method_repo,
+        payment_method_client,
     ):
         # TODO move some of the mocking into the fixutre, if it is common across different test functions
         app_context = MagicMock()
@@ -274,12 +333,20 @@ class TestCartPaymentProcessor:
             return_value=MagicMock()
         )
 
-        result = await processor.update_payment(
+        cart_payment_interface = processor.CartPaymentInterface(
             app_context=app_context,
             req_context=MagicMock(),
             payment_repo=cart_payment_repo,
             payer_repo=payer_repo,
             payment_method_repo=payment_method_repo,
+            payment_method_client=payment_method_client,
+        )
+
+        cart_payment_processor = processor.CartPaymentProcessor(
+            cart_payment_interface=cart_payment_interface
+        )
+
+        result = await cart_payment_processor.update_payment(
             idempotency_key=uuid.uuid4(),
             cart_payment_id=cart_payment.id,
             payer_id=cart_payment.payer_id,

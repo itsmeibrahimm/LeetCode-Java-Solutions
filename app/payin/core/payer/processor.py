@@ -2,9 +2,15 @@ from abc import abstractmethod
 from typing import Optional
 
 from asyncpg import DataError
+from fastapi import Depends
+from structlog import BoundLogger
 
-from app.commons.context.app_context import AppContext
-from app.commons.context.req_context import ReqContext
+from app.commons.context.app_context import AppContext, get_global_app_context
+from app.commons.context.req_context import (
+    ReqContext,
+    get_context_from_req,
+    get_logger_from_req,
+)
 
 from app.commons.providers.stripe_models import (
     CreateCustomer,
@@ -22,7 +28,7 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.types import PayerType
-from app.payin.core.payment_method.processor import get_payment_method
+from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import PayerIdType
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -40,7 +46,6 @@ from app.payin.repository.payer_repo import (
     StripeCustomerDbEntity,
     GetPayerByDDPayerIdAndTypeInput,
 )
-from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
 
 class PayerClient:
@@ -49,7 +54,10 @@ class PayerClient:
     """
 
     def __init__(
-        self, app_ctxt: AppContext, req_ctxt: ReqContext, payer_repo: PayerRepository
+        self,
+        app_ctxt: AppContext = Depends(get_global_app_context),
+        req_ctxt: ReqContext = Depends(get_context_from_req),
+        payer_repo: PayerRepository = Depends(PayerRepository.get_repository),
     ):
         self.app_ctxt = app_ctxt
         self.req_ctxt = req_ctxt
@@ -262,173 +270,156 @@ class PayerClient:
         return stripe_customer
 
 
-async def create_payer_impl(
-    payer_repository: PayerRepository,
-    app_ctxt: AppContext,
-    req_ctxt: ReqContext,
-    dd_payer_id: str,
-    payer_type: str,
-    email: str,
-    country: str,
-    description: str,
-) -> Payer:
-    """
-    create a new DoorDash payer. We will create 3 models under the hood:
-        - Payer
-        - PgpCustomer
-        - StripeCustomer (for backward compatibility)
+class PayerProcessor:
+    def __init__(
+        self,
+        payment_method_client: PaymentMethodClient = Depends(PaymentMethodClient),
+        payer_client: PayerClient = Depends(PayerClient),
+        log: BoundLogger = Depends(get_logger_from_req),
+    ):
+        self.payer_client = payer_client
+        self.log = log
+        self.payment_method_client = payment_method_client
 
-    :param payer_repository:
-    :param app_ctxt: Application context
-    :param req_ctxt: Request context
-    :param dd_payer_id: DoorDash client identifier (consumer_id, etc.)
-    :param payer_type: Identify the owner type
-    :param email: payer email
-    :param country: payer country code
-    :param description: short description for the payer
-    :return: Payer object
-    """
-    req_ctxt.log.info(
-        f"[create_payer_impl] dd_payer_id:{dd_payer_id}, payer_type:{payer_type}"
-    )
+    async def create(
+        self,
+        dd_payer_id: str,
+        payer_type: str,
+        email: str,
+        country: str,
+        description: str,
+    ) -> Payer:
+        """
+        create a new DoorDash payer. We will create 3 models under the hood:
+            - Payer
+            - PgpCustomer
+            - StripeCustomer (for backward compatibility)
 
-    # TODO: we should get pgp_code in different way
-    pgp_code = PaymentProvider.STRIPE.value
-    payer_client = PayerClient(
-        app_ctxt=app_ctxt, req_ctxt=req_ctxt, payer_repo=payer_repository
-    )
+        :param dd_payer_id: DoorDash client identifier (consumer_id, etc.)
+        :param payer_type: Identify the owner type
+        :param email: payer email
+        :param country: payer country code
+        :param description: short description for the payer
+        :return: Payer object
+        """
+        self.log.info(
+            f"[create_payer_impl] dd_payer_id:{dd_payer_id}, payer_type:{payer_type}"
+        )
 
-    # step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
-    await payer_client.has_existing_payer(
-        dd_payer_id=dd_payer_id, payer_type=payer_type
-    )
+        # TODO: we should get pgp_code in different way
+        pgp_code = PaymentProvider.STRIPE.value
 
-    # step 2: create PGP customer
-    pgp_customer_id: CustomerId = await payer_client.pgp_create_customer(
-        country=country, email=email, description=description
-    )
+        # step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
+        await self.payer_client.has_existing_payer(
+            dd_payer_id=dd_payer_id, payer_type=payer_type
+        )
 
-    req_ctxt.log.info(
-        f"[create_payer_impl][{dd_payer_id}] create PGP customer completed. id:[{pgp_customer_id}]"
-    )
+        # step 2: create PGP customer
+        pgp_customer_id: CustomerId = await self.payer_client.pgp_create_customer(
+            country=country, email=email, description=description
+        )
 
-    # step 3: create Payer/PgpCustomer/StripeCustomer objects
-    raw_payer: RawPayer = await payer_client.create_payer_raw_objects(
-        dd_payer_id=dd_payer_id,
-        payer_type=payer_type,
-        country=country,
-        pgp_customer_id=pgp_customer_id,
-        pgp_code=pgp_code,
-        description=description,
-    )
-    return raw_payer.to_payer()
+        self.log.info(
+            f"[create_payer_impl][{dd_payer_id}] create PGP customer completed. id:[{pgp_customer_id}]"
+        )
 
+        # step 3: create Payer/PgpCustomer/StripeCustomer objects
+        raw_payer: RawPayer = await self.payer_client.create_payer_raw_objects(
+            dd_payer_id=dd_payer_id,
+            payer_type=payer_type,
+            country=country,
+            pgp_customer_id=pgp_customer_id,
+            pgp_code=pgp_code,
+            description=description,
+        )
+        return raw_payer.to_payer()
 
-async def get_payer_impl(
-    app_ctxt: AppContext,
-    req_ctxt: ReqContext,
-    payer_id: str,
-    payer_id_type: Optional[str],
-    payer_type: Optional[str],
-    force_update: Optional[bool] = False,
-) -> Payer:
-    """
-    Retrieve DoorDash payer
+    async def get(
+        self,
+        payer_id: str,
+        payer_id_type: Optional[str],
+        payer_type: Optional[str],
+        force_update: Optional[bool] = False,
+    ):
+        """
+        Retrieve DoorDash payer
 
-    :param app_ctxt: Application context
-    :param req_ctxt: Request context
-    :param payer_id: payer unique id.
-    :param payer_type: Identify the owner type. This is for backward compatibility.
-           Caller can ignore it for new consumer who is onboard from
-           new payer APIs.
-    :param payer_id_type: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-           "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
-    :return: Payer object
-    """
-    req_ctxt.log.info(
-        f"[get_payer_impl] payer_id:{payer_id}, payer_id_type:{payer_id_type}"
-    )
+        :param payer_id: payer unique id.
+        :param payer_type: Identify the owner type. This is for backward compatibility.
+               Caller can ignore it for new consumer who is onboard from
+               new payer APIs.
+        :param payer_id_type: [string] identify the type of payer_id. Valid values include "dd_payer_id",
+               "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+        :return: Payer object
+        """
+        self.log.info(
+            f"[get_payer_impl] payer_id:{payer_id}, payer_id_type:{payer_id_type}"
+        )
 
-    # TODO: if force_update is true, we should retrieve the customer from PGP
+        # TODO: if force_update is true, we should retrieve the customer from PGP
 
-    payer_client = PayerClient(
-        app_ctxt=app_ctxt,
-        req_ctxt=req_ctxt,
-        payer_repo=PayerRepository(context=app_ctxt),
-    )
-    raw_payer: RawPayer = await payer_client.get_payer_raw_objects(
-        payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
-    )
-    return raw_payer.to_payer()
+        raw_payer: RawPayer = await self.payer_client.get_payer_raw_objects(
+            payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
+        )
+        return raw_payer.to_payer()
 
+    async def update(
+        self,
+        payer_id: str,
+        default_payment_method_id: str,
+        country: CountryCode = CountryCode.US,
+        payer_id_type: Optional[str] = None,
+        payer_type: Optional[str] = None,
+        payment_method_id_type: Optional[str] = None,
+    ):
+        """
+        Update DoorDash payer's default payment method.
 
-async def update_payer_impl(
-    payer_repository: PayerRepository,
-    app_ctxt: AppContext,
-    req_ctxt: ReqContext,
-    payer_id: str,
-    default_payment_method_id: str,
-    country: CountryCode = CountryCode.US,
-    payer_id_type: Optional[str] = None,
-    payer_type: Optional[str] = None,
-    payment_method_id_type: Optional[str] = None,
-) -> Payer:
-    """
-    Update DoorDash payer's default payment method.
+        :param country:
+        :param payer_id: payer unique id.
+        :param default_payment_method_id: new default payment_method identity.
+        :param payer_id_type: Identify the owner type. This is for backward compatibility.
+                              Caller can ignore it for new consumer who is onboard from
+                              new payer APIs.
+        :param payer_type:
+        :param payment_method_id_type:
+        :param payer_client: Utility client that manipulates payer objects
+        :return: Payer object
+        """
+        # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
+        raw_payer: RawPayer = await self.payer_client.get_payer_raw_objects(
+            payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
+        )
 
-    :param payer_repository:
-    :param app_ctxt: Application context
-    :param req_ctxt: Request context
-    :param payer_id: payer unique id.
-    :param default_payment_method_id: new default payment_method identity.
-    :param payer_id_type: Identify the owner type. This is for backward compatibility.
-                          Caller can ignore it for new consumer who is onboard from
-                          new payer APIs.
-    :param payer_type:
-    :param payment_method_id_type:
-    :return: Payer object
-    """
+        # step 2: find PaymentMethod object to get pgp_resource_id.
+        pm_entity, sc_entity = await self.payment_method_client.get_payment_method(
+            payer_id=payer_id,
+            payment_method_id=default_payment_method_id,
+            payer_id_type=payer_id_type,
+            payment_method_id_type=payment_method_id_type,
+        )
 
-    payer_client = PayerClient(
-        app_ctxt=app_ctxt, req_ctxt=req_ctxt, payer_repo=payer_repository
-    )
+        # step 3: call PGP/stripe api to update default payment method
+        stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
+            country=country,
+            pgp_customer_id=raw_payer.get_pgp_customer_id(),
+            default_payment_method_id=sc_entity.stripe_id,
+        )
 
-    # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
-    raw_payer: RawPayer = await payer_client.get_payer_raw_objects(
-        payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
-    )
+        self.log.info(
+            f"[update_payer_impl][{payer_id}][{payer_id_type}] PGP update default_payment_method completed:[{stripe_customer.invoice_settings.default_payment_method}]"
+        )
 
-    # step 2: find PaymentMethod object to get pgp_resource_id.
-    pm_entity, sc_entity = await get_payment_method(
-        payment_method_repository=PaymentMethodRepository(context=app_ctxt),
-        req_ctxt=req_ctxt,
-        payer_id=payer_id,
-        payment_method_id=default_payment_method_id,
-        payer_id_type=payer_id_type,
-        payment_method_id_type=payment_method_id_type,
-    )
+        # step 4: update default_payment_method in pgp_customers/stripe_customer table
+        updated_raw_payer: RawPayer = await self.payer_client.update_payer_default_payment_method(
+            raw_payer=raw_payer,
+            pgp_default_payment_method_id=sc_entity.stripe_id,
+            payer_id=payer_id,
+            payer_type=payer_type,
+            payer_id_type=payer_id_type,
+        )
 
-    # step 3: call PGP/stripe api to update default payment method
-    stripe_customer = await payer_client.pgp_update_customer_default_payment_method(
-        country=country,
-        pgp_customer_id=raw_payer.get_pgp_customer_id(),
-        default_payment_method_id=sc_entity.stripe_id,
-    )
-
-    req_ctxt.log.info(
-        f"[update_payer_impl][{payer_id}][{payer_id_type}] PGP update default_payment_method completed:[{stripe_customer.invoice_settings.default_payment_method}]"
-    )
-
-    # step 4: update default_payment_method in pgp_customers/stripe_customer table
-    updated_raw_payer: RawPayer = await payer_client.update_payer_default_payment_method(
-        raw_payer=raw_payer,
-        pgp_default_payment_method_id=sc_entity.stripe_id,
-        payer_id=payer_id,
-        payer_type=payer_type,
-        payer_id_type=payer_id_type,
-    )
-
-    return updated_raw_payer.to_payer()
+        return updated_raw_payer.to_payer()
 
 
 class PayerOpsInterface:

@@ -37,3 +37,7 @@ def get_context_from_req(request: Request) -> ReqContext:
 def build_req_context(app_context: AppContext):
     req_id = uuid4()
     return ReqContext(req_id=req_id, log=app_context.log.bind(req_id=req_id))
+
+
+def get_logger_from_req(request: Request):
+    return get_context_from_req(request).log
