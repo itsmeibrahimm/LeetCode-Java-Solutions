@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from typing_extensions import final
@@ -28,7 +28,9 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
     async def create_payout(self, data: PayoutCreate) -> Payout:
         stmt = (
             payouts.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*payouts.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

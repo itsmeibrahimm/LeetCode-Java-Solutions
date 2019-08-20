@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
@@ -76,7 +76,9 @@ class PaymentAccountRepository(
     ) -> PaymentAccount:
         stmt = (
             payment_accounts.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*payment_accounts.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

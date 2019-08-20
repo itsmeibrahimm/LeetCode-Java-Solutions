@@ -2,6 +2,8 @@ import pytest
 from starlette.testclient import TestClient
 from datetime import datetime
 
+from app.testcase_utils import validate_expected_items_in_dict
+
 TRANSFER_ENDPOINT = "/payout/api/v0/transfers"
 STRIPE_TRANSFER_ENDPOINT = "/payout/api/v0/transfers/stripe"
 
@@ -52,25 +54,54 @@ class TestTransferV0:
             "adjustments": "some-adjustment",
             "amount": 123,
             "method": "stripe",
+            "currency": "currency",
+            "submitted_at": "2019-08-20T05:34:53+00:00",
+            "deleted_at": "2019-08-20T05:34:53+00:00",
+            "manual_transfer_reason": "manual_transfer_reason",
+            "status": "status",
+            "status_code": "status_code",
+            "submitting_at": "2019-08-20T05:34:53+00:00",
+            "should_retry_on_failure": True,
+            "statement_description": "statement_description",
+            "created_by_id": 123,
+            "deleted_by_id": 321,
+            "payment_account_id": 123,
+            "recipient_id": 321,
+            "recipient_ct_id": 123,
+            "submitted_by_id": 321,
         }
 
         response = client.post(create_transfer_url(), json=transfer_to_create)
         assert response.status_code == 201
         created = response.json()
-        assert transfer_to_create.items() <= created.items()
+
+        validate_expected_items_in_dict(expected=transfer_to_create, actual=created)
+
         return created
 
     @pytest.fixture
     def prepared_stripe_transfer(self, prepared_transfer: dict, client: TestClient):
         to_create = {
-            "stripe_status": "default",
-            "stripe_id": f"stripe_id-{datetime.utcnow()}",
+            "stripe_status": "status",
             "transfer_id": prepared_transfer["id"],
+            "stripe_id": f"stripe_id-{datetime.utcnow()}",
+            "stripe_request_id": "stripe_request_id",
+            "stripe_failure_code": "stripe_failure_code",
+            "stripe_account_id": "stripe_account_id",
+            "stripe_account_type": "stripe_account_type",
+            "country_shortname": "country_shortname",
+            "bank_last_four": "bank_last_four",
+            "bank_name": "bank_name",
+            "submission_error_code": "submission_error_code",
+            "submission_error_type": "submission_error_type",
+            "submission_status": "submission_status",
+            "submitted_at": "2019-08-20T05:34:53+00:00",
         }
+
         response = client.post(create_stripe_transfer_url(), json=to_create)
         assert response.status_code == 201
         created: dict = response.json()
-        assert to_create.items() <= created.items()
+        validate_expected_items_in_dict(expected=to_create, actual=created)
         return created
 
     def test_invalid(self, client: TestClient):

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 import pytest
 
@@ -12,6 +13,7 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountUpdate,
 )
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.testcase_utils import validate_expected_items_in_dict
 
 
 class TestPaymentAccountRepository:
@@ -25,18 +27,34 @@ class TestPaymentAccountRepository:
         self, payment_account_repo: PaymentAccountRepository
     ):
         data = PaymentAccountCreate(
-            account_type="some_type",
             account_id=123,
-            statement_descriptor="my account",
+            account_type="sma",
             entity="dasher",
+            resolve_outstanding_balance_frequency="daily",
+            payout_disabled=True,
+            charges_enabled=True,
+            old_account_id=1234,
+            upgraded_to_managed_account_at=datetime.now(timezone.utc),
+            is_verified_with_stripe=True,
+            transfers_enabled=True,
+            statement_descriptor="test_statement_descriptor",
         )
 
+        assert len(data.__fields_set__) == len(
+            data.__fields__
+        ), "all fields should be set"
+
         created_account = await payment_account_repo.create_payment_account(data)
-        assert created_account.id, "account is created, assigned an ID"
+        assert created_account.id, "id shouldn't be None"
+        assert created_account.created_at, "created_at shouldn't be None"
+
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=created_account.dict()
+        )
 
         assert created_account == await payment_account_repo.get_payment_account_by_id(
             created_account.id
-        ), "retrieved account matches"
+        ), "retrieved account doesn't match created account"
 
         update_data = PaymentAccountUpdate(
             account_type="some_other_type", statement_descriptor="new descriptor"
@@ -47,8 +65,9 @@ class TestPaymentAccountRepository:
         )
 
         assert updated_account
-        assert updated_account.account_type == update_data.account_type
-        assert updated_account.statement_descriptor == update_data.statement_descriptor
+        validate_expected_items_in_dict(
+            expected=update_data.dict(skip_defaults=True), actual=updated_account.dict()
+        )
 
     async def test_get_all_payment_accounts_by_account_id_account_type(
         self, payment_account_repo: PaymentAccountRepository
@@ -85,10 +104,29 @@ class TestPaymentAccountRepository:
     async def test_create_update_get_stripe_managed_account(
         self, payment_account_repo: PaymentAccountRepository
     ):
-        data = StripeManagedAccountCreate(stripe_id="stripe_id", country_shortname="us")
+        data = StripeManagedAccountCreate(
+            stripe_id="stripe_id",
+            country_shortname="us",
+            stripe_last_updated_at=datetime.now(timezone.utc),
+            bank_account_last_updated_at=datetime.now(timezone.utc),
+            fingerprint="fingerprint",
+            default_bank_last_four="last4",
+            default_bank_name="bank",
+            verification_disabled_reason="no-reason",
+            verification_due_by=datetime.now(timezone.utc),
+            verification_fields_needed="a lot",
+        )
+
+        assert len(data.__fields_set__) == len(
+            data.__fields__
+        ), "all fields should be set"
 
         created_account = await payment_account_repo.create_stripe_managed_account(data)
         assert created_account.id, "account is created, assigned an ID"
+
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=created_account.dict()
+        )
 
         retrieved_account = await payment_account_repo.get_stripe_managed_account_by_id(
             created_account.id
@@ -104,5 +142,6 @@ class TestPaymentAccountRepository:
         )
 
         assert updated_account
-        assert updated_account.stripe_id == update_data.stripe_id
-        assert updated_account.country_shortname == update_data.country_shortname
+        validate_expected_items_in_dict(
+            expected=update_data.dict(skip_defaults=True), actual=updated_account.dict()
+        )

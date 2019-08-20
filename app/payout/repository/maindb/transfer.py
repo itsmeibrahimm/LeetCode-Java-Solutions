@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from typing_extensions import final
@@ -82,7 +82,9 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     async def create_transfer(self, data: TransferCreate) -> Transfer:
         stmt = (
             transfers.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*transfers.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)
@@ -124,7 +126,9 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     ) -> StripeTransfer:
         stmt = (
             stripe_transfers.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*stripe_transfers.table.columns.values())
         )
 

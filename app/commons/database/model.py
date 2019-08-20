@@ -5,8 +5,8 @@ import sqlalchemy
 from pydantic import BaseModel, validate_model
 from pydantic.utils import GetterDict
 from sqlalchemy import Column, Table
-from sqlalchemy.sql.schema import SchemaItem
 from sqlalchemy.exc import ArgumentError
+from sqlalchemy.sql.schema import SchemaItem
 
 from app.commons.utils.dataclass_extensions import no_init_field
 
@@ -99,6 +99,9 @@ class DBEntity(BaseModel):
     via :func:`app.tests.commons.database.model.validation_db_entity_and_table_schema`
     """
 
+    class Config:
+        allow_mutation = False  # Immutable
+
     @classmethod
     def from_row(cls, row: Mapping):
         """
@@ -110,9 +113,6 @@ class DBEntity(BaseModel):
         object.__setattr__(m, "__values__", values)
         object.__setattr__(m, "__fields_set__", fields_set)
         return m
-
-    class Config:
-        allow_mutation = False  # Immutable
 
 
 class DBRequestModel(BaseModel):

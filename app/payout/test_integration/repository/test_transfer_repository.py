@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 
 from app.commons.database.infra import DB
@@ -7,6 +9,7 @@ from app.payout.repository.maindb.model.stripe_transfer import (
 )
 from app.payout.repository.maindb.model.transfer import TransferCreate, TransferUpdate
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.testcase_utils import validate_expected_items_in_dict
 
 
 class TestTransferRepository:
@@ -18,11 +21,37 @@ class TestTransferRepository:
 
     async def test_create_update_get_transfer(self, transfer_repo: TransferRepository):
         data = TransferCreate(
-            subtotal=123, adjustments="some-adjustment", amount=123, method="stripe"
+            subtotal=123,
+            adjustments="some-adjustment",
+            amount=123,
+            method="stripe",
+            currency="currency",
+            submitted_at=datetime.now(timezone.utc),
+            deleted_at=datetime.now(timezone.utc),
+            manual_transfer_reason="manual_transfer_reason",
+            status="status",
+            status_code="status_code",
+            submitting_at=datetime.now(timezone.utc),
+            should_retry_on_failure=True,
+            statement_description="statement_description",
+            created_by_id=123,
+            deleted_by_id=321,
+            payment_account_id=123,
+            recipient_id=321,
+            recipient_ct_id=123,
+            submitted_by_id=321,
         )
+
+        assert len(data.__fields_set__) == len(
+            data.__fields__
+        ), "all fields should be set"
 
         created = await transfer_repo.create_transfer(data)
         assert created.id, "account is created, assigned an ID"
+
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=created.dict()
+        )
 
         assert created == await transfer_repo.get_transfer_by_id(
             created.id
@@ -37,10 +66,9 @@ class TestTransferRepository:
         )
 
         assert updated
-        assert updated.subtotal == update_data.subtotal
-        assert updated.adjustments == update_data.adjustments
-        assert updated.amount == update_data.amount
-        assert updated.method == update_data.method
+        validate_expected_items_in_dict(
+            expected=update_data.dict(skip_defaults=True), actual=updated.dict()
+        )
 
     async def test_get_transfer_by_id_not_found(self, transfer_repo):
         assert not await transfer_repo.get_transfer_by_id(transfer_id=-1)
@@ -58,11 +86,32 @@ class TestTransferRepository:
         )
 
         data = StripeTransferCreate(
-            stripe_status="status", transfer_id=existing_transfer.id
+            stripe_status="status",
+            transfer_id=existing_transfer.id,
+            stripe_id="stripe_id",
+            stripe_request_id="stripe_request_id",
+            stripe_failure_code="stripe_failure_code",
+            stripe_account_id="stripe_account_id",
+            stripe_account_type="stripe_account_type",
+            country_shortname="country_shortname",
+            bank_last_four="bank_last_four",
+            bank_name="bank_name",
+            submission_error_code="submission_error_code",
+            submission_error_type="submission_error_type",
+            submission_status="submission_status",
+            submitted_at=datetime.now(timezone.utc),
         )
+
+        assert len(data.__fields_set__) == len(
+            data.__fields__
+        ), "all fields should be set"
 
         created = await transfer_repo.create_stripe_transfer(data)
         assert created.id, "account is created, assigned an ID"
+
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=created.dict()
+        )
 
         assert created == await transfer_repo.get_stripe_transfer_by_id(
             created.id
@@ -83,8 +132,9 @@ class TestTransferRepository:
         )
 
         assert updated
-        assert updated.stripe_status == update_data.stripe_status
-        assert updated.transfer_id == created.transfer_id
+        validate_expected_items_in_dict(
+            expected=update_data.dict(skip_defaults=True), actual=updated.dict()
+        )
 
         await transfer_repo.delete_stripe_transfer_by_stripe_id(
             stripe_id=updated.stripe_id

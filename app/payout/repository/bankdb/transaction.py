@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from typing_extensions import final
@@ -44,7 +44,9 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
     async def create_transaction(self, data: TransactionCreate) -> Transaction:
         stmt = (
             transactions.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*transactions.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

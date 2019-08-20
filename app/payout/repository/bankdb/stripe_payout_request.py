@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from typing_extensions import final
@@ -39,7 +39,9 @@ class StripePayoutRequestRepository(
     ) -> StripePayoutRequest:
         stmt = (
             stripe_payout_requests.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*stripe_payout_requests.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

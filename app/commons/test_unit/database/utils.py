@@ -1,6 +1,5 @@
 import sqlalchemy
 from enum import Enum
-from typing import Dict, Type
 from uuid import UUID
 
 from pydantic import Json
