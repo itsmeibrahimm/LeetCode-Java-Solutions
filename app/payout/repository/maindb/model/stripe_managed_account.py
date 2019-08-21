@@ -58,6 +58,8 @@ class _StripeManagedAccountPartial(DBEntity):
     verification_disabled_reason: Optional[str]
     verification_due_by: Optional[datetime]
     verification_fields_needed: Optional[str]
+    country_shortname: Optional[str]
+    stripe_id: Optional[str]
 
 
 class StripeManagedAccount(_StripeManagedAccountPartial):
@@ -73,5 +75,4 @@ class StripeManagedAccountCreate(_StripeManagedAccountPartial):
 
 
 class StripeManagedAccountUpdate(_StripeManagedAccountPartial):
-    country_shortname: Optional[str]
-    stripe_id: Optional[str]
+    pass

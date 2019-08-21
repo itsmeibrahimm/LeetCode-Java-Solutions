@@ -67,11 +67,13 @@ class _StripeTransferPartial(DBEntity):
     submission_error_type: Optional[str]
     submission_status: Optional[str]
     submitted_at: Optional[datetime]
+    stripe_status: Optional[str]
+    transfer_id: Optional[int]
 
 
 class StripeTransfer(_StripeTransferPartial):
-    id: Optional[int]  # server default generated
-    created_at: Optional[datetime]  # client table definition default generated
+    id: int
+    created_at: datetime
 
     transfer_id: int
     stripe_status: str
@@ -83,5 +85,4 @@ class StripeTransferCreate(_StripeTransferPartial):
 
 
 class StripeTransferUpdate(_StripeTransferPartial):
-    stripe_status: Optional[str]
-    transfer_id: Optional[int]
+    pass

@@ -75,11 +75,12 @@ class _PaymentAccountPartial(DBEntity):
     upgraded_to_managed_account_at: Optional[datetime]
     is_verified_with_stripe: Optional[bool]
     transfers_enabled: Optional[bool]
+    statement_descriptor: Optional[str]
 
 
 class PaymentAccount(_PaymentAccountPartial):
     id: int  # server default generated
-    created_at: datetime  # client table definition default generated
+    created_at: Optional[datetime]  # there is existing data with NULL created_at
 
     statement_descriptor: str
 
@@ -89,4 +90,4 @@ class PaymentAccountCreate(_PaymentAccountPartial):
 
 
 class PaymentAccountUpdate(_PaymentAccountPartial):
-    statement_descriptor: Optional[str]
+    pass

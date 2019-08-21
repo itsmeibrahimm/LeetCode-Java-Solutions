@@ -90,11 +90,15 @@ class _TransferPartial(DBEntity):
     recipient_id: Optional[int]
     recipient_ct_id: Optional[int]
     submitted_by_id: Optional[int]
+    subtotal: Optional[int]
+    adjustments: Optional[str]
+    amount: Optional[int]
+    method: Optional[str]
 
 
 class Transfer(_TransferPartial):
-    id: Optional[int]  # server default generated
-    created_at: Optional[datetime]  # client table definition default generated
+    id: int
+    created_at: datetime
 
     subtotal: int
     adjustments: str
@@ -110,7 +114,4 @@ class TransferCreate(_TransferPartial):
 
 
 class TransferUpdate(_TransferPartial):
-    subtotal: Optional[int]
-    adjustments: Optional[str]
-    amount: Optional[int]
-    method: Optional[str]
+    pass
