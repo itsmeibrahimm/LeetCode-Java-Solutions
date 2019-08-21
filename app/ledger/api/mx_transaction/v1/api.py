@@ -80,10 +80,7 @@ def create_mx_transactions_router(
             req_context.log.info("create_mx_transaction() completed. ")
         except MxTransactionCreationError as e:
             req_context.log.error(
-                "[create_mx_transaction][{}] Exception caught when creating txn.".format(
-                    mx_transaction_request.payment_account_id
-                ),
-                e,
+                f"[create_mx_transaction] [{mx_transaction_request.payment_account_id}] Exception caught when creating txn. {e}"
             )
             return create_payment_error_response_blob(
                 HTTP_500_INTERNAL_SERVER_ERROR,

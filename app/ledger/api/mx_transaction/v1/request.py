@@ -12,7 +12,7 @@ from app.ledger.core.mx_transaction.types import (
 class CreateMxTransactionRequest(BaseModel):
     payment_account_id: str
     target_type: MxTransactionType
-    amount: str
+    amount: int
     currency: str
     idempotency_key: str
     routing_key: datetime

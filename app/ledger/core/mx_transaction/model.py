@@ -66,5 +66,6 @@ class MxScheduledLedger(MxTransactionModel):
     interval_type: MxScheduledLedgerIntervalType
     start_time: datetime
     end_time: datetime
+    closed_at: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]

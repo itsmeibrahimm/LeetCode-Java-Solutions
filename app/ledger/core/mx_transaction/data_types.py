@@ -76,6 +76,7 @@ class MxScheduledLedgerDbEntity(DBEntity):
     interval_type: str
     start_time: datetime
     end_time: datetime
+    closed_at: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 

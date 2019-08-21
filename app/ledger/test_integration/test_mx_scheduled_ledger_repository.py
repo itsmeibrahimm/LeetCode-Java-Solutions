@@ -46,6 +46,7 @@ class TestMxLedgerRepository:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
             start_time=datetime(2019, 8, 5),
             end_time=datetime(2019, 8, 12),
         )
@@ -86,6 +87,7 @@ class TestMxLedgerRepository:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
             start_time=datetime(2019, 7, 29, 7),
             end_time=datetime(2019, 8, 5, 7),
         )
@@ -131,6 +133,7 @@ class TestMxLedgerRepository:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
             start_time=datetime(2019, 8, 5, 7),
             end_time=datetime(2019, 8, 12, 7),
         )

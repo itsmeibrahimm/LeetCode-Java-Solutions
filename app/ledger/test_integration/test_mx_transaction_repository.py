@@ -183,6 +183,7 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             ledger_id=mx_ledger.id,
             interval_type=interval_type,
+            closed_at=0,
             start_time=mx_scheduled_ledger_repo.pacific_start_time_for_current_interval(
                 routing_key, interval_type
             ),

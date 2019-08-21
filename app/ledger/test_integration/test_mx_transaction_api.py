@@ -17,7 +17,7 @@ class TestMxTransactionAPI:
         mx_transaction_request = {
             "payment_account_id": payment_account_id,
             "target_type": MxTransactionType.MERCHANT_DELIVERY.value,
-            "amount": "3000",
+            "amount": 3000,
             "currency": CurrencyType.USD.value,
             "idempotency_key": idempotency_key,
             "routing_key": datetime(2019, 8, 1).isoformat(),

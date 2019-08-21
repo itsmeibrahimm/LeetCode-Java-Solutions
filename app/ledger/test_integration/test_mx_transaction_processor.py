@@ -59,6 +59,7 @@ class TestMxTransactionProcessor:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
             start_time=datetime(2019, 7, 29, 7),
             end_time=datetime(2019, 8, 5, 7),
         )
@@ -130,6 +131,7 @@ class TestMxTransactionProcessor:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
             start_time=datetime(2019, 7, 29, 7),
             end_time=datetime(2019, 8, 5, 7),
         )
@@ -237,7 +239,7 @@ class TestMxTransactionProcessor:
     async def test_insert_txn_and_ledger_raise_data_error(
         self, mocker: pytest_mock.MockFixture, ledger_app_context: AppContext
     ):
-        error = DataError()
+        error = DataError("Test data error.")
         mocker.patch(
             "app.ledger.repository.mx_transaction_repository.MxTransactionRepository.create_ledger_and_insert_mx_transaction",
             side_effect=error,
@@ -285,6 +287,7 @@ class TestMxTransactionProcessor:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
             start_time=datetime(2019, 7, 29, 7),
             end_time=datetime(2019, 8, 5, 7),
         )
@@ -356,13 +359,14 @@ class TestMxTransactionProcessor:
     async def test_insert_txn_and_update_ledger_raise_data_error(
         self, mocker: pytest_mock.MockFixture, ledger_app_context: AppContext
     ):
-        error = DataError()
+        error = DataError("Test data error.")
         payment_account_id = str(uuid.uuid4())
         mock_mx_scheduled_ledger = GetMxScheduledLedgerOutput(
             id=uuid.uuid4(),
             payment_account_id=payment_account_id,
             ledger_id=uuid.uuid4(),
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
+            closed_at=0,
             start_time=datetime(2019, 8, 5),
             end_time=datetime(2019, 8, 12),
         )

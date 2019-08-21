@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Text
+from sqlalchemy import BigInteger, Column, DateTime, Text
 from typing_extensions import final
 
 from app.commons.database.model import TableDefinition
@@ -23,5 +23,6 @@ class MxScheduledLedgerTable(TableDefinition):
     start_time: Column = no_init_field(Column("start_time", DateTime(False)))
     end_time: Column = no_init_field(Column("end_time", DateTime(False)))
     ledger_id: Column = no_init_field(Column("ledger_id", Text))
+    closed_at: Column = no_init_field(Column("closed_at", BigInteger))
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))

@@ -13,8 +13,7 @@ from app.ledger.core.mx_transaction.data_types import (
     InsertMxLedgerInput,
     InsertMxLedgerOutput,
     UpdateMxLedgerSetInput,
-    UpdateMxLedgerWhereInput,
-    GetMxLedgerByIdInput,
+    GetMxLedgerByIdOutput,
     InsertMxScheduledLedgerInput,
     UpdateMxLedgerOutput,
     InsertMxScheduledLedgerOutput,
@@ -99,7 +98,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_ledger_to_insert.dict(skip_defaults=True))
                     .returning(*mx_ledgers.table.columns.values())
                 )
-                ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+                ledger_row = await paymentdb_conn.fetch_one(ledger_stmt)
                 assert ledger_row
                 created_mx_ledger = InsertMxLedgerOutput.from_row(ledger_row)
                 req_context.log.info(
@@ -107,10 +106,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 )
             except Exception as e:
                 req_context.log.error(
-                    "[insert_mx_ledger] Exception caught while creating mx_ledger for payment_account {}, rolled back.".format(
-                        request.payment_account_id
-                    ),
-                    e,
+                    f"[insert_mx_ledger] Exception caught while creating mx_ledger for payment_account {request.payment_account_id}, rolled back. {e}"
                 )
                 raise e
             try:
@@ -121,6 +117,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     payment_account_id=request.payment_account_id,
                     ledger_id=created_mx_ledger.id,
                     interval_type=request.interval_type,
+                    closed_at=0,
                     start_time=mx_scheduled_ledger_repository.pacific_start_time_for_current_interval(
                         request.routing_key, request.interval_type
                     ),
@@ -133,7 +130,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_scheduled_ledger_to_insert.dict(skip_defaults=True))
                     .returning(*mx_scheduled_ledgers.table.columns.values())
                 )
-                scheduled_ledger_row = await self.payment_database.master().fetch_one(
+                scheduled_ledger_row = await paymentdb_conn.fetch_one(
                     scheduled_ledger_stmt
                 )
                 assert scheduled_ledger_row
@@ -145,10 +142,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 )
             except Exception as e:
                 req_context.log.error(
-                    "[insert_mx_scheduled_ledger] Exception caught while creating mx_scheduled_ledger for payment_account {}, rolled back.".format(
-                        request.payment_account_id
-                    ),
-                    e,
+                    f"[insert_mx_scheduled_ledger] Exception caught while creating mx_scheduled_ledger for payment_account {request.payment_account_id}, rolled back. {e}"
                 )
                 raise e
             try:
@@ -172,7 +166,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_transaction_to_insert.dict(skip_defaults=True))
                     .returning(*mx_transactions.table.columns.values())
                 )
-                txn_row = await self.payment_database.master().fetch_one(txn_stmt)
+                txn_row = await paymentdb_conn.fetch_one(txn_stmt)
                 assert txn_row
                 mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
                 req_context.log.info(
@@ -180,40 +174,9 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 )
             except Exception as e:
                 req_context.log.error(
-                    "[insert_mx_transaction] Exception caught while creating mx_transaction for payment_account {}, rolled back.".format(
-                        request.payment_account_id
-                    ),
-                    e,
+                    f"[insert_mx_transaction] Exception caught while creating mx_transaction for payment_account {request.payment_account_id}, rolled back. {e}"
                 )
                 raise e
-            try:
-                # construct request and update mx_ledger balance
-                request_balance = UpdateMxLedgerSetInput(balance=request.amount)
-                request_id = UpdateMxLedgerWhereInput(id=created_mx_ledger.id)
-
-                update_ledger_stmt = (
-                    mx_ledgers.table.update()
-                    .where(mx_ledgers.id == request_id.id)
-                    .values(request_balance.dict(skip_defaults=True))
-                    .returning(*mx_ledgers.table.columns.values())
-                )
-                updated_ledger_row = await self.payment_database.master().fetch_one(
-                    update_ledger_stmt
-                )
-                assert updated_ledger_row
-                updated_mx_ledger = UpdateMxLedgerOutput.from_row(updated_ledger_row)
-                req_context.log.info(
-                    f"Updated mx_ledger {updated_mx_ledger.id} with amount {updated_mx_ledger.balance}."
-                )
-            except Exception as e:
-                req_context.log.error(
-                    "[update_ledger_balance] Exception caught while updating ledger {} balance, rolled back.".format(
-                        created_mx_ledger.id
-                    ),
-                    e,
-                )
-                raise e
-
         return mx_transaction
 
     # todo: add mx_ledger lock and proper error handling
@@ -224,24 +187,35 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         mx_ledger_id: UUID,
         req_context: ReqContext,
     ) -> InsertMxTransactionOutput:
-        request_ledger = GetMxLedgerByIdInput(id=mx_ledger_id)
-        mx_ledger = await mx_ledger_repository.get_ledger_by_id(request_ledger)
-        # get_ledger_by_id will return Optional but in this case, it should always return a valid mx_ledger otherwise raise exception
-        assert mx_ledger
         paymentdb_conn = self.payment_database.master()
         async with paymentdb_conn.transaction():
+            try:
+                # Lock the row for updating the balance
+                stmt = (
+                    mx_ledgers.table.select()
+                    .where(mx_ledgers.id == mx_ledger_id)
+                    .with_for_update(nowait=True)
+                )
+                row = await paymentdb_conn.fetch_one(stmt)
+                assert row
+                mx_ledger = GetMxLedgerByIdOutput.from_row(row)
+            except Exception as e:
+                req_context.log.error(
+                    f"[update_ledger_balance] Exception caught while updating ledger {mx_ledger_id} balance {e}"
+                )
+                raise e
+
             try:
                 # construct update request and update mx_ledger balance
                 updated_amount = mx_ledger.balance + request.amount
                 request_balance = UpdateMxLedgerSetInput(balance=updated_amount)
-                request_id = UpdateMxLedgerWhereInput(id=mx_ledger.id)
                 stmt = (
                     mx_ledgers.table.update()
-                    .where(mx_ledgers.id == request_id.id)
+                    .where(mx_ledgers.id == mx_ledger.id)
                     .values(request_balance.dict(skip_defaults=True))
                     .returning(*mx_ledgers.table.columns.values())
                 )
-                ledger_row = await self.payment_database.master().fetch_one(stmt)
+                ledger_row = await paymentdb_conn.fetch_one(stmt)
                 assert ledger_row
                 created_mx_ledger = UpdateMxLedgerOutput.from_row(ledger_row)
                 req_context.log.info(
@@ -249,10 +223,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 )
             except Exception as e:
                 req_context.log.error(
-                    "[update_ledger_balance] Exception caught while updating ledger {} balance, rolled back.".format(
-                        mx_ledger.id
-                    ),
-                    e,
+                    f"[update_ledger_balance] Exception caught while updating ledger {mx_ledger_id} balance, rolled back. {e}"
                 )
                 raise e
             try:
@@ -276,7 +247,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_transaction_to_insert.dict(skip_defaults=True))
                     .returning(*mx_transactions.table.columns.values())
                 )
-                txn_row = await self.payment_database.master().fetch_one(txn_stmt)
+                txn_row = await paymentdb_conn.fetch_one(txn_stmt)
                 assert txn_row
                 mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
                 req_context.log.info(
@@ -284,10 +255,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 )
             except Exception as e:
                 req_context.log.error(
-                    "[insert_mx_transaction] Exception caught while creating mx_txn for payment_account {}, rolled back.".format(
-                        request.payment_account_id
-                    ),
-                    e,
+                    f"[insert_mx_transaction] Exception caught while creating mx_txn for payment_account {request.payment_account_id} balance, rolled back. {e}"
                 )
                 raise e
         return mx_transaction
