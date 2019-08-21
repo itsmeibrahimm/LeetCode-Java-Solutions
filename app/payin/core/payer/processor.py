@@ -612,16 +612,27 @@ class LegacyPayerOps(PayerOpsInterface):
                 payer_entity.id,
                 pgp_customer_id,
             )
+
             stripe_customer_entity = await self.payer_repo.get_stripe_customer(
                 GetStripeCustomerInput(stripe_id=pgp_customer_id)
             )
             if not stripe_customer_entity:
+                try:
+                    owner_id = int(dd_payer_id)
+                except ValueError as e:
+                    self.req_ctxt.log.error(
+                        f"[create_payer_impl][{dd_payer_id}] Value error for non-numeric value. {e}"
+                    )
+                    raise PayerCreationError(
+                        error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
+                        retryable=False,
+                    )
                 stripe_customer_entity = await self.payer_repo.insert_stripe_customer(
                     request=InsertStripeCustomerInput(
                         stripe_id=pgp_customer_id,
                         country_shortname=country,
                         owner_type=payer_type,
-                        owner_id=int(dd_payer_id),
+                        owner_id=owner_id,
                         default_card=default_payment_method_id,
                     )
                 )

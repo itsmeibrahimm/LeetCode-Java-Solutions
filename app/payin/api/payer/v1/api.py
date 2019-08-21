@@ -14,6 +14,7 @@ from starlette.status import (
     HTTP_404_NOT_FOUND,
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_200_OK,
+    HTTP_422_UNPROCESSABLE_ENTITY,
 )
 
 
@@ -51,7 +52,11 @@ def create_payer_router():
             log.info("[create_payer] onboard_payer() completed.")
         except PaymentError as e:
             raise PaymentException(
-                http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                http_status_code=(
+                    HTTP_422_UNPROCESSABLE_ENTITY
+                    if e.error_code == "payin_1"
+                    else HTTP_500_INTERNAL_SERVER_ERROR
+                ),
                 error_code=e.error_code,
                 error_message=e.error_message,
                 retryable=e.retryable,

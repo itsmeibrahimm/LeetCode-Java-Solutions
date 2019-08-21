@@ -32,9 +32,8 @@ def test_create_and_get_payer_with_non_numeric_id():
         logger.log(msg=str(e), level=logging.INFO)
         error_code_non_numeric_id = e.status
         error_message_non_numeric_id = e.reason
-    # FIXME: Should throw invalid data type error. Currently throwing 500
-    assert error_code_non_numeric_id == 500
-    assert error_message_non_numeric_id == "Internal Server Error"
+    assert error_code_non_numeric_id == 422
+    assert error_message_non_numeric_id == "Unprocessable Entity"
 
 
 @pytest.mark.skip(
