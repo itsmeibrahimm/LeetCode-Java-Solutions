@@ -73,7 +73,7 @@ class PayerClient:
                 )
             )
             if exist_payer:
-                self.req_ctxt.log.error(
+                self.req_ctxt.log.info(
                     f"[create_payer_impl][{exist_payer.id}] payer already exists. dd_payer_id:[{dd_payer_id}], payer_type:[{payer_type}]"
                 )
                 # raise PayerCreationError(

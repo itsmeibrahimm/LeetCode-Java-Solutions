@@ -51,6 +51,10 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentMethodClient:
+    """
+    PaymentMethod client wrapper that provides utilities to PaymentMethod.
+    """
+
     def __init__(
         self,
         payment_method_repository: PaymentMethodRepository = Depends(
