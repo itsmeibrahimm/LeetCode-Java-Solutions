@@ -3,8 +3,6 @@ import uuid
 import pytest
 from asyncpg import UniqueViolationError
 
-from app.commons.context.app_context import AppContext
-from app.commons.database.infra import DB
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.types import (
     MxLedgerType,
@@ -25,9 +23,8 @@ class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_insert_mx_ledger_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_insert = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -38,7 +35,7 @@ class TestMxLedgerRepository:
             payment_account_id="pay_act_test_id",
         )
 
-        mx_ledger = await repo.insert_mx_ledger(mx_ledger_to_insert)
+        mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         assert mx_ledger.id == mx_ledger_id
         assert mx_ledger.type == MxLedgerType.MANUAL
         assert mx_ledger.currency == CurrencyType.USD
@@ -47,9 +44,8 @@ class TestMxLedgerRepository:
         assert mx_ledger.payment_account_id == "pay_act_test_id"
 
     async def test_insert_mx_ledger_raise_exception(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_insert = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -59,15 +55,14 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id="pay_act_test_id",
         )
-        await repo.insert_mx_ledger(mx_ledger_to_insert)
+        await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
         with pytest.raises(UniqueViolationError):
-            await repo.insert_mx_ledger(mx_ledger_to_insert)
+            await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
     async def test_update_mx_ledger_balance_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_insert = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -77,22 +72,21 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id="pay_act_test_id",
         )
-        mx_ledger = await repo.insert_mx_ledger(mx_ledger_to_insert)
+        mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
         assert mx_ledger.balance == 2000
 
         mx_ledger_set_input = UpdateMxLedgerSetInput(balance=3000)
         mx_ledger_where_input = UpdateMxLedgerWhereInput(id=mx_ledger.id)
-        updated_mx_ledger = await repo.update_mx_ledger_balance(
+        updated_mx_ledger = await mx_ledger_repository.update_mx_ledger_balance(
             mx_ledger_set_input, mx_ledger_where_input
         )
         assert mx_ledger.id == updated_mx_ledger.id
         assert updated_mx_ledger.balance == 3000
 
     async def test_get_ledger_by_id_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_insert = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -102,9 +96,11 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id="pay_act_test_id",
         )
-        mx_ledger = await repo.insert_mx_ledger(mx_ledger_to_insert)
+        mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByIdInput(id=mx_ledger.id)
-        retrieved_mx_ledger = await repo.get_ledger_by_id(mx_ledger_request)
+        retrieved_mx_ledger = await mx_ledger_repository.get_ledger_by_id(
+            mx_ledger_request
+        )
 
         assert retrieved_mx_ledger is not None
         assert retrieved_mx_ledger.id == mx_ledger.id
@@ -115,10 +111,8 @@ class TestMxLedgerRepository:
         assert retrieved_mx_ledger.payment_account_id == mx_ledger.payment_account_id
 
     async def test_get_ledger_by_id_not_exist_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_insert = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -128,16 +122,17 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id="pay_act_test_id",
         )
-        await repo.insert_mx_ledger(mx_ledger_to_insert)
+        await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByIdInput(id=uuid.uuid4())
-        retrieved_mx_ledger = await repo.get_ledger_by_id(mx_ledger_request)
+        retrieved_mx_ledger = await mx_ledger_repository.get_ledger_by_id(
+            mx_ledger_request
+        )
 
         assert retrieved_mx_ledger is None
 
     async def test_get_open_ledger_for_payment_account_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
         mx_ledger_to_insert = InsertMxLedgerInput(
@@ -148,11 +143,11 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id=payment_account_id,
         )
-        mx_ledger = await repo.insert_mx_ledger(mx_ledger_to_insert)
+        mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByAccountInput(
             payment_account_id=payment_account_id
         )
-        retrieved_mx_ledger = await repo.get_open_ledger_for_payment_account(
+        retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
             mx_ledger_request
         )
 
@@ -165,9 +160,8 @@ class TestMxLedgerRepository:
         assert retrieved_mx_ledger.payment_account_id == mx_ledger.payment_account_id
 
     async def test_get_open_ledger_for_payment_account_no_open_ledger(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
         mx_ledger_to_insert = InsertMxLedgerInput(
@@ -178,20 +172,19 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id=payment_account_id,
         )
-        await repo.insert_mx_ledger(mx_ledger_to_insert)
+        await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByAccountInput(
             payment_account_id=payment_account_id
         )
-        retrieved_mx_ledger = await repo.get_open_ledger_for_payment_account(
+        retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
             mx_ledger_request
         )
 
         assert retrieved_mx_ledger is None
 
     async def test_get_open_ledger_for_payment_account_no_account(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_insert = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -201,20 +194,19 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id=str(uuid.uuid4()),
         )
-        await repo.insert_mx_ledger(mx_ledger_to_insert)
+        await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByAccountInput(
             payment_account_id=str(uuid.uuid4())
         )
-        retrieved_mx_ledger = await repo.get_open_ledger_for_payment_account(
+        retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
             mx_ledger_request
         )
 
         assert retrieved_mx_ledger is None
 
     async def test_create_one_off_mx_ledger(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self, mx_ledger_repository: MxLedgerRepository
     ):
-        repo = MxLedgerRepository(context=ledger_app_context)
         mx_ledger_id = uuid.uuid4()
         mx_ledger_to_create = InsertMxLedgerInput(
             id=mx_ledger_id,
@@ -224,7 +216,7 @@ class TestMxLedgerRepository:
             balance=2000,
             payment_account_id="pay_act_test_id",
         )
-        one_off_mx_ledger, mx_transaction = await repo.create_one_off_mx_ledger(
+        one_off_mx_ledger, mx_transaction = await mx_ledger_repository.create_one_off_mx_ledger(
             mx_ledger_to_create
         )
 

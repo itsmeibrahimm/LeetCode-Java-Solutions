@@ -3,8 +3,6 @@ import uuid
 
 import pytest
 
-from app.commons.context.app_context import AppContext
-from app.commons.database.infra import DB
 from app.commons.types import CurrencyType
 from app.ledger.core.mx_transaction.types import (
     MxScheduledLedgerIntervalType,
@@ -26,10 +24,10 @@ class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
 
     async def test_insert_mx_scheduled_ledger_success(
-        self, ledger_paymentdb: DB, ledger_app_context: AppContext
+        self,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        mx_ledger_repository: MxLedgerRepository,
     ):
-        scheduled_ledger_repo = MxScheduledLedgerRepository(context=ledger_app_context)
-        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         mx_scheduled_ledger_id = uuid.uuid4()
         ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
@@ -50,8 +48,8 @@ class TestMxLedgerRepository:
             start_time=datetime(2019, 8, 5),
             end_time=datetime(2019, 8, 12),
         )
-        await ledger_repo.insert_mx_ledger(ledger_to_insert)
-        mx_scheduled_ledger = await scheduled_ledger_repo.insert_mx_scheduled_ledger(
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+        mx_scheduled_ledger = await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
 
@@ -63,10 +61,10 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.end_time == datetime(2019, 8, 12)
 
     async def test_get_open_mx_scheduled_ledger_for_period_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        mx_ledger_repository: MxLedgerRepository,
     ):
-        scheduled_ledger_repo = MxScheduledLedgerRepository(context=ledger_app_context)
-        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
         request = GetMxScheduledLedgerInput(
@@ -91,12 +89,12 @@ class TestMxLedgerRepository:
             start_time=datetime(2019, 7, 29, 7),
             end_time=datetime(2019, 8, 5, 7),
         )
-        await ledger_repo.insert_mx_ledger(ledger_to_insert)
-        await scheduled_ledger_repo.insert_mx_scheduled_ledger(
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+        await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
 
-        mx_scheduled_ledger = await scheduled_ledger_repo.get_open_mx_scheduled_ledger_for_period(
+        mx_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
             request
         )
 
@@ -109,10 +107,10 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.end_time == datetime(2019, 8, 5, 7)
 
     async def test_get_open_mx_scheduled_ledger_for_period_not_exist_success(
-        self, ledger_app_context: AppContext, ledger_paymentdb: DB
+        self,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        mx_ledger_repository: MxLedgerRepository,
     ):
-        scheduled_ledger_repo = MxScheduledLedgerRepository(context=ledger_app_context)
-        ledger_repo = MxLedgerRepository(context=ledger_app_context)
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
         request = GetMxScheduledLedgerInput(
@@ -137,12 +135,12 @@ class TestMxLedgerRepository:
             start_time=datetime(2019, 8, 5, 7),
             end_time=datetime(2019, 8, 12, 7),
         )
-        await ledger_repo.insert_mx_ledger(ledger_to_insert)
-        await scheduled_ledger_repo.insert_mx_scheduled_ledger(
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+        await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
 
-        mx_scheduled_ledger = await scheduled_ledger_repo.get_open_mx_scheduled_ledger_for_period(
+        mx_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
             request
         )
         assert mx_scheduled_ledger is None

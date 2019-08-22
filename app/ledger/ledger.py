@@ -25,13 +25,9 @@ def create_ledger_app(context: AppContext, config: AppConfig) -> FastAPI:
     set_context_for_app(app, context)
 
     # Init routers
-    mx_transactions_router = create_mx_transactions_router(
-        MxTransactionRepository(context=context),
-        MxLedgerRepository(context=context),
-        MxScheduledLedgerRepository(context=context),
-    )
+    mx_transactions_router = create_mx_transactions_router()
 
-    route_authorizer = RouteAuthorizer(config.PAYOUT_SERVICE_ID)
+    route_authorizer = RouteAuthorizer(config.LEDGER_SERVICE_ID)
 
     grouped_routers = group_routers([mx_transactions_router])
 

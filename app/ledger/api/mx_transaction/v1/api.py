@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from structlog import BoundLogger
 
-from app.commons.context.req_context import get_context_from_req
-from app.commons.context.app_context import get_context_from_app
+from app.commons.context.req_context import get_logger_from_req
 from app.commons.error.errors import (
     create_payment_error_response_blob,
     PaymentErrorResponseBody,
@@ -9,7 +9,7 @@ from app.commons.error.errors import (
 from app.ledger.api.mx_transaction.v1.request import CreateMxTransactionRequest
 from app.ledger.core.mx_transaction.exceptions import MxTransactionCreationError
 from app.ledger.core.mx_transaction.model import MxTransaction
-from app.ledger.core.mx_transaction.processor import create_mx_transaction_impl
+from app.ledger.core.mx_transaction.processor import MxTransactionProcessor
 
 from starlette.responses import JSONResponse
 from starlette.requests import Request
@@ -19,23 +19,17 @@ from starlette.status import (
     HTTP_501_NOT_IMPLEMENTED,
 )
 
-from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
-from app.ledger.repository.mx_scheduled_ledger_repository import (
-    MxScheduledLedgerRepository,
-)
-from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 
-
-def create_mx_transactions_router(
-    mx_transaction_repository: MxTransactionRepository,
-    mx_ledger_repository: MxLedgerRepository,
-    mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
-) -> APIRouter:
+def create_mx_transactions_router() -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/v1/mx_transactions", status_code=HTTP_201_CREATED)
     async def create_mx_transaction(
-        mx_transaction_request: CreateMxTransactionRequest, request: Request
+        mx_transaction_request: CreateMxTransactionRequest,
+        log: BoundLogger = Depends(get_logger_from_req),
+        mx_transaction_processor: MxTransactionProcessor = Depends(
+            MxTransactionProcessor
+        ),
     ):
         """
             Create a mx_transaction on DoorDash payments platform
@@ -52,19 +46,12 @@ def create_mx_transactions_router(
             - **metadata**: Optional[Json], metadata of mx_transaction
             - **legacy_transaction_id**: Optional[str], points to the corresponding txn in DSJ, used for migration purpose
         """
-        req_context = get_context_from_req(request)
-        app_context = get_context_from_app(request.app)
-        req_context.log.debug(
+        log.debug(
             f"Creating mx_transaction for payment_account {mx_transaction_request.payment_account_id}"
         )
 
         try:
-            mx_transaction: MxTransaction = await create_mx_transaction_impl(
-                app_context=app_context,
-                req_context=req_context,
-                mx_transaction_repository=mx_transaction_repository,
-                mx_ledger_repository=mx_ledger_repository,
-                mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            mx_transaction: MxTransaction = await mx_transaction_processor.create(
                 payment_account_id=mx_transaction_request.payment_account_id,
                 target_type=mx_transaction_request.target_type,
                 amount=mx_transaction_request.amount,
@@ -77,9 +64,9 @@ def create_mx_transactions_router(
                 metadata=mx_transaction_request.metadata,
                 legacy_transaction_id=mx_transaction_request.legacy_transaction_id,
             )
-            req_context.log.info("create_mx_transaction() completed. ")
+            log.info("create_mx_transaction() completed. ")
         except MxTransactionCreationError as e:
-            req_context.log.error(
+            log.error(
                 f"[create_mx_transaction] [{mx_transaction_request.payment_account_id}] Exception caught when creating txn. {e}"
             )
             return create_payment_error_response_blob(
@@ -91,20 +78,18 @@ def create_mx_transactions_router(
                 ),
             )
 
-        req_context.log.info(
+        log.info(
             f"Created mx_transaction {mx_transaction.id} of type {mx_transaction.target_type} for payment_account {mx_transaction.payment_account_id}"
         )
         return mx_transaction
 
     @router.get("/api/v1/mx_transactions/{mx_transaction_id}")
     async def get_mx_transaction(
-        mx_transaction_id: str, request: Request
+        mx_transaction_id: str,
+        request: Request,
+        log: BoundLogger = Depends(get_logger_from_req),
     ) -> JSONResponse:
-        req_context = get_context_from_req(request)
-        # app_context = get_context_from_app(request.app)
-        req_context.log.info(
-            "get_mx_transaction() mx_transaction_id=%s", mx_transaction_id
-        )
+        log.info("get_mx_transaction() mx_transaction_id=%s", mx_transaction_id)
 
         return create_payment_error_response_blob(
             HTTP_501_NOT_IMPLEMENTED,

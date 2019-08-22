@@ -14,6 +14,11 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.database.infra import DB
 from app.commons.types import CountryCode, CurrencyType
+from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
+from app.ledger.repository.mx_scheduled_ledger_repository import (
+    MxScheduledLedgerRepository,
+)
+from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 from app.payin.core.cart_payment.model import PaymentIntent
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -168,22 +173,6 @@ def dummy_app_context(mocker: MockFixture):
     )
 
 
-@pytest.fixture
-async def ledger_app_context(mocker: MockFixture, ledger_paymentdb: DB):
-    return AppContext(
-        log=mocker.Mock(),
-        payout_bankdb=mocker.Mock(),
-        payin_maindb=mocker.Mock(),
-        payin_paymentdb=mocker.Mock(),
-        payout_maindb=mocker.Mock(),
-        ledger_maindb=mocker.Mock(),
-        ledger_paymentdb=ledger_paymentdb,
-        stripe=mocker.Mock(),
-        dsj_client=mocker.Mock(),
-        identity_client=mocker.Mock(),
-    )
-
-
 def pytest_collection_modifyitems(items: List[Item]):
     for item in items:
         # For all test cases placed under any .../test_integration/... path:
@@ -203,6 +192,21 @@ async def cart_payment_repository(app_context: AppContext):
 @pytest.fixture
 async def payer_repository(app_context: AppContext):
     yield PayerRepository(app_context)
+
+
+@pytest.fixture
+async def mx_transaction_repository(app_context: AppContext):
+    return MxTransactionRepository(app_context)
+
+
+@pytest.fixture
+async def mx_ledger_repository(app_context: AppContext):
+    return MxLedgerRepository(app_context)
+
+
+@pytest.fixture
+async def mx_scheduled_ledger_repository(app_context: AppContext):
+    return MxScheduledLedgerRepository(app_context)
 
 
 @pytest.fixture(scope="session")
