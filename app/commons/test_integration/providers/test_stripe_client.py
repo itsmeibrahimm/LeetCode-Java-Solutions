@@ -1,11 +1,10 @@
 import pytest
-from app.commons.providers.stripe_client import (
+from app.commons.providers.stripe.stripe_client import (
     StripeClient,
     StripeTestClient,
     StripeClientPool,
 )
-from app.commons.providers import stripe_models as models
-
+from app.commons.providers.stripe import stripe_models as models
 
 pytestmark = [
     # mark all these tests as stripe tests

@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from app.commons.providers.stripe_models import CreatePaymentIntent
+from app.commons.providers.stripe.stripe_models import CreatePaymentIntent, Event
 
 
 class TestPaymentIntent:
@@ -36,3 +36,27 @@ class TestPaymentIntent:
         # data validation is done
         with pytest.raises(ValidationError, match=r"\bcapture_method\b"):
             CreatePaymentIntent(amount=222, currency="CAD", capture_method="invalid")
+
+
+class TestEvent:
+    def test_get_resource_type(
+        self, sample_payment_method_webhook, sample_customer_subscription
+    ):
+        event = Event(**sample_payment_method_webhook)
+        resource_type = event.resource_type
+        assert resource_type == "payment_method"
+
+        event = Event(**sample_customer_subscription)
+        resource_type = event.resource_type
+        assert resource_type == "subscription"
+
+    def test_get_event_type(
+        self, sample_payment_method_webhook, sample_customer_subscription
+    ):
+        event = Event(**sample_payment_method_webhook)
+        event_type = event.event_type
+        assert event_type == "attached"
+
+        event = Event(**sample_customer_subscription)
+        event_type = event.event_type
+        assert event_type == "deleted"

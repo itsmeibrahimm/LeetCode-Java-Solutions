@@ -5,9 +5,9 @@ import pytest_mock
 from starlette.testclient import TestClient
 
 from app.commons.context.app_context import AppContext
-from app.commons.providers import stripe_models as models
+from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.identity_client import StubbedIdentityClient
-from app.commons.providers.stripe_client import StripeClientPool
+from app.commons.providers.stripe.stripe_client import StripeClientPool
 from app.commons.providers.dsj_client import DSJClient
 from app.main import app
 

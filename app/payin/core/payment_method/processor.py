@@ -9,7 +9,7 @@ from structlog import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.providers.stripe_models import (
+from app.commons.providers.stripe.stripe_models import (
     CreatePaymentMethod,
     AttachPaymentMethod,
     DetachPaymentMethod,

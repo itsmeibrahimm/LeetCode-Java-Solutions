@@ -1,6 +1,9 @@
+from datetime import datetime
+
 import pydantic
-from typing import Dict, List, NewType, Optional
+from typing import Dict, List, NewType, Optional, Any
 from enum import Enum
+
 from app.commons.types import CountryCode
 
 
@@ -20,7 +23,11 @@ PaymentIntentId = NewType("PaymentIntentId", str)
 PaymentIntentStatus = NewType("PaymentIntentStatus", str)
 
 
-class BaseModel(pydantic.BaseModel):
+class StripeBaseModel(pydantic.BaseModel):
+    # object String that comes from a typical stripe response. Denotes the object 'type'
+    # Reference: https://stripe.com/docs/api/events/object#event_object-object
+    _STRIPE_OBJECT_NAME: Optional[str] = None
+
     def dict(self, *, include=None, exclude=None, by_alias=False, skip_defaults=True):
         """
         Generate a dictionary representation of the model, optionally specifying which fields to include or exclude.
@@ -35,7 +42,7 @@ class BaseModel(pydantic.BaseModel):
         )
 
 
-class StripeClientSettings(BaseModel):
+class StripeClientSettings(StripeBaseModel):
     # informational
     country: CountryCode
 
@@ -48,42 +55,43 @@ class StripeClientSettings(BaseModel):
         return {"api_key": self.api_key, "stripe_version": self.api_version}
 
 
-class CreateConnectedAccountToken(BaseModel):
+# --------------- REQUEST MODELS ---------------------------------------------------------------------------------------
+class CreateConnectedAccountToken(StripeBaseModel):
     card: str
     stripe_account: str
     customer: str
 
 
-class CreateBankAccountToken(BaseModel):
+class CreateBankAccountToken(StripeBaseModel):
     ...
 
 
-class CreateCreditCardToken(BaseModel):
+class CreateCreditCardToken(StripeBaseModel):
     number: str
     exp_month: int
     exp_year: int
     cvc: str
 
 
-class CreateCustomer(BaseModel):
+class CreateCustomer(StripeBaseModel):
     email: str
     description: str
 
 
-class UpdateCustomer(BaseModel):
-    class InvoiceSettings(BaseModel):
+class UpdateCustomer(StripeBaseModel):
+    class InvoiceSettings(StripeBaseModel):
         default_payment_method: str
 
     sid: str
     invoice_settings: InvoiceSettings
 
 
-class TransferData(BaseModel):
+class TransferData(StripeBaseModel):
     destination: ConnectedAccountId
     amount: Optional[int]
 
 
-class CreatePaymentIntent(BaseModel):
+class CreatePaymentIntent(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/payment_intents/create
     """
@@ -100,8 +108,8 @@ class CreatePaymentIntent(BaseModel):
         ON_SESSION = "on_session"
         OFF_SESSION = "off_session"
 
-    class PaymentMethodOptions(BaseModel):
-        class CardOptions(BaseModel):
+    class PaymentMethodOptions(StripeBaseModel):
+        class CardOptions(StripeBaseModel):
             class RequestThreeDSecure(str, Enum):
                 AUTOMATIC = "automatic"
                 ANY = "any"
@@ -136,7 +144,7 @@ class CreatePaymentIntent(BaseModel):
     transfer_group: Optional[str]
 
 
-class CapturePaymentIntent(BaseModel):
+class CapturePaymentIntent(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/payment_intents/capture
     """
@@ -148,7 +156,7 @@ class CapturePaymentIntent(BaseModel):
     transfer_data: Optional[TransferData]
 
 
-class CancelPaymentIntent(BaseModel):
+class CancelPaymentIntent(StripeBaseModel):
     class CancellationReason(str, Enum):
         ABANDONED = "abandoned"
         DUPLICATE = "duplicate"
@@ -159,33 +167,36 @@ class CancelPaymentIntent(BaseModel):
     cancellation_reason: str
 
 
-class CreatePaymentMethod(BaseModel):
-    class Card(BaseModel):
+class CreatePaymentMethod(StripeBaseModel):
+    class Card(StripeBaseModel):
         token: str
 
     type: str
     card: Card
 
 
-class AttachPaymentMethod(BaseModel):
+class AttachPaymentMethod(StripeBaseModel):
     sid: str
     customer: str
 
 
-class DetachPaymentMethod(BaseModel):
+class DetachPaymentMethod(StripeBaseModel):
     sid: str
 
 
-class RetrievePaymentMethod(BaseModel):
+class RetrievePaymentMethod(StripeBaseModel):
     id: str
 
 
-class PaymentMethod(BaseModel):
+# --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
+class PaymentMethod(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/payment_methods/object
     """
 
-    class Card(BaseModel):
+    _STRIPE_OBJECT_NAME: str = "payment_method"
+
+    class Card(StripeBaseModel):
         exp_month: int
         exp_year: int
         fingerprint: str
@@ -195,8 +206,8 @@ class PaymentMethod(BaseModel):
         country: Optional[str]
         description: Optional[str]
 
-    class BillingDetails(BaseModel):
-        class Address(BaseModel):
+    class BillingDetails(StripeBaseModel):
+        class Address(StripeBaseModel):
             city: Optional[str]
             country: Optional[str]
             line1: Optional[str]
@@ -215,3 +226,53 @@ class PaymentMethod(BaseModel):
     customer: Optional[str]
     card: Card
     billing_details: BillingDetails
+
+
+class Event(StripeBaseModel):
+    """
+    https://stripe.com/docs/api/events
+    """
+
+    _STRIPE_OBJECT_NAME: str = "event"
+
+    id: str
+    object: str
+    account: Optional[str]
+    api_version: str
+    created: datetime
+
+    class Data(StripeBaseModel):
+        object: Dict[str, Any]
+        previous_attributes: Optional[Dict[str, Any]]
+
+    data: Data
+    livemode: bool
+    pending_webhooks: int
+
+    class Request(StripeBaseModel):
+        id: Optional[str]
+        idempotency_key: Optional[str]
+
+    request: Optional[Request]
+    type: str
+
+    @property
+    def resource_type(self):
+        """
+        Reference: https://stripe.com/docs/api/events/object#event_object-type
+        :return: str represeting the api resource type in Stripe's API
+        """
+        return self.data.object.get("object")
+
+    @property
+    def event_type(self):
+        """
+        Reference: https://stripe.com/docs/api/events/object#event_object-type
+        :return: str represeting the api resource type in Stripe's API
+        """
+        split_type = self.type.rsplit(".", 1)
+        return split_type[1]
+
+    @property
+    def data_object(self):
+        return self.data.object

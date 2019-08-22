@@ -6,7 +6,7 @@ from fastapi import Depends
 
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
-from app.commons.providers.stripe_models import (
+from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
     CancelPaymentIntent,

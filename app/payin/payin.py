@@ -9,6 +9,7 @@ from app.payin.api.payer.v1.api import create_payer_router
 from app.payin.api.payment_method.v1.api import create_payment_method_router
 from app.commons.error.errors import register_payment_exception_handler
 from app.payin.api.cart_payment.v1.api import create_cart_payments_router
+from app.payin.api import webhook
 
 
 def create_payin_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -24,7 +25,7 @@ def create_payin_app(context: AppContext, config: AppConfig) -> FastAPI:
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
 
     grouped_routers = group_routers(
-        [payer_router, cart_payments_router, payment_method_router]
+        [payer_router, cart_payments_router, payment_method_router, webhook.v1.router]
     )
 
     app.include_router(grouped_routers, dependencies=[Depends(router_authorizer)])

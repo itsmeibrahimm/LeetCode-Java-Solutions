@@ -17,8 +17,8 @@ from app.commons.providers.identity_client import (
     IdentityClient,
     StubbedIdentityClient,
 )
-from app.commons.providers.stripe_client import StripeClientPool
-from app.commons.providers.stripe_models import StripeClientSettings
+from app.commons.providers.stripe.stripe_client import StripeClientPool
+from app.commons.providers.stripe.stripe_models import StripeClientSettings
 
 
 @dataclass(frozen=True)

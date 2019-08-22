@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -21,8 +20,6 @@ from starlette.status import (
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
-
-logger = logging.getLogger(__name__)
 
 
 def create_payment_method_router():

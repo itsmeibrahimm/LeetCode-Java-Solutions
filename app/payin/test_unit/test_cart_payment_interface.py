@@ -1,7 +1,7 @@
 from copy import deepcopy
 import pytest
 from unittest.mock import MagicMock
-from app.commons.providers.stripe_models import CreatePaymentIntent
+from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
 import app.payin.core.cart_payment.processor as processor
 from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.tests.utils import (
