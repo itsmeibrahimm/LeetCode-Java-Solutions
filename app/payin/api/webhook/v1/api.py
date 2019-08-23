@@ -10,4 +10,4 @@ router = APIRouter()
 async def handle_payin_webhook(
     country_code: str, webhook_processor: WebhookProcessor = Depends(WebhookProcessor)
 ):
-    webhook_processor.process_webhook(country_code=country_code)
+    await webhook_processor.process_webhook(country_code=country_code)

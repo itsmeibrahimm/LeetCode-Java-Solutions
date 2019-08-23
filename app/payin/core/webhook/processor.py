@@ -27,7 +27,7 @@ class WebhookHandlerError(Exception):
 
 class BaseWebhookHandler(ABC):
     @abstractmethod
-    def __call__(self, event: StripeWebHookEvent, country_code: str):
+    async def __call__(self, event: StripeWebHookEvent, country_code: str):
         ...
 
 
@@ -44,7 +44,7 @@ class ChargeRefundHandler(BaseWebhookHandler):
         self.log = log
         self.cart_payment_repository = cart_payment_repository
 
-    def __call__(self, event: StripeWebHookEvent, country_code: str):
+    async def __call__(self, event: StripeWebHookEvent, country_code: str):
         self.log.info(f"Handling {self.TYPE_NAME} webhook for country {country_code}")
 
 
@@ -87,6 +87,6 @@ class WebhookProcessor:
         self.event = stripe_webhook_event
         self.container = container
 
-    def process_webhook(self, country_code: str):
+    async def process_webhook(self, country_code: str):
         handler = self.container.provide_handler(self.event.type)
-        handler(self.event, country_code)
+        await handler(self.event, country_code)
