@@ -24,7 +24,7 @@ class LedgerErrorCode(str, Enum):
 
 class LedgerError(PaymentError):
     """
-    Base exception class for payin. This is base class that can be inherited by
+    Base exception class for ledger. This is base class that can be inherited by
     each business operation layer with corresponding sub error class and
     raise to application layers.  Provides automatic supplying of error message
     based on provided code.
@@ -32,9 +32,9 @@ class LedgerError(PaymentError):
 
     def __init__(self, error_code: LedgerErrorCode, retryable: bool):
         """
-        Base Payin exception class.
+        Base Ledger exception class.
 
-        :param error_code: payin service predefined client-facing error codes.
+        :param error_code: ledger service predefined client-facing error codes.
         :param retryable: identify if the error is retryable or not.
         """
         super(LedgerError, self).__init__(

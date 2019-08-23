@@ -9,16 +9,13 @@ from typing import Optional
 
 from sqlalchemy import and_
 
-from app.ledger.core.mx_transaction.data_types import (
+from app.ledger.core.data_types import (
     InsertMxScheduledLedgerInput,
     InsertMxScheduledLedgerOutput,
     GetMxScheduledLedgerInput,
     GetMxScheduledLedgerOutput,
 )
-from app.ledger.core.mx_transaction.types import (
-    MxScheduledLedgerIntervalType,
-    MxLedgerStateType,
-)
+from app.ledger.core.types import MxScheduledLedgerIntervalType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_scheduled_ledgers, mx_ledgers
 from app.ledger.repository.base import LedgerDBRepository
 

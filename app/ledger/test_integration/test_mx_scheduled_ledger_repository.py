@@ -4,19 +4,19 @@ import uuid
 import pytest
 
 from app.commons.types import CurrencyType
-from app.ledger.core.mx_transaction.types import (
-    MxScheduledLedgerIntervalType,
-    MxLedgerType,
-    MxLedgerStateType,
-)
-from app.ledger.repository.mx_ledger_repository import (
+from app.ledger.core.data_types import (
     InsertMxLedgerInput,
-    MxLedgerRepository,
-)
-from app.ledger.repository.mx_scheduled_ledger_repository import (
-    MxScheduledLedgerRepository,
     InsertMxScheduledLedgerInput,
     GetMxScheduledLedgerInput,
+)
+from app.ledger.core.types import (
+    MxLedgerType,
+    MxLedgerStateType,
+    MxScheduledLedgerIntervalType,
+)
+from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
+from app.ledger.repository.mx_scheduled_ledger_repository import (
+    MxScheduledLedgerRepository,
 )
 
 

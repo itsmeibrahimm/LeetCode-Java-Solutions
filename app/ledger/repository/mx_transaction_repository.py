@@ -5,23 +5,22 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.ledger.core.mx_transaction.data_types import (
+from app.ledger.core.data_types import (
     InsertMxTransactionInput,
     InsertMxTransactionOutput,
     InsertMxTransactionWithLedgerInput,
     InsertMxLedgerInput,
     InsertMxLedgerOutput,
-    UpdateMxLedgerSetInput,
-    GetMxLedgerByIdOutput,
     InsertMxScheduledLedgerInput,
+    GetMxLedgerByIdOutput,
+    UpdateMxLedgerSetInput,
 )
-from app.ledger.core.mx_transaction.types import MxLedgerStateType
+from app.ledger.core.types import MxLedgerStateType
 from app.ledger.models.paymentdb import (
     mx_transactions,
     mx_ledgers,
     mx_scheduled_ledgers,
 )
-
 from app.ledger.repository.base import LedgerDBRepository
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
@@ -170,7 +169,6 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 mx_ledger = GetMxLedgerByIdOutput.from_row(row)
             except Exception as e:
                 raise e
-
             try:
                 # construct update request and update mx_ledger balance
                 updated_amount = mx_ledger.balance + request.amount

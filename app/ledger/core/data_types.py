@@ -7,7 +7,7 @@ from uuid import UUID
 
 from app.commons.database.model import DBEntity, DBRequestModel
 from app.commons.types import CurrencyType
-from app.ledger.core.mx_transaction.types import (
+from app.ledger.core.types import (
     MxLedgerType,
     MxScheduledLedgerIntervalType,
     MxTransactionType,

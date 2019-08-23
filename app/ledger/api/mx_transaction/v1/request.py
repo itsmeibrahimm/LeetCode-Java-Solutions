@@ -3,10 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from app.ledger.core.mx_transaction.types import (
-    MxTransactionType,
-    MxScheduledLedgerIntervalType,
-)
+from app.ledger.core.types import MxTransactionType, MxScheduledLedgerIntervalType
 
 
 class CreateMxTransactionRequest(BaseModel):

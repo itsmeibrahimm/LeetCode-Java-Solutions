@@ -6,7 +6,7 @@ from pydantic import BaseModel, Json
 from typing_extensions import final
 
 from app.commons.types import CurrencyType
-from app.ledger.core.mx_transaction.types import (
+from app.ledger.core.types import (
     MxTransactionType,
     MxLedgerType,
     MxLedgerStateType,

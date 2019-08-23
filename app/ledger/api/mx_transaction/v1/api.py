@@ -7,7 +7,7 @@ from app.commons.error.errors import (
     PaymentErrorResponseBody,
 )
 from app.ledger.api.mx_transaction.v1.request import CreateMxTransactionRequest
-from app.ledger.core.mx_transaction.exceptions import MxTransactionCreationError
+from app.ledger.core.exceptions import MxTransactionCreationError
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.mx_transaction.processor import MxTransactionProcessor
 

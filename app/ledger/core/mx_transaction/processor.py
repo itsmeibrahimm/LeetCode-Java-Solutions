@@ -8,18 +8,26 @@ from pydantic import Json
 from structlog import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.ledger.core.mx_transaction.exceptions import (
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+    RetryError,
+)
+
+from app.ledger.core.exceptions import (
     MxTransactionCreationError,
     LedgerErrorCode,
     ledger_error_message_maps,
 )
-from app.ledger.core.mx_transaction.utils import to_mx_transaction
+from app.ledger.core.utils import to_mx_transaction
 from app.ledger.repository.mx_transaction_repository import (
     MxTransactionRepository,
     InsertMxTransactionWithLedgerInput,
 )
 from app.ledger.core.mx_transaction.model import MxTransaction
-from app.ledger.core.mx_transaction.types import (
+from app.ledger.core.types import (
     MxTransactionType,
     MxScheduledLedgerIntervalType,
     MxLedgerType,
@@ -145,15 +153,31 @@ class MxTransactionProcessor:
 
         # create transaction attached and update balance with given mx_ledger_id
         assert mx_ledger_id  # no exceptions should be raised from the assertion
-        created_mx_txn = await self.insert_mx_txn_and_update_ledger_balance(
-            mx_ledger_id, request_input
-        )
+        try:
+            created_mx_txn = await self._insert_mx_txn_and_update_ledger_balance(
+                mx_ledger_id, request_input
+            )
+        except RetryError as e:
+            self.log.error(
+                f"[create_ledger_and_insert_mx_transaction] Failed to retry locking mx_ledger {mx_ledger_id}, {e}"
+            )
+            raise MxTransactionCreationError(
+                error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
+                error_message=ledger_error_message_maps[
+                    LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
+                ],
+                retryable=True,
+            )
         return to_mx_transaction(created_mx_txn)
 
-    async def insert_mx_txn_and_update_ledger_balance(
+    @retry(
+        retry=retry_if_exception_type(LockNotAvailableError),
+        stop=stop_after_attempt(5),
+        wait=wait_fixed(0.3),
+    )
+    async def _insert_mx_txn_and_update_ledger_balance(
         self, ledger_id: UUID, request_input: InsertMxTransactionWithLedgerInput
     ):
-
         try:
             created_mx_txn = await self.mx_transaction_repo.insert_mx_transaction_and_update_ledger(
                 request_input, self.mx_ledger_repo, ledger_id
@@ -170,16 +194,10 @@ class MxTransactionProcessor:
                 retryable=True,
             )
         except LockNotAvailableError as e:
-            self.log.error(
+            self.log.warn(
                 f"[insert_mx_transaction_and_update_ledger] Cannot obtain lock while updating ledger {ledger_id} balance {e}"
             )
-            raise MxTransactionCreationError(
-                error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
-                error_message=ledger_error_message_maps[
-                    LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
-                ],
-                retryable=True,
-            )
+            raise e
         except Exception as e:
             self.log.error(
                 f"[insert_mx_transaction_and_update_ledger] Exception caught while updating ledger {ledger_id} balance {e}"

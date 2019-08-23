@@ -4,29 +4,25 @@ from datetime import datetime
 import pytest
 from asyncpg import UniqueViolationError
 from app.commons.types import CurrencyType
-from app.ledger.core.mx_transaction.data_types import (
+from app.ledger.core.data_types import (
+    InsertMxLedgerInput,
+    InsertMxTransactionInput,
     InsertMxTransactionWithLedgerInput,
+    GetMxScheduledLedgerInput,
     GetMxLedgerByIdInput,
     InsertMxScheduledLedgerInput,
-    GetMxScheduledLedgerInput,
 )
-from app.ledger.core.mx_transaction.types import (
-    MxTransactionType,
-    MxLedgerType,
+from app.ledger.core.types import (
     MxLedgerStateType,
+    MxLedgerType,
+    MxTransactionType,
     MxScheduledLedgerIntervalType,
 )
-from app.ledger.repository.mx_ledger_repository import (
-    MxLedgerRepository,
-    InsertMxLedgerInput,
-)
+from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
-from app.ledger.repository.mx_transaction_repository import (
-    MxTransactionRepository,
-    InsertMxTransactionInput,
-)
+from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 
 
 class TestMxTransactionRepository:
@@ -157,7 +153,7 @@ class TestMxTransactionRepository:
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
-        # test roll back created_mx_ledger if insert mx_scheduled_ledger failed due to duplicate [payment_account_id, start_time, end_time]
+        # test raise UniqueViolationError if insert mx_scheduled_ledger failed due to duplicate [payment_account_id, start_time, end_time, closed_at]
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
         interval_type = MxScheduledLedgerIntervalType.WEEKLY
@@ -195,21 +191,15 @@ class TestMxTransactionRepository:
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        with pytest.raises(Exception):
+        with pytest.raises(UniqueViolationError):
             await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                 request_input, mx_scheduled_ledger_repository
             )
-            # the mx_ledger created before should be rolled back
-            get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger.id)
-            mx_ledger_retrieved = await mx_ledger_repository.get_ledger_by_id(
-                get_ledger_request
-            )
-            assert mx_ledger_retrieved is None
 
     async def test_insert_mx_transaction_and_update_ledger_success(
         self,
@@ -294,17 +284,17 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             routing_key=datetime(2019, 8, 1),
-            idempotency_key=str(uuid.uuid4()),
+            idempotency_key=idempotency_key,
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
         with pytest.raises(Exception):
             await mx_transaction_repository.insert_mx_transaction_and_update_ledger(
                 request_input, mx_ledger_repository, mx_ledger_id
             )
-            # the mx_ledger that needs to be updated should not be updated
-            get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger_id)
-            mx_ledger_retrieved = await mx_ledger_repository.get_ledger_by_id(
-                get_ledger_request
-            )
-            assert mx_ledger_retrieved is not None
-            assert mx_ledger_retrieved.balance == 2000
+        # the mx_ledger that needs to be updated should not be updated
+        get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger_id)
+        mx_ledger_retrieved = await mx_ledger_repository.get_ledger_by_id(
+            get_ledger_request
+        )
+        assert mx_ledger_retrieved is not None
+        assert mx_ledger_retrieved.balance == 2000

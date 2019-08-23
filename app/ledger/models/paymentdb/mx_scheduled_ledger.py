@@ -23,6 +23,8 @@ class MxScheduledLedgerTable(TableDefinition):
     start_time: Column = no_init_field(Column("start_time", DateTime(False)))
     end_time: Column = no_init_field(Column("end_time", DateTime(False)))
     ledger_id: Column = no_init_field(Column("ledger_id", Text))
-    closed_at: Column = no_init_field(Column("closed_at", BigInteger))
+    closed_at: Column = no_init_field(
+        Column("closed_at", BigInteger)
+    )  # timestamp of when the ledger is updated from OPEN to PROCESSING
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))

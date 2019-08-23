@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.commons.context.app_context import AppContext
-from app.ledger.core.mx_transaction.types import MxScheduledLedgerIntervalType
+from app.ledger.core.types import MxScheduledLedgerIntervalType
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )

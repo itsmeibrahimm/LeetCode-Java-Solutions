@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import and_
 
-from app.ledger.core.mx_transaction.data_types import (
+from app.ledger.core.data_types import (
     InsertMxLedgerInput,
     InsertMxLedgerOutput,
     UpdateMxLedgerSetInput,
@@ -21,9 +21,8 @@ from app.ledger.core.mx_transaction.data_types import (
     InsertMxTransactionOutput,
     InsertMxTransactionInput,
 )
-from app.ledger.core.mx_transaction.types import MxTransactionType, MxLedgerStateType
+from app.ledger.core.types import MxTransactionType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_ledgers, mx_transactions
-
 
 from app.ledger.repository.base import LedgerDBRepository
 
@@ -98,7 +97,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         row = await self.payment_database.master().fetch_one(stmt)
         return GetMxLedgerByIdOutput.from_row(row) if row else None
 
-    # todo: update this to select from multiple returned mx_scheduled_ledger after state field is added to mx_scheduled_ledger table
+    # todo: PAY-3469: update this to select from existing mx_ledger after closed_at field is added to mx_scheduled_ledger table, order by (end_time, start_time)
     async def get_open_ledger_for_payment_account(
         self, request: GetMxLedgerByAccountInput
     ) -> Optional[GetMxLedgerByAccountOutput]:

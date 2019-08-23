@@ -4,19 +4,15 @@ import pytest
 from asyncpg import UniqueViolationError
 
 from app.commons.types import CurrencyType
-from app.ledger.core.mx_transaction.types import (
-    MxLedgerType,
-    MxLedgerStateType,
-    MxTransactionType,
-)
-from app.ledger.repository.mx_ledger_repository import (
-    MxLedgerRepository,
+from app.ledger.core.data_types import (
     InsertMxLedgerInput,
     UpdateMxLedgerSetInput,
     UpdateMxLedgerWhereInput,
     GetMxLedgerByIdInput,
     GetMxLedgerByAccountInput,
 )
+from app.ledger.core.types import MxLedgerType, MxLedgerStateType, MxTransactionType
+from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 
 
 class TestMxLedgerRepository:

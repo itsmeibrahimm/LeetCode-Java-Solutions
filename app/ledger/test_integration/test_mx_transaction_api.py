@@ -4,10 +4,7 @@ from datetime import datetime
 from starlette.testclient import TestClient
 
 from app.commons.types import CurrencyType
-from app.ledger.core.mx_transaction.types import (
-    MxTransactionType,
-    MxScheduledLedgerIntervalType,
-)
+from app.ledger.core.types import MxTransactionType, MxScheduledLedgerIntervalType
 
 
 class TestMxTransactionAPI:
