@@ -76,8 +76,9 @@ async def payment_intent(cart_payment_repository: CartPaymentRepository, payer: 
 
 class TestPaymentIntent:
     @pytest.mark.asyncio
+    @pytest.mark.skip("fix this to not relying on forcerollback")
     async def test_find_uncaptured_payment_intents_when_none_exist(
-        self, cart_payment_repository
+        self, cart_payment_repository: CartPaymentRepository
     ):
         uncaptured_payment_intents = (
             await cart_payment_repository.find_uncaptured_payment_intents()
@@ -85,8 +86,9 @@ class TestPaymentIntent:
         assert uncaptured_payment_intents == []
 
     @pytest.mark.asyncio
+    @pytest.mark.skip("fix this to not relying on forcerollback")
     async def test_find_uncaptured_payment_intents_when_one_exists(
-        self, cart_payment_repository, payment_intent
+        self, cart_payment_repository: CartPaymentRepository, payment_intent
     ):
         uncaptured_payment_intents = (
             await cart_payment_repository.find_uncaptured_payment_intents()

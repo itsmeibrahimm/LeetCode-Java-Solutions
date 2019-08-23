@@ -1,18 +1,18 @@
 import uuid
 
+import psycopg2
 import pytest
-from asyncpg import UniqueViolationError
 
 from app.commons.types import CurrencyType
-from app.ledger.core.data_types import (
+from app.ledger.core.types import MxLedgerStateType, MxLedgerType, MxTransactionType
+from app.ledger.repository.mx_ledger_repository import (
+    GetMxLedgerByAccountInput,
+    GetMxLedgerByIdInput,
     InsertMxLedgerInput,
+    MxLedgerRepository,
     UpdateMxLedgerSetInput,
     UpdateMxLedgerWhereInput,
-    GetMxLedgerByIdInput,
-    GetMxLedgerByAccountInput,
 )
-from app.ledger.core.types import MxLedgerType, MxLedgerStateType, MxTransactionType
-from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 
 
 class TestMxLedgerRepository:
@@ -53,7 +53,7 @@ class TestMxLedgerRepository:
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
-        with pytest.raises(UniqueViolationError):
+        with pytest.raises(psycopg2.IntegrityError):
             await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
     async def test_update_mx_ledger_balance_success(

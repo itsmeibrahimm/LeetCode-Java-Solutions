@@ -157,12 +157,12 @@ class AioConnection(DBConnection):
 
 class AioEngine(DBEngine):
     id: str
-    dsn: str
+    _dsn: str
     minsize: int = 1
     maxsize: int = 1
     connection_timeout_sec: int = 30
     closing_timeout_sec: int = 60
-
+    default_stmt_timeout_sec: int = 30
     force_rollback: bool = False
     debug: bool = False
     _raw_engine: Optional[engine.Engine]
@@ -192,7 +192,7 @@ class AioEngine(DBEngine):
             raise ValueError(
                 f"connection_timeout_sec should be > 0 but found {connection_timeout_sec}"
             )
-        if closing_timeout_sec <= 0:
+        if closing_timeout_sec < 0:
             raise ValueError(
                 f"closing_timeout_sec should be > 0 but found {closing_timeout_sec}"
             )
@@ -201,7 +201,7 @@ class AioEngine(DBEngine):
                 f"default_stmt_timeout_sec should be > 0 but found {default_stmt_timeout_sec}"
             )
 
-        self.dsn = dsn
+        self._dsn = dsn
         self.minsize = minsize
         self.maxsize = maxsize
         self.connection_timeout_sec = connection_timeout_sec
@@ -225,6 +225,10 @@ class AioEngine(DBEngine):
                 echo=self.debug,
             )
         return self
+
+    @property
+    def dsn(self) -> str:
+        return self._dsn
 
     async def disconnect(self):
         if not self.closed():

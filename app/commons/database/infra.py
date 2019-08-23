@@ -2,11 +2,11 @@ from dataclasses import dataclass, replace
 from typing import Optional
 from urllib import parse
 
-from databases import Database
-
 from app.commons.config.app_config import DBConfig
 from app.commons.config.secrets import Secret
 from app.commons.context.logger import root_logger
+from app.commons.database.client.aiopg import AioEngine
+from app.commons.database.client.interface import DBEngine
 
 
 @dataclass(frozen=True)
@@ -16,23 +16,23 @@ class DB:
 
     """
 
-    _master: Database
-    _replica: Database
+    _master: DBEngine
+    _replica: DBEngine
     _id: str
 
     @property
     def id(self):
         return self._id
 
-    def master(self) -> Database:
+    def master(self) -> DBEngine:
         return self._master
 
-    def replica(self) -> Database:
+    def replica(self) -> DBEngine:
         return self._replica
 
     @property
     def connected(self) -> bool:
-        return self._replica.is_connected and self._master.is_connected
+        return self._replica.is_connected() and self._master.is_connected()
 
     async def __aenter__(self):
         await self.connect()
@@ -43,9 +43,9 @@ class DB:
 
     async def connect(self):
         try:
-            if not self._master.is_connected:
+            if not self._master.is_connected():
                 await self._master.connect()
-            if not self._replica.is_connected:
+            if not self._replica.is_connected():
                 await self._replica.connect()
         except Exception:
             root_logger.exception(f"{self.id} failed to connect!")
@@ -54,9 +54,9 @@ class DB:
 
     async def disconnect(self):
         try:
-            if self._master.is_connected:
+            if self._master.is_connected():
                 await self._master.disconnect()
-            if self._replica.is_connected:
+            if self._replica.is_connected():
                 await self._replica.disconnect()
         except Exception:
             root_logger.exception(f"{self.id} failed to disconnect!")
@@ -75,35 +75,27 @@ class DB:
         :param replica_url: connection string of replica instance of target database
         :return: instance of DB
         """
-        # https://magicstack.github.io/asyncpg/current/faq.html#why-am-i-getting-prepared-statement-errors
-        # note when running under pgbouncer, we need to disable
-        # named prepared statements. we also do not benefit from
-        # prepared statement caching
-        # https://github.com/MagicStack/asyncpg/issues/339
-        statement_cache_size = 0
 
         assert master_url.value
-        master = Database(
-            master_url.value,
-            max_size=db_config.master_pool_max_size,
-            min_size=db_config.master_pool_min_size,
-            # echo=db_config.debug,
-            # logging_name=f"{name}_master",
-            command_timeout=db_config.statement_timeout,
+        master = AioEngine(
+            dsn=master_url.value,
+            maxsize=db_config.master_pool_max_size,
+            minsize=db_config.master_pool_min_size,
+            debug=db_config.debug,
             force_rollback=db_config.force_rollback,
-            statement_cache_size=statement_cache_size,
+            default_stmt_timeout_sec=db_config.statement_timeout,
+            closing_timeout_sec=db_config.closing_timeout,
         )
 
         assert replica_url.value
-        replica = Database(
-            replica_url.value,
-            max_size=db_config.replica_pool_max_size,
-            min_size=db_config.replica_pool_min_size,
-            # echo=db_config.debug,
-            # logging_name=f"{name}_replica",
-            command_timeout=db_config.statement_timeout,
+        replica = AioEngine(
+            dsn=master_url.value,
+            maxsize=db_config.replica_pool_max_size,
+            minsize=db_config.replica_pool_min_size,
+            debug=db_config.debug,
             force_rollback=db_config.force_rollback,
-            statement_cache_size=statement_cache_size,
+            default_stmt_timeout_sec=db_config.statement_timeout,
+            closing_timeout_sec=db_config.closing_timeout,
         )
 
         return cls(_master=master, _replica=replica, _id=db_id)

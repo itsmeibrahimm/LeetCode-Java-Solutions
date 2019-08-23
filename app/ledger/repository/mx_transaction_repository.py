@@ -155,7 +155,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         mx_ledger_repository: MxLedgerRepository,
         mx_ledger_id: UUID,
     ) -> InsertMxTransactionOutput:
-        paymentdb_conn = self.payment_database.master()
+        paymentdb_conn = await self.payment_database.master().acquire()
         async with paymentdb_conn.transaction():
             try:
                 # Lock the row for updating the balance

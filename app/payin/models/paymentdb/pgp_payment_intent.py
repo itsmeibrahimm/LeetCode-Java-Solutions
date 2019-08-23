@@ -12,7 +12,7 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @dataclass(frozen=True)
 class PgpPaymentIntentTable(TableDefinition):
     name: str = no_init_field("pgp_payment_intents")
-    id: Column = no_init_field(Column("id", UUID(as_uuid=False), primary_key=True))
+    id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
     payment_intent_id: Column = no_init_field(Column("payment_intent_id", Text))
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
     provider: Column = no_init_field(Column("provider", String))

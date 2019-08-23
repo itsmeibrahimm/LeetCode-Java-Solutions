@@ -162,15 +162,64 @@ class EngineTransactionContext:
 
 class DBEngine(ABC):
     """
-    Encapsulate a set connection pool/engine interfaces
+    Encapsulate a set connection pool/engine interfaces.
+    Basic usage:
+    1. Directly execute statement WITHOUT worrying about closing resource
+        result = await engine.fetch_one(stmt, timeout=...)
+
+    2. Acquire connection and execute as you will:
+        2.1 await style:
+           !! need to manually close connection !!
+            conn = await engine.acquire()
+            ...
+            await conn.close()
+        2.2. async cxt manager style:
+            async with engine.acquire() as conn:
+                result = await conn.fetch_one(stmt)
+            assert conn.closed()
+        2.3. mix-and-match!
+            conn = await engine.acquire()
+            async with conn:
+                result = await conn.fetch_one(stmt)
+            assert conn.closed()
+
+        Reference tests: app.commons.test_integration.database.client.aiopg.test_aiopg_client_resource.test_engine_acquire_connection
+
+    3. Acquire transaction and execute as you will:
+        ONLY support via async cxt manager style, as acquire a transaction from engine directly
+        will implicitly open a DBConnection so you want to make sure close it and not passing it around.
+
+        e.g.
+        async with engine.transaction() as tx:
+            conn = tx.connection()
+            result = await conn.fetch_all(stmt)
+
+            tx.rollback() (or cxt manager will auto commit for you!)
+
+        Reference tests: app.commons.test_integration.database.client.aiopg.test_aiopg_client_resource.test_connection_acquire_transaction
+
+    4. More use cases demonstrated by:
+        4.1 resource management tests:
+            app/commons/test_integration/database/client/aiopg/test_aiopg_client_resource.py
+        4.2 execution / transaction tests:
+            app/commons/test_integration/database/client/aiopg/test_aiopg_client_execution.py
+
     """
 
     @abstractmethod
     def closed(self):
         pass
 
+    def is_connected(self):
+        return not self.closed()
+
     @abstractmethod
     async def connect(self):
+        pass
+
+    @property
+    @abstractmethod
+    def dsn(self) -> str:
         pass
 
     @abstractmethod

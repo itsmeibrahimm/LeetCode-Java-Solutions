@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "677ef485c6e888aaf559d0704e17c5e5dff5f3034d7c3f3c22063f0a80917aef"
+            "sha256": "0ae2f13f3cc856b4cc8db903bcfb62010be9ac1ce267a9f848205cd07e46f18e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -91,27 +91,6 @@
             ],
             "version": "==3.0.1"
         },
-        "asyncpg": {
-            "hashes": [
-                "sha256:0677714b26b48d63db728867b812ef365ec3879d2be6fa1c9cf4328503f9a464",
-                "sha256:2dee4fb251139f1c1ee4bd9959d516f930f4da37a2f33b07c2b902b837a76666",
-                "sha256:378a7ef11ce7b35f11eb816e5252bc1e779119f7583a872233b45a76effac02e",
-                "sha256:4539bc2e63600a1ee999086bbb59bf717ab32ea771ac20b5b792a2234633b5fb",
-                "sha256:4a779a85302241782bed8ed0f2bcb38544805b3e107b16ee7489c5818d8f4228",
-                "sha256:51a3d67a3fa43112b17ec510338723932e1e0611ad99a146acc9960d32210196",
-                "sha256:58a5eccaac60fd326e32683226efe1046bfea558fa043360bdd1708e0e812c67",
-                "sha256:814343dc2baa489a11521ff9fad68f337a05c9ae0461fdf9f1ec7ac3541c13a9",
-                "sha256:84084f7dfed0b2d397a0c2fd7eaf29b01904c74f4320e5fe95ad3042042cf188",
-                "sha256:89e727fdba05d90a0156d9d18932fd44a2baa84e90e3368573f432a308ad8fd7",
-                "sha256:ab8b9d367e3ef48f35a059642940714a2bda7a7fce8b017b21bfbc4f8fbf8f5f",
-                "sha256:c1fe1f0ef848f0f17bf63b90a4c3f446a14e4c899d8531ea988109cc0de014e5",
-                "sha256:cc7aa61bf41273ee5d4c11e0e72c0d9340e9c4dbf752464ae2b6816abadaabce",
-                "sha256:d5450bdf8631fa1200c08a2e70cab06c2e8c09ef608629908531513444d12858",
-                "sha256:fd2d13da29f55c2c71b1acc9d9f107c7a5176fffb3f62ff503f2b300f7ecd74e",
-                "sha256:fd35a8082b97d5b97d26bcd1b010fdd65a56311d7a02bf2a7e2c56810b9961a7"
-            ],
-            "version": "==0.18.3"
-        },
         "attrs": {
             "hashes": [
                 "sha256:69c0dbf2ed392de1cb5ec704444b08a5ef81680a61cb899dc08127123af36a79",
@@ -121,24 +100,24 @@
         },
         "boto3": {
             "hashes": [
-                "sha256:3a8a8af144df27643f5e444ae437b5bc45e94b37de15dabb5bb799a0205f1d8f",
-                "sha256:dacfd1651860eda526abaeb5f9eee2063043a75d4c555cc7b0c22a7989bf88cd"
+                "sha256:13ec6cc11a329b56681b9a24421e58fac753cfb79085f186076fd3f9ca958c56",
+                "sha256:72bea54f1dfa080a5b10ae09946649f174ee72bb07a0eecf8ee774533bda2462"
             ],
-            "version": "==1.9.213"
+            "version": "==1.9.214"
         },
         "botocore": {
             "hashes": [
-                "sha256:14ab8371f883c47348e749c4d8773366dd2cc549038e9eaabe21fb1d05bca7b5",
-                "sha256:b76a264c0781e4f19138617e4201e8e67fa6dd331db32f4b6273fc18a433f4ec"
+                "sha256:1c357c8081f67797596eb28295cac38aa835cdb4ef6c69ede57e203359659d9c",
+                "sha256:2b6e366cac12f7146542ac802ea62a6b46dfc92e9ee3eb75ba450949d5e10f71"
             ],
-            "version": "==1.12.213"
+            "version": "==1.12.214"
         },
         "botostubs": {
             "hashes": [
-                "sha256:001ab1908d6465e6106967249ae2694254cfcf823c5586b4103163e3047e26a4",
-                "sha256:3a3ff160d5fac611cc072dd2e4fca204c302b71478a85037bd9abf7e56154ab0"
+                "sha256:85a9b45fa66d2aee95dff013a8279ce3078d3f5553bb006cae26c6fd48457bb4",
+                "sha256:bdc2208150d0c9f0e5e18e3c5ddc2542e65232c9308a46abed6604ef9c60db0f"
             ],
-            "version": "==0.10.1.9.210"
+            "version": "==0.11.1.9.213"
         },
         "bunch": {
             "hashes": [
@@ -236,16 +215,6 @@
                 "sha256:f57b76e46a58b63d1c6375017f4564a28f19a5ca912691fd2e4261b3414b618d"
             ],
             "version": "==2.7"
-        },
-        "databases": {
-            "extras": [
-                "postgresql"
-            ],
-            "hashes": [
-                "sha256:1e3b21a237d8b8a8774da1237fa75e951e23bf8e943516df8fe2443f1968287f"
-            ],
-            "index": "pypi",
-            "version": "==0.2.5"
         },
         "dnspython": {
             "hashes": [

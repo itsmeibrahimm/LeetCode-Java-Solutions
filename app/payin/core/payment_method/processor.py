@@ -3,8 +3,8 @@ from datetime import datetime
 
 from typing import Optional, Any, Tuple
 
-from asyncpg import DataError
 from fastapi import Depends
+from psycopg2._psycopg import DataError
 from structlog import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context

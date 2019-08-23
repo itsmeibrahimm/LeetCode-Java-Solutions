@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from typing import Optional
 
-from asyncpg import DataError
 from fastapi import Depends
+from psycopg2._psycopg import DataError
 from structlog import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context

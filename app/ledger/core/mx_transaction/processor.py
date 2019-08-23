@@ -2,36 +2,33 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from asyncpg import DataError, UniqueViolationError, LockNotAvailableError
+import psycopg2
 from fastapi import Depends
+from psycopg2._psycopg import DataError, OperationalError
+from psycopg2.errorcodes import UNIQUE_VIOLATION, LOCK_NOT_AVAILABLE
 from pydantic import Json
 from structlog import BoundLogger
-
-from app.commons.context.req_context import get_logger_from_req
 from tenacity import (
+    RetryError,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_fixed,
-    RetryError,
 )
 
+from app.commons.context.req_context import get_logger_from_req
 from app.ledger.core.exceptions import (
     MxTransactionCreationError,
     LedgerErrorCode,
     ledger_error_message_maps,
 )
-from app.ledger.core.utils import to_mx_transaction
-from app.ledger.repository.mx_transaction_repository import (
-    MxTransactionRepository,
-    InsertMxTransactionWithLedgerInput,
-)
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.types import (
-    MxTransactionType,
     MxScheduledLedgerIntervalType,
+    MxTransactionType,
     MxLedgerType,
 )
+from app.ledger.core.utils import to_mx_transaction
 from app.ledger.repository.mx_ledger_repository import (
     GetMxLedgerByAccountInput,
     MxLedgerRepository,
@@ -39,6 +36,10 @@ from app.ledger.repository.mx_ledger_repository import (
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     GetMxScheduledLedgerInput,
     MxScheduledLedgerRepository,
+)
+from app.ledger.repository.mx_transaction_repository import (
+    InsertMxTransactionWithLedgerInput,
+    MxTransactionRepository,
 )
 
 
@@ -133,7 +134,9 @@ class MxTransactionProcessor:
                         ],
                         retryable=True,
                     )
-                except UniqueViolationError as e:
+                except psycopg2.IntegrityError as e:
+                    if e.pgcode != UNIQUE_VIOLATION:
+                        raise
                     self.log.warn(
                         f"[create_ledger_and_insert_mx_transaction] Retry to update ledger balance instead of insert due to unique constraints violation, {e}"
                     )
@@ -171,7 +174,8 @@ class MxTransactionProcessor:
         return to_mx_transaction(created_mx_txn)
 
     @retry(
-        retry=retry_if_exception_type(LockNotAvailableError),
+        # TODO need to be revised to retry on actual error code LOCK_NOT_AVAILABLE @yu.qu
+        retry=retry_if_exception_type(OperationalError),
         stop=stop_after_attempt(5),
         wait=wait_fixed(0.3),
     )
@@ -193,7 +197,9 @@ class MxTransactionProcessor:
                 ],
                 retryable=True,
             )
-        except LockNotAvailableError as e:
+        except OperationalError as e:
+            if e.pgcode != LOCK_NOT_AVAILABLE:
+                raise
             self.log.warn(
                 f"[insert_mx_transaction_and_update_ledger] Cannot obtain lock while updating ledger {ledger_id} balance {e}"
             )

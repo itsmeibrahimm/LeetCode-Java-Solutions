@@ -80,9 +80,10 @@ def create_app_config() -> AppConfig:
         DEFAULT_DB_CONFIG=DBConfig(
             replica_pool_max_size=2,
             master_pool_max_size=2,
-            debug=True,
+            debug=False,
             # roll back all database transactions before shutting down
             force_rollback=True,
+            closing_timeout=0,  # instantly close unclosed connections
         ),
         AVAILABLE_MAINDB_REPLICAS=["maindb_test"],
         DSJ_API_BASE_URL="",

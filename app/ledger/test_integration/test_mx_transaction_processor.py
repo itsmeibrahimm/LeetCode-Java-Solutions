@@ -4,8 +4,8 @@ import uuid
 
 import pytest
 import pytest_mock
-from asyncpg import DataError, LockNotAvailableError
 from asynctest import patch
+from psycopg2._psycopg import DataError, OperationalError
 from tenacity import RetryError
 
 from app.commons.types import CurrencyType
@@ -512,7 +512,7 @@ class TestMxTransactionProcessor:
             mx_ledger_repo=mx_ledger_repository,
             log=mocker.Mock(),
         )
-        error = LockNotAvailableError("Test lock not available error")
+        error = OperationalError("Test lock not available error")
         mock_update_ledger.side_effect = error
         with pytest.raises(RetryError) as e:
             await mx_transaction_processor._insert_mx_txn_and_update_ledger_balance(

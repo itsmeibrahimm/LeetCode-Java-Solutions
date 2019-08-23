@@ -77,28 +77,39 @@ async def test_engine_creation(app_config: AppConfig):
 async def test_engine_acquire_connection(payout_maindb_aio_engine: AioEngine):
 
     # Test no context manager
-    connection: AioConnection = await payout_maindb_aio_engine.acquire()
-    assert not connection.closed()
-    assert not connection.raw_connection.closed
+    conn1: AioConnection = await payout_maindb_aio_engine.acquire()
+    assert not conn1.closed()
+    assert not conn1.raw_connection.closed
 
-    await connection.close()
-    assert connection.closed()
-    assert connection.raw_connection.closed
+    await conn1.close()
+    assert conn1.closed()
+    assert conn1.raw_connection.closed
+
+    # Test await acquire then use as cxt manager!
+    conn2: AioConnection = await payout_maindb_aio_engine.acquire()
+    assert not conn2.closed()
+    assert not conn2.raw_connection.closed
+
+    async with conn2:
+        assert not conn2.closed()
+        assert not conn2.raw_connection.closed
+    assert conn2.closed()
+    assert conn2.raw_connection.closed
 
     # Test await connection and use as context manager
     conn_cxt: AwaitableConnectionContext = payout_maindb_aio_engine.acquire()
-    async with conn_cxt as connection:
-        assert not connection.closed()
-        assert not connection.raw_connection.closed
-    assert connection.closed()
-    assert connection.raw_connection.closed
+    async with conn_cxt as conn3:
+        assert not conn3.closed()
+        assert not conn3.raw_connection.closed
+    assert conn3.closed()
+    assert conn3.raw_connection.closed
 
     # Test use acquire connection as context manager
-    async with payout_maindb_aio_engine.acquire() as conn:  # type: AioConnection
-        assert not conn.closed()
-        assert not conn.raw_connection.closed
-    assert conn.closed()
-    assert conn.raw_connection.closed
+    async with payout_maindb_aio_engine.acquire() as conn4:  # type: AioConnection
+        assert not conn4.closed()
+        assert not conn4.raw_connection.closed
+    assert conn4.closed()
+    assert conn4.raw_connection.closed
 
 
 async def test_connection_acquire_transaction(payout_maindb_aio_engine: AioEngine):

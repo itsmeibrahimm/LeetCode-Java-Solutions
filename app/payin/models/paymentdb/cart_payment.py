@@ -12,7 +12,7 @@ from app.commons.utils.dataclass_extensions import no_init_field
 @dataclass(frozen=True)
 class CartPaymentTable(TableDefinition):
     name: str = no_init_field("cart_payments")
-    id: Column = no_init_field(Column("id", UUID(as_uuid=False), primary_key=True))
+    id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
     payer_id: Column = no_init_field(Column("payer_id", Text))
     type: Column = no_init_field(Column("type", String))
     reference_id: Column = no_init_field(Column("reference_id", BigInteger))

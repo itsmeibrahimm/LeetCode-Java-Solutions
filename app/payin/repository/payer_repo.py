@@ -318,13 +318,13 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         if input.id:
             stmt = (
-                select([payers.table, pgp_customers.table])
+                select([payers.table, pgp_customers.table], use_labels=True)
                 .select_from(join_stmt)
                 .where(payers.id == input.id)
             )
         elif input.dd_payer_id:
             stmt = (
-                select([payers.table, pgp_customers.table])
+                select([payers.table, pgp_customers.table], use_labels=True)
                 .select_from(join_stmt)
                 .where(payers.dd_payer_id == input.dd_payer_id)
             )

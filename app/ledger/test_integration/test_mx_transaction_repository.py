@@ -1,16 +1,16 @@
 import uuid
 from datetime import datetime
 
+import psycopg2
 import pytest
-from asyncpg import UniqueViolationError
+from psycopg2 import errorcodes
+
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import (
-    InsertMxLedgerInput,
-    InsertMxTransactionInput,
-    InsertMxTransactionWithLedgerInput,
-    GetMxScheduledLedgerInput,
     GetMxLedgerByIdInput,
+    GetMxScheduledLedgerInput,
     InsertMxScheduledLedgerInput,
+    InsertMxTransactionWithLedgerInput,
 )
 from app.ledger.core.types import (
     MxLedgerStateType,
@@ -18,11 +18,17 @@ from app.ledger.core.types import (
     MxTransactionType,
     MxScheduledLedgerIntervalType,
 )
-from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
+from app.ledger.repository.mx_ledger_repository import (
+    InsertMxLedgerInput,
+    MxLedgerRepository,
+)
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
-from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
+from app.ledger.repository.mx_transaction_repository import (
+    InsertMxTransactionInput,
+    MxTransactionRepository,
+)
 
 
 class TestMxTransactionRepository:
@@ -97,10 +103,11 @@ class TestMxTransactionRepository:
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         await mx_transaction_repository.insert_mx_transaction(mx_transaction_to_insert)
 
-        with pytest.raises(UniqueViolationError):
+        with pytest.raises(psycopg2.IntegrityError) as e:
             await mx_transaction_repository.insert_mx_transaction(
                 mx_transaction_to_insert
             )
+            assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
 
     async def test_create_ledger_and_insert_mx_transaction_success(
         self,
@@ -196,7 +203,7 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        with pytest.raises(UniqueViolationError):
+        with pytest.raises(psycopg2.IntegrityError):
             await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                 request_input, mx_scheduled_ledger_repository
             )

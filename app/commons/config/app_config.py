@@ -21,7 +21,8 @@ class DBConfig:
     replica_pool_max_size: int
     master_pool_min_size: int = 1
     replica_pool_min_size: int = 1
-    statement_timeout = 1.0
+    statement_timeout: int = 1
+    closing_timeout: int = 60
     force_rollback: bool = False
 
     def __post_init__(self):
