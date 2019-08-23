@@ -2,7 +2,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional
 from typing_extensions import final
-from app.payin.core.cart_payment.types import CartType, IntentStatus
+from app.payin.core.cart_payment.types import CartType, IntentStatus, ChargeStatus
 from uuid import UUID
 
 
@@ -106,3 +106,45 @@ class PaymentIntentAdjustmentHistory:
     amount_delta: int
     currency: str
     created_at: datetime
+
+
+@final
+@dataclass(frozen=True)
+class PaymentCharge:
+    id: UUID
+    payment_intent_id: UUID
+    provider: str
+    idempotency_key: str
+    status: ChargeStatus
+    currency: str
+    amount: int
+    amount_refunded: int
+    application_fee_amount: Optional[int]
+    payout_account_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    captured_at: Optional[datetime]
+    cancelled_at: Optional[datetime]
+
+
+@final
+@dataclass(frozen=True)
+class PgpPaymentCharge:
+    id: UUID
+    payment_charge_id: UUID
+    provider: str
+    idempotency_key: str
+    status: ChargeStatus
+    currency: str
+    amount: int
+    amount_refunded: int
+    application_fee_amount: Optional[int]
+    payout_account_id: Optional[str]
+    resource_id: Optional[str]
+    intent_resource_id: Optional[str]
+    invoice_resource_id: Optional[str]
+    payment_method_resource_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    captured_at: Optional[datetime]
+    cancelled_at: Optional[datetime]

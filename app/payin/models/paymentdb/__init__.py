@@ -9,6 +9,8 @@ from app.payin.models.paymentdb.pgp_payment_method import PgpPaymentMethodTable
 from app.payin.models.paymentdb.payment_intent_adjustment_history import (
     PaymentIntentAdjustmentTable,
 )
+from app.payin.models.paymentdb.payment_charge import PaymentChargeTable
+from app.payin.models.paymentdb.pgp_payment_charge import PgpPaymentChargeTable
 
 payin_paymentdb_metadata = sqlalchemy.MetaData()
 
@@ -21,3 +23,5 @@ pgp_payment_intents = PgpPaymentIntentTable(db_metadata=payin_paymentdb_metadata
 payment_intents_adjustment_history = PaymentIntentAdjustmentTable(
     db_metadata=payin_paymentdb_metadata
 )
+payment_charges = PaymentChargeTable(db_metadata=payin_paymentdb_metadata)
+pgp_payment_charges = PgpPaymentChargeTable(db_metadata=payin_paymentdb_metadata)

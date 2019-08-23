@@ -108,16 +108,6 @@ class CreatePaymentIntent(StripeBaseModel):
         ON_SESSION = "on_session"
         OFF_SESSION = "off_session"
 
-    class PaymentMethodOptions(StripeBaseModel):
-        class CardOptions(StripeBaseModel):
-            class RequestThreeDSecure(str, Enum):
-                AUTOMATIC = "automatic"
-                ANY = "any"
-
-            request_three_d_secure: Optional[RequestThreeDSecure]
-
-        card: Optional[CardOptions]
-
     # TODO Determine how we can use types where Enums are defined.  For example capture_method: Optional[CaptureMethod].
     # If used directly stripe will error out.
     amount: int
@@ -167,6 +157,20 @@ class CancelPaymentIntent(StripeBaseModel):
     cancellation_reason: str
 
 
+class RefundCharge(StripeBaseModel):
+    class RefundReason(str, Enum):
+        DUPLICATE = "duplicate"
+        FRAUDULENT = "fraudulent"
+        REQUESTED_BY_CONSUMER = "requested_by_customer"
+
+    charge: str
+    amount: Optional[int]
+    metadata: Optional[Dict]
+    reason: Optional[str]
+    refund_application_fee: Optional[bool]
+    reverse_transfer: Optional[bool]
+
+
 class CreatePaymentMethod(StripeBaseModel):
     class Card(StripeBaseModel):
         token: str
@@ -189,6 +193,51 @@ class RetrievePaymentMethod(StripeBaseModel):
 
 
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
+class Address(StripeBaseModel):
+    city: Optional[str]
+    country: Optional[str]
+    line1: Optional[str]
+    line2: Optional[str]
+    postal_code: Optional[str]
+    state: Optional[str]
+
+
+class BillingDetails(StripeBaseModel):
+    address: Optional[Address]
+    email: Optional[str]
+    name: Optional[str]
+    phone: Optional[str]
+
+
+class Shipping(StripeBaseModel):
+    address: Optional[Address]
+    carrier: Optional[str]
+    name: Optional[str]
+    phone: Optional[str]
+    tracking_nubmer: Optional[str]
+
+
+class PaymentMethodOptions(StripeBaseModel):
+    class CardOptions(StripeBaseModel):
+        class RequestThreeDSecure(str, Enum):
+            automatic = "automatic"
+            any = "any"
+
+        request_three_d_secure: Optional[RequestThreeDSecure]
+
+    card: Optional[CardOptions]
+
+
+class Outcome(StripeBaseModel):
+    network_status: str
+    reason: str
+    risk_level: str
+    risk_score: int
+    rule: str
+    seller_message: str
+    type: str
+
+
 class PaymentMethod(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/payment_methods/object
@@ -205,20 +254,6 @@ class PaymentMethod(StripeBaseModel):
         brand: Optional[str]
         country: Optional[str]
         description: Optional[str]
-
-    class BillingDetails(StripeBaseModel):
-        class Address(StripeBaseModel):
-            city: Optional[str]
-            country: Optional[str]
-            line1: Optional[str]
-            line2: Optional[str]
-            postal_code: Optional[str]
-            state: Optional[str]
-
-        address: Optional[Address]
-        email: Optional[str]
-        name: Optional[str]
-        phone: Optional[str]
 
     id: str
     type: str
@@ -276,3 +311,143 @@ class Event(StripeBaseModel):
     @property
     def data_object(self):
         return self.data.object
+
+
+class Refund(StripeBaseModel):
+    """
+    https://stripe.com/docs/api/refunds
+    """
+
+    _STRIPE_OBJECT_NAME: str = "refund"
+
+    id: str
+    object: str
+    amount: int
+    balance_transaction: Optional[str]
+    charge: str
+    created: int
+    currency: str
+    metadata: Optional[Dict]
+    reason: Optional[str]
+    receipt_number: Optional[str]
+    source_transfer_reversal: Optional[str]
+    status: str
+    transfer_reversal: Optional[str]
+
+
+class Charge(StripeBaseModel):
+    """
+    https://stripe.com/docs/api/charges
+    """
+
+    _STRIPE_OBJECT_NAME: str = "charge"
+
+    id: str
+    object: str
+    amount: int
+    amount_refunded: int
+    # amount_updates - preview feature
+    application: str
+    application_fee: str
+    application_fee_amount: int
+    balance_transaction: str
+    billing_details: Optional[BillingDetails]
+    captured: bool
+    created: datetime
+    currency: str
+    customer: str
+    description: Optional[str]
+    dispute: Optional[str]
+    failure_code: Optional[str]
+    failure_message: Optional[str]
+    invoice: Optional[str]
+    livemode: bool
+    metadata: Optional[Dict]
+    on_behalf_of: Optional[str]
+    order: Optional[str]
+    outcome: Optional[Outcome]
+    paid: bool
+    payment_intent: Optional[str]
+    payment_method: Optional[str]
+    # TODO payment_method_details
+    receipt_email: Optional[str]
+    receipt_number: Optional[str]
+    receipt_url: Optional[str]
+    refunded: bool
+    # TODO refunds
+    review: Optional[str]
+    shipping: Optional[Shipping]
+    source_transfer: Optional[str]
+    statement_descriptor: Optional[str]
+    statement_descriptor_suffix: Optional[str]
+    status: str
+    transfer: Optional[str]
+    transfer_data: Optional[TransferData]
+    transfer_group: Optional[str]
+
+
+class PaymentIntent(StripeBaseModel):
+    """
+    https://stripe.com/docs/api/payment_intents
+    """
+
+    _STRIPE_OBJECT_NAME: str = "payment_intent"
+
+    class NextAction(StripeBaseModel):
+        class RedirectToUrl(StripeBaseModel):
+            return_url: str
+            url: str
+
+        redirect_to_url: RedirectToUrl
+        type: str
+        use_stripe_sdk: str
+
+    class LastPaymentError(StripeBaseModel):
+        charge: Optional[str]
+        code: Optional[str]
+        decline_code: Optional[str]
+        doc_url: Optional[str]
+        message: Optional[str]
+        param: Optional[str]
+        payment_method: Optional[PaymentMethod]
+        type: Optional[str]
+
+    class Charges(StripeBaseModel):
+        data: List[Charge]
+        has_more: bool
+        object: str
+        url: Optional[str]
+
+    id: str
+    object: str
+    amount: int
+    amount_capturable: Optional[int]
+    amount_received: Optional[int]
+    application: Optional[str]
+    application_fee_amount: Optional[int]
+    canceled_at: Optional[datetime]
+    cancellation_reason: Optional[str]
+    capture_method: str
+    charges: Charges
+    confirmation_method: str
+    created: datetime
+    currency: str
+    customer: str
+    description: Optional[str]
+    invoice: Optional[str]
+    last_payment_error: Optional[LastPaymentError]
+    livemode: bool
+    metadata: Optional[dict]
+    next_action: Optional[NextAction]
+    on_behalf_of: str
+    payment_method: str
+    payment_method_options: Optional[PaymentMethodOptions]
+    payment_method_types: List[str]
+    receipt_email: str
+    review: str
+    setup_future_usuage: str
+    shipping: Optional[Shipping]
+    statement_descriptor: Optional[str]
+    status: str
+    transfer_data: Optional[TransferData]
+    transfer_group: Optional[str]

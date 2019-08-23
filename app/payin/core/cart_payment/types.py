@@ -25,3 +25,10 @@ class IntentStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class ChargeStatus(str, Enum):
+    REQUIRES_CAPTURE = "requires_capture"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"

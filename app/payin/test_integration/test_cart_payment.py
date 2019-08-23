@@ -32,11 +32,11 @@ class TestCartPayment:
         return request_body
 
     def _get_cart_payment_create_request(
-        self, payer, payment_method, idempotency_key=None
+        self, payer, payment_method, amount=500, idempotency_key=None
     ):
         request_body = {
             "payer_id": payer["id"],
-            "amount": 500,
+            "amount": amount,
             "country": "US",
             "currency": "USD",
             "payment_method_id": payment_method["id"],
@@ -115,8 +115,12 @@ class TestCartPayment:
         assert payer["deleted_at"] is None
         return payment_method
 
-    def _test_cart_payment_creation(self, stripe_api, client, payer, payment_method):
-        request_body = self._get_cart_payment_create_request(payer, payment_method)
+    def _test_cart_payment_creation(
+        self, stripe_api, client, payer, payment_method, amount
+    ):
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, amount
+        )
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
         cart_payment = response.json()
@@ -164,10 +168,10 @@ class TestCartPayment:
         assert "retryable" in body
         assert body["retryable"] == expected_retryable
 
-    def _test_cart_payment_adjustment(self, stripe_api, client, cart_payment):
+    def _test_cart_payment_adjustment(self, stripe_api, client, cart_payment, amount):
         request_body = self._get_cart_payment_update_request(
             cart_payment=cart_payment,
-            amount=800,
+            amount=amount,
             client_description=f"{cart_payment['client_description']}-updated",
         )
         response = client.post(
@@ -196,16 +200,27 @@ class TestCartPayment:
         # persiste state.
         stripe_api.enable_outbound()
 
-        payer = self._test_payer_creation(stripe_api, client)
-        payment_method = self._test_payment_method_creation(stripe_api, client, payer)
+        payer = self._test_payer_creation(stripe_api=stripe_api, client=client)
+        payment_method = self._test_payment_method_creation(
+            stripe_api=stripe_api, client=client, payer=payer
+        )
 
         # Success case: intent created, not captured yet
         cart_payment = self._test_cart_payment_creation(
-            stripe_api, client, payer, payment_method
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=500,
         )
 
         # Order cart adjustment
-        self._test_cart_payment_adjustment(stripe_api, client, cart_payment)
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=800
+        )
+        # self._test_cart_payment_adjustment(
+        #     stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=300
+        # )
 
         # Other payer cannot use some else's payment method
         other_payer = payer = self._test_payer_creation(stripe_api, client)

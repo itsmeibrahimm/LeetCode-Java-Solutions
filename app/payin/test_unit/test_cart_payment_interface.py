@@ -2,15 +2,16 @@ from copy import deepcopy
 import pytest
 from unittest.mock import MagicMock
 from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
-import app.payin.core.cart_payment.processor as processor
-from app.payin.core.cart_payment.types import IntentStatus
+from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
 from app.payin.tests.utils import (
     generate_payment_intent,
     generate_pgp_payment_intent,
     generate_cart_payment,
-    ContextMock,
+    generate_payment_charge,
+    generate_pgp_payment_charge,
     FunctionMock,
 )
+from app.payin.core.exceptions import PaymentIntentRefundError
 import uuid
 
 
@@ -18,18 +19,6 @@ class TestCartPaymentInterface:
     """
     Test CartPaymentInterface class functions.
     """
-
-    @pytest.fixture
-    def cart_payment_interface(self):
-        cart_payment_interface = processor.CartPaymentInterface(
-            app_context=MagicMock(),
-            req_context=MagicMock(),
-            payment_repo=MagicMock(),
-            payer_repo=MagicMock(),
-            payment_method_repo=MagicMock(),
-        )
-        cart_payment_interface.payment_repo.payment_database_transaction = ContextMock()
-        return cart_payment_interface
 
     @pytest.mark.asyncio
     async def test_find_existing_no_matches(self, cart_payment_interface):
@@ -149,23 +138,52 @@ class TestCartPaymentInterface:
         assert cart_payment_interface._can_payment_intent_be_cancelled(intent) is False
 
         intent = generate_payment_intent(status=IntentStatus.SUCCEEDED)
-        assert cart_payment_interface._can_payment_intent_be_cancelled(intent) is True
+        assert cart_payment_interface._can_payment_intent_be_cancelled(intent) is False
 
         intent = generate_payment_intent(status=IntentStatus.REQUIRES_CAPTURE)
         assert cart_payment_interface._can_payment_intent_be_cancelled(intent) is True
 
-    def test_intent_processed_evaluation(self, cart_payment_interface):
+    def test_can_payment_intent_be_refunded(self, cart_payment_interface):
+        intent = generate_payment_intent(status=IntentStatus.FAILED)
+        assert cart_payment_interface._can_payment_intent_be_refunded(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.SUCCEEDED)
+        assert cart_payment_interface._can_payment_intent_be_refunded(intent) is True
+
+        intent = generate_payment_intent(status=IntentStatus.REQUIRES_CAPTURE)
+        assert cart_payment_interface._can_payment_intent_be_refunded(intent) is False
+
+    def test_can_pgp_payment_intent_be_refunded(self, cart_payment_interface):
+        pgp_intent = generate_pgp_payment_intent(status=IntentStatus.FAILED)
+        assert (
+            cart_payment_interface._can_pgp_payment_intent_be_refunded(pgp_intent)
+            is False
+        )
+
+        pgp_intent = generate_pgp_payment_intent(status=IntentStatus.SUCCEEDED)
+        assert (
+            cart_payment_interface._can_pgp_payment_intent_be_refunded(pgp_intent)
+            is True
+        )
+
+        pgp_intent = generate_pgp_payment_intent(status=IntentStatus.REQUIRES_CAPTURE)
+        assert (
+            cart_payment_interface._can_pgp_payment_intent_be_refunded(pgp_intent)
+            is False
+        )
+
+    def test_has_capture_been_attempted(self, cart_payment_interface):
         intent = generate_payment_intent(status="init")
-        assert cart_payment_interface._is_intent_processed(intent) is False
+        assert cart_payment_interface._has_capture_been_attempted(intent) is False
 
         intent = generate_payment_intent(status="requires_capture")
-        assert cart_payment_interface._is_intent_processed(intent) is False
+        assert cart_payment_interface._has_capture_been_attempted(intent) is False
 
         intent = generate_payment_intent(status="succeeded")
-        assert cart_payment_interface._is_intent_processed(intent) is True
+        assert cart_payment_interface._has_capture_been_attempted(intent) is True
 
         intent = generate_payment_intent(status="failed")
-        assert cart_payment_interface._is_intent_processed(intent) is True
+        assert cart_payment_interface._has_capture_been_attempted(intent) is True
 
     def test_get_intent_status_from_provider_status(self, cart_payment_interface):
         intent_status = cart_payment_interface._get_intent_status_from_provider_status(
@@ -229,6 +247,44 @@ class TestCartPaymentInterface:
         )
         assert result is None
 
+    def test_filter_payment_intents_by_function(self, cart_payment_interface):
+        target_payment_intent = generate_payment_intent()
+        second_intent = generate_payment_intent()
+
+        def filter_function(payment_intent):
+            return payment_intent.id == target_payment_intent.id
+
+        result = cart_payment_interface._filter_payment_intents_by_function(
+            [target_payment_intent, second_intent], filter_function
+        )
+        assert result == [target_payment_intent]
+
+    def test_get_charge_status_from_intent_status(self, cart_payment_interface):
+        charge_status = cart_payment_interface._get_charge_status_from_intent_status(
+            IntentStatus.SUCCEEDED
+        )
+        assert charge_status == ChargeStatus.SUCCEEDED
+
+        charge_status = cart_payment_interface._get_charge_status_from_intent_status(
+            IntentStatus.FAILED
+        )
+        assert charge_status == ChargeStatus.FAILED
+
+        charge_status = cart_payment_interface._get_charge_status_from_intent_status(
+            IntentStatus.REQUIRES_CAPTURE
+        )
+        assert charge_status == ChargeStatus.REQUIRES_CAPTURE
+
+        charge_status = cart_payment_interface._get_charge_status_from_intent_status(
+            IntentStatus.CANCELLED
+        )
+        assert charge_status == ChargeStatus.CANCELLED
+
+        with pytest.raises(ValueError):
+            cart_payment_interface._get_charge_status_from_intent_status(
+                IntentStatus.INIT
+            )
+
     def test_is_amount_adjusted_higher(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
         cart_payment.amount = 500
@@ -261,22 +317,6 @@ class TestCartPaymentInterface:
 
     @pytest.mark.asyncio
     async def test_submit_payment_to_provider(self, cart_payment_interface):
-        cart_payment_interface._create_provider_payment = FunctionMock(
-            return_value="intent_id"
-        )
-
-        mock_update_intent_status = FunctionMock()
-        cart_payment_interface.payment_repo.update_payment_intent_status = (
-            mock_update_intent_status
-        )
-
-        mock_update_pgp_from_provider = FunctionMock()
-        cart_payment_interface._update_pgp_intent_from_provider = (
-            mock_update_pgp_from_provider
-        )
-
-        # Ensure contract with db layer gets correct inputs
-        # TODO once repo layer is refactored, assert returned (updated) objects instead
         intent = generate_payment_intent()
         pgp_intent = generate_pgp_payment_intent()
         result = await cart_payment_interface._submit_payment_to_provider(
@@ -286,60 +326,44 @@ class TestCartPaymentInterface:
             provider_customer_resource_id="customer_resource_id",
         )
 
-        mock_update_intent_status.assert_called_with(
-            id=intent.id, status=IntentStatus.REQUIRES_CAPTURE
-        )
-
-        mock_update_pgp_from_provider.assert_called_with(
-            pgp_intent_id=pgp_intent.id,
-            status=IntentStatus.REQUIRES_CAPTURE,
-            provider_payment_response="intent_id",
-        )
+        # TODO once repo layer is refactored, assert returned (updated) objects instead
         assert result is None
 
     @pytest.mark.asyncio
     async def test_create_provider_payment(self, cart_payment_interface):
-        cart_payment_interface.app_context.stripe = MagicMock()
-        mock_provider_function = FunctionMock(return_value="intent_id")
-        cart_payment_interface.app_context.stripe.create_payment_intent = (
-            mock_provider_function
-        )
-
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
         response = await cart_payment_interface._create_provider_payment(
             intent, pgp_intent, "payment_resource_id", "customer_resource_id"
         )
-        assert response == "intent_id"
+        assert response
 
     @pytest.mark.asyncio
-    async def test_cancel_provider_payment(self, cart_payment_interface):
-        cart_payment_interface.app_context.stripe = MagicMock()
-        mock_provider_function = FunctionMock(return_value="intent_id")
-        cart_payment_interface.app_context.stripe.cancel_payment_intent = (
-            mock_provider_function
-        )
-
+    async def test_cancel_provider_payment_charge(self, cart_payment_interface):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-        response = await cart_payment_interface._cancel_provider_payment(
+        response = await cart_payment_interface._cancel_provider_payment_charge(
             intent, pgp_intent, "abandoned"
         )
-        assert response == "intent_id"
+        assert response
+
+    @pytest.mark.asyncio
+    async def test_refund_provider_payment(self, cart_payment_interface):
+        intent = generate_payment_intent(status="succeeded")
+        pgp_intent = generate_pgp_payment_intent(status="succeeded")
+        response = await cart_payment_interface._refund_provider_payment(
+            intent, pgp_intent, "abandoned", 500
+        )
+        assert response
 
     @pytest.mark.asyncio
     async def test_capture_payment_with_provider(self, cart_payment_interface):
-        # Mock call out to provider
-        cart_payment_interface.app_context.stripe = MagicMock()
-        mock_capture = FunctionMock(return_value="succeeded")
-        cart_payment_interface.app_context.stripe.capture_payment_intent = mock_capture
-
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
         response = await cart_payment_interface._capture_payment_with_provider(
             intent, pgp_intent
         )
-        assert response == "succeeded"
+        assert response
 
     def test_is_accessible(self, cart_payment_interface):
         # Stub function: return value is fixed
@@ -355,7 +379,7 @@ class TestCartPaymentInterface:
     def test_is_capture_immediate(self, cart_payment_interface):
         # Stub function: return value is fixed
         intent = generate_payment_intent()
-        assert cart_payment_interface.is_capture_immediate(intent) is False
+        assert cart_payment_interface._is_capture_immediate(intent) is False
 
     def test_populate_cart_payment_for_response(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
@@ -425,26 +449,191 @@ class TestCartPaymentInterface:
         assert result_pgp_intent.payment_intent_id == intent.id
 
     @pytest.mark.asyncio
-    async def test_update_pgp_intent_from_provider(self, cart_payment_interface):
-        mock_db_function = FunctionMock()
-        cart_payment_interface.payment_repo.update_pgp_payment_intent = mock_db_function
-
-        intent = generate_pgp_payment_intent(status="init")
-        provider_payment_response = "ID From Provider"
-        result = await cart_payment_interface._update_pgp_intent_from_provider(
-            pgp_intent_id=intent.id,
-            status=IntentStatus.PROCESSING,
-            provider_payment_response=provider_payment_response,
+    async def test_create_new_charge_pair(self, cart_payment_interface):
+        payment_charge = generate_payment_charge()
+        cart_payment_interface.payment_repo.insert_payment_charge = FunctionMock(
+            return_value=payment_charge
         )
 
-        # Ensure contract with db layer gets correct inputs
-        # TODO once repo layer is refactored, assert returned (updated) objects instead
-        mock_db_function.assert_called_with(
-            id=intent.id,
-            status=IntentStatus.PROCESSING,
-            provider_intent_id=provider_payment_response,
+        pgp_charge = generate_pgp_payment_charge()
+        cart_payment_interface.payment_repo.insert_pgp_payment_charge = FunctionMock(
+            return_value=pgp_charge
         )
-        assert result is None
+
+        provider_intent = (
+            await cart_payment_interface.app_context.stripe.capture_payment_intent()
+        )
+
+        result_payment_charge, result_pgp_charge = await cart_payment_interface._create_new_charge_pair(
+            payment_intent=MagicMock(),
+            pgp_payment_intent=MagicMock(),
+            provider_intent=provider_intent,
+        )
+
+        assert result_payment_charge == payment_charge
+        assert result_pgp_charge == pgp_charge
+
+    @pytest.mark.asyncio
+    async def test_update_charge_pair_after_capture(self, cart_payment_interface):
+        updated_payment_charge = generate_payment_charge(status=ChargeStatus.SUCCEEDED)
+        cart_payment_interface.payment_repo.update_payment_charge_status = FunctionMock(
+            return_value=updated_payment_charge
+        )
+
+        updated_pgp_charge = generate_pgp_payment_charge(status=ChargeStatus.SUCCEEDED)
+        cart_payment_interface.payment_repo.update_pgp_payment_charge = FunctionMock(
+            return_value=updated_pgp_charge
+        )
+
+        provider_intent = (
+            await cart_payment_interface.app_context.stripe.capture_payment_intent()
+        )
+
+        result_payment_charge, result_pgp_charge = await cart_payment_interface._update_charge_pair_after_capture(
+            payment_intent=MagicMock(),
+            status=ChargeStatus.SUCCEEDED,
+            provider_intent=provider_intent,
+        )
+
+        assert result_payment_charge == updated_payment_charge
+        assert result_pgp_charge == updated_pgp_charge
+
+    @pytest.mark.asyncio
+    async def test_update_charge_pair_after_cancel(self, cart_payment_interface):
+        updated_payment_charge = generate_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_payment_charge_status = FunctionMock(
+            return_value=updated_payment_charge
+        )
+
+        updated_pgp_charge = generate_pgp_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_pgp_payment_charge_status = FunctionMock(
+            return_value=updated_pgp_charge
+        )
+
+        result_payment_charge, result_pgp_charge = await cart_payment_interface._update_charge_pair_after_cancel(
+            payment_intent=MagicMock(), status=ChargeStatus.CANCELLED
+        )
+
+        assert result_payment_charge == updated_payment_charge
+        assert result_pgp_charge == updated_pgp_charge
+
+    @pytest.mark.asyncio
+    async def test_update_charge_pair_after_refund(self, cart_payment_interface):
+        updated_payment_charge = generate_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_payment_charge = FunctionMock(
+            return_value=updated_payment_charge
+        )
+
+        updated_pgp_charge = generate_pgp_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_pgp_payment_charge = FunctionMock(
+            return_value=updated_pgp_charge
+        )
+
+        provider_refund = (
+            await cart_payment_interface.app_context.stripe.refund_charge()
+        )
+        result_payment_charge, result_pgp_charge = await cart_payment_interface._update_charge_pair_after_refund(
+            payment_intent=MagicMock(), provider_refund=provider_refund
+        )
+
+        assert result_payment_charge == updated_payment_charge
+        assert result_pgp_charge == updated_pgp_charge
+
+    @pytest.mark.asyncio
+    async def test_update_charge_pair_after_amount_reduction(
+        self, cart_payment_interface
+    ):
+        updated_payment_charge = generate_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_payment_charge_amount = FunctionMock(
+            return_value=updated_payment_charge
+        )
+
+        updated_pgp_charge = generate_pgp_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_pgp_payment_charge_amount = FunctionMock(
+            return_value=updated_pgp_charge
+        )
+
+        result_payment_charge, result_pgp_charge = await cart_payment_interface._update_charge_pair_after_amount_reduction(
+            payment_intent=MagicMock(), amount=600
+        )
+
+        assert result_payment_charge == updated_payment_charge
+        assert result_pgp_charge == updated_pgp_charge
+
+    @pytest.mark.asyncio
+    async def test_update_pgp_charge_from_provider(self, cart_payment_interface):
+        provider_intent = (
+            await cart_payment_interface.app_context.stripe.capture_payment_intent()
+        )
+
+        pgp_charge = generate_pgp_payment_charge(status=ChargeStatus.SUCCEEDED)
+        cart_payment_interface.payment_repo.update_pgp_payment_charge = FunctionMock(
+            return_value=pgp_charge
+        )
+
+        result = await cart_payment_interface._update_pgp_charge_from_provider(
+            payment_charge_id=uuid.uuid4(),
+            status=ChargeStatus.SUCCEEDED,
+            provider_intent=provider_intent,
+        )
+
+        assert result == pgp_charge
+
+    @pytest.mark.asyncio
+    async def test_record_amount_decrease(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent()
+        pgp_intent = generate_pgp_payment_intent()
+
+        updated_payment_intent = generate_payment_intent()
+        cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=updated_payment_intent
+        )
+        updated_pgp_intent = generate_pgp_payment_intent()
+        cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=updated_pgp_intent
+        )
+
+        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_pgp_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_interface._record_amount_decrease(
+            cart_payment=cart_payment,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_intent,
+            amount=200,
+        )
+        assert result_intent == updated_payment_intent
+        assert result_pgp_intent == updated_pgp_intent
+
+    @pytest.mark.asyncio
+    async def test_update_cart_payment_attributes(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        updated_cart_payment = generate_cart_payment(amount=100)
+
+        cart_payment_interface.payment_repo.update_cart_payment_details = FunctionMock(
+            return_value=updated_cart_payment
+        )
+
+        result = await cart_payment_interface._update_cart_payment_attributes(
+            cart_payment=cart_payment,
+            idempotency_key=str(uuid.uuid4()),
+            payment_intent=generate_payment_intent(),
+            pgp_payment_intent=generate_pgp_payment_intent(),
+            amount=100,
+            client_description=None,
+        )
+
+        # Since updated_cart_payment object returned from mocked db function, it is modified aftewards via the
+        # _populate_cart_payment_for_response function.
+        assert result == updated_cart_payment
 
     @pytest.mark.asyncio
     async def test_submit_new_payment(self, cart_payment_interface):
@@ -469,7 +658,6 @@ class TestCartPaymentInterface:
         cart_payment_interface.payment_repo.insert_pgp_payment_intent = FunctionMock(
             return_value=pgp_intent
         )
-        cart_payment_interface._submit_payment_to_provider = FunctionMock()
 
         cart_payment, payment_intent = await cart_payment_interface.submit_new_payment(
             request_cart_payment,
@@ -501,7 +689,6 @@ class TestCartPaymentInterface:
         cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
             return_value=[pgp_intent]
         )
-        cart_payment_interface._submit_payment_to_provider = FunctionMock()
 
         # Already submitted before
         response = await cart_payment_interface.resubmit_existing_payment(
@@ -520,38 +707,46 @@ class TestCartPaymentInterface:
 
     @pytest.mark.asyncio
     async def test_cancel_intent(self, cart_payment_interface):
-        cart_payment_interface._cancel_provider_payment = FunctionMock(
-            return_value="intent_id"
-        )
-
-        mock_update_intent_status = FunctionMock()
-        cart_payment_interface.payment_repo.update_payment_intent_status = (
-            mock_update_intent_status
-        )
-
-        update_pgp_payment_intent_mock = FunctionMock()
-        cart_payment_interface.payment_repo.update_pgp_payment_intent = (
-            update_pgp_payment_intent_mock
-        )
-
-        # Ensure contract with db layer gets correct inputs
-        # TODO once repo layer is refactored, assert returned (updated) objects instead
         intent = generate_payment_intent()
         pgp_intent = generate_pgp_payment_intent()
         result = await cart_payment_interface._cancel_intent(
             payment_intent=intent, pgp_payment_intents=[pgp_intent]
         )
-
-        mock_update_intent_status.assert_called_with(
-            id=intent.id, status=IntentStatus.CANCELLED
-        )
-
-        update_pgp_payment_intent_mock.assert_called_with(
-            id=pgp_intent.id,
-            status=IntentStatus.CANCELLED,
-            provider_intent_id=pgp_intent.resource_id,
-        )
+        # TODO once repo layer is refactored, assert returned (updated) objects instead
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_refund_intent_invalid_state(self, cart_payment_interface):
+        payment_intent = generate_payment_intent()
+        pgp_intent = generate_pgp_payment_intent(status=IntentStatus.REQUIRES_CAPTURE)
+
+        with pytest.raises(PaymentIntentRefundError):
+            await cart_payment_interface._refund_intent(
+                payment_intent=payment_intent,
+                pgp_payment_intents=[pgp_intent],
+                amount=300,
+            )
+
+    @pytest.mark.asyncio
+    async def test_refund_intent(self, cart_payment_interface):
+        payment_intent = generate_payment_intent(status=IntentStatus.SUCCEEDED)
+        pgp_intent = generate_pgp_payment_intent(status=IntentStatus.SUCCEEDED)
+
+        updated_payment_charge = generate_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_payment_charge = FunctionMock(
+            return_value=updated_payment_charge
+        )
+
+        updated_pgp_charge = generate_pgp_payment_charge(status=ChargeStatus.CANCELLED)
+        cart_payment_interface.payment_repo.update_pgp_payment_charge = FunctionMock(
+            return_value=updated_pgp_charge
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_interface._refund_intent(
+            payment_intent=payment_intent, pgp_payment_intents=[pgp_intent], amount=300
+        )
+        assert result_intent == payment_intent
+        assert result_pgp_intent == pgp_intent
 
     @pytest.mark.asyncio
     async def test_resubmit_add_amount_to_cart_payment(self, cart_payment_interface):
@@ -571,10 +766,6 @@ class TestCartPaymentInterface:
         # Resubmit, with need to call out to provider
         intent = generate_payment_intent(status="init")
         pgp_intent = generate_pgp_payment_intent(status="init")
-        cart_payment_interface._get_required_payment_resource_ids = FunctionMock(
-            return_value=("payment_method_id", "customer_id")
-        )
-        cart_payment_interface._submit_payment_to_provider = FunctionMock()
         cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
             return_value=[pgp_intent]
         )
@@ -607,12 +798,8 @@ class TestCartPaymentInterface:
         cart_payment_interface.payment_repo.insert_pgp_payment_intent = FunctionMock(
             return_value=pgp_intent
         )
-        cart_payment_interface._submit_payment_to_provider = FunctionMock()
         cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
             return_value=[generate_pgp_payment_intent()]
-        )
-        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
-            return_value=MagicMock()
         )
 
         result_intent, result_pgp_intent = await cart_payment_interface._submit_amount_increase_to_cart_payment(
@@ -632,9 +819,6 @@ class TestCartPaymentInterface:
         # No such existing intent with idempotency key
         cart_payment_interface.payment_repo.get_payment_intents_for_cart_payment = FunctionMock(
             return_value=[generate_payment_intent()]
-        )
-        cart_payment_interface._get_required_payment_resource_ids = FunctionMock(
-            return_value=("payment_method_id", "customer_id")
         )
         intent = generate_payment_intent(
             cart_payment_id=cart_payment.id, status="requires_capture"
@@ -661,13 +845,11 @@ class TestCartPaymentInterface:
         cart_payment_interface.payment_repo.update_cart_payment_details = FunctionMock(
             return_value=updated_cart_payment
         )
-        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
-            return_value=MagicMock()
-        )
 
         result_cart_payment = await cart_payment_interface._add_amount_to_cart_payment(
             cart_payment=cart_payment,
             idempotency_key=uuid.uuid4(),
+            payment_intents=[intent],
             amount=875,
             legacy_payment=None,
             client_description=None,
@@ -675,3 +857,126 @@ class TestCartPaymentInterface:
             metadata=None,
         )
         assert result_cart_payment == updated_cart_payment
+
+    @pytest.mark.asyncio
+    async def test_submit_amount_decrease_to_cart_payment(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent()
+
+        updated_intent = generate_payment_intent()
+        cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=updated_intent
+        )
+        updated_pgp_intent = generate_pgp_payment_intent()
+        cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=updated_pgp_intent
+        )
+
+        cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+            return_value=[generate_pgp_payment_intent()]
+        )
+        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_pgp_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_interface._submit_amount_decrease_to_cart_payment(
+            cart_payment=cart_payment, payment_intent=payment_intent, amount=500
+        )
+
+        assert result_intent == updated_intent
+        assert result_pgp_intent == updated_pgp_intent
+
+    @pytest.mark.asyncio
+    async def test_submit_refund_to_cart_payment(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(status="succeeded")
+
+        updated_intent = generate_payment_intent(status="succeeded")
+        cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=updated_intent
+        )
+        updated_pgp_intent = generate_pgp_payment_intent(status="succeeded")
+        cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=updated_pgp_intent
+        )
+
+        cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+            return_value=[generate_pgp_payment_intent(status="succeeded")]
+        )
+        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_pgp_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_charge = FunctionMock(
+            return_value=MagicMock()
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_interface._submit_refund_to_cart_payment(
+            cart_payment=cart_payment, payment_intent=payment_intent, amount=500
+        )
+
+        assert result_intent == updated_intent
+        assert result_pgp_intent == updated_pgp_intent
+
+    @pytest.mark.asyncio
+    async def test_deduct_amount_from_cart_payment(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        payment_intents = [generate_payment_intent(status="requires_capture")]
+        amount = 900
+
+        updated_intent = generate_payment_intent()
+        cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=updated_intent
+        )
+        updated_pgp_intent = generate_pgp_payment_intent()
+        cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=updated_pgp_intent
+        )
+
+        cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+            return_value=[generate_pgp_payment_intent()]
+        )
+        cart_payment_interface.payment_repo.insert_payment_intent_adjustment_history = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_pgp_payment_charge_amount = FunctionMock(
+            return_value=MagicMock()
+        )
+
+        updated_cart_payment = generate_cart_payment()
+        cart_payment_interface.payment_repo.update_cart_payment_details = FunctionMock(
+            return_value=deepcopy(updated_cart_payment)
+        )
+
+        result = await cart_payment_interface._deduct_amount_from_cart_payment(
+            cart_payment=cart_payment,
+            idempotency_key=str(uuid.uuid4()),
+            payment_intents=payment_intents,
+            amount=amount,
+            legacy_payment=None,
+            client_description=None,
+            payer_statement_description=None,
+            metadata=None,
+        )
+
+        updated_cart_payment.payment_method_id = (
+            updated_pgp_intent.payment_method_resource_id
+        )
+        updated_cart_payment.payer_statement_description = (
+            updated_intent.statement_descriptor
+        )
+        assert result == updated_cart_payment

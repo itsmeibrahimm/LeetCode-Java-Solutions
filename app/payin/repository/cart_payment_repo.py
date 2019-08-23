@@ -10,13 +10,17 @@ from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
     PaymentIntentAdjustmentHistory,
+    PaymentCharge,
+    PgpPaymentCharge,
 )
-from app.payin.core.cart_payment.types import IntentStatus
+from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
 from app.payin.models.paymentdb import (
     cart_payments,
     payment_intents,
     pgp_payment_intents,
     payment_intents_adjustment_history,
+    payment_charges,
+    pgp_payment_charges,
 )
 from app.payin.repository.base import PayinDBRepository
 
@@ -173,6 +177,19 @@ class CartPaymentRepository(PayinDBRepository):
 
         await self.payment_database.master().execute(statement)
 
+    async def update_payment_intent_amount(
+        self, id: UUID, amount: int
+    ) -> PaymentIntent:
+        statement = (
+            payment_intents.table.update()
+            .where(payment_intents.id == id)
+            .values(amount=amount)
+            .returning(*payment_intents.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_intent(row)
+
     async def get_payment_intent_for_idempotency_key(
         self, idempotency_key: str
     ) -> Optional[PaymentIntent]:
@@ -238,15 +255,45 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_pgp_payment_intent(row)
 
     async def update_pgp_payment_intent(
-        self, id: UUID, status: str, provider_intent_id: str
+        self, id: UUID, status: str, resource_id: str, charge_resource_id: str
     ) -> None:
         statement = (
             pgp_payment_intents.table.update()
             .where(pgp_payment_intents.id == id)
-            .values(status=status, resource_id=provider_intent_id)
+            .values(
+                status=status,
+                resource_id=resource_id,
+                charge_resource_id=charge_resource_id,
+            )
         )
 
         await self.payment_database.master().execute(statement)
+
+    async def update_pgp_payment_intent_status(
+        self, id: UUID, status: str
+    ) -> PgpPaymentIntent:
+        statement = (
+            pgp_payment_intents.table.update()
+            .where(pgp_payment_intents.id == id)
+            .values(status=status)
+            .returning(*pgp_payment_intents.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_intent(row)
+
+    async def update_pgp_payment_intent_amount(
+        self, id: UUID, amount: int
+    ) -> PgpPaymentIntent:
+        statement = (
+            pgp_payment_intents.table.update()
+            .where(pgp_payment_intents.id == id)
+            .values(amount=amount)
+            .returning(*pgp_payment_intents.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_intent(row)
 
     async def find_pgp_payment_intents(
         self, payment_intent_id: UUID
@@ -332,3 +379,207 @@ class CartPaymentRepository(PayinDBRepository):
             currency=row[payment_intents_adjustment_history.currency],
             created_at=row[payment_intents_adjustment_history.created_at],
         )
+
+    async def insert_payment_charge(
+        self,
+        id: UUID,
+        payment_intent_id: UUID,
+        provider: str,
+        idempotency_key: str,
+        status: str,
+        currency: str,
+        amount: int,
+        amount_refunded: int,
+        application_fee_amount: Optional[int],
+        payout_account_id: Optional[str],
+    ) -> PaymentCharge:
+        data = {
+            payment_charges.id: str(id),
+            payment_charges.payment_intent_id: str(payment_intent_id),
+            payment_charges.provider: provider,
+            payment_charges.idempotency_key: idempotency_key,
+            payment_charges.status: status,
+            payment_charges.currency: currency,
+            payment_charges.amount: amount,
+            payment_charges.amount_refunded: amount_refunded,
+            payment_charges.application_fee_amount: application_fee_amount,
+            payment_charges.payout_account_id: payout_account_id,
+        }
+
+        statement = (
+            payment_charges.table.insert()
+            .values(data)
+            .returning(*payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_charge(row)
+
+    def to_payment_charge(self, row: Any) -> PaymentCharge:
+        return PaymentCharge(
+            id=row[payment_charges.id],
+            payment_intent_id=row[payment_charges.payment_intent_id],
+            provider=row[payment_charges.provider],
+            idempotency_key=row[payment_charges.idempotency_key],
+            status=ChargeStatus(row[payment_charges.status]),
+            currency=row[payment_charges.currency],
+            amount=row[payment_charges.amount],
+            amount_refunded=row[payment_charges.amount_refunded],
+            application_fee_amount=row[payment_charges.application_fee_amount],
+            payout_account_id=row[payment_charges.payout_account_id],
+            created_at=row[payment_charges.created_at],
+            updated_at=row[payment_charges.updated_at],
+            captured_at=row[payment_charges.captured_at],
+            cancelled_at=row[payment_charges.cancelled_at],
+        )
+
+    async def update_payment_charge_status(
+        self, payment_intent_id: UUID, status: str
+    ) -> PaymentCharge:
+        # We expect a 1-1 relationship between intent and charge for our use cases.
+        # As an optimization, support updating based on intent_id, which avoids an extra
+        # round trip to fetch the record to update.
+        statement = (
+            payment_charges.table.update()
+            .where(payment_charges.payment_intent_id == payment_intent_id)
+            .values(status=status)
+            .returning(*payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_charge(row)
+
+    async def update_payment_charge(
+        self, payment_intent_id: UUID, status: str, amount_refunded: int
+    ) -> PaymentCharge:
+        statement = (
+            payment_charges.table.update()
+            .where(payment_charges.payment_intent_id == payment_intent_id)
+            .values(status=status, amount_refunded=amount_refunded)
+            .returning(*payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_charge(row)
+
+    async def update_payment_charge_amount(
+        self, payment_intent_id: UUID, amount: int
+    ) -> PaymentCharge:
+        statement = (
+            payment_charges.table.update()
+            .where(payment_charges.payment_intent_id == payment_intent_id)
+            .values(amount=amount)
+            .returning(*payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_charge(row)
+
+    async def insert_pgp_payment_charge(
+        self,
+        id: UUID,
+        payment_charge_id: UUID,
+        provider: str,
+        idempotency_key: str,
+        status: str,
+        currency: str,
+        amount: int,
+        amount_refunded: int,
+        application_fee_amount: Optional[int],
+        payout_account_id: Optional[str],
+        resource_id: Optional[str],
+        intent_resource_id: Optional[str],
+        invoice_resource_id: Optional[str],
+        payment_method_resource_id: Optional[str],
+    ) -> PgpPaymentCharge:
+        data = {
+            pgp_payment_charges.id: id,
+            pgp_payment_charges.payment_charge_id: payment_charge_id,
+            pgp_payment_charges.provider: provider,
+            pgp_payment_charges.idempotency_key: idempotency_key,
+            pgp_payment_charges.status: status,
+            pgp_payment_charges.currency: currency,
+            pgp_payment_charges.amount: amount,
+            pgp_payment_charges.amount_refunded: amount_refunded,
+            pgp_payment_charges.application_fee_amount: application_fee_amount,
+            pgp_payment_charges.payout_account_id: payout_account_id,
+            pgp_payment_charges.resource_id: resource_id,
+            pgp_payment_charges.intent_resource_id: intent_resource_id,
+            pgp_payment_charges.invoice_resource_id: invoice_resource_id,
+            pgp_payment_charges.payment_method_resource_id: payment_method_resource_id,
+        }
+
+        statement = (
+            pgp_payment_charges.table.insert()
+            .values(data)
+            .returning(*pgp_payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_charge(row)
+
+    def to_pgp_payment_charge(self, row: Any) -> PgpPaymentCharge:
+        return PgpPaymentCharge(
+            id=row[pgp_payment_charges.id],
+            payment_charge_id=row[pgp_payment_charges.payment_charge_id],
+            provider=row[pgp_payment_charges.provider],
+            idempotency_key=row[pgp_payment_charges.idempotency_key],
+            status=ChargeStatus(row[pgp_payment_charges.status]),
+            currency=row[pgp_payment_charges.currency],
+            amount=row[pgp_payment_charges.amount],
+            amount_refunded=row[pgp_payment_charges.amount_refunded],
+            application_fee_amount=row[pgp_payment_charges.application_fee_amount],
+            payout_account_id=row[pgp_payment_charges.payout_account_id],
+            resource_id=row[pgp_payment_charges.resource_id],
+            intent_resource_id=row[pgp_payment_charges.intent_resource_id],
+            invoice_resource_id=row[pgp_payment_charges.invoice_resource_id],
+            payment_method_resource_id=row[
+                pgp_payment_charges.payment_method_resource_id
+            ],
+            created_at=row[pgp_payment_charges.created_at],
+            updated_at=row[pgp_payment_charges.updated_at],
+            captured_at=row[pgp_payment_charges.captured_at],
+            cancelled_at=row[pgp_payment_charges.cancelled_at],
+        )
+
+    async def update_pgp_payment_charge(
+        self, payment_charge_id: UUID, status: str, amount: int, amount_refunded: int
+    ) -> PgpPaymentCharge:
+        # We expect a 1-1 relationship between charge and pgp_charge for our use cases.
+        # As an optimization, support updating based on charge_id, which avoids an extra
+        # round trip to fetch the record to update.
+        statement = (
+            pgp_payment_charges.table.update()
+            .where(pgp_payment_charges.payment_charge_id == str(payment_charge_id))
+            .values(status=status, amount=amount, amount_refunded=amount_refunded)
+            .returning(*pgp_payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_charge(row)
+
+    async def update_pgp_payment_charge_amount(
+        self, payment_charge_id: UUID, amount: int
+    ) -> PgpPaymentCharge:
+        statement = (
+            pgp_payment_charges.table.update()
+            .where(pgp_payment_charges.payment_charge_id == str(payment_charge_id))
+            .values(amount=amount)
+            .returning(*pgp_payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_charge(row)
+
+    async def update_pgp_payment_charge_status(
+        self, payment_charge_id: UUID, status: str
+    ) -> PgpPaymentCharge:
+        statement = (
+            pgp_payment_charges.table.update()
+            .where(pgp_payment_charges.payment_charge_id == payment_charge_id)
+            .values(status=status)
+            .returning(*pgp_payment_charges.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_charge(row)

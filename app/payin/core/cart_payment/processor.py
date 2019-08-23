@@ -1,6 +1,6 @@
 from asyncio import gather
 import uuid
-from typing import Any, Tuple, List, Optional
+from typing import Tuple, List, Optional, Callable
 
 from fastapi import Depends
 
@@ -10,6 +10,9 @@ from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
     CancelPaymentIntent,
+    RefundCharge,
+    PaymentIntent as ProviderPaymentIntent,
+    Refund as ProviderRefund,
 )
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
@@ -20,6 +23,8 @@ from app.payin.core.cart_payment.model import (
     LegacyPayment,
     PaymentIntent,
     PgpPaymentIntent,
+    PaymentCharge,
+    PgpPaymentCharge,
 )
 from app.payin.core.exceptions import (
     PayinErrorCode,
@@ -27,11 +32,14 @@ from app.payin.core.exceptions import (
     CartPaymentReadError,
     PaymentIntentCaptureError,
     PaymentIntentCancelError,
+    PaymentIntentRefundError,
+    PaymentChargeRefundError,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
     ConfirmationMethod,
     IntentStatus,
+    ChargeStatus,
 )
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -138,22 +146,41 @@ class CartPaymentInterface:
 
         return matched_intents[0] if matched_intents else None
 
-    def _is_payment_intent_submitted(self, payment_intent: PaymentIntent):
+    def _filter_payment_intents_by_function(
+        self,
+        payment_intents: List[PaymentIntent],
+        filter_function: Callable[[PaymentIntent], bool],
+    ) -> List[PaymentIntent]:
+        return list(filter(lambda intent: filter_function(intent), payment_intents))
+
+    def _is_payment_intent_submitted(self, payment_intent: PaymentIntent) -> bool:
         return payment_intent.status != IntentStatus.INIT
 
-    def _can_payment_intent_be_cancelled(self, payment_intent: PaymentIntent):
-        return payment_intent.status in [
-            IntentStatus.REQUIRES_CAPTURE,
-            IntentStatus.SUCCEEDED,
-        ]
+    def _can_payment_intent_be_cancelled(self, payment_intent: PaymentIntent) -> bool:
+        # Not yet captured.  SCA related states will be added here later.
+        return payment_intent.status in [IntentStatus.REQUIRES_CAPTURE]
 
-    def _is_intent_processed(self, payment_intent: PaymentIntent):
+    def _can_payment_intent_be_refunded(self, payment_intent: PaymentIntent) -> bool:
+        return payment_intent.status == IntentStatus.SUCCEEDED
+
+    def _can_pgp_payment_intent_be_refunded(
+        self, pgp_payment_intent: PgpPaymentIntent
+    ) -> bool:
+        return pgp_payment_intent.status == IntentStatus.SUCCEEDED
+
+    def _has_capture_been_attempted(self, payment_intent: PaymentIntent) -> bool:
         return payment_intent.status in [IntentStatus.SUCCEEDED, IntentStatus.FAILED]
 
     def _get_intent_status_from_provider_status(
         self, provider_status: str
     ) -> IntentStatus:
         return IntentStatus(provider_status)
+
+    def _get_charge_status_from_intent_status(
+        self, intent_status: IntentStatus
+    ) -> ChargeStatus:
+        # Charge status is a subset of Intent status
+        return ChargeStatus(intent_status)
 
     def _get_most_recent_intent(
         self, intent_list: List[PaymentIntent]
@@ -178,7 +205,7 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
-    ) -> str:
+    ) -> ProviderPaymentIntent:
         # Call to stripe payment intent API
         try:
             intent_request = CreatePaymentIntent(
@@ -225,7 +252,7 @@ class CartPaymentInterface:
         self.req_context.log.debug(
             f"Creating new intent with provider.  IDs: {payment_intent.id}, {pgp_payment_intent.id}"
         )
-        provider_payment_response = await self._create_provider_payment(
+        provider_payment_intent = await self._create_provider_payment(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_resource_id=provider_payment_resource_id,
@@ -238,15 +265,73 @@ class CartPaymentInterface:
             await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
             )
-            await self._update_pgp_intent_from_provider(
-                pgp_intent_id=pgp_payment_intent.id,
+            await self.payment_repo.update_pgp_payment_intent(
+                id=pgp_payment_intent.id,
                 status=IntentStatus.REQUIRES_CAPTURE,
-                provider_payment_response=provider_payment_response,
+                resource_id=provider_payment_intent.id,
+                charge_resource_id=provider_payment_intent.charges.data[0].id,
             )
+            await self._create_new_charge_pair(
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                provider_intent=provider_payment_intent,
+            )
+
+        # Depending on configuration, submitting payment to provider may require immediate capture.
+        if self._is_capture_immediate(payment_intent):
+            await self.capture_payment(payment_intent)
+
+    async def _update_charge_pair_after_capture(
+        self,
+        payment_intent: PaymentIntent,
+        status: ChargeStatus,
+        provider_intent: ProviderPaymentIntent,
+    ) -> Tuple[PaymentCharge, PgpPaymentCharge]:
+        # Assumption: this is called within a transaction already
+        # TODO add a config parameter and switch between writing to payin db and main db legacy tables.
+        payment_charge = await self.payment_repo.update_payment_charge_status(
+            payment_intent.id, status.value
+        )
+        pgp_charge = await self._update_pgp_charge_from_provider(
+            payment_charge.id, status, provider_intent
+        )
+        return payment_charge, pgp_charge
+
+    async def _update_charge_pair_after_refund(
+        self, payment_intent: PaymentIntent, provider_refund: ProviderRefund
+    ) -> Tuple[PaymentCharge, PgpPaymentCharge]:
+        # Assumption: this is called within a transaction already
+        # TODO add a config parameter and switch between writing to payin db and main db legacy tables.
+        status = ChargeStatus(provider_refund.status)
+        payment_charge = await self.payment_repo.update_payment_charge(
+            payment_intent_id=payment_intent.id,
+            status=status.value,
+            amount_refunded=provider_refund.amount,
+        )
+        pgp_charge = await self.payment_repo.update_pgp_payment_charge(
+            payment_charge_id=payment_charge.id,
+            status=status.value,
+            amount=provider_refund.amount,
+            amount_refunded=provider_refund.amount,
+        )
+        return payment_charge, pgp_charge
+
+    async def _update_charge_pair_after_amount_reduction(
+        self, payment_intent: PaymentIntent, amount: int
+    ) -> Tuple[PaymentCharge, PgpPaymentCharge]:
+        # Assumption: this is called within a transaction already
+        # TODO add a config parameter and switch between writing to payin db and main db legacy tables
+        payment_charge = await self.payment_repo.update_payment_charge_amount(
+            payment_intent_id=payment_intent.id, amount=amount
+        )
+        pgp_charge = await self.payment_repo.update_pgp_payment_charge_amount(
+            payment_charge_id=payment_charge.id, amount=amount
+        )
+        return payment_charge, pgp_charge
 
     async def _capture_payment_with_provider(
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
-    ) -> str:
+    ) -> ProviderPaymentIntent:
         # Call to stripe payment intent API
         try:
             intent_request = CapturePaymentIntent(sid=pgp_payment_intent.resource_id)
@@ -254,14 +339,11 @@ class CartPaymentInterface:
             self.req_context.log.info(
                 f"Capturing payment intent: {payment_intent.country}, key: {pgp_payment_intent.idempotency_key}"
             )
-            response = await self.app_context.stripe.capture_payment_intent(
+            provider_intent = await self.app_context.stripe.capture_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
                 idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
             )
-            self.req_context.log.info("Provider response: ")
-            self.req_context.log.info(response)
-            return response
         except Exception as e:
             self.req_context.log.error(f"Error capturing intent with provider: {e}")
             raise PaymentIntentCaptureError(
@@ -269,7 +351,32 @@ class CartPaymentInterface:
                 retryable=False,
             )
 
-    async def _cancel_provider_payment(
+        new_intent_status = self._get_intent_status_from_provider_status(
+            provider_intent.status
+        )
+        new_charge_status = self._get_charge_status_from_intent_status(
+            new_intent_status
+        )
+        self.req_context.log.debug(
+            f"Updating intent {payment_intent.id}, pgp intent {pgp_payment_intent.id} to status {new_intent_status}"
+        )
+
+        # Update state
+        async with self.payment_repo.payment_database_transaction():
+            # TODO try gather
+            await self.payment_repo.update_payment_intent_status(
+                payment_intent.id, new_intent_status
+            )
+            await self.payment_repo.update_pgp_payment_intent_status(
+                pgp_payment_intent.id, new_intent_status
+            )
+            await self._update_charge_pair_after_capture(
+                payment_intent, new_charge_status, provider_intent
+            )
+
+        return provider_intent
+
+    async def _cancel_provider_payment_charge(
         self,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
@@ -291,22 +398,55 @@ class CartPaymentInterface:
             self.req_context.log.debug(f"Provider response: {response}")
             return response
         except Exception as e:
-            self.req_context.log.error(f"Error cancelling intent with provider: {e}")
-            raise PaymentIntentCancelError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_CAPTURE_STRIPE_ERROR,
+            self.req_context.log.error(f"Error refunding payment with provider: {e}")
+            raise PaymentChargeRefundError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
                 retryable=False,
             )
 
-    async def _update_pgp_intent_from_provider(
+    async def _refund_provider_payment(
         self,
-        pgp_intent_id: uuid.UUID,
-        status: IntentStatus,
-        provider_payment_response: Any,
-    ) -> None:
-        await self.payment_repo.update_pgp_payment_intent(
-            id=pgp_intent_id,
-            status=status,
-            provider_intent_id=provider_payment_response,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        reason: str,
+        amount: int,
+    ) -> ProviderRefund:
+        try:
+            refund_request = RefundCharge(
+                charge=pgp_payment_intent.charge_resource_id,
+                amount=amount,
+                reason=reason,
+            )
+
+            self.req_context.log.info(
+                f"Refunding charge {pgp_payment_intent.charge_resource_id}"
+            )
+            response = await self.app_context.stripe.refund_charge(
+                country=CountryCode(payment_intent.country),
+                request=refund_request,
+                idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
+            )
+            self.req_context.log.debug(f"Provider response: {response}")
+            return response
+        except Exception as e:
+            self.req_context.log.error(f"Error cancelling charge with provider: {e}")
+            raise PaymentIntentCancelError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
+                retryable=False,
+            )
+
+    async def _update_pgp_charge_from_provider(
+        self,
+        payment_charge_id: uuid.UUID,
+        status: ChargeStatus,
+        provider_intent: ProviderPaymentIntent,
+    ):
+        charge = provider_intent.charges.data[0]
+        return await self.payment_repo.update_pgp_payment_charge(
+            payment_charge_id=payment_charge_id,
+            status=status.value,
+            amount=charge.amount,
+            amount_refunded=charge.amount_refunded,
         )
 
     def _populate_cart_payment_for_response(
@@ -337,9 +477,57 @@ class CartPaymentInterface:
         # return cart_payment.payer_id == payer_id and cart_payment.payer_id == request_payer_id
         return True
 
-    def is_capture_immediate(self, payment_intent: PaymentIntent) -> bool:
+    def _is_capture_immediate(self, payment_intent: PaymentIntent) -> bool:
         # TODO control percentage of intents for delayed capture here with a config parameter
         return False
+        # return True
+
+    async def _create_new_charge_pair(
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        provider_intent: ProviderPaymentIntent,
+    ) -> Tuple[PaymentCharge, PgpPaymentCharge]:
+        # TODO Add config parameter that switches between writing to payment db and legacy tables in main db, and support
+        # writing to those legacy tables for backward compatibility.
+        payment_charge = await self.payment_repo.insert_payment_charge(
+            id=uuid.uuid4(),
+            payment_intent_id=payment_intent.id,
+            provider=PaymentProvider.STRIPE.value,
+            idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
+            status=ChargeStatus.REQUIRES_CAPTURE,
+            currency=payment_intent.currency,
+            amount=payment_intent.amount,
+            amount_refunded=0,
+            application_fee_amount=payment_intent.application_fee_amount,
+            payout_account_id=pgp_payment_intent.payout_account_id,
+        )
+
+        provider_charges = provider_intent.charges
+        if len(provider_charges.data) > 1:
+            # Upon creation, there is expected to be one provider charge.
+            self.req_context.log.warn(
+                f"Multiple pgp charges at time of creation for intent {payment_intent.id}, pgp intent {pgp_payment_intent.id}"
+            )
+        provider_charge = provider_charges.data[0]
+        pgp_payment_charge = await self.payment_repo.insert_pgp_payment_charge(
+            id=uuid.uuid4(),
+            payment_charge_id=payment_charge.id,
+            provider=PaymentProvider.STRIPE.value,
+            idempotency_key=payment_charge.idempotency_key,
+            status=ChargeStatus.REQUIRES_CAPTURE,
+            currency=provider_charge.currency,
+            amount=provider_charge.amount,
+            amount_refunded=provider_charge.amount_refunded,
+            application_fee_amount=provider_charge.application_fee_amount,
+            payout_account_id=provider_charge.on_behalf_of,
+            resource_id=provider_charge.id,
+            intent_resource_id=provider_charge.payment_intent,
+            invoice_resource_id=provider_charge.invoice,
+            payment_method_resource_id=provider_charge.payment_method,
+        )
+
+        return payment_charge, pgp_payment_charge
 
     async def _create_new_intent_pair(
         self,
@@ -351,9 +539,9 @@ class CartPaymentInterface:
         currency: str,
         capture_method: str,
         payer_statement_description: Optional[str] = None,
-    ):
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         # Create PaymentIntent
-        payment_intent: PaymentIntent = await self.payment_repo.insert_payment_intent(
+        payment_intent = await self.payment_repo.insert_payment_intent(
             id=uuid.uuid4(),
             cart_payment_id=cart_payment.id,
             idempotency_key=idempotency_key,
@@ -371,7 +559,7 @@ class CartPaymentInterface:
         )
 
         # Create PgpPaymentIntent
-        pgp_payment_intent: PgpPaymentIntent = await self.payment_repo.insert_pgp_payment_intent(
+        pgp_payment_intent = await self.payment_repo.insert_pgp_payment_intent(
             id=uuid.uuid4(),
             payment_intent_id=payment_intent.id,
             idempotency_key=idempotency_key,
@@ -404,8 +592,8 @@ class CartPaymentInterface:
         client_description: str,
     ) -> Tuple[CartPayment, PaymentIntent]:
         # Create a new cart payment, with associated models
-        self.req_context.log.debug(
-            f"Submitting new payment for payer ${request_cart_payment.payer_id}"
+        self.req_context.log.info(
+            f"Submitting new payment for payer {request_cart_payment.payer_id}"
         )
 
         # Required as inputs to creation API, but optional in model.  Verify we have the required fields.
@@ -502,13 +690,26 @@ class CartPaymentInterface:
         )
         return cart_payment
 
+    async def _update_charge_pair_after_cancel(
+        self, payment_intent: PaymentIntent, status: ChargeStatus
+    ) -> Tuple[PaymentCharge, PgpPaymentCharge]:
+        # Assumption: this is called within a transaction already
+        # TODO add a config parameter and switch between writing to payin db and main db legacy tables.
+        payment_charge = await self.payment_repo.update_payment_charge_status(
+            payment_intent_id=payment_intent.id, status=status.value
+        )
+        pgp_payment_charge = await self.payment_repo.update_pgp_payment_charge_status(
+            payment_charge_id=payment_charge.id, status=status.value
+        )
+        return payment_charge, pgp_payment_charge
+
     async def _cancel_intent(
         self, payment_intent: PaymentIntent, pgp_payment_intents: List[PgpPaymentIntent]
     ):
         self.req_context.log.info(f"Cancelling payment intent {payment_intent.id}")
         # TODO handle case where there are multiple pgp intents
         pgp_payment_intent = pgp_payment_intents[0]
-        await self._cancel_provider_payment(
+        await self._cancel_provider_payment_charge(
             payment_intent,
             pgp_payment_intent,
             CancelPaymentIntent.CancellationReason.ABANDONED,
@@ -518,14 +719,52 @@ class CartPaymentInterface:
             await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id, status=IntentStatus.CANCELLED
             )
-            await self.payment_repo.update_pgp_payment_intent(
-                id=pgp_payment_intent.id,
-                status=IntentStatus.CANCELLED,
-                provider_intent_id=pgp_payment_intent.resource_id,
+            await self.payment_repo.update_pgp_payment_intent_status(
+                id=pgp_payment_intent.id, status=IntentStatus.CANCELLED
+            )
+            await self.payment_repo.update_pgp_payment_intent_status(
+                id=pgp_payment_intent.id, status=IntentStatus.CANCELLED
+            )
+            await self._update_charge_pair_after_cancel(
+                payment_intent=payment_intent, status=ChargeStatus.CANCELLED
             )
 
-    async def _refund_intent(self, payment_intent: PaymentIntent):
-        pass
+    async def _refund_intent(
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intents: List[PgpPaymentIntent],
+        amount: int,
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+        self.req_context.log.info(
+            f"Refunding payment intent {payment_intent.id} for amount {amount}"
+        )
+        # TODO handle case where there may be multiple pgp_payment_intents
+        pgp_payment_intent = pgp_payment_intents[0]
+        if not self._can_pgp_payment_intent_be_refunded(pgp_payment_intent):
+            self.req_context.log.error(
+                f"Attempt to refund pgp intent {pgp_payment_intent.id} in invalid state {pgp_payment_intent.status}"
+            )
+            raise PaymentIntentRefundError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
+                retryable=False,
+            )
+
+        # TODO verify if pgp intent can be refunded: may have been refunded previously, protect against
+        # exceeding limits (avoid call to provider if not necessary)
+
+        refund = await self._refund_provider_payment(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            reason=RefundCharge.RefundReason.REQUESTED_BY_CONSUMER,
+            amount=amount,
+        )
+
+        async with self.payment_repo.payment_database_transaction():
+            await self._update_charge_pair_after_refund(
+                payment_intent=payment_intent, provider_refund=refund
+            )
+
+        return payment_intent, pgp_payment_intent
 
     async def _get_required_payment_resource_ids(
         self,
@@ -624,6 +863,7 @@ class CartPaymentInterface:
             )
 
             # Insert adjustment history record
+            # TODO consider adding cart_payment_id
             await self.payment_repo.insert_payment_intent_adjustment_history(
                 id=uuid.uuid4(),
                 payer_id=cart_payment.payer_id,
@@ -651,14 +891,15 @@ class CartPaymentInterface:
         self,
         cart_payment: CartPayment,
         idempotency_key: str,
+        payment_intents: List[PaymentIntent],
         amount: int,
         legacy_payment: Optional[LegacyPayment],
         client_description: Optional[str],
         payer_statement_description: Optional[str],
         metadata: Optional[CartMetadata],
     ) -> CartPayment:
-        payment_intents = await self.payment_repo.get_payment_intents_for_cart_payment(
-            cart_payment.id
+        self.req_context.log.info(
+            f"Adjusting amount higher to {amount} from {cart_payment.amount} for cart payment {cart_payment.id}"
         )
         existing_intent = self._filter_payment_intents_by_idempotency_key(
             payment_intents, idempotency_key
@@ -679,20 +920,168 @@ class CartPaymentInterface:
             )
 
         # Cancel previous intents
-        cancellations = []
+        intent_operations = []
         for intent in payment_intents:
             if self._can_payment_intent_be_cancelled(intent):
-                cancellations.append(
+                # Intent not yet captured: it can be cancelled.
+                intent_operations.append(
                     self._cancel_intent(
                         intent,
                         await self.payment_repo.find_pgp_payment_intents(intent.id),
                     )
                 )
-            # TODO handle case where intent cannot be cancelled, but requires refund.
+            elif self._can_payment_intent_be_refunded(intent):
+                # The intent cannot be cancelled because its state is beyond capture.  Instead we must refund
+                intent_operations.append(
+                    self._refund_intent(
+                        intent,
+                        await self.payment_repo.find_pgp_payment_intents(intent.id),
+                        intent.amount,
+                    )
+                )
+            # No need for else block here: If not able to cancel or refund, no action is needed (for example, intent is in failed state).
 
-        await gather(*cancellations)
+        if len(intent_operations) > 0:
+            self.req_context.log.info(
+                f"Cancelling intents for cart payment {cart_payment.id}"
+            )
+            await gather(*intent_operations)
 
         # Update properties of the cart payment
+        return await self._update_cart_payment_attributes(
+            cart_payment=cart_payment,
+            idempotency_key=idempotency_key,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            amount=amount,
+            client_description=client_description,
+        )
+
+    async def _record_amount_decrease(
+        self,
+        cart_payment: CartPayment,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        amount: int,
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+        async with self.payment_repo.payment_database_transaction():
+            updated_intent = await self.payment_repo.update_payment_intent_amount(
+                id=payment_intent.id, amount=amount
+            )
+            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_amount(
+                id=pgp_payment_intent.id, amount=amount
+            )
+            await self._update_charge_pair_after_amount_reduction(
+                payment_intent=payment_intent, amount=amount
+            )
+            await self.payment_repo.insert_payment_intent_adjustment_history(
+                id=uuid.uuid4(),
+                payer_id=cart_payment.payer_id,
+                payment_intent_id=payment_intent.id,
+                amount=amount,
+                amount_original=cart_payment.amount,
+                amount_delta=(amount - cart_payment.amount),
+                currency=payment_intent.currency,
+            )
+
+        return updated_intent, updated_pgp_intent
+
+    async def _submit_refund_to_cart_payment(
+        self, cart_payment: CartPayment, payment_intent: PaymentIntent, amount: int
+    ):
+        refunded_intent, refunded_pgp_intent = await self._refund_intent(
+            payment_intent,
+            await self.payment_repo.find_pgp_payment_intents(payment_intent.id),
+            payment_intent.amount - amount,
+        )
+
+        return await self._record_amount_decrease(
+            cart_payment=cart_payment,
+            payment_intent=refunded_intent,
+            pgp_payment_intent=refunded_pgp_intent,
+            amount=amount,
+        )
+
+    async def _submit_amount_decrease_to_cart_payment(
+        self, cart_payment: CartPayment, payment_intent: PaymentIntent, amount: int
+    ):
+        # TODO handle case where there are multiple pgp intents
+        pgp_payment_intents = await self.payment_repo.find_pgp_payment_intents(
+            payment_intent.id
+        )
+        pgp_payment_intent = pgp_payment_intents[0]
+
+        # There is no need to call provider at this point in time.  The original auth done upon cart payment
+        # creation is sufficient to cover a lower amount, so there is no need to update the amount with the provider.
+        # Instead we will record updated amounts in our system, which will be reflected at time of (delayed) capture.
+
+        return await self._record_amount_decrease(
+            cart_payment=cart_payment,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            amount=amount,
+        )
+
+    async def _deduct_amount_from_cart_payment(
+        self,
+        cart_payment: CartPayment,
+        idempotency_key: str,
+        payment_intents: List[PaymentIntent],
+        amount: int,
+        legacy_payment: Optional[LegacyPayment],
+        client_description: Optional[str],
+        payer_statement_description: Optional[str],
+        metadata: Optional[CartMetadata],
+    ) -> CartPayment:
+        self.req_context.log.info(
+            f"Adjusting amount lower to {amount} from {cart_payment.amount} for cart payment {cart_payment.id}"
+        )
+
+        capturable_intents = self._filter_payment_intents_by_state(
+            payment_intents, IntentStatus.REQUIRES_CAPTURE
+        )
+
+        # TODO handle resubmit case via idempotency key
+
+        if capturable_intents:
+            # If there are any uncaptured intents suitable for this amount change, update
+            capturable_intent = self._get_most_recent_intent(capturable_intents)
+            payment_intent, pgp_payment_intent = await self._submit_amount_decrease_to_cart_payment(
+                cart_payment=cart_payment,
+                payment_intent=capturable_intent,
+                amount=amount,
+            )
+        else:
+            # If there are no uncaptured intents suitable for this amount change, a refund is necessary.
+            refundable_intents = self._filter_payment_intents_by_function(
+                payment_intents, self._can_payment_intent_be_refunded
+            )
+            refundable_intent = self._get_most_recent_intent(refundable_intents)
+            payment_intent, pgp_payment_intent = await self._submit_refund_to_cart_payment(
+                cart_payment=cart_payment,
+                payment_intent=refundable_intent,
+                amount=amount,
+            )
+
+        # Update properties of the cart payment
+        return await self._update_cart_payment_attributes(
+            cart_payment=cart_payment,
+            idempotency_key=idempotency_key,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            amount=amount,
+            client_description=client_description,
+        )
+
+    async def _update_cart_payment_attributes(
+        self,
+        cart_payment: CartPayment,
+        idempotency_key: str,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        amount: int,
+        client_description: Optional[str],
+    ) -> CartPayment:
         updated_cart_payment = await self.payment_repo.update_cart_payment_details(
             cart_payment_id=cart_payment.id,
             amount=amount,
@@ -702,45 +1091,6 @@ class CartPaymentInterface:
             updated_cart_payment, payment_intent, pgp_payment_intent
         )
         return updated_cart_payment
-
-    async def _deduct_amount_from_cart_payment(
-        self,
-        cart_payment: CartPayment,
-        idempotency_key: str,
-        uncaptured_intent: Optional[PaymentIntent],
-        amount: Optional[int],
-        legacy_payment: Optional[LegacyPayment],
-        client_description: Optional[str],
-        payer_statement_description: Optional[str],
-        metadata: Optional[CartMetadata],
-    ) -> CartPayment:
-        # TODO Fill in this function (or move entirely to refund API):
-        # If no uncaptured intent (already captured/failed): issue refund
-        #
-        # If there is an uncaptured intent, update amount and store history record for the adjustment
-        return cart_payment
-
-    async def _update_cart_payment_attributes(
-        self,
-        cart_payment: CartPayment,
-        idempotency_key: str,
-        uncaptured_intent: Optional[PaymentIntent],
-        amount: Optional[int],
-        legacy_payment: Optional[LegacyPayment],
-        client_description: Optional[str],
-        payer_statement_description: Optional[str],
-        metadata: Optional[CartMetadata],
-    ) -> CartPayment:
-        # TODO Fill in this function:
-        # Edge case: just return immediately if nothing is really changing
-        #
-        # If no uncaptured intent, amount is not changing, but other fields are, return an error.  We cannot update the
-        # already processed intent but with no difference in amount, we cannot make a new intent.
-        #
-        # Call to provider to update intent
-        #
-        # Update intent/pgp intent in our system
-        return cart_payment
 
     async def update_payment(
         self,
@@ -756,23 +1106,48 @@ class CartPaymentInterface:
 
         # TODO concurrency control for attempts to update the same cart payment
 
+        payment_intents = await self.payment_repo.get_payment_intents_for_cart_payment(
+            cart_payment.id
+        )
+
         if self._is_amount_adjusted_higher(cart_payment, amount):
             updated_cart_payment = await self._add_amount_to_cart_payment(
-                cart_payment,
-                idempotency_key,
-                amount,
-                legacy_payment,
-                client_description,
-                payer_statement_description,
-                metadata,
+                cart_payment=cart_payment,
+                idempotency_key=idempotency_key,
+                payment_intents=payment_intents,
+                amount=amount,
+                legacy_payment=legacy_payment,
+                client_description=client_description,
+                payer_statement_description=payer_statement_description,
+                metadata=metadata,
             )
         elif self._is_amount_adjusted_lower(cart_payment, amount):
-            # updated_cart_payment = await self._deduct_amount_from_cart_payment()
+            updated_cart_payment = await self._deduct_amount_from_cart_payment(
+                cart_payment=cart_payment,
+                idempotency_key=idempotency_key,
+                payment_intents=payment_intents,
+                amount=amount,
+                legacy_payment=legacy_payment,
+                client_description=client_description,
+                payer_statement_description=payer_statement_description,
+                metadata=metadata,
+            )
             pass
         else:
             # Amount is the same: properties of cart payment other than the amount may be changing
-            # updated_cart_payment = await self._update_cart_payment_attributes()
-            pass
+            payment_intent = self._get_most_recent_intent(payment_intents)
+            # TODO handle case where there are multiple pgp intents
+            pgp_payment_intents = await self.payment_repo.find_pgp_payment_intents(
+                payment_intent.id
+            )
+            updated_cart_payment = await self._update_cart_payment_attributes(
+                cart_payment=cart_payment,
+                idempotency_key=idempotency_key,
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intents[0],
+                amount=amount,
+                client_description=client_description,
+            )
 
         return updated_cart_payment
 
@@ -794,7 +1169,7 @@ class CartPaymentInterface:
         # TODO scheduling of this logic
         # TODO concurrency control to ensure we are capturing something once (though underlying provider call will be idempotent)
         # Check state of intent.  If already captured (successfully or not), stop.  Clients are expected to
-        if self._is_intent_processed(payment_intent):
+        if self._has_capture_been_attempted(payment_intent):
             self.req_context.log.info(
                 f"Payment intent not eligible for capturing, in state {payment_intent.status}"
             )
@@ -808,22 +1183,8 @@ class CartPaymentInterface:
         pgp_payment_intent = pgp_intents[0]
 
         # Call to provider to capture, with idempotency key
-        provider_status = await self._capture_payment_with_provider(
-            payment_intent, pgp_payment_intent
-        )
-        new_status = self._get_intent_status_from_provider_status(provider_status)
-        self.req_context.log.info(
-            f"Updating intent {payment_intent.id}, pgp intent {pgp_payment_intent.id} to status {new_status}"
-        )
-
-        # Update state
-        async with self.payment_repo.payment_database_transaction():
-            await self.payment_repo.update_payment_intent_status(
-                payment_intent.id, new_status
-            )
-            await self._update_pgp_intent_from_provider(
-                pgp_payment_intent.id, new_status, pgp_payment_intent.resource_id
-            )
+        await self._capture_payment_with_provider(payment_intent, pgp_payment_intent)
+        # TODO update captured_at dates, amounts
 
 
 class CartPaymentProcessor:
@@ -953,8 +1314,5 @@ class CartPaymentProcessor:
             currency,
             client_description,
         )
-
-        if self.cart_payment_interface.is_capture_immediate(payment_intent):
-            await self.cart_payment_interface.capture_payment(payment_intent)
 
         return cart_payment

@@ -30,7 +30,7 @@ class TestPaymentIntent:
         assert create.transfer_data.amount == 123
 
     @pytest.mark.skip(
-        "Type chnage required for stripe call to work - tbd if this can be changed back"
+        "Type change required for stripe call to work - tbd if this can be changed back"
     )
     def test_enum_validation(self):
         # data validation is done

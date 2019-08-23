@@ -26,6 +26,7 @@ payin_error_message_maps = {
     "payin_29": "Data I/O error. Please retry again!",
     "payin_40": "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
     "payin_41": "Error returned from Payment Provider. Please verify parameters of capture.",
+    "payin_42": "Cannot refund previous charge for amount increase.",
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
@@ -48,6 +49,7 @@ class PayinErrorCode(str, Enum):
     PAYER_UPDATE_STRIPE_ERROR = "payin_10"
     PAYMENT_INTENT_CREATE_STRIPE_ERROR = "payin_40"
     PAYMENT_INTENT_CAPTURE_STRIPE_ERROR = "payin_41"
+    PAYMENT_INTENT_ADJUST_REFUND_ERROR = "payin_42"
     PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
     PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
     PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"
@@ -126,11 +128,22 @@ class CartPaymentReadError(PayinError):
 
 
 ###########################################################
-# PaymentIntentrrors                                      #
+# PaymentCharge Errors                                      #
+###########################################################
+class PaymentChargeRefundError(PayinError):
+    pass
+
+
+###########################################################
+# PaymentIntent Errors                                      #
 ###########################################################
 class PaymentIntentCaptureError(PayinError):
     pass
 
 
 class PaymentIntentCancelError(PayinError):
+    pass
+
+
+class PaymentIntentRefundError(PayinError):
     pass

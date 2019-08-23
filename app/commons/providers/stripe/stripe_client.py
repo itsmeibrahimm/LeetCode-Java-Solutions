@@ -97,7 +97,7 @@ class StripeClientInterface:
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentId:
+    ) -> models.PaymentIntent:
         """
         Create a new PaymentIntent
         https://stripe.com/docs/api/payment_intents
@@ -109,7 +109,7 @@ class StripeClientInterface:
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentStatus:
+    ) -> models.PaymentIntent:
         """
         Capture a PaymentIntent
         https://stripe.com/docs/api/payment_intents
@@ -125,6 +125,18 @@ class StripeClientInterface:
         """
         Cancel a PaymentIntent
         https://stripe.com/docs/api/payment_intents
+        """
+        ...
+
+    def refund_charge(
+        self,
+        country: models.CountryCode,
+        request: models.RefundCharge,
+        idempotency_key: models.IdempotencyKey,
+    ) -> models.Refund:
+        """
+        Refund a Charge
+        https://stripe.com/docs/api/refunds
         """
         ...
 
@@ -250,26 +262,26 @@ class StripeClient(StripeClientInterface):
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentId:
+    ) -> models.PaymentIntent:
         payment_intent = stripe.PaymentIntent.create(
             idempotency_key=idempotency_key,
             **self.settings_for(country),
             **request.dict(skip_defaults=True),
         )
-        return payment_intent.id
+        return payment_intent
 
     def capture_payment_intent(
         self,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentStatus:
+    ) -> models.PaymentIntent:
         payment_intent = stripe.PaymentIntent.capture(
             idempotency_key=idempotency_key,
             **self.settings_for(country),
             **request.dict(skip_defaults=True),
         )
-        return payment_intent.status
+        return payment_intent
 
     def cancel_payment_intent(
         self,
@@ -283,6 +295,19 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return payment_intent.id
+
+    def refund_charge(
+        self,
+        country: models.CountryCode,
+        request: models.RefundCharge,
+        idempotency_key: models.IdempotencyKey,
+    ) -> models.Refund:
+        refund = stripe.Refund.create(
+            idempotency_key=idempotency_key,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return refund
 
 
 class StripeTestClient(StripeClient):
@@ -436,7 +461,7 @@ class StripeClientPool(ThreadPoolHelper):
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentId:
+    ) -> models.PaymentIntent:
         return await self.submit(
             self.client.create_payment_intent,
             country,
@@ -449,7 +474,7 @@ class StripeClientPool(ThreadPoolHelper):
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentStatus:
+    ) -> models.PaymentIntent:
         return await self.submit(
             self.client.capture_payment_intent,
             country,
@@ -463,10 +488,19 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.CancelPaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
-        # TODO refactor intent API to return full intent
         return await self.submit(
             self.client.cancel_payment_intent,
             country,
             request,
             idempotency_key=idempotency_key,
+        )
+
+    async def refund_charge(
+        self,
+        country: models.CountryCode,
+        request: models.RefundCharge,
+        idempotency_key: models.IdempotencyKey,
+    ) -> models.Refund:
+        return await self.submit(
+            self.client.refund_charge, country, request, idempotency_key=idempotency_key
         )
