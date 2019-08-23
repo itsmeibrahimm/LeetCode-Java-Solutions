@@ -64,10 +64,10 @@ def create_mx_transactions_router() -> APIRouter:
                 metadata=mx_transaction_request.metadata,
                 legacy_transaction_id=mx_transaction_request.legacy_transaction_id,
             )
-            log.info("create_mx_transaction() completed. ")
+            log.info("create mx_transaction completed. ")
         except MxTransactionCreationError as e:
             log.error(
-                f"[create_mx_transaction] [{mx_transaction_request.payment_account_id}] Exception caught when creating txn. {e}"
+                f"[create_mx_transaction] [{mx_transaction_request.payment_account_id}] Exception caught when creating mx_txn. {e}"
             )
             return create_payment_error_response_blob(
                 HTTP_500_INTERNAL_SERVER_ERROR,

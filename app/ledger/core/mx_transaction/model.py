@@ -5,13 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Json
 from typing_extensions import final
 
-from app.commons.types import CurrencyType
-from app.ledger.core.types import (
-    MxTransactionType,
-    MxLedgerType,
-    MxLedgerStateType,
-    MxScheduledLedgerIntervalType,
-)
+from app.ledger.core.types import MxTransactionType, MxScheduledLedgerIntervalType
 
 
 class MxTransactionModel(BaseModel):
@@ -39,25 +33,6 @@ class MxTransaction(MxTransactionModel):
 
 
 # todo：refactor this into new folder later
-@final
-class MxLedger(MxTransactionModel):
-    id: UUID
-    type: MxLedgerType
-    currency: CurrencyType
-    state: MxLedgerStateType
-    balance: int
-    payment_account_id: str
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    submitted_at: Optional[datetime]
-    amount_paid: Optional[int]
-    legacy_transfer_id: Optional[str]
-    finalized_at: Optional[datetime]
-    created_by_employee_id: Optional[str]
-    submitted_by_employee_id: Optional[str]
-    rolled_to_ledger_id: Optional[str]
-
-
 @final
 class MxScheduledLedger(MxTransactionModel):
     id: UUID

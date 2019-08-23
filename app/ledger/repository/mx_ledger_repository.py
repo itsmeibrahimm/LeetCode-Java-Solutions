@@ -20,6 +20,8 @@ from app.ledger.core.data_types import (
     GetMxLedgerByAccountOutput,
     InsertMxTransactionOutput,
     InsertMxTransactionInput,
+    ProcessMxLedgerInput,
+    ProcessMxLedgerOutput,
 )
 from app.ledger.core.types import MxTransactionType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_ledgers, mx_transactions
@@ -40,6 +42,12 @@ class MxLedgerRepositoryInterface:
         request_set: UpdateMxLedgerSetInput,
         request_where: UpdateMxLedgerWhereInput,
     ) -> UpdateMxLedgerOutput:
+        ...
+
+    @abstractmethod
+    async def process_mx_ledger_state(
+        self, request: ProcessMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
         ...
 
     @abstractmethod
@@ -89,6 +97,19 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         row = await self.payment_database.master().fetch_one(stmt)
         assert row
         return UpdateMxLedgerOutput.from_row(row)
+
+    async def process_mx_ledger_state(
+        self, request: ProcessMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        stmt = (
+            mx_ledgers.table.update()
+            .where(mx_ledgers.id == request.id)
+            .values(state=MxLedgerStateType.PROCESSING)
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        assert row
+        return ProcessMxLedgerOutput.from_row(row)
 
     async def get_ledger_by_id(
         self, request: GetMxLedgerByIdInput

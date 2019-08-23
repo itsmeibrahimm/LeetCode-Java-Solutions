@@ -152,6 +152,14 @@ class UpdateMxLedgerOutput(MxLedgerDbEntity):
     pass
 
 
+class ProcessMxLedgerInput(DBRequestModel):
+    id: UUID
+
+
+class ProcessMxLedgerOutput(MxLedgerDbEntity):
+    pass
+
+
 class GetMxLedgerByAccountInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name

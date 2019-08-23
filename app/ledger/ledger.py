@@ -13,6 +13,8 @@ from app.ledger.repository.mx_scheduled_ledger_repository import (
 )
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 from app.ledger.api.mx_transaction.v1.api import create_mx_transactions_router
+from app.ledger.api.mx_ledger.v1.api import create_mx_ledgers_router
+
 
 mx_ledger_repository: MxLedgerRepository
 mx_transaction_repository: MxTransactionRepository
@@ -26,10 +28,10 @@ def create_ledger_app(context: AppContext, config: AppConfig) -> FastAPI:
 
     # Init routers
     mx_transactions_router = create_mx_transactions_router()
+    mx_ledgers_router = create_mx_ledgers_router()
 
     route_authorizer = RouteAuthorizer(config.LEDGER_SERVICE_ID)
-
-    grouped_routers = group_routers([mx_transactions_router])
+    grouped_routers = group_routers([mx_transactions_router, mx_ledgers_router])
 
     app.include_router(grouped_routers, dependencies=[Depends(route_authorizer)])
 

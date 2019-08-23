@@ -309,7 +309,7 @@ class TestMxTransactionProcessor:
         def mock_get_open_ledger_for_payment_account(*args):
             return None
 
-        # To trigger a UniqueViolationError in create_mx_transaction_impl, we have to insert a mx_scheduled_ledger
+        # To trigger a UniqueViolationError in MxTransactionProcessor.create(), we have to insert a mx_scheduled_ledger
         # first, and mock get_open_mx_scheduled_ledger_for_period and get_open_ledger_for_payment_account as None to
         # simulate the concurrent mx_scheduled_ledger creations.
         # In the error handling of UniqueViolationError, get_open_mx_scheduled_ledger_for_period is called again, since

@@ -6,12 +6,13 @@ import pytest
 from app.commons.types import CurrencyType
 from app.ledger.core.types import MxLedgerStateType, MxLedgerType, MxTransactionType
 from app.ledger.repository.mx_ledger_repository import (
-    GetMxLedgerByAccountInput,
-    GetMxLedgerByIdInput,
     InsertMxLedgerInput,
     MxLedgerRepository,
     UpdateMxLedgerSetInput,
     UpdateMxLedgerWhereInput,
+    GetMxLedgerByIdInput,
+    GetMxLedgerByAccountInput,
+    ProcessMxLedgerInput,
 )
 
 
@@ -79,6 +80,28 @@ class TestMxLedgerRepository:
         )
         assert mx_ledger.id == updated_mx_ledger.id
         assert updated_mx_ledger.balance == 3000
+
+    async def test_process_mx_ledger_success(
+        self, mx_ledger_repository: MxLedgerRepository
+    ):
+        mx_ledger_id = uuid.uuid4()
+        mx_ledger_to_insert = InsertMxLedgerInput(
+            id=mx_ledger_id,
+            type=MxLedgerType.MANUAL.value,
+            currency=CurrencyType.USD.value,
+            state=MxLedgerStateType.OPEN.value,
+            balance=2000,
+            payment_account_id="pay_act_test_id",
+        )
+        mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
+        assert mx_ledger is not None
+
+        process_mx_ledger_input = ProcessMxLedgerInput(id=mx_ledger_id)
+        updated_mx_ledger = await mx_ledger_repository.process_mx_ledger_state(
+            process_mx_ledger_input
+        )
+        assert mx_ledger.id == updated_mx_ledger.id
+        assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
 
     async def test_get_ledger_by_id_success(
         self, mx_ledger_repository: MxLedgerRepository

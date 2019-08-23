@@ -1,6 +1,7 @@
 from typing import Any
 
-from app.ledger.core.mx_transaction.model import MxLedger, MxTransaction
+from app.ledger.core.mx_ledger.model import MxLedger
+from app.ledger.core.mx_transaction.model import MxTransaction
 
 
 def to_mx_ledger(row: Any) -> MxLedger:

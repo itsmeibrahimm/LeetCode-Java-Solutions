@@ -6,7 +6,6 @@ import psycopg2
 from fastapi import Depends
 from psycopg2._psycopg import DataError, OperationalError
 from psycopg2.errorcodes import UNIQUE_VIOLATION, LOCK_NOT_AVAILABLE
-from pydantic import Json
 from structlog import BoundLogger
 from tenacity import (
     RetryError,
@@ -70,15 +69,15 @@ class MxTransactionProcessor:
         routing_key: datetime,
         interval_type: MxScheduledLedgerIntervalType,
         target_id: Optional[str] = None,
-        context: Optional[Json] = None,
-        metadata: Optional[Json] = None,
+        context: Optional[str] = None,
+        metadata: Optional[str] = None,
         legacy_transaction_id: Optional[str] = None,
     ) -> MxTransaction:
         """
         Get or create mx_ledger and mx_scheduled_ledger and create mx_txn attached and update corresponding balance
         """
         self.log.info(
-            f"[create_mx_transaction_impl] payment_account_id: {payment_account_id}, target_type: {target_type.value}"
+            f"[create mx_transaction] payment_account_id: {payment_account_id}, target_type: {target_type.value}"
         )
 
         # with given payment_account_id, routing_key and interval_type, retrieve open scheduled ledger

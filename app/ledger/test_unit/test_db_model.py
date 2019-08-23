@@ -3,12 +3,9 @@ import pytest
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.test_unit.database.utils import validation_db_entity_and_table_schema
+from app.ledger.core.mx_ledger.model import MxLedger
 
-from app.ledger.core.mx_transaction.model import (
-    MxLedger,
-    MxScheduledLedger,
-    MxTransaction,
-)
+from app.ledger.core.mx_transaction.model import MxScheduledLedger, MxTransaction
 from app.ledger.models.paymentdb import (
     MxLedgerTable,
     MxScheduledLedgerTable,
