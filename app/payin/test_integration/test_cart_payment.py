@@ -18,16 +18,15 @@ class TestCartPayment:
         return request_body
 
     def _get_payer_payment_method_request(self, payer):
-        # TODO remove use of stripe_customer_id once create payment method api supports lookup of provider id based on payer id
         request_body = {
             "payer_id": payer["id"],
             "payment_gateway": "stripe",
             "token": "tok_mastercard",
-            "legacy_payment_info": {
-                "stripe_customer_id": payer["payment_gateway_provider_customers"][0][
-                    "payment_provider_customer_id"
-                ]
-            },
+            # "legacy_payment_info": {
+            #     "stripe_customer_id": payer["payment_gateway_provider_customers"][0][
+            #         "payment_provider_customer_id"
+            #     ]
+            # },
         }
         return request_body
 

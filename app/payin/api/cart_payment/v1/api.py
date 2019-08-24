@@ -28,76 +28,73 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 
-def create_cart_payments_router() -> APIRouter:
-    router = APIRouter()
+router = APIRouter()
 
-    @router.post("/api/v1/cart_payments", status_code=HTTP_201_CREATED)
-    async def create_cart_payment(
-        cart_payment_request: CreateCartPaymentRequest,
-        log: BoundLogger = Depends(get_logger_from_req),
-        cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
-    ):
-        log.debug(f"Creating cart_payment for payer {cart_payment_request.payer_id}")
 
-        try:
-            cart_payment = await cart_payment_processor.submit_payment(
-                request_cart_payment=request_to_model(cart_payment_request),
-                idempotency_key=cart_payment_request.idempotency_key,
-                country=cart_payment_request.country,
-                currency=cart_payment_request.currency,
-                client_description=cart_payment_request.client_description,
-                payer_id_type=cart_payment_request.payer_id_type,
-                payment_method_id_type=cart_payment_request.payment_method_id_type,
-            )
+@router.post("/api/v1/cart_payments", status_code=HTTP_201_CREATED)
+async def create_cart_payment(
+    cart_payment_request: CreateCartPaymentRequest,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+):
+    log.info(f"Creating cart_payment for payer {cart_payment_request.payer_id}")
 
-            log.info(
-                f"Created cart_payment {cart_payment.id} of type {cart_payment.cart_metadata.type} for payer {cart_payment.payer_id}"
-            )
-            return cart_payment
-        except PaymentError as payment_error:
-            http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-            if payment_error.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
-                http_status_code = HTTP_400_BAD_REQUEST
-            elif (
-                payment_error.error_code
-                == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
-            ):
-                http_status_code = HTTP_403_FORBIDDEN
-
-            raise PaymentException(
-                http_status_code=http_status_code,
-                error_code=payment_error.error_code,
-                error_message=payment_error.error_message,
-                retryable=payment_error.retryable,
-            )
-
-    @router.post(
-        "/api/v1/cart_payments/{cart_payment_id}/adjust", status_code=HTTP_200_OK
-    )
-    async def update_cart_payment(
-        cart_payment_id: UUID,
-        cart_payment_request: UpdateCartPaymentRequest,
-        log: BoundLogger = Depends(get_logger_from_req),
-        cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
-    ):
-        log.info(f"Updating cart_payment {cart_payment_id}")
-
-        cart_payment: CartPayment = await cart_payment_processor.update_payment(
+    try:
+        cart_payment = await cart_payment_processor.submit_payment(
+            request_cart_payment=request_to_model(cart_payment_request),
             idempotency_key=cart_payment_request.idempotency_key,
-            cart_payment_id=cart_payment_id,
-            payer_id=cart_payment_request.payer_id,
-            amount=cart_payment_request.amount,
-            legacy_payment=get_legacy_payment_model(cart_payment_request),
+            country=cart_payment_request.country,
+            currency=cart_payment_request.currency,
             client_description=cart_payment_request.client_description,
-            payer_statement_description=cart_payment_request.payer_statement_description,
-            metadata=get_cart_payment_metadata_model(cart_payment_request),
+            payer_id_type=cart_payment_request.payer_id_type,
+            payment_method_id_type=cart_payment_request.payment_method_id_type,
         )
+
         log.info(
-            f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
+            f"Created cart_payment {cart_payment.id} of type {cart_payment.cart_metadata.type} for payer {cart_payment.payer_id}"
         )
         return cart_payment
+    except PaymentError as payment_error:
+        http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
+        if payment_error.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
+            http_status_code = HTTP_400_BAD_REQUEST
+        elif (
+            payment_error.error_code
+            == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
+        ):
+            http_status_code = HTTP_403_FORBIDDEN
 
-    return router
+        raise PaymentException(
+            http_status_code=http_status_code,
+            error_code=payment_error.error_code,
+            error_message=payment_error.error_message,
+            retryable=payment_error.retryable,
+        )
+
+
+@router.post("/api/v1/cart_payments/{cart_payment_id}/adjust", status_code=HTTP_200_OK)
+async def update_cart_payment(
+    cart_payment_id: UUID,
+    cart_payment_request: UpdateCartPaymentRequest,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+):
+    log.info(f"Updating cart_payment {cart_payment_id}")
+
+    cart_payment: CartPayment = await cart_payment_processor.update_payment(
+        idempotency_key=cart_payment_request.idempotency_key,
+        cart_payment_id=cart_payment_id,
+        payer_id=cart_payment_request.payer_id,
+        amount=cart_payment_request.amount,
+        legacy_payment=get_legacy_payment_model(cart_payment_request),
+        client_description=cart_payment_request.client_description,
+        payer_statement_description=cart_payment_request.payer_statement_description,
+        metadata=get_cart_payment_metadata_model(cart_payment_request),
+    )
+    log.info(
+        f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
+    )
+    return cart_payment
 
 
 def request_to_model(cart_payment_request: CreateCartPaymentRequest) -> CartPayment:

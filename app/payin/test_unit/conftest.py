@@ -92,8 +92,8 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
         app_context=MagicMock(),
         req_context=MagicMock(),
         payment_repo=cart_payment_repo,
-        payer_repo=MagicMock(),
-        payment_method_repo=MagicMock(),
+        payer_client=MagicMock(),
+        payment_method_client=MagicMock(),
     )
 
     # Lookup functions

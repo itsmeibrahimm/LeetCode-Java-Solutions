@@ -41,10 +41,9 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
 )
+from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
-from app.payin.repository.payment_method_repo import PaymentMethodRepository
-from app.payin.repository.payer_repo import PayerRepository, GetPgpCustomerInput
 
 
 class CartPaymentInterface:
@@ -55,17 +54,13 @@ class CartPaymentInterface:
         payment_repo: CartPaymentRepository = Depends(
             CartPaymentRepository.get_repository
         ),
-        payer_repo: PayerRepository = Depends(PayerRepository.get_repository),
-        payment_method_repo: PaymentMethodRepository = Depends(
-            PaymentMethodRepository.get_repository
-        ),
+        payer_client: PayerClient = Depends(PayerClient),
         payment_method_client: PaymentMethodClient = Depends(PaymentMethodClient),
     ):
         self.app_context = app_context
         self.req_context = req_context
         self.payment_repo = payment_repo
-        self.payer_repo = payer_repo
-        self.payment_method_repo = payment_method_repo
+        self.payer_client = payer_client
         self.payment_method_client = payment_method_client
 
     async def _find_existing(
@@ -311,7 +306,7 @@ class CartPaymentInterface:
         pgp_charge = await self.payment_repo.update_pgp_payment_charge(
             payment_charge_id=payment_charge.id,
             status=status.value,
-            amount=provider_refund.amount,
+            amount=payment_intent.amount,
             amount_refunded=provider_refund.amount,
         )
         return payment_charge, pgp_charge
@@ -409,12 +404,12 @@ class CartPaymentInterface:
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         reason: str,
-        amount: int,
+        refund_amount: int,
     ) -> ProviderRefund:
         try:
             refund_request = RefundCharge(
                 charge=pgp_payment_intent.charge_resource_id,
-                amount=amount,
+                amount=refund_amount,
                 reason=reason,
             )
 
@@ -589,7 +584,7 @@ class CartPaymentInterface:
         idempotency_key: str,
         country: str,
         currency: str,
-        client_description: str,
+        client_description: Optional[str],
     ) -> Tuple[CartPayment, PaymentIntent]:
         # Create a new cart payment, with associated models
         self.req_context.log.info(
@@ -733,10 +728,10 @@ class CartPaymentInterface:
         self,
         payment_intent: PaymentIntent,
         pgp_payment_intents: List[PgpPaymentIntent],
-        amount: int,
+        refund_amount: int,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         self.req_context.log.info(
-            f"Refunding payment intent {payment_intent.id} for amount {amount}"
+            f"Refunding payment intent {payment_intent.id} amount {refund_amount}, out of {payment_intent.amount}"
         )
         # TODO handle case where there may be multiple pgp_payment_intents
         pgp_payment_intent = pgp_payment_intents[0]
@@ -756,15 +751,21 @@ class CartPaymentInterface:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             reason=RefundCharge.RefundReason.REQUESTED_BY_CONSUMER,
-            amount=amount,
+            refund_amount=refund_amount,
         )
 
         async with self.payment_repo.payment_database_transaction():
+            updated_intent = await self.payment_repo.update_payment_intent_amount(
+                id=payment_intent.id, amount=(payment_intent.amount - refund_amount)
+            )
+            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_amount(
+                id=pgp_payment_intent.id, amount=(payment_intent.amount - refund_amount)
+            )
             await self._update_charge_pair_after_refund(
                 payment_intent=payment_intent, provider_refund=refund
             )
 
-        return payment_intent, pgp_payment_intent
+        return updated_intent, updated_pgp_intent
 
     async def _get_required_payment_resource_ids(
         self,
@@ -773,10 +774,9 @@ class CartPaymentInterface:
         payment_method_id,
         payment_method_id_type: PaymentMethodIdType,
     ) -> Tuple[str, str]:
-        assert self.payer_repo
-        assert self.payment_method_repo
         # Get payment method, in order to submit new intent to the provider
 
+        self.req_context.log.debug(f"Getting payment info")
         raw_payment_method = await self.payment_method_client.get_payment_method(
             payer_id=payer_id,
             payment_method_id=payment_method_id,
@@ -788,16 +788,21 @@ class CartPaymentInterface:
             not raw_payment_method.pgp_payment_method_entity
             or not raw_payment_method.pgp_payment_method_entity.pgp_resource_id
         ):
+            self.req_context.log.error(f"No payment method found")
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
             )
 
-        # TODO Get customer ID from payer processor
-        pgp_customer = await self.payer_repo.get_pgp_customer(
-            GetPgpCustomerInput(payer_id=payer_id)
+        raw_payer = await self.payer_client.get_payer_raw_object(
+            payer_id=payer_id, payer_id_type=payer_id_type
         )
-        if not pgp_customer:
+        if (
+            not raw_payer
+            or not raw_payer.payer_entity
+            or not raw_payer.payer_entity.legacy_stripe_customer_id
+        ):
+            self.req_context.log.error(f"No payer found")
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
@@ -805,7 +810,7 @@ class CartPaymentInterface:
 
         return (
             raw_payment_method.pgp_payment_method_entity.pgp_resource_id,
-            pgp_customer.pgp_resource_id,
+            raw_payer.payer_entity.legacy_stripe_customer_id,
         )
 
     async def _resubmit_add_amount_to_cart_payment(
@@ -962,13 +967,19 @@ class CartPaymentInterface:
             client_description=client_description,
         )
 
-    async def _record_amount_decrease(
-        self,
-        cart_payment: CartPayment,
-        payment_intent: PaymentIntent,
-        pgp_payment_intent: PgpPaymentIntent,
-        amount: int,
-    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+    async def _submit_amount_decrease_to_cart_payment(
+        self, cart_payment: CartPayment, payment_intent: PaymentIntent, amount: int
+    ):
+        # TODO handle case where there are multiple pgp intents
+        pgp_payment_intents = await self.payment_repo.find_pgp_payment_intents(
+            payment_intent.id
+        )
+        pgp_payment_intent = pgp_payment_intents[0]
+
+        # There is no need to call provider at this point in time.  The original auth done upon cart payment
+        # creation is sufficient to cover a lower amount, so there is no need to update the amount with the provider.
+        # Instead we will record updated amounts in our system, which will be reflected at time of (delayed) capture.
+
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_amount(
                 id=payment_intent.id, amount=amount
@@ -990,42 +1001,6 @@ class CartPaymentInterface:
             )
 
         return updated_intent, updated_pgp_intent
-
-    async def _submit_refund_to_cart_payment(
-        self, cart_payment: CartPayment, payment_intent: PaymentIntent, amount: int
-    ):
-        refunded_intent, refunded_pgp_intent = await self._refund_intent(
-            payment_intent,
-            await self.payment_repo.find_pgp_payment_intents(payment_intent.id),
-            payment_intent.amount - amount,
-        )
-
-        return await self._record_amount_decrease(
-            cart_payment=cart_payment,
-            payment_intent=refunded_intent,
-            pgp_payment_intent=refunded_pgp_intent,
-            amount=amount,
-        )
-
-    async def _submit_amount_decrease_to_cart_payment(
-        self, cart_payment: CartPayment, payment_intent: PaymentIntent, amount: int
-    ):
-        # TODO handle case where there are multiple pgp intents
-        pgp_payment_intents = await self.payment_repo.find_pgp_payment_intents(
-            payment_intent.id
-        )
-        pgp_payment_intent = pgp_payment_intents[0]
-
-        # There is no need to call provider at this point in time.  The original auth done upon cart payment
-        # creation is sufficient to cover a lower amount, so there is no need to update the amount with the provider.
-        # Instead we will record updated amounts in our system, which will be reflected at time of (delayed) capture.
-
-        return await self._record_amount_decrease(
-            cart_payment=cart_payment,
-            payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
-            amount=amount,
-        )
 
     async def _deduct_amount_from_cart_payment(
         self,
@@ -1061,11 +1036,21 @@ class CartPaymentInterface:
             refundable_intents = self._filter_payment_intents_by_function(
                 payment_intents, self._can_payment_intent_be_refunded
             )
+
+            if not refundable_intents:
+                # There is an existing cart payment but no intents that are capturable or refundable.
+                raise PaymentIntentRefundError(
+                    error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
+                    retryable=False,
+                )
+
             refundable_intent = self._get_most_recent_intent(refundable_intents)
-            payment_intent, pgp_payment_intent = await self._submit_refund_to_cart_payment(
-                cart_payment=cart_payment,
+            payment_intent, pgp_payment_intent = await self._refund_intent(
                 payment_intent=refundable_intent,
-                amount=amount,
+                pgp_payment_intents=await self.payment_repo.find_pgp_payment_intents(
+                    refundable_intent.id
+                ),
+                refund_amount=(refundable_intent.amount - amount),
             )
 
         # Update properties of the cart payment
@@ -1262,7 +1247,7 @@ class CartPaymentProcessor:
         idempotency_key: str,
         country: str,
         currency: str,
-        client_description: str,
+        client_description: Optional[str],
         payer_id_type: PayerIdType,
         payment_method_id_type: PaymentMethodIdType,
     ) -> CartPayment:

@@ -6,6 +6,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
 )
+from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 import app.payin.core.cart_payment.processor as processor
@@ -56,8 +57,14 @@ class TestCartPaymentProcessor:
     @pytest.fixture
     def payment_method_client(self, payment_method_repo):
         return PaymentMethodClient(
-            payment_method_repo=payment_method_repo, log=MagicMock()
+            payment_method_repo=payment_method_repo,
+            log=MagicMock(),
+            app_ctxt=MagicMock(),
         )
+
+    @pytest.fixture
+    def payer_client(self, payer_repo):
+        return PayerClient(payer_repo=payer_repo, log=MagicMock(), app_ctxt=MagicMock())
 
     @pytest.fixture
     def cart_payment_processor(self, cart_payment_interface):
@@ -68,14 +75,14 @@ class TestCartPaymentProcessor:
         cart_payment_processor,
         request_cart_payment,
         payment_method_repo,
+        payer_client,
         payment_method_client,
     ):
         cart_payment_interface = processor.CartPaymentInterface(
             app_context=MagicMock(),
             req_context=MagicMock(),
             payment_repo=MagicMock(),
-            payer_repo=MagicMock(),
-            payment_method_repo=payment_method_repo,
+            payer_client=payer_client,
             payment_method_client=payment_method_client,
         )
 
@@ -107,7 +114,7 @@ class TestCartPaymentProcessor:
         )
 
     async def test_submit_with_other_owner(
-        self, request_cart_payment, payment_method_repo, payment_method_client
+        self, request_cart_payment, payer_client, payment_method_client
     ):
         # Avoid mocking of payment_method_client done in the cart_payment_processor fixture, as we need
         # the actual check to fail in order to ensure we see the proper exception.
@@ -116,8 +123,7 @@ class TestCartPaymentProcessor:
             app_context=MagicMock(),
             req_context=MagicMock(),
             payment_repo=MagicMock(),
-            payer_repo=MagicMock(),
-            payment_method_repo=payment_method_repo,
+            payer_client=payer_client,
             payment_method_client=payment_method_client,
         )
 
@@ -334,6 +340,12 @@ class TestCartPaymentProcessor:
         )
         cart_payment_processor.cart_payment_interface.payment_repo.update_pgp_payment_charge = FunctionMock(
             return_value=MagicMock()
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=generate_payment_intent()
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=generate_pgp_payment_intent()
         )
 
         updated_cart_payment = deepcopy(cart_payment)
