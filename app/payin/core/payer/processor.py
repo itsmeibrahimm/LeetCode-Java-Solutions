@@ -28,7 +28,7 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.types import PayerType
-from app.payin.core.payment_method.processor import PaymentMethodClient
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.types import PayerIdType
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -74,7 +74,7 @@ class PayerClient:
             )
             if exist_payer:
                 self.req_ctxt.log.info(
-                    f"[create_payer_impl][{exist_payer.id}] payer already exists. dd_payer_id:[{dd_payer_id}], payer_type:[{payer_type}]"
+                    f"[has_existing_payer][{exist_payer.id}] payer already exists. dd_payer_id:[{dd_payer_id}], payer_type:[{payer_type}]"
                 )
                 # raise PayerCreationError(
                 #     error_code=PayinErrorCode.PAYER_CREATE_PAYER_ALREADY_EXIST,
@@ -82,7 +82,7 @@ class PayerClient:
                 # )
         except DataError as e:
             self.req_ctxt.log.error(
-                f"[create_payer_impl][{dd_payer_id}] DataError when reading from payers table: {e}"
+                f"[has_existing_payer][{dd_payer_id}] DataError when reading from payers table: {e}"
             )
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=True
@@ -100,11 +100,9 @@ class PayerClient:
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
         if payer_type == PayerType.MARKETPLACE.value:
-            payer_interface = PayerOps(self.app_ctxt, self.req_ctxt, self.payer_repo)
+            payer_interface = PayerOps(self.req_ctxt, self.payer_repo)
         else:
-            payer_interface = LegacyPayerOps(
-                self.app_ctxt, self.req_ctxt, self.payer_repo
-            )
+            payer_interface = LegacyPayerOps(self.req_ctxt, self.payer_repo)
 
         return await payer_interface.create_payer_raw_objects(
             dd_payer_id=dd_payer_id,
@@ -117,24 +115,25 @@ class PayerClient:
         )
 
     async def get_payer_raw_objects(
-        self, payer_id: str, payer_id_type: Optional[str], payer_type: Optional[str]
+        self,
+        payer_id: str,
+        payer_id_type: Optional[str] = None,
+        payer_type: Optional[str] = None,
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
         if not payer_id_type or payer_id_type in (
             PayerIdType.DD_PAYMENT_PAYER_ID.value,
             PayerIdType.DD_CONSUMER_ID.value,
         ):
-            payer_interface = PayerOps(self.app_ctxt, self.req_ctxt, self.payer_repo)
+            payer_interface = PayerOps(self.req_ctxt, self.payer_repo)
         elif payer_id_type in (
             PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
             PayerIdType.STRIPE_CUSTOMER_ID.value,
         ):
-            payer_interface = LegacyPayerOps(
-                self.app_ctxt, self.req_ctxt, self.payer_repo
-            )
+            payer_interface = LegacyPayerOps(self.req_ctxt, self.payer_repo)
         else:
             self.req_ctxt.log.error(
-                f"[get_payer_entity][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
+                f"[get_payer_raw_objects][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_INVALID_DATA, retryable=False
@@ -142,6 +141,27 @@ class PayerClient:
         return await payer_interface.get_payer_raw_objects(
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
+
+    async def get_payer_raw_object(
+        self, payer_id: str, payer_id_type: Optional[str]
+    ) -> RawPayer:
+        input: GetPayerByIdInput
+        if not payer_id_type or payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID:
+            input = GetPayerByIdInput(id=payer_id)
+        elif payer_id_type == PayerIdType.DD_CONSUMER_ID:
+            input = GetPayerByIdInput(dd_payer_id=payer_id)
+        else:
+            # TODO: throw exception
+            ...
+
+        payer_entity: Optional[PayerDbEntity] = await self.payer_repo.get_payer_by_id(
+            request=input
+        )
+        if not payer_entity:
+            raise PayerReadError(
+                error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
+            )
+        return RawPayer(payer_entity=payer_entity)
 
     async def update_payer_default_payment_method(
         self,
@@ -158,18 +178,16 @@ class PayerClient:
             PayerIdType.DD_PAYMENT_PAYER_ID.value,
             PayerIdType.DD_CONSUMER_ID.value,
         ):
-            payer_interface = PayerOps(self.app_ctxt, self.req_ctxt, self.payer_repo)
+            payer_interface = PayerOps(self.req_ctxt, self.payer_repo)
         elif payer_id_type in (
             PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
             PayerIdType.STRIPE_CUSTOMER_ID.value,
         ):
-            payer_interface = LegacyPayerOps(
-                self.app_ctxt, self.req_ctxt, self.payer_repo
-            )
+            payer_interface = LegacyPayerOps(self.req_ctxt, self.payer_repo)
             lazy_create = True
         else:
             self.req_ctxt.log.error(
-                f"[get_payer_entity][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
+                f"[update_payer_default_payment_method][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_INVALID_DATA, retryable=False
@@ -271,6 +289,9 @@ class PayerClient:
 
 
 class PayerProcessor:
+    # prevent circular dependency
+    from app.payin.core.payment_method.processor import PaymentMethodClient
+
     def __init__(
         self,
         payment_method_client: PaymentMethodClient = Depends(PaymentMethodClient),
@@ -392,7 +413,7 @@ class PayerProcessor:
         )
 
         # step 2: find PaymentMethod object to get pgp_resource_id.
-        pm_entity, sc_entity = await self.payment_method_client.get_payment_method(
+        raw_pm: RawPaymentMethod = await self.payment_method_client.get_payment_method(
             payer_id=payer_id,
             payment_method_id=default_payment_method_id,
             payer_id_type=payer_id_type,
@@ -402,8 +423,8 @@ class PayerProcessor:
         # step 3: call PGP/stripe api to update default payment method
         stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
             country=country,
-            pgp_customer_id=raw_payer.get_pgp_customer_id(),
-            default_payment_method_id=sc_entity.stripe_id,
+            pgp_customer_id=raw_payer.pgp_customer_id(),
+            default_payment_method_id=raw_pm.pgp_payment_method_id(),
         )
 
         self.log.info(
@@ -413,7 +434,7 @@ class PayerProcessor:
         # step 4: update default_payment_method in pgp_customers/stripe_customer table
         updated_raw_payer: RawPayer = await self.payer_client.update_payer_default_payment_method(
             raw_payer=raw_payer,
-            pgp_default_payment_method_id=sc_entity.stripe_id,
+            pgp_default_payment_method_id=raw_pm.pgp_payment_method_id(),
             payer_id=payer_id,
             payer_type=payer_type,
             payer_id_type=payer_id_type,
@@ -423,10 +444,7 @@ class PayerProcessor:
 
 
 class PayerOpsInterface:
-    def __init__(
-        self, app_ctxt: AppContext, req_ctxt: ReqContext, payer_repo: PayerRepository
-    ):
-        self.app_ctxt = app_ctxt
+    def __init__(self, req_ctxt: ReqContext, payer_repo: PayerRepository):
         self.req_ctxt = req_ctxt
         self.payer_repo = payer_repo
 

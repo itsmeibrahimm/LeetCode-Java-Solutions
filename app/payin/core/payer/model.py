@@ -79,13 +79,21 @@ class RawPayer:
         self.pgp_customer_entity = pgp_customer_entity
         self.stripe_customer_entity = stripe_customer_entity
 
-    def get_pgp_customer_id(self) -> str:
-        pgp_customer_id: str
-        if self.pgp_customer_entity:
+    def country(self):
+        country: str
+        if self.payer_entity:
+            country = self.payer_entity.country
+        elif self.stripe_customer_entity:
+            country = self.stripe_customer_entity.country_shortname
+        return country
+
+    def pgp_customer_id(self):
+        if self.payer_entity:
+            pgp_customer_id = self.payer_entity.legacy_stripe_customer_id
+        elif self.pgp_customer_entity:
             pgp_customer_id = self.pgp_customer_entity.pgp_resource_id
         elif self.stripe_customer_entity:
             pgp_customer_id = self.stripe_customer_entity.stripe_id
-
         return pgp_customer_id
 
     def to_payer(self):

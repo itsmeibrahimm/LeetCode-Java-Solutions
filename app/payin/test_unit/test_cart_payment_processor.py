@@ -56,7 +56,7 @@ class TestCartPaymentProcessor:
     @pytest.fixture
     def payment_method_client(self, payment_method_repo):
         return PaymentMethodClient(
-            payment_method_repository=payment_method_repo, log=MagicMock()
+            payment_method_repo=payment_method_repo, log=MagicMock()
         )
 
     @pytest.fixture

@@ -56,9 +56,9 @@ def create_payment_method_router():
             str
         ] = req_body.legacy_payment_info.stripe_customer_id if req_body.legacy_payment_info else None
         try:
-            payment_method: PaymentMethod = await payment_method_processor.create_payment_method_impl(
+            payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
                 payer_id=req_body.payer_id,
-                payment_gateway=req_body.payment_gateway,
+                pgp_code=req_body.payment_gateway,
                 token=req_body.token,
                 dd_consumer_id=dd_consumer_id,
                 stripe_customer_id=stripe_customer_id,
@@ -127,7 +127,7 @@ def create_payment_method_router():
         )
 
         try:
-            payment_method: PaymentMethod = await payment_method_processor.get_payment_method_impl(
+            payment_method: PaymentMethod = await payment_method_processor.get_payment_method(
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
                 payer_id_type=payer_id_type,
@@ -197,7 +197,7 @@ def create_payment_method_router():
         req_ctxt.log.info("[delete_payment_method] receive request")
 
         try:
-            payment_method: PaymentMethod = await payment_method_processor.delete_payment_method_impl(
+            payment_method: PaymentMethod = await payment_method_processor.delete_payment_method(
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
                 payer_id_type=payer_id_type,

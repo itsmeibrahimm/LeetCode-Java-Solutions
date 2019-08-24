@@ -777,15 +777,17 @@ class CartPaymentInterface:
         assert self.payment_method_repo
         # Get payment method, in order to submit new intent to the provider
 
-        payment_method, stripe_card = await self.payment_method_client.get_payment_method(
+        raw_payment_method = await self.payment_method_client.get_payment_method(
             payer_id=payer_id,
             payment_method_id=payment_method_id,
             payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
-
         # TODO add more error_code values to help client distinguish error cases
-        if not payment_method or not payment_method.pgp_resource_id:
+        if (
+            not raw_payment_method.pgp_payment_method_entity
+            or not raw_payment_method.pgp_payment_method_entity.pgp_resource_id
+        ):
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
@@ -801,7 +803,10 @@ class CartPaymentInterface:
                 retryable=False,
             )
 
-        return payment_method.pgp_resource_id, pgp_customer.pgp_resource_id
+        return (
+            raw_payment_method.pgp_payment_method_entity.pgp_resource_id,
+            pgp_customer.pgp_resource_id,
+        )
 
     async def _resubmit_add_amount_to_cart_payment(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent
