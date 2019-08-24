@@ -6,11 +6,7 @@ from psycopg2._psycopg import DataError
 from structlog import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context
-from app.commons.context.req_context import (
-    ReqContext,
-    get_context_from_req,
-    get_logger_from_req,
-)
+from app.commons.context.req_context import get_logger_from_req
 
 from app.commons.providers.stripe.stripe_models import (
     CreateCustomer,
@@ -56,11 +52,11 @@ class PayerClient:
     def __init__(
         self,
         app_ctxt: AppContext = Depends(get_global_app_context),
-        req_ctxt: ReqContext = Depends(get_context_from_req),
+        log: BoundLogger = Depends(get_logger_from_req),
         payer_repo: PayerRepository = Depends(PayerRepository.get_repository),
     ):
         self.app_ctxt = app_ctxt
-        self.req_ctxt = req_ctxt
+        self.log = log
         self.payer_repo = payer_repo
 
     async def has_existing_payer(self, dd_payer_id: str, payer_type: str):
@@ -73,7 +69,7 @@ class PayerClient:
                 )
             )
             if exist_payer:
-                self.req_ctxt.log.info(
+                self.log.info(
                     f"[has_existing_payer][{exist_payer.id}] payer already exists. dd_payer_id:[{dd_payer_id}], payer_type:[{payer_type}]"
                 )
                 # raise PayerCreationError(
@@ -81,7 +77,7 @@ class PayerClient:
                 #     retryable=False,
                 # )
         except DataError as e:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[has_existing_payer][{dd_payer_id}] DataError when reading from payers table: {e}"
             )
             raise PayerCreationError(
@@ -100,9 +96,9 @@ class PayerClient:
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
         if payer_type == PayerType.MARKETPLACE.value:
-            payer_interface = PayerOps(self.req_ctxt, self.payer_repo)
+            payer_interface = PayerOps(self.log, self.payer_repo)
         else:
-            payer_interface = LegacyPayerOps(self.req_ctxt, self.payer_repo)
+            payer_interface = LegacyPayerOps(self.log, self.payer_repo)
 
         return await payer_interface.create_payer_raw_objects(
             dd_payer_id=dd_payer_id,
@@ -125,14 +121,14 @@ class PayerClient:
             PayerIdType.DD_PAYMENT_PAYER_ID.value,
             PayerIdType.DD_CONSUMER_ID.value,
         ):
-            payer_interface = PayerOps(self.req_ctxt, self.payer_repo)
+            payer_interface = PayerOps(self.log, self.payer_repo)
         elif payer_id_type in (
             PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
             PayerIdType.STRIPE_CUSTOMER_ID.value,
         ):
-            payer_interface = LegacyPayerOps(self.req_ctxt, self.payer_repo)
+            payer_interface = LegacyPayerOps(self.log, self.payer_repo)
         else:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[get_payer_raw_objects][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
             )
             raise PayerReadError(
@@ -178,15 +174,15 @@ class PayerClient:
             PayerIdType.DD_PAYMENT_PAYER_ID.value,
             PayerIdType.DD_CONSUMER_ID.value,
         ):
-            payer_interface = PayerOps(self.req_ctxt, self.payer_repo)
+            payer_interface = PayerOps(self.log, self.payer_repo)
         elif payer_id_type in (
             PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
             PayerIdType.STRIPE_CUSTOMER_ID.value,
         ):
-            payer_interface = LegacyPayerOps(self.req_ctxt, self.payer_repo)
+            payer_interface = LegacyPayerOps(self.log, self.payer_repo)
             lazy_create = True
         else:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[update_payer_default_payment_method][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
             )
             raise PayerReadError(
@@ -228,7 +224,7 @@ class PayerClient:
             request=GetPayerByIdInput(legacy_stripe_customer_id=pgp_customer_id)
         )
         if get_payer_entity:
-            self.req_ctxt.log.info(
+            self.log.info(
                 "[lazy_create_payer] payer already exist for stripe_customer %s . payer_id:%s",
                 pgp_customer_id,
                 get_payer_entity.id,
@@ -256,7 +252,7 @@ class PayerClient:
                 country=CountryCode(country), request=creat_cus_req
             )
         except Exception as e:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[pgp_create_customer] error while creating stripe customer. {e}"
             )
             raise PayerCreationError(
@@ -279,7 +275,7 @@ class PayerClient:
                 country=input_country, request=update_cus_req
             )
         except Exception as e:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[pgp_update_customer_default_payment_method][{pgp_customer_id}][{default_payment_method_id}] error while updating stripe customer {e}"
             )
             raise PayerUpdateError(
@@ -444,8 +440,8 @@ class PayerProcessor:
 
 
 class PayerOpsInterface:
-    def __init__(self, req_ctxt: ReqContext, payer_repo: PayerRepository):
-        self.req_ctxt = req_ctxt
+    def __init__(self, log: BoundLogger, payer_repo: PayerRepository):
+        self.log = log
         self.payer_repo = payer_repo
 
     @abstractmethod
@@ -513,14 +509,14 @@ class PayerOps(PayerOpsInterface):
             payer_entity, pgp_customer_entity = await self.payer_repo.insert_payer_and_pgp_customer(
                 payer_input=payer_input, pgp_customer_input=pgp_customer_input
             )
-            self.req_ctxt.log.info(
+            self.log.info(
                 "[create_payer_impl][%s] create payer/pgp_customer completed. stripe_customer_id_id:%s",
                 payer_entity.id,
                 pgp_customer_id,
             )
         except DataError as e:
-            self.req_ctxt.log.error(
-                f"[create_payer_impl][{payer_entity.id}] DataError when writing into db. {e}"
+            self.log.error(
+                f"[create_payer_impl][{pgp_code}] DataError when writing into db. {e}"
             )
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA, retryable=True
@@ -546,14 +542,14 @@ class PayerOps(PayerOpsInterface):
             )
             is_found = True if (payer_entity and pgp_cus_entity) else False
         except DataError as e:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[get_payer_raw_objects] DataError when reading data from db: {e}"
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False
             )
         if not is_found:
-            self.req_ctxt.log.error(
+            self.log.error(
                 "[get_payer_entity][%s] payer not found:[%s]", payer_id, payer_id_type
             )
             raise PayerReadError(
@@ -590,11 +586,11 @@ class PayerOps(PayerOpsInterface):
                 UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
             )
         else:
-            self.req_ctxt.log.info(
+            self.log.info(
                 f"[update_payer_default_payment_method][{payer_id}][{payer_id_type}] payer object doesn't exist"
             )
 
-        self.req_ctxt.log.info(
+        self.log.info(
             f"[update_payer_default_payment_method][{payer_id}][{payer_id_type}] pgp_customers update default_payment_method completed:[{pgp_default_payment_method_id}]"
         )
         return raw_payer
@@ -625,7 +621,7 @@ class LegacyPayerOps(PayerOpsInterface):
             )
             # create Payer and StripeCustomer objects
             payer_entity = await self.payer_repo.insert_payer(request=payer_input)
-            self.req_ctxt.log.info(
+            self.log.info(
                 "[create_payer_impl][%s] create payer completed. stripe_customer_id_id:%s",
                 payer_entity.id,
                 pgp_customer_id,
@@ -638,7 +634,7 @@ class LegacyPayerOps(PayerOpsInterface):
                 try:
                     owner_id = int(dd_payer_id)
                 except ValueError as e:
-                    self.req_ctxt.log.error(
+                    self.log.error(
                         f"[create_payer_impl][{dd_payer_id}] Value error for non-numeric value. {e}"
                     )
                     raise PayerCreationError(
@@ -654,15 +650,13 @@ class LegacyPayerOps(PayerOpsInterface):
                         default_card=default_payment_method_id,
                     )
                 )
-            self.req_ctxt.log.info(
+            self.log.info(
                 "[create_payer_impl][%s] create stripe_customer completed. stripe_customer.id:%s",
                 payer_entity.id,
                 stripe_customer_entity.id,
             )
         except DataError as e:
-            self.req_ctxt.log.error(
-                f"[create_payer_impl][{payer_entity.id}] DataError when writing into db. {e}"
-            )
+            self.log.error(f"[create_payer_impl] DataError when writing into db. {e}")
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA, retryable=True
             )
@@ -691,18 +685,18 @@ class LegacyPayerOps(PayerOpsInterface):
                 is_found = True if stripe_cus_entity else False
             else:
                 # TODO: add error handling here
-                self.req_ctxt.log.error(
+                self.log.error(
                     f"[get_payer_raw_objects][{payer_id}] no record in db, should retrieve from stripe. [{payer_id_type}][{payer_type}]"
                 )
         except DataError as e:
-            self.req_ctxt.log.error(
+            self.log.error(
                 f"[get_payer_entity] DataError when reading data from db: {e}"
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False
             )
         if not is_found:
-            self.req_ctxt.log.error(
+            self.log.error(
                 "[get_payer_entity][%s] payer not found:[%s]", payer_id, payer_id_type
             )
             raise PayerReadError(
@@ -730,7 +724,7 @@ class LegacyPayerOps(PayerOpsInterface):
                 ),
                 UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
             )
-            self.req_ctxt.log.info(
+            self.log.info(
                 f"[update_payer_impl][{payer_id}][{payer_id_type}] stripe_customer update default_payment_method completed:[{pgp_default_payment_method_id}]"
             )
         return raw_payer
