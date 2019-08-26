@@ -119,7 +119,7 @@ def buildTagPushNoRelease(Map optArgs = [:], String gitUrl, String sha, String b
 /**
  * Tag and Push a docker image with releaseTag
  */
-def tagPushRelease(String releaseTag) {
+def tagPushRelease(String releaseTag, String cacheTag) {
 
   github.doClosureWithStatus({
       withCredentials([
@@ -130,8 +130,9 @@ def tagPushRelease(String releaseTag) {
         sh """|#!/bin/bash
               |set -ex
               |
-              |make release-tag release-push \\
+              |make build release-tag release-push \\
               | RELEASE_TAG=${releaseTag}
+              | CACHE_FROM=${cacheTag}
               |""".stripMargin()
       }
     }, gitUrl, sha, "Docker Tag Push - [Release]", "${BUILD_URL}testReport")
