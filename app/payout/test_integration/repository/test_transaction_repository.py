@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.commons.database.infra import DB
 from app.payout.repository.bankdb.model.transaction import (
@@ -19,7 +19,7 @@ class TestTransactionRepository:
     async def test_create_get_transaction(
         self, transaction_repo: TransactionRepository
     ):
-        ts_utc = datetime.utcnow()
+        ts_utc = datetime.now(timezone.utc)
         data = TransactionCreate(
             amount=1000,
             payment_account_id=123,
@@ -39,7 +39,7 @@ class TestTransactionRepository:
     async def test_update_transaction_by_id(
         self, transaction_repo: TransactionRepository
     ):
-        ts_utc = datetime.utcnow()
+        ts_utc = datetime.now(timezone.utc)
         data = TransactionCreate(
             amount=1000,
             payment_account_id=123,
@@ -70,7 +70,7 @@ class TestTransactionRepository:
     async def test_set_transaction_payout_id_by_ids(
         self, transaction_repo: TransactionRepository
     ):
-        ts_utc = datetime.utcnow()
+        ts_utc = datetime.now(timezone.utc)
         data = TransactionCreate(
             amount=1000,
             payment_account_id=123,

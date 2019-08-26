@@ -10,6 +10,7 @@ from app.payout.repository.bankdb.model import stripe_payout_requests
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequest,
     StripePayoutRequestCreate,
+    StripePayoutRequestUpdate,
 )
 
 
@@ -23,6 +24,18 @@ class StripePayoutRequestRepositoryInterface(ABC):
     @abstractmethod
     async def get_stripe_payout_request_by_payout_id(
         self, payout_id: int
+    ) -> Optional[StripePayoutRequest]:
+        pass
+
+    @abstractmethod
+    async def get_stripe_payout_request_by_stripe_payout_id(
+        self, stripe_payout_id: str
+    ) -> Optional[StripePayoutRequest]:
+        pass
+
+    @abstractmethod
+    async def update_stripe_payout_request_by_id(
+        self, stripe_payout_request_id: int, data: StripePayoutRequestUpdate
     ) -> Optional[StripePayoutRequest]:
         pass
 
@@ -61,3 +74,24 @@ class StripePayoutRequestRepository(
             return StripePayoutRequest.from_row(rows[0])
 
         return None
+
+    async def get_stripe_payout_request_by_stripe_payout_id(
+        self, stripe_payout_id: str
+    ) -> Optional[StripePayoutRequest]:
+        stmt = stripe_payout_requests.table.select().where(
+            stripe_payout_requests.stripe_payout_id == stripe_payout_id
+        )
+        row = await self._database.master().fetch_one(stmt)
+        return StripePayoutRequest.from_row(row) if row else None
+
+    async def update_stripe_payout_request_by_id(
+        self, stripe_payout_request_id: int, data: StripePayoutRequestUpdate
+    ) -> Optional[StripePayoutRequest]:
+        stmt = (
+            stripe_payout_requests.table.update()
+            .where(stripe_payout_requests.id == stripe_payout_request_id)
+            .values(data.dict(skip_defaults=True))
+            .returning(*stripe_payout_requests.table.columns.values())
+        )
+        row = await self._database.master().fetch_one(stmt)
+        return StripePayoutRequest.from_row(row) if row else None

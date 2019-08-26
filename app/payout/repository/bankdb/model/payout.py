@@ -51,6 +51,24 @@ class PayoutTable(TableDefinition):
 
 
 class _PayoutPartial(DBEntity):
+    amount: Optional[int]
+    payment_account_id: Optional[int]
+    status: Optional[str]
+    currency: Optional[str]
+    fee: Optional[int]
+    type: Optional[str]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    idempotency_key: Optional[str]
+    payout_method_id: Optional[int]
+    transaction_ids: Optional[List[int]]
+    token: Optional[str]
+    fee_transaction_id: Optional[int]
+    error: Optional[Json]
+
+
+class Payout(_PayoutPartial):
+    id: int
     amount: int
     payment_account_id: int
     status: str
@@ -63,13 +81,11 @@ class _PayoutPartial(DBEntity):
     payout_method_id: int
     transaction_ids: List[int]
     token: str
-    fee_transaction_id: Optional[int]
-    error: Optional[Json]
-
-
-class Payout(_PayoutPartial):
-    id: Optional[int]  # server default generated
 
 
 class PayoutCreate(_PayoutPartial):
+    pass
+
+
+class PayoutUpdate(_PayoutPartial):
     pass

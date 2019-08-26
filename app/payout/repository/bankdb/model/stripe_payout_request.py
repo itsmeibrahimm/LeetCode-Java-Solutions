@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 from pydantic import Json
 
 from sqlalchemy import Column, DateTime, Integer, JSON, Text, text, ForeignKey
@@ -59,23 +59,33 @@ class StripePayoutRequestTable(TableDefinition):
 
 
 class _StripePayoutRequestPartial(DBEntity):
-    payout_id: int
-    idempotency_key: str
-    payout_method_id: int
+    payout_id: Optional[int]
+    idempotency_key: Optional[str]
+    payout_method_id: Optional[int]
     response: Optional[Json]
-    created_at: datetime
+    created_at: Optional[datetime]
     received_at: Optional[datetime]
-    updated_at: datetime
+    updated_at: Optional[datetime]
     stripe_payout_id: Optional[str]
     request: Optional[Json]
-    status: str
-    events: Optional[Json]
+    status: Optional[str]
+    events: Optional[Json[List[Dict]]]  # type: ignore
     stripe_account_id: Optional[str]
 
 
 class StripePayoutRequest(_StripePayoutRequestPartial):
-    id: Optional[int]  # server default generated
+    id: int
+    payout_id: int
+    idempotency_key: str
+    payout_method_id: int
+    created_at: datetime
+    updated_at: datetime
+    status: str
 
 
 class StripePayoutRequestCreate(_StripePayoutRequestPartial):
+    pass
+
+
+class StripePayoutRequestUpdate(_StripePayoutRequestPartial):
     pass

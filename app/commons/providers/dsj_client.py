@@ -2,6 +2,8 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 import aiohttp
 
+DEFAULT_HTTP_REQUEST_TIMEOUT = 10
+
 
 class DSJAuthException(Exception):
     pass
@@ -83,18 +85,25 @@ class DSJClient:
         # return the token
         return self.auth_jwt_local_state["token"]
 
-    async def get(self, uri: str, params: Dict[str, str]) -> Dict[str, Any]:
+    async def get(
+        self,
+        uri: str,
+        params: Dict[str, str],
+        timeout_sec: int = DEFAULT_HTTP_REQUEST_TIMEOUT,
+    ) -> Dict[str, Any]:
         """
         DSJ REST get method (wrap around aiohttp get)
 
         :param uri:
         :param params:
+        :param timeout_sec: default 10 seconds for the request session
         :return:
         """
 
         token = self.get_token()
         headers = {"Authorization": f"JWT {token}"}
-        async with aiohttp.ClientSession(headers=headers) as session:
+        timeout = aiohttp.ClientTimeout(total=timeout_sec)
+        async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
             async with session.get(self._dsj_uri(uri), params=params) as resp:
                 if resp.status != 200:
                     # TODO: provide specific HTTP error handlers
@@ -103,18 +112,25 @@ class DSJClient:
                     )
                 return await resp.json()
 
-    async def post(self, uri: str, data: Dict[str, str]) -> Dict[str, Any]:
+    async def post(
+        self,
+        uri: str,
+        data: Dict[str, str],
+        timeout_sec: int = DEFAULT_HTTP_REQUEST_TIMEOUT,
+    ) -> Dict[str, Any]:
         """
         DSJ REST post method (wrap around aiohttp post)
 
         :param uri:
         :param data:
+        :param timeout_sec: default 10 seconds for the request session
         :return:
         """
 
         token = self.get_token()
         headers = {"Authorization": f"JWT {token}"}
-        async with aiohttp.ClientSession(headers=headers) as session:
+        timeout = aiohttp.ClientTimeout(total=timeout_sec)
+        async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
             async with session.post(self._dsj_uri(uri), data=data) as resp:
                 if resp.status != 200:
                     # TODO: provide specific HTTP error handlers

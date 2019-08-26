@@ -30,11 +30,11 @@ from app.payout.repository.maindb.model.transfer import (
 )
 
 # from app.payout.repository.bankdb.model.payout import Payout, PayoutTable, PayoutCreate
-from app.payout.repository.bankdb.model.stripe_payout_request import (
-    StripePayoutRequest,
-    StripePayoutRequestTable,
-    StripePayoutRequestCreate,
-)
+# from app.payout.repository.bankdb.model.stripe_payout_request import (
+#     StripePayoutRequest,
+#     StripePayoutRequestTable,
+#     StripePayoutRequestCreate,
+# )
 
 test_db_entity_and_table_definition_data = [
     (PaymentAccount, PaymentAccountTable),
@@ -51,8 +51,8 @@ test_db_entity_and_table_definition_data = [
     (StripeTransferUpdate, StripeTransferTable),
     # (Payout, PayoutTable),
     # (PayoutCreate, PayoutTable),
-    (StripePayoutRequest, StripePayoutRequestTable),
-    (StripePayoutRequestCreate, StripePayoutRequestTable),
+    # (StripePayoutRequest, StripePayoutRequestTable),
+    # (StripePayoutRequestCreate, StripePayoutRequestTable),
 ]
 
 
