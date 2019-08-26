@@ -12,6 +12,7 @@ ledger_error_message_maps = {
     "ledger_4": "Cannot process mx_ledger from OPEN to PROCESSING",
     "ledger_10": "Cannot found mx_scheduled_ledger with given id, please verify your input.",
     "ledger_20": "Error encountered while inserting mx_txn, please verify your input.",
+    "ledger_21": "OperationalError encountered while inserting mx_txn.",
 }
 
 
@@ -22,6 +23,7 @@ class LedgerErrorCode(str, Enum):
     MX_LEDGER_PROCESS_ERROR = "ledger_4"
     MX_SCHEDULED_LEDGER_NOT_FOUND = "ledger_10"
     MX_TXN_CREATE_ERROR = "ledger_20"
+    MX_TXN_OPERATIONAL_ERROR = "ledger_21"
 
 
 class LedgerError(PaymentError):
@@ -56,6 +58,10 @@ class MxLedgerProcessError(PaymentError):
 
 
 class MxLedgerReadError(PaymentError):
+    pass
+
+
+class MxLedgerLockError(PaymentError):
     pass
 
 

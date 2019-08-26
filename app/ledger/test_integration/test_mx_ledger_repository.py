@@ -2,6 +2,7 @@ import uuid
 
 import psycopg2
 import pytest
+from psycopg2 import errorcodes
 
 from app.commons.types import CurrencyType
 from app.ledger.core.types import MxLedgerStateType, MxLedgerType, MxTransactionType
@@ -54,8 +55,9 @@ class TestMxLedgerRepository:
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
-        with pytest.raises(psycopg2.IntegrityError):
+        with pytest.raises(psycopg2.IntegrityError) as e:
             await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
+        assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
 
     async def test_update_mx_ledger_balance_success(
         self, mx_ledger_repository: MxLedgerRepository

@@ -20,6 +20,7 @@ from app.ledger.core.exceptions import (
     MxTransactionCreationError,
     LedgerErrorCode,
     ledger_error_message_maps,
+    MxLedgerLockError,
 )
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.types import (
@@ -174,7 +175,7 @@ class MxTransactionProcessor:
 
     @retry(
         # TODO need to be revised to retry on actual error code LOCK_NOT_AVAILABLE @yu.qu
-        retry=retry_if_exception_type(OperationalError),
+        retry=retry_if_exception_type(MxLedgerLockError),
         stop=stop_after_attempt(5),
         wait=wait_fixed(0.3),
     )
@@ -198,11 +199,26 @@ class MxTransactionProcessor:
             )
         except OperationalError as e:
             if e.pgcode != LOCK_NOT_AVAILABLE:
-                raise
+                self.log.error(
+                    f"[insert_mx_transaction_and_update_ledger] OperationalError caught while inserting mx_transaction and updating ledger, {e}"
+                )
+                raise MxTransactionCreationError(
+                    error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR,
+                    error_message=ledger_error_message_maps[
+                        LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR.value
+                    ],
+                    retryable=True,
+                )
             self.log.warn(
                 f"[insert_mx_transaction_and_update_ledger] Cannot obtain lock while updating ledger {ledger_id} balance {e}"
             )
-            raise e
+            raise MxLedgerLockError(
+                error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
+                error_message=ledger_error_message_maps[
+                    LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
+                ],
+                retryable=True,
+            )
         except Exception as e:
             self.log.error(
                 f"[insert_mx_transaction_and_update_ledger] Exception caught while updating ledger {ledger_id} balance {e}"

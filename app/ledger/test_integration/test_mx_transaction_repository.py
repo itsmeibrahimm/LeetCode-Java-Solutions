@@ -107,7 +107,7 @@ class TestMxTransactionRepository:
             await mx_transaction_repository.insert_mx_transaction(
                 mx_transaction_to_insert
             )
-            assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
+        assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
 
     async def test_create_ledger_and_insert_mx_transaction_success(
         self,
@@ -160,7 +160,7 @@ class TestMxTransactionRepository:
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
-        # test raise UniqueViolationError if insert mx_scheduled_ledger failed due to duplicate [payment_account_id, start_time, end_time, closed_at]
+        # test raise error if insert mx_scheduled_ledger failed due to duplicate [payment_account_id, start_time, end_time, closed_at]
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
         interval_type = MxScheduledLedgerIntervalType.WEEKLY
@@ -203,10 +203,11 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        with pytest.raises(psycopg2.IntegrityError):
+        with pytest.raises(psycopg2.IntegrityError) as e:
             await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                 request_input, mx_scheduled_ledger_repository
             )
+        assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
 
     async def test_insert_mx_transaction_and_update_ledger_success(
         self,
