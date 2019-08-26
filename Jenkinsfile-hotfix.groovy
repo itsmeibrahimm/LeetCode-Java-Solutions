@@ -36,6 +36,7 @@ pipeline {
       steps {
         script {
           runningStage = env.STAGE_NAME
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
           common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
         }
         artifactoryLogin()
@@ -55,7 +56,6 @@ pipeline {
            * version of that code that doesn't match the params['SHA'] value.
            */
           env.tag = getImmutableReleaseSemverTag(params['SHA'])
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
         }
       }
     }
