@@ -529,7 +529,7 @@ def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status, mentionC
     def slackChannel = getCDSlackChannel()
     def serviceName = getServiceName()
     mention = mentionChannel ? "@here" : ""
-    slack.notifySlackChannel("${mention}[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
+    slack.notifySlackChannel("${mention} [${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
 }
 
 return this
