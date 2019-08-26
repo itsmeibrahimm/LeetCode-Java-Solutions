@@ -111,12 +111,11 @@ class MxTransactionProcessor:
             get_mx_ledger_request = GetMxLedgerByAccountInput(
                 payment_account_id=payment_account_id
             )
-            mx_ledger = await self.mx_ledger_repo.get_open_ledger_for_payment_account(
+            mx_scheduled_ledger = await self.mx_scheduled_ledger_repo.get_open_mx_scheduled_ledger_for_payment_account(
                 get_mx_ledger_request
             )
-            mx_ledger_id = mx_ledger.id if mx_ledger else None
             # if not found, create new mx_scheduled_ledger and mx_ledger
-            if not mx_ledger:
+            if not mx_scheduled_ledger:
                 try:
                     created_mx_txn = await self.mx_transaction_repo.create_ledger_and_insert_mx_transaction(
                         request_input, self.mx_scheduled_ledger_repo
@@ -153,6 +152,8 @@ class MxTransactionProcessor:
                         f"[create_ledger_and_insert_mx_transaction] Exception caught while inserting mx transaction and creating ledger, {e}"
                     )
                     raise e
+            else:
+                mx_ledger_id = mx_scheduled_ledger.ledger_id
 
         # create transaction attached and update balance with given mx_ledger_id
         assert mx_ledger_id  # no exceptions should be raised from the assertion

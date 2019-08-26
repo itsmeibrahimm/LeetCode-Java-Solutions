@@ -145,7 +145,6 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         row = await self.payment_database.master().fetch_one(stmt)
         return GetMxLedgerByIdOutput.from_row(row) if row else None
 
-    # todo: PAY-3469: update this to select from existing mx_ledger after closed_at field is added to mx_scheduled_ledger table, order by (end_time, start_time)
     async def get_open_ledger_for_payment_account(
         self, request: GetMxLedgerByAccountInput
     ) -> Optional[GetMxLedgerByAccountOutput]:

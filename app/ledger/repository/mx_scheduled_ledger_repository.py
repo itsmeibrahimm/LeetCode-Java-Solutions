@@ -14,6 +14,7 @@ from app.ledger.core.data_types import (
     InsertMxScheduledLedgerOutput,
     GetMxScheduledLedgerInput,
     GetMxScheduledLedgerOutput,
+    GetMxLedgerByAccountInput,
 )
 from app.ledger.core.types import MxScheduledLedgerIntervalType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_scheduled_ledgers, mx_ledgers
@@ -73,6 +74,32 @@ class MxScheduledLedgerRepository(
                 ),
                 mx_ledgers.state == MxLedgerStateType.OPEN,
                 mx_ledgers.table.c.id == mx_scheduled_ledgers.ledger_id,
+            )
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return GetMxScheduledLedgerOutput.from_row(row) if row else None
+
+    async def get_open_mx_scheduled_ledger_for_payment_account(
+        self, request: GetMxLedgerByAccountInput
+    ) -> Optional[GetMxScheduledLedgerOutput]:
+        """
+        Get the first mx_scheduled_ledger with given payment_account_id and also 0 for closed_at value, and order by
+        (end_time, start_time)
+        :param request: GetMxLedgerByAccountInput
+        :return: GetMxScheduledLedgerOutput
+        """
+        stmt = (
+            mx_scheduled_ledgers.table.select()
+            .where(
+                and_(
+                    mx_scheduled_ledgers.payment_account_id
+                    == request.payment_account_id,
+                    mx_scheduled_ledgers.closed_at == 0,
+                )
+            )
+            .order_by(
+                mx_scheduled_ledgers.end_time.asc(),
+                mx_scheduled_ledgers.start_time.asc(),
             )
         )
         row = await self.payment_database.master().fetch_one(stmt)

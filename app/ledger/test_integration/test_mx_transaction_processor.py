@@ -113,7 +113,7 @@ class TestMxTransactionProcessor:
         assert mx_ledger is not None
         assert mx_ledger.balance == 4000
 
-    async def test_get_open_mx_ledger_success(
+    async def test_get_open_multi_mx_scheduled_ledger_success(
         self,
         mocker: pytest_mock.MockFixture,
         mx_ledger_repository: MxLedgerRepository,
@@ -130,7 +130,7 @@ class TestMxTransactionProcessor:
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
+            closed_at=1566606165000,
             start_time=datetime(2019, 7, 29, 7),
             end_time=datetime(2019, 8, 5, 7),
         )
@@ -142,21 +142,55 @@ class TestMxTransactionProcessor:
             balance=2000,
             payment_account_id=payment_account_id,
         )
-        ledger_id_correct = uuid.uuid4()
-        ledger_to_insert_correct = InsertMxLedgerInput(
-            id=ledger_id_correct,
+        ledger_id_1 = uuid.uuid4()
+        ledger_to_insert_1 = InsertMxLedgerInput(
+            id=ledger_id_1,
             type=MxLedgerType.SCHEDULED.value,
             currency=CurrencyType.USD.value,
             state=MxLedgerStateType.OPEN.value,
             balance=2000,
             payment_account_id=payment_account_id,
         )
+        mx_scheduled_ledger_to_insert_1 = InsertMxScheduledLedgerInput(
+            id=ledger_id_1,
+            payment_account_id=payment_account_id,
+            ledger_id=ledger_id_1,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
+            start_time=datetime(2019, 8, 12, 7),
+            end_time=datetime(2019, 8, 19, 7),
+        )
+        ledger_id_2 = uuid.uuid4()
+        ledger_to_insert_2 = InsertMxLedgerInput(
+            id=ledger_id_2,
+            type=MxLedgerType.SCHEDULED.value,
+            currency=CurrencyType.USD.value,
+            state=MxLedgerStateType.OPEN.value,
+            balance=2000,
+            payment_account_id=payment_account_id,
+        )
+        mx_scheduled_ledger_to_insert_2 = InsertMxScheduledLedgerInput(
+            id=ledger_id_2,
+            payment_account_id=payment_account_id,
+            ledger_id=ledger_id_2,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            closed_at=0,
+            start_time=datetime(2019, 8, 5, 7),
+            end_time=datetime(2019, 8, 12, 7),
+        )
 
         await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
-        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert_correct)
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert_1)
+        await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
+            mx_scheduled_ledger_to_insert_1
+        )
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert_2)
+        await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
+            mx_scheduled_ledger_to_insert_2
+        )
         mx_transaction_processor = MxTransactionProcessor(
             mx_transaction_repo=mx_transaction_repository,
             mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
@@ -173,13 +207,13 @@ class TestMxTransactionProcessor:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
         assert mx_transaction is not None
-        assert mx_transaction.ledger_id == ledger_id_correct
+        assert mx_transaction.ledger_id == ledger_id_2
         assert mx_transaction.currency == CurrencyType.USD
         assert mx_transaction.routing_key == routing_key
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
-        get_mx_ledger_request = GetMxLedgerByIdInput(id=ledger_to_insert_correct.id)
+        get_mx_ledger_request = GetMxLedgerByIdInput(id=ledger_to_insert_2.id)
         mx_ledger = await mx_ledger_repository.get_ledger_by_id(get_mx_ledger_request)
         assert mx_ledger is not None
         assert mx_ledger.balance == 4000
@@ -307,12 +341,12 @@ class TestMxTransactionProcessor:
             return next(values_for_get_open_mx_scheduled_ledger_for_period)
 
         @asyncio.coroutine
-        def mock_get_open_ledger_for_payment_account(*args):
+        def mock_get_open_mx_scheduled_ledger_for_payment_account(*args):
             return None
 
         # To trigger a UniqueViolationError in MxTransactionProcessor.create(), we have to insert a mx_scheduled_ledger
-        # first, and mock get_open_mx_scheduled_ledger_for_period and get_open_ledger_for_payment_account as None to
-        # simulate the concurrent mx_scheduled_ledger creations.
+        # first, and mock get_open_mx_scheduled_ledger_for_period and get_open_mx_scheduled_ledger_for_payment_account
+        # as None to simulate the concurrent mx_scheduled_ledger creations.
         # In the error handling of UniqueViolationError, get_open_mx_scheduled_ledger_for_period is called again, since
         # the same mx_scheduled_ledger is already created. We mock the second get_open_mx_scheduled_ledger_for_period
         # call to return the inserted_mx_scheduled_ledger.
@@ -321,8 +355,8 @@ class TestMxTransactionProcessor:
             side_effect=mock_get_open_mx_scheduled_ledger_for_period_results,
         )
         mocker.patch(
-            "app.ledger.repository.mx_ledger_repository.MxLedgerRepository.get_open_ledger_for_payment_account",
-            side_effect=mock_get_open_ledger_for_payment_account,
+            "app.ledger.repository.mx_scheduled_ledger_repository.MxScheduledLedgerRepository.get_open_mx_scheduled_ledger_for_payment_account",
+            side_effect=mock_get_open_mx_scheduled_ledger_for_payment_account,
         )
 
         mx_transaction_processor = MxTransactionProcessor(
