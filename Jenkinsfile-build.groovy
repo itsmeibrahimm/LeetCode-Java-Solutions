@@ -59,7 +59,7 @@ pipeline {
           runningStage = env.STAGE_NAME
         }
         script {
-          common.tagPushRelease(env.tag, params['SHA'])
+          common.tagPushRelease(params['GITHUB_REPOSITORY'], params['SHA'], env.tag)
         }
       }
     }
