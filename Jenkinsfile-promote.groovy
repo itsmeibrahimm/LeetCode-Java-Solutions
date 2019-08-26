@@ -40,6 +40,7 @@ pipeline {
           runningStage = env.STAGE_NAME
           common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
         }
+        artifactoryLogin()
         script {
           /**
            * Beware: Github does not offer a way for us to "protect" git tags. Any
@@ -55,7 +56,6 @@ pipeline {
            * pushed" around. You could unknowingly end up building/deploying (etc) a
            * version of that code that doesn't match the params['SHA'] value.
            */
-          artifactoryLogin()
           env.tag = getImmutableReleaseSemverTag(params['SHA'])
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
         }
