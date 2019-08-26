@@ -55,6 +55,7 @@ class MxScheduledLedgerRepository(
     ) -> Optional[GetMxScheduledLedgerOutput]:
         """
         Get mx_scheduled_ledger with given payment_account_id, routing_key, interval_type and corresponding open mx ledger
+        Filter specific start_time and end_time to avoid multiple existing scheduled ledger with same start_time
         :param request: GetMxScheduledLedgerInput
         :return: GetMxScheduledLedgerOutput
         """
@@ -64,6 +65,10 @@ class MxScheduledLedgerRepository(
                 == request.payment_account_id,  # noqa: W503
                 mx_scheduled_ledgers.start_time
                 == self.pacific_start_time_for_current_interval(  # noqa: W503
+                    request.routing_key, request.interval_type
+                ),
+                mx_scheduled_ledgers.end_time
+                == self.pacific_end_time_for_current_interval(  # noqa: W503
                     request.routing_key, request.interval_type
                 ),
                 mx_ledgers.state == MxLedgerStateType.OPEN,
