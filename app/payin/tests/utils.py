@@ -27,17 +27,19 @@ class ContextMock(MagicMock):
 
 
 def generate_payment_intent(
-    cart_payment_id: uuid.UUID = uuid.uuid4(),
+    id: uuid.UUID = None,
+    cart_payment_id: uuid.UUID = None,
     status: str = "init",
+    amount: int = 500,
     capture_method: str = "manual",
     confirmation_method: str = "manual",
 ):
     return PaymentIntent(
-        id=uuid.uuid4(),
-        cart_payment_id=cart_payment_id,
+        id=id if id else uuid.uuid4(),
+        cart_payment_id=cart_payment_id if cart_payment_id else uuid.uuid4(),
         idempotency_key=str(uuid.uuid4()),
         amount_initiated=0,
-        amount=0,
+        amount=amount,
         amount_capturable=0,
         amount_received=0,
         application_fee_amount=0,
@@ -55,26 +57,30 @@ def generate_payment_intent(
 
 
 def generate_pgp_payment_intent(
-    payment_intent_id: uuid.UUID = uuid.uuid4(),
+    id: uuid.UUID = None,
+    payment_intent_id: uuid.UUID = None,
     status: str = "init",
+    amount: int = 500,
     capture_method: str = "manual",
+    resource_id: str = str(uuid.uuid4()),
+    charge_resource_id: str = "charge_resource_id",
 ) -> PgpPaymentIntent:
     return PgpPaymentIntent(
-        id=uuid.uuid4(),
-        payment_intent_id=payment_intent_id,
+        id=id if id else uuid.uuid4(),
+        payment_intent_id=payment_intent_id if payment_intent_id else uuid.uuid4(),
         idempotency_key=str(uuid.uuid4()),
-        provider="Stripe",
+        provider="stripe",
         resource_id=str(uuid.uuid4()),
         status=IntentStatus(status),
         invoice_resource_id=None,
         charge_resource_id="charge_resource_id",
         payment_method_resource_id=str(uuid.uuid4()),
         currency="USD",
-        amount=0,
+        amount=amount,
         amount_capturable=0,
         amount_received=0,
         application_fee_amount=0,
-        payout_account_id=str(uuid.uuid4()),
+        payout_account_id=None,
         capture_method=capture_method,
         confirmation_method="manual",
         created_at=datetime.now(),
@@ -85,12 +91,13 @@ def generate_pgp_payment_intent(
 
 
 def generate_cart_payment(
+    id: uuid.UUID = None,
     payer_id: str = str(uuid.uuid4()),
     payment_method_id: str = str(uuid.uuid4()),
     amount=500,
 ) -> CartPayment:
     return CartPayment(
-        id=uuid.uuid4(),
+        id=id if id else uuid.uuid4(),
         amount=amount,
         payer_id=payer_id,
         payment_method_id=payment_method_id,
@@ -104,6 +111,8 @@ def generate_cart_payment(
 def generate_payment_charge(
     payment_intent_id: uuid.UUID = uuid.uuid4(),
     status: ChargeStatus = ChargeStatus.REQUIRES_CAPTURE,
+    amount: int = 700,
+    amount_refunded=0,
 ) -> PaymentCharge:
     return PaymentCharge(
         id=uuid.uuid4(),
@@ -112,8 +121,8 @@ def generate_payment_charge(
         idempotency_key=str(uuid.uuid4()),
         status=status,
         currency="USD",
-        amount=700,
-        amount_refunded=0,
+        amount=amount,
+        amount_refunded=amount_refunded,
         application_fee_amount=None,
         payout_account_id=None,
         created_at=datetime.now(),
@@ -126,6 +135,8 @@ def generate_payment_charge(
 def generate_pgp_payment_charge(
     payment_charge_id: uuid.UUID = uuid.uuid4(),
     status: ChargeStatus = ChargeStatus.REQUIRES_CAPTURE,
+    amount: int = 700,
+    amount_refunded=0,
 ) -> PgpPaymentCharge:
     return PgpPaymentCharge(
         id=uuid.uuid4(),
@@ -134,8 +145,8 @@ def generate_pgp_payment_charge(
         idempotency_key=str(uuid.uuid4()),
         status=status,
         currency="USD",
-        amount=700,
-        amount_refunded=0,
+        amount=amount,
+        amount_refunded=amount_refunded,
         application_fee_amount=None,
         payout_account_id=None,
         resource_id="resource_id",
@@ -147,3 +158,34 @@ def generate_pgp_payment_charge(
         captured_at=None,
         cancelled_at=None,
     )
+
+
+def _generate_provider_charge(
+    payment_intent: PaymentIntent,
+    pgp_payment_intent: PgpPaymentIntent,
+    amount_refunded: int = 0,
+):
+    provider_charge = MagicMock()
+    provider_charge.currency = pgp_payment_intent.currency
+    provider_charge.amount = pgp_payment_intent.amount
+    provider_charge.amount_refunded = amount_refunded
+    provider_charge.application_fee_amount = pgp_payment_intent.application_fee_amount
+    provider_charge.on_behalf_of = pgp_payment_intent.payout_account_id
+    provider_charge.charge_id = str(uuid.uuid4())
+    provider_charge.payment_intent = pgp_payment_intent.resource_id
+    provider_charge.invoice = str(uuid.uuid4())
+    provider_charge.payment_method = str(uuid.uuid4())
+    return provider_charge
+
+
+def generate_provider_charges(
+    payment_intent: PaymentIntent,
+    pgp_payment_intent: PgpPaymentIntent,
+    amount_refunded: int = 0,
+):
+    charges = MagicMock()
+    charges.data = [
+        _generate_provider_charge(payment_intent, pgp_payment_intent, amount_refunded)
+    ]
+
+    return charges

@@ -168,14 +168,18 @@ class CartPaymentRepository(PayinDBRepository):
             cancelled_at=row[payment_intents.cancelled_at],
         )
 
-    async def update_payment_intent_status(self, id: UUID, status: str) -> None:
+    async def update_payment_intent_status(
+        self, id: UUID, status: str
+    ) -> PaymentIntent:
         statement = (
             payment_intents.table.update()
             .where(payment_intents.id == id)
             .values(status=status)
+            .returning(*payment_intents.table.columns.values())
         )
 
-        await self.payment_database.master().execute(statement)
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_payment_intent(row)
 
     async def update_payment_intent_amount(
         self, id: UUID, amount: int
@@ -256,7 +260,7 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def update_pgp_payment_intent(
         self, id: UUID, status: str, resource_id: str, charge_resource_id: str
-    ) -> None:
+    ) -> PgpPaymentIntent:
         statement = (
             pgp_payment_intents.table.update()
             .where(pgp_payment_intents.id == id)
@@ -265,9 +269,11 @@ class CartPaymentRepository(PayinDBRepository):
                 resource_id=resource_id,
                 charge_resource_id=charge_resource_id,
             )
+            .returning(*pgp_payment_intents.table.columns.values())
         )
 
-        await self.payment_database.master().execute(statement)
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_payment_intent(row)
 
     async def update_pgp_payment_intent_status(
         self, id: UUID, status: str

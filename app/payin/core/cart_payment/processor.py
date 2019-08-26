@@ -240,7 +240,7 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
-    ) -> None:
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         # Call out to provider to create the payment intent in their system.  The payment_intent
         # instance includes the idempotency_key, which is passed to provider to ensure records already
         # submitted are actually processed only once.
@@ -257,10 +257,10 @@ class CartPaymentInterface:
         async with self.payment_repo.payment_database_transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
-            await self.payment_repo.update_payment_intent_status(
+            updated_intent = await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
             )
-            await self.payment_repo.update_pgp_payment_intent(
+            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
                 id=pgp_payment_intent.id,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 resource_id=provider_payment_intent.id,
@@ -275,6 +275,8 @@ class CartPaymentInterface:
         # Depending on configuration, submitting payment to provider may require immediate capture.
         if self._is_capture_immediate(payment_intent):
             await self.capture_payment(payment_intent)
+
+        return updated_intent, updated_pgp_intent
 
     async def _update_charge_pair_after_capture(
         self,
@@ -700,7 +702,7 @@ class CartPaymentInterface:
 
     async def _cancel_intent(
         self, payment_intent: PaymentIntent, pgp_payment_intents: List[PgpPaymentIntent]
-    ):
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         self.req_context.log.info(f"Cancelling payment intent {payment_intent.id}")
         # TODO handle case where there are multiple pgp intents
         pgp_payment_intent = pgp_payment_intents[0]
@@ -711,18 +713,17 @@ class CartPaymentInterface:
         )
 
         async with self.payment_repo.payment_database_transaction():
-            await self.payment_repo.update_payment_intent_status(
+            updated_intent = await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id, status=IntentStatus.CANCELLED
             )
-            await self.payment_repo.update_pgp_payment_intent_status(
-                id=pgp_payment_intent.id, status=IntentStatus.CANCELLED
-            )
-            await self.payment_repo.update_pgp_payment_intent_status(
+            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_status(
                 id=pgp_payment_intent.id, status=IntentStatus.CANCELLED
             )
             await self._update_charge_pair_after_cancel(
                 payment_intent=payment_intent, status=ChargeStatus.CANCELLED
             )
+
+        return updated_intent, updated_pgp_intent
 
     async def _refund_intent(
         self,
@@ -832,11 +833,9 @@ class CartPaymentInterface:
             pgp_intent.payment_method_resource_id,
             PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
         )
-        await self._submit_payment_to_provider(
+        return await self._submit_payment_to_provider(
             payment_intent, pgp_intent, payment_resource_id, customer_resource_id
         )
-
-        return payment_intent, pgp_intent
 
     async def _submit_amount_increase_to_cart_payment(
         self,
@@ -888,14 +887,12 @@ class CartPaymentInterface:
                 f"Created intent pair {payment_intent_for_submit.id}, {pgp_intent_for_submit.id}"
             )
 
-        await self._submit_payment_to_provider(
+        return await self._submit_payment_to_provider(
             payment_intent_for_submit,
             pgp_intent_for_submit,
             payment_resource_id,
             customer_resource_id,
         )
-
-        return payment_intent_for_submit, pgp_intent_for_submit
 
     async def _add_amount_to_cart_payment(
         self,
@@ -969,7 +966,7 @@ class CartPaymentInterface:
 
     async def _submit_amount_decrease_to_cart_payment(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent, amount: int
-    ):
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         # TODO handle case where there are multiple pgp intents
         pgp_payment_intents = await self.payment_repo.find_pgp_payment_intents(
             payment_intent.id

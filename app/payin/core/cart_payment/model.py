@@ -54,15 +54,15 @@ class PaymentIntent:
     idempotency_key: str
     amount_initiated: int
     amount: int
-    amount_capturable: int
-    amount_received: int
-    application_fee_amount: int
+    amount_capturable: Optional[int]  # TODO fix use of this field
+    amount_received: Optional[int]
+    application_fee_amount: Optional[int]
     capture_method: str
     confirmation_method: str
     country: str
     currency: str
     status: IntentStatus
-    statement_descriptor: str
+    statement_descriptor: Optional[str]
     created_at: datetime
     updated_at: datetime
     captured_at: Optional[datetime]
@@ -76,15 +76,15 @@ class PgpPaymentIntent:
     payment_intent_id: UUID
     idempotency_key: str
     provider: str
-    resource_id: str
+    resource_id: Optional[str]
     status: IntentStatus
     invoice_resource_id: Optional[str]
     charge_resource_id: Optional[str]
     payment_method_resource_id: str
     currency: str
     amount: int
-    amount_capturable: int
-    amount_received: int
+    amount_capturable: Optional[int]
+    amount_received: Optional[int]
     application_fee_amount: Optional[int]
     payout_account_id: Optional[str]
     capture_method: str
