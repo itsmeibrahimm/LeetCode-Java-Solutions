@@ -131,10 +131,14 @@ pipeline {
       }
     }
     failure {
-      common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "failure", true)
+      script {
+        common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "failure", true)
+      }
     }
     success {
-      common.notifySlackChannelDeploymentStatus("Successful Build Release", params['SHA'], "${env.BUILD_NUMBER}", "success", false)
+      script {
+        common.notifySlackChannelDeploymentStatus("Successful Build Release", params['SHA'], "${env.BUILD_NUMBER}", "success", false)
+      }
     }
   }
 }
