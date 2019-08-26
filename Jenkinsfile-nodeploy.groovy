@@ -1,4 +1,4 @@
-@Library('common-pipelines@10.12.0') _
+@Library('common-pipelines@10.16.0') _
 
 // -----------------------------------------------------------------------------------
 // The following params are automatically provided by the callback gateway as inputs
@@ -36,7 +36,7 @@ pipeline {
       steps {
         artifactoryLogin()
         script {
-          common.buildTagPush(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName())
+          common.buildTagPushNoRelease(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName())
         }
       }
     }

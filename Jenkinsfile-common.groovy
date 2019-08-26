@@ -71,7 +71,7 @@ def getDockerImageUrl() {
  * <li>env.FURY_TOKEN = Gemfury Token to install Python packages
  * </ul>
  */
-def buildTagPush(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName) {
+def buildTagPushNoRelease(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName) {
   Map o = [
           dockerDoorctlVersion: 'v0.0.118',
           dockerImageUrl      : getDockerImageUrl()
@@ -112,24 +112,46 @@ def buildTagPush(Map optArgs = [:], String gitUrl, String sha, String branch, St
               | CACHE_FROM=${cacheFromValue}
               |""".stripMargin()
       }
-    }, gitUrl, sha, "Docker Build Tag Push", "${BUILD_URL}testReport")
+    }, gitUrl, sha, "Docker Build Tag Push - [NoRelease]", "${BUILD_URL}testReport")
   }
 }
 
 /**
+ * Tag and Push a docker image with releaseTag
+ */
+def tagPushRelease(String releaseTag) {
+
+  github.doClosureWithStatus({
+      withCredentials([
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS_URLENCODED', variable: 'ARTIFACTORY_PASSWORD'),
+        string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
+      ]) {
+        sh """|#!/bin/bash
+              |set -ex
+              |
+              |make release-tag release-push \\
+              | RELEASE_TAG=${releaseTag}
+              |""".stripMargin()
+      }
+    }, gitUrl, sha, "Docker Tag Push - [Release]", "${BUILD_URL}testReport")
+}
+
+
+/**
  * Runs a local container useful to run CI tests on
  */
-def runCIcontainer(String serviceName, String sha) {
+def runCIcontainer(String serviceName, String tag) {
   def dockerImageUrl = getDockerImageUrl()
   github.doClosureWithStatus({
     sh """|#!/bin/bash
           |set -eox
           |docker rm ${serviceName}-ci || true
           |make run-ci-container \\
-          |    CI_BASE_IMAGE="${dockerImageUrl}:${sha}" \\
+          |    CI_BASE_IMAGE="${dockerImageUrl}:${tag}" \\
           |    CI_CONTAINER_NAME="${serviceName}-ci"
           |""".stripMargin()
-  }, gitUrl, sha, "Unit Tests", "${BUILD_URL}testReport")
+  }, gitUrl, tag, "Unit Tests", "${BUILD_URL}testReport")
 }
 
 
@@ -339,7 +361,7 @@ def runHooks(String serviceName) {
 /**
  * Deploy a Microservice using Helm.
  */
-def deployHelm(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName, String env) {
+def deployHelm(Map optArgs = [:], String tag, String serviceName, String env) {
   Map o = [
           helmCommand: 'upgrade',
           helmFlags: '--install',
@@ -359,7 +381,7 @@ def deployHelm(Map optArgs = [:], String gitUrl, String sha, String branch, Stri
       |# working together with k8s readiness probe to prevent uninitialized pod serving traffic
       |helm="docker run --rm -v ${k8sCredsFile}:/root/.kube/config -v ${WORKSPACE}:/apps alpine/helm:2.10.0"
       |HELM_OPTIONS="${o.helmCommand} ${o.helmRelease} ${o.helmChartPath} \\
-      | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${sha} --set cron.tag=${sha} ${o.helmFlags} \\
+      | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${tag} --set cron.tag=${tag} ${o.helmFlags} \\
       | --tiller-namespace ${o.tillerNamespace} --namespace ${o.k8sNamespace} \\
       | --wait --timeout ${o.timeoutSeconds}"
       |
@@ -501,10 +523,11 @@ def inputCanDeployToProd() {
  * Notification utilities
  */
 
-def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status) {
+def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status, mentionChannel = false) {
     def slackChannel = getCDSlackChannel()
     def serviceName = getServiceName()
-    slack.notifySlackChannel("[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
+    mention = mentionChannel ? "@here" : ""
+    slack.notifySlackChannel("${mention}[${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
 }
 
 return this

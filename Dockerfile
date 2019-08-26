@@ -62,3 +62,6 @@ CMD ["gunicorn", "--worker-tmp-dir", "/tmpfs", "-k", "uvicorn.workers.UvicornWor
 
 ARG BUILD_NUMBER=unknown
 ENV BUILD_NUMBER ${BUILD_NUMBER}
+
+ARG RELEASE_TAG=unknown
+ENV RELEASE_TAG ${RELEASE_TAG}

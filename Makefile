@@ -43,13 +43,33 @@ run-ci-container: build-ci-container
 	CI_CONTAINER_NAME="$(CI_CONTAINER_NAME)" \
 	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate --renew-anon-volumes
 
+
+.PHONY: release-tag
+release-tag:
+ifdef RELEASE_TAG
+	docker tag $(SERVICE_NAME):$(LOCAL_TAG) $(DOCKER_IMAGE_URL):$(RELEASE_TAG)
+else
+	echo "RELEASE_TAG not defined!"
+endif
+
+.PHONY: release-push
+release-push:
+ifdef RELEASE_TAG
+	docker push $(DOCKER_IMAGE_URL):$(RELEASE_TAG)
+else
+	echo "RELEASE_TAG not defined!"
+endif
+
+
 .PHONY: tag
 tag:
 	$(doorctl) tag --repourl $(DOCKER_IMAGE_URL) --localimage $(SERVICE_NAME):$(LOCAL_TAG) --sha $(SHA) --branch $(branch)
 
+
 .PHONY: push
 push:
 	$(doorctl) push --repourl $(DOCKER_IMAGE_URL) --localimage $(SERVICE_NAME):$(LOCAL_TAG) --sha $(SHA) --branch $(branch)
+
 
 .PHONY: sync-pipenv
 sync-pipenv:

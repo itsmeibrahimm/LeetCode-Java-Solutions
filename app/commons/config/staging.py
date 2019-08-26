@@ -44,6 +44,6 @@ def create_app_config() -> AppConfig:
         SENTRY_CONFIG=SentryConfig(
             dsn=Secret(name="sentry_dsn"),
             environment="staging",
-            release=f"payment-service@build-{os.getenv('BUILD_NUMBER')}",
+            release=f"payment-service@build-{os.getenv('BUILD_NUMBER')}-release-{os.getenv('RELEASE_TAG')}",
         ),
     )
