@@ -1,5 +1,6 @@
 @Library('common-pipelines@10.16.0') _
 
+import groovy.transform.Field
 /**
  * Expected inputs:
  * ----------------
