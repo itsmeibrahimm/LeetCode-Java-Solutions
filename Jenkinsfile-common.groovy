@@ -142,17 +142,18 @@ def tagPushRelease(String gitUrl, String sha, String releaseTag) {
 /**
  * Runs a local container useful to run CI tests on
  */
-def runCIcontainer(String serviceName, String tag) {
+def runCIcontainer(String serviceName, String sha, String releaseTag = null) {
   def dockerImageUrl = getDockerImageUrl()
+  def imageTag = releaseTag ?: sha
   github.doClosureWithStatus({
     sh """|#!/bin/bash
           |set -eox
           |docker rm ${serviceName}-ci || true
           |make run-ci-container \\
-          |    CI_BASE_IMAGE="${dockerImageUrl}:${tag}" \\
+          |    CI_BASE_IMAGE="${dockerImageUrl}:${imageTag}" \\
           |    CI_CONTAINER_NAME="${serviceName}-ci"
           |""".stripMargin()
-  }, gitUrl, tag, "Unit Tests", "${BUILD_URL}testReport")
+  }, gitUrl, sha, "Unit Tests", "${BUILD_URL}testReport")
 }
 
 

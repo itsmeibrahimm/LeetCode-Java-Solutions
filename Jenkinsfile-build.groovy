@@ -69,7 +69,7 @@ pipeline {
           runningStage = env.STAGE_NAME
         }
         script {
-          common.runCIcontainer(common.getServiceName(), env.tag)
+          common.runCIcontainer(common.getServiceName(), params['SHA'], env.tag)
         }
       }
     }
