@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import and_
 
+from app.commons.database.client.aiopg import AioTransaction
 from app.ledger.core.data_types import (
     InsertMxLedgerInput,
     InsertMxLedgerOutput,
@@ -24,7 +25,11 @@ from app.ledger.core.data_types import (
     ProcessMxLedgerOutput,
 )
 from app.ledger.core.types import MxTransactionType, MxLedgerStateType
-from app.ledger.models.paymentdb import mx_ledgers, mx_transactions
+from app.ledger.models.paymentdb import (
+    mx_ledgers,
+    mx_transactions,
+    mx_scheduled_ledgers,
+)
 
 from app.ledger.repository.base import LedgerDBRepository
 
@@ -45,7 +50,7 @@ class MxLedgerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def process_mx_ledger_state(
+    async def process_mx_ledger_state_and_close_schedule_ledger(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
         ...
@@ -98,18 +103,40 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         assert row
         return UpdateMxLedgerOutput.from_row(row)
 
-    async def process_mx_ledger_state(
+    async def process_mx_ledger_state_and_close_schedule_ledger(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
-        stmt = (
-            mx_ledgers.table.update()
-            .where(mx_ledgers.id == request.id)
-            .values(state=MxLedgerStateType.PROCESSING)
-            .returning(*mx_ledgers.table.columns.values())
-        )
-        row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        return ProcessMxLedgerOutput.from_row(row)
+        async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
+            connection = tx.connection()
+            try:
+                # update ledger state to PROCESSING
+                ledger_stmt = (
+                    mx_ledgers.table.update()
+                    .where(mx_ledgers.id == request.id)
+                    .values(state=MxLedgerStateType.PROCESSING)
+                    .returning(*mx_ledgers.table.columns.values())
+                )
+                ledger_row = await connection.fetch_one(ledger_stmt)
+                assert ledger_row
+            except Exception as e:
+                raise e
+            try:
+                # update scheduled_ledger closed_at only when it is 0
+                scheduled_ledger_stmt = (
+                    mx_scheduled_ledgers.table.update()
+                    .where(
+                        and_(
+                            mx_scheduled_ledgers.ledger_id == request.id,
+                            mx_scheduled_ledgers.closed_at == 0,
+                        )
+                    )
+                    .values(closed_at=datetime.utcnow().microsecond)
+                    .returning(*mx_scheduled_ledgers.table.columns.values())
+                )
+                await connection.fetch_one(scheduled_ledger_stmt)
+            except Exception as e:
+                raise e
+        return ProcessMxLedgerOutput.from_row(ledger_row)
 
     async def get_ledger_by_id(
         self, request: GetMxLedgerByIdInput

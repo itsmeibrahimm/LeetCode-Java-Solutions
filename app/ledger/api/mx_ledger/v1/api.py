@@ -8,10 +8,19 @@ from app.commons.error.errors import (
     create_payment_error_response_blob,
     PaymentErrorResponseBody,
 )
-from app.ledger.core.exceptions import MxLedgerProcessError
+from app.ledger.core.exceptions import (
+    MxLedgerProcessError,
+    MxLedgerReadError,
+    MxLedgerInvalidProcessStateError,
+)
 from app.ledger.core.mx_ledger.model import MxLedger
 
-from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_200_OK
+from starlette.status import (
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_200_OK,
+    HTTP_404_NOT_FOUND,
+    HTTP_400_BAD_REQUEST,
+)
 
 from app.ledger.core.mx_ledger.processor import MxLedgerProcessor
 
@@ -26,9 +35,9 @@ def create_mx_ledgers_router() -> APIRouter:
         mx_ledger_processor: MxLedgerProcessor = Depends(MxLedgerProcessor),
     ):
         """
-        Move mx_ledger from OPEN to PROCESSING
+        Move mx_ledger to PROCESSING.
         """
-        log.debug(f"Moving mx_ledger {mx_ledger_id} from OPEN to PROCESSING")
+        log.debug(f"Moving mx_ledger {mx_ledger_id} to PROCESSING.")
 
         try:
             mx_ledger: MxLedger = await mx_ledger_processor.process(mx_ledger_id)
@@ -45,7 +54,31 @@ def create_mx_ledgers_router() -> APIRouter:
                     retryable=e.retryable,
                 ),
             )
-        log.info(f"Processed mx_ledger {mx_ledger.id} from OPEN to PROCESSING")
+        except MxLedgerReadError as e:
+            log.error(
+                f"[process mx_ledger] [{mx_ledger_id}] Cannot find mx_ledger with given id. {e}"
+            )
+            return create_payment_error_response_blob(
+                HTTP_404_NOT_FOUND,
+                PaymentErrorResponseBody(
+                    error_code=e.error_code,
+                    error_message=e.error_message,
+                    retryable=e.retryable,
+                ),
+            )
+        except MxLedgerInvalidProcessStateError as e:
+            log.error(
+                f"[process mx_ledger] [{mx_ledger_id}] Cannot process invalid mx_ledger state to PROCESSING {e}"
+            )
+            return create_payment_error_response_blob(
+                HTTP_400_BAD_REQUEST,
+                PaymentErrorResponseBody(
+                    error_code=e.error_code,
+                    error_message=e.error_message,
+                    retryable=e.retryable,
+                ),
+            )
+        log.info(f"Processed mx_ledger {mx_ledger.id} to PROCESSING.")
         return mx_ledger
 
     return router

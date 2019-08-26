@@ -5,6 +5,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from uuid import UUID
 
+from app.commons.database.client.aiopg import AioTransaction
 from app.ledger.core.data_types import (
     InsertMxTransactionInput,
     InsertMxTransactionOutput,
@@ -72,8 +73,8 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         request: InsertMxTransactionWithLedgerInput,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ) -> InsertMxTransactionOutput:
-        paymentdb_conn = self.payment_database.master()
-        async with paymentdb_conn.transaction():
+        async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
+            connection = tx.connection()
             try:
                 # construct mx_ledger and insert
                 mx_ledger_id = uuid.uuid4()
@@ -91,7 +92,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_ledger_to_insert.dict(skip_defaults=True))
                     .returning(*mx_ledgers.table.columns.values())
                 )
-                ledger_row = await paymentdb_conn.fetch_one(ledger_stmt)
+                ledger_row = await connection.fetch_one(ledger_stmt)
                 assert ledger_row
                 created_mx_ledger = InsertMxLedgerOutput.from_row(ledger_row)
             except Exception as e:
@@ -117,7 +118,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_scheduled_ledger_to_insert.dict(skip_defaults=True))
                     .returning(*mx_scheduled_ledgers.table.columns.values())
                 )
-                await paymentdb_conn.fetch_one(scheduled_ledger_stmt)
+                await connection.fetch_one(scheduled_ledger_stmt)
             except Exception as e:
                 raise e
             try:
@@ -141,22 +142,21 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_transaction_to_insert.dict(skip_defaults=True))
                     .returning(*mx_transactions.table.columns.values())
                 )
-                txn_row = await paymentdb_conn.fetch_one(txn_stmt)
+                txn_row = await connection.fetch_one(txn_stmt)
                 assert txn_row
                 mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
             except Exception as e:
                 raise e
         return mx_transaction
 
-    # todo: add error handling for ledger lock
     async def insert_mx_transaction_and_update_ledger(
         self,
         request: InsertMxTransactionWithLedgerInput,
         mx_ledger_repository: MxLedgerRepository,
         mx_ledger_id: UUID,
     ) -> InsertMxTransactionOutput:
-        paymentdb_conn = await self.payment_database.master().acquire()
-        async with paymentdb_conn.transaction():
+        async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
+            connection = tx.connection()
             try:
                 # Lock the row for updating the balance
                 stmt = (
@@ -164,7 +164,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .where(mx_ledgers.id == mx_ledger_id)
                     .with_for_update(nowait=True)
                 )
-                row = await paymentdb_conn.fetch_one(stmt)
+                row = await connection.fetch_one(stmt)
                 assert row
                 mx_ledger = GetMxLedgerByIdOutput.from_row(row)
             except Exception as e:
@@ -179,7 +179,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(request_balance.dict(skip_defaults=True))
                     .returning(*mx_ledgers.table.columns.values())
                 )
-                await paymentdb_conn.fetch_one(stmt)
+                await connection.fetch_one(stmt)
             except Exception as e:
                 raise e
             try:
@@ -203,7 +203,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     .values(mx_transaction_to_insert.dict(skip_defaults=True))
                     .returning(*mx_transactions.table.columns.values())
                 )
-                txn_row = await paymentdb_conn.fetch_one(txn_stmt)
+                txn_row = await connection.fetch_one(txn_stmt)
                 assert txn_row
                 mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
             except Exception as e:
