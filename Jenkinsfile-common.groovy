@@ -528,7 +528,7 @@ def inputCanDeployToProd() {
 def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status, mentionChannel = false) {
     def slackChannel = getCDSlackChannel()
     def serviceName = getServiceName()
-    mention = mentionChannel ? "@here," : ""
+    mention = mentionChannel ? "<!here>" : ""
     slack.notifySlackChannel("${mention} [${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
 }
 
