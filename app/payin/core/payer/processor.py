@@ -95,7 +95,7 @@ class PayerClient:
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
-        if payer_type == PayerType.MARKETPLACE.value:
+        if payer_type == PayerType.MARKETPLACE:
             payer_interface = PayerOps(self.log, self.payer_repo)
         else:
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
@@ -118,13 +118,13 @@ class PayerClient:
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
         if not payer_id_type or payer_id_type in (
-            PayerIdType.DD_PAYMENT_PAYER_ID.value,
-            PayerIdType.DD_CONSUMER_ID.value,
+            PayerIdType.DD_PAYMENT_PAYER_ID,
+            PayerIdType.DD_CONSUMER_ID,
         ):
             payer_interface = PayerOps(self.log, self.payer_repo)
         elif payer_id_type in (
-            PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
-            PayerIdType.STRIPE_CUSTOMER_ID.value,
+            PayerIdType.STRIPE_CUSTOMER_SERIAL_ID,
+            PayerIdType.STRIPE_CUSTOMER_ID,
         ):
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
         else:
@@ -171,13 +171,13 @@ class PayerClient:
         lazy_create: bool = False
         payer_interface: PayerOpsInterface
         if not payer_id_type or payer_id_type in (
-            PayerIdType.DD_PAYMENT_PAYER_ID.value,
-            PayerIdType.DD_CONSUMER_ID.value,
+            PayerIdType.DD_PAYMENT_PAYER_ID,
+            PayerIdType.DD_CONSUMER_ID,
         ):
             payer_interface = PayerOps(self.log, self.payer_repo)
         elif payer_id_type in (
-            PayerIdType.STRIPE_CUSTOMER_SERIAL_ID.value,
-            PayerIdType.STRIPE_CUSTOMER_ID.value,
+            PayerIdType.STRIPE_CUSTOMER_SERIAL_ID,
+            PayerIdType.STRIPE_CUSTOMER_ID,
         ):
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
             lazy_create = True
@@ -200,7 +200,7 @@ class PayerClient:
                 dd_payer_id=str(updated_raw_payer.stripe_customer_entity.owner_id),
                 country=updated_raw_payer.stripe_customer_entity.country_shortname,
                 pgp_customer_id=updated_raw_payer.stripe_customer_entity.stripe_id,
-                pgp_code=PaymentProvider.STRIPE.value,  # hard-code "stripe"
+                pgp_code=PaymentProvider.STRIPE,  # hard-code "stripe"
                 payer_type=updated_raw_payer.stripe_customer_entity.owner_type,
                 default_payment_method_id=pgp_default_payment_method_id,
                 description=description,
@@ -324,7 +324,7 @@ class PayerProcessor:
         )
 
         # TODO: we should get pgp_code in different way
-        pgp_code = PaymentProvider.STRIPE.value
+        pgp_code = PaymentProvider.STRIPE
 
         # step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
         await self.payer_client.has_existing_payer(
@@ -537,7 +537,7 @@ class PayerOps(PayerOpsInterface):
             # pgp_customers or stripe_customer
             payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_id(
                 input=GetPayerByIdInput(dd_payer_id=payer_id)
-                if payer_id_type == PayerIdType.DD_CONSUMER_ID.value
+                if payer_id_type == PayerIdType.DD_CONSUMER_ID
                 else GetPayerByIdInput(id=payer_id)
             )
             is_found = True if (payer_entity and pgp_cus_entity) else False
@@ -675,19 +675,29 @@ class LegacyPayerOps(PayerOpsInterface):
             if payer_type and payer_type != PayerType.MARKETPLACE:
                 stripe_cus_entity = await self.payer_repo.get_stripe_customer(
                     GetStripeCustomerInput(stripe_id=payer_id)
-                    if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID.value
+                    if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID
                     else GetStripeCustomerInput(id=payer_id)
                 )
                 # payer entity is optional
                 payer_entity = await self.payer_repo.get_payer_by_id(
                     request=GetPayerByIdInput(legacy_stripe_customer_id=payer_id)
                 )
-                is_found = True if stripe_cus_entity else False
+                is_found = bool(stripe_cus_entity)
             else:
-                # TODO: add error handling here
-                self.log.error(
-                    f"[get_payer_raw_objects][{payer_id}] no record in db, should retrieve from stripe. [{payer_id_type}][{payer_type}]"
-                )
+                # lookup payers and pgp_customers first. This happens when client creates payer
+                # but use stripe_customer_id to lookup payer
+                if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
+                    payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_id(
+                        input=GetPayerByIdInput(legacy_stripe_customer_id=payer_id)
+                    )
+                    is_found = bool(payer_entity and pgp_cus_entity)
+                    if not is_found:
+                        # TODO: retrieve from stripe
+                        ...
+                if not is_found:
+                    self.log.error(
+                        f"[get_payer_raw_objects][{payer_id}] no record in db, should retrieve from stripe. [{payer_id_type}][{payer_type}]"
+                    )
         except DataError as e:
             self.log.error(
                 f"[get_payer_entity] DataError when reading data from db: {e}"

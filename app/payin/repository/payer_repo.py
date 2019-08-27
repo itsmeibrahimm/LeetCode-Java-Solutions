@@ -328,6 +328,14 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 .select_from(join_stmt)
                 .where(payers.dd_payer_id == input.dd_payer_id)
             )
+        elif input.legacy_stripe_customer_id:
+            stmt = (
+                select([payers.table, pgp_customers.table], use_labels=True)
+                .select_from(join_stmt)
+                .where(
+                    payers.legacy_stripe_customer_id == input.legacy_stripe_customer_id
+                )
+            )
         row = await self.payment_database.master().fetch_one(stmt)
         if not row:
             return None, None

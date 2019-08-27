@@ -25,6 +25,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
     PaymentMethodDeleteError,
+    PayerReadError,
 )
 from app.payin.core.payer.model import RawPayer
 
@@ -93,6 +94,7 @@ class PaymentMethodClient:
                     stripe_id=stripe_payment_method.id,
                     fingerprint=stripe_payment_method.card.fingerprint,
                     last4=stripe_payment_method.card.last4,
+                    external_stripe_customer_id=stripe_payment_method.customer,
                     country_of_origin=stripe_payment_method.card.country,
                     dynamic_last4=stripe_payment_method.card.last4,
                     exp_month=stripe_payment_method.card.exp_month,
@@ -139,15 +141,14 @@ class PaymentMethodClient:
 
         pm_interface: PaymentMethodOpsInterface
         if (
-            payment_method_id_type
-            == PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID.value
+            payment_method_id_type == PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID
         ) or (not payment_method_id_type):
             pm_interface = PaymentMethodOps(
                 log=self.log, payment_method_repo=self.payment_method_repo
             )
         elif payment_method_id_type in (
-            PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID.value,
-            PaymentMethodIdType.STRIPE_CARD_SERIAL_ID.value,
+            PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID,
+            PaymentMethodIdType.STRIPE_CARD_SERIAL_ID,
         ):
             pm_interface = LegacyPaymentMethodOps(
                 log=self.log, payment_method_repo=self.payment_method_repo
@@ -203,7 +204,7 @@ class PaymentMethodClient:
                 )
         except DataError as e:
             self.log.error(
-                f"[delete_payment_method_impl][{payer_id}][{pgp_payment_method_id}] DataError when read db. {e}"
+                f"[detach_payment_method][{payer_id}][{pgp_payment_method_id}] DataError when read db. {e}"
             )
             raise PaymentMethodDeleteError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR, retryable=True
@@ -217,7 +218,7 @@ class PaymentMethodClient:
         self,
         token: str,
         pgp_customer_id: str,
-        country: Optional[str] = CountryCode.US.value,
+        country: Optional[str] = CountryCode.US,
         attached: Optional[bool] = True,
     ) -> StripePaymentMethod:
         try:
@@ -254,7 +255,7 @@ class PaymentMethodClient:
         self,
         payer_id: str,
         pgp_payment_method_id: str,
-        country: Optional[str] = CountryCode.US.value,
+        country: Optional[str] = CountryCode.US,
     ) -> StripePaymentMethod:
         try:
             stripe_payment_method = await self.app_ctxt.stripe.detach_payment_method(
@@ -304,7 +305,7 @@ class PaymentMethodProcessor:
         payer_id: Optional[str],
         dd_consumer_id: Optional[str],
         stripe_customer_id: Optional[str],
-        country: Optional[str] = CountryCode.US.value,
+        country: Optional[str] = CountryCode.US,
     ) -> PaymentMethod:
         """
         Implementation to create a payment method.
@@ -320,7 +321,7 @@ class PaymentMethodProcessor:
 
         # step 1: lookup stripe_customer_id by payer_id from Payers table if not present
         # TODO: retrieve pgp_resouce_id from pgp_customers table, instead of payers.legacy_stripe_customer_id
-        if not payer_id and not dd_consumer_id:
+        if not (payer_id or dd_consumer_id or stripe_customer_id):
             self.log.info(f"[create_payment_method] invalid input. must provide id")
             raise PaymentMethodCreateError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
@@ -424,9 +425,17 @@ class PaymentMethodProcessor:
         """
 
         # step 1: get payer by for country information
-        raw_payer: RawPayer = await self.payer_client.get_payer_raw_objects(
-            payer_id=payer_id, payer_id_type=payer_id_type
-        )
+        raw_payer: Optional[RawPayer] = None
+        try:
+            raw_payer = await self.payer_client.get_payer_raw_objects(
+                payer_id=payer_id, payer_id_type=payer_id_type
+            )
+        except PayerReadError as e:
+            if e.error_code != PayinErrorCode.PAYER_READ_NOT_FOUND:
+                raise e
+            self.log.info(
+                f"[delete_payment_method][{payer_id}][{payer_id_type}] can't find payer. could be DSJ consumer"
+            )
 
         # step 2: find payment_method.
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_payment_method(
@@ -438,10 +447,21 @@ class PaymentMethodProcessor:
         pgp_payment_method_id: str = raw_payment_method.pgp_payment_method_id()
 
         # step 3: detach PGP payment method
+        country_code: str
+        if country:
+            country_code = country
+        else:
+            if raw_payer:
+                country_code = raw_payer.country()
+            else:
+                self.log.info(
+                    f"[delete_payment_method][{payer_id}][{payer_id_type}] use hard-coded country code"
+                )
+                country_code = "US"
         await self.payment_method_client.pgp_detach_payment_method(
             payer_id=payer_id,
             pgp_payment_method_id=pgp_payment_method_id,
-            country=(country if country else raw_payer.country()),
+            country=country_code,
         )
 
         # step 4: update pgp_payment_method.detached_at
@@ -452,12 +472,14 @@ class PaymentMethodProcessor:
         )
 
         # step 5: update payer and pgp_customers / stripe_customer to remove the default_payment_method.
-        await self.payer_client.update_payer_default_payment_method(
-            raw_payer=raw_payer,
-            pgp_default_payment_method_id=None,
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
-        )
+        # we don’t need to if it’s DSJ marketplace consumer.
+        if raw_payer:
+            await self.payer_client.update_payer_default_payment_method(
+                raw_payer=raw_payer,
+                pgp_default_payment_method_id=None,
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
+            )
 
         # we dont automatically update the new default payment method for payer
 
@@ -488,10 +510,8 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:
-        # resp_sc_entity: StripeCardDbEntity  # hate this way, temporarily solution to get rid of compilation error
         sc_entity: Optional[StripeCardDbEntity] = None
         pm_entity: Optional[PgpPaymentMethodDbEntity] = None
-        # is_found: bool = False
         try:
             # get pgp_payment_method object
             pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_payment_method_id(
@@ -521,9 +541,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
             )
 
         is_owner: bool = False
-        if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID.value) or (
-            not payer_id_type
-        ):
+        if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID) or (not payer_id_type):
             if pm_entity:
                 is_owner = payer_id == pm_entity.payer_id
         elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
@@ -561,10 +579,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
         sc_entity: Optional[StripeCardDbEntity] = None
         pm_entity: Optional[PgpPaymentMethodDbEntity] = None
         try:
-            if (
-                payment_method_id_type
-                == PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID.value
-            ):
+            if payment_method_id_type == PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID:
                 # get pgp_payment_method object. Could be None if it's not created through Payin APIs.
                 pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_pgp_resource_id(
                     input=GetPgpPaymentMethodByPgpResourceIdInput(
@@ -576,10 +591,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
                 )
 
-            elif (
-                payment_method_id_type
-                == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID.value
-            ):
+            elif payment_method_id_type == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID:
                 # get stripe_card object
                 sc_entity = await self.payment_method_repo.get_stripe_card_by_id(
                     GetStripeCardByIdInput(id=payment_method_id)
