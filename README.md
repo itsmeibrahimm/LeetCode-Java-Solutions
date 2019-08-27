@@ -11,6 +11,7 @@ The repo was created through python-flask-service-template [link to specific SHA
 
 - [Architecture and Tech Stack](#architecture-and-tech-stack)
 - [Deployment](#deployment)
+- [Monitoring](#monitoring)
 - [Development](#development)
   - [Environment Setup](#environment-setup)
   - [Development Guide](#development-guide)
@@ -54,12 +55,36 @@ The following technologies/frameworks are used across the entire stack:
 - **Artifactory** to store docker images
 - **Jenkins/Groovy** for CICD
 
-# Deployment
-
-- [CD pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-deploy.groovy/)
-- [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
+# Monitoring
 - [Wavefront Dashboard](https://metrics.wavefront.com/dashboard/payment-service-health)
 - [Sentry Issues](https://sentry.io/organizations/doordash/issues/?project=1381528)
+
+# Deployment
+
+Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddops) to control releases and k8s deployment:
+
+- [Promote pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-promote.groovy/)
+- [Release build pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-build.groovy/)
+- [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
+- [Migration pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-migrate.groovy/)
+
+## Regular code contribution
+- All PRs running through CI steps defined in [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
+- Approved PRs are merged to master branch, **without** being deployed to k8s cluster.
+
+## Deployment
+- Payment-service [deploy pilots](https://github.com/doordash/runtime/blob/master/data/ops/authorizedDeployPersonnel.yml#L78) are authorized to perform regular deployment, hotfix, rollback or migration by [ddops commands](https://github.com/doordash/infrastructure/wiki/ddops) through deployment [slack channel](https://doordash.slack.com/messages/CL52A5SKZ)
+- Deployment procedures
+  - Regular deployment: 
+    1. `/ddops cut-release payment-service` -> output: `releaseTag`
+    2. `/ddops build payment-service <releaseTag>`
+    3. `/ddops promote payment-service <releaseTag>`
+  - Hotfix:
+    1. `/ddops add-to-release-branch payment-service <hotfix-sha> payment-service <deployed-release-branch> <hotfix-reason>` -> output: `releaseTag` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566873325021800))
+    2. `/ddops hotfix payment-service <releaseTag>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566862402011100))
+  - Rollback:
+    1. `/ddops rollback payment-service <rollback-to-release-tag> <rollback reason>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566862671012400))
+  - Migration: (TODO: @hsinyuan.peng)
 
 # Development
 
