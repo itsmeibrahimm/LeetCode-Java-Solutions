@@ -30,6 +30,9 @@ payin_error_message_maps = {
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
+    "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
+    "payin_101": "Data I/O error. Please retry again!",
+    "payin_102": "Invalid data types. Please verify your input again!",
 }
 
 
@@ -60,6 +63,9 @@ class PayinErrorCode(str, Enum):
     PAYMENT_METHOD_CREATE_INVALID_INPUT = "payin_27"
     PAYMENT_METHOD_DELETE_STRIPE_ERROR = "payin_28"
     PAYMENT_METHOD_DELETE_DB_ERROR = "payin_29"
+    DISPUTE_NOT_FOUND = "payin_100"
+    DISPUTE_READ_DB_ERROR = "payin_101"
+    DISPUTE_READ_INVALID_DATA = "payin_102"
 
 
 class PayinError(PaymentError):
@@ -146,4 +152,11 @@ class PaymentIntentCancelError(PayinError):
 
 
 class PaymentIntentRefundError(PayinError):
+    pass
+
+
+###########################################################
+# StripeDispute Errors                                      #
+###########################################################
+class DisputeReadError(PayinError):
     pass

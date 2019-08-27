@@ -11,6 +11,8 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentCharge,
 )
 from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.dispute.model import Dispute
+from app.payin.repository.dispute_repo import StripeDisputeDbEntity
 
 
 class FunctionMock(MagicMock):
@@ -189,3 +191,37 @@ def generate_provider_charges(
     ]
 
     return charges
+
+
+def generate_dispute() -> Dispute:
+    return Dispute(
+        id=1,
+        stripe_dispute_id="1",
+        disputed_at=datetime.now(),
+        amount=100,
+        fee=10,
+        net=110,
+        charged_at=datetime.now(),
+        reason="subscription_cancelled",
+        status="needs_response",
+        evidence_due_by=datetime.now(),
+        stripe_charge_id=1,
+        stripe_card_id=1,
+    )
+
+
+def generate_dispute_db_entity() -> StripeDisputeDbEntity:
+    return StripeDisputeDbEntity(
+        id=1,
+        stripe_dispute_id="1",
+        disputed_at=datetime.now(),
+        amount=100,
+        fee=10,
+        net=110,
+        charged_at=datetime.now(),
+        reason="subscription_cancelled",
+        status="needs_response",
+        evidence_due_by=datetime.now(),
+        stripe_charge_id=1,
+        stripe_card_id=1,
+    )

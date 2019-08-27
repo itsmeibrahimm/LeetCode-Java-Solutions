@@ -75,7 +75,7 @@ Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddo
 ## Deployment
 - Payment-service [deploy pilots](https://github.com/doordash/runtime/blob/master/data/ops/authorizedDeployPersonnel.yml#L78) are authorized to perform regular deployment, hotfix, rollback or migration by [ddops commands](https://github.com/doordash/infrastructure/wiki/ddops) through deployment [slack channel](https://doordash.slack.com/messages/CL52A5SKZ)
 - Deployment procedures
-  - Regular deployment: 
+  - Regular deployment:
     1. `/ddops cut-release payment-service` -> output: `releaseTag`
     2. `/ddops build payment-service <releaseTag>`
     3. `/ddops promote payment-service <releaseTag>`

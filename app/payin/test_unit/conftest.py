@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from uuid import UUID
 
 from app.payin.core.cart_payment.processor import CartPaymentInterface
+from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
 from app.payin.tests.utils import FunctionMock, ContextMock
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -438,3 +439,25 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     cart_payment_interface.app_context.stripe = stripe_interface
 
     return cart_payment_interface
+
+
+@pytest.fixture
+def dispute_repo():
+    dispute_repo = MagicMock()
+    dispute_repo.get_dispute_by_dispute_id = FunctionMock(return_value=MagicMock())
+    dispute_repo.main_database_transaction = ContextMock()
+    return dispute_repo
+
+
+@pytest.fixture
+def dispute_processor():
+    dispute_processor = DisputeProcessor(dispute_client=MagicMock(), log=MagicMock())
+    return dispute_processor
+
+
+@pytest.fixture
+def dispute_client():
+    dispute_client = DisputeClient(
+        app_ctxt=MagicMock(), log=MagicMock(), dispute_repo=dispute_repo
+    )
+    return dispute_client

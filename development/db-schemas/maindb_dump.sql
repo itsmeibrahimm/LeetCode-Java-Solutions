@@ -9050,7 +9050,7 @@ ALTER SEQUENCE stripe_customer_id_seq OWNED BY stripe_customer.id;
 
 
 --
--- Name: stripe_dispute; Type: TABLE; Schema: public; Owner: -
+-- Name: dispute; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE stripe_dispute (
@@ -11843,7 +11843,7 @@ ALTER TABLE ONLY stripe_customer ALTER COLUMN id SET DEFAULT nextval('stripe_cus
 
 
 --
--- Name: stripe_dispute id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: dispute id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY stripe_dispute ALTER COLUMN id SET DEFAULT nextval('stripe_dispute_id_seq'::regclass);
@@ -18883,10 +18883,10 @@ SELECT pg_catalog.setval('stripe_customer_id_seq', 1, false);
 
 
 --
--- Data for Name: stripe_dispute; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: dispute; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY stripe_dispute (id, stripe_dispute_id, disputed_at, amount, fee, net, currency, charged_at, reason, status, evidence_due_by, evidence_submitted_at, updated_at, stripe_card_id, stripe_charge_id) FROM stdin;
+COPY dispute (id, stripe_dispute_id, disputed_at, amount, fee, net, currency, charged_at, reason, status, evidence_due_by, evidence_submitted_at, updated_at, stripe_card_id, stripe_charge_id) FROM stdin;
 \.
 
 

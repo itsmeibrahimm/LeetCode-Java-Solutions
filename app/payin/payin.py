@@ -6,7 +6,7 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import group_routers
 from app.commons.error.errors import register_payment_exception_handler
-from app.payin.api import cart_payment, payer, payment_method, webhook
+from app.payin.api import cart_payment, payer, payment_method, webhook, dispute
 
 
 def create_payin_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -22,6 +22,7 @@ def create_payin_app(context: AppContext, config: AppConfig) -> FastAPI:
             cart_payment.v1.router,
             payment_method.v1.router,
             webhook.v1.router,
+            dispute.v1.router,
         ]
     )
 
