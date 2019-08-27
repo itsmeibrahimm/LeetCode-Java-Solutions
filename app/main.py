@@ -67,6 +67,14 @@ async def get_health():
     )
 
 
+@app.get("/health/release", status_code=HTTP_200_OK)
+async def get_release():
+    """
+    Retrieve ddops style github release tag for this running image
+    """
+    return os.getenv("RELEASE_TAG", "unknown")
+
+
 @app.get("/error")
 async def make_error():
     raise Exception("testing deployed sentry integration")
