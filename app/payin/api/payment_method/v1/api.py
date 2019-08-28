@@ -136,7 +136,7 @@ async def get_payment_method(
         )
     except PaymentError as e:
         log.error(
-            f"[create_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
+            f"[get_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
         )
         raise PaymentException(
             http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,

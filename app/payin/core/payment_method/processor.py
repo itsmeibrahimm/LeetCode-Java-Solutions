@@ -627,7 +627,9 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
             )
 
         is_owner: bool = False
-        if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID and sc_entity:
+        if payer_id_type is None and pm_entity:
+            is_owner = payer_id == pm_entity.payer_id
+        elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID and sc_entity:
             is_owner = payer_id == sc_entity.external_stripe_customer_id
         if is_owner is False:
             self.log.error(

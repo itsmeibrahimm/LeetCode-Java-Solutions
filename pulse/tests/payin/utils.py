@@ -12,7 +12,7 @@ class StripeUtil:
     def create_stripe_customer():
         stripe.api_key = API_KEY
         return stripe.Customer.create(
-            description="Customer for jenny.rosen@example.com", source="tok_amex"
+            description="Customer for jenny.rosen@example.com", source="tok_mastercard"
         )
 
     @staticmethod
@@ -31,7 +31,7 @@ class PaymentUtil:
 
     @staticmethod
     def get_payer_info(
-        dd_payer_id=int(time.time()), country="US", payer_type="marketplace"
+        dd_payer_id=int(time.time() * 1e6), country="US", payer_type="marketplace"
     ):
         return {
             "dd_payer_id": dd_payer_id,
@@ -46,3 +46,22 @@ class PaymentUtil:
         return payin_client_pulse.create_payer_api_v1_payers_post_with_http_info(
             create_payer_request=PaymentUtil.get_payer_info()
         )
+
+    @staticmethod
+    def create_payment_method(payer_id: str, payer_id_type: str):
+        if payer_id_type == "dd_payer_id":
+            return payin_client_pulse.create_payment_method_api_v1_payment_methods_post(
+                create_payment_method_request={
+                    "payer_id": id,
+                    "payment_gateway": "stripe",
+                    "token": "tok_visa",
+                }
+            )
+        elif payer_id_type == "stripe_customer_id":
+            return payin_client_pulse.create_payment_method_api_v1_payment_methods_post(
+                create_payment_method_request={
+                    "payment_gateway": "stripe",
+                    "token": "tok_visa",
+                    "legacy_payment_info": {"stripe_customer_id": id},
+                }
+            )

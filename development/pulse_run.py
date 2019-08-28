@@ -1,9 +1,11 @@
 import asyncio
+from asyncio import create_subprocess_shell
+from os import unlink
 import requests
 from subprocess import Popen
-from time import sleep
-from asyncio import create_subprocess_shell
 import sys
+from time import sleep
+from tempfile import NamedTemporaryFile
 
 
 async def run_pulse_test():
@@ -11,6 +13,7 @@ async def run_pulse_test():
     Run local-server in subprocess and pulse env as well
     """
     # create payment service subprocess in background
+    temp_output = NamedTemporaryFile(delete=False)
     try:
         requests.get(url="http://localhost:8082/health")
         print(
@@ -22,9 +25,7 @@ async def run_pulse_test():
             "./development/start-local-server.sh -e testing -p 8082 &"
         )
         process_payment = await create_subprocess_shell(
-            command_payment_service,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            command_payment_service, stdout=temp_output, stderr=asyncio.subprocess.PIPE
         )
 
         # Status
@@ -57,14 +58,21 @@ async def run_pulse_test():
                 flush=True,
             )
             process_pulse.communicate()
+            print("Pulse test execution completed")
             exit_status = process_pulse.returncode
             process_pulse.kill()
 
+            temp_output.close()
+            unlink(temp_output.name)
+
+            print("exit_status is %s", exit_status)
             return exit_status
         except requests.exceptions.ConnectionError:
             # waiting for 5 secs
             sleep(5)
             if retries < 0:
+                temp_output.close()
+                unlink(temp_output.name)
                 print("Error connecting to Payment service from Pulse service")
                 raise requests.exceptions.ConnectionError
 
@@ -76,4 +84,5 @@ async def main():
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     return_value = loop.run_until_complete(main())
+    print("main return_value: %s", return_value)
     sys.exit(return_value)
