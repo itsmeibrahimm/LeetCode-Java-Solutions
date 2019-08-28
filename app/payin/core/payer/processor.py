@@ -123,7 +123,7 @@ class PayerClient:
         ):
             payer_interface = PayerOps(self.log, self.payer_repo)
         elif payer_id_type in (
-            PayerIdType.STRIPE_CUSTOMER_SERIAL_ID,
+            PayerIdType.DD_STRIPE_CUSTOMER_SERIAL_ID,
             PayerIdType.STRIPE_CUSTOMER_ID,
         ):
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
@@ -176,7 +176,7 @@ class PayerClient:
         ):
             payer_interface = PayerOps(self.log, self.payer_repo)
         elif payer_id_type in (
-            PayerIdType.STRIPE_CUSTOMER_SERIAL_ID,
+            PayerIdType.DD_STRIPE_CUSTOMER_SERIAL_ID,
             PayerIdType.STRIPE_CUSTOMER_ID,
         ):
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
@@ -354,6 +354,7 @@ class PayerProcessor:
     async def get(
         self,
         payer_id: str,
+        country: CountryCode,
         payer_id_type: Optional[str],
         payer_type: Optional[str],
         force_update: Optional[bool] = False,

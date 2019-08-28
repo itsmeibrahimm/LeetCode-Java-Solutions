@@ -140,15 +140,15 @@ class PaymentMethodClient:
         """
 
         pm_interface: PaymentMethodOpsInterface
-        if (
-            payment_method_id_type == PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID
-        ) or (not payment_method_id_type):
+        if (payment_method_id_type == PaymentMethodIdType.DD_PAYMENT_METHOD_ID) or (
+            not payment_method_id_type
+        ):
             pm_interface = PaymentMethodOps(
                 log=self.log, payment_method_repo=self.payment_method_repo
             )
         elif payment_method_id_type in (
             PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID,
-            PaymentMethodIdType.STRIPE_CARD_SERIAL_ID,
+            PaymentMethodIdType.DD_STRIPE_CARD_SERIAL_ID,
         ):
             pm_interface = LegacyPaymentMethodOps(
                 log=self.log, payment_method_repo=self.payment_method_repo
@@ -305,7 +305,7 @@ class PaymentMethodProcessor:
         payer_id: Optional[str],
         dd_consumer_id: Optional[str],
         stripe_customer_id: Optional[str],
-        country: Optional[str] = CountryCode.US,
+        country: Optional[CountryCode] = CountryCode.US,
     ) -> PaymentMethod:
         """
         Implementation to create a payment method.
@@ -409,9 +409,9 @@ class PaymentMethodProcessor:
         self,
         payer_id: str,
         payment_method_id: str,
+        country: CountryCode,
         payer_id_type: str = None,
         payment_method_id_type: str = None,
-        country: Optional[str] = None,
     ) -> PaymentMethod:
         """
         Implementation of delete/detach a payment method.
@@ -447,7 +447,7 @@ class PaymentMethodProcessor:
         pgp_payment_method_id: str = raw_payment_method.pgp_payment_method_id()
 
         # step 3: detach PGP payment method
-        country_code: str
+        country_code: CountryCode = CountryCode.US
         if country:
             country_code = country
         else:
@@ -455,9 +455,8 @@ class PaymentMethodProcessor:
                 country_code = raw_payer.country()
             else:
                 self.log.info(
-                    f"[delete_payment_method][{payer_id}][{payer_id_type}] use hard-coded country code"
+                    f"[delete_payment_method][{payer_id}][{payer_id_type}] use default country code US"
                 )
-                country_code = "US"
         await self.payment_method_client.pgp_detach_payment_method(
             payer_id=payer_id,
             pgp_payment_method_id=pgp_payment_method_id,
@@ -591,7 +590,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
                 )
 
-            elif payment_method_id_type == PaymentMethodIdType.STRIPE_CARD_SERIAL_ID:
+            elif payment_method_id_type == PaymentMethodIdType.DD_STRIPE_CARD_SERIAL_ID:
                 # get stripe_card object
                 sc_entity = await self.payment_method_repo.get_stripe_card_by_id(
                     GetStripeCardByIdInput(id=payment_method_id)

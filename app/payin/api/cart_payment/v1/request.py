@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+from app.commons.types import CountryCode
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.core.cart_payment.types import CaptureMethod, CartType
 
@@ -29,10 +30,11 @@ class CreateCartPaymentRequest(BaseModel):
     payer_id: str
     payer_id_type: PayerIdType = PayerIdType.DD_PAYMENT_PAYER_ID
     amount: int
-    country: str
+    payer_country: CountryCode = CountryCode.US
+    payment_country: CountryCode
     currency: str
     payment_method_id: str
-    payment_method_id_type: PaymentMethodIdType = PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID
+    payment_method_id_type: PaymentMethodIdType = PaymentMethodIdType.DD_PAYMENT_METHOD_ID
     capture_method: CaptureMethod = CaptureMethod.AUTO
     idempotency_key: str
     client_description: Optional[str] = None
@@ -47,6 +49,7 @@ class UpdateCartPaymentRequest(BaseModel):
     payer_id: str
     payer_id_type: PayerIdType = PayerIdType.DD_PAYMENT_PAYER_ID
     amount: int
+    payer_country: CountryCode = CountryCode.US
     metadata: Optional[CartMetadata] = None
     legacy_payment: Optional[LegacyPayment] = None
     client_description: Optional[str] = None

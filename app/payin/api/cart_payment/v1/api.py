@@ -37,13 +37,39 @@ async def create_cart_payment(
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):
+    """
+    Create a cart payment.
+
+    - **payer_id**: DoorDash payer_id or stripe_customer_id
+    - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
+                         "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
+    - **amount**: [int] amount in cent to charge the cart
+    - **payer_country**: [string] payer's country ISO code
+    - **currency**: [string] currency to charge the cart
+    - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
+                             can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+    - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values include
+                                  "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
+                                  (default is "dd_payment_method_id")
+    - **capture_method**: [string] auto capture or manual (captured by DD payment platform)
+    - **idempotency_key**: [string] idempotency key to sumibt the payment
+    - **client_description** [string] client description
+    - **payer_statement_description** [string] payer_statement_description
+    - **legacy_payment** [json object] legacy payment information
+    - **split_payment** [json object] information for flow of funds
+    - **split_payment.payout_account_id** [string] merchant's payout account id. Now it is stripe_managed_account_id
+    - **split_payment.appication_fee_amount** [int] fees that we charge merchant on the order
+    - **metadata** [json object] key-value map for metadata
+    """
+
     log.info(f"Creating cart_payment for payer {cart_payment_request.payer_id}")
 
     try:
+        # TODO: use cart_payment_request.payer_country to get stripe platform key
         cart_payment = await cart_payment_processor.submit_payment(
             request_cart_payment=request_to_model(cart_payment_request),
             idempotency_key=cart_payment_request.idempotency_key,
-            country=cart_payment_request.country,
+            country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
             client_description=cart_payment_request.client_description,
             payer_id_type=cart_payment_request.payer_id_type,
@@ -79,8 +105,23 @@ async def update_cart_payment(
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):
+    """
+    Adjust amount of an existing cart payment.
+
+    - **cart_payment_id**: unique cart_payment id
+    - **payer_id**: DoorDash payer_id or stripe_customer_id
+    - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
+                         "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
+    - **amount**: [int] amount in cent to adjust the cart
+    - **payer_country**: [string] payer's country ISO code
+    - **idempotency_key**: [string] idempotency key to sumibt the payment
+    - **client_description** [string] client description
+    - **legacy_payment** [json object] legacy payment information
+    - **metadata** [json object] key-value map for metadata
+    """
     log.info(f"Updating cart_payment {cart_payment_id}")
 
+    # TODO: use cart_payment_request.payer_country to get stripe platform key
     cart_payment: CartPayment = await cart_payment_processor.update_payment(
         idempotency_key=cart_payment_request.idempotency_key,
         cart_payment_id=cart_payment_id,

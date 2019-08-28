@@ -71,7 +71,7 @@ class TestCartPaymentProcessor:
                 currency="USD",
                 client_description="Client description",
                 payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-                payment_method_id_type=PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+                payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
             )
         assert (
             payment_error.value.error_code
@@ -108,7 +108,7 @@ class TestCartPaymentProcessor:
                 currency="USD",
                 client_description="Client description",
                 payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-                payment_method_id_type=PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+                payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
             )
         assert (
             payment_error.value.error_code
@@ -133,7 +133,7 @@ class TestCartPaymentProcessor:
             currency="USD",
             client_description="Client description",
             payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id_type=PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+            payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         assert result_cart_payment
         assert result_cart_payment.id
@@ -162,7 +162,7 @@ class TestCartPaymentProcessor:
             currency="USD",
             client_description="Client description",
             payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id_type=PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+            payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         assert result
 
@@ -178,7 +178,7 @@ class TestCartPaymentProcessor:
             currency="USD",
             client_description="Client description",
             payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id_type=PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+            payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         assert second_result
         assert result == second_result

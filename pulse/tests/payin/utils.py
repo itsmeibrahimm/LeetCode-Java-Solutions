@@ -23,7 +23,11 @@ class StripeUtil:
 class PaymentUtil:
     @staticmethod
     def get_payment_method_info(payer):
-        return {"payer_id": payer["id"], "payment_gateway": "test", "token": "tok_visa"}
+        return {
+            "payer_id": payer["id"],
+            "payment_gateway": "stripe",
+            "token": "tok_visa",
+        }
 
     @staticmethod
     def get_payer_info(

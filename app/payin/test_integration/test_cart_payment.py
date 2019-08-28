@@ -36,7 +36,8 @@ class TestCartPayment:
         request_body = {
             "payer_id": payer["id"],
             "amount": amount,
-            "country": "US",
+            "payer_country": "US",
+            "payment_country": "US",
             "currency": "USD",
             "payment_method_id": payment_method["id"],
             "capture_method": "manual",

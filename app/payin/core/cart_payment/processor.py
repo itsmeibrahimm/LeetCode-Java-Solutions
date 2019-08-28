@@ -831,7 +831,7 @@ class CartPaymentInterface:
             cart_payment.payer_id,
             PayerIdType.DD_PAYMENT_PAYER_ID,
             pgp_intent.payment_method_resource_id,
-            PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+            PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         return await self._submit_payment_to_provider(
             payment_intent, pgp_intent, payment_resource_id, customer_resource_id
@@ -855,7 +855,7 @@ class CartPaymentInterface:
             cart_payment.payer_id,
             PayerIdType.DD_PAYMENT_PAYER_ID,
             pgp_intent.payment_method_resource_id,
-            PaymentMethodIdType.PAYMENT_PAYMENT_METHOD_ID,
+            PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
 
         # New intent pair for the higher amount

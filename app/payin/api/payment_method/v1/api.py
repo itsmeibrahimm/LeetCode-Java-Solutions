@@ -5,6 +5,7 @@ from structlog import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.error.errors import PaymentError, PaymentException
+from app.commons.types import CountryCode
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
 
 from starlette.requests import Request
@@ -21,6 +22,7 @@ from starlette.status import (
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
+from app.payin.core.types import PayerIdType, PaymentMethodIdType
 
 router = APIRouter()
 
@@ -40,17 +42,20 @@ async def create_payment_method(
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
     - **legacy_payment_info**: [json object] legacy information for DSJ backward compatibility.
-    - **dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
-    - **stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
+    - **legacy_payment_info.country**: [string] country code of DoorDash consumer
+    - **legacy_payment_info.dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
+    - **legacy_payment_info.stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
     """
     log.info("[create_payment_method] receive request. payer_id:%s", req_body.payer_id)
 
-    dd_consumer_id: Optional[
-        str
-    ] = req_body.legacy_payment_info.dd_consumer_id if req_body.legacy_payment_info else None
-    stripe_customer_id: Optional[
-        str
-    ] = req_body.legacy_payment_info.stripe_customer_id if req_body.legacy_payment_info else None
+    dd_consumer_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    country: Optional[CountryCode] = CountryCode.US
+    if req_body.legacy_payment_info:
+        dd_consumer_id = req_body.legacy_payment_info.dd_consumer_id
+        stripe_customer_id = req_body.legacy_payment_info.stripe_customer_id
+        if req_body.legacy_payment_info.country:
+            country = req_body.legacy_payment_info.country
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
             payer_id=req_body.payer_id,
@@ -58,6 +63,7 @@ async def create_payment_method(
             token=req_body.token,
             dd_consumer_id=dd_consumer_id,
             stripe_customer_id=stripe_customer_id,
+            country=country,
         )
         log.info(
             f"[create_payment_method][{req_body.payer_id}][{dd_consumer_id}][{stripe_customer_id}] completed."
@@ -88,8 +94,9 @@ async def get_payment_method(
     request: Request,
     payer_id: str,
     payment_method_id: str,
-    payer_id_type: str = None,
-    payment_method_id_type: str = None,
+    country: CountryCode = CountryCode.US,
+    payer_id_type: PayerIdType = None,
+    payment_method_id_type: PaymentMethodIdType = None,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
@@ -101,8 +108,9 @@ async def get_payment_method(
                     stripe_customer_id, or stripe_customer_serial_id
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
                              can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+    - **country**: country of DoorDash payer (consumer)
     - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-                        "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+                        "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
     - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values include
                                   "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
                                   (default is "dd_payment_method_id")
@@ -166,8 +174,9 @@ async def delete_payment_method(
     request: Request,
     payer_id: str,
     payment_method_id: str,
-    payer_id_type: str = None,
-    payment_method_id_type: str = None,
+    country: CountryCode = CountryCode.US,
+    payer_id_type: PayerIdType = None,
+    payment_method_id_type: PaymentMethodIdType = None,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
@@ -178,8 +187,9 @@ async def delete_payment_method(
                     stripe_customer_id, or stripe_customer_serial_id
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id can
                              be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+    - **country**: country of DoorDash payer (consumer)
     - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-                         "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+                         "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
     - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values including
                                   "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
                                   (default is "dd_payment_method_id")
@@ -189,6 +199,7 @@ async def delete_payment_method(
         payment_method: PaymentMethod = await payment_method_processor.delete_payment_method(
             payer_id=payer_id,
             payment_method_id=payment_method_id,
+            country=country,
             payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )

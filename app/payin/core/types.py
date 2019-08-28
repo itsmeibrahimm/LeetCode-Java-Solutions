@@ -3,6 +3,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.commons.types import CountryCode
+
 
 class LegacyPaymentInfo(BaseModel):
     """
@@ -18,6 +20,16 @@ class LegacyPaymentInfo(BaseModel):
 LegacyPaymentInfo.update_forward_refs()
 
 
+class LegacyPaymentMethodInfo(BaseModel):
+    """
+    Legacy payment method information for DSJ backward compatibility.
+    """
+
+    country: CountryCode = CountryCode.US
+    dd_consumer_id: Optional[str]
+    stripe_customer_id: Optional[str]
+
+
 class PayerIdType(str, Enum):
     """
     Enum definition of payer id type. This is used in most of payin API endpoints for
@@ -25,11 +37,9 @@ class PayerIdType(str, Enum):
     """
 
     DD_PAYMENT_PAYER_ID = "dd_payer_id"
-    # used for payer/payment_method APIs
-    STRIPE_CUSTOMER_ID = "stripe_customer_id"
-    # used for payer APIs
-    STRIPE_CUSTOMER_SERIAL_ID = "stripe_customer_serial_id"
     DD_CONSUMER_ID = "dd_consumer_id"
+    DD_STRIPE_CUSTOMER_SERIAL_ID = "dd_stripe_customer_serial_id"  # used for payer APIs
+    STRIPE_CUSTOMER_ID = "stripe_customer_id"  # used for payer/payment_method APIs
 
 
 class PaymentMethodIdType(str, Enum):
@@ -38,11 +48,13 @@ class PaymentMethodIdType(str, Enum):
     backward compatibility purpose to identify the type of input payment_method_id.
     """
 
-    PAYMENT_PAYMENT_METHOD_ID = "dd_payment_method_id"
-    # used for payment_methods APIs
-    STRIPE_PAYMENT_METHOD_ID = "stripe_payment_method_id"
-    # used for payment_methods APIs
-    STRIPE_CARD_SERIAL_ID = "stripe_card_serial_id"
+    DD_PAYMENT_METHOD_ID = "dd_payment_method_id"
+    DD_STRIPE_CARD_SERIAL_ID = (
+        "dd_stripe_card_serial_id"
+    )  # used for payment_methods APIs
+    STRIPE_PAYMENT_METHOD_ID = (
+        "stripe_payment_method_id"
+    )  # used for payment_methods APIs
 
 
 class PaymentMethodObjectType(str, Enum):

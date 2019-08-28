@@ -3,6 +3,7 @@ from structlog import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.error.errors import PaymentException, PaymentError
+from app.commons.types import CountryCode
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payer.model import Payer
@@ -16,6 +17,9 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_422_UNPROCESSABLE_ENTITY,
 )
+
+from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PayerIdType
 
 router = APIRouter()
 
@@ -66,8 +70,9 @@ async def create_payer(
 @router.get("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
 async def get_payer(
     payer_id: str,
-    payer_id_type: str = None,
-    payer_type: str = None,
+    country: CountryCode = CountryCode.US,
+    payer_id_type: PayerIdType = None,
+    payer_type: PayerType = None,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     payer_processor: PayerProcessor = Depends(PayerProcessor),
@@ -76,16 +81,18 @@ async def get_payer(
     Get payer.
 
     - **payer_id**: DoorDash payer_id or stripe_customer_id
+    - **country**: country of DoorDash payer (consumer)
     - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",
                       "drive", "merchant", "store", "business" (default is "marketplace")
     - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-                        "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+                        "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
     - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
     """
     log.info("[get_payer] payer_id=%s", payer_id)
     try:
         payer: Payer = await payer_processor.get(
             payer_id=payer_id,
+            country=country,
             payer_id_type=payer_id_type,
             payer_type=payer_type,
             force_update=force_update,
@@ -127,6 +134,7 @@ async def update_payer(
         payer: Payer = await payer_processor.update(
             payer_id=payer_id,
             default_payment_method_id=req_body.default_payment_method.id,
+            country=req_body.country,
             payment_method_id_type=req_body.default_payment_method.payment_method_id_type,
         )
     except PaymentError as e:
