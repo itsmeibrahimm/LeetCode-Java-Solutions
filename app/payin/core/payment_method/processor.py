@@ -170,7 +170,7 @@ class PaymentMethodClient:
         )
 
         self.log.info(
-            "[get_payment_method][{payment_method_id}][{payer_id}] find payment_method!!"
+            f"[get_payment_method][{payment_method_id}][{payer_id}] find payment_method!!"
         )
         return raw_payment_method
 
@@ -593,7 +593,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
             elif payment_method_id_type == PaymentMethodIdType.DD_STRIPE_CARD_SERIAL_ID:
                 # get stripe_card object
                 sc_entity = await self.payment_method_repo.get_stripe_card_by_id(
-                    GetStripeCardByIdInput(id=payment_method_id)
+                    GetStripeCardByIdInput(id=int(payment_method_id))
                 )
                 # get pgp_payment_method object
                 if sc_entity:

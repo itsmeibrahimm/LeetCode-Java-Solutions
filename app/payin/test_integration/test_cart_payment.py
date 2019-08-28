@@ -4,6 +4,10 @@ import uuid
 from starlette.testclient import TestClient
 
 
+# Since this test requires a sequence of calls to stripe in order to set up a payment intent
+# creation attempt, we need to use the actual test stripe system.  As a result this test class
+# is marked as external.  The stripe simulator does not return the correct result since it does
+# persiste state.
 @pytest.mark.external
 class TestCartPayment:
     def _get_payer_create_request(self):
@@ -143,9 +147,9 @@ class TestCartPayment:
         assert statement_description == request_body["payer_statement_description"]
         assert cart_payment["legacy_payment"] is None
         assert cart_payment["split_payment"] is None
-        assert payer["created_at"]
-        assert payer["updated_at"]
-        assert payer["deleted_at"] is None
+        assert cart_payment["created_at"]
+        assert cart_payment["updated_at"]
+        assert cart_payment["deleted_at"] is None
         return cart_payment
 
     def _test_cart_payment_creation_error(
@@ -194,10 +198,6 @@ class TestCartPayment:
         assert statement_description == cart_payment["payer_statement_description"]
 
     def test_cart_payment(self, stripe_api, client: TestClient):
-        # Since this test requires a sequence of calls to stripe in order to set up a payment intent
-        # creation attempt, we need to use the actual test stripe system.  As a result this test class
-        # is marked as external.  The stripe simulator does not return the correct result since it does
-        # persiste state.
         stripe_api.enable_outbound()
 
         payer = self._test_payer_creation(stripe_api=stripe_api, client=client)

@@ -958,10 +958,7 @@ class TestCartPaymentInterface:
             idempotency_key=uuid.uuid4(),
             payment_intents=[generate_payment_intent(cart_payment_id=cart_payment.id)],
             amount=875,
-            legacy_payment=None,
             client_description=None,
-            payer_statement_description=None,
-            metadata=None,
         )
         assert result_cart_payment
         assert result_cart_payment.amount == 875
@@ -1010,10 +1007,7 @@ class TestCartPaymentInterface:
             idempotency_key=str(uuid.uuid4()),
             payment_intents=payment_intents,
             amount=updated_amount,
-            legacy_payment=None,
             client_description=None,
-            payer_statement_description=None,
-            metadata=None,
         )
 
         assert result_cart_payment
@@ -1040,10 +1034,7 @@ class TestCartPaymentInterface:
             idempotency_key=str(uuid.uuid4()),
             payment_intents=payment_intents,
             amount=updated_amount,
-            legacy_payment=None,
             client_description=None,
-            payer_statement_description=None,
-            metadata=None,
         )
 
         assert result_cart_payment
@@ -1067,10 +1058,7 @@ class TestCartPaymentInterface:
                 idempotency_key=str(uuid.uuid4()),
                 payment_intents=payment_intents,
                 amount=updated_amount,
-                legacy_payment=None,
                 client_description=None,
-                payer_statement_description=None,
-                metadata=None,
             )
         assert (
             refund_error.value.error_code

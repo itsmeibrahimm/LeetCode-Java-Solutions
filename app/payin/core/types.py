@@ -11,9 +11,12 @@ class LegacyPaymentInfo(BaseModel):
     Legacy payment information for DSJ backward compatibility.
     """
 
-    dd_consumer_id: Optional[str]
-    stripe_customer_id: Optional[str]
-    charge_id: Optional[str]
+    dd_consumer_id: Optional[str] = None
+    dd_stripe_card_id: Optional[str] = None
+    dd_charge_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    stripe_payment_method_id: Optional[str] = None
+    stripe_card_id: Optional[str] = None
 
 
 # https://pydantic-docs.helpmanual.io/#self-referencing-models

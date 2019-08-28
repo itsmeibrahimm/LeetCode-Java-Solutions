@@ -9,9 +9,12 @@ from uuid import UUID
 @final
 @dataclass(frozen=True)
 class LegacyPayment:
-    consumer_id: int
-    charge_id: int
-    stripe_customer_id: Optional[int] = None
+    dd_consumer_id: Optional[str] = None
+    dd_stripe_card_id: Optional[str] = None
+    dd_charge_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    stripe_payment_method_id: Optional[str] = None
+    stripe_card_id: Optional[str] = None
 
 
 @final

@@ -7,7 +7,6 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
-from app.payin.core.types import PayerIdType, PaymentMethodIdType
 import app.payin.core.cart_payment.processor as processor
 from app.payin.tests.utils import (
     generate_payment_intent,
@@ -70,8 +69,6 @@ class TestCartPaymentProcessor:
                 country="US",
                 currency="USD",
                 client_description="Client description",
-                payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-                payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
             )
         assert (
             payment_error.value.error_code
@@ -107,8 +104,6 @@ class TestCartPaymentProcessor:
                 country="US",
                 currency="USD",
                 client_description="Client description",
-                payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-                payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
             )
         assert (
             payment_error.value.error_code
@@ -132,8 +127,6 @@ class TestCartPaymentProcessor:
             country="US",
             currency="USD",
             client_description="Client description",
-            payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         assert result_cart_payment
         assert result_cart_payment.id
@@ -161,8 +154,6 @@ class TestCartPaymentProcessor:
             country="US",
             currency="USD",
             client_description="Client description",
-            payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         assert result
 
@@ -177,8 +168,6 @@ class TestCartPaymentProcessor:
             country="US",
             currency="USD",
             client_description="Client description",
-            payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
         )
         assert second_result
         assert result == second_result
@@ -197,8 +186,6 @@ class TestCartPaymentProcessor:
                 amount=500,
                 legacy_payment=None,
                 client_description=None,
-                payer_statement_description=None,
-                metadata=None,
             )
         assert (
             payment_error.value.error_code
@@ -216,8 +203,6 @@ class TestCartPaymentProcessor:
             amount=updated_amount,
             legacy_payment=None,
             client_description=None,
-            payer_statement_description=None,
-            metadata=None,
         )
         assert result
         assert result.id == cart_payment.id
@@ -235,8 +220,6 @@ class TestCartPaymentProcessor:
             amount=updated_amount,
             legacy_payment=None,
             client_description=None,
-            payer_statement_description=None,
-            metadata=None,
         )
         assert result
         assert result.id == cart_payment.id

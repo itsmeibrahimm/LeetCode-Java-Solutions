@@ -8,6 +8,7 @@ from app.payin.api.cart_payment.v1.request import (
     UpdateCartPaymentRequest,
 )
 from app.payin.core.exceptions import PayinErrorCode
+from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -67,13 +68,11 @@ async def create_cart_payment(
     try:
         # TODO: use cart_payment_request.payer_country to get stripe platform key
         cart_payment = await cart_payment_processor.submit_payment(
-            request_cart_payment=request_to_model(cart_payment_request),
+            request_cart_payment=create_request_to_model(cart_payment_request),
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
             client_description=cart_payment_request.client_description,
-            payer_id_type=cart_payment_request.payer_id_type,
-            payment_method_id_type=cart_payment_request.payment_method_id_type,
         )
 
         log.info(
@@ -127,10 +126,8 @@ async def update_cart_payment(
         cart_payment_id=cart_payment_id,
         payer_id=cart_payment_request.payer_id,
         amount=cart_payment_request.amount,
-        legacy_payment=get_legacy_payment_model(cart_payment_request),
+        legacy_payment=get_legacy_payment_model(cart_payment_request.legacy_payment),
         client_description=cart_payment_request.client_description,
-        payer_statement_description=cart_payment_request.payer_statement_description,
-        metadata=get_cart_payment_metadata_model(cart_payment_request),
     )
     log.info(
         f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
@@ -138,12 +135,16 @@ async def update_cart_payment(
     return cart_payment
 
 
-def request_to_model(cart_payment_request: CreateCartPaymentRequest) -> CartPayment:
+def create_request_to_model(
+    cart_payment_request: CreateCartPaymentRequest
+) -> CartPayment:
     return CartPayment(
         id=uuid4(),
-        payer_id=cart_payment_request.payer_id,
+        payer_id=cart_payment_request.payer_id if cart_payment_request.payer_id else "",
         amount=cart_payment_request.amount,
-        payment_method_id=cart_payment_request.payment_method_id,
+        payment_method_id=cart_payment_request.payment_method_id
+        if cart_payment_request.payment_method_id
+        else "",
         capture_method=cart_payment_request.capture_method,
         cart_metadata=CartMetadata(
             reference_id=cart_payment_request.metadata.reference_id,
@@ -152,15 +153,7 @@ def request_to_model(cart_payment_request: CreateCartPaymentRequest) -> CartPaym
         ),
         client_description=cart_payment_request.client_description,
         payer_statement_description=cart_payment_request.payer_statement_description,
-        legacy_payment=LegacyPayment(
-            consumer_id=getattr(
-                cart_payment_request.legacy_payment, "consumer_id", None
-            ),
-            charge_id=getattr(cart_payment_request.legacy_payment, "charge_id", None),
-            stripe_customer_id=getattr(
-                cart_payment_request.legacy_payment, "stripe_customer_id", None
-            ),
-        ),
+        legacy_payment=get_legacy_payment_model(cart_payment_request.legacy_payment),
         split_payment=SplitPayment(
             payout_account_id=getattr(
                 cart_payment_request.split_payment, "payout_account_id", None
@@ -175,26 +168,22 @@ def request_to_model(cart_payment_request: CreateCartPaymentRequest) -> CartPaym
 
 
 def get_legacy_payment_model(
-    cart_payment_request: UpdateCartPaymentRequest
+    request_legacy_payment_info: Optional[RequestLegacyPaymentInfo]
 ) -> Optional[LegacyPayment]:
-    if not cart_payment_request.legacy_payment:
+    if not request_legacy_payment_info:
         return None
 
     return LegacyPayment(
-        consumer_id=cart_payment_request.legacy_payment.consumer_id,
-        stripe_customer_id=cart_payment_request.legacy_payment.stripe_customer_id,
-        charge_id=cart_payment_request.legacy_payment.charge_id,
-    )
-
-
-def get_cart_payment_metadata_model(
-    cart_payment_request: UpdateCartPaymentRequest
-) -> Optional[CartMetadata]:
-    if not cart_payment_request.metadata:
-        return None
-
-    return CartMetadata(
-        reference_id=cart_payment_request.metadata.reference_id,
-        ct_reference_id=cart_payment_request.metadata.ct_reference_id,
-        type=cart_payment_request.metadata.type,
+        dd_consumer_id=getattr(request_legacy_payment_info, "dd_consumer_id", None),
+        dd_stripe_card_id=getattr(
+            request_legacy_payment_info, "dd_stripe_card_id", None
+        ),
+        dd_charge_id=getattr(request_legacy_payment_info, "dd_charge_id", None),
+        stripe_customer_id=getattr(
+            request_legacy_payment_info, "stripe_customer_id", None
+        ),
+        stripe_payment_method_id=getattr(
+            request_legacy_payment_info, "stripe_payment_method_id", None
+        ),
+        stripe_card_id=getattr(request_legacy_payment_info, "stripe_card_id", None),
     )

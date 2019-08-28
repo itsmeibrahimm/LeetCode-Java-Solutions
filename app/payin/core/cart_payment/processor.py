@@ -18,7 +18,6 @@ from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.core.cart_payment.model import (
-    CartMetadata,
     CartPayment,
     LegacyPayment,
     PaymentIntent,
@@ -257,6 +256,7 @@ class CartPaymentInterface:
         async with self.payment_repo.payment_database_transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
+            # TODO Determine intent status based on capture method.  Below assumes manual case.
             updated_intent = await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
             )
@@ -604,6 +604,13 @@ class CartPaymentInterface:
                 retryable=False,
             )
 
+        dd_consumer_id = None
+        if (
+            request_cart_payment.legacy_payment
+            and request_cart_payment.legacy_payment.dd_consumer_id
+        ):
+            dd_consumer_id = int(request_cart_payment.legacy_payment.dd_consumer_id)
+
         async with self.payment_repo.payment_database_transaction():
             # Create CartPayment
             cart_payment = await self.payment_repo.insert_cart_payment(
@@ -613,7 +620,7 @@ class CartPaymentInterface:
                 client_description=request_cart_payment.client_description,
                 reference_id=request_cart_payment.cart_metadata.reference_id,
                 reference_ct_id=request_cart_payment.cart_metadata.ct_reference_id,
-                legacy_consumer_id=request_cart_payment.legacy_payment.consumer_id
+                legacy_consumer_id=dd_consumer_id
                 if request_cart_payment.legacy_payment
                 else None,
                 amount_original=request_cart_payment.amount,
@@ -771,48 +778,34 @@ class CartPaymentInterface:
     async def _get_required_payment_resource_ids(
         self,
         payer_id: str,
-        payer_id_type: PayerIdType,
-        payment_method_id,
-        payment_method_id_type: PaymentMethodIdType,
+        payment_method_id: str,
+        legacy_payment: Optional[LegacyPayment],
     ) -> Tuple[str, str]:
         # Get payment method, in order to submit new intent to the provider
 
-        self.req_context.log.debug(f"Getting payment info")
+        self.req_context.log.debug("Getting payment info.")
+
+        lookup_payer_id = payer_id
+        payer_id_type = PayerIdType.DD_PAYMENT_PAYER_ID
+
+        lookup_payment_method_id = payment_method_id
+        payment_method_id_type = PaymentMethodIdType.DD_PAYMENT_METHOD_ID
+
+        # TODO Handle legacy payment identifiers
+
         raw_payment_method = await self.payment_method_client.get_payment_method(
-            payer_id=payer_id,
-            payment_method_id=payment_method_id,
+            payer_id=lookup_payer_id,
             payer_id_type=payer_id_type,
+            payment_method_id=lookup_payment_method_id,
             payment_method_id_type=payment_method_id_type,
         )
         # TODO add more error_code values to help client distinguish error cases
-        if (
-            not raw_payment_method.pgp_payment_method_entity
-            or not raw_payment_method.pgp_payment_method_entity.pgp_resource_id
-        ):
-            self.req_context.log.error(f"No payment method found")
-            raise CartPaymentCreateError(
-                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
-            )
 
         raw_payer = await self.payer_client.get_payer_raw_object(
-            payer_id=payer_id, payer_id_type=payer_id_type
+            payer_id=lookup_payer_id, payer_id_type=payer_id_type
         )
-        if (
-            not raw_payer
-            or not raw_payer.payer_entity
-            or not raw_payer.payer_entity.legacy_stripe_customer_id
-        ):
-            self.req_context.log.error(f"No payer found")
-            raise CartPaymentCreateError(
-                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
-            )
 
-        return (
-            raw_payment_method.pgp_payment_method_entity.pgp_resource_id,
-            raw_payer.payer_entity.legacy_stripe_customer_id,
-        )
+        return (raw_payment_method.pgp_payment_method_id(), raw_payer.pgp_customer_id())
 
     async def _resubmit_add_amount_to_cart_payment(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent
@@ -828,10 +821,9 @@ class CartPaymentInterface:
 
         # Intent is in init state, so there may have been an issue with calling provider.  Call again.
         payment_resource_id, customer_resource_id = await self._get_required_payment_resource_ids(
-            cart_payment.payer_id,
-            PayerIdType.DD_PAYMENT_PAYER_ID,
-            pgp_intent.payment_method_resource_id,
-            PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
+            payer_id=cart_payment.payer_id,
+            payment_method_id=pgp_intent.payment_method_resource_id,
+            legacy_payment=None,
         )
         return await self._submit_payment_to_provider(
             payment_intent, pgp_intent, payment_resource_id, customer_resource_id
@@ -852,10 +844,9 @@ class CartPaymentInterface:
         self.req_context.log.debug(f"Gathering fields from last intent {pgp_intent.id}")
 
         payment_resource_id, customer_resource_id = await self._get_required_payment_resource_ids(
-            cart_payment.payer_id,
-            PayerIdType.DD_PAYMENT_PAYER_ID,
-            pgp_intent.payment_method_resource_id,
-            PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
+            payer_id=cart_payment.payer_id,
+            payment_method_id=pgp_intent.payment_method_resource_id,
+            legacy_payment=None,
         )
 
         # New intent pair for the higher amount
@@ -900,10 +891,7 @@ class CartPaymentInterface:
         idempotency_key: str,
         payment_intents: List[PaymentIntent],
         amount: int,
-        legacy_payment: Optional[LegacyPayment],
         client_description: Optional[str],
-        payer_statement_description: Optional[str],
-        metadata: Optional[CartMetadata],
     ) -> CartPayment:
         self.req_context.log.info(
             f"Adjusting amount higher to {amount} from {cart_payment.amount} for cart payment {cart_payment.id}"
@@ -915,7 +903,7 @@ class CartPaymentInterface:
         if existing_intent:
             # Second attempt to adjust cart payment amount, with same idempotency key
             payment_intent, pgp_payment_intent = await self._resubmit_add_amount_to_cart_payment(
-                cart_payment, existing_intent
+                cart_payment=cart_payment, payment_intent=existing_intent
             )
         else:
             # First attempt at cart payment adjustment for this idempotency key.
@@ -923,7 +911,10 @@ class CartPaymentInterface:
             # have these fields for new intent submission and keep API simple for clients.
             most_recent_intent = self._get_most_recent_intent(payment_intents)
             payment_intent, pgp_payment_intent = await self._submit_amount_increase_to_cart_payment(
-                cart_payment, most_recent_intent, amount, idempotency_key
+                cart_payment=cart_payment,
+                most_recent_intent=most_recent_intent,
+                amount=amount,
+                idempotency_key=idempotency_key,
             )
 
         # Cancel previous intents
@@ -1005,10 +996,7 @@ class CartPaymentInterface:
         idempotency_key: str,
         payment_intents: List[PaymentIntent],
         amount: int,
-        legacy_payment: Optional[LegacyPayment],
         client_description: Optional[str],
-        payer_statement_description: Optional[str],
-        metadata: Optional[CartMetadata],
     ) -> CartPayment:
         self.req_context.log.info(
             f"Adjusting amount lower to {amount} from {cart_payment.amount} for cart payment {cart_payment.id}"
@@ -1084,10 +1072,7 @@ class CartPaymentInterface:
         cart_payment: CartPayment,
         idempotency_key: str,
         amount: int,
-        legacy_payment: Optional[LegacyPayment],
         client_description: Optional[str],
-        payer_statement_description: Optional[str],
-        metadata: Optional[CartMetadata],
     ) -> CartPayment:
         # Update the amount of a cart payment.  Includes managing underlying/associated payment intent/pgp payment intents.
 
@@ -1103,10 +1088,7 @@ class CartPaymentInterface:
                 idempotency_key=idempotency_key,
                 payment_intents=payment_intents,
                 amount=amount,
-                legacy_payment=legacy_payment,
                 client_description=client_description,
-                payer_statement_description=payer_statement_description,
-                metadata=metadata,
             )
         elif self._is_amount_adjusted_lower(cart_payment, amount):
             updated_cart_payment = await self._deduct_amount_from_cart_payment(
@@ -1114,10 +1096,7 @@ class CartPaymentInterface:
                 idempotency_key=idempotency_key,
                 payment_intents=payment_intents,
                 amount=amount,
-                legacy_payment=legacy_payment,
                 client_description=client_description,
-                payer_statement_description=payer_statement_description,
-                metadata=metadata,
             )
             pass
         else:
@@ -1189,8 +1168,6 @@ class CartPaymentProcessor:
         amount: int,
         legacy_payment: Optional[LegacyPayment],
         client_description: Optional[str],
-        payer_statement_description: Optional[str],
-        metadata: Optional[CartMetadata],
     ) -> CartPayment:
         """Update an existing payment.
 
@@ -1200,10 +1177,7 @@ class CartPaymentProcessor:
             cart_payment_id {uuid.UUID} -- ID of the cart payment to adjust.
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             amount {int} -- New amount to use for cart payment.
-            legacy_payment {Optional[LegacyPayment]} -- Legacy payment, for support legacy clients.
             client_description {Optional[str]} -- New client description to use for cart payment.
-            payer_statement_description {Optional[str]} -- New payer statement description to use for cart payment.
-            metadata {Optional[CartMetadata]} -- Metadata of cart payment.
 
         Raises:
             CartPaymentReadError: Raised when there is an error retrieving the specified cart payment.
@@ -1229,13 +1203,10 @@ class CartPaymentProcessor:
 
         # Update the cart payment
         return await self.cart_payment_interface.update_payment(
-            cart_payment,
-            idempotency_key,
-            amount,
-            legacy_payment,
-            client_description,
-            payer_statement_description,
-            metadata,
+            cart_payment=cart_payment,
+            idempotency_key=idempotency_key,
+            amount=amount,
+            client_description=client_description,
         )
 
     async def submit_payment(
@@ -1245,8 +1216,6 @@ class CartPaymentProcessor:
         country: str,
         currency: str,
         client_description: Optional[str],
-        payer_id_type: PayerIdType,
-        payment_method_id_type: PaymentMethodIdType,
     ) -> CartPayment:
         """Submit a cart payment creation request.
 
@@ -1256,8 +1225,6 @@ class CartPaymentProcessor:
             country {str} -- ISO country code.
             currency {str} -- Currency for cart payment request.
             client_description {str} -- Pass through value clients may associated with the cart payment.
-            payer_id_type {PayerIdType} -- Type for payer ID, to support legacy clients.
-            payment_method_id_type {PaymentMethodIdType} -- Type for payment method ID, to support legacy clients.
 
         Returns:
             CartPayment -- A CartPayment model for the created payment.
@@ -1274,9 +1241,8 @@ class CartPaymentProcessor:
         # our exception handling middleware.
         payment_method_resource_id, customer_resource_id = await self.cart_payment_interface._get_required_payment_resource_ids(
             payer_id=request_cart_payment.payer_id,
-            payer_id_type=payer_id_type,
             payment_method_id=request_cart_payment.payment_method_id,
-            payment_method_id_type=payment_method_id_type,
+            legacy_payment=request_cart_payment.legacy_payment,
         )
 
         # Check for resubmission by client
@@ -1286,20 +1252,20 @@ class CartPaymentProcessor:
         if cart_payment:
             assert payment_intent
             return await self.cart_payment_interface.resubmit_existing_payment(
-                cart_payment,
-                payment_intent,
-                payment_method_resource_id,
-                customer_resource_id,
+                cart_payment=cart_payment,
+                payment_intent=payment_intent,
+                provider_payment_resource_id=payment_method_resource_id,
+                provider_customer_resource_id=customer_resource_id,
             )
 
         cart_payment, payment_intent = await self.cart_payment_interface.submit_new_payment(
-            request_cart_payment,
-            payment_method_resource_id,
-            customer_resource_id,
-            idempotency_key,
-            country,
-            currency,
-            client_description,
+            request_cart_payment=request_cart_payment,
+            provider_payment_resource_id=payment_method_resource_id,
+            provider_customer_resource_id=customer_resource_id,
+            idempotency_key=idempotency_key,
+            country=country,
+            currency=currency,
+            client_description=client_description,
         )
 
         return cart_payment
