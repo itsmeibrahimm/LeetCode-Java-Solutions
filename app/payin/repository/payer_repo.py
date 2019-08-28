@@ -132,13 +132,20 @@ class InsertStripeCustomerInput(DBRequestModel):
     default_source: Optional[str]
 
 
-class GetStripeCustomerInput(DBRequestModel):
+class GetStripeCustomerByIdInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
     """
 
-    id: Optional[int]
-    stripe_id: Optional[str]
+    id: int
+
+
+class GetStripeCustomerByStripeIdInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    stripe_id: str
 
 
 class UpdateStripeCustomerSetInput(DBRequestModel):
@@ -218,8 +225,14 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def get_stripe_customer(
-        self, request: GetStripeCustomerInput
+    async def get_stripe_customer_by_id(
+        self, request: GetStripeCustomerByIdInput
+    ) -> StripeCustomerDbEntity:
+        ...
+
+    @abstractmethod
+    async def get_stripe_customer_by_stripe_id(
+        self, request: GetStripeCustomerByStripeIdInput
     ) -> StripeCustomerDbEntity:
         ...
 
@@ -391,10 +404,19 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         row = await self.main_database.master().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
 
-    async def get_stripe_customer(
-        self, request: GetStripeCustomerInput
+    async def get_stripe_customer_by_id(
+        self, request: GetStripeCustomerByIdInput
     ) -> StripeCustomerDbEntity:
         stmt = stripe_customers.table.select().where(stripe_customers.id == request.id)
+        row = await self.main_database.master().fetch_one(stmt)
+        return StripeCustomerDbEntity.from_row(row) if row else None
+
+    async def get_stripe_customer_by_stripe_id(
+        self, request: GetStripeCustomerByStripeIdInput
+    ) -> StripeCustomerDbEntity:
+        stmt = stripe_customers.table.select().where(
+            stripe_customers.stripe_id == request.stripe_id
+        )
         row = await self.main_database.master().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
 

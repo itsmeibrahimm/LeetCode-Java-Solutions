@@ -32,7 +32,6 @@ from app.payin.repository.payer_repo import (
     InsertStripeCustomerInput,
     GetPayerByIdInput,
     UpdatePgpCustomerSetInput,
-    GetStripeCustomerInput,
     UpdateStripeCustomerSetInput,
     UpdateStripeCustomerWhereInput,
     UpdatePgpCustomerWhereInput,
@@ -41,6 +40,8 @@ from app.payin.repository.payer_repo import (
     PgpCustomerDbEntity,
     StripeCustomerDbEntity,
     GetPayerByDDPayerIdAndTypeInput,
+    GetStripeCustomerByStripeIdInput,
+    GetStripeCustomerByIdInput,
 )
 
 
@@ -628,8 +629,8 @@ class LegacyPayerOps(PayerOpsInterface):
                 pgp_customer_id,
             )
 
-            stripe_customer_entity = await self.payer_repo.get_stripe_customer(
-                GetStripeCustomerInput(stripe_id=pgp_customer_id)
+            stripe_customer_entity = await self.payer_repo.get_stripe_customer_by_stripe_id(
+                GetStripeCustomerByStripeIdInput(stripe_id=pgp_customer_id)
             )
             if not stripe_customer_entity:
                 try:
@@ -674,11 +675,14 @@ class LegacyPayerOps(PayerOpsInterface):
         is_found: bool = False
         try:
             if payer_type and payer_type != PayerType.MARKETPLACE:
-                stripe_cus_entity = await self.payer_repo.get_stripe_customer(
-                    GetStripeCustomerInput(stripe_id=payer_id)
-                    if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID
-                    else GetStripeCustomerInput(id=payer_id)
-                )
+                if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
+                    stripe_cus_entity = await self.payer_repo.get_stripe_customer_by_stripe_id(
+                        GetStripeCustomerByStripeIdInput(stripe_id=payer_id)
+                    )
+                else:
+                    stripe_cus_entity = await self.payer_repo.get_stripe_customer_by_id(
+                        GetStripeCustomerByIdInput(id=payer_id)
+                    )
                 # payer entity is optional
                 payer_entity = await self.payer_repo.get_payer_by_id(
                     request=GetPayerByIdInput(legacy_stripe_customer_id=payer_id)
