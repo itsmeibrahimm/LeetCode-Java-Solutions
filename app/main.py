@@ -39,7 +39,7 @@ app = FastAPI(title="Payment Service", debug=config.DEBUG)
 
 # middleware needs to be added in reverse order due to:
 # https://github.com/encode/starlette/issues/479
-app.add_middleware(DoorDashMetricsMiddleware, config=config)
+app.add_middleware(DoorDashMetricsMiddleware, config=config.API_STATSD_CONFIG)
 app.add_middleware(ReqContextMiddleware)
 if config.SENTRY_CONFIG:
     sentry_sdk.init(

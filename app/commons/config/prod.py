@@ -1,6 +1,11 @@
 import os
 
-from app.commons.config.app_config import AppConfig, SentryConfig, DBConfig
+from app.commons.config.app_config import (
+    AppConfig,
+    ApiStatsDConfig,
+    DBConfig,
+    SentryConfig,
+)
 from app.commons.config.secrets import Secret
 
 
@@ -13,7 +18,9 @@ def create_app_config() -> AppConfig:
         ENVIRONMENT="prod",
         DEBUG=False,
         REMOTE_SECRET_ENABLED=True,
-        METRICS_CONFIG={"service_name": "payment-service", "cluster": "prod"},
+        API_STATSD_CONFIG=ApiStatsDConfig(
+            TAGS={"service_name": "payment-service", "cluster": "prod"}
+        ),
         IDENTITY_SERVICE_HTTP_ENDPOINT="https://identity.doordash.com/",
         IDENTITY_SERVICE_GRPC_ENDPOINT="identity.int.doordash.com:50051",
         PAYIN_SERVICE_ID=1631011587067518976,

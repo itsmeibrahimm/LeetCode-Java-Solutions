@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from typing_extensions import final
@@ -46,6 +46,17 @@ class DBConfig:
             )
 
 
+@dataclass(frozen=True)
+class StatsDConfig:
+    SERVER: str = "prod-proxy-internal.doordash.com"
+    PREFIX: str = "dd.pay.payment-service"
+    TAGS: Dict[str, str] = field(default_factory=dict)
+
+
+class ApiStatsDConfig(StatsDConfig):
+    PREFIX: str = "dd.response"
+
+
 @final
 @dataclass(frozen=True)
 class AppConfig(SecretAware):
@@ -61,7 +72,6 @@ class AppConfig(SecretAware):
     ENVIRONMENT: str
     DEBUG: bool
     REMOTE_SECRET_ENABLED: bool
-    METRICS_CONFIG: Dict[str, str]
 
     # IDS
     IDENTITY_SERVICE_HTTP_ENDPOINT: str
@@ -105,8 +115,19 @@ class AppConfig(SecretAware):
     DSJ_API_BASE_URL: str = "https://api.doordash.com"
     DSJ_API_JWT_TOKEN_TTL: int = 1800  # in seconds
 
+    # Stats
     STATSD_SERVER: str = "prod-proxy-internal.doordash.com"
-    STATSD_PREFIX: str = "payment-service"
+    STATSD_PREFIX: str = "dd.pay.payment-service"
+
+    # general API responses, common across all apps
+    API_STATSD_CONFIG: ApiStatsDConfig = ApiStatsDConfig()
+
+    # service level metrics
+    SERVICE_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payment-service")
+
+    PAYOUT_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payout-service")
+    PAYIN_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payin-service")
+    LEDGER_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.ledger-service")
 
     SENTRY_CONFIG: Optional[SentryConfig] = None
 

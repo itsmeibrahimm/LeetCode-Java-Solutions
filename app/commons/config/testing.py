@@ -1,7 +1,6 @@
 import os
 
-from app.commons.config.app_config import DBConfig
-from .app_config import AppConfig
+from app.commons.config.app_config import AppConfig, ApiStatsDConfig, DBConfig
 from app.commons.config.secrets import Secret
 
 
@@ -16,7 +15,9 @@ def create_app_config() -> AppConfig:
         ENVIRONMENT="testing",
         DEBUG=True,
         REMOTE_SECRET_ENABLED=False,
-        METRICS_CONFIG={"service_name": "payment-service", "cluster": "testing"},
+        API_STATSD_CONFIG=ApiStatsDConfig(
+            TAGS={"service_name": "payment-service", "cluster": "testing"}
+        ),
         IDENTITY_SERVICE_HTTP_ENDPOINT="https://identity-service.doorcrawl.com",
         IDENTITY_SERVICE_GRPC_ENDPOINT="identity.doorcrawl-int.com:50051",
         PAYIN_SERVICE_ID=1631011374003906560,
