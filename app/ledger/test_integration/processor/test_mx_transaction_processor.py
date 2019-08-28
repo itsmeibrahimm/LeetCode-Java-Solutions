@@ -11,8 +11,6 @@ from tenacity import RetryError
 
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import (
-    InsertMxScheduledLedgerInput,
-    InsertMxLedgerInput,
     GetMxScheduledLedgerInput,
     GetMxLedgerByIdInput,
     GetMxScheduledLedgerOutput,
@@ -37,14 +35,32 @@ from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
+from app.ledger.test_integration.utils import (
+    prepare_mx_scheduled_ledger,
+    prepare_mx_ledger,
+)
 
 
 class TestMxTransactionProcessor:
     pytestmark = [pytest.mark.asyncio]
 
-    async def test_get_open_mx_scheduled_ledger_success(
+    @pytest.fixture(autouse=True)
+    def setup(
         self,
         mocker: pytest_mock.MockFixture,
+        mx_transaction_repository: MxTransactionRepository,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        mx_ledger_repository: MxLedgerRepository,
+    ):
+        self.mx_transaction_processor = MxTransactionProcessor(
+            mx_transaction_repo=mx_transaction_repository,
+            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
+            mx_ledger_repo=mx_ledger_repository,
+            log=mocker.Mock(),
+        )
+
+    async def test_get_open_mx_scheduled_ledger_success(
+        self,
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
@@ -53,35 +69,25 @@ class TestMxTransactionProcessor:
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
         interval_type = MxScheduledLedgerIntervalType.WEEKLY
+        scheduled_ledger_id = uuid.uuid4()
 
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=ledger_id,
-            payment_account_id=payment_account_id,
-            ledger_id=ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
-        )
-        ledger_to_insert = InsertMxLedgerInput(
-            id=ledger_id,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
+        ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=ledger_id, payment_account_id=payment_account_id
         )
         await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
+            ledger_id=ledger_id,
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
+        )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
-        mx_transaction_processor = MxTransactionProcessor(
-            mx_transaction_repo=mx_transaction_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-            mx_ledger_repo=mx_ledger_repository,
-            log=mocker.Mock(),
-        )
-        mx_transaction = await mx_transaction_processor.create(
+
+        mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
             currency=CurrencyType.USD,
@@ -115,125 +121,105 @@ class TestMxTransactionProcessor:
 
     async def test_get_open_multi_mx_scheduled_ledger_success(
         self,
-        mocker: pytest_mock.MockFixture,
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         ledger_id = uuid.uuid4()
+        scheduled_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
-        interval_type = MxScheduledLedgerIntervalType.WEEKLY
+        closed_at = datetime.utcnow().microsecond
 
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=ledger_id,
-            payment_account_id=payment_account_id,
+        # construct and insert paid/closed ledger/scheduled_ledger so that it cannot find an open scheduled ledger with given period
+        ledger_to_insert = await prepare_mx_ledger(
             ledger_id=ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=1566606165000,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
-        )
-        ledger_to_insert = InsertMxLedgerInput(
-            id=ledger_id,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.PAID.value,
-            balance=2000,
             payment_account_id=payment_account_id,
+            state=MxLedgerStateType.PAID,
         )
-        ledger_id_1 = uuid.uuid4()
-        ledger_to_insert_1 = InsertMxLedgerInput(
-            id=ledger_id_1,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
-        )
-        mx_scheduled_ledger_to_insert_1 = InsertMxScheduledLedgerInput(
-            id=ledger_id_1,
-            payment_account_id=payment_account_id,
-            ledger_id=ledger_id_1,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 8, 12, 7),
-            end_time=datetime(2019, 8, 19, 7),
-        )
-        ledger_id_2 = uuid.uuid4()
-        ledger_to_insert_2 = InsertMxLedgerInput(
-            id=ledger_id_2,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
-        )
-        mx_scheduled_ledger_to_insert_2 = InsertMxScheduledLedgerInput(
-            id=ledger_id_2,
-            payment_account_id=payment_account_id,
-            ledger_id=ledger_id_2,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 8, 5, 7),
-            end_time=datetime(2019, 8, 12, 7),
-        )
-
         await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
+            ledger_id=ledger_id,
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
+            closed_at=closed_at,
+        )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
-        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert_1)
+
+        # construct and insert open ledger/scheduled_ledger from (2019-08-12-7:00) to (2019-08-19-7:00)
+        ledger_id = uuid.uuid4()
+        scheduled_ledger_id = uuid.uuid4()
+        ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=ledger_id, payment_account_id=payment_account_id
+        )
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
+            ledger_id=ledger_id,
+            payment_account_id=payment_account_id,
+            routing_key=datetime(2019, 8, 13),
+        )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
-            mx_scheduled_ledger_to_insert_1
+            mx_scheduled_ledger_to_insert
         )
-        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert_2)
+
+        # construct and insert open ledger/scheduled_ledger from (2019-08-05-7:00) to (2019-08-12-7:00)
+        ledger_id = uuid.uuid4()
+        scheduled_ledger_id = uuid.uuid4()
+        ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=ledger_id, payment_account_id=payment_account_id
+        )
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
+            ledger_id=ledger_id,
+            payment_account_id=payment_account_id,
+            routing_key=datetime(2019, 8, 7),
+        )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
-            mx_scheduled_ledger_to_insert_2
+            mx_scheduled_ledger_to_insert
         )
-        mx_transaction_processor = MxTransactionProcessor(
-            mx_transaction_repo=mx_transaction_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-            mx_ledger_repo=mx_ledger_repository,
-            log=mocker.Mock(),
-        )
-        mx_transaction = await mx_transaction_processor.create(
+
+        mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
             currency=CurrencyType.USD,
             routing_key=routing_key,
-            interval_type=interval_type,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
         assert mx_transaction is not None
-        assert mx_transaction.ledger_id == ledger_id_2
+        assert mx_transaction.ledger_id == ledger_id
         assert mx_transaction.currency == CurrencyType.USD
         assert mx_transaction.routing_key == routing_key
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
-        get_mx_ledger_request = GetMxLedgerByIdInput(id=ledger_to_insert_2.id)
+        get_mx_ledger_request = GetMxLedgerByIdInput(id=ledger_id)
         mx_ledger = await mx_ledger_repository.get_ledger_by_id(get_mx_ledger_request)
         assert mx_ledger is not None
         assert mx_ledger.balance == 4000
 
     async def test_create_mx_ledger_success(
         self,
-        mocker: pytest_mock.MockFixture,
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
-        mx_transaction_processor = MxTransactionProcessor(
-            mx_transaction_repo=mx_transaction_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-            mx_ledger_repo=mx_ledger_repository,
-            log=mocker.Mock(),
-        )
-        mx_transaction = await mx_transaction_processor.create(
+
+        mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
             currency=CurrencyType.USD,
@@ -245,7 +231,7 @@ class TestMxTransactionProcessor:
 
         assert mx_transaction is not None
         assert mx_transaction.currency == CurrencyType.USD
-        assert mx_transaction.routing_key == datetime(2019, 8, 1)
+        assert mx_transaction.routing_key == routing_key
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
@@ -279,13 +265,7 @@ class TestMxTransactionProcessor:
         )
         payment_account_id = str(uuid.uuid4())
         with pytest.raises(MxTransactionCreationError) as e:
-            mx_transaction_processor = MxTransactionProcessor(
-                mx_transaction_repo=mx_transaction_repository,
-                mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-                mx_ledger_repo=mx_ledger_repository,
-                log=mocker.Mock(),
-            )
-            await mx_transaction_processor.create(
+            await self.mx_transaction_processor.create(
                 payment_account_id=payment_account_id,
                 amount=2000,
                 currency=CurrencyType.USD,
@@ -309,25 +289,22 @@ class TestMxTransactionProcessor:
     ):
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=ledger_id,
+        scheduled_ledger_id = uuid.uuid4()
+        routing_key = datetime(2019, 8, 1)
+
+        # construct and insert ledger/scheduled_ledger
+        ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=ledger_id, payment_account_id=payment_account_id
+        )
+        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
             payment_account_id=payment_account_id,
             ledger_id=ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
+            routing_key=routing_key,
         )
-        ledger_to_insert = InsertMxLedgerInput(
-            id=ledger_id,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
-        )
-
-        await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
         inserted_mx_scheduled_ledger = await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
         )
@@ -359,17 +336,11 @@ class TestMxTransactionProcessor:
             side_effect=mock_get_open_mx_scheduled_ledger_for_payment_account,
         )
 
-        mx_transaction_processor = MxTransactionProcessor(
-            mx_transaction_repo=mx_transaction_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-            mx_ledger_repo=mx_ledger_repository,
-            log=mocker.Mock(),
-        )
-        mx_transaction = await mx_transaction_processor.create(
+        mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
             currency=CurrencyType.USD,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
@@ -417,13 +388,7 @@ class TestMxTransactionProcessor:
         )
 
         with pytest.raises(MxTransactionCreationError) as e:
-            mx_transaction_processor = MxTransactionProcessor(
-                mx_transaction_repo=mx_transaction_repository,
-                mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-                mx_ledger_repo=mx_ledger_repository,
-                log=mocker.Mock(),
-            )
-            await mx_transaction_processor.create(
+            await self.mx_transaction_processor.create(
                 payment_account_id=payment_account_id,
                 amount=2000,
                 currency=CurrencyType.USD,
@@ -440,30 +405,26 @@ class TestMxTransactionProcessor:
 
     async def test_insert_mx_txn_and_update_ledger_balance_success(
         self,
-        mocker: pytest_mock.MockFixture,
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
-        ledger_to_insert = InsertMxLedgerInput(
-            id=ledger_id,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.PAID.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
+        scheduled_ledger_id = uuid.uuid4()
+        routing_key = datetime(2019, 8, 1)
+
+        ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=ledger_id, payment_account_id=payment_account_id
         )
         await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=ledger_id,
-            payment_account_id=payment_account_id,
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
             ledger_id=ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -475,17 +436,11 @@ class TestMxTransactionProcessor:
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        mx_transaction_processor = MxTransactionProcessor(
-            mx_transaction_repo=mx_transaction_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-            mx_ledger_repo=mx_ledger_repository,
-            log=mocker.Mock(),
-        )
-        mx_transaction = await mx_transaction_processor._insert_mx_txn_and_update_ledger_balance(
+        mx_transaction = await self.mx_transaction_processor._insert_mx_txn_and_update_ledger_balance(
             ledger_id=ledger_id, request_input=insert_request
         )
         assert mx_transaction is not None
@@ -502,30 +457,26 @@ class TestMxTransactionProcessor:
     async def test_insert_mx_txn_and_update_ledger_balance_retry_attempt_exceed_raise_exception(
         self,
         mock_update_ledger,
-        mocker: pytest_mock.MockFixture,
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
-        ledger_to_insert = InsertMxLedgerInput(
-            id=ledger_id,
-            type=MxLedgerType.SCHEDULED.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.PAID.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
+        scheduled_ledger_id = uuid.uuid4()
+        routing_key = datetime(2019, 8, 1)
+
+        ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=ledger_id, payment_account_id=payment_account_id
         )
         await mx_ledger_repository.insert_mx_ledger(ledger_to_insert)
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=ledger_id,
-            payment_account_id=payment_account_id,
+
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=scheduled_ledger_id,
             ledger_id=ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -537,15 +488,9 @@ class TestMxTransactionProcessor:
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
-        )
-        mx_transaction_processor = MxTransactionProcessor(
-            mx_transaction_repo=mx_transaction_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
-            mx_ledger_repo=mx_ledger_repository,
-            log=mocker.Mock(),
         )
 
         # todo: maybe need to fix this later
@@ -555,7 +500,7 @@ class TestMxTransactionProcessor:
         error = SubOE("Test lock not available error")
         mock_update_ledger.side_effect = error
         with pytest.raises(RetryError) as e:
-            await mx_transaction_processor._insert_mx_txn_and_update_ledger_balance(
+            await self.mx_transaction_processor._insert_mx_txn_and_update_ledger_balance(
                 ledger_id=ledger_id, request_input=insert_request
             )
         assert mock_update_ledger.call_count == e.value.last_attempt.attempt_number

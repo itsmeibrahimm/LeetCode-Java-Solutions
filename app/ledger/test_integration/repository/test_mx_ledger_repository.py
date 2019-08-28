@@ -6,10 +6,7 @@ import pytest
 from psycopg2 import errorcodes
 
 from app.commons.types import CurrencyType
-from app.ledger.core.data_types import (
-    InsertMxScheduledLedgerInput,
-    GetMxScheduledLedgerInput,
-)
+from app.ledger.core.data_types import GetMxScheduledLedgerInput
 from app.ledger.core.types import (
     MxLedgerStateType,
     MxLedgerType,
@@ -28,6 +25,10 @@ from app.ledger.repository.mx_ledger_repository import (
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
+from app.ledger.test_integration.utils import (
+    prepare_mx_ledger,
+    prepare_mx_scheduled_ledger,
+)
 
 
 class TestMxLedgerRepository:
@@ -37,34 +38,25 @@ class TestMxLedgerRepository:
         self, mx_ledger_repository: MxLedgerRepository
     ):
         mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
+        payment_account_id = str(uuid.uuid4())
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
-
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         assert mx_ledger.id == mx_ledger_id
-        assert mx_ledger.type == MxLedgerType.MANUAL
+        assert mx_ledger.type == MxLedgerType.SCHEDULED
         assert mx_ledger.currency == CurrencyType.USD
         assert mx_ledger.state == MxLedgerStateType.OPEN
         assert mx_ledger.balance == 2000
-        assert mx_ledger.payment_account_id == "pay_act_test_id"
+        assert mx_ledger.payment_account_id == payment_account_id
 
     async def test_insert_mx_ledger_raise_exception(
         self, mx_ledger_repository: MxLedgerRepository
     ):
         mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
+        payment_account_id = str(uuid.uuid4())
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
@@ -76,13 +68,9 @@ class TestMxLedgerRepository:
         self, mx_ledger_repository: MxLedgerRepository
     ):
         mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
+        payment_account_id = str(uuid.uuid4())
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
@@ -103,26 +91,21 @@ class TestMxLedgerRepository:
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
+        mx_scheduled_ledger_id = uuid.uuid4()
+        routing_key = datetime(2019, 8, 1)
+
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         assert mx_ledger is not None
 
-        mx_scheduled_ledger_id = uuid.uuid4()
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=mx_scheduled_ledger_id,
-            payment_account_id=payment_account_id,
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=mx_scheduled_ledger_id,
             ledger_id=mx_ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
-            closed_at=0,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -130,7 +113,7 @@ class TestMxLedgerRepository:
         # make sure we can find open scheduled_ledger with given period before process
         scheduled_ledger_request = GetMxScheduledLedgerInput(
             payment_account_id=payment_account_id,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
         scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
@@ -159,27 +142,24 @@ class TestMxLedgerRepository:
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.FAILED.value,
-            balance=2000,
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id,
             payment_account_id=payment_account_id,
+            state=MxLedgerStateType.FAILED,
         )
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         assert mx_ledger is not None
 
         close_at_micro_sec = datetime.utcnow().microsecond
         mx_scheduled_ledger_id = uuid.uuid4()
-        mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-            id=mx_scheduled_ledger_id,
-            payment_account_id=payment_account_id,
+        routing_key = datetime(2019, 8, 1)
+        mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
+            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
+            scheduled_ledger_id=mx_scheduled_ledger_id,
             ledger_id=mx_ledger_id,
-            interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
             closed_at=close_at_micro_sec,
-            start_time=datetime(2019, 7, 29, 7),
-            end_time=datetime(2019, 8, 5, 7),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -208,15 +188,12 @@ class TestMxLedgerRepository:
         self, mx_ledger_repository: MxLedgerRepository
     ):
         mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
+        payment_account_id = str(uuid.uuid4())
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
+
         mx_ledger_request = GetMxLedgerByIdInput(id=mx_ledger.id)
         retrieved_mx_ledger = await mx_ledger_repository.get_ledger_by_id(
             mx_ledger_request
@@ -234,20 +211,16 @@ class TestMxLedgerRepository:
         self, mx_ledger_repository: MxLedgerRepository
     ):
         mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
+        payment_account_id = str(uuid.uuid4())
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
+
         mx_ledger_request = GetMxLedgerByIdInput(id=uuid.uuid4())
         retrieved_mx_ledger = await mx_ledger_repository.get_ledger_by_id(
             mx_ledger_request
         )
-
         assert retrieved_mx_ledger is None
 
     async def test_get_open_ledger_for_payment_account_success(
@@ -255,13 +228,8 @@ class TestMxLedgerRepository:
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id=payment_account_id,
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
         )
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByAccountInput(
@@ -284,14 +252,12 @@ class TestMxLedgerRepository:
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.PAID.value,
-            balance=2000,
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id,
             payment_account_id=payment_account_id,
+            state=MxLedgerStateType.PAID,
         )
+
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByAccountInput(
             payment_account_id=payment_account_id
@@ -299,21 +265,16 @@ class TestMxLedgerRepository:
         retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
             mx_ledger_request
         )
-
         assert retrieved_mx_ledger is None
 
     async def test_get_open_ledger_for_payment_account_no_account(
         self, mx_ledger_repository: MxLedgerRepository
     ):
         mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.PAID.value,
-            balance=2000,
-            payment_account_id=str(uuid.uuid4()),
+        mx_ledger_to_insert = await prepare_mx_ledger(
+            ledger_id=mx_ledger_id, payment_account_id=str(uuid.uuid4())
         )
+
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         mx_ledger_request = GetMxLedgerByAccountInput(
             payment_account_id=str(uuid.uuid4())
@@ -321,7 +282,6 @@ class TestMxLedgerRepository:
         retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
             mx_ledger_request
         )
-
         assert retrieved_mx_ledger is None
 
     async def test_create_one_off_mx_ledger(
