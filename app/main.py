@@ -27,7 +27,7 @@ from app.middleware.doordash_metrics import (
 )
 from app.middleware.req_context import ReqContextMiddleware
 from app.payin.payin import create_payin_app
-from app.payout.payout import create_payout_app
+from app.payout.payout import create_payout_v0_app, create_payout_v1_app
 
 if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
     from development import debug
@@ -97,8 +97,12 @@ async def startup():
     )
 
     if "payout" in config.INCLUDED_APPS:
-        payout_app = create_payout_app(context, config)
-        app.mount(payout_app.openapi_prefix, payout_app)
+        for payout_app in [
+            create_payout_v0_app(context, config),
+            create_payout_v1_app(context, config),
+        ]:
+            app.mount(payout_app.openapi_prefix, payout_app)
+
         root_logger.info("Mounted payout app")
 
     if "payin" in config.INCLUDED_APPS:
