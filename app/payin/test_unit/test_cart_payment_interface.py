@@ -485,7 +485,10 @@ class TestCartPaymentInterface:
 
     def test_is_capture_immediate(self, cart_payment_interface):
         # Stub function: return value is fixed
-        intent = generate_payment_intent()
+        intent = generate_payment_intent(capture_method="manual")
+        assert cart_payment_interface._is_capture_immediate(intent) is False
+
+        intent = generate_payment_intent(capture_method="auto")
         assert cart_payment_interface._is_capture_immediate(intent) is False
 
     def test_populate_cart_payment_for_response(self, cart_payment_interface):
@@ -612,6 +615,7 @@ class TestCartPaymentInterface:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_intent=provider_intent,
+            status=ChargeStatus.SUCCEEDED,
         )
 
         expected_payment_charge = PaymentCharge(
@@ -619,7 +623,7 @@ class TestCartPaymentInterface:
             payment_intent_id=payment_intent.id,
             provider=pgp_payment_intent.provider,
             idempotency_key=result_payment_charge.idempotency_key,
-            status=ChargeStatus.REQUIRES_CAPTURE,
+            status=ChargeStatus.SUCCEEDED,
             currency=payment_intent.currency,
             amount=payment_intent.amount,
             amount_refunded=0,
@@ -643,7 +647,7 @@ class TestCartPaymentInterface:
             payment_charge_id=result_payment_charge.id,
             provider=pgp_payment_intent.provider,
             idempotency_key=result_payment_charge.idempotency_key,
-            status=ChargeStatus.REQUIRES_CAPTURE,
+            status=ChargeStatus.SUCCEEDED,
             currency=payment_intent.currency,
             amount=payment_intent.amount,
             amount_refunded=0,

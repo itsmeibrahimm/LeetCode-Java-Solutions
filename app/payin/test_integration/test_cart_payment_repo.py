@@ -628,3 +628,21 @@ class TestUpdatePaymentIntentStatus:
             payment_intent = await cart_payment_repository.update_payment_intent_status(
                 payment_intent.id, IntentStatus.CAPTURING.value, IntentStatus.INIT.value
             )
+
+
+class TestCartPayment:
+    @pytest.mark.asyncio
+    async def test_get_cart_payment_by_id(
+        self, cart_payment_repository: CartPaymentRepository, cart_payment: CartPayment
+    ):
+        # No result
+        result = await cart_payment_repository.get_cart_payment_by_id(
+            cart_payment_id=uuid4()
+        )
+        assert result is None
+
+        # Match
+        result = await cart_payment_repository.get_cart_payment_by_id(
+            cart_payment_id=cart_payment.id
+        )
+        assert result == cart_payment

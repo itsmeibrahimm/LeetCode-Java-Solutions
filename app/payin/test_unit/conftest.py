@@ -198,7 +198,7 @@ class MockedPaymentRepo:
             payment_intent_id=payment_intent_id,
             provider=provider,
             idempotency_key=idempotency_key,
-            status=ChargeStatus.REQUIRES_CAPTURE,
+            status=ChargeStatus(status),
             currency=currency,
             amount=amount,
             amount_refunded=amount_refunded,
@@ -232,7 +232,7 @@ class MockedPaymentRepo:
             payment_charge_id=payment_charge_id,
             provider=provider,
             idempotency_key=idempotency_key,
-            status=ChargeStatus.REQUIRES_CAPTURE,
+            status=ChargeStatus(status),
             currency=currency,
             amount=amount,
             amount_refunded=amount_refunded,
@@ -397,7 +397,7 @@ def stripe_interface():
     # Intent functions
     mocked_intent = MagicMock()
     mocked_intent.id = "test_intent_id"
-    mocked_intent.status = "succeeded"
+    mocked_intent.status = "requires_capture"  # Assume delayed capture is used
     mocked_intent.charges = MagicMock()
     mocked_intent.charges.data = [MagicMock()]
 

@@ -35,7 +35,12 @@ class TestCartPayment:
         return request_body
 
     def _get_cart_payment_create_request(
-        self, payer, payment_method, amount=500, idempotency_key=None
+        self,
+        payer,
+        payment_method,
+        amount=500,
+        capture_method="manual",
+        idempotency_key=None,
     ):
         request_body = {
             "payer_id": payer["id"],
@@ -44,7 +49,7 @@ class TestCartPayment:
             "payment_country": "US",
             "currency": "USD",
             "payment_method_id": payment_method["id"],
-            "capture_method": "manual",
+            "capture_method": capture_method,
             "client_description": f"{payer['id']} description",
             "payer_statement_description": f"{payer['id'][0:10]} statement",
             "metadata": {
@@ -120,10 +125,10 @@ class TestCartPayment:
         return payment_method
 
     def _test_cart_payment_creation(
-        self, stripe_api, client, payer, payment_method, amount
+        self, stripe_api, client, payer, payment_method, amount, capture_method
     ):
         request_body = self._get_cart_payment_create_request(
-            payer, payment_method, amount
+            payer, payment_method, amount, capture_method
         )
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
@@ -212,6 +217,7 @@ class TestCartPayment:
             payer=payer,
             payment_method=payment_method,
             amount=500,
+            capture_method="manual",
         )
 
         # Order cart adjustment
@@ -221,6 +227,16 @@ class TestCartPayment:
         # self._test_cart_payment_adjustment(
         #     stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=300
         # )
+
+        # Success case: intent created, auto captured
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=500,
+            capture_method="auto",
+        )
 
         # Other payer cannot use some else's payment method
         other_payer = payer = self._test_payer_creation(stripe_api, client)

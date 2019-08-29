@@ -257,18 +257,20 @@ class CartPaymentInterface:
             provider_customer_resource_id=provider_customer_resource_id,
         )
 
+        target_intent_status = self._get_intent_status_from_provider_status(
+            provider_payment_intent.status
+        )
         async with self.payment_repo.payment_database_transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
-            # TODO Determine intent status based on capture method.  Below assumes manual case.
             updated_intent = await self.payment_repo.update_payment_intent_status(
                 id=payment_intent.id,
-                new_status=IntentStatus.REQUIRES_CAPTURE,
+                new_status=target_intent_status,
                 previous_status=payment_intent.status,
             )
             updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
                 id=pgp_payment_intent.id,
-                status=IntentStatus.REQUIRES_CAPTURE,
+                status=target_intent_status,
                 resource_id=provider_payment_intent.id,
                 charge_resource_id=provider_payment_intent.charges.data[0].id,
             )
@@ -276,11 +278,16 @@ class CartPaymentInterface:
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
                 provider_intent=provider_payment_intent,
+                status=self._get_charge_status_from_intent_status(target_intent_status),
             )
 
-        # Depending on configuration, submitting payment to provider may require immediate capture.
-        if self._is_capture_immediate(payment_intent):
-            await self.capture_payment(payment_intent)
+        # When submitting a new intent, capture may happen if:
+        # (a) Caller specified capture_method = auto.  This happens above, and intents are already transitioned to success/failed states.
+        # (b) Caller specified capture_method = manual (delay capture) but based on config we are not going to wait - handled below.
+        if self._is_capture_immediate(
+            payment_intent
+        ) and self._does_intent_require_capture(updated_intent):
+            await self.capture_payment(updated_intent)
 
         return updated_intent, updated_pgp_intent
 
@@ -492,6 +499,7 @@ class CartPaymentInterface:
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         provider_intent: ProviderPaymentIntent,
+        status: ChargeStatus,
     ) -> Tuple[PaymentCharge, PgpPaymentCharge]:
         # TODO Add config parameter that switches between writing to payment db and legacy tables in main db, and support
         # writing to those legacy tables for backward compatibility.
@@ -500,7 +508,7 @@ class CartPaymentInterface:
             payment_intent_id=payment_intent.id,
             provider=PaymentProvider.STRIPE.value,
             idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
-            status=ChargeStatus.REQUIRES_CAPTURE,
+            status=status,
             currency=payment_intent.currency,
             amount=payment_intent.amount,
             amount_refunded=0,
@@ -520,7 +528,7 @@ class CartPaymentInterface:
             payment_charge_id=payment_charge.id,
             provider=PaymentProvider.STRIPE.value,
             idempotency_key=payment_charge.idempotency_key,
-            status=ChargeStatus.REQUIRES_CAPTURE,
+            status=status,
             currency=provider_charge.currency,
             amount=provider_charge.amount,
             amount_refunded=provider_charge.amount_refunded,
