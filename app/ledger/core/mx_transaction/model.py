@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Json
+from pydantic import BaseModel
 from typing_extensions import final
 
 from app.ledger.core.types import MxTransactionType, MxScheduledLedgerIntervalType
@@ -28,8 +28,8 @@ class MxTransaction(MxTransactionModel):
     target_id: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
-    context: Optional[Json]
-    metadata: Optional[Json]
+    context: Optional[dict]
+    metadata: Optional[dict]
 
 
 # todo：refactor this into new folder later

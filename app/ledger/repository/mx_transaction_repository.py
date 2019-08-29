@@ -82,7 +82,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     id=mx_ledger_id,
                     type=request.type,
                     currency=request.currency,
-                    state=MxLedgerStateType.OPEN.value,
+                    state=MxLedgerStateType.OPEN.value,  # todo: update to Processing when input is micro deposit
                     balance=request.amount,
                     payment_account_id=request.payment_account_id,
                     amount_paid=0,
@@ -97,6 +97,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 created_mx_ledger = InsertMxLedgerOutput.from_row(ledger_row)
             except Exception as e:
                 raise e
+            # todo: skip mirco deposit type
             try:
                 # construct mx_scheduled_ledger and insert
                 mx_scheduled_ledger_id = uuid.uuid4()

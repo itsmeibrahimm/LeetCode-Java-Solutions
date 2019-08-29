@@ -150,7 +150,7 @@ class TestMxLedgerRepository:
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         assert mx_ledger is not None
 
-        close_at_micro_sec = datetime.utcnow().microsecond
+        close_at_micro_sec = int(datetime.utcnow().timestamp() * 1000000)
         mx_scheduled_ledger_id = uuid.uuid4()
         routing_key = datetime(2019, 8, 1)
         mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(

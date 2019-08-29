@@ -70,8 +70,8 @@ class MxTransactionProcessor:
         routing_key: datetime,
         interval_type: MxScheduledLedgerIntervalType,
         target_id: Optional[str] = None,
-        context: Optional[str] = None,
-        metadata: Optional[str] = None,
+        context: Optional[dict] = None,
+        metadata: Optional[dict] = None,
         legacy_transaction_id: Optional[str] = None,
     ) -> MxTransaction:
         """

@@ -9,14 +9,14 @@ from app.commons.types import CurrencyType
 from app.ledger.core.types import MxLedgerType, MxLedgerStateType
 
 
-class MxTransactionModel(BaseModel):
+class MxLedgerModel(BaseModel):
     class Config:
         allow_mutation = False
         orm_mode = True
 
 
 @final
-class MxLedger(MxTransactionModel):
+class MxLedger(MxLedgerModel):
     id: UUID
     type: MxLedgerType
     currency: CurrencyType

@@ -15,8 +15,8 @@ class CreateMxTransactionRequest(BaseModel):
     routing_key: datetime
     interval_type: MxScheduledLedgerIntervalType
     target_id: Optional[str]
-    context: Optional[str]
-    metadata: Optional[str]
+    context: Optional[dict]  # Json
+    metadata: Optional[dict]  # Json
     legacy_transaction_id: Optional[str]
 
 

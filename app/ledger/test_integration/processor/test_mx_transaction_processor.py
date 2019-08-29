@@ -129,7 +129,7 @@ class TestMxTransactionProcessor:
         scheduled_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
-        closed_at = datetime.utcnow().microsecond
+        closed_at = int(datetime.utcnow().timestamp() * 1000000)
 
         # construct and insert paid/closed ledger/scheduled_ledger so that it cannot find an open scheduled ledger with given period
         ledger_to_insert = await prepare_mx_ledger(

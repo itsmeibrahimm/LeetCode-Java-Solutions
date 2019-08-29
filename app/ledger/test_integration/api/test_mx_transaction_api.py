@@ -20,8 +20,8 @@ class TestMxTransactionAPI:
             "routing_key": datetime(2019, 8, 1).isoformat(),
             "interval_type": MxScheduledLedgerIntervalType.WEEKLY.value,
             "target_id": "optional_target_id",
-            "context": "{}",
-            "metadata": "{}",
+            "context": {"abc": 123, "def": 456},
+            "metadata": {},
             "legacy_transaction_id": "optional_legacy_transaction_id",
         }
         response = client.post(

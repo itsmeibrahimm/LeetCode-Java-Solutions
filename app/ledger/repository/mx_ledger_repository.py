@@ -130,7 +130,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
                             mx_scheduled_ledgers.closed_at == 0,
                         )
                     )
-                    .values(closed_at=datetime.utcnow().microsecond)
+                    .values(closed_at=int(datetime.utcnow().timestamp() * 1000000))
                     .returning(*mx_scheduled_ledgers.table.columns.values())
                 )
                 await connection.fetch_one(scheduled_ledger_stmt)
