@@ -24,8 +24,7 @@ PaymentGatewayProviderCustomer.update_forward_refs()
 
 
 @final
-@dataclass(frozen=True)
-class Payer:
+class Payer(BaseModel):
     id: str
     created_at: Optional[datetime]
     updated_at: Optional[datetime]

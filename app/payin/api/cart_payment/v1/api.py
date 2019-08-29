@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends
 from structlog import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import PaymentError, PaymentException
+from app.commons.error.errors import (
+    PaymentError,
+    PaymentException,
+    PaymentErrorResponseBody,
+)
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
@@ -29,10 +33,22 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 
+api_tags = ["CartPaymentV1"]
 router = APIRouter()
 
 
-@router.post("/api/v1/cart_payments", status_code=HTTP_201_CREATED)
+@router.post(
+    "/api/v1/cart_payments",
+    response_model=CartPayment,
+    status_code=HTTP_201_CREATED,
+    operation_id="CreateCartPayment",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def create_cart_payment(
     cart_payment_request: CreateCartPaymentRequest,
     log: BoundLogger = Depends(get_logger_from_req),
@@ -97,7 +113,18 @@ async def create_cart_payment(
         )
 
 
-@router.post("/api/v1/cart_payments/{cart_payment_id}/adjust", status_code=HTTP_200_OK)
+@router.post(
+    "/api/v1/cart_payments/{cart_payment_id}/adjust",
+    response_model=CartPayment,
+    status_code=HTTP_200_OK,
+    operation_id="AdjustCartPayment",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def update_cart_payment(
     cart_payment_id: UUID,
     cart_payment_request: UpdateCartPaymentRequest,
@@ -154,7 +181,9 @@ def create_request_to_model(
         client_description=cart_payment_request.client_description,
         payer_statement_description=cart_payment_request.payer_statement_description,
         legacy_payment=get_legacy_payment_model(cart_payment_request.legacy_payment),
-        split_payment=SplitPayment(
+        split_payment=None
+        if not cart_payment_request.split_payment
+        else SplitPayment(
             payout_account_id=getattr(
                 cart_payment_request.split_payment, "payout_account_id", None
             ),

@@ -1,14 +1,15 @@
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional
+
+from pydantic import BaseModel
 from typing_extensions import final
 from app.payin.core.cart_payment.types import CartType, IntentStatus, ChargeStatus
 from uuid import UUID
 
 
 @final
-@dataclass(frozen=True)
-class LegacyPayment:
+class LegacyPayment(BaseModel):
     dd_consumer_id: Optional[str] = None
     dd_stripe_card_id: Optional[str] = None
     dd_charge_id: Optional[str] = None
@@ -18,22 +19,19 @@ class LegacyPayment:
 
 
 @final
-@dataclass(frozen=True)
-class SplitPayment:
+class SplitPayment(BaseModel):
     payout_account_id: str
     application_fee_amount: int
 
 
 @final
-@dataclass(frozen=True)
-class CartMetadata:
+class CartMetadata(BaseModel):
     reference_id: int
     ct_reference_id: int
     type: CartType
 
 
-@dataclass
-class CartPayment:
+class CartPayment(BaseModel):
     id: UUID
     amount: int
     payer_id: str
@@ -50,8 +48,7 @@ class CartPayment:
 
 
 @final
-@dataclass(frozen=True)
-class PaymentIntent:
+class PaymentIntent(BaseModel):
     id: UUID
     cart_payment_id: UUID
     idempotency_key: str

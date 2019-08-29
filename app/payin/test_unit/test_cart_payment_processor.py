@@ -123,7 +123,7 @@ class TestCartPaymentProcessor:
     async def test_submit(self, cart_payment_processor, request_cart_payment):
         result_cart_payment = await cart_payment_processor.submit_payment(
             request_cart_payment=request_cart_payment,
-            idempotency_key=uuid.uuid4(),
+            idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
             client_description="Client description",
@@ -150,7 +150,7 @@ class TestCartPaymentProcessor:
         # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
         result = await cart_payment_processor.submit_payment(
             request_cart_payment=request_cart_payment,
-            idempotency_key=uuid.uuid4(),
+            idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
             client_description="Client description",
@@ -164,7 +164,7 @@ class TestCartPaymentProcessor:
         # Second submission attempt
         second_result = await cart_payment_processor.submit_payment(
             request_cart_payment=request_cart_payment,
-            idempotency_key=uuid.uuid4(),
+            idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
             client_description="Client description",
@@ -180,7 +180,7 @@ class TestCartPaymentProcessor:
 
         with pytest.raises(CartPaymentReadError) as payment_error:
             await cart_payment_processor.update_payment(
-                idempotency_key=uuid.uuid4(),
+                idempotency_key=str(uuid.uuid4()),
                 cart_payment_id=uuid.uuid4(),
                 payer_id="payer_id",
                 amount=500,
@@ -197,7 +197,7 @@ class TestCartPaymentProcessor:
         cart_payment = generate_cart_payment()
         updated_amount = cart_payment.amount + 100
         result = await cart_payment_processor.update_payment(
-            idempotency_key=uuid.uuid4(),
+            idempotency_key=str(uuid.uuid4()),
             cart_payment_id=cart_payment.id,
             payer_id=cart_payment.payer_id,
             amount=updated_amount,
@@ -214,7 +214,7 @@ class TestCartPaymentProcessor:
         cart_payment = generate_cart_payment()
         updated_amount = cart_payment.amount + 100
         result = await cart_payment_processor.update_payment(
-            idempotency_key=uuid.uuid4(),
+            idempotency_key=str(uuid.uuid4()),
             cart_payment_id=cart_payment.id,
             payer_id=cart_payment.payer_id,
             amount=updated_amount,

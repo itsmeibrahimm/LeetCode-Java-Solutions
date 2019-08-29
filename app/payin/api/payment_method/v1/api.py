@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends
 from structlog import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import PaymentError, PaymentException
+from app.commons.error.errors import (
+    PaymentError,
+    PaymentException,
+    PaymentErrorResponseBody,
+)
 from app.commons.types import CountryCode
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
 
@@ -24,10 +28,22 @@ from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 
+api_tags = ["PaymentMethodV1"]
 router = APIRouter()
 
 
-@router.post("/api/v1/payment_methods", status_code=HTTP_201_CREATED)
+@router.post(
+    "/api/v1/payment_methods",
+    response_model=PaymentMethod,
+    status_code=HTTP_201_CREATED,
+    operation_id="CreatePaymentMethod",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def create_payment_method(
     request: Request,
     req_body: CreatePaymentMethodRequest,
@@ -88,7 +104,15 @@ async def create_payment_method(
 
 
 @router.get(
-    "/api/v1/payment_methods/{payer_id}/{payment_method_id}", status_code=HTTP_200_OK
+    "/api/v1/payment_methods/{payer_id}/{payment_method_id}",
+    response_model=PaymentMethod,
+    status_code=HTTP_200_OK,
+    operation_id="GetPaymentMethod",
+    responses={
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
 )
 async def get_payment_method(
     request: Request,
@@ -147,7 +171,16 @@ async def get_payment_method(
     return payment_method
 
 
-@router.get("/api/v1/payment_methods", status_code=HTTP_200_OK)
+@router.get(
+    "/api/v1/payment_methods",
+    status_code=HTTP_200_OK,
+    operation_id="ListPaymentMethod",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def list_payment_methods(
     request: Request,
     payer_id: str = None,
@@ -168,7 +201,16 @@ async def list_payment_methods(
 
 
 @router.delete(
-    "/api/v1/payment_methods/{payer_id}/{payment_method_id}", status_code=HTTP_200_OK
+    "/api/v1/payment_methods/{payer_id}/{payment_method_id}",
+    response_model=PaymentMethod,
+    status_code=HTTP_200_OK,
+    operation_id="DeletePaymentMethod",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
 )
 async def delete_payment_method(
     request: Request,

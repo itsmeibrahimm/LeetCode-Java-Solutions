@@ -787,7 +787,7 @@ class TestCartPaymentInterface:
         request_cart_payment = generate_cart_payment()
         payment_resource_id = "payment_resource_id"
         customer_resource_id = "customer_resource_id"
-        idempotency_key = uuid.uuid4()
+        idempotency_key = str(uuid.uuid4())
         country = "US"
         currency = "USD"
         client_description = "test"
@@ -955,7 +955,7 @@ class TestCartPaymentInterface:
         cart_payment = generate_cart_payment()
         result_cart_payment = await cart_payment_interface._add_amount_to_cart_payment(
             cart_payment=cart_payment,
-            idempotency_key=uuid.uuid4(),
+            idempotency_key=str(uuid.uuid4()),
             payment_intents=[generate_payment_intent(cart_payment_id=cart_payment.id)],
             amount=875,
             client_description=None,

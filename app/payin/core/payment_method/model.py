@@ -1,7 +1,7 @@
 from datetime import datetime
-from dataclasses import dataclass
 from typing import Optional
 
+from pydantic import BaseModel
 from typing_extensions import final
 
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
@@ -12,8 +12,7 @@ from app.payin.repository.payment_method_repo import (
 
 
 @final
-@dataclass(frozen=True)
-class Card:
+class Card(BaseModel):
     last4: str
     exp_year: str
     exp_month: str
@@ -25,8 +24,7 @@ class Card:
 
 
 @final
-@dataclass(frozen=True)
-class PaymentMethod:
+class PaymentMethod(BaseModel):
     id: str
     payment_provider: str
     card: Card

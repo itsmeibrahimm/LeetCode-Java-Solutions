@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends
 from structlog import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import PaymentException, PaymentError
+from app.commons.error.errors import (
+    PaymentException,
+    PaymentError,
+    PaymentErrorResponseBody,
+)
 from app.commons.types import CountryCode
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
 from app.payin.core.exceptions import PayinErrorCode
@@ -21,10 +25,22 @@ from starlette.status import (
 from app.payin.core.payer.types import PayerType
 from app.payin.core.types import PayerIdType
 
+
+api_tags = ["PayerV1"]
 router = APIRouter()
 
 
-@router.post("/api/v1/payers", status_code=HTTP_201_CREATED)
+@router.post(
+    "/api/v1/payers",
+    response_model=Payer,
+    status_code=HTTP_201_CREATED,
+    operation_id="CreatePayer",
+    responses={
+        HTTP_422_UNPROCESSABLE_ENTITY: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def create_payer(
     req_body: CreatePayerRequest,
     log: BoundLogger = Depends(get_logger_from_req),
@@ -67,7 +83,17 @@ async def create_payer(
     return payer
 
 
-@router.get("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
+@router.get(
+    "/api/v1/payers/{payer_id}",
+    response_model=Payer,
+    status_code=HTTP_200_OK,
+    operation_id="GetPayer",
+    responses={
+        HTTP_422_UNPROCESSABLE_ENTITY: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def get_payer(
     payer_id: str,
     country: CountryCode = CountryCode.US,
@@ -112,7 +138,17 @@ async def get_payer(
     return payer
 
 
-@router.patch("/api/v1/payers/{payer_id}", status_code=HTTP_200_OK)
+@router.patch(
+    "/api/v1/payers/{payer_id}",
+    response_model=Payer,
+    status_code=HTTP_200_OK,
+    operation_id="UpdatePayer",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def update_payer(
     payer_id: str,
     req_body: UpdatePayerRequest,

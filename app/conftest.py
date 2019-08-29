@@ -237,7 +237,7 @@ class PaymentIntentFactory(factory.Factory):
     country = CountryCode.US
     currency = CurrencyType.USD
     status = IntentStatus.INIT
-    statement_descriptor = str
+    statement_descriptor = "test statement desriptor"
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)
     captured_at = None
