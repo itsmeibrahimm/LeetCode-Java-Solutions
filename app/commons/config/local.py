@@ -82,7 +82,7 @@ def create_app_config() -> AppConfig:
         STRIPE_US_PUBLIC_KEY=Secret(
             name="stripe_us_public_key", value="pk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
         ),
-        DSJ_API_BASE_URL="",
+        DSJ_API_BASE_URL="https://api.doorcrawl.com",
         DSJ_API_USER_EMAIL=Secret(name="dsj_api_user_email", value=""),
         DSJ_API_USER_PASSWORD=Secret(name="dsj_api_user_password", value=""),
         DSJ_API_JWT_TOKEN_TTL=1800,

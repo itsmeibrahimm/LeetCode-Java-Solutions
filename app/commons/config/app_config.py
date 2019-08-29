@@ -112,7 +112,7 @@ class AppConfig(SecretAware):
     # DSJ client
     DSJ_API_USER_EMAIL: Secret
     DSJ_API_USER_PASSWORD: Secret
-    DSJ_API_BASE_URL: str = "https://api.doordash.com"
+    DSJ_API_BASE_URL: str
     DSJ_API_JWT_TOKEN_TTL: int = 1800  # in seconds
 
     # Stats
