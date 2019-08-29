@@ -20,7 +20,7 @@ import uuid
 @pytest.mark.asyncio
 class TestCartPaymentProcessor:
     """
-    Test external facing functions exposed by app/payin/ccore/cart_payment/processor.py.
+    Test external facing functions exposed by app/payin/core/cart_payment/processor.py.
     """
 
     @pytest.fixture
@@ -65,7 +65,7 @@ class TestCartPaymentProcessor:
         with pytest.raises(PaymentMethodReadError) as payment_error:
             await cart_payment_processor.submit_payment(
                 request_cart_payment=request_cart_payment,
-                idempotency_key=uuid.uuid4(),
+                idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
                 client_description="Client description",
@@ -100,7 +100,7 @@ class TestCartPaymentProcessor:
         with pytest.raises(PaymentMethodReadError) as payment_error:
             await cart_payment_processor.submit_payment(
                 request_cart_payment=request_cart_payment,
-                idempotency_key=uuid.uuid4(),
+                idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
                 client_description="Client description",

@@ -267,7 +267,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             .returning(*payers.table.columns.values())
         )
         row = await self.payment_database.master().fetch_one(stmt)
-        return PayerDbEntity.from_row(row) if row else None
+        return PayerDbEntity.from_row(row)  # type: ignore
 
     async def insert_payer_and_pgp_customer(
         self, payer_input: InsertPayerInput, pgp_customer_input: InsertPgpCustomerInput

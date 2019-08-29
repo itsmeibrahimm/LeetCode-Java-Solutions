@@ -21,7 +21,7 @@ def run_scheduler():
     scheduler.add_job(
         capture_uncaptured_payment_intents,
         "cron",
-        minute="*/1",
+        minute="*/5",
         kwargs={"app_context": app_context, "cart_payment_repo": cart_payment_repo},
     )
 

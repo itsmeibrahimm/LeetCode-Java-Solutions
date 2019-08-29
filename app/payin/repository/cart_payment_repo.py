@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, List, Optional
 from uuid import UUID
 
+from sqlalchemy import and_
 from typing_extensions import final
 
 from app.payin.core.cart_payment.model import (
@@ -14,6 +16,7 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentCharge,
 )
 from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.models.paymentdb import (
     cart_payments,
     payment_intents,
@@ -79,9 +82,11 @@ class CartPaymentRepository(PayinDBRepository):
             updated_at=row[cart_payments.updated_at],
         )
 
-    async def find_uncaptured_payment_intents(self) -> List[PaymentIntent]:
+    async def find_payment_intents_with_status(
+        self, status: IntentStatus
+    ) -> List[PaymentIntent]:
         statement = payment_intents.table.select().where(
-            payment_intents.status == IntentStatus.REQUIRES_CAPTURE
+            payment_intents.status == status
         )
         results = await self.payment_database.master().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
@@ -169,12 +174,45 @@ class CartPaymentRepository(PayinDBRepository):
         )
 
     async def update_payment_intent_status(
-        self, id: UUID, status: str
+        self, id: UUID, new_status: str, previous_status: str
     ) -> PaymentIntent:
+        """
+        Updates a payment intent's status taking into account the previous status to prevent
+        race conditions
+
+        :param id:
+        :param new_status:
+        :param previous_status: the status from which the intent is transitioning
+        :return:
+        """
+        statement = (
+            payment_intents.table.update()
+            .where(
+                and_(
+                    payment_intents.id == id, payment_intents.status == previous_status
+                )
+            )
+            .values(status=new_status)
+            .returning(*payment_intents.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+
+        # Record was not updated
+        if not row:
+            raise PaymentIntentCouldNotBeUpdatedError()
+
+        return self.to_payment_intent(row)
+
+    async def update_payment_intent(
+        self, id: UUID, status: str, amount_received: int, captured_at: datetime
+    ):
         statement = (
             payment_intents.table.update()
             .where(payment_intents.id == id)
-            .values(status=status)
+            .values(
+                status=status, amount_received=amount_received, captured_at=captured_at
+            )
             .returning(*payment_intents.table.columns.values())
         )
 

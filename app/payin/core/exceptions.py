@@ -155,6 +155,18 @@ class PaymentIntentRefundError(PayinError):
     pass
 
 
+class PaymentIntentNotInRequiresCaptureState(Exception):
+    pass
+
+
+class PaymentIntentCouldNotBeUpdatedError(Exception):
+    pass
+
+
+class PaymentIntentConcurrentAccessError(Exception):
+    pass
+
+
 ###########################################################
 # StripeDispute Errors                                      #
 ###########################################################

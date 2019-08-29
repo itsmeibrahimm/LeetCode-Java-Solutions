@@ -19,6 +19,7 @@ from app.payin.core.cart_payment.types import (
     CartType,
     ChargeStatus,
 )
+from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -147,8 +148,8 @@ class TestPaymentIntent:
     async def test_find_uncaptured_payment_intents_when_none_exist(
         self, cart_payment_repository: CartPaymentRepository
     ):
-        uncaptured_payment_intents = (
-            await cart_payment_repository.find_uncaptured_payment_intents()
+        uncaptured_payment_intents = await cart_payment_repository.find_payment_intents_with_status(
+            IntentStatus.REQUIRES_CAPTURE
         )
         assert uncaptured_payment_intents == []
 
@@ -157,8 +158,8 @@ class TestPaymentIntent:
     async def test_find_uncaptured_payment_intents_when_one_exists(
         self, cart_payment_repository: CartPaymentRepository, payment_intent
     ):
-        uncaptured_payment_intents = (
-            await cart_payment_repository.find_uncaptured_payment_intents()
+        uncaptured_payment_intents = await cart_payment_repository.find_payment_intents_with_status(
+            IntentStatus.REQUIRES_CAPTURE
         )
         uncaptured_payment_intent_ids = [pi.id for pi in uncaptured_payment_intents]
         assert uncaptured_payment_intent_ids == [payment_intent.id]
@@ -601,3 +602,29 @@ class TestPgpPaymentCharge:
         )
 
         assert result == expected_charge
+
+
+class TestUpdatePaymentIntentStatus:
+    @pytest.mark.asyncio
+    async def test_success_returns_row(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        payment_intent = await cart_payment_repository.update_payment_intent_status(
+            payment_intent.id,
+            IntentStatus.CAPTURING.value,
+            IntentStatus.REQUIRES_CAPTURE.value,
+        )
+        assert payment_intent.status == IntentStatus.CAPTURING.value
+
+    @pytest.mark.asyncio
+    async def test_failure_returns_nothing(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        with pytest.raises(PaymentIntentCouldNotBeUpdatedError):
+            payment_intent = await cart_payment_repository.update_payment_intent_status(
+                payment_intent.id, IntentStatus.CAPTURING.value, IntentStatus.INIT.value
+            )

@@ -1,10 +1,7 @@
 import os
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, List
-from uuid import uuid4
 
-import factory
 import pytest
 from _pytest.nodes import Item
 from pytest_mock import MockFixture
@@ -13,18 +10,11 @@ from starlette.testclient import TestClient
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.database.infra import DB
-from app.commons.types import CountryCode, CurrencyType
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
-from app.payin.core.cart_payment.model import PaymentIntent
-from app.payin.core.cart_payment.types import (
-    CaptureMethod,
-    ConfirmationMethod,
-    IntentStatus,
-)
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 
@@ -215,30 +205,3 @@ def client():
 
     with TestClient(app) as client:
         yield client
-
-
-# Factories
-
-
-class PaymentIntentFactory(factory.Factory):
-    class Meta:
-        model = PaymentIntent
-
-    id = factory.LazyAttribute(lambda o: str(uuid4()))
-    cart_payment_id = factory.LazyAttribute(lambda o: str(uuid4()))
-    idempotency_key = factory.LazyAttribute(lambda o: str(uuid4()))
-    amount_initiated = 100
-    amount = 100
-    amount_capturable = 100
-    amount_received = 0
-    application_fee_amount = 0
-    capture_method = CaptureMethod.MANUAL
-    confirmation_method = ConfirmationMethod.MANUAL
-    country = CountryCode.US
-    currency = CurrencyType.USD
-    status = IntentStatus.INIT
-    statement_descriptor = "test statement desriptor"
-    created_at = factory.LazyFunction(datetime.utcnow)
-    updated_at = factory.LazyFunction(datetime.utcnow)
-    captured_at = None
-    cancelled_at = None

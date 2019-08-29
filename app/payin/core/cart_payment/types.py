@@ -22,6 +22,8 @@ class IntentStatus(str, Enum):
     INIT = "init"
     PROCESSING = "processing"
     REQUIRES_CAPTURE = "requires_capture"
+    CAPTURE_FAILED = "capture_failed"
+    CAPTURING = "capturing"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"

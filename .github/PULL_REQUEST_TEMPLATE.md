@@ -1,6 +1,7 @@
 ## Description
+
 ### Change summary
-<!-- Add breif description of what has changed and why-->
+<!-- Add brief description of what has changed and why-->
 
 ### Type of change
 - [ ] Bug fix

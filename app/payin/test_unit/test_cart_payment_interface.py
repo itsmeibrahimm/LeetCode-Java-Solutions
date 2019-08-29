@@ -1,21 +1,21 @@
+import uuid
 from copy import deepcopy
-import pytest
 from unittest.mock import MagicMock
+
+import asynctest
+import pytest
+from asynctest import create_autospec
+
 from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
+from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
     PaymentCharge,
     PgpPaymentCharge,
 )
+from app.payin.core.cart_payment.processor import CartPaymentInterface
 from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
-from app.payin.tests.utils import (
-    generate_payment_intent,
-    generate_pgp_payment_intent,
-    generate_cart_payment,
-    generate_provider_charges,
-    FunctionMock,
-)
 from app.payin.core.exceptions import (
     PaymentIntentRefundError,
     CartPaymentCreateError,
@@ -23,8 +23,16 @@ from app.payin.core.exceptions import (
     PaymentIntentCancelError,
     PaymentIntentCaptureError,
     PayinErrorCode,
+    PaymentIntentCouldNotBeUpdatedError,
+    PaymentIntentConcurrentAccessError,
 )
-import uuid
+from app.payin.tests.utils import (
+    generate_payment_intent,
+    generate_pgp_payment_intent,
+    generate_cart_payment,
+    generate_provider_charges,
+    FunctionMock,
+)
 
 
 class TestCartPaymentInterface:
@@ -184,18 +192,12 @@ class TestCartPaymentInterface:
             is False
         )
 
-    def test_has_capture_been_attempted(self, cart_payment_interface):
+    def test_does_intent_require_capture(self, cart_payment_interface):
         intent = generate_payment_intent(status="init")
-        assert cart_payment_interface._has_capture_been_attempted(intent) is False
+        assert cart_payment_interface._does_intent_require_capture(intent) is False
 
         intent = generate_payment_intent(status="requires_capture")
-        assert cart_payment_interface._has_capture_been_attempted(intent) is False
-
-        intent = generate_payment_intent(status="succeeded")
-        assert cart_payment_interface._has_capture_been_attempted(intent) is True
-
-        intent = generate_payment_intent(status="failed")
-        assert cart_payment_interface._has_capture_been_attempted(intent) is True
+        assert cart_payment_interface._does_intent_require_capture(intent) is True
 
     def test_get_intent_status_from_provider_status(self, cart_payment_interface):
         intent_status = cart_payment_interface._get_intent_status_from_provider_status(
@@ -1076,3 +1078,48 @@ class TestCartPaymentInterface:
     async def test_get_required_payment_resource_ids(self, cart_payment_interface):
         # TODO
         pass
+
+
+class TestCapturePayment:
+    @pytest.mark.asyncio
+    async def test_cannot_acquire_lock(
+        self, cart_payment_interface: CartPaymentInterface
+    ):
+        payment_intent = PaymentIntentFactory(status=IntentStatus.REQUIRES_CAPTURE)
+        cart_payment_interface.payment_repo.update_payment_intent_status = (  # type: ignore
+            MagicMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_intent_status.side_effect = (  # type: ignore
+            PaymentIntentCouldNotBeUpdatedError()
+        )
+        with pytest.raises(PaymentIntentConcurrentAccessError):
+            await cart_payment_interface.capture_payment(payment_intent)
+
+    @pytest.mark.asyncio
+    async def test_success(self, cart_payment_interface: CartPaymentInterface):
+        payment_intent = PaymentIntentFactory(
+            status=IntentStatus.REQUIRES_CAPTURE
+        )  # type: PaymentIntent
+        cart_payment_interface.payment_repo.update_payment_intent = (  # type: ignore
+            asynctest.CoroutineMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_intent_status = (  # type: ignore
+            asynctest.CoroutineMock()
+        )
+        cart_payment_interface.payment_repo.update_payment_intent_status.return_value = (  # type: ignore
+            payment_intent
+        )
+        cart_payment_interface._capture_payment_with_provider = create_autospec(  # type: ignore
+            cart_payment_interface._capture_payment_with_provider
+        )
+        pgp_payment_intent = PgpPaymentIntentFactory()  # type: PgpPaymentIntent
+        cart_payment_interface.payment_repo.find_pgp_payment_intents = (  # type: ignore
+            asynctest.CoroutineMock()
+        )
+        cart_payment_interface.payment_repo.find_pgp_payment_intents.return_value = [  # type: ignore
+            pgp_payment_intent
+        ]
+        await cart_payment_interface.capture_payment(payment_intent)
+        cart_payment_interface._capture_payment_with_provider.assert_called_once_with(  # type: ignore
+            payment_intent, pgp_payment_intent
+        )

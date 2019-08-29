@@ -1,5 +1,6 @@
 from asyncio import gather
 import uuid
+from datetime import datetime
 from typing import Tuple, List, Optional, Callable
 
 from fastapi import Depends
@@ -33,6 +34,9 @@ from app.payin.core.exceptions import (
     PaymentIntentCancelError,
     PaymentIntentRefundError,
     PaymentChargeRefundError,
+    PaymentIntentCouldNotBeUpdatedError,
+    PaymentIntentConcurrentAccessError,
+    PaymentIntentNotInRequiresCaptureState,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -70,13 +74,13 @@ class CartPaymentInterface:
         )
 
         if not payment_intent:
-            return (None, None)
+            return None, None
 
         cart_payment = await self.payment_repo.get_cart_payment_by_id(
             payment_intent.cart_payment_id
         )
 
-        return (cart_payment, payment_intent)
+        return cart_payment, payment_intent
 
     async def _get_cart_payment(
         self, cart_payment_id: uuid.UUID
@@ -162,8 +166,8 @@ class CartPaymentInterface:
     ) -> bool:
         return pgp_payment_intent.status == IntentStatus.SUCCEEDED
 
-    def _has_capture_been_attempted(self, payment_intent: PaymentIntent) -> bool:
-        return payment_intent.status in [IntentStatus.SUCCEEDED, IntentStatus.FAILED]
+    def _does_intent_require_capture(self, payment_intent: PaymentIntent) -> bool:
+        return payment_intent.status == IntentStatus.REQUIRES_CAPTURE
 
     def _get_intent_status_from_provider_status(
         self, provider_status: str
@@ -258,7 +262,9 @@ class CartPaymentInterface:
             # Cannot gather calls here because of shared connection/transaction
             # TODO Determine intent status based on capture method.  Below assumes manual case.
             updated_intent = await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
+                id=payment_intent.id,
+                new_status=IntentStatus.REQUIRES_CAPTURE,
+                previous_status=payment_intent.status,
             )
             updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
                 id=pgp_payment_intent.id,
@@ -362,7 +368,9 @@ class CartPaymentInterface:
         async with self.payment_repo.payment_database_transaction():
             # TODO try gather
             await self.payment_repo.update_payment_intent_status(
-                payment_intent.id, new_intent_status
+                id=payment_intent.id,
+                new_status=new_intent_status,
+                previous_status=payment_intent.status,
             )
             await self.payment_repo.update_pgp_payment_intent_status(
                 pgp_payment_intent.id, new_intent_status
@@ -721,7 +729,9 @@ class CartPaymentInterface:
 
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id, status=IntentStatus.CANCELLED
+                id=payment_intent.id,
+                new_status=IntentStatus.CANCELLED,
+                previous_status=payment_intent.status,
             )
             updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_status(
                 id=pgp_payment_intent.id, status=IntentStatus.CANCELLED
@@ -1132,14 +1142,22 @@ class CartPaymentInterface:
         self.req_context.log.info(
             f"Capture attempt for payment_intent {payment_intent.id}"
         )
-        # TODO scheduling of this logic
-        # TODO concurrency control to ensure we are capturing something once (though underlying provider call will be idempotent)
-        # Check state of intent.  If already captured (successfully or not), stop.  Clients are expected to
-        if self._has_capture_been_attempted(payment_intent):
+
+        if not self._does_intent_require_capture(payment_intent):
             self.req_context.log.info(
                 f"Payment intent not eligible for capturing, in state {payment_intent.status}"
             )
-            return
+            raise PaymentIntentNotInRequiresCaptureState()
+
+        # Update intent status; acts as optimistic lock
+        try:
+            payment_intent = await self.payment_repo.update_payment_intent_status(
+                id=payment_intent.id,
+                new_status=IntentStatus.CAPTURING,
+                previous_status=payment_intent.status,
+            )
+        except PaymentIntentCouldNotBeUpdatedError:
+            raise PaymentIntentConcurrentAccessError()
 
         # Find the PgpPaymentIntent to capture
         pgp_intents = await self.payment_repo.find_pgp_payment_intents(
@@ -1150,7 +1168,13 @@ class CartPaymentInterface:
 
         # Call to provider to capture, with idempotency key
         await self._capture_payment_with_provider(payment_intent, pgp_payment_intent)
-        # TODO update captured_at dates, amounts
+
+        await self.payment_repo.update_payment_intent(
+            id=payment_intent.id,
+            status=IntentStatus.SUCCEEDED,
+            amount_received=payment_intent.amount,
+            captured_at=datetime.utcnow(),
+        )
 
 
 class CartPaymentProcessor:

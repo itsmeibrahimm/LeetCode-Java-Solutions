@@ -101,9 +101,9 @@ class MockedPaymentRepo:
         )
 
     async def update_payment_intent_status(
-        self, id: UUID, status: str
+        self, id: UUID, new_status: str, previous_status: str
     ) -> PaymentIntent:
-        return utils.generate_payment_intent(id=id, status=status)
+        return utils.generate_payment_intent(id=id, status=new_status)
 
     async def update_payment_intent_amount(
         self, id: UUID, amount: int
