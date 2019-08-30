@@ -159,7 +159,7 @@ async def get_payment_method(
             force_update=force_update,
         )
     except PaymentError as e:
-        log.error(
+        log.warn(
             f"[get_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
         )
         raise PaymentException(

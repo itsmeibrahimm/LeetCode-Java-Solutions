@@ -154,7 +154,7 @@ class PaymentMethodClient:
                 log=self.log, payment_method_repo=self.payment_method_repo
             )
         else:
-            self.log.error(
+            self.log.warn(
                 f"[get_payment_method][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
             )
             raise PaymentMethodReadError(
