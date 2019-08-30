@@ -31,4 +31,4 @@ class MxLedger(MxLedgerModel):
     finalized_at: Optional[datetime]
     created_by_employee_id: Optional[str]
     submitted_by_employee_id: Optional[str]
-    rolled_to_ledger_id: Optional[str]
+    rolled_to_ledger_id: Optional[UUID]

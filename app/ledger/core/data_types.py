@@ -125,7 +125,7 @@ class MxLedgerDbEntity(DBEntity):
     finalized_at: Optional[datetime]
     created_by_employee_id: Optional[str]
     submitted_by_employee_id: Optional[str]
-    rolled_to_ledger_id: Optional[str]
+    rolled_to_ledger_id: Optional[UUID]
 
 
 class InsertMxLedgerInput(MxLedgerDbEntity):
@@ -158,6 +158,24 @@ class ProcessMxLedgerInput(DBRequestModel):
 
 class ProcessMxLedgerOutput(MxLedgerDbEntity):
     pass
+
+
+class UpdatePaidMxLedgerInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
+    amount_paid: int
+
+
+class UpdatedRolledMxLedgerInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
+    rolled_to_ledger_id: UUID
 
 
 class GetMxLedgerByAccountInput(DBRequestModel):

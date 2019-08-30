@@ -33,6 +33,7 @@ class MxLedgerStateType(str, Enum):
     FAILED = "failed"
     ROLLED = "rolled"
     REVERSED = "reversed"
+    SUBMITTED = "submitted"
 
 
 class MxScheduledLedgerIntervalType(str, Enum):

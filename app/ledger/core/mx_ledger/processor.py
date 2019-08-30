@@ -61,7 +61,7 @@ class MxLedgerProcessor:
         # process mx_ledger
         process_mx_ledger_request = ProcessMxLedgerInput(id=mx_ledger_id)
         try:
-            mx_ledger = await self.mx_ledger_repo.process_mx_ledger_state_and_close_schedule_ledger(
+            mx_ledger = await self.mx_ledger_repo.move_ledger_state_to_processing_and_close_schedule_ledger(
                 process_mx_ledger_request
             )
         except DataError as e:

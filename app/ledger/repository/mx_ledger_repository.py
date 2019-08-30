@@ -23,6 +23,8 @@ from app.ledger.core.data_types import (
     InsertMxTransactionInput,
     ProcessMxLedgerInput,
     ProcessMxLedgerOutput,
+    UpdatePaidMxLedgerInput,
+    UpdatedRolledMxLedgerInput,
 )
 from app.ledger.core.types import MxTransactionType, MxLedgerStateType
 from app.ledger.models.paymentdb import (
@@ -50,7 +52,7 @@ class MxLedgerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def process_mx_ledger_state_and_close_schedule_ledger(
+    async def move_ledger_state_to_processing_and_close_schedule_ledger(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
         ...
@@ -71,6 +73,30 @@ class MxLedgerRepositoryInterface:
     async def create_one_off_mx_ledger(
         self, request_ledger: InsertMxLedgerInput
     ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:
+        ...
+
+    @abstractmethod
+    async def move_ledger_state_to_failed(
+        self, request: ProcessMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        ...
+
+    @abstractmethod
+    async def move_ledger_state_to_paid(
+        self, request: UpdatePaidMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        ...
+
+    @abstractmethod
+    async def move_ledger_state_to_rolled(
+        self, request: UpdatedRolledMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        ...
+
+    @abstractmethod
+    async def move_ledger_state_to_submitted(
+        self, request: ProcessMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
         ...
 
 
@@ -103,11 +129,21 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         assert row
         return UpdateMxLedgerOutput.from_row(row)
 
-    async def process_mx_ledger_state_and_close_schedule_ledger(
+    async def move_ledger_state_to_processing_and_close_schedule_ledger(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
         async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
             connection = tx.connection()
+            try:
+                # Lock mx_ledger row for updating state
+                stmt = (
+                    mx_ledgers.table.select()
+                    .where(mx_ledgers.id == request.id)
+                    .with_for_update(nowait=True)
+                )
+                await connection.fetch_one(stmt)
+            except Exception as e:
+                raise e
             try:
                 # update ledger state to PROCESSING
                 ledger_stmt = (
@@ -156,6 +192,93 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         return GetMxLedgerByAccountOutput.from_row(row) if row else None
+
+    async def move_ledger_state_to_failed(
+        self, request: ProcessMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        now = datetime.utcnow()
+        try:
+            # update ledger state to FAILED and finalized_at, updated_at
+            ledger_stmt = (
+                mx_ledgers.table.update()
+                .where(mx_ledgers.id == request.id)
+                .values(
+                    state=MxLedgerStateType.FAILED, finalized_at=now, updated_at=now
+                )
+                .returning(*mx_ledgers.table.columns.values())
+            )
+            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+            assert ledger_row
+        except Exception as e:
+            raise e
+        return ProcessMxLedgerOutput.from_row(ledger_row)
+
+    async def move_ledger_state_to_paid(
+        self, request: UpdatePaidMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        now = datetime.utcnow()
+        try:
+            # update ledger state to PAID and update amount_paid and finalized_at, updated_at
+            ledger_stmt = (
+                mx_ledgers.table.update()
+                .where(mx_ledgers.id == request.id)
+                .values(
+                    state=MxLedgerStateType.PAID,
+                    amount_paid=request.amount_paid,
+                    finalized_at=now,
+                    updated_at=now,
+                )
+                .returning(*mx_ledgers.table.columns.values())
+            )
+            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+            assert ledger_row
+        except Exception as e:
+            raise e
+        return ProcessMxLedgerOutput.from_row(ledger_row)
+
+    async def move_ledger_state_to_rolled(
+        self, request: UpdatedRolledMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        now = datetime.utcnow()
+        try:
+            # update ledger state to ROLLED, amount_paid, finalized_at, rolled_to_ledger_id, updated_at
+            ledger_stmt = (
+                mx_ledgers.table.update()
+                .where(mx_ledgers.id == request.id)
+                .values(
+                    state=MxLedgerStateType.ROLLED,
+                    amount_paid=0,
+                    finalized_at=now,
+                    rolled_to_ledger_id=request.rolled_to_ledger_id,
+                    updated_at=now,
+                )
+                .returning(*mx_ledgers.table.columns.values())
+            )
+            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+            assert ledger_row
+        except Exception as e:
+            raise e
+        return ProcessMxLedgerOutput.from_row(ledger_row)
+
+    async def move_ledger_state_to_submitted(
+        self, request: ProcessMxLedgerInput
+    ) -> ProcessMxLedgerOutput:
+        now = datetime.utcnow()
+        try:
+            # update ledger state to SUBMITTED, submitted_at, updated_at
+            ledger_stmt = (
+                mx_ledgers.table.update()
+                .where(mx_ledgers.id == request.id)
+                .values(
+                    state=MxLedgerStateType.SUBMITTED, submitted_at=now, updated_at=now
+                )
+                .returning(*mx_ledgers.table.columns.values())
+            )
+            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+            assert ledger_row
+        except Exception as e:
+            raise e
+        return ProcessMxLedgerOutput.from_row(ledger_row)
 
     # todo: lock db transaction here as well
     async def create_one_off_mx_ledger(

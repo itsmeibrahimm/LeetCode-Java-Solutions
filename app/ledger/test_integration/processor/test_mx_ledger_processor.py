@@ -113,7 +113,7 @@ class TestMxLedgerProcessor:
 
         error = DataError("Test data error.")
         mocker.patch(
-            "app.ledger.repository.mx_ledger_repository.MxLedgerRepository.process_mx_ledger_state_and_close_schedule_ledger",
+            "app.ledger.repository.mx_ledger_repository.MxLedgerRepository.move_ledger_state_to_processing_and_close_schedule_ledger",
             side_effect=error,
         )
         with pytest.raises(MxLedgerProcessError) as e:
