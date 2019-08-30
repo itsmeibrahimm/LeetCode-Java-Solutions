@@ -14,7 +14,7 @@ from app.ledger.core.data_types import (
     InsertMxScheduledLedgerOutput,
     GetMxScheduledLedgerInput,
     GetMxScheduledLedgerOutput,
-    GetMxLedgerByAccountInput,
+    GetMxScheduledLedgerByAccountInput,
 )
 from app.ledger.core.types import MxScheduledLedgerIntervalType, MxLedgerStateType
 from app.ledger.models.paymentdb import mx_scheduled_ledgers, mx_ledgers
@@ -31,6 +31,12 @@ class MxScheduledLedgerRepositoryInterface:
     @abstractmethod
     async def get_open_mx_scheduled_ledger_for_period(
         self, request: GetMxScheduledLedgerInput
+    ) -> Optional[GetMxScheduledLedgerOutput]:
+        ...
+
+    @abstractmethod
+    async def get_open_mx_scheduled_ledger_for_payment_account(
+        self, request: GetMxScheduledLedgerByAccountInput
     ) -> Optional[GetMxScheduledLedgerOutput]:
         ...
 
@@ -80,12 +86,12 @@ class MxScheduledLedgerRepository(
         return GetMxScheduledLedgerOutput.from_row(row) if row else None
 
     async def get_open_mx_scheduled_ledger_for_payment_account(
-        self, request: GetMxLedgerByAccountInput
+        self, request: GetMxScheduledLedgerByAccountInput
     ) -> Optional[GetMxScheduledLedgerOutput]:
         """
         Get the first mx_scheduled_ledger with given payment_account_id and also 0 for closed_at value, and order by
         (end_time, start_time)
-        :param request: GetMxLedgerByAccountInput
+        :param request: GetMxScheduledLedgerByAccountInput
         :return: GetMxScheduledLedgerOutput
         """
         stmt = (

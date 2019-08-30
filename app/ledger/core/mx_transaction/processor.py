@@ -16,6 +16,7 @@ from tenacity import (
 )
 
 from app.commons.context.req_context import get_logger_from_req
+from app.ledger.core.data_types import GetMxScheduledLedgerByAccountInput
 from app.ledger.core.exceptions import (
     MxTransactionCreationError,
     LedgerErrorCode,
@@ -29,10 +30,7 @@ from app.ledger.core.types import (
     MxLedgerType,
 )
 from app.ledger.core.utils import to_mx_transaction
-from app.ledger.repository.mx_ledger_repository import (
-    GetMxLedgerByAccountInput,
-    MxLedgerRepository,
-)
+from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     GetMxScheduledLedgerInput,
     MxScheduledLedgerRepository,
@@ -108,7 +106,7 @@ class MxTransactionProcessor:
 
         # if not found, retrieve open ledger for current payment_account
         if not mx_scheduled_ledger:
-            get_mx_ledger_request = GetMxLedgerByAccountInput(
+            get_mx_ledger_request = GetMxScheduledLedgerByAccountInput(
                 payment_account_id=payment_account_id
             )
             mx_scheduled_ledger = await self.mx_scheduled_ledger_repo.get_open_mx_scheduled_ledger_for_payment_account(
@@ -135,6 +133,7 @@ class MxTransactionProcessor:
                     )
                 except psycopg2.IntegrityError as e:
                     if e.pgcode != UNIQUE_VIOLATION:
+                        # todo: needs to be wrapped up
                         raise
                     self.log.warn(
                         f"[create_ledger_and_insert_mx_transaction] Retry to update ledger balance instead of insert due to unique constraints violation, {e}"
@@ -175,7 +174,6 @@ class MxTransactionProcessor:
         return to_mx_transaction(created_mx_txn)
 
     @retry(
-        # TODO need to be revised to retry on actual error code LOCK_NOT_AVAILABLE @yu.qu
         retry=retry_if_exception_type(MxLedgerLockError),
         stop=stop_after_attempt(5),
         wait=wait_fixed(0.3),

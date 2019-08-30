@@ -9,6 +9,7 @@ from app.ledger.core.exceptions import (
     MxLedgerProcessError,
     MxLedgerReadError,
     MxLedgerInvalidProcessStateError,
+    MxLedgerSubmissionError,
 )
 from app.ledger.core.mx_ledger.model import MxLedger
 
@@ -49,7 +50,6 @@ async def process(
 
     try:
         mx_ledger: MxLedger = await mx_ledger_processor.process(mx_ledger_id)
-        log.info("process mx_ledger completed. ")
     except MxLedgerProcessError as e:
         log.error(
             f"[process mx_ledger] [{mx_ledger_id}] Exception caught when processing mx_ledger. {e}"
@@ -69,7 +69,56 @@ async def process(
     return mx_ledger
 
 
+@router.post(
+    "/api/v1/mx_ledgers/{mx_ledger_id}/submit",
+    status_code=HTTP_200_OK,
+    response_model=MxLedger,
+    responses={},
+    operation_id="SubmitMxLedger",
+    tags=api_tags,
+)
+async def submit(
+    mx_ledger_id: UUID,
+    log: BoundLogger = Depends(get_logger_from_req),
+    mx_ledger_processor: MxLedgerProcessor = Depends(MxLedgerProcessor),
+):
+    """
+    Submit mx_ledger.
+    """
+    log.debug(f"Submitting mx_ledger {mx_ledger_id}.")
+    try:
+        mx_ledger: MxLedger = await mx_ledger_processor.submit(mx_ledger_id)
+    except MxLedgerReadError as e:
+        log.error(
+            f"[submit mx_ledger] [{mx_ledger_id}] Cannot find mx_ledger with given id. {e}"
+        )
+        raise _mx_ledger_not_found(e)
+    except MxLedgerInvalidProcessStateError as e:
+        log.error(
+            f"[submit mx_ledger] [{mx_ledger_id}] Cannot process invalid mx_ledger state to PROCESSING {e}"
+        )
+        raise _mx_ledger_bad_request(e)
+    except MxLedgerSubmissionError as e:
+        log.error(
+            f"[submit mx_ledger] [{mx_ledger_id}] Exception caught when processing mx_ledger. {e}"
+        )
+        raise _mx_ledger_submission_internal_error(e)
+    log.info(f"Submitted mx_ledger {mx_ledger_id}.")
+    return mx_ledger
+
+
 def _mx_ledger_process_internal_error(e: MxLedgerProcessError) -> PaymentException:
+    return PaymentException(
+        http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        error_code=e.error_code,
+        error_message=e.error_message,
+        retryable=e.retryable,
+    )
+
+
+def _mx_ledger_submission_internal_error(
+    e: MxLedgerSubmissionError
+) -> PaymentException:
     return PaymentException(
         http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
         error_code=e.error_code,

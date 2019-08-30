@@ -5,7 +5,7 @@ import pytest
 
 from app.ledger.core.data_types import (
     GetMxScheduledLedgerInput,
-    GetMxLedgerByAccountInput,
+    GetMxScheduledLedgerByAccountInput,
 )
 from app.ledger.core.types import MxScheduledLedgerIntervalType
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
@@ -243,7 +243,9 @@ class TestMxLedgerRepository:
             mx_scheduled_ledger_to_insert
         )
 
-        request = GetMxLedgerByAccountInput(payment_account_id=payment_account_id)
+        request = GetMxScheduledLedgerByAccountInput(
+            payment_account_id=payment_account_id
+        )
         mx_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_payment_account(
             request
         )
@@ -282,7 +284,9 @@ class TestMxLedgerRepository:
             mx_scheduled_ledger_to_insert
         )
 
-        request = GetMxLedgerByAccountInput(payment_account_id=str(uuid.uuid4()))
+        request = GetMxScheduledLedgerByAccountInput(
+            payment_account_id=str(uuid.uuid4())
+        )
         mx_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_payment_account(
             request
         )

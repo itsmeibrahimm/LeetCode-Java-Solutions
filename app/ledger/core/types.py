@@ -10,6 +10,7 @@ class MxTransactionType(str, Enum):
     STORE_PAYMENT = "store_payment"
     DELIVERY_ERROR = "delivery_error"
     MICRO_DEPOSIT = "micro_deposit"
+    NEGATIVE_BALANCE_ROLLOVER = "negative_balance_rollover"
 
 
 class MxLedgerType(str, Enum):

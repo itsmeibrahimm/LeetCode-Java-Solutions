@@ -7,10 +7,10 @@ from psycopg2 import errorcodes
 
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import (
-    GetMxScheduledLedgerInput,
     UpdatePaidMxLedgerInput,
     UpdatedRolledMxLedgerInput,
 )
+from app.ledger.core.data_types import GetMxScheduledLedgerInput
 from app.ledger.core.types import (
     MxLedgerStateType,
     MxLedgerType,

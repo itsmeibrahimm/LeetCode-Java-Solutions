@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Optional, Tuple
 from abc import abstractmethod
 from dataclasses import dataclass
+from uuid import UUID
+import uuid
 
 from sqlalchemy import and_
 
@@ -25,8 +26,16 @@ from app.ledger.core.data_types import (
     ProcessMxLedgerOutput,
     UpdatePaidMxLedgerInput,
     UpdatedRolledMxLedgerInput,
+    RolloverNegativeLedgerInput,
+    RolloverNegativeLedgerOutput,
+    InsertMxScheduledLedgerInput,
 )
-from app.ledger.core.types import MxTransactionType, MxLedgerStateType
+from app.ledger.core.types import (
+    MxTransactionType,
+    MxLedgerStateType,
+    MxLedgerType,
+    MxScheduledLedgerIntervalType,
+)
 from app.ledger.models.paymentdb import (
     mx_ledgers,
     mx_transactions,
@@ -34,6 +43,9 @@ from app.ledger.models.paymentdb import (
 )
 
 from app.ledger.repository.base import LedgerDBRepository
+from app.ledger.repository.mx_scheduled_ledger_repository import (
+    MxScheduledLedgerRepository,
+)
 
 
 class MxLedgerRepositoryInterface:
@@ -67,6 +79,20 @@ class MxLedgerRepositoryInterface:
     async def get_open_ledger_for_payment_account(
         self, request: GetMxLedgerByAccountInput
     ) -> Optional[GetMxLedgerByAccountOutput]:
+        ...
+
+    @abstractmethod
+    async def rollover_negative_ledger_to_open_ledger(
+        self, request: RolloverNegativeLedgerInput, open_ledger_id: UUID
+    ) -> RolloverNegativeLedgerOutput:
+        ...
+
+    @abstractmethod
+    async def rollover_negative_ledger_to_new_ledger(
+        self,
+        request: RolloverNegativeLedgerInput,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+    ) -> RolloverNegativeLedgerOutput:
         ...
 
     @abstractmethod
@@ -279,6 +305,170 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         except Exception as e:
             raise e
         return ProcessMxLedgerOutput.from_row(ledger_row)
+
+    async def rollover_negative_ledger_to_open_ledger(
+        self, request: RolloverNegativeLedgerInput, open_ledger_id: UUID
+    ) -> RolloverNegativeLedgerOutput:
+        async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
+            connection = tx.connection()
+            try:
+                # try to obtain the negative ledger
+                negative_mx_ledger_row_stmt = (
+                    mx_ledgers.table.select()
+                    .where(mx_ledgers.id == request.id)
+                    .with_for_update(nowait=True)
+                )
+                negative_mx_ledger_row = await connection.fetch_one(
+                    negative_mx_ledger_row_stmt
+                )
+                assert negative_mx_ledger_row
+                negative_mx_ledger = GetMxLedgerByIdOutput.from_row(
+                    negative_mx_ledger_row
+                )
+                assert negative_mx_ledger
+            except Exception as e:
+                raise e
+            try:
+                # Lock the row of open ledger for updating balance
+                open_mx_ledger_row_stmt = (
+                    mx_ledgers.table.select()
+                    .where(mx_ledgers.id == open_ledger_id)
+                    .with_for_update(nowait=True)
+                )
+                open_mx_ledger_row = await connection.fetch_one(open_mx_ledger_row_stmt)
+                assert open_mx_ledger_row
+                open_mx_ledger = GetMxLedgerByIdOutput.from_row(open_mx_ledger_row)
+                assert open_mx_ledger
+            except Exception as e:
+                raise e
+            try:
+                # construct request and update balance of the open mx_ledger
+                updated_amount = open_mx_ledger.balance + negative_mx_ledger.balance
+                request_balance = UpdateMxLedgerSetInput(balance=updated_amount)
+                stmt = (
+                    mx_ledgers.table.update()
+                    .where(mx_ledgers.id == open_ledger_id)
+                    .values(request_balance.dict(skip_defaults=True))
+                    .returning(*mx_ledgers.table.columns.values())
+                )
+                updated_open_ledger_row = await connection.fetch_one(stmt)
+                assert updated_open_ledger_row
+                updated_open_ledger = UpdateMxLedgerOutput.from_row(open_mx_ledger_row)
+            except Exception as e:
+                raise e
+            try:
+                # construct mx_transaction and attach to open mx_ledger
+                mx_transaction_to_insert = InsertMxTransactionInput(
+                    id=uuid.uuid4(),
+                    payment_account_id=open_mx_ledger.payment_account_id,
+                    amount=negative_mx_ledger.balance,
+                    currency=updated_open_ledger.currency,
+                    ledger_id=updated_open_ledger.id,
+                    idempotency_key=str(uuid.uuid4()),
+                    routing_key=datetime.utcnow(),
+                    target_type=MxTransactionType.NEGATIVE_BALANCE_ROLLOVER.value,
+                )
+                txn_stmt = (
+                    mx_transactions.table.insert()
+                    .values(mx_transaction_to_insert.dict(skip_defaults=True))
+                    .returning(*mx_transactions.table.columns.values())
+                )
+                await connection.fetch_one(txn_stmt)
+            except Exception as e:
+                raise e
+        return updated_open_ledger
+
+    async def rollover_negative_ledger_to_new_ledger(
+        self,
+        request: RolloverNegativeLedgerInput,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+    ) -> RolloverNegativeLedgerOutput:
+        async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
+            connection = tx.connection()
+            try:
+                # try to obtain negative balance ledger
+                negative_mx_ledger_row_stmt = (
+                    mx_ledgers.table.select()
+                    .where(mx_ledgers.id == request.id)
+                    .with_for_update(nowait=True)
+                )
+                negative_mx_ledger_row = await connection.fetch_one(
+                    negative_mx_ledger_row_stmt
+                )
+                assert negative_mx_ledger_row
+                negative_mx_ledger = GetMxLedgerByIdOutput.from_row(
+                    negative_mx_ledger_row
+                )
+                assert negative_mx_ledger
+            except Exception as e:
+                raise e
+            try:
+                mx_ledger_id = uuid.uuid4()
+                # construct request and create new ledger with rollover balance
+                mx_ledger_to_insert = InsertMxLedgerInput(
+                    id=mx_ledger_id,
+                    type=MxLedgerType.SCHEDULED.value,
+                    currency=negative_mx_ledger.currency,
+                    state=MxLedgerStateType.OPEN.value,
+                    balance=negative_mx_ledger.balance,
+                    payment_account_id=negative_mx_ledger.payment_account_id,
+                )
+                ledger_stmt = (
+                    mx_ledgers.table.insert()
+                    .values(mx_ledger_to_insert.dict(skip_defaults=True))
+                    .returning(*mx_ledgers.table.columns.values())
+                )
+                ledger_row = await connection.fetch_one(ledger_stmt)
+                assert ledger_row
+                created_mx_ledger = InsertMxLedgerOutput.from_row(ledger_row)
+                assert created_mx_ledger
+            except Exception as e:
+                raise e
+            try:
+                # construct mx_scheduled_ledger and insert
+                routing_key = datetime.utcnow()
+                mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
+                    id=uuid.uuid4(),
+                    payment_account_id=created_mx_ledger.payment_account_id,
+                    ledger_id=created_mx_ledger.id,
+                    interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
+                    closed_at=0,
+                    start_time=mx_scheduled_ledger_repository.pacific_start_time_for_current_interval(
+                        routing_key, MxScheduledLedgerIntervalType.WEEKLY
+                    ),
+                    end_time=mx_scheduled_ledger_repository.pacific_end_time_for_current_interval(
+                        routing_key, MxScheduledLedgerIntervalType.WEEKLY
+                    ),
+                )
+                scheduled_ledger_stmt = (
+                    mx_scheduled_ledgers.table.insert()
+                    .values(mx_scheduled_ledger_to_insert.dict(skip_defaults=True))
+                    .returning(*mx_scheduled_ledgers.table.columns.values())
+                )
+                await connection.fetch_one(scheduled_ledger_stmt)
+            except Exception as e:
+                raise e
+            try:
+                # construct mx_transaction and insert
+                mx_transaction_to_insert = InsertMxTransactionInput(
+                    id=uuid.uuid4(),
+                    payment_account_id=created_mx_ledger.payment_account_id,
+                    amount=created_mx_ledger.balance,
+                    currency=created_mx_ledger.currency,
+                    ledger_id=created_mx_ledger.id,
+                    idempotency_key=str(uuid.uuid4()),
+                    routing_key=routing_key,
+                    target_type=MxTransactionType.NEGATIVE_BALANCE_ROLLOVER.value,
+                )
+                txn_stmt = (
+                    mx_transactions.table.insert()
+                    .values(mx_transaction_to_insert.dict(skip_defaults=True))
+                    .returning(*mx_transactions.table.columns.values())
+                )
+                await connection.fetch_one(txn_stmt)
+            except Exception as e:
+                raise e
+            return created_mx_ledger
 
     # todo: lock db transaction here as well
     async def create_one_off_mx_ledger(

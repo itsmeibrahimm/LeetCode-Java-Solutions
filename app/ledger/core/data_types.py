@@ -11,6 +11,7 @@ from app.ledger.core.types import (
     MxLedgerType,
     MxScheduledLedgerIntervalType,
     MxTransactionType,
+    MxLedgerStateType,
 )
 
 
@@ -25,7 +26,7 @@ class MxTransactionDbEntity(DBEntity):
     currency: str
     ledger_id: UUID
     idempotency_key: str
-    target_type: str
+    target_type: str  # todo: update all wrong types to Enum
     routing_key: datetime
     target_id: Optional[str]
     legacy_transaction_id: Optional[str]
@@ -101,6 +102,14 @@ class GetMxScheduledLedgerInput(DBRequestModel):
 
 class GetMxScheduledLedgerOutput(MxScheduledLedgerDbEntity):
     pass
+
+
+class GetMxScheduledLedgerByAccountInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    payment_account_id: str
 
 
 ###########################################################
@@ -199,4 +208,27 @@ class GetMxLedgerByIdInput(DBRequestModel):
 
 
 class GetMxLedgerByIdOutput(MxLedgerDbEntity):
+    pass
+
+
+class RolloverNegativeLedgerInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
+
+
+class RolloverNegativeLedgerOutput(MxLedgerDbEntity):
+    pass
+
+
+class UpdateNegativeLedgerInput(DBRequestModel):
+    amount_paid: int
+    finalized_at: datetime
+    state: MxLedgerStateType
+    rolled_to_ledger_id: UUID
+
+
+class UpdateNegativeLedgerOutput(MxLedgerDbEntity):
     pass
