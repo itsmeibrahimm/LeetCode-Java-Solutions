@@ -18,6 +18,12 @@ import org.doordash.JenkinsDd
 // params["GITHUB_REPOSITORY"]      - GitHub ssh url of repository (git://....)
 // -----------------------------------------------------------------------------------
 
+@Field
+def canMigrateProd = false
+
+@Field
+def runningStage = "Not Started"
+
 pipeline {
   options {
     timestamps()
@@ -28,50 +34,77 @@ pipeline {
     label 'universal'
   }
   stages {
-    stage('Deploy to staging') {
+    stage('Migrate staging') {
       steps {
+        script {
+          runningStage = env.STAGE_NAME
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
+        }
         artifactoryLogin()
         script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          common.deployHelm(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], 'payment-service-migration', 'staging'
-          )
+          env.tag = getImmutableReleaseSemverTag(params['SHA'])
+          common.deployHelm(env.tag, 'payment-service-migration', 'staging')
         }
       }
     }
-    stage('Reading staging results') {
+    stage('Reading migrate staging results') {
       steps {
         script {
-          println 'Query for splunk:'
-          println "index=staging kubernetes.labels.job-name=payment-service-migration-job | table log | reverse"
-          withCredentials([file(credentialsId: "K8S_CONFIG_STAGING_NEW", variable: 'k8sCredsFile')]) {
-            sh """|#!/bin/bash
-                  |set -ex
-                  |export KUBECONFIG=$k8sCredsFile
-                  |# Find pod name so that we can manage it
-                  |POD_NAME=''
-                  |for i in 1 2 4 8; do
-                  |  POD_NAME=\$(kubectl get pods -n staging --selector='job-name=payment-service-migration-job' -o name)
-                  |  if [[ "\${POD_NAME}" != "" ]]; then
-                  |    echo "Found pod \${POD_NAME}"
-                  |    break
-                  |  fi
-                  |  echo "Did not find pod, waiting for \${i} seconds"
-                  |  sleep \$i
-                  |done
-                  |if [[ "\${POD_NAME}" == "" ]]; then
-                  |  echo "Failed to find pod for payment-service-migration-job"
-                  |  exit 1
-                  |fi
-                  |
-                  |# Wait for job to be completed.
-                  |kubectl wait --for=condition=complete --timeout=5m job.batch/payment-service-migration-job -n staging
-                  |# Pod is completed, gather logs from it
-                  |kubectl logs -n staging \$POD_NAME -f &
-                  |# kubectl wait --for=condition=complete --timeout=5m job.batch/payment-service-migration-job -n staging
-                  |kubectl delete job payment-service-migration-job -n staging
-                  |""".stripMargin()
+          common.getMigrationJobLog('staging')
+        }
+      }
+    }
+    stage('Continue to prod?') {
+      steps {
+        script {
+          runningStage = env.STAGE_NAME
+          common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
+        }
+        script {
+          canMigrateProd = common.inputCanDeployToProd()
+          if (!canMigrateProd) {
+            currentBuild.result = "ABORTED" /* Set current deployment to aborted */
           }
         }
+      }
+    }
+    stage('Migrate prod') {
+      when {
+        equals expected: true, actual: canMigrateProd
+      }
+      steps {
+        script {
+          runningStage = env.STAGE_NAME
+          common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
+        }
+        script {
+          common.deployHelm(env.tag, 'payment-service-migration', 'prod')
+        }
+      }
+    }
+    stage('Reading migrate prod results') {
+      steps {
+        script {
+          common.getMigrationJobLog('prod')
+        }
+      }
+    }
+  }
+  post {
+    success {
+      script {
+        common.notifySlackChannelDeploymentStatus("Successful Migration", params['SHA'], "${env.BUILD_NUMBER}", "success", true)
+      }
+    }
+    aborted {
+      script {
+        common.notifySlackChannelDeploymentStatus("Aborted Migration", params['SHA'], "${env.BUILD_NUMBER}", "aborted", true)
+      }
+    }
+    failure {
+      script {
+        common.notifySlackChannelDeploymentStatus("Failed Migration", params['SHA'], "${env.BUILD_NUMBER}", "failure", true)
       }
     }
   }

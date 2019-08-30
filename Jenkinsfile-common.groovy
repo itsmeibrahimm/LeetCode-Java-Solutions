@@ -532,4 +532,41 @@ def notifySlackChannelDeploymentStatus(stage, sha, buildNumber, status, mentionC
     slack.notifySlackChannel("${mention} [${stage}][${serviceName}] deployment status [${status}]: <${JenkinsDd.instance.getBlueOceanJobUrl()}|[${buildNumber}]>", slackChannel)
 }
 
+
+/**
+ * Get service migration job logs
+ */
+
+def getMigrationJobLog(String env) {
+    println 'Query for splunk:'
+    println "index=${env} kubernetes.labels.job-name=payment-service-migration-job | table log | reverse"
+    withCredentials([file(credentialsId: "K8S_CONFIG_${env.toUpperCase()}_NEW", variable: 'k8sCredsFile')]) {
+      sh """|#!/bin/bash
+            |set -ex
+            |export KUBECONFIG=$k8sCredsFile
+            |# Find pod name so that we can manage it
+            |POD_NAME=''
+            |for i in 1 2 4 8; do
+            |  POD_NAME=\$(kubectl get pods -n ${env} --selector='job-name=payment-service-migration-job' -o name)
+            |  if [[ "\${POD_NAME}" != "" ]]; then
+            |    echo "Found pod \${POD_NAME}"
+            |    break
+            |  fi
+            |  echo "Did not find pod, waiting for \${i} seconds"
+            |  sleep \$i
+            |done
+            |if [[ "\${POD_NAME}" == "" ]]; then
+            |  echo "Failed to find pod for payment-service-migration-job"
+            |  exit 1
+            |fi
+            |
+            |# Wait for job to be completed.
+            |kubectl wait --for=condition=complete --timeout=5m job.batch/payment-service-migration-job -n ${env}
+            |# Pod is completed, gather logs from it
+            |kubectl logs -n ${env} \$POD_NAME
+            |kubectl delete job payment-service-migration-job -n ${env}
+            |""".stripMargin()
+      }
+}
+
 return this
