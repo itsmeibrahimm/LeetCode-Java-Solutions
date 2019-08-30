@@ -11,7 +11,7 @@ from app.payin.core.cart_payment.types import CaptureMethod, CartType
 
 class SplitPayment(BaseModel):
     payout_account_id: str
-    appication_fee_amount: int
+    application_fee_amount: int
 
 
 class CartMetadata(BaseModel):

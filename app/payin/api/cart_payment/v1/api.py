@@ -95,6 +95,7 @@ async def create_cart_payment(
         )
         return cart_payment
     except PaymentError as payment_error:
+        log.info(f"exception from create_cart_payment() {payment_error}")
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
         if payment_error.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
             http_status_code = HTTP_400_BAD_REQUEST
@@ -184,7 +185,7 @@ def create_request_to_model(
                 cart_payment_request.split_payment, "payout_account_id", None
             ),
             application_fee_amount=getattr(
-                cart_payment_request.split_payment, "appication_fee_amount", None
+                cart_payment_request.split_payment, "application_fee_amount", None
             ),
         ),
         created_at=None,

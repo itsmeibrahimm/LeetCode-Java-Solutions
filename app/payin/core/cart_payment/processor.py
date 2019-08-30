@@ -247,7 +247,7 @@ class CartPaymentInterface:
         # Call out to provider to create the payment intent in their system.  The payment_intent
         # instance includes the idempotency_key, which is passed to provider to ensure records already
         # submitted are actually processed only once.
-        self.req_context.log.debug(
+        self.req_context.log.info(
             f"Creating new intent with provider.  IDs: {payment_intent.id}, {pgp_payment_intent.id}"
         )
         provider_payment_intent = await self._create_provider_payment(
@@ -611,15 +611,17 @@ class CartPaymentInterface:
 
         # Required as inputs to creation API, but optional in model.  Verify we have the required fields.
         # TODO add codes to distinguish between different cases for client
-        if (
-            not request_cart_payment.capture_method
-            or not request_cart_payment.payment_method_id
+        if not (
+            request_cart_payment.capture_method
+            and request_cart_payment.payment_method_id
         ):
+            self.req_context.log.info(
+                f"invalid input. capture_method [{request_cart_payment.capture_method}] and payment_method_id [{request_cart_payment.payment_method_id}] can't be empty"
+            )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
             )
-
         dd_consumer_id = None
         if (
             request_cart_payment.legacy_payment
@@ -653,6 +655,10 @@ class CartPaymentInterface:
                 capture_method=request_cart_payment.capture_method,
                 payer_statement_description=request_cart_payment.payer_statement_description,
             )
+
+        self.req_context.log.info(
+            f"[submit_new_payment] insert payment_intent objects completed"
+        )
 
         await self._submit_payment_to_provider(
             payment_intent,
