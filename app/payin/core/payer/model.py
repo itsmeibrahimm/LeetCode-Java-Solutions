@@ -130,7 +130,7 @@ class RawPayer:
             )
         elif self.stripe_customer_entity:
             provider_customer = PaymentGatewayProviderCustomer(
-                payment_provider=self.PaymentProvider.STRIPE.value,  # hard-coded "stripe"
+                payment_provider=PaymentProvider.STRIPE.value,  # hard-coded "stripe"
                 payment_provider_customer_id=self.stripe_customer_entity.stripe_id,
                 default_payment_method_id=self.stripe_customer_entity.default_card,
             )
