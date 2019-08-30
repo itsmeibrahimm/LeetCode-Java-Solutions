@@ -546,7 +546,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
         elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
             is_owner = payer_id == sc_entity.external_stripe_customer_id
         if is_owner is False:
-            self.log.error(
+            self.log.warn(
                 "[get_payment_method][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
                 payment_method_id,
                 payer_id,
@@ -632,7 +632,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
         elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID and sc_entity:
             is_owner = payer_id == sc_entity.external_stripe_customer_id
         if is_owner is False:
-            self.log.error(
+            self.log.warn(
                 "[get_payment_method][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
                 payment_method_id,
                 payer_id,
