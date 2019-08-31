@@ -49,7 +49,7 @@ The following technologies/frameworks are used across the entire stack:
 - **black** for code formatting
 - **pre-commit** for pre-commit hooks
 - **DoorDash doorctl** for images tagging/pushing
-- **DoorDash Pulse** for semantic monitoring
+- **DoorDash Pulse** for semantic monitoring and system testing
 - **DoorDash Pressure** for load testing
 - **DoorDash Runtime** for configuration management
 - **Artifactory** to store docker images
