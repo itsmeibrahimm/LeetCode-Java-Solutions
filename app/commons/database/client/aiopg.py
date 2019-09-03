@@ -71,7 +71,7 @@ class AioTransaction(DBTransaction):
 class AioConnection(DBConnection):
 
     _raw_connection: Optional[connection.SAConnection]
-    default_timeout: int
+    default_timeout: float
     engine: "AioEngine"
 
     def __init__(self, engine: "AioEngine"):
@@ -160,9 +160,9 @@ class AioEngine(DBEngine):
     _dsn: str
     minsize: int = 1
     maxsize: int = 1
-    connection_timeout_sec: int = 30
-    closing_timeout_sec: int = 60
-    default_stmt_timeout_sec: int = 30
+    connection_timeout_sec: float = 30
+    closing_timeout_sec: float = 60
+    default_stmt_timeout_sec: float = 30
     force_rollback: bool = False
     debug: bool = False
     _raw_engine: Optional[engine.Engine]
@@ -174,9 +174,9 @@ class AioEngine(DBEngine):
         id: Optional[str] = None,
         minsize: int = 1,
         maxsize: int = 1,
-        connection_timeout_sec: int = 30,
-        default_stmt_timeout_sec: int = 30,
-        closing_timeout_sec: int = 60,
+        connection_timeout_sec: float = 30,
+        default_stmt_timeout_sec: float = 30,
+        closing_timeout_sec: float = 60,
         force_rollback: bool = False,
         debug: bool = False,
     ):

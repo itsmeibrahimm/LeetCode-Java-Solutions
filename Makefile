@@ -121,7 +121,7 @@ test-unit:
 
 .PHONY: test-integration
 test-integration: wait-test-dependency
-	python runtests.py -m "integration" app/
+	python runtests.py -m "integration and not external" app/
 
 .PHONY: test-pulse
 test-pulse: wait-test-dependency

@@ -50,7 +50,7 @@ async def test_engine_creation(app_config: AppConfig):
     assert engine.closed()
 
     # Test terminate engine with open connections and transactions!
-    closing_timeout_sec = 10
+    closing_timeout_sec = 0.5
     engine = AioEngine(
         dsn=app_config.PAYOUT_MAINDB_MASTER_URL.value,
         minsize=minsize,

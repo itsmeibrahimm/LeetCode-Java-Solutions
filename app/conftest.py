@@ -88,7 +88,9 @@ def app_config():
 
 @pytest.fixture
 async def app_context(app_config: AppConfig):
-    return await create_app_context(app_config)
+    context = await create_app_context(app_config)
+    yield context
+    await context.close()
 
 
 @pytest.fixture

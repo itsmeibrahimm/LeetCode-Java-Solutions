@@ -1,6 +1,8 @@
 import pytest
 import pexpect
 import sys
+import signal
+from typing import List
 from psutil import Process
 
 
@@ -17,7 +19,7 @@ class TestStartup:
         Ensure that any ThreadPools are created in app startup handlers, which should be triggered post-fork
         (do not initialize thread pools as module import time).
         """
-        child = pexpect.spawn(
+        gunicorn = pexpect.spawn(
             "gunicorn",
             [
                 # run one worker with the main app to trigger the initialization code
@@ -35,14 +37,23 @@ class TestStartup:
             # set char encoding for stdout output
             encoding="utf-8",
         )
-        child.logfile = sys.stdout  # log to stdout
+        gunicorn.logfile = sys.stdout  # log to stdout
+        workers: List[Process] = []
         try:
             # see https://github.com/benoitc/gunicorn/blob/f38f717539b1b7296720805b8ae3969c3509b9c1/gunicorn/arbiter.py#L583
-            child.expect(["Booting worker with pid:"], timeout=self.TIMEOUT_SECONDS)
-            process = Process(child.pid)
+            # gunicorn startup
+            gunicorn.expect(["Started server process"], timeout=self.TIMEOUT_SECONDS)
+            process = Process(gunicorn.pid)
+            workers = process.children(True)
+            print("worker pids: {}".format([w.pid for w in workers]))
+
             assert (
                 process.num_threads() == self.EXPECTED_THREADS
             ), "master process does not have additional python threads"
+
+            # properly clean up
+            gunicorn.kill(signal.SIGINT)
+            # gunicorn.expect(["Shutting down: Master"], timeout=self.TIMEOUT_SECONDS)
         except pexpect.TIMEOUT:
             pytest.fail(
                 "gunicorn process may not have started correctly, could not find expected output"
@@ -50,4 +61,8 @@ class TestStartup:
         except pexpect.EOF:
             pytest.fail("gunicorn exited early during init; check logs for details")
         finally:
-            child.close(force=True)
+            # force cleanup of master process and children
+            gunicorn.kill(signal.SIGKILL)
+            for worker in workers:
+                worker.kill()
+            gunicorn.close(force=True)
