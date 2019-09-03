@@ -132,7 +132,7 @@ class RawPayer:
             provider_customer = PaymentGatewayProviderCustomer(
                 payment_provider=PaymentProvider.STRIPE.value,  # hard-coded "stripe"
                 payment_provider_customer_id=self.stripe_customer_entity.stripe_id,
-                default_payment_method_id=self.stripe_customer_entity.default_card,
+                default_payment_method_id=self.stripe_customer_entity.default_source,
             )
             if self.payer_entity:
                 payer = Payer(
@@ -152,7 +152,7 @@ class RawPayer:
                     updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                     country=self.stripe_customer_entity.country_shortname,
                     dd_payer_id=str(self.stripe_customer_entity.owner_id),
-                    # payer_type=stripe_customer_entity.owner_type,
+                    payer_type=self.stripe_customer_entity.owner_type,
                     payment_gateway_provider_customers=[provider_customer],
                 )
 
