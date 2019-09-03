@@ -1,10 +1,13 @@
 import uuid
 from copy import deepcopy
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 import asynctest
 import pytest
 from asynctest import create_autospec
+from freezegun import freeze_time
+from stripe.error import StripeError
 
 from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
 from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
@@ -14,8 +17,11 @@ from app.payin.core.cart_payment.model import (
     PaymentCharge,
     PgpPaymentCharge,
 )
-from app.payin.core.cart_payment.processor import CartPaymentInterface
-from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.cart_payment.processor import (
+    CartPaymentInterface,
+    CAPTURE_DELAY_IN_HOURS,
+)
+from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus, CaptureMethod
 from app.payin.core.exceptions import (
     PaymentIntentRefundError,
     CartPaymentCreateError,
@@ -360,7 +366,7 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_create_provider_payment_error(self, cart_payment_interface):
         mocked_stripe_function = FunctionMock()
-        mocked_stripe_function.side_effect = Exception()
+        mocked_stripe_function.side_effect = StripeError()
         cart_payment_interface.app_context.stripe.create_payment_intent = (
             mocked_stripe_function
         )
@@ -493,7 +499,7 @@ class TestCartPaymentInterface:
 
     def test_populate_cart_payment_for_response(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
-        cart_payment.capture_method = "manual"
+        cart_payment.delay_capture = True
         cart_payment.payer_statement_description = "Fill in here"
         intent = generate_payment_intent(
             status="requires_capture", capture_method="auto"
@@ -510,7 +516,7 @@ class TestCartPaymentInterface:
         # Fields populated based on related objects
         assert cart_payment.payment_method_id == pgp_intent.payment_method_resource_id
         assert cart_payment.payer_statement_description == intent.statement_descriptor
-        assert cart_payment.capture_method == intent.capture_method
+        assert cart_payment.delay_capture is True
 
         # Unchanged attributes
         assert cart_payment.id == original_cart_payment.id
@@ -529,6 +535,7 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_create_new_intent_pair(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
+        capture_after = datetime.utcnow()
         result_intent, result_pgp_intent = await cart_payment_interface._create_new_intent_pair(
             cart_payment=cart_payment,
             idempotency_key="idempotency_key",
@@ -536,7 +543,8 @@ class TestCartPaymentInterface:
             amount=cart_payment.amount,
             country="US",
             currency="USD",
-            capture_method=cart_payment.capture_method,
+            capture_method=CaptureMethod.MANUAL,
+            capture_after=capture_after,
             payer_statement_description=None,
         )
 
@@ -557,6 +565,7 @@ class TestCartPaymentInterface:
             statement_descriptor=None,
             created_at=result_intent.created_at,  # Generated field
             updated_at=result_intent.updated_at,  # Generated field
+            capture_after=capture_after,
             captured_at=None,
             cancelled_at=None,
         )
@@ -788,9 +797,12 @@ class TestCartPaymentInterface:
         assert result.client_description is None
 
     @pytest.mark.asyncio
+    @freeze_time("2011-01-01")
     async def test_submit_new_payment(self, cart_payment_interface, stripe_interface):
         # Parameters for function
-        request_cart_payment = generate_cart_payment()
+        request_cart_payment = generate_cart_payment(
+            capture_method=CaptureMethod.MANUAL.value
+        )
         payment_resource_id = "payment_resource_id"
         customer_resource_id = "customer_resource_id"
         idempotency_key = str(uuid.uuid4())
@@ -826,7 +838,7 @@ class TestCartPaymentInterface:
             amount_capturable=None,
             amount_received=None,
             application_fee_amount=None,
-            capture_method="manual",
+            capture_method=CaptureMethod.MANUAL.value,
             confirmation_method="manual",
             country=country,
             currency=currency,
@@ -836,12 +848,16 @@ class TestCartPaymentInterface:
             updated_at=result_payment_intent.updated_at,  # Generated field
             captured_at=None,
             cancelled_at=None,
+            capture_after=result_payment_intent.capture_after,
         )
         assert result_payment_intent
         assert result_payment_intent == expected_payment_intent
         assert result_payment_intent.id
         assert result_payment_intent.created_at
         assert result_payment_intent.updated_at
+        assert result_payment_intent.capture_after == (
+            datetime(2011, 1, 1) + timedelta(hours=CAPTURE_DELAY_IN_HOURS)
+        )
 
     @pytest.mark.asyncio
     async def test_resubmit_existing_payment(self, cart_payment_interface):

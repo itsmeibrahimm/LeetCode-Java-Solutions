@@ -32,3 +32,4 @@ class PaymentIntentTable(TableDefinition):
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
     captured_at: Column = no_init_field(Column("captured_at", DateTime(False)))
     cancelled_at: Column = no_init_field(Column("cancelled_at", DateTime(False)))
+    capture_after: Column = no_init_field(Column("capture_after", DateTime(False)))

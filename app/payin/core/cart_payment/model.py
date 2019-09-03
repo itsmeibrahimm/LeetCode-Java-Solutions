@@ -36,7 +36,7 @@ class CartPayment(BaseModel):
     amount: int
     payer_id: str
     payment_method_id: Optional[str]
-    capture_method: Optional[str]
+    delay_capture: bool
     cart_metadata: CartMetadata
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -44,6 +44,7 @@ class CartPayment(BaseModel):
     payer_statement_description: Optional[str] = None
     legacy_payment: Optional[LegacyPayment] = None
     split_payment: Optional[SplitPayment] = None
+    capture_after: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
 
 
@@ -67,6 +68,7 @@ class PaymentIntent(BaseModel):
     updated_at: datetime
     captured_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+    capture_after: Optional[datetime]
 
 
 @final

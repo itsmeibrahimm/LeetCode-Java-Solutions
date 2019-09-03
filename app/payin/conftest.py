@@ -49,6 +49,7 @@ async def payment_intent(
         amount_original=100,
         legacy_consumer_id=None,
         amount_total=200,
+        delay_capture=False,
     )
 
     payment_intent = PaymentIntentFactory(
@@ -67,6 +68,7 @@ async def payment_intent(
         confirmation_method=payment_intent.confirmation_method,
         status=payment_intent.status,
         statement_descriptor=payment_intent.statement_descriptor,
+        capture_after=None,
     )
 
 

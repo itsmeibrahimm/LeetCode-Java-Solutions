@@ -46,6 +46,7 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
         reference_id=99,
         reference_ct_id=88,
         legacy_consumer_id=None,
+        delay_capture=False,
     )
 
 
@@ -62,6 +63,7 @@ async def payment_intent(cart_payment_repository: CartPaymentRepository, payer: 
         reference_id=99,
         reference_ct_id=88,
         legacy_consumer_id=None,
+        delay_capture=False,
     )
 
     payment_intent = await cart_payment_repository.insert_payment_intent(
@@ -77,6 +79,7 @@ async def payment_intent(cart_payment_repository: CartPaymentRepository, payer: 
         confirmation_method=ConfirmationMethod.MANUAL,
         status=IntentStatus.REQUIRES_CAPTURE,
         statement_descriptor=None,
+        capture_after=None,
     )
     yield payment_intent
 
@@ -215,6 +218,7 @@ class TestPaymentIntentAdjustmentHistory:
             confirmation_method=ConfirmationMethod.MANUAL,
             status=IntentStatus.REQUIRES_CAPTURE,
             statement_descriptor=None,
+            capture_after=None,
         )
 
         id = uuid4()

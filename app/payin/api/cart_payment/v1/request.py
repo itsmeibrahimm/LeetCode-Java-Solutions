@@ -1,9 +1,10 @@
-from pydantic import BaseModel
 from typing import Optional
 
+from pydantic import BaseModel
+
 from app.commons.types import CountryCode
+from app.payin.core.cart_payment.types import CartType
 from app.payin.core.types import LegacyPaymentInfo
-from app.payin.core.cart_payment.types import CaptureMethod, CartType
 
 
 # Our Mypy type checking does not currently support Schema objects.
@@ -27,7 +28,7 @@ class CreateCartPaymentRequest(BaseModel):
     payment_country: CountryCode
     currency: str
     payment_method_id: Optional[str] = None
-    capture_method: CaptureMethod = CaptureMethod.MANUAL
+    delay_capture: bool
     idempotency_key: str
     client_description: Optional[str] = None
     payer_statement_description: Optional[str] = None

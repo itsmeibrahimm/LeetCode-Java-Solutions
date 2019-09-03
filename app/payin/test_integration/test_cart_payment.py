@@ -1,13 +1,13 @@
-import pytest
 import uuid
 
+import pytest
 from starlette.testclient import TestClient
 
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
 # is marked as external.  The stripe simulator does not return the correct result since it does
-# persiste state.
+# persist state.
 @pytest.mark.external
 class TestCartPayment:
     def _get_payer_create_request(self):

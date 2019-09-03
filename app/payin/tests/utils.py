@@ -10,7 +10,7 @@ from app.payin.core.cart_payment.model import (
     PaymentCharge,
     PgpPaymentCharge,
 )
-from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus, CaptureMethod
 from app.payin.core.dispute.model import Dispute
 from app.payin.repository.dispute_repo import StripeDisputeDbEntity
 
@@ -97,16 +97,18 @@ def generate_cart_payment(
     payer_id: str = str(uuid.uuid4()),
     payment_method_id: str = str(uuid.uuid4()),
     amount=500,
+    capture_method=CaptureMethod.MANUAL.value,
 ) -> CartPayment:
     return CartPayment(
         id=id if id else uuid.uuid4(),
         amount=amount,
         payer_id=payer_id,
         payment_method_id=payment_method_id,
-        capture_method="manual",
+        capture_method=capture_method,
         cart_metadata=CartMetadata(
             reference_id=0, ct_reference_id=0, type=CartType.ORDER_CART
         ),
+        delay_capture=True,
     )
 
 

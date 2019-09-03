@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -21,6 +21,7 @@ class CartPaymentTable(TableDefinition):
     legacy_consumer_id: Column = no_init_field(Column("legacy_consumer_id", BigInteger))
     amount_original: Column = no_init_field(Column("amount_original", Integer))
     amount_total: Column = no_init_field(Column("amount_total", Integer))
+    delay_capture: Column = no_init_field(Column("delay_capture", Boolean))
     client_description: Column = no_init_field(Column("client_description", String))
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))

@@ -19,7 +19,7 @@ class TestCaptureUncapturedPaymentIntents:
         await capture_uncaptured_payment_intents(
             app_context=app_context, cart_payment_repo=cart_payment_repository
         )
-        cart_payment_repository.find_payment_intents_with_status.assert_called_once()  # type: ignore
+        cart_payment_repository.find_payment_intents_that_require_capture.assert_called_once()  # type: ignore
 
     @pytest.mark.asyncio
     @patch("app.payin.jobs.CartPaymentInterface.capture_payment")
@@ -30,11 +30,11 @@ class TestCaptureUncapturedPaymentIntents:
         cart_payment_repository: CartPaymentRepository,
     ):
         payment_intent = PaymentIntentFactory()
-        cart_payment_repository.find_payment_intents_with_status.return_value = [  # type: ignore
+        cart_payment_repository.find_payment_intents_that_require_capture.return_value = [  # type: ignore
             payment_intent
         ]
         await capture_uncaptured_payment_intents(
             app_context=app_context, cart_payment_repo=cart_payment_repository
         )
-        cart_payment_repository.find_payment_intents_with_status.assert_called_once()  # type: ignore
+        cart_payment_repository.find_payment_intents_that_require_capture.assert_called_once()  # type: ignore
         mock_capture_payment.assert_called_once_with(payment_intent)  # type: ignore

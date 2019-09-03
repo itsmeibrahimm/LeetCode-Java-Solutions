@@ -43,6 +43,7 @@ class CartPaymentRepository(PayinDBRepository):
         legacy_consumer_id: Optional[int],
         amount_original: int,
         amount_total: int,
+        delay_capture: bool,
     ) -> CartPayment:
         data = {
             cart_payments.id: id,
@@ -54,6 +55,7 @@ class CartPaymentRepository(PayinDBRepository):
             cart_payments.legacy_consumer_id: legacy_consumer_id,
             cart_payments.amount_original: amount_original,
             cart_payments.amount_total: amount_total,
+            cart_payments.delay_capture: delay_capture,
         }
 
         statement = (
@@ -80,6 +82,7 @@ class CartPaymentRepository(PayinDBRepository):
             ),
             created_at=row[cart_payments.created_at],
             updated_at=row[cart_payments.updated_at],
+            delay_capture=row[cart_payments.delay_capture],
         )
 
     async def find_payment_intents_with_status(
@@ -87,6 +90,23 @@ class CartPaymentRepository(PayinDBRepository):
     ) -> List[PaymentIntent]:
         statement = payment_intents.table.select().where(
             payment_intents.status == status
+        )
+        results = await self.payment_database.master().fetch_all(statement)
+        return [self.to_payment_intent(row) for row in results]
+
+    async def find_payment_intents_that_require_capture(
+        self, cutoff: datetime
+    ) -> List[PaymentIntent]:
+        """
+
+        :param cutoff: The date after which capture_after should be
+        :return:
+        """
+        statement = payment_intents.table.select().where(
+            and_(
+                payment_intents.status == IntentStatus.REQUIRES_CAPTURE,
+                payment_intents.capture_after >= cutoff,
+            )
         )
         results = await self.payment_database.master().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
@@ -127,6 +147,7 @@ class CartPaymentRepository(PayinDBRepository):
         confirmation_method: str,
         status: str,
         statement_descriptor: Optional[str],
+        capture_after: Optional[datetime],
     ) -> PaymentIntent:
         data = {
             payment_intents.id: id,
@@ -141,6 +162,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents.confirmation_method: confirmation_method,
             payment_intents.status: status,
             payment_intents.statement_descriptor: statement_descriptor,
+            payment_intents.capture_after: capture_after,
         }
 
         statement = (
@@ -172,6 +194,7 @@ class CartPaymentRepository(PayinDBRepository):
             updated_at=row[payment_intents.updated_at],
             captured_at=row[payment_intents.captured_at],
             cancelled_at=row[payment_intents.cancelled_at],
+            capture_after=row[payment_intents.capture_after],
         )
 
     async def update_payment_intent_status(

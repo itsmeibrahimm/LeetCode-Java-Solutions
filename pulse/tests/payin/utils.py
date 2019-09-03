@@ -89,6 +89,7 @@ class PaymentUtil:
             "client_description": "Transaction",
             "payer_statement_description": "Transaction",
             "metadata": {"reference_id": 1, "ct_reference_id": 1, "type": "OrderCart"},
+            "delay_capture": True,
         }
 
     @staticmethod

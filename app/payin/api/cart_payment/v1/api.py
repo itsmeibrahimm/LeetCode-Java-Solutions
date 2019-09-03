@@ -63,8 +63,8 @@ async def create_cart_payment(
     - **currency**: [string] currency to charge the cart
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
                              can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
-    - **capture_method**: [string] auto capture or manual (captured by DD payment platform)
-    - **idempotency_key**: [string] idempotency key to sumibt the payment
+    - **delay_capture**: [bool] whether to capture immediately or delay
+    - **idempotency_key**: [string] idempotency key to submit the payment
     - **client_description** [string] client description
     - **metadata** [json object] key-value map for cart metadata
     - **metadata.reference_id** [int] DoorDash order_cart id
@@ -169,7 +169,7 @@ def create_request_to_model(
         payment_method_id=cart_payment_request.payment_method_id
         if cart_payment_request.payment_method_id
         else "",
-        capture_method=cart_payment_request.capture_method,
+        delay_capture=cart_payment_request.delay_capture,
         cart_metadata=CartMetadata(
             reference_id=cart_payment_request.metadata.reference_id,
             ct_reference_id=cart_payment_request.metadata.ct_reference_id,

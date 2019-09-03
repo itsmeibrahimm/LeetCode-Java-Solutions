@@ -1,6 +1,7 @@
-from asyncio import gather
 import uuid
-from datetime import datetime
+from asyncio import gather
+from datetime import datetime, timedelta
+from stripe.error import StripeError
 from typing import Tuple, List, Optional, Callable
 
 from fastapi import Depends
@@ -17,7 +18,6 @@ from app.commons.providers.stripe.stripe_models import (
 )
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
-from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.core.cart_payment.model import (
     CartPayment,
     LegacyPayment,
@@ -25,6 +25,12 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentIntent,
     PaymentCharge,
     PgpPaymentCharge,
+)
+from app.payin.core.cart_payment.types import (
+    CaptureMethod,
+    ConfirmationMethod,
+    IntentStatus,
+    ChargeStatus,
 )
 from app.payin.core.exceptions import (
     PayinErrorCode,
@@ -38,15 +44,12 @@ from app.payin.core.exceptions import (
     PaymentIntentConcurrentAccessError,
     PaymentIntentNotInRequiresCaptureState,
 )
-from app.payin.core.cart_payment.types import (
-    CaptureMethod,
-    ConfirmationMethod,
-    IntentStatus,
-    ChargeStatus,
-)
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
+from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
+
+CAPTURE_DELAY_IN_HOURS = 24 * 1
 
 
 class CartPaymentInterface:
@@ -228,7 +231,7 @@ class CartPaymentInterface:
                 idempotency_key=pgp_payment_intent.idempotency_key,
             )
             return response
-        except Exception as e:
+        except StripeError as e:
             self.req_context.log.error(
                 f"Error invoking provider to create a payment intent: {e}"
             )
@@ -477,7 +480,6 @@ class CartPaymentInterface:
             payment_intent {PaymentIntent} -- An associated PaymentIntent.
             pgp_payment_intent {PgpPaymentIntent} -- An associated PgpPaymentIntent.
         """
-        cart_payment.capture_method = payment_intent.capture_method
         cart_payment.payer_statement_description = payment_intent.statement_descriptor
         cart_payment.payment_method_id = pgp_payment_intent.payment_method_resource_id
 
@@ -551,6 +553,7 @@ class CartPaymentInterface:
         country: str,
         currency: str,
         capture_method: str,
+        capture_after: Optional[datetime],
         payer_statement_description: Optional[str] = None,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         # Create PaymentIntent
@@ -569,6 +572,7 @@ class CartPaymentInterface:
             confirmation_method=ConfirmationMethod.MANUAL,
             status=IntentStatus.INIT,
             statement_descriptor=payer_statement_description,
+            capture_after=capture_after,
         )
 
         # Create PgpPaymentIntent
@@ -611,12 +615,9 @@ class CartPaymentInterface:
 
         # Required as inputs to creation API, but optional in model.  Verify we have the required fields.
         # TODO add codes to distinguish between different cases for client
-        if not (
-            request_cart_payment.capture_method
-            and request_cart_payment.payment_method_id
-        ):
+        if not request_cart_payment.payment_method_id:
             self.req_context.log.info(
-                f"invalid input. capture_method [{request_cart_payment.capture_method}] and payment_method_id [{request_cart_payment.payment_method_id}] can't be empty"
+                f"invalid input. payment_method_id [{request_cart_payment.payment_method_id}] can't be empty"
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
@@ -629,8 +630,25 @@ class CartPaymentInterface:
         ):
             dd_consumer_id = int(request_cart_payment.legacy_payment.dd_consumer_id)
 
+        legacy_consumer_id = None
+        if request_cart_payment.legacy_payment:
+            legacy_consumer_id = dd_consumer_id
+
+        # Capture after
+        capture_after = None
+        if request_cart_payment.delay_capture:
+            capture_after = datetime.utcnow() + timedelta(hours=CAPTURE_DELAY_IN_HOURS)
+
+        # Capture Method
+        capture_method = (
+            CaptureMethod.MANUAL
+            if request_cart_payment.delay_capture
+            else CaptureMethod.AUTO
+        )
+
         async with self.payment_repo.payment_database_transaction():
             # Create CartPayment
+
             cart_payment = await self.payment_repo.insert_cart_payment(
                 id=request_cart_payment.id,
                 payer_id=request_cart_payment.payer_id,
@@ -638,11 +656,10 @@ class CartPaymentInterface:
                 client_description=request_cart_payment.client_description,
                 reference_id=request_cart_payment.cart_metadata.reference_id,
                 reference_ct_id=request_cart_payment.cart_metadata.ct_reference_id,
-                legacy_consumer_id=dd_consumer_id
-                if request_cart_payment.legacy_payment
-                else None,
+                legacy_consumer_id=legacy_consumer_id,
                 amount_original=request_cart_payment.amount,
                 amount_total=request_cart_payment.amount,
+                delay_capture=request_cart_payment.delay_capture,
             )
 
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
@@ -652,8 +669,9 @@ class CartPaymentInterface:
                 amount=cart_payment.amount,
                 country=country,
                 currency=currency,
-                capture_method=request_cart_payment.capture_method,
+                capture_method=capture_method,
                 payer_statement_description=request_cart_payment.payer_statement_description,
+                capture_after=capture_after,
             )
 
         self.req_context.log.info(
@@ -884,6 +902,7 @@ class CartPaymentInterface:
                 currency=most_recent_intent.currency,
                 capture_method=most_recent_intent.capture_method,
                 payer_statement_description=most_recent_intent.statement_descriptor,
+                capture_after=most_recent_intent.capture_after,
             )
 
             # Insert adjustment history record

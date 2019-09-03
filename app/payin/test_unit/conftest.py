@@ -35,12 +35,12 @@ class MockedPaymentRepo:
         legacy_consumer_id: Optional[int],
         amount_original: int,
         amount_total: int,
+        delay_capture: bool,
     ) -> CartPayment:
         return CartPayment(
             id=id,
             payer_id=payer_id,
             amount=amount_total,
-            capture_method=None,  # Not populated until after intent pair is also created
             payment_method_id=None,  # Not populated until after intent pair is also created
             client_description=client_description,
             cart_metadata=CartMetadata(
@@ -50,6 +50,7 @@ class MockedPaymentRepo:
             ),
             created_at=datetime.now(),
             updated_at=datetime.now(),
+            delay_capture=delay_capture,
         )
 
     async def update_cart_payment_details(
@@ -78,6 +79,7 @@ class MockedPaymentRepo:
         confirmation_method: str,
         status: str,
         statement_descriptor: Optional[str],
+        capture_after: Optional[datetime],
     ) -> PaymentIntent:
         return PaymentIntent(
             id=id,
@@ -98,6 +100,7 @@ class MockedPaymentRepo:
             updated_at=datetime.now(),
             captured_at=None,
             cancelled_at=None,
+            capture_after=capture_after,
         )
 
     async def update_payment_intent_status(
