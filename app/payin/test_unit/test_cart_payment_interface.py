@@ -482,8 +482,9 @@ class TestCartPaymentInterface:
         # Stub function: return value is fixed
         assert (
             cart_payment_interface.is_accessible(
-                cart_payment=MagicMock(),
+                cart_payment=generate_cart_payment(),
                 request_payer_id="payer_id",
+                legacy_payment=None,
                 credential_owner="credential_ower",
             )
             is True
@@ -514,7 +515,7 @@ class TestCartPaymentInterface:
         )
 
         # Fields populated based on related objects
-        assert cart_payment.payment_method_id == pgp_intent.payment_method_resource_id
+        assert cart_payment.payment_method_id == intent.payment_method_id
         assert cart_payment.payer_statement_description == intent.statement_descriptor
         assert cart_payment.delay_capture is True
 
@@ -540,6 +541,8 @@ class TestCartPaymentInterface:
             cart_payment=cart_payment,
             idempotency_key="idempotency_key",
             payment_method_id=cart_payment.payment_method_id,
+            provider_payment_resource_id="provider_payment_resource_id",
+            provider_customer_resource_id="provider_customer_resource_id",
             amount=cart_payment.amount,
             country="US",
             currency="USD",
@@ -563,6 +566,7 @@ class TestCartPaymentInterface:
             currency="USD",
             status=IntentStatus.INIT,
             statement_descriptor=None,
+            payment_method_id=cart_payment.payment_method_id,
             created_at=result_intent.created_at,  # Generated field
             updated_at=result_intent.updated_at,  # Generated field
             capture_after=capture_after,
@@ -586,7 +590,8 @@ class TestCartPaymentInterface:
             resource_id=None,
             charge_resource_id=None,
             invoice_resource_id=None,
-            payment_method_resource_id=cart_payment.payment_method_id,
+            payment_method_resource_id="provider_payment_resource_id",
+            customer_resource_id="provider_customer_resource_id",
             currency="USD",
             amount=cart_payment.amount,
             amount_capturable=None,
@@ -844,6 +849,7 @@ class TestCartPaymentInterface:
             currency=currency,
             status=IntentStatus.INIT,
             statement_descriptor=None,
+            payment_method_id=request_cart_payment.payment_method_id,
             created_at=result_payment_intent.created_at,  # Generated field
             updated_at=result_payment_intent.updated_at,  # Generated field
             captured_at=None,

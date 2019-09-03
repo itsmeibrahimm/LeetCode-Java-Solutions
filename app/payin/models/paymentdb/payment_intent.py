@@ -28,6 +28,7 @@ class PaymentIntentTable(TableDefinition):
     currency: Column = no_init_field(Column("currency", String))
     status: Column = no_init_field(Column("status", String))
     statement_descriptor: Column = no_init_field(Column("statement_descriptor", String))
+    payment_method_id: Column = no_init_field(Column("payment_method_id", Text))
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
     captured_at: Column = no_init_field(Column("captured_at", DateTime(False)))

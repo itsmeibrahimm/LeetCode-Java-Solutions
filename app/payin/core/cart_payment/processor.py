@@ -70,8 +70,9 @@ class CartPaymentInterface:
         self.payment_method_client = payment_method_client
 
     async def _find_existing(
-        self, payer_id: str, idempotency_key: str
+        self, payer_id: Optional[str], idempotency_key: str
     ) -> Tuple[Optional[CartPayment], Optional[PaymentIntent]]:
+        # TODO support legacy payment case, where there is no payer_id
         payment_intent = await self.payment_repo.get_payment_intent_for_idempotency_key(
             idempotency_key
         )
@@ -481,10 +482,25 @@ class CartPaymentInterface:
             pgp_payment_intent {PgpPaymentIntent} -- An associated PgpPaymentIntent.
         """
         cart_payment.payer_statement_description = payment_intent.statement_descriptor
-        cart_payment.payment_method_id = pgp_payment_intent.payment_method_resource_id
+        cart_payment.payment_method_id = payment_intent.payment_method_id
+
+        # TODO conditionally populate legacy payment
+        # if not cart_payment.payer_id and not cart_payment.payment_method_id:
+        #     cart_payment.legacy_payment = LegacyPayment(
+        #         dd_consumer_id=None,
+        #         dd_stripe_card_id=None,
+        #         dd_charge_id=None,
+        #         stripe_customer_id="todo",
+        #         stripe_payment_method_id=pgp_payment_intent.payment_method_resource_id,
+        #         stripe_card_id=None,
+        #     )
 
     def is_accessible(
-        self, cart_payment: CartPayment, request_payer_id: str, credential_owner: str
+        self,
+        cart_payment: CartPayment,
+        request_payer_id: Optional[str],
+        legacy_payment: Optional[LegacyPayment],
+        credential_owner: str,
     ) -> bool:
         # TODO verify the caller (as identified by the provided credentials for this request) owns the cart payment
         # From credential_owner, get payer_id
@@ -548,7 +564,9 @@ class CartPaymentInterface:
         self,
         cart_payment: CartPayment,
         idempotency_key: str,
-        payment_method_id: str,
+        payment_method_id: Optional[str],
+        provider_payment_resource_id: str,
+        provider_customer_resource_id: str,
         amount: int,
         country: str,
         currency: str,
@@ -573,6 +591,7 @@ class CartPaymentInterface:
             status=IntentStatus.INIT,
             statement_descriptor=payer_statement_description,
             capture_after=capture_after,
+            payment_method_id=payment_method_id,
         )
 
         # Create PgpPaymentIntent
@@ -581,7 +600,8 @@ class CartPaymentInterface:
             payment_intent_id=payment_intent.id,
             idempotency_key=idempotency_key,
             provider=PaymentProvider.STRIPE.value,
-            payment_method_resource_id=payment_method_id,
+            payment_method_resource_id=provider_payment_resource_id,
+            customer_resource_id=provider_customer_resource_id,
             currency=currency,
             amount=amount,
             application_fee_amount=getattr(
@@ -596,7 +616,7 @@ class CartPaymentInterface:
             statement_descriptor=payer_statement_description,
         )
 
-        return (payment_intent, pgp_payment_intent)
+        return payment_intent, pgp_payment_intent
 
     async def submit_new_payment(
         self,
@@ -613,16 +633,6 @@ class CartPaymentInterface:
             f"Submitting new payment for payer {request_cart_payment.payer_id}"
         )
 
-        # Required as inputs to creation API, but optional in model.  Verify we have the required fields.
-        # TODO add codes to distinguish between different cases for client
-        if not request_cart_payment.payment_method_id:
-            self.req_context.log.info(
-                f"invalid input. payment_method_id [{request_cart_payment.payment_method_id}] can't be empty"
-            )
-            raise CartPaymentCreateError(
-                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
-            )
         dd_consumer_id = None
         if (
             request_cart_payment.legacy_payment
@@ -663,10 +673,12 @@ class CartPaymentInterface:
             )
 
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
-                cart_payment=cart_payment,
+                cart_payment=request_cart_payment,
                 idempotency_key=idempotency_key,
                 payment_method_id=request_cart_payment.payment_method_id,
-                amount=cart_payment.amount,
+                provider_payment_resource_id=provider_payment_resource_id,
+                provider_customer_resource_id=provider_customer_resource_id,
+                amount=request_cart_payment.amount,
                 country=country,
                 currency=currency,
                 capture_method=capture_method,
@@ -819,35 +831,59 @@ class CartPaymentInterface:
 
     async def _get_required_payment_resource_ids(
         self,
-        payer_id: str,
-        payment_method_id: str,
+        payer_id: Optional[str],
+        payment_method_id: Optional[str],
         legacy_payment: Optional[LegacyPayment],
     ) -> Tuple[str, str]:
-        # Get payment method, in order to submit new intent to the provider
-
+        # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent
+        # submission and management.  A client is expected to either provide either (a) both payer_id and
+        # payment_method_id, which we can use to look up corresponding pgp resource IDs, or (b) stripe resource
+        # IDs directly via the legacy_payment request field.  Case (b) is for legacy clients who have not fully
+        # adopted payin service yet, and in this case we direclty use those IDs and no lookup is needed.
         self.req_context.log.debug("Getting payment info.")
 
-        lookup_payer_id = payer_id
-        payer_id_type = PayerIdType.DD_PAYMENT_PAYER_ID
+        if payer_id and payment_method_id:
+            raw_payment_method = await self.payment_method_client.get_payment_method(
+                payer_id=payer_id,
+                payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
+                payment_method_id=payment_method_id,
+                payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
+            )
+            raw_payer = await self.payer_client.get_payer_raw_object(
+                payer_id=payer_id, payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID
+            )
+            payer_resource_id = raw_payer.pgp_customer_id()
+            payment_method_resource_id = raw_payment_method.pgp_payment_method_id()
+        elif legacy_payment:
+            # Legacy payment case: no payer_id/payment_method_id provided
+            payer_resource_id = legacy_payment.stripe_customer_id
+            payment_method_resource_id = ""
+            if legacy_payment.stripe_payment_method_id:
+                payment_method_resource_id = legacy_payment.stripe_payment_method_id
+            elif legacy_payment.stripe_card_id:
+                payment_method_resource_id = legacy_payment.stripe_card_id
 
-        lookup_payment_method_id = payment_method_id
-        payment_method_id_type = PaymentMethodIdType.DD_PAYMENT_METHOD_ID
+            self.req_context.log.debug(
+                f"Legacy resource IDs: {payer_resource_id}, {payment_method_resource_id}"
+            )
 
-        # TODO Handle legacy payment identifiers
+        # Ensure we have the necessary fields.  Though payer_client/payment_method_client already throws exceptions
+        # if not found, still check here since we have to support the legacy payment case.
+        if not payer_resource_id:
+            self.req_context.log.warn("No payer pgp resource ID found.")
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+                retryable=False,
+            )
 
-        raw_payment_method = await self.payment_method_client.get_payment_method(
-            payer_id=lookup_payer_id,
-            payer_id_type=payer_id_type,
-            payment_method_id=lookup_payment_method_id,
-            payment_method_id_type=payment_method_id_type,
-        )
-        # TODO add more error_code values to help client distinguish error cases
+        if not payment_method_resource_id:
+            self.req_context.log.warn("No payment method pgp resource ID found.")
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+                retryable=False,
+            )
 
-        raw_payer = await self.payer_client.get_payer_raw_object(
-            payer_id=lookup_payer_id, payer_id_type=payer_id_type
-        )
-
-        return (raw_payment_method.pgp_payment_method_id(), raw_payer.pgp_customer_id())
+        return payment_method_resource_id, payer_resource_id
 
     async def _resubmit_add_amount_to_cart_payment(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent
@@ -864,11 +900,18 @@ class CartPaymentInterface:
         # Intent is in init state, so there may have been an issue with calling provider.  Call again.
         payment_resource_id, customer_resource_id = await self._get_required_payment_resource_ids(
             payer_id=cart_payment.payer_id,
-            payment_method_id=pgp_intent.payment_method_resource_id,
-            legacy_payment=None,
+            payment_method_id=payment_intent.payment_method_id,
+            legacy_payment=None,  # TODO support resubmit when legacy payment is used
         )
         return await self._submit_payment_to_provider(
             payment_intent, pgp_intent, payment_resource_id, customer_resource_id
+        )
+
+    def populate_legacy_payment(self, pgp_payment_intent: PgpPaymentIntent):
+        # TODO may need to distinguish between card id and payment method values stored within legacy payment_method_resource_id
+        return LegacyPayment(
+            stripe_payment_method_id=pgp_payment_intent.payment_method_resource_id,
+            stripe_customer_id=pgp_payment_intent.customer_resource_id,
         )
 
     async def _submit_amount_increase_to_cart_payment(
@@ -887,8 +930,8 @@ class CartPaymentInterface:
 
         payment_resource_id, customer_resource_id = await self._get_required_payment_resource_ids(
             payer_id=cart_payment.payer_id,
-            payment_method_id=pgp_intent.payment_method_resource_id,
-            legacy_payment=None,
+            payment_method_id=most_recent_intent.payment_method_id,
+            legacy_payment=self.populate_legacy_payment(pgp_intent),
         )
 
         # New intent pair for the higher amount
@@ -896,7 +939,9 @@ class CartPaymentInterface:
             payment_intent_for_submit, pgp_intent_for_submit = await self._create_new_intent_pair(
                 cart_payment=cart_payment,
                 idempotency_key=idempotency_key,
-                payment_method_id=pgp_intent.payment_method_resource_id,
+                payment_method_id=most_recent_intent.payment_method_id,
+                provider_payment_resource_id=pgp_intent.payment_method_resource_id,
+                provider_customer_resource_id=pgp_intent.customer_resource_id,
                 amount=amount,
                 country=most_recent_intent.country,
                 currency=most_recent_intent.currency,
@@ -1211,6 +1256,8 @@ class CartPaymentInterface:
 
 
 class CartPaymentProcessor:
+    # TODO: use payer_country passed to processor functions to get the right stripe platform key within CartPaymentInterface.
+
     def __init__(
         self,
         cart_payment_interface: CartPaymentInterface = Depends(CartPaymentInterface),
@@ -1221,7 +1268,7 @@ class CartPaymentProcessor:
         self,
         idempotency_key: str,
         cart_payment_id: uuid.UUID,
-        payer_id: str,
+        payer_id: Optional[str],
         amount: int,
         legacy_payment: Optional[LegacyPayment],
         client_description: Optional[str],
@@ -1253,7 +1300,12 @@ class CartPaymentProcessor:
             )
 
         # Ensure the caller can access the cart payment being modified
-        if not self.cart_payment_interface.is_accessible(cart_payment, payer_id, ""):
+        if not self.cart_payment_interface.is_accessible(
+            cart_payment=cart_payment,
+            request_payer_id=payer_id,
+            legacy_payment=legacy_payment,
+            credential_owner="",
+        ):
             raise CartPaymentReadError(
                 error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
             )
@@ -1286,14 +1338,6 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- A CartPayment model for the created payment.
         """
-        # TODO: Validate amount does not exceed configured max for specified currency
-
-        if not request_cart_payment.payment_method_id:
-            raise CartPaymentCreateError(
-                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
-            )
-
         # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
         # our exception handling middleware.
         payment_method_resource_id, customer_resource_id = await self.cart_payment_interface._get_required_payment_resource_ids(
@@ -1306,8 +1350,7 @@ class CartPaymentProcessor:
         cart_payment, payment_intent = await self.cart_payment_interface._find_existing(
             request_cart_payment.payer_id, idempotency_key
         )
-        if cart_payment:
-            assert payment_intent
+        if cart_payment and payment_intent:
             return await self.cart_payment_interface.resubmit_existing_payment(
                 cart_payment=cart_payment,
                 payment_intent=payment_intent,

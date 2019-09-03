@@ -3,7 +3,6 @@ import uuid
 import pytest
 from starlette.testclient import TestClient
 
-
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
 # is marked as external.  The stripe simulator does not return the correct result since it does
@@ -26,11 +25,6 @@ class TestCartPayment:
             "payer_id": payer["id"],
             "payment_gateway": "stripe",
             "token": "tok_mastercard",
-            # "legacy_payment_info": {
-            #     "stripe_customer_id": payer["payment_gateway_provider_customers"][0][
-            #         "payment_provider_customer_id"
-            #     ]
-            # },
         }
         return request_body
 
@@ -56,6 +50,39 @@ class TestCartPayment:
                 "reference_id": 123,
                 "ct_reference_id": 5,
                 "type": "OrderCart",
+            },
+        }
+
+        if not idempotency_key:
+            request_body["idempotency_key"] = str(uuid.uuid4())
+
+        return request_body
+
+    def _get_cart_payment_create_legacy_payment_request(
+        self,
+        legacy_stripe_customer_id,
+        legacy_stripe_payment_method_id,
+        amount=500,
+        idempotency_key=None,
+    ):
+        # No payer_id or payment_method_id.  Instead we use legacy_payment.
+        request_body = {
+            "amount": amount,
+            "country": "US",
+            "currency": "USD",
+            "capture_method": "manual",
+            "client_description": f"{legacy_stripe_customer_id} description",
+            "payer_statement_description": f"{legacy_stripe_customer_id}",
+            "payer_country": "US",
+            "payment_country": "US",
+            "metadata": {
+                "reference_id": 123,
+                "ct_reference_id": 5,
+                "type": "OrderCart",
+            },
+            "legacy_payment": {
+                "stripe_customer_id": legacy_stripe_customer_id,
+                "stripe_payment_method_id": legacy_stripe_payment_method_id,
             },
         }
 
@@ -124,6 +151,48 @@ class TestCartPayment:
         assert payer["deleted_at"] is None
         return payment_method
 
+    def _test_cart_payment_legacy_payment_creation(
+        self,
+        stripe_api,
+        client,
+        legacy_stripe_customer_id,
+        legacy_stripe_payment_method_id,
+        amount,
+    ):
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            legacy_stripe_customer_id, legacy_stripe_payment_method_id, amount
+        )
+
+        response = client.post("/payin/api/v1/cart_payments/legacy", json=request_body)
+        assert response.status_code == 201
+        cart_payment = response.json()
+
+        # For legacy based payments, payer_id and payment_method_id keys are expected in the body
+        # but value is None.  Legacy payment must be defined and match request.
+        assert cart_payment
+        assert cart_payment["id"]
+        assert cart_payment["amount"] == request_body["amount"]
+        assert cart_payment["payer_id"] is None
+        assert cart_payment["payment_method_id"] is None
+        assert cart_payment["capture_method"] == request_body["capture_method"]
+        assert cart_payment["cart_metadata"]
+        metadata = cart_payment["cart_metadata"]
+        assert metadata["reference_id"] == request_body["metadata"]["reference_id"]
+        assert (
+            metadata["ct_reference_id"] == request_body["metadata"]["ct_reference_id"]
+        )
+        assert metadata["type"] == request_body["metadata"]["type"]
+        assert cart_payment["client_description"] == request_body["client_description"]
+        statement_description = cart_payment["payer_statement_description"]
+        assert statement_description == request_body["payer_statement_description"]
+        # TODO fix legacy_payment that is missing in response
+        assert cart_payment["legacy_payment"] is None
+        assert cart_payment["split_payment"] is None
+        assert cart_payment["created_at"]
+        assert cart_payment["updated_at"]
+        assert cart_payment["deleted_at"] is None
+        return cart_payment
+
     def _test_cart_payment_creation(
         self, stripe_api, client, payer, payment_method, amount, capture_method
     ):
@@ -133,7 +202,6 @@ class TestCartPayment:
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
         cart_payment = response.json()
-        print(cart_payment)
         assert cart_payment
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
@@ -187,10 +255,7 @@ class TestCartPayment:
             f"/payin/api/v1/cart_payments/{str(cart_payment['id'])}/adjust",
             json=request_body,
         )
-        # print(response)
         body = response.json()
-        # print("**** Body")
-        # print(body)
         assert response.status_code == 200
         assert body["id"] == cart_payment["id"]
         assert body["amount"] == request_body["amount"]
@@ -202,7 +267,7 @@ class TestCartPayment:
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
 
-    def test_cart_payment(self, stripe_api, client: TestClient):
+    def test_cart_payment_use(self, stripe_api, client: TestClient):
         stripe_api.enable_outbound()
 
         payer = self._test_payer_creation(stripe_api=stripe_api, client=client)
@@ -242,4 +307,35 @@ class TestCartPayment:
         other_payer = payer = self._test_payer_creation(stripe_api, client)
         self._test_cart_payment_creation_error(
             stripe_api, client, other_payer, payment_method, 403, "payin_23", False
+        )
+
+    def test_legacy_payment(self, stripe_api, client: TestClient):
+        stripe_api.enable_outbound()
+
+        # Use payer, payment method api calls to seed data into legacy table.  It would be better to
+        # create directly in legacy system without creating corresponding records in the new tables since
+        # that is a more realistic case, but there is not yet an easy way to set this up.
+        payer = self._test_payer_creation(stripe_api=stripe_api, client=client)
+        provider_account_id = payer["payment_gateway_provider_customers"][0][
+            "payment_provider_customer_id"
+        ]
+
+        payment_method = self._test_payment_method_creation(
+            stripe_api=stripe_api, client=client, payer=payer
+        )
+        provider_card_id = payment_method["card"]["payment_provider_card_id"]
+
+        # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            legacy_stripe_customer_id=provider_account_id,
+            legacy_stripe_payment_method_id=provider_card_id,
+            amount=900,
+        )
+
+        # Adjustment for case where legacy payment was initially used
+        # TODO: Replace this with use of legacy api, for handling when legacy charge_id is passed in
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=1000
         )

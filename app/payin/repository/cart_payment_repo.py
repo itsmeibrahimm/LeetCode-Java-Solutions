@@ -35,7 +35,7 @@ class CartPaymentRepository(PayinDBRepository):
         self,
         *,
         id: UUID,
-        payer_id: str,
+        payer_id: Optional[str],
         type: str,
         client_description: Optional[str],
         reference_id: int,
@@ -148,6 +148,7 @@ class CartPaymentRepository(PayinDBRepository):
         status: str,
         statement_descriptor: Optional[str],
         capture_after: Optional[datetime],
+        payment_method_id: Optional[str],
     ) -> PaymentIntent:
         data = {
             payment_intents.id: id,
@@ -163,6 +164,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents.status: status,
             payment_intents.statement_descriptor: statement_descriptor,
             payment_intents.capture_after: capture_after,
+            payment_intents.payment_method_id: payment_method_id,
         }
 
         statement = (
@@ -190,6 +192,7 @@ class CartPaymentRepository(PayinDBRepository):
             currency=row[payment_intents.currency],
             status=IntentStatus(row[payment_intents.status]),
             statement_descriptor=row[payment_intents.statement_descriptor],
+            payment_method_id=row[payment_intents.payment_method_id],
             created_at=row[payment_intents.created_at],
             updated_at=row[payment_intents.updated_at],
             captured_at=row[payment_intents.captured_at],
@@ -286,6 +289,7 @@ class CartPaymentRepository(PayinDBRepository):
         idempotency_key: str,
         provider: str,
         payment_method_resource_id: str,
+        customer_resource_id: Optional[str],
         currency: str,
         amount: int,
         application_fee_amount: Optional[int],
@@ -301,6 +305,7 @@ class CartPaymentRepository(PayinDBRepository):
             pgp_payment_intents.idempotency_key: idempotency_key,
             pgp_payment_intents.provider: provider,
             pgp_payment_intents.payment_method_resource_id: payment_method_resource_id,
+            pgp_payment_intents.customer_resource_id: customer_resource_id,
             pgp_payment_intents.currency: currency,
             pgp_payment_intents.amount: amount,
             pgp_payment_intents.application_fee_amount: application_fee_amount,
@@ -391,6 +396,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_method_resource_id=row[
                 pgp_payment_intents.payment_method_resource_id
             ],
+            customer_resource_id=row[pgp_payment_intents.customer_resource_id],
             currency=row[pgp_payment_intents.currency],
             amount=row[pgp_payment_intents.amount],
             amount_capturable=row[pgp_payment_intents.amount_capturable],
@@ -408,7 +414,7 @@ class CartPaymentRepository(PayinDBRepository):
     async def insert_payment_intent_adjustment_history(
         self,
         id: UUID,
-        payer_id: str,
+        payer_id: Optional[str],
         payment_intent_id: UUID,
         amount: int,
         amount_original: int,

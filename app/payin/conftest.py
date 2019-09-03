@@ -69,6 +69,7 @@ async def payment_intent(
         status=payment_intent.status,
         statement_descriptor=payment_intent.statement_descriptor,
         capture_after=None,
+        payment_method_id=payment_intent.payment_method_id,
     )
 
 
@@ -93,6 +94,7 @@ class PaymentIntentFactory(factory.Factory):
     currency = CurrencyType.USD
     status = IntentStatus.INIT
     statement_descriptor = "Maccas"
+    payment_method_id = "asdf"
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)
     captured_at = None
@@ -140,6 +142,7 @@ class PgpPaymentIntentFactory(factory.Factory):
     invoice_resource_id = "asdf"
     charge_resource_id = "asdf"
     payment_method_resource_id = "asdf"
+    customer_resource_id = "asdf"
     capture_method = CaptureMethod.MANUAL.value
     confirmation_method = ConfirmationMethod.MANUAL.value
     currency = CurrencyType.USD

@@ -80,6 +80,7 @@ class MockedPaymentRepo:
         status: str,
         statement_descriptor: Optional[str],
         capture_after: Optional[datetime],
+        payment_method_id: Optional[str],
     ) -> PaymentIntent:
         return PaymentIntent(
             id=id,
@@ -96,6 +97,7 @@ class MockedPaymentRepo:
             currency=currency,
             status=IntentStatus.INIT,
             statement_descriptor=statement_descriptor,
+            payment_method_id=payment_method_id,
             created_at=datetime.now(),
             updated_at=datetime.now(),
             captured_at=None,
@@ -125,6 +127,7 @@ class MockedPaymentRepo:
         idempotency_key: str,
         provider: str,
         payment_method_resource_id: str,
+        customer_resource_id: str,
         currency: str,
         amount: int,
         application_fee_amount: Optional[int],
@@ -144,6 +147,7 @@ class MockedPaymentRepo:
             invoice_resource_id=None,
             charge_resource_id=None,
             payment_method_resource_id=payment_method_resource_id,
+            customer_resource_id=customer_resource_id,
             currency=currency,
             amount=amount,
             amount_capturable=None,

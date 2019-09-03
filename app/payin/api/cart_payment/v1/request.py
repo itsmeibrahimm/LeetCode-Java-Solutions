@@ -21,26 +21,38 @@ class CartMetadata(BaseModel):
     type: CartType
 
 
-class CreateCartPaymentRequest(BaseModel):
-    payer_id: Optional[str] = None
+class CreateCartPaymentBaseRequest(BaseModel):
     amount: int
     payer_country: CountryCode = CountryCode.US
     payment_country: CountryCode
     currency: str
-    payment_method_id: Optional[str] = None
     delay_capture: bool
     idempotency_key: str
     client_description: Optional[str] = None
     payer_statement_description: Optional[str] = None
-    legacy_payment: Optional[LegacyPaymentInfo] = None
     split_payment: Optional[SplitPayment] = None
     metadata: CartMetadata
 
 
-class UpdateCartPaymentRequest(BaseModel):
-    idempotency_key: str
+class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
     payer_id: str
+    payment_method_id: str
+
+
+class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):
+    legacy_payment: LegacyPaymentInfo
+
+
+class UpdateCartPaymentBaseRequest(BaseModel):
+    idempotency_key: str
     amount: int
     payer_country: CountryCode = CountryCode.US
-    legacy_payment: Optional[LegacyPaymentInfo] = None
     client_description: Optional[str] = None
+
+
+class UpdateCartPaymentRequest(UpdateCartPaymentBaseRequest):
+    payer_id: Optional[str]
+
+
+class UpdateCartPaymentLegacyRequest(UpdateCartPaymentBaseRequest):
+    legacy_payment: Optional[LegacyPaymentInfo] = None

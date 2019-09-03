@@ -22,6 +22,7 @@ class PgpPaymentIntentTable(TableDefinition):
     payment_method_resource_id: Column = no_init_field(
         Column("payment_method_resource_id", Text)
     )
+    customer_resource_id: Column = no_init_field(Column("customer_resource_id", Text))
     currency: Column = no_init_field(Column("currency", String))
     amount: Column = no_init_field(Column("amount", Integer))
     amount_capturable: Column = no_init_field(Column("amount_capturable", Integer))

@@ -24,6 +24,11 @@ from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
+from app.payin.repository.payment_method_repo import (
+    PaymentMethodRepository,
+    InsertPgpPaymentMethodInput,
+    InsertStripeCardInput,
+)
 
 
 @pytest.fixture
@@ -32,6 +37,32 @@ async def payer(payer_repository: PayerRepository):
         id=str(uuid4()), payer_type=PayerType.STORE, country=CountryCode.US
     )
     yield await payer_repository.insert_payer(insert_payer_input)
+
+
+@pytest.fixture
+async def payment_method(payer, payment_method_repository: PaymentMethodRepository):
+    insert_payment_method = InsertPgpPaymentMethodInput(
+        id=str(uuid4()),
+        pgp_code=PaymentProvider.STRIPE.value,
+        pgp_resource_id=str(uuid4()),
+        payer_id=payer.id,
+    )
+
+    insert_stripe_card = InsertStripeCardInput(
+        stripe_id=insert_payment_method.pgp_resource_id,
+        fingerprint="fingerprint",
+        last4="1500",
+        dynamic_last4="1500",
+        exp_month="9",
+        exp_year="2024",
+        type="mastercard",
+        active=True,
+    )
+
+    insert_result = await payment_method_repository.insert_payment_method_and_stripe_card(
+        insert_payment_method, insert_stripe_card
+    )
+    yield insert_result[0]
 
 
 @pytest.fixture
@@ -51,7 +82,9 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
 
 
 @pytest.fixture
-async def payment_intent(cart_payment_repository: CartPaymentRepository, payer: Payer):
+async def payment_intent(
+    cart_payment_repository: CartPaymentRepository, payer, payment_method
+):
     cart_payment_id = uuid4()
     await cart_payment_repository.insert_cart_payment(
         id=cart_payment_id,
@@ -80,6 +113,7 @@ async def payment_intent(cart_payment_repository: CartPaymentRepository, payer: 
         status=IntentStatus.REQUIRES_CAPTURE,
         statement_descriptor=None,
         capture_after=None,
+        payment_method_id=payment_method.id,
     )
     yield payment_intent
 
@@ -94,6 +128,7 @@ async def pgp_payment_intent(
         idempotency_key=str(uuid4()),
         provider=PaymentProvider.STRIPE,
         payment_method_resource_id="pm_test",
+        customer_resource_id=None,
         currency="USD",
         amount=500,
         application_fee_amount=None,
@@ -192,6 +227,7 @@ class TestPaymentIntent:
             currency=payment_intent.currency,
             status=payment_intent.status,
             statement_descriptor=payment_intent.statement_descriptor,
+            payment_method_id=payment_intent.payment_method_id,
             created_at=payment_intent.created_at,
             updated_at=result.updated_at,  # Don't know generated date ahead of time
             captured_at=payment_intent.captured_at,
@@ -203,7 +239,10 @@ class TestPaymentIntent:
 class TestPaymentIntentAdjustmentHistory:
     @pytest.mark.asyncio
     async def test_insert_history(
-        self, cart_payment_repository: CartPaymentRepository, cart_payment: CartPayment
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        cart_payment: CartPayment,
+        payment_method,
     ):
         payment_intent = await cart_payment_repository.insert_payment_intent(
             id=uuid4(),
@@ -219,6 +258,7 @@ class TestPaymentIntentAdjustmentHistory:
             status=IntentStatus.REQUIRES_CAPTURE,
             statement_descriptor=None,
             capture_after=None,
+            payment_method_id=payment_method.id,
         )
 
         id = uuid4()
@@ -268,6 +308,7 @@ class TestPgpPaymentIntent:
             invoice_resource_id=pgp_payment_intent.invoice_resource_id,
             charge_resource_id=pgp_payment_intent.charge_resource_id,
             payment_method_resource_id=pgp_payment_intent.payment_method_resource_id,
+            customer_resource_id=pgp_payment_intent.customer_resource_id,
             currency=pgp_payment_intent.currency,
             amount=pgp_payment_intent.amount,
             amount_capturable=pgp_payment_intent.amount_capturable,
@@ -304,6 +345,7 @@ class TestPgpPaymentIntent:
             invoice_resource_id=pgp_payment_intent.invoice_resource_id,
             charge_resource_id=pgp_payment_intent.charge_resource_id,
             payment_method_resource_id=pgp_payment_intent.payment_method_resource_id,
+            customer_resource_id=pgp_payment_intent.customer_resource_id,
             currency=pgp_payment_intent.currency,
             amount=(pgp_payment_intent.amount + 100),  # Updated
             amount_capturable=pgp_payment_intent.amount_capturable,

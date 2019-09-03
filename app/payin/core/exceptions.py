@@ -68,6 +68,9 @@ class PayinErrorCode(str, Enum):
     DISPUTE_READ_INVALID_DATA = "payin_102"
 
 
+# TODO Enhance errors to allow us to declare here the response codes they should map to
+# (e.g. if it is permission related and should result in 403, or data existence related
+# and should map to 404, etc).
 class PayinError(PaymentError):
     """
     Base exception class for payin. This is base class that can be inherited by

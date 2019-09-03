@@ -34,7 +34,7 @@ class CartMetadata(BaseModel):
 class CartPayment(BaseModel):
     id: UUID
     amount: int
-    payer_id: str
+    payer_id: Optional[str]
     payment_method_id: Optional[str]
     delay_capture: bool
     cart_metadata: CartMetadata
@@ -64,6 +64,7 @@ class PaymentIntent(BaseModel):
     currency: str
     status: IntentStatus
     statement_descriptor: Optional[str]
+    payment_method_id: Optional[str]
     created_at: datetime
     updated_at: datetime
     captured_at: Optional[datetime]
@@ -83,6 +84,7 @@ class PgpPaymentIntent:
     invoice_resource_id: Optional[str]
     charge_resource_id: Optional[str]
     payment_method_resource_id: str
+    customer_resource_id: Optional[str]
     currency: str
     amount: int
     amount_capturable: Optional[int]
@@ -101,7 +103,7 @@ class PgpPaymentIntent:
 @dataclass(frozen=True)
 class PaymentIntentAdjustmentHistory:
     id: UUID
-    payer_id: str
+    payer_id: Optional[str]
     payment_intent_id: UUID
     amount: int
     amount_original: int
