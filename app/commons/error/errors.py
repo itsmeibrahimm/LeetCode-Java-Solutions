@@ -1,10 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.status import (
+    HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
+from structlog.stdlib import BoundLogger
+
+from app.commons.context.req_context import get_logger_from_req, response_with_req_id
 
 
 class PaymentError(Exception):
@@ -117,8 +125,12 @@ async def payment_http_exception_handler(
     :param exception: starlette.exceptions.HTTPException
     :return: Handled Http exception response
     """
+    logger: BoundLogger = get_logger_from_req(request)
+    logger.info(f"Translating source exception={str(exception)}")
+
+    exception_response = None
     if isinstance(exception, PaymentException):
-        return JSONResponse(
+        exception_response = JSONResponse(
             status_code=exception.status_code,
             content=jsonable_encoder(
                 PaymentErrorResponseBody(
@@ -129,8 +141,42 @@ async def payment_http_exception_handler(
             ),
         )
     else:
-        return await http_exception_handler(request, exception)
+        exception_response = await http_exception_handler(request, exception)
+
+    return response_with_req_id(request, exception_response)
+
+
+async def payment_internal_error_handler(
+    request: Request, exception: Exception
+) -> Response:
+    logger: BoundLogger = get_logger_from_req(request)
+    logger.exception(f"Translating source exception={exception}")
+
+    return response_with_req_id(
+        request,
+        PlainTextResponse(
+            "Internal Server Error", status_code=HTTP_500_INTERNAL_SERVER_ERROR
+        ),
+    )
+
+
+async def payment_request_validation_exception_handler(
+    request: Request, exception: RequestValidationError
+) -> JSONResponse:
+    logger: BoundLogger = get_logger_from_req(request)
+    logger.exception(f"Translating source exception={exception}")
+    return response_with_req_id(
+        request,
+        JSONResponse(
+            status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": exception.errors()},
+        ),
+    )
 
 
 def register_payment_exception_handler(app: FastAPI):
     app.add_exception_handler(StarletteHTTPException, payment_http_exception_handler)
+    app.add_exception_handler(
+        RequestValidationError, payment_request_validation_exception_handler
+    )
+    app.add_exception_handler(Exception, payment_internal_error_handler)

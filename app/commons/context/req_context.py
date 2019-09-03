@@ -1,11 +1,13 @@
-from typing import Any, cast
 from dataclasses import dataclass
-
-from starlette.requests import Request
-from structlog import BoundLogger
+from typing import Any, cast
 from uuid import UUID, uuid4
 
-from app.commons.context.app_context import get_context_from_app, AppContext
+from starlette.requests import Request
+from starlette.responses import Response
+from structlog import BoundLogger
+
+from app.commons.constants import PAYMENT_REQUEST_ID_HEADER
+from app.commons.context.app_context import AppContext, get_context_from_app
 
 
 @dataclass(frozen=True)
@@ -41,3 +43,9 @@ def build_req_context(app_context: AppContext):
 
 def get_logger_from_req(request: Request):
     return get_context_from_req(request).log
+
+
+def response_with_req_id(request: Request, response: Response):
+    req_id = str(get_context_from_req(request).req_id)
+    response.headers[PAYMENT_REQUEST_ID_HEADER] = req_id
+    return response
