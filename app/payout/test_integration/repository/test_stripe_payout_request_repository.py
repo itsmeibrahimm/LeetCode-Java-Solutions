@@ -1,5 +1,6 @@
 import psycopg2
 import pytest
+import json
 from datetime import datetime, timezone
 
 from app.commons.database.infra import DB
@@ -193,7 +194,10 @@ class TestPayoutRepository:
         ), "retrieved stripe payout request matches"
 
         timestamp = datetime.now(timezone.utc)
-        new_data = StripePayoutRequestUpdate(status="OK", updated_at=timestamp)
+
+        new_data = StripePayoutRequestUpdate(
+            status="OK", updated_at=timestamp, events=json.dumps([{"a": "b"}])
+        )
         updated = await stripe_payout_request_repo.update_stripe_payout_request_by_id(
             created.id, new_data
         )

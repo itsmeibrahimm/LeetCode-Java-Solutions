@@ -90,7 +90,7 @@ class StripePayoutRequestRepository(
         stmt = (
             stripe_payout_requests.table.update()
             .where(stripe_payout_requests.id == stripe_payout_request_id)
-            .values(data.dict(skip_defaults=True))
+            .values(data.dict_after_json_to_string(skip_defaults=True))
             .returning(*stripe_payout_requests.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

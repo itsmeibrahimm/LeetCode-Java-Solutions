@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping
-
+import json
 import sqlalchemy
 from pydantic import BaseModel, validate_model
 from pydantic.utils import GetterDict
@@ -113,6 +113,26 @@ class DBEntity(BaseModel):
         object.__setattr__(m, "__values__", values)
         object.__setattr__(m, "__fields_set__", fields_set)
         return m
+
+    def _fields_need_json_to_string_conversion(self):
+        """
+        Pydantic model has Json type, which takes json string
+        once model is instantiated, Json field is converted into python obj
+        when we use the model to interact with sqlalchemy, we need to
+        convert Json fields back to string, otherwise DB exe will throw
+
+        :return:
+        """
+        pass
+
+    def dict_after_json_to_string(self, *args, **kwargs):
+        data_dict = self.dict(*args, **kwargs)
+        return {
+            key: json.dumps(value)
+            if key in self._fields_need_json_to_string_conversion()
+            else value
+            for (key, value) in data_dict.items()
+        }
 
 
 class DBRequestModel(BaseModel):

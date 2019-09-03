@@ -54,7 +54,7 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
         stmt = (
             payouts.table.update()
             .where(payouts.id == payout_id)
-            .values(data.dict(skip_defaults=True))
+            .values(data.dict_after_json_to_string(skip_defaults=True))
             .returning(*payouts.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

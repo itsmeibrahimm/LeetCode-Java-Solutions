@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Dict
 from pydantic import Json
 
-from sqlalchemy import Column, DateTime, Integer, JSON, Text, text, ForeignKey
+from sqlalchemy import Column, DateTime, Integer, Text, text, ForeignKey
 from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
@@ -37,7 +37,7 @@ class StripePayoutRequestTable(TableDefinition):
     payout_method_id: Column = no_init_field(
         Column("payout_method_id", Integer, nullable=False)
     )
-    response: Column = no_init_field(Column("response", JSON))
+    response: Column = no_init_field(Column("response", Text))  # json string
     created_at: Column = no_init_field(
         Column("created_at", DateTime(True), nullable=False)
     )
@@ -50,9 +50,9 @@ class StripePayoutRequestTable(TableDefinition):
     stripe_payout_id: Column = no_init_field(
         Column("stripe_payout_id", Text, nullable=True)
     )
-    request: Column = no_init_field(Column("request", JSON))
+    request: Column = no_init_field(Column("request", Text))  # json string
     status: Column = no_init_field(Column("status", Text, nullable=False))
-    events: Column = no_init_field(Column("events", JSON))
+    events: Column = no_init_field(Column("events", Text))  # json string
     stripe_account_id: Column = no_init_field(
         Column("stripe_account_id", Text, nullable=True)
     )
@@ -71,6 +71,9 @@ class _StripePayoutRequestPartial(DBEntity):
     status: Optional[str]
     events: Optional[Json[List[Dict]]]  # type: ignore
     stripe_account_id: Optional[str]
+
+    def _fields_need_json_to_string_conversion(self):
+        return ["response", "request", "events"]
 
 
 class StripePayoutRequest(_StripePayoutRequestPartial):
