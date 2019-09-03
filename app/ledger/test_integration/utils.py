@@ -13,6 +13,10 @@ from app.ledger.core.types import (
     MxTransactionType,
     MxScheduledLedgerIntervalType,
 )
+from app.ledger.core.utils import (
+    pacific_start_time_for_current_interval,
+    pacific_end_time_for_current_interval,
+)
 
 
 async def prepare_mx_ledger(
@@ -61,7 +65,6 @@ async def prepare_mx_scheduled_ledger(
     payment_account_id,
     ledger_id,
     scheduled_ledger_id,
-    mx_scheduled_ledger_repository=None,
     routing_key=None,
     closed_at=0,
     interval_type=MxScheduledLedgerIntervalType.WEEKLY,
@@ -77,14 +80,10 @@ async def prepare_mx_scheduled_ledger(
         ledger_id=ledger_id,
         interval_type=interval_type,
         closed_at=closed_at,
-        start_time=mx_scheduled_ledger_repository.pacific_start_time_for_current_interval(
-            routing_key, interval_type
-        )
+        start_time=pacific_start_time_for_current_interval(routing_key, interval_type)
         if routing_key
         else start_time,
-        end_time=mx_scheduled_ledger_repository.pacific_end_time_for_current_interval(
-            routing_key, interval_type
-        )
+        end_time=pacific_end_time_for_current_interval(routing_key, interval_type)
         if routing_key
         else end_time,
     )

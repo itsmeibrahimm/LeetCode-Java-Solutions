@@ -14,6 +14,7 @@ ledger_error_message_maps = {
     "ledger_6": "Error encountered while processing negative balance mx_ledger",
     "ledger_7": "OperationalError encountered while processing mx_ledger.",
     "ledger_8": "Cannot submit mx_ledger",
+    "ledger_9": "Cannot insert mx_ledger due to integrity error.",
     "ledger_10": "Cannot found mx_scheduled_ledger with given id, please verify your input.",
     "ledger_20": "Error encountered while inserting mx_txn, please verify your input.",
     "ledger_21": "OperationalError encountered while inserting mx_txn.",
@@ -29,6 +30,7 @@ class LedgerErrorCode(str, Enum):
     MX_LEDGER_ROLLOVER_ERROR = "ledger_6"
     MX_LEDGER_OPERATIONAL_ERROR = "ledger_7"
     MX_LEDGER_SUBMIT_ERROR = "ledger_8"
+    MX_LEDGER_CREATE_INTEGRITY_ERROR = "ledger_9"
     MX_SCHEDULED_LEDGER_NOT_FOUND = "ledger_10"
     MX_TXN_CREATE_ERROR = "ledger_20"
     MX_TXN_OPERATIONAL_ERROR = "ledger_21"
@@ -78,6 +80,10 @@ class MxLedgerLockError(PaymentError):
 
 
 class MxLedgerSubmissionError(PaymentError):
+    pass
+
+
+class MxLedgerCreateUniqueViolationError(PaymentError):
     pass
 
 

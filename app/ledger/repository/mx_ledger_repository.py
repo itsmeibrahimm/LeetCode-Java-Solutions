@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional, Tuple
+import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional, Tuple
 from uuid import UUID
-import uuid
 
 from sqlalchemy import and_
 
@@ -36,16 +36,16 @@ from app.ledger.core.types import (
     MxLedgerType,
     MxScheduledLedgerIntervalType,
 )
+from app.ledger.core.utils import (
+    pacific_start_time_for_current_interval,
+    pacific_end_time_for_current_interval,
+)
 from app.ledger.models.paymentdb import (
     mx_ledgers,
     mx_transactions,
     mx_scheduled_ledgers,
 )
-
 from app.ledger.repository.base import LedgerDBRepository
-from app.ledger.repository.mx_scheduled_ledger_repository import (
-    MxScheduledLedgerRepository,
-)
 
 
 class MxLedgerRepositoryInterface:
@@ -89,9 +89,7 @@ class MxLedgerRepositoryInterface:
 
     @abstractmethod
     async def rollover_negative_ledger_to_new_ledger(
-        self,
-        request: RolloverNegativeLedgerInput,
-        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        self, request: RolloverNegativeLedgerInput
     ) -> RolloverNegativeLedgerOutput:
         ...
 
@@ -379,9 +377,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         return updated_open_ledger
 
     async def rollover_negative_ledger_to_new_ledger(
-        self,
-        request: RolloverNegativeLedgerInput,
-        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        self, request: RolloverNegativeLedgerInput
     ) -> RolloverNegativeLedgerOutput:
         async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
             connection = tx.connection()
@@ -433,10 +429,10 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
                     ledger_id=created_mx_ledger.id,
                     interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
                     closed_at=0,
-                    start_time=mx_scheduled_ledger_repository.pacific_start_time_for_current_interval(
+                    start_time=pacific_start_time_for_current_interval(
                         routing_key, MxScheduledLedgerIntervalType.WEEKLY
                     ),
-                    end_time=mx_scheduled_ledger_repository.pacific_end_time_for_current_interval(
+                    end_time=pacific_end_time_for_current_interval(
                         routing_key, MxScheduledLedgerIntervalType.WEEKLY
                     ),
                 )

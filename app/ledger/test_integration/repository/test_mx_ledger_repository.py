@@ -5,6 +5,7 @@ import psycopg2
 import pytest
 from psycopg2 import errorcodes
 
+from app.commons.database.client.interface import DBTransaction
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import (
     UpdatePaidMxLedgerInput,
@@ -29,6 +30,7 @@ from app.ledger.repository.mx_ledger_repository import (
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
+from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 from app.ledger.test_integration.utils import (
     prepare_mx_ledger,
     prepare_mx_scheduled_ledger,
@@ -92,6 +94,7 @@ class TestMxLedgerRepository:
         self,
         mx_ledger_repository: MxLedgerRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
@@ -105,7 +108,6 @@ class TestMxLedgerRepository:
         assert mx_ledger is not None
 
         mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
-            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
             scheduled_ledger_id=mx_scheduled_ledger_id,
             ledger_id=mx_ledger_id,
             payment_account_id=payment_account_id,
@@ -120,29 +122,31 @@ class TestMxLedgerRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
-            scheduled_ledger_request
-        )
-        assert scheduled_ledger is not None
+        async with mx_ledger_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
+            connection = tx.connection()
+            scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
+                scheduled_ledger_request, connection
+            )
+            assert scheduled_ledger is not None
 
-        process_mx_ledger_input = ProcessMxLedgerInput(id=mx_ledger_id)
-        updated_mx_ledger = await mx_ledger_repository.move_ledger_state_to_processing_and_close_schedule_ledger(
-            process_mx_ledger_input
-        )
-        assert mx_ledger.id == updated_mx_ledger.id
-        assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
-        retrieved_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
-            scheduled_ledger_request
-        )
-
-        # make sure there is no open scheduled_ledger with given period after process
-        assert retrieved_scheduled_ledger is None
+            process_mx_ledger_input = ProcessMxLedgerInput(id=mx_ledger_id)
+            updated_mx_ledger = await mx_ledger_repository.move_ledger_state_to_processing_and_close_schedule_ledger(
+                process_mx_ledger_input
+            )
+            assert mx_ledger.id == updated_mx_ledger.id
+            assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
+            retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
+                scheduled_ledger_request, connection
+            )
+            # make sure there is no open scheduled_ledger with given period after process
+            assert retrieved_scheduled_ledger is None
 
     # todo: need to confirm the scheduled_ledger closed_at still equals to original closed_at
     async def test_process_mx_ledger_state_and_close_schedule_ledger_close_at_not_zero_skip(
         self,
         mx_ledger_repository: MxLedgerRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
@@ -158,7 +162,6 @@ class TestMxLedgerRepository:
         mx_scheduled_ledger_id = uuid.uuid4()
         routing_key = datetime(2019, 8, 1)
         mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
-            mx_scheduled_ledger_repository=mx_scheduled_ledger_repository,
             scheduled_ledger_id=mx_scheduled_ledger_id,
             ledger_id=mx_ledger_id,
             payment_account_id=payment_account_id,
@@ -181,12 +184,14 @@ class TestMxLedgerRepository:
             routing_key=datetime(2019, 8, 1),
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        retrieved_scheduled_ledger = await mx_scheduled_ledger_repository.get_open_mx_scheduled_ledger_for_period(
-            scheduled_ledger_request
-        )
+        async with mx_ledger_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
+            connection = tx.connection()
+            retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
+                scheduled_ledger_request, connection
+            )
 
-        # make sure there is no open scheduled_ledger with given period after process
-        assert retrieved_scheduled_ledger is None
+            # make sure there is no open scheduled_ledger with given period after process
+            assert retrieved_scheduled_ledger is None
 
     async def test_get_ledger_by_id_success(
         self, mx_ledger_repository: MxLedgerRepository
