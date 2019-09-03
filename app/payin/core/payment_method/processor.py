@@ -115,10 +115,10 @@ class PaymentMethodClient:
             pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
         )
 
-    async def get_payment_method(
+    async def _get_payment_method(
         self,
-        payer_id: str,
         payment_method_id: str,
+        payer_id: Optional[str] = None,
         payer_id_type: Optional[str] = None,
         payment_method_id_type: Optional[str] = None,
     ) -> RawPaymentMethod:
@@ -155,7 +155,7 @@ class PaymentMethodClient:
             )
         else:
             self.log.warn(
-                f"[get_payment_method][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
+                f"[_get_payment_method][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
@@ -170,9 +170,33 @@ class PaymentMethodClient:
         )
 
         self.log.info(
-            f"[get_payment_method][{payment_method_id}][{payer_id}] find payment_method!!"
+            f"[_get_payment_method][{payment_method_id}][{payer_id}] find payment_method!!"
         )
         return raw_payment_method
+
+    async def get_payment_method(
+        self,
+        payer_id: str,
+        payment_method_id: str,
+        payer_id_type: Optional[str] = None,
+        payment_method_id_type: Optional[str] = None,
+    ) -> RawPaymentMethod:
+
+        return await self._get_payment_method(
+            payment_method_id=payment_method_id,
+            payer_id=payer_id,
+            payer_id_type=payer_id_type,
+            payment_method_id_type=payment_method_id_type,
+        )
+
+    async def get_payment_method_no_payer_auth(
+        self, payment_method_id: str, payment_method_id_type: Optional[str] = None
+    ) -> RawPaymentMethod:
+
+        return await self._get_payment_method(
+            payment_method_id=payment_method_id,
+            payment_method_id_type=payment_method_id_type,
+        )
 
     async def detach_payment_method(
         self,
@@ -390,8 +414,8 @@ class PaymentMethodProcessor:
 
         # step 2: retrieve data from DB
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_payment_method(
-            payer_id=payer_id,
             payment_method_id=payment_method_id,
+            payer_id=payer_id,
             payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
@@ -493,8 +517,8 @@ class PaymentMethodOpsInterface:
     @abstractmethod
     async def get_payment_method_raw_objects(
         self,
-        payer_id: str,
         payment_method_id: str,
+        payer_id: Optional[str],
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:
@@ -504,8 +528,8 @@ class PaymentMethodOpsInterface:
 class PaymentMethodOps(PaymentMethodOpsInterface):
     async def get_payment_method_raw_objects(
         self,
-        payer_id: str,
         payment_method_id: str,
+        payer_id: Optional[str],
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:
@@ -525,7 +549,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
                 )
         except DataError as e:
             self.log.error(
-                f"[get_payment_method][{payer_id}][{payment_method_id}] DataError when read db: {e}"
+                f"[get_payment_method_raw_objects][{payer_id}][{payment_method_id}] DataError when read db: {e}"
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
@@ -533,21 +557,27 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
 
         if not (pm_entity and sc_entity):
             self.log.error(
-                "[get_payment_method][{payment_method_id}] cant retrieve data from pgp_payment_method and stripe_card tables!"
+                "[get_payment_method_raw_objects][{payment_method_id}] cant retrieve data from pgp_payment_method and stripe_card tables!"
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
             )
 
         is_owner: bool = False
-        if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID) or (not payer_id_type):
-            if pm_entity:
-                is_owner = payer_id == pm_entity.payer_id
-        elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
-            is_owner = payer_id == sc_entity.external_stripe_customer_id
+        if not payer_id:
+            # no need to authorize payment_method
+            is_owner = True
+        else:
+            if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID) or (
+                not payer_id_type
+            ):
+                if pm_entity:
+                    is_owner = payer_id == pm_entity.payer_id
+            elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
+                is_owner = payer_id == sc_entity.external_stripe_customer_id
         if is_owner is False:
             self.log.warn(
-                "[get_payment_method][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
+                "[get_payment_method_raw_objects][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
                 payment_method_id,
                 payer_id,
                 payer_id_type,
@@ -559,7 +589,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
             )
 
         self.log.info(
-            f"[get_payment_method][{payment_method_id}][{payer_id}] find payment_method!"
+            f"[get_payment_method_raw_objects][{payment_method_id}][{payer_id}] find payment_method!"
         )
         return RawPaymentMethod(
             pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
@@ -569,8 +599,8 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
 class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
     async def get_payment_method_raw_objects(
         self,
-        payer_id: str,
         payment_method_id: str,
+        payer_id: Optional[str],
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:
@@ -604,7 +634,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     )
             else:
                 self.log.error(
-                    "[get_payment_method][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
+                    "[get_payment_method_raw_objects][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
                 )
                 raise PaymentMethodReadError(
                     error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
@@ -612,7 +642,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                 )
         except DataError as e:
             self.log.error(
-                f"[get_payment_method][{payer_id}][{payment_method_id}] DataError when read db: {e}"
+                f"[get_payment_method_raw_objects][{payer_id}][{payment_method_id}] DataError when read db: {e}"
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
@@ -620,20 +650,24 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
 
         if not sc_entity:
             self.log.error(
-                f"[get_payment_method][{payment_method_id}] cant retrieve data from pgp_payment_method and stripe_card tables!"
+                f"[get_payment_method_raw_objects][{payment_method_id}] cant retrieve data from pgp_payment_method and stripe_card tables!"
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
             )
 
         is_owner: bool = False
-        if payer_id_type is None and pm_entity:
-            is_owner = payer_id == pm_entity.payer_id
-        elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID and sc_entity:
-            is_owner = payer_id == sc_entity.external_stripe_customer_id
+        if not payer_id:
+            # no need to authorize payment_method
+            is_owner = True
+        else:
+            if payer_id_type is None and pm_entity:
+                is_owner = payer_id == pm_entity.payer_id
+            elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID and sc_entity:
+                is_owner = payer_id == sc_entity.external_stripe_customer_id
         if is_owner is False:
             self.log.warn(
-                "[get_payment_method][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
+                "[get_payment_method_raw_objects][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
                 payment_method_id,
                 payer_id,
                 payer_id_type,
@@ -645,7 +679,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
             )
 
         self.log.info(
-            f"[get_payment_method][{payment_method_id}][{payer_id}] find payment_method!"
+            f"[get_payment_method_raw_objects][{payment_method_id}][{payer_id}] find payment_method!"
         )
 
         return RawPaymentMethod(

@@ -18,6 +18,7 @@ class Card(BaseModel):
     exp_month: str
     fingerprint: str
     active: bool
+    legacy_dd_stripe_card_id: str  # primary key of maindb_stripe_card
     country: Optional[str]
     brand: Optional[str]
     payment_provider_card_id: Optional[str] = None
@@ -67,6 +68,7 @@ class RawPaymentMethod:
             exp_month=self.stripe_card_entity.exp_month,
             fingerprint=self.stripe_card_entity.fingerprint,
             active=self.stripe_card_entity.active,
+            legacy_dd_stripe_card_id=self.stripe_card_entity.id,
             brand=self.stripe_card_entity.type,
             payment_provider_card_id=self.stripe_card_entity.stripe_id,
         )
@@ -106,3 +108,9 @@ class RawPaymentMethod:
             pgp_payment_method_id = self.stripe_card_entity.stripe_id
 
         return pgp_payment_method_id
+
+    def legacy_dd_stripe_card_id(self) -> str:
+        legacy_dd_stripe_card_id: str
+        if self.stripe_card_entity:
+            legacy_dd_stripe_card_id = str(self.stripe_card_entity.id)
+        return legacy_dd_stripe_card_id
