@@ -13,7 +13,7 @@ from app.commons.context.app_context import (
     remove_context_for_app,
     set_context_for_app,
 )
-from app.commons.context.logger import root_logger
+from app.commons.context.logger import init_logger as log
 from app.commons.error.errors import (
     PaymentErrorResponseBody,
     PaymentException,
@@ -86,7 +86,7 @@ async def startup():
         context = await create_app_context(config)
         set_context_for_app(app, context)
     except Exception:
-        root_logger.exception("failed to create application context")
+        log.exception("failed to create application context")
         raise
 
     # set up the global statsd client
@@ -103,21 +103,21 @@ async def startup():
         ]:
             app.mount(payout_app.openapi_prefix, payout_app)
 
-        root_logger.info("Mounted payout app")
+        log.info("mounted", app="payout")
 
     if "payin" in config.INCLUDED_APPS:
         payin_app = create_payin_app(context, config)
         app.mount(payin_app.openapi_prefix, payin_app)
-        root_logger.info("Mounted payin app")
+        log.info("mounted", app="payin")
 
     if "ledger" in config.INCLUDED_APPS:
         ledger_app = create_ledger_app(context, config)
         app.mount(ledger_app.openapi_prefix, ledger_app)
-        root_logger.info("Mounted ledger app")
+        log.info("mounted", app="ledger")
 
     app.mount(example_v1.openapi_prefix, example_v1)
 
-    root_logger.info("====== Finished running application startup hooks. ======")
+    log.info("finished startup")
 
 
 @app.on_event("shutdown")

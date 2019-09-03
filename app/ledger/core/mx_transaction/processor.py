@@ -6,7 +6,7 @@ import psycopg2
 from fastapi import Depends
 from psycopg2._psycopg import DataError, OperationalError
 from psycopg2.errorcodes import UNIQUE_VIOLATION, LOCK_NOT_AVAILABLE
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
 from tenacity import (
     RetryError,
     retry,

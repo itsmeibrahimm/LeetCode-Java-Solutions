@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict
 
 from fastapi import Depends
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.payin.api.webhook.v1.request import StripeWebHookEvent

@@ -1,4 +1,3 @@
-import logging
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,6 +5,7 @@ from typing import Optional, Tuple
 
 from typing_extensions import final
 
+from app.commons.context.logger import get_logger
 from app.commons.database.model import DBEntity, DBRequestModel
 
 ###########################################################
@@ -15,7 +15,7 @@ from app.payin.models.maindb import stripe_cards
 from app.payin.models.paymentdb import pgp_payment_methods
 from app.payin.repository.base import PayinDBRepository
 
-logger = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class PgpPaymentMethodDbEntity(DBEntity):
@@ -168,7 +168,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         async with maindb_conn.transaction(), paymentdb_conn.transaction():
             # insert object into stripe_card table
             try:
-                logger.info(
+                log.info(
                     "[insert_payment_method_and_stripe_card] ready to insert stripe_card table"
                 )
                 stmt = (
@@ -179,11 +179,11 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                 row = await maindb_conn.fetch_one(stmt)
                 assert row
                 sc_output = StripeCardDbEntity.from_row(row)
-                logger.info(
+                log.info(
                     "[insert_payment_method_and_stripe_card] insert stripe_card table completed."
                 )
             except Exception as e:
-                logger.error(
+                log.error(
                     "[insert_payment_method_and_stripe_card] exception caught by inserting stripe_card table. rollback from stripe_card table",
                     e,
                 )
@@ -191,7 +191,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
 
             # insert object into pgp_payment_methods table
             try:
-                logger.info(
+                log.info(
                     "[insert_payment_method_and_stripe_card] ready to insert pgp_payment_methods table"
                 )
                 stmt = (
@@ -202,11 +202,11 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                 row = await self.payment_database.master().fetch_one(stmt)
                 assert row
                 pm_output = PgpPaymentMethodDbEntity.from_row(row)
-                logger.info(
+                log.info(
                     "[insert_payment_method_and_stripe_card] insert pgp_payment_methods table completed."
                 )
             except Exception as e:
-                logger.error(
+                log.error(
                     "[insert_payment_method_and_stripe_card] exception caught by inserting pgp_customers table. rollback both stripe_customer and pgp_payment_method",
                     e,
                 )

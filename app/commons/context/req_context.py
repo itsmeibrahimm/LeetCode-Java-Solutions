@@ -4,7 +4,8 @@ from uuid import UUID, uuid4
 
 from starlette.requests import Request
 from starlette.responses import Response
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
+from uuid import UUID, uuid4
 
 from app.commons.constants import PAYMENT_REQUEST_ID_HEADER
 from app.commons.context.app_context import AppContext, get_context_from_app
@@ -41,7 +42,7 @@ def build_req_context(app_context: AppContext):
     return ReqContext(req_id=req_id, log=app_context.log.bind(req_id=req_id))
 
 
-def get_logger_from_req(request: Request):
+def get_logger_from_req(request: Request) -> BoundLogger:
     return get_context_from_req(request).log
 
 

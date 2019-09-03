@@ -4,9 +4,12 @@ from urllib import parse
 
 from app.commons.config.app_config import DBConfig
 from app.commons.config.secrets import Secret
-from app.commons.context.logger import root_logger
+from app.commons.context.logger import get_logger
 from app.commons.database.client.aiopg import AioEngine
 from app.commons.database.client.interface import DBEngine
+
+
+log = get_logger("database")
 
 
 @dataclass(frozen=True)
@@ -48,9 +51,9 @@ class DB:
             if not self._replica.is_connected():
                 await self._replica.connect()
         except Exception:
-            root_logger.exception(f"{self.id} failed to connect!")
+            log.exception("connect failed", database=self.id)
             raise
-        root_logger.info(f"{self.id} connected")
+        log.info("connected", database=self.id)
 
     async def disconnect(self):
         try:
@@ -59,9 +62,9 @@ class DB:
             if self._replica.is_connected():
                 await self._replica.disconnect()
         except Exception:
-            root_logger.exception(f"{self.id} failed to disconnect!")
+            log.exception("discconnect failed", database=self.id)
             raise
-        root_logger.info(f"{self.id} discounted")
+        log.info("disconnected", database=self.id)
 
     @classmethod
     def create(
@@ -134,10 +137,11 @@ class DB:
         assert replica_url.value
         parsed_replica_url = parse.urlparse(replica_url.value)
 
-        #  TODO Maybe we don't want to directly import root logger here
-        root_logger.info(
-            f"[create_with_alternative_replica] db_id={db_id}, replacing original "
-            f"db={parsed_replica_url.path} with its replica=/{alternative_replica}"
+        log.info(
+            "replica selected",
+            database=db_id,
+            original=parsed_replica_url.path,
+            replica=f"/{alternative_replica}",
         )
         updated_replica_url_str = parsed_replica_url._replace(
             path=f"/{alternative_replica}"

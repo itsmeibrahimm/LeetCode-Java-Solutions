@@ -6,7 +6,7 @@ from typing import Optional
 from ninox.interface.helper import Helper
 from typing_extensions import final
 
-from app.commons.context.logger import root_logger
+from app.commons.context.logger import init_logger as log
 
 
 @final
@@ -54,7 +54,7 @@ class SecretLoader:
         try:
             self.ninox = Helper(config_section=environment)
         except Exception:
-            root_logger.exception("Ninox initialization failed with reason:")
+            log.exception("ninox initialization failed")
             raise
         if self.ninox.disabled:
             # Ninox helper internally set itself to disabled when init fails without raising exception.

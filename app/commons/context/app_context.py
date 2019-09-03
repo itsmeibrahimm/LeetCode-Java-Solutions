@@ -5,7 +5,7 @@ from random import choice
 from typing import Any, cast
 
 from starlette.requests import Request
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
 
 from app.commons.applications import FastAPI
 from app.commons.config.app_config import AppConfig

@@ -1,6 +1,5 @@
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
-from app.commons.context.logger import root_logger
 
 from app.payout.api.webhook.utils.event_handler import (
     STRIPE_WEBHOOK_EVENT_TYPE_HANDLER_MAPPING,
@@ -18,7 +17,9 @@ async def handle_webhook_event(
     event_type = event.get("type", None)
     event_id = event.get("id", None)
 
-    root_logger.info(f"[payout] processing webhook event: {event_type} - {event_id}")
+    payout_service.log.info(
+        "processing webhook", event_type=event_type, event_id=event_id
+    )
 
     handler = STRIPE_WEBHOOK_EVENT_TYPE_HANDLER_MAPPING.get(event_type, None)
 

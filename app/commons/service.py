@@ -4,7 +4,7 @@ from app.commons.context.app_context import AppContext, get_context_from_app
 from app.commons.context.req_context import ReqContext, get_context_from_req
 
 from starlette.requests import Request
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
 
 
 class BaseService(metaclass=ABCMeta):

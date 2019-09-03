@@ -54,8 +54,8 @@ def add_err_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict
     return event_dict
 
 
-root_logger = structlog.wrap_logger(
-    logger=_sys_logger,
+# configure structlog globally
+structlog.configure_once(
     processors=[
         # global
         structlog.processors.TimeStamper(fmt="iso"),
@@ -72,6 +72,14 @@ root_logger = structlog.wrap_logger(
         # integrate with JsonLogger
         structlog.stdlib.render_to_log_kwargs,
     ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
     wrapper_class=structlog.stdlib.BoundLogger,
     cache_logger_on_first_use=True,
 )
+
+# used for application initialization
+init_logger = structlog.get_logger("initialization")
+# used for general application usage
+root_logger = structlog.get_logger("application")
+# get or create a named logger
+get_logger = structlog.get_logger
