@@ -118,7 +118,9 @@ class DisputeClient:
                     payment_method_id=payment_method_id,
                     payment_method_id_type=payment_method_id_type,
                 )
-            stripe_card_id = int(raw_payment_method.legacy_dd_stripe_card_id())
+            legacy_dd_stripe_card_id = raw_payment_method.legacy_dd_stripe_card_id()
+            assert legacy_dd_stripe_card_id
+            stripe_card_id = int(legacy_dd_stripe_card_id)
             dispute_db_entities = await self.dispute_repo.list_disputes_by_payment_method_id(
                 input=GetAllStripeDisputesByPaymentMethodIdInput(
                     stripe_card_id=stripe_card_id
@@ -131,7 +133,9 @@ class DisputeClient:
                 raw_payer_object: RawPayer = await self.payer_client.get_raw_payer(
                     payer_id=payer_id, payer_id_type=payer_id_type
                 )
-                stripe_customer_id = raw_payer_object.pgp_customer_id()
+                pgp_customer_id = raw_payer_object.pgp_customer_id()
+                assert pgp_customer_id
+                stripe_customer_id = pgp_customer_id
             if stripe_customer_id is None:
                 self.log.error(
                     f"[list_disputes_client] No payer found for the payer_id"
