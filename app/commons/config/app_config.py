@@ -53,6 +53,7 @@ class StatsDConfig:
     TAGS: Dict[str, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
 class ApiStatsDConfig(StatsDConfig):
     PREFIX: str = "dd.response"
 
