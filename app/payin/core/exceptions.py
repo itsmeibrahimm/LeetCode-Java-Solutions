@@ -1,6 +1,6 @@
 from enum import Enum
 
-from app.commons.error.errors import PaymentError
+from app.commons.core.errors import PaymentError
 
 
 payin_error_message_maps = {

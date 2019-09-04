@@ -5,7 +5,7 @@ from app.commons.auth.service_auth import RouteAuthorizer
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import group_routers
-from app.commons.error.errors import register_payment_exception_handler
+from app.commons.api.exceptions import register_payment_exception_handler
 from app.payin.api import cart_payment, payer, payment_method, webhook, dispute
 from app.middleware.doordash_metrics import ServiceMetricsMiddleware
 

@@ -2,11 +2,8 @@ from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import (
-    PaymentError,
-    PaymentException,
-    PaymentErrorResponseBody,
-)
+from app.commons.core.errors import PaymentError
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentBaseRequest,
     CreateCartPaymentLegacyRequest,

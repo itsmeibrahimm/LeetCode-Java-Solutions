@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends
 from starlette.status import (
     HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
     HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
 
+from app.commons.api.models import PaymentException
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import PaymentError, PaymentException
+from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute, DisputeList
 from app.payin.core.dispute.processor import DisputeProcessor
 from app.payin.core.exceptions import PayinErrorCode

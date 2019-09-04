@@ -4,7 +4,7 @@ from app.commons.applications import FastAPI
 from app.commons.auth.service_auth import RouteAuthorizer
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
-from app.commons.error.errors import register_payment_exception_handler
+from app.commons.api.exceptions import register_payment_exception_handler
 from app.commons.routing import group_routers_with_path_prefix
 from app.payout.api import account, transfer, webhook
 from app.middleware.doordash_metrics import ServiceMetricsMiddleware

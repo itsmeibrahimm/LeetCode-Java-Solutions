@@ -7,7 +7,7 @@ from app.payout.service import (
     PaymentAccountRepository,
     PaymentAccountRepositoryInterface,
 )
-from app.commons.error.errors import PaymentErrorResponseBody, PaymentException
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
     PaymentAccountCreate,

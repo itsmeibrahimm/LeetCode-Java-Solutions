@@ -14,11 +14,8 @@ from app.commons.context.app_context import (
     set_context_for_app,
 )
 from app.commons.context.logger import init_logger as log
-from app.commons.error.errors import (
-    PaymentErrorResponseBody,
-    PaymentException,
-    register_payment_exception_handler,
-)
+from app.commons.api.exceptions import register_payment_exception_handler
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.example_v1.app import example_v1
 from app.ledger.ledger import create_ledger_app
 from app.commons.stats import init_global_statsd

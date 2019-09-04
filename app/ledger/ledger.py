@@ -5,7 +5,7 @@ from app.commons.auth.service_auth import RouteAuthorizer
 from app.commons.config.app_config import AppConfig
 
 from app.commons.context.app_context import AppContext, set_context_for_app
-from app.commons.error.errors import register_payment_exception_handler
+from app.commons.api.exceptions import register_payment_exception_handler
 from app.commons.routing import group_routers
 from app.ledger.api import mx_transaction, mx_ledger
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository

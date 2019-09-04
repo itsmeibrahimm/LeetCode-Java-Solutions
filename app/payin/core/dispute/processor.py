@@ -7,7 +7,7 @@ from structlog.stdlib import BoundLogger
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import PaymentError
+from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute
 from app.payin.core.dispute.types import DISPUTE_ID_TYPE
 from app.payin.core.exceptions import (

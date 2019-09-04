@@ -1,80 +1,18 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.responses import JSONResponse, Response, PlainTextResponse
 from starlette.status import (
-    HTTP_422_UNPROCESSABLE_ENTITY,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_422_UNPROCESSABLE_ENTITY,
 )
 from structlog.stdlib import BoundLogger
 
+from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import get_logger_from_req, response_with_req_id
-
-
-class PaymentError(Exception):
-    """
-    Base exception class. This is base class that can be inherited by
-    each business operation layer with corresponding sub error class and
-    raise to application layers.
-    """
-
-    def __init__(self, error_code: str, error_message: str, retryable: bool):
-        """
-        Base exception class.
-
-        :param error_code: payin service predefined client-facing error codes.
-        :param error_message: friendly error message for client reference.
-        :param retryable: identify if the error is retryable or not.
-        """
-        super(PaymentError, self).__init__(error_message)
-        self.error_code = error_code
-        self.error_message = error_message
-        self.retryable = retryable
-
-
-class PaymentException(HTTPException):
-    """
-    Payment external exception class. This is application-level class that can be used
-    by each FastAPI router to return error back to client.
-    """
-
-    def __init__(
-        self,
-        http_status_code: int,
-        error_code: str,
-        error_message: str,
-        retryable: bool,
-    ):
-        """
-        External exception class.
-
-        :param http_status_code: http status code
-        :param error_code: payin service predefined client-facing error codes.
-        :param error_message: friendly error message for client reference.
-        :param retryable: identify if the error is retryable or not.
-        """
-        super().__init__(status_code=http_status_code, detail=error_message)
-        self.error_code = error_code
-        self.error_message = error_message
-        self.retryable = retryable
-
-
-class PaymentErrorResponseBody(BaseModel):
-    """
-    Customized payment error http response body.
-
-    :param error_code: payin service predefined client-facing error codes.
-    :param error_message: friendly error message for client reference.
-    :param retryable: identify if the error is retryable or not.
-    """
-
-    error_code: str
-    error_message: str
-    retryable: bool
 
 
 def create_payment_error_response_blob(

@@ -1,6 +1,6 @@
 from enum import Enum
 
-from app.commons.error.errors import PaymentError
+from app.commons.core.errors import PaymentError
 
 # mx_ledger related error will use ledger_1~ledger_9
 # mx_scheduled_ledger related error will use ledger_10~ledger_19

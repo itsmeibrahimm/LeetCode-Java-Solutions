@@ -2,11 +2,8 @@ from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.error.errors import (
-    create_payment_error_response_blob,
-    PaymentErrorResponseBody,
-    PaymentException,
-)
+from app.commons.api.exceptions import create_payment_error_response_blob
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.ledger.api.mx_transaction.v1.request import CreateMxTransactionRequest
 from app.ledger.core.exceptions import MxTransactionCreationError
 from app.ledger.core.mx_transaction.model import MxTransaction

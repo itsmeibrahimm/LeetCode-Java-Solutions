@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 
 from app.payout.service import TransferRepository, TransferRepositoryInterface
-from app.commons.error.errors import PaymentErrorResponseBody, PaymentException
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payout.api.response import Acknowledgement
 from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransfer,
