@@ -18,7 +18,7 @@ class Card(BaseModel):
     exp_month: str
     fingerprint: str
     active: bool
-    legacy_dd_stripe_card_id: str  # primary key of maindb_stripe_card
+    legacy_dd_stripe_card_id: int  # primary key of maindb_stripe_card
     country: Optional[str]
     brand: Optional[str]
     payment_provider_card_id: Optional[str] = None

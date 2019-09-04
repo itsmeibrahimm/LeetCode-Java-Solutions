@@ -1,18 +1,17 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from app.commons import tracing
 from app.commons.database.model import DBEntity, DBRequestModel
-
-###########################################################
-# Stripe Dispute DBEntity and CRUD operations                    #
-###########################################################
 from app.payin.core.dispute.model import StripeDispute
 from app.payin.core.dispute.types import DISPUTE_ID_TYPE
 from app.payin.models.maindb import stripe_disputes
 from app.payin.repository.base import PayinDBRepository
 
 
+###########################################################
+# Stripe Dispute DBEntity and CRUD operations             #
+###########################################################
 class StripeDisputeDbEntity(DBEntity):
     """
     The variable name must be consistent with DB table column name
@@ -59,11 +58,12 @@ class GetStripeDisputeByIdInput(DBRequestModel):
     dispute_id_type: Optional[str] = None
 
 
-class GetAllStripeDisputesInput(DBRequestModel):
-    payer_id: Optional[str]
-    payer_id_type: Optional[str]
-    payment_method_id: Optional[str]
-    payment_method_id_type: Optional[str]
+class GetAllStripeDisputesByPayerIdInput(DBRequestModel):
+    stripe_card_ids: List[int]
+
+
+class GetAllStripeDisputesByPaymentMethodIdInput(DBRequestModel):
+    stripe_card_id: int
 
 
 class UpdateStripeDisputeInput(DBRequestModel):
@@ -79,6 +79,16 @@ class DisputeRepositoryInterface:
     async def get_dispute_by_dispute_id(
         self, dispute_input: GetStripeDisputeByIdInput
     ) -> Optional[StripeDisputeDbEntity]:
+        ...
+
+    async def list_disputes_by_payer_id(
+        self, list_dispute_input: GetAllStripeDisputesByPayerIdInput
+    ) -> List[StripeDisputeDbEntity]:
+        ...
+
+    async def list_disputes_by_payment_method_id(
+        self, list_dispute_input: GetAllStripeDisputesByPaymentMethodIdInput
+    ) -> List[StripeDisputeDbEntity]:
         ...
 
 
@@ -104,3 +114,23 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
             )
         row = await self.main_database.replica().fetch_one(stmt)
         return StripeDisputeDbEntity.from_row(row) if row else None
+
+    async def list_disputes_by_payer_id(
+        self, input: GetAllStripeDisputesByPayerIdInput
+    ) -> List[StripeDisputeDbEntity]:
+        stmt = stripe_disputes.table.select().where(
+            stripe_disputes.stripe_card_id.in_(input.stripe_card_ids)
+        )
+        rows = await self.main_database.replica().fetch_all(stmt)
+        dispute_db_entities = [StripeDisputeDbEntity.from_row(row) for row in rows]
+        return dispute_db_entities
+
+    async def list_disputes_by_payment_method_id(
+        self, input: GetAllStripeDisputesByPaymentMethodIdInput
+    ) -> List[StripeDisputeDbEntity]:
+        stmt = stripe_disputes.table.select().where(
+            stripe_disputes.stripe_card_id == input.stripe_card_id
+        )
+        rows = await self.main_database.replica().fetch_all(stmt)
+        dispute_db_entities = [StripeDisputeDbEntity.from_row(row) for row in rows]
+        return dispute_db_entities

@@ -69,3 +69,23 @@ class PaymentMethodObjectType(str, Enum):
     PAYMENT_METHOD = "payment_method"
     SOURCE = "source"
     CARD = "card"
+
+
+class DisputePayerIdType(str, Enum):
+    """
+    Enum definition of payer id type for a dispute. This is used in Dispute API endpoints to identify
+    type of input payer id
+    """
+
+    DD_PAYMENT_PAYER_ID = "dd_payer_id"
+    STRIPE_CUSTOMER_ID = "stripe_customer_id"
+
+
+class DisputePaymentMethodIdType(str, Enum):
+    """
+    Enum definition of payment method id type for a dispute. This is used in Dispute API endpoints to identify
+    type of input payment method id
+    """
+
+    DD_PAYMENT_METHOD_ID = "dd_payment_method_id"
+    STRIPE_PAYMENT_METHOD_ID = "stripe_payment_method_id"

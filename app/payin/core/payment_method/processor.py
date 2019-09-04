@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from datetime import datetime
-
 from typing import Optional
 
 from fastapi import Depends
@@ -18,7 +17,6 @@ from app.commons.providers.stripe.stripe_models import (
 from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
 )
-
 from app.commons.types import CountryCode
 from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
 from app.payin.core.exceptions import (
@@ -29,10 +27,8 @@ from app.payin.core.exceptions import (
     PayerReadError,
 )
 from app.payin.core.payer.model import RawPayer
-
 from app.payin.core.payment_method.model import PaymentMethod, RawPaymentMethod
 from app.payin.core.types import PaymentMethodIdType, PayerIdType
-
 from app.payin.repository.payment_method_repo import (
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
@@ -47,6 +43,7 @@ from app.payin.repository.payment_method_repo import (
     DeletePgpPaymentMethodByIdWhereInput,
     DeleteStripeCardByIdSetInput,
     DeleteStripeCardByIdWhereInput,
+    GetStripeCardsByStripeCustomerIdInput,
 )
 
 
@@ -304,6 +301,25 @@ class PaymentMethodClient:
                 retryable=False,
             )
         return stripe_payment_method
+
+    async def get_dd_stripe_card_ids_by_stripe_customer_id(
+        self, stripe_customer_id: str
+    ):
+        try:
+            stripe_customer_db_entities = await self.payment_method_repo.get_dd_stripe_card_ids_by_stripe_customer_id(
+                input=GetStripeCardsByStripeCustomerIdInput(
+                    stripe_customer_id=stripe_customer_id
+                )
+            )
+        except DataError as e:
+            self.log.error(
+                f"[get_dd_stripe_card_ids_by_stripe_customer_id][{stripe_customer_id}]DataError when read db: {e}"
+            )
+            raise PaymentMethodReadError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
+            )
+        stripe_card_ids = [entity.id for entity in stripe_customer_db_entities]
+        return stripe_card_ids
 
 
 class PaymentMethodProcessor:

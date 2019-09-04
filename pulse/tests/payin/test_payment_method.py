@@ -427,7 +427,7 @@ def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_st
         payment_method_id_type="stripe_card_serial_id",
     )
     assert get_payment_method[1] == 200
-    # assert get_payment_method[0] == payment_method
+    # assert get_payment_method0] == payment_method
     assert get_payment_method[0]["deleted_at"] is None
 
     # step 3: delete payment_method using stripe_customer_serial_id and stripe_card_serial_id

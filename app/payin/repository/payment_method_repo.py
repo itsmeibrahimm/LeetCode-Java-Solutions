@@ -118,6 +118,10 @@ class DeleteStripeCardByIdWhereInput(DBRequestModel):
     id: int
 
 
+class GetStripeCardsByStripeCustomerIdInput(DBRequestModel):
+    stripe_customer_id: str
+
+
 class PaymentMethodRepositoryInterface:
     """
     PaymentMethod repository interface class that exposes complicated CRUD operations APIs for business layer.
@@ -291,3 +295,15 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         )
         row = await self.main_database.master().fetch_one(stmt)
         return StripeCardDbEntity.from_row(row) if row else None
+
+    async def get_dd_stripe_card_ids_by_stripe_customer_id(
+        self, input: GetStripeCardsByStripeCustomerIdInput
+    ):
+        stmt = stripe_cards.table.select().where(
+            stripe_cards.external_stripe_customer_id == input.stripe_customer_id
+        )
+        stripe_card_rows = await self.main_database.replica().fetch_all(stmt)
+        stripe_card_db_entities = [
+            StripeCardDbEntity.from_row(row) for row in stripe_card_rows
+        ]
+        return stripe_card_db_entities

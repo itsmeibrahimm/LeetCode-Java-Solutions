@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from typing_extensions import final
 
@@ -27,3 +27,10 @@ class StripeDispute:
 @final
 class Dispute(StripeDispute):
     pass
+
+
+@dataclass()
+class DisputeList:
+    count: int
+    has_more: bool  # Currently default to False. Returning all the disputes for a query
+    data: List[Dispute]
