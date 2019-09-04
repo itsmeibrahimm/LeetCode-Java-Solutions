@@ -359,12 +359,17 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     get_mx_scheduled_ledger_request, db_connection
                 )
                 # if not found, create new mx_scheduled_ledger and mx_ledger
-                if not mx_scheduled_ledger:
+                # if open ledger found, but the mx_txn routing_key is late than the end_time of found ledger
+                # we will need to create new ledger for the mx_txn
+                if (
+                    not mx_scheduled_ledger
+                    or mx_scheduled_ledger.end_time < request_input.routing_key
+                ):
                     try:
-                        mx_ledger_and_tx = await self.create_ledger_and_insert_mx_transaction(
+                        created_ledger, created_txn = await self.create_ledger_and_insert_mx_transaction(
                             request_input, db_connection
                         )
-                        return to_mx_transaction(mx_ledger_and_tx[1])
+                        return to_mx_transaction(created_txn)
                     except Exception as e:
                         raise e
                 else:

@@ -328,7 +328,11 @@ class TestMxLedgerProcessor:
         # prepare pair of open ledger/scheduled_ledger
         open_ledger_id = uuid.uuid4()
         scheduled_ledger_id = uuid.uuid4()
-        routing_key = datetime(2019, 8, 1)
+        # when inserting txn for negative balance rollover, we use utcnow() as routing_key
+        # this will cause the routing_key will always late than end_time of the found scheduled_ledger
+        # so we use utcnow() when preparing scheduled_ledger to make sure we can fulfill the testing scenario
+        # it might be flaky if we rollover negative balance between the switch of two periods, which is of low possibility
+        routing_key = datetime.utcnow()
         open_mx_ledger_to_insert = await prepare_mx_ledger(
             ledger_id=open_ledger_id,
             payment_account_id=payment_account_id,
