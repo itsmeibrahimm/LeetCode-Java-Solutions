@@ -399,7 +399,7 @@ def deployHelm(Map optArgs = [:], String tag, String serviceName, String env) {
 /**
  * Deploy Pulse for a Microservice.
  */
-def deployPulse(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName, String env) {
+def deployPulse(Map optArgs = [:], String sha, String branch, String serviceName, String env) {
   Map o = [
           k8sNamespace: env,
           pulseVersion: '2.1',
@@ -425,7 +425,7 @@ def deployPulse(Map optArgs = [:], String gitUrl, String sha, String branch, Str
 /**
  * Deploy Blocking Pulse for a Microservice.
  */
-def deployBlockingPulse(Map optArgs = [:], String gitUrl, String sha, String branch, String serviceName, String env) {
+def deployBlockingPulse(Map optArgs = [:], String sha, String branch, String serviceName, String env) {
   Map o = [
           k8sNamespace: env,
           pulseVersion: '2.1',
