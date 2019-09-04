@@ -497,12 +497,20 @@ class PaymentMethodProcessor:
         # step 5: update payer and pgp_customers / stripe_customer to remove the default_payment_method.
         # we don’t need to if it’s DSJ marketplace consumer.
         if raw_payer:
-            await self.payer_client.update_payer_default_payment_method(
-                raw_payer=raw_payer,
-                pgp_default_payment_method_id=None,
-                payer_id=payer_id,
-                payer_id_type=payer_id_type,
-            )
+            if raw_payer.pgp_default_payment_method_id() == pgp_payment_method_id:
+                self.log.info(
+                    f"[delete_payment_method] delete default payment method {pgp_payment_method_id} from pgp_customers table "
+                )
+                await self.payer_client.update_payer_default_payment_method(
+                    raw_payer=raw_payer,
+                    pgp_default_payment_method_id=None,
+                    payer_id=payer_id,
+                    payer_id_type=payer_id_type,
+                )
+            else:
+                self.log.info(
+                    f"[delete_payment_method] no need to delete default payment method {raw_payer.pgp_default_payment_method_id}"
+                )
 
         # we dont automatically update the new default payment method for payer
 

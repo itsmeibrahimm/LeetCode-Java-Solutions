@@ -22,7 +22,7 @@ def test_end_to_end():
     assert payment_method[1] == 201
     assert payment_method[0]["deleted_at"] is None
 
-    # step 3: update payment_method of payer object
+    # step 3: set default payment_method
     updated_payer = payin_client_pulse.update_payer_api_v1_payers_payer_id_patch_with_http_info(
         payer_id=test_payer[0]["id"],
         update_payer_request={"default_payment_method": payment_method[0]},

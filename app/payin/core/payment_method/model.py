@@ -109,8 +109,5 @@ class RawPaymentMethod:
 
         return pgp_payment_method_id
 
-    def legacy_dd_stripe_card_id(self) -> str:
-        legacy_dd_stripe_card_id: str
-        if self.stripe_card_entity:
-            legacy_dd_stripe_card_id = str(self.stripe_card_entity.id)
-        return legacy_dd_stripe_card_id
+    def legacy_dd_stripe_card_id(self) -> Optional[str]:
+        return str(self.stripe_card_entity.id) if self.stripe_card_entity else None

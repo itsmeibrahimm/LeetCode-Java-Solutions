@@ -398,11 +398,13 @@ class PayerProcessor:
         )
 
         # step 3: call PGP/stripe api to update default payment method
-        stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
-            country=country,
-            pgp_customer_id=raw_payer.pgp_customer_id(),
-            default_payment_method_id=raw_pm.pgp_payment_method_id(),
-        )
+        pgp_customer_id: Optional[str] = raw_payer.pgp_customer_id()
+        if pgp_customer_id:
+            stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
+                country=country,
+                pgp_customer_id=pgp_customer_id,
+                default_payment_method_id=raw_pm.pgp_payment_method_id(),
+            )
 
         self.log.info(
             f"[update_payer_impl][{payer_id}][{payer_id_type}] PGP update default_payment_method completed:[{stripe_customer.invoice_settings.default_payment_method}]"
@@ -714,7 +716,7 @@ class LegacyPayerOps(PayerOpsInterface):
         if raw_payer.stripe_customer_entity:
             raw_payer.stripe_customer_entity = await self.payer_repo.update_stripe_customer(
                 UpdateStripeCustomerSetInput(
-                    default_card=pgp_default_payment_method_id
+                    default_source=pgp_default_payment_method_id
                 ),
                 UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
             )
