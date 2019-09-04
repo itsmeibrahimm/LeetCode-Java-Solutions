@@ -111,7 +111,6 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     state=MxLedgerStateType.OPEN.value,  # todo: update to Processing when input is micro deposit
                     balance=request.amount,
                     payment_account_id=request.payment_account_id,
-                    amount_paid=0,
                 )
                 ledger_stmt = (
                     mx_ledgers.table.insert()
@@ -182,59 +181,62 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         mx_ledger_id: UUID,
         db_connection: DBConnection,
     ) -> InsertMxTransactionOutput:
-        async with db_connection:
-            try:
-                # Lock the row for updating the balance
-                stmt = (
-                    mx_ledgers.table.select()
-                    .where(mx_ledgers.id == mx_ledger_id)
-                    .with_for_update(nowait=True)
-                )
-                row = await db_connection.fetch_one(stmt)
-                assert row
-                mx_ledger = GetMxLedgerByIdOutput.from_row(row)
-            except Exception as e:
-                raise e
-            try:
-                # construct update request and update mx_ledger balance
-                updated_amount = mx_ledger.balance + request.amount
-                request_balance = UpdateMxLedgerSetInput(balance=updated_amount)
-                stmt = (
-                    mx_ledgers.table.update()
-                    .where(mx_ledgers.id == mx_ledger.id)
-                    .values(request_balance.dict(skip_defaults=True))
-                    .returning(*mx_ledgers.table.columns.values())
-                )
-                await db_connection.fetch_one(stmt)
-            except Exception as e:
-                raise e
-            try:
-                # construct mx_transaction and insert
-                mx_transaction_to_insert = InsertMxTransactionInput(
-                    id=uuid.uuid4(),
-                    payment_account_id=request.payment_account_id,
-                    amount=request.amount,
-                    currency=request.currency,
-                    ledger_id=mx_ledger.id,
-                    idempotency_key=request.idempotency_key,
-                    routing_key=request.routing_key,
-                    target_type=request.target_type,
-                    target_id=request.target_id,
-                    legacy_transaction_id=request.legacy_transaction_id,
-                    context=request.context,
-                    metadata=request.metadata,
-                )
-                txn_stmt = (
-                    mx_transactions.table.insert()
-                    .values(mx_transaction_to_insert.dict(skip_defaults=True))
-                    .returning(*mx_transactions.table.columns.values())
-                )
-                txn_row = await db_connection.fetch_one(txn_stmt)
-                assert txn_row
-                mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
-            except Exception as e:
-                raise e
-            return mx_transaction
+        try:
+            async with db_connection.transaction():
+                try:
+                    # Lock the row for updating the balance
+                    stmt = (
+                        mx_ledgers.table.select()
+                        .where(mx_ledgers.id == mx_ledger_id)
+                        .with_for_update(nowait=True)
+                    )
+                    row = await db_connection.fetch_one(stmt)
+                    assert row
+                    mx_ledger = GetMxLedgerByIdOutput.from_row(row)
+                except Exception as e:
+                    raise e
+                try:
+                    # construct update request and update mx_ledger balance
+                    updated_amount = mx_ledger.balance + request.amount
+                    request_balance = UpdateMxLedgerSetInput(balance=updated_amount)
+                    stmt = (
+                        mx_ledgers.table.update()
+                        .where(mx_ledgers.id == mx_ledger.id)
+                        .values(request_balance.dict(skip_defaults=True))
+                        .returning(*mx_ledgers.table.columns.values())
+                    )
+                    await db_connection.fetch_one(stmt)
+                except Exception as e:
+                    raise e
+                try:
+                    # construct mx_transaction and insert
+                    mx_transaction_to_insert = InsertMxTransactionInput(
+                        id=uuid.uuid4(),
+                        payment_account_id=request.payment_account_id,
+                        amount=request.amount,
+                        currency=request.currency,
+                        ledger_id=mx_ledger.id,
+                        idempotency_key=request.idempotency_key,
+                        routing_key=request.routing_key,
+                        target_type=request.target_type,
+                        target_id=request.target_id,
+                        legacy_transaction_id=request.legacy_transaction_id,
+                        context=request.context,
+                        metadata=request.metadata,
+                    )
+                    txn_stmt = (
+                        mx_transactions.table.insert()
+                        .values(mx_transaction_to_insert.dict(skip_defaults=True))
+                        .returning(*mx_transactions.table.columns.values())
+                    )
+                    txn_row = await db_connection.fetch_one(txn_stmt)
+                    assert txn_row
+                    mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
+                except Exception as e:
+                    raise e
+                return mx_transaction
+        except Exception as e:
+            raise e
 
     async def get_open_mx_scheduled_ledger_with_period(
         self, request: GetMxScheduledLedgerInput, db_connection: DBConnection

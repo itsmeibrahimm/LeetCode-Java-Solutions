@@ -24,7 +24,6 @@ from app.ledger.repository.mx_ledger_repository import (
     UpdateMxLedgerSetInput,
     UpdateMxLedgerWhereInput,
     GetMxLedgerByIdInput,
-    GetMxLedgerByAccountInput,
     ProcessMxLedgerInput,
 )
 from app.ledger.repository.mx_scheduled_ledger_repository import (
@@ -282,7 +281,9 @@ class TestMxLedgerRepository:
         assert not paid_mx_ledger.updated_at == mx_ledger.updated_at
 
     async def test_move_ledger_state_to_rolled_success(
-        self, mx_ledger_repository: MxLedgerRepository
+        self,
+        mx_ledger_repository: MxLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
     ):
         mx_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
@@ -298,9 +299,11 @@ class TestMxLedgerRepository:
         move_ledger_request = UpdatedRolledMxLedgerInput(
             id=mx_ledger_id, rolled_to_ledger_id=rolled_to_ledger_id
         )
-        rolled_mx_ledger = await mx_ledger_repository.move_ledger_state_to_rolled(
-            move_ledger_request
-        )
+        async with mx_transaction_repository.payment_database.master().transaction() as db_tx:  # type: DBTransaction
+            connection = db_tx.connection()
+            rolled_mx_ledger = await mx_ledger_repository.move_ledger_state_to_rolled(
+                move_ledger_request, connection
+            )
 
         assert rolled_mx_ledger is not None
         assert rolled_mx_ledger.id == mx_ledger_id
@@ -334,67 +337,6 @@ class TestMxLedgerRepository:
         assert submitted_mx_ledger.state == MxLedgerStateType.SUBMITTED
         assert submitted_mx_ledger.submitted_at == submitted_mx_ledger.updated_at
         assert not submitted_mx_ledger.updated_at == mx_ledger.updated_at
-
-    async def test_get_open_ledger_for_payment_account_success(
-        self, mx_ledger_repository: MxLedgerRepository
-    ):
-        mx_ledger_id = uuid.uuid4()
-        payment_account_id = str(uuid.uuid4())
-        mx_ledger_to_insert = await prepare_mx_ledger(
-            ledger_id=mx_ledger_id, payment_account_id=payment_account_id
-        )
-        mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
-        mx_ledger_request = GetMxLedgerByAccountInput(
-            payment_account_id=payment_account_id
-        )
-        retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
-            mx_ledger_request
-        )
-
-        assert retrieved_mx_ledger is not None
-        assert retrieved_mx_ledger.id == mx_ledger.id
-        assert retrieved_mx_ledger.type == mx_ledger.type
-        assert retrieved_mx_ledger.currency == mx_ledger.currency
-        assert retrieved_mx_ledger.state == mx_ledger.state
-        assert retrieved_mx_ledger.balance == mx_ledger.balance
-        assert retrieved_mx_ledger.payment_account_id == mx_ledger.payment_account_id
-
-    async def test_get_open_ledger_for_payment_account_no_open_ledger(
-        self, mx_ledger_repository: MxLedgerRepository
-    ):
-        mx_ledger_id = uuid.uuid4()
-        payment_account_id = str(uuid.uuid4())
-        mx_ledger_to_insert = await prepare_mx_ledger(
-            ledger_id=mx_ledger_id,
-            payment_account_id=payment_account_id,
-            state=MxLedgerStateType.PAID,
-        )
-
-        await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
-        mx_ledger_request = GetMxLedgerByAccountInput(
-            payment_account_id=payment_account_id
-        )
-        retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
-            mx_ledger_request
-        )
-        assert retrieved_mx_ledger is None
-
-    async def test_get_open_ledger_for_payment_account_no_account(
-        self, mx_ledger_repository: MxLedgerRepository
-    ):
-        mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_insert = await prepare_mx_ledger(
-            ledger_id=mx_ledger_id, payment_account_id=str(uuid.uuid4())
-        )
-
-        await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
-        mx_ledger_request = GetMxLedgerByAccountInput(
-            payment_account_id=str(uuid.uuid4())
-        )
-        retrieved_mx_ledger = await mx_ledger_repository.get_open_ledger_for_payment_account(
-            mx_ledger_request
-        )
-        assert retrieved_mx_ledger is None
 
     async def test_create_one_off_mx_ledger(
         self, mx_ledger_repository: MxLedgerRepository

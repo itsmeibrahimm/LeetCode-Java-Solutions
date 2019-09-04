@@ -90,7 +90,7 @@ class MxTransactionProcessor:
             return created_mx_transaction
         except RetryError as e:
             self.log.error(
-                f"[create_ledger_and_insert_mx_transaction] Failed to retry locking mx_ledger, {e}"
+                f"[create_ledger_and_insert_mx_transaction] Failed to retry creating mx_transaction, {e}"
             )
             raise MxTransactionCreationError(
                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,

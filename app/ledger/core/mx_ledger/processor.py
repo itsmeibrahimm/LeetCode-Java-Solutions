@@ -1,8 +1,8 @@
 from uuid import UUID
 
 from fastapi import Depends
-from psycopg2._psycopg import DataError, OperationalError
-from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
+from psycopg2._psycopg import DataError, OperationalError, IntegrityError
+from psycopg2.errorcodes import LOCK_NOT_AVAILABLE, UNIQUE_VIOLATION
 from structlog import BoundLogger
 from tenacity import (
     retry,
@@ -17,6 +17,8 @@ from app.ledger.core.data_types import (
     ProcessMxLedgerInput,
     GetMxLedgerByIdInput,
     UpdatePaidMxLedgerInput,
+    RolloverNegativeLedgerInput,
+    ProcessMxLedgerOutput,
 )
 from app.ledger.core.exceptions import (
     LedgerErrorCode,
@@ -26,6 +28,7 @@ from app.ledger.core.exceptions import (
     MxLedgerInvalidProcessStateError,
     MxLedgerLockError,
     MxLedgerSubmissionError,
+    MxLedgerCreateUniqueViolationError,
 )
 from app.ledger.core.mx_ledger.model import MxLedger
 from app.ledger.core.types import MxLedgerStateType
@@ -185,7 +188,7 @@ class MxLedgerProcessor:
                 )
             except DataError as e:
                 self.log.error(
-                    f"[submit mx_ledger] Invalid input data while processing ledger {mx_ledger_id}, {e}"
+                    f"[submit mx_ledger] Invalid input data while submitting ledger {mx_ledger_id}, {e}"
                 )
                 raise MxLedgerSubmissionError(
                     error_code=LedgerErrorCode.MX_LEDGER_SUBMIT_ERROR,
@@ -197,8 +200,7 @@ class MxLedgerProcessor:
             except Exception as e:
                 raise e
             return to_mx_ledger(mx_ledger)
-        # elif retrieved_ledger.balance == 0:
-        else:
+        elif retrieved_ledger.balance == 0:
             paid_ledger_request = UpdatePaidMxLedgerInput(
                 id=mx_ledger_id, amount_paid=0
             )
@@ -209,7 +211,7 @@ class MxLedgerProcessor:
                 return to_mx_ledger(mx_ledger)
             except DataError as e:
                 self.log.error(
-                    f"[submit mx_ledger] Invalid input data while processing ledger {mx_ledger_id}, {e}"
+                    f"[submit mx_ledger] Invalid input data while submitting ledger {mx_ledger_id}, {e}"
                 )
                 raise MxLedgerSubmissionError(
                     error_code=LedgerErrorCode.MX_LEDGER_SUBMIT_ERROR,
@@ -221,165 +223,99 @@ class MxLedgerProcessor:
             except Exception as e:
                 raise e
 
-    #     else:
-    #         # process negative balance mx_ledger
-    #         try:
-    #             # todo: move this function into ledger repo in order to obtain db connection
-    #             mx_ledger = await self.rollover_negative_balanced_ledger(mx_ledger_id)
-    #             return to_mx_ledger(mx_ledger)
-    #         except RetryError as e:
-    #             self.log.error(
-    #                 f"[submit mx_ledger] Failed to retry locking mx_ledger {mx_ledger_id}, {e}"
-    #             )
-    #             raise MxLedgerSubmissionError(
-    #                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
-    #                 error_message=ledger_error_message_maps[
-    #                     LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
-    #                 ],
-    #                 retryable=True,
-    #             )
-    #
-    # @retry(
-    #     retry=retry_if_exception_type(MxLedgerLockError),
-    #     stop=stop_after_attempt(5),
-    #     wait=wait_fixed(0.3),
-    # )
-    # async def rollover_negative_balanced_ledger(self, mx_ledger_id: UUID) -> MxLedger:
-    #
-    #     # todo: replace with Min's refactor after merged
-    #     # just assume the given ledger id is valid for now
-    #     retrieve_ledger_request = GetMxLedgerByIdInput(id=mx_ledger_id)
-    #     retrieved_ledger = await self.mx_ledger_repo.get_ledger_by_id(
-    #         retrieve_ledger_request
-    #     )
-    #     assert retrieved_ledger
-    #
-    #     # check whether there is another open ledger(we use open scheduled_ledger to represent open ledger) for the payment account
-    #     retrieve_scheduled_ledger_request = GetMxScheduledLedgerByAccountInput(
-    #         payment_account_id=retrieved_ledger.payment_account_id
-    #     )
-    #     mx_scheduled_ledger = await self.mx_transaction_repo.get_open_mx_scheduled_ledger_for_payment_account_id(
-    #         retrieve_scheduled_ledger_request
-    #     )
-    #     open_ledger = None
-    #     # if so, rollover the mx_ledger to the open ledger and create negative balance txn
-    #     if mx_scheduled_ledger:
-    #         open_ledger_id = mx_scheduled_ledger.ledger_id
-    #         rollover_negative_ledger_request = RolloverNegativeLedgerInput(
-    #             id=mx_ledger_id
-    #         )
-    #         try:
-    #             open_ledger = await self.mx_ledger_repo.rollover_negative_ledger_to_open_ledger(
-    #                 rollover_negative_ledger_request, open_ledger_id
-    #             )
-    #         except DataError as e:
-    #             self.log.error(
-    #                 f"[process negative balance mx_ledger] Invalid input data while processing negative balance mx_ledger to open ledger, {e}"
-    #             )
-    #
-    #             raise MxLedgerSubmissionError(
-    #                 error_code=LedgerErrorCode.MX_LEDGER_ROLLOVER_ERROR,
-    #                 error_message=ledger_error_message_maps[
-    #                     LedgerErrorCode.MX_LEDGER_ROLLOVER_ERROR.value
-    #                 ],
-    #                 retryable=True,
-    #             )
-    #         except OperationalError as e:
-    #             if e.pgcode != LOCK_NOT_AVAILABLE:
-    #                 self.log.error(
-    #                     f"[process negative balance mx_ledger] OperationalError caught while processing negative balance mx_ledger to open ledger, {e}"
-    #                 )
-    #                 raise MxLedgerSubmissionError(
-    #                     error_code=LedgerErrorCode.MX_LEDGER_OPERATIONAL_ERROR,
-    #                     error_message=ledger_error_message_maps[
-    #                         LedgerErrorCode.MX_LEDGER_OPERATIONAL_ERROR.value
-    #                     ],
-    #                     retryable=True,
-    #                 )
-    #             self.log.warn(
-    #                 f"[process negative balance mx_ledger] Cannot obtain lock for mx_ledger {e}"
-    #             )
-    #             # todo: retry needed here
-    #             raise MxLedgerSubmissionError(
-    #                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
-    #                 error_message=ledger_error_message_maps[
-    #                     LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
-    #                 ],
-    #                 retryable=True,
-    #             )
-    #         except Exception as e:
-    #             self.log.error(
-    #                 f"[process negative balance mx_ledger] Error caught while processing negative balance mx_ledger to open ledger, {e}"
-    #             )
-    #             raise e
-    #     else:
-    #         # if not, rollover the mx_ledger to a newly created ledger with negative balance initialized
-    #         rollover_negative_ledger_request = RolloverNegativeLedgerInput(
-    #             id=retrieved_ledger.id
-    #         )
-    #         try:
-    #             open_ledger = await self.mx_ledger_repo.rollover_negative_ledger_to_new_ledger(
-    #                 rollover_negative_ledger_request
-    #             )
-    #         except DataError as e:
-    #             self.log.error(
-    #                 f"[process negative balance mx_ledger] Invalid input data while processing negative balance mx_ledger to new ledger, {e}"
-    #             )
-    #
-    #             raise MxLedgerSubmissionError(
-    #                 error_code=LedgerErrorCode.MX_LEDGER_ROLLOVER_ERROR,
-    #                 error_message=ledger_error_message_maps[
-    #                     LedgerErrorCode.MX_LEDGER_ROLLOVER_ERROR.value
-    #                 ],
-    #                 retryable=True,
-    #             )
-    #         except OperationalError as e:
-    #             if e.pgcode != LOCK_NOT_AVAILABLE:
-    #                 self.log.error(
-    #                     f"[process negative balance mx_ledger] OperationalError caught while processing negative balance mx_ledger to new ledger, {e}"
-    #                 )
-    #                 raise MxLedgerSubmissionError(
-    #                     error_code=LedgerErrorCode.MX_LEDGER_OPERATIONAL_ERROR,
-    #                     error_message=ledger_error_message_maps[
-    #                         LedgerErrorCode.MX_LEDGER_OPERATIONAL_ERROR.value
-    #                     ],
-    #                     retryable=True,
-    #                 )
-    #             self.log.warn(
-    #                 f"[process negative balance mx_ledger] Cannot obtain lock for mx_ledger {e}"
-    #             )
-    #             # todo: retry needed here
-    #             raise MxLedgerSubmissionError(
-    #                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
-    #                 error_message=ledger_error_message_maps[
-    #                     LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
-    #                 ],
-    #                 retryable=True,
-    #             )
-    #         except psycopg2.IntegrityError as e:
-    #             # todo: needs to be wrapped up
-    #             if e.pgcode != UNIQUE_VIOLATION:
-    #                 raise
-    #             self.log.warn(
-    #                 f"[process negative balance mx_ledger] Retry to rollover to open ledger instead of new ledger due to unique constraints violation, {e}"
-    #             )
-    #             # todo: retry needed here
-    #         except Exception as e:
-    #             self.log.error(
-    #                 f"[process negative balance mx_ledger] Error caught while processing negative balance mx_ledger to new ledger, {e}"
-    #             )
-    #             raise e
-    #
-    #     # update negative balance ledger states to ROLLED
-    #     # todo: need to update as mx_transaction after Min's pr
-    #     assert open_ledger
-    #     submit_ledger_request = UpdatedRolledMxLedgerInput(
-    #         id=mx_ledger_id, rolled_to_ledger_id=open_ledger.id
-    #     )
-    #     try:
-    #         mx_ledger = await self.mx_ledger_repo.move_ledger_state_to_rolled(
-    #             submit_ledger_request
-    #         )
-    #         return to_mx_ledger(mx_ledger)
-    #     except Exception as e:
-    #         raise e
+        else:
+            # rollover negative balance mx_ledger
+            try:
+                mx_ledger = await self._rollover_negative_balanced_ledger_impl(
+                    mx_ledger_id
+                )
+                return to_mx_ledger(mx_ledger)
+            except RetryError as e:
+                self.log.error(
+                    f"[submit mx_ledger] Failed to retry rolling over mx_ledger {mx_ledger_id}, {e}"
+                )
+                raise MxLedgerSubmissionError(
+                    error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
+                    error_message=ledger_error_message_maps[
+                        LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
+                    ],
+                    retryable=True,
+                )
+            except Exception as e:
+                raise e
+
+    @retry(
+        retry=(
+            retry_if_exception_type(MxLedgerCreateUniqueViolationError)
+            | retry_if_exception_type(MxLedgerLockError)
+        ),
+        stop=stop_after_attempt(5),
+        wait=wait_fixed(0.3),
+    )
+    async def _rollover_negative_balanced_ledger_impl(
+        self, mx_ledger_id: UUID
+    ) -> ProcessMxLedgerOutput:
+        rollover_negative_ledger_request = RolloverNegativeLedgerInput(id=mx_ledger_id)
+        try:
+            rolled_mx_ledger = await self.mx_ledger_repo.rollover_negative_balanced_ledger(
+                rollover_negative_ledger_request, self.mx_transaction_repo
+            )
+            return rolled_mx_ledger
+        except DataError as e:
+            self.log.error(
+                f"[rollover_negative_balanced_ledger_impl] Invalid input data while submitting ledger {mx_ledger_id}, {e}"
+            )
+            raise MxLedgerSubmissionError(
+                error_code=LedgerErrorCode.MX_LEDGER_SUBMIT_ERROR,
+                error_message=ledger_error_message_maps[
+                    LedgerErrorCode.MX_LEDGER_SUBMIT_ERROR.value
+                ],
+                retryable=True,
+            )
+        except OperationalError as e:
+            if e.pgcode != LOCK_NOT_AVAILABLE:
+                self.log.error(
+                    f"[rollover_negative_balanced_ledger_impl] OperationalError caught while rolling over negative balanced ledger {mx_ledger_id}, {e}"
+                )
+                raise MxLedgerProcessError(
+                    error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR,
+                    error_message=ledger_error_message_maps[
+                        LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR.value
+                    ],
+                    retryable=True,
+                )
+            self.log.warn(
+                f"[rollover_negative_balanced_ledger_impl] Cannot obtain lock while rolling over negative balanced ledger {mx_ledger_id}, {e}"
+            )
+            raise MxLedgerLockError(
+                error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
+                error_message=ledger_error_message_maps[
+                    LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR.value
+                ],
+                retryable=True,
+            )
+        except IntegrityError as e:
+            if e.pgcode != UNIQUE_VIOLATION:
+                self.log.error(
+                    f"[rollover_negative_balanced_ledger_impl] IntegrityError caught while creating ledger and "
+                    f"inserting mx_transaction, {e}"
+                )
+                raise MxLedgerProcessError(
+                    error_code=LedgerErrorCode.MX_LEDGER_CREATE_INTEGRITY_ERROR,
+                    error_message=ledger_error_message_maps[
+                        LedgerErrorCode.MX_LEDGER_CREATE_INTEGRITY_ERROR.value
+                    ],
+                    retryable=True,
+                )
+            self.log.warn(
+                f"[rollover_negative_balanced_ledger_impl] Retry to update ledger balance instead of insert "
+                f"due to unique constraints violation, {e}"
+            )
+            # retry with insert_mx_txn_and_update_ledger due to unique constraints violation
+            raise MxLedgerCreateUniqueViolationError(
+                error_code=LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR,
+                error_message=ledger_error_message_maps[
+                    LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR.value
+                ],
+                retryable=True,
+            )
