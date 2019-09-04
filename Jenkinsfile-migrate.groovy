@@ -62,7 +62,7 @@ pipeline {
           common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
         }
         script {
-          common.deployBlockingPulse(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
+          common.deployBlockingPulse(params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
         }
       }
     }
