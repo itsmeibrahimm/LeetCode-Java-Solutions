@@ -33,7 +33,7 @@ class TestCartPayment:
         payer,
         payment_method,
         amount=500,
-        capture_method="manual",
+        delay_capture=True,
         idempotency_key=None,
     ):
         request_body = {
@@ -43,7 +43,7 @@ class TestCartPayment:
             "payment_country": "US",
             "currency": "USD",
             "payment_method_id": payment_method["id"],
-            "capture_method": capture_method,
+            "delay_capture": delay_capture,
             "client_description": f"{payer['id']} description",
             "payer_statement_description": f"{payer['id'][0:10]} statement",
             "metadata": {
@@ -70,7 +70,7 @@ class TestCartPayment:
             "amount": amount,
             "country": "US",
             "currency": "USD",
-            "capture_method": "manual",
+            "delay_capture": True,
             "client_description": f"{legacy_stripe_customer_id} description",
             "payer_statement_description": f"{legacy_stripe_customer_id}",
             "payer_country": "US",
@@ -174,7 +174,7 @@ class TestCartPayment:
         assert cart_payment["amount"] == request_body["amount"]
         assert cart_payment["payer_id"] is None
         assert cart_payment["payment_method_id"] is None
-        assert cart_payment["capture_method"] == request_body["capture_method"]
+        assert cart_payment["delay_capture"] == request_body["delay_capture"]
         assert cart_payment["cart_metadata"]
         metadata = cart_payment["cart_metadata"]
         assert metadata["reference_id"] == request_body["metadata"]["reference_id"]
@@ -194,10 +194,10 @@ class TestCartPayment:
         return cart_payment
 
     def _test_cart_payment_creation(
-        self, stripe_api, client, payer, payment_method, amount, capture_method
+        self, stripe_api, client, payer, payment_method, amount, delay_capture
     ):
         request_body = self._get_cart_payment_create_request(
-            payer, payment_method, amount, capture_method
+            payer, payment_method, amount, delay_capture
         )
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
@@ -207,7 +207,7 @@ class TestCartPayment:
         assert cart_payment["amount"] == request_body["amount"]
         assert cart_payment["payer_id"] == payer["id"]
         assert cart_payment["payment_method_id"] == request_body["payment_method_id"]
-        assert cart_payment["capture_method"] == request_body["capture_method"]
+        assert cart_payment["delay_capture"] == request_body["delay_capture"]
         assert cart_payment["cart_metadata"]
         metadata = cart_payment["cart_metadata"]
         assert metadata["reference_id"] == request_body["metadata"]["reference_id"]
@@ -261,7 +261,7 @@ class TestCartPayment:
         assert body["amount"] == request_body["amount"]
         assert body["payer_id"] == cart_payment["payer_id"]
         assert body["payment_method_id"] == cart_payment["payment_method_id"]
-        assert body["capture_method"] == cart_payment["capture_method"]
+        assert body["delay_capture"] == cart_payment["delay_capture"]
         assert body["cart_metadata"] == cart_payment["cart_metadata"]
         assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
@@ -282,7 +282,7 @@ class TestCartPayment:
             payer=payer,
             payment_method=payment_method,
             amount=500,
-            capture_method="manual",
+            delay_capture=True,
         )
 
         # Order cart adjustment
@@ -300,7 +300,7 @@ class TestCartPayment:
             payer=payer,
             payment_method=payment_method,
             amount=500,
-            capture_method="auto",
+            delay_capture=False,
         )
 
         # Other payer cannot use some else's payment method
