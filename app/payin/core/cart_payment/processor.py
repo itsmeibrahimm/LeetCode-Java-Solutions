@@ -8,6 +8,7 @@ from fastapi import Depends
 
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
+from app.commons import tracing
 from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
@@ -52,6 +53,7 @@ from app.payin.repository.cart_payment_repo import CartPaymentRepository
 CAPTURE_DELAY_IN_HOURS = 24 * 1
 
 
+@tracing.set_processor_name("cart_payments", only_trackable=False)
 class CartPaymentInterface:
     def __init__(
         self,

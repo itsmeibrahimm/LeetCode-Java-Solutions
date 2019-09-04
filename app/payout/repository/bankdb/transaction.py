@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Optional, List
-
 from typing_extensions import final
 
+from app.commons import tracing
 from app.commons.database.infra import DB
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import transactions
@@ -37,6 +37,7 @@ class TransactionRepositoryInterface(ABC):
 
 
 @final
+@tracing.set_repository_name("transaction", only_trackable=False)
 class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterface):
     def __init__(self, database: DB):
         super().__init__(_database=database)

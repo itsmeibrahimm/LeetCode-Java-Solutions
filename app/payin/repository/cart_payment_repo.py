@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import and_
 from typing_extensions import final
 
+from app.commons import tracing
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CartMetadata,
@@ -29,6 +30,7 @@ from app.payin.repository.base import PayinDBRepository
 
 
 @final
+@tracing.set_repository_name("cart_payment", only_trackable=False)
 @dataclass
 class CartPaymentRepository(PayinDBRepository):
     async def insert_cart_payment(

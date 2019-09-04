@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from sqlalchemy import select, and_
 from typing_extensions import final
 
+from app.commons import tracing
 from app.commons.database.model import DBRequestModel, DBEntity
 from app.payin.models.maindb import stripe_customers
 from app.payin.models.paymentdb import payers, pgp_customers
@@ -254,6 +255,7 @@ class PayerRepositoryInterface:
 
 
 @final
+@tracing.set_repository_name("payer", only_trackable=False)
 @dataclass
 class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
     """

@@ -4,6 +4,7 @@ from fastapi import Depends
 from psycopg2._psycopg import DataError
 from structlog.stdlib import BoundLogger
 
+from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
 from app.payin.core.dispute.types import DISPUTE_ID_TYPE
@@ -15,6 +16,7 @@ from app.payin.repository.dispute_repo import (
 )
 
 
+@tracing.set_processor_name("disputes", only_trackable=False)
 class DisputeClient:
     """
     Dispute client wrapper that provides utilities to dispute.

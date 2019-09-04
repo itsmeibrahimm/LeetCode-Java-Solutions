@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from typing import List, Optional
-
 from sqlalchemy import and_
 from typing_extensions import final
 
+from app.commons import tracing
 from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import payment_accounts, stripe_managed_accounts
@@ -65,6 +65,7 @@ class PaymentAccountRepositoryInterface(ABC):
 
 
 @final
+@tracing.set_repository_name("payment_account", only_trackable=False)
 class PaymentAccountRepository(
     PayoutMainDBRepository, PaymentAccountRepositoryInterface
 ):

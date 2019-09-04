@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 
 from sqlalchemy import and_
 
+from app.commons import tracing
 from app.commons.database.client.aiopg import AioTransaction
 from app.commons.database.client.interface import DBConnection, DBTransaction
 from app.ledger.core.data_types import (
@@ -109,6 +110,7 @@ class MxLedgerRepositoryInterface:
 
 
 @dataclass
+@tracing.set_repository_name("mx_ledger", only_trackable=False)
 class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     async def insert_mx_ledger(
         self, request: InsertMxLedgerInput

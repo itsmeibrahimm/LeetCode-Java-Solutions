@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy import and_
 
+from app.commons import tracing
 from app.commons.database.client.interface import DBConnection
 from app.ledger.core.data_types import (
     InsertMxTransactionInput,
@@ -87,6 +88,7 @@ class MxTransactionRepositoryInterface:
 
 
 @dataclass
+@tracing.set_repository_name("mx_transaction", only_trackable=False)
 class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBRepository):
     async def insert_mx_transaction(
         self, request: InsertMxTransactionInput

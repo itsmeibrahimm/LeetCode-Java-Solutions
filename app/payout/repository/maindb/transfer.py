@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Optional, List
-
 from typing_extensions import final
 
+from app.commons import tracing
 from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import stripe_transfers, transfers
@@ -70,6 +70,7 @@ class TransferRepositoryInterface(ABC):
 
 
 @final
+@tracing.set_repository_name("transfer", only_trackable=False)
 class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     def __init__(self, database: DB):
         super().__init__(_database=database)

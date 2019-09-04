@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 
+from app.commons import tracing
 from app.ledger.core.data_types import (
     InsertMxScheduledLedgerInput,
     InsertMxScheduledLedgerOutput,
@@ -20,6 +21,7 @@ class MxScheduledLedgerRepositoryInterface:
 
 
 @dataclass
+@tracing.set_repository_name("mx_scheduled_ledger", only_trackable=False)
 class MxScheduledLedgerRepository(
     MxScheduledLedgerRepositoryInterface, LedgerDBRepository
 ):

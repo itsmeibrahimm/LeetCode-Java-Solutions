@@ -7,12 +7,22 @@ from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import group_routers
 from app.commons.error.errors import register_payment_exception_handler
 from app.payin.api import cart_payment, payer, payment_method, webhook, dispute
+from app.middleware.doordash_metrics import ServiceMetricsMiddleware
 
 
 def create_payin_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Declare sub app
     app = FastAPI(openapi_prefix="/payin", description="Payin service")
     set_context_for_app(app, context)
+
+    # allow tracking of service-level metrics
+    app.add_middleware(
+        ServiceMetricsMiddleware,
+        app_name="payin-v1",
+        host=config.STATSD_SERVER,
+        config=config.PAYIN_STATSD_CONFIG,
+        additional_tags={"app": "payin-v1"},
+    )
 
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
 

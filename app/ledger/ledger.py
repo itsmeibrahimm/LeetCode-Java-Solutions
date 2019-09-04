@@ -13,6 +13,7 @@ from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
 )
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
+from app.middleware.doordash_metrics import ServiceMetricsMiddleware
 
 
 mx_ledger_repository: MxLedgerRepository
@@ -24,6 +25,15 @@ def create_ledger_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Declare sub app
     app = FastAPI(openapi_prefix="/ledger", description="Ledger service")
     set_context_for_app(app, context)
+
+    # allow tracking of service-level metrics
+    app.add_middleware(
+        ServiceMetricsMiddleware,
+        app_name="ledger-v1",
+        host=config.STATSD_SERVER,
+        config=config.LEDGER_STATSD_CONFIG,
+        additional_tags={"app": "ledger-v1"},
+    )
 
     route_authorizer = RouteAuthorizer(config.LEDGER_SERVICE_ID)
     grouped_routers = group_routers([mx_transaction.v1.router, mx_ledger.v1.router])

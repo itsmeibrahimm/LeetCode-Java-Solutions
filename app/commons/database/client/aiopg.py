@@ -4,6 +4,7 @@ from typing import Any, List, Mapping, Optional
 from aiopg.sa import connection, create_engine, engine, transaction
 from aiopg.sa.result import ResultProxy
 
+from app.commons import timing
 from app.commons.database.client.interface import (
     DBConnection,
     DBEngine,
@@ -68,17 +69,22 @@ class AioTransaction(DBTransaction):
             await self.commit()
 
 
-class AioConnection(DBConnection):
+class AioConnection(DBConnection, timing.Database):
 
     _raw_connection: Optional[connection.SAConnection]
     default_timeout: float
     engine: "AioEngine"
+    database_name: str
+    instance_name: str
 
     def __init__(self, engine: "AioEngine"):
         if engine.closed():
             raise ValueError("engine is closed!")
 
         self.engine = engine
+        self.database_name = engine.database_name
+        self.instance_name = engine.instance_name
+
         self.default_timeout = self.engine.default_stmt_timeout_sec
         self._raw_connection = None
 
@@ -99,6 +105,7 @@ class AioConnection(DBConnection):
         new_transaction = AioTransaction(connection=self)
         return AwaitableTransactionContext(generator=new_transaction.start)
 
+    @timing.track_query
     async def execute(self, stmt, *, timeout: int = None) -> List[Mapping]:
         _timeout = timeout or self.default_timeout
         result_proxy: ResultProxy = await self.raw_connection.execute(
@@ -111,6 +118,7 @@ class AioConnection(DBConnection):
             result_proxy.close()
         return result
 
+    @timing.track_query
     async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[Mapping]:
         _timeout = timeout or self.default_timeout
         result_proxy: ResultProxy = await self.raw_connection.execute(
@@ -123,6 +131,7 @@ class AioConnection(DBConnection):
             result_proxy.close()
         return result
 
+    @timing.track_query
     async def fetch_all(self, stmt, *, timeout: int = None) -> List[Mapping]:
         _timeout = timeout or self.default_timeout
         result_proxy: ResultProxy = await self.raw_connection.execute(
@@ -135,6 +144,7 @@ class AioConnection(DBConnection):
             result_proxy.close()
         return result
 
+    @timing.track_query
     async def fetch_value(self, stmt, *, timeout: int = None):
         _timeout = timeout or self.default_timeout
         return await self.raw_connection.scalar(
@@ -155,8 +165,9 @@ class AioConnection(DBConnection):
         await self.close()
 
 
-class AioEngine(DBEngine):
-    id: str
+class AioEngine(DBEngine, timing.Database):
+    database_name: str
+    instance_name: str
     _dsn: str
     minsize: int = 1
     maxsize: int = 1
@@ -171,7 +182,8 @@ class AioEngine(DBEngine):
         self,
         dsn: str,
         *,
-        id: Optional[str] = None,
+        database_name: Optional[str] = None,
+        instance_name: str = "",
         minsize: int = 1,
         maxsize: int = 1,
         connection_timeout_sec: float = 30,
@@ -207,7 +219,8 @@ class AioEngine(DBEngine):
         self.connection_timeout_sec = connection_timeout_sec
         self.closing_timeout_sec = closing_timeout_sec
         self.default_stmt_timeout_sec = default_stmt_timeout_sec
-        self.id = id if id else "undefined"
+        self.database_name = database_name if database_name else "undefined"
+        self.instance_name = instance_name
         self._raw_engine = None
         self.debug = debug
         self.force_rollback = force_rollback  # TODO actually implement force rollback
@@ -245,6 +258,7 @@ class AioEngine(DBEngine):
         new_connection = AioConnection(engine=self)
         return AwaitableConnectionContext(generator=new_connection.open)
 
+    @timing.track_transaction
     def transaction(self):
         async def tx_generator() -> AioTransaction:
             opened_conn = await self.acquire()

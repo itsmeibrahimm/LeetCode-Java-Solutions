@@ -48,7 +48,6 @@ class DBConfig:
 
 @dataclass(frozen=True)
 class StatsDConfig:
-    SERVER: str = "prod-proxy-internal.doordash.com"
     PREFIX: str = "dd.pay.payment-service"
     TAGS: Dict[str, str] = field(default_factory=dict)
 
@@ -117,7 +116,7 @@ class AppConfig(SecretAware):
     DSJ_API_JWT_TOKEN_TTL: int = 1800  # in seconds
 
     # Stats
-    STATSD_SERVER: str = "prod-proxy-internal.doordash.com"
+    STATSD_SERVER: str = "localhost"
     STATSD_PREFIX: str = "dd.pay.payment-service"
 
     # general API responses, common across all apps

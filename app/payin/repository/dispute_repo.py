@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from app.commons import tracing
 from app.commons.database.model import DBEntity, DBRequestModel
 
 ###########################################################
@@ -81,6 +82,7 @@ class DisputeRepositoryInterface:
         ...
 
 
+@tracing.set_repository_name("dispute", only_trackable=False)
 class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
     """
     Dispute repository interface class that exposes complicated CRUD operations APIs for business layer.

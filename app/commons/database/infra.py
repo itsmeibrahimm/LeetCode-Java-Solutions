@@ -81,6 +81,8 @@ class DB:
 
         assert master_url.value
         master = AioEngine(
+            database_name=db_id,
+            instance_name="master",
             dsn=master_url.value,
             maxsize=db_config.master_pool_max_size,
             minsize=db_config.master_pool_min_size,
@@ -92,6 +94,8 @@ class DB:
 
         assert replica_url.value
         replica = AioEngine(
+            database_name=db_id,
+            instance_name="replica",
             dsn=master_url.value,
             maxsize=db_config.replica_pool_max_size,
             minsize=db_config.replica_pool_min_size,

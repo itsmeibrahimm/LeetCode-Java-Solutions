@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Optional
-
 from typing_extensions import final
 
+from app.commons import tracing
 from app.commons.database.infra import DB
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import stripe_payout_requests
@@ -41,6 +41,7 @@ class StripePayoutRequestRepositoryInterface(ABC):
 
 
 @final
+@tracing.set_repository_name("stripe_payout_request", only_trackable=False)
 class StripePayoutRequestRepository(
     PayoutBankDBRepository, StripePayoutRequestRepositoryInterface
 ):

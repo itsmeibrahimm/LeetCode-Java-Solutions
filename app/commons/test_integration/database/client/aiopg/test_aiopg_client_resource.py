@@ -5,10 +5,7 @@ from aiopg.sa import connection
 
 from app.commons.config.app_config import AppConfig
 from app.commons.database.client.aiopg import AioConnection, AioEngine, AioTransaction
-from app.commons.database.client.interface import (
-    AwaitableConnectionContext,
-    EngineTransactionContext,
-)
+from app.commons.database.client.interface import AwaitableConnectionContext
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -181,9 +178,9 @@ async def test_engine_acquire_transaction(payout_maindb_aio_engine: AioEngine):
     validate_aio_connection_closed(tx.connection())
 
     # engine transaction can only be used as cxt manager to avoid connection leaking
-    cxt: EngineTransactionContext = payout_maindb_aio_engine.transaction()
+    cxt = payout_maindb_aio_engine.transaction()
+    assert hasattr(cxt, "__aenter__")
     assert not hasattr(cxt, "__await__")
-    assert not cxt._transaction
 
 
 def validate_aio_connection_open(conn: AioConnection):

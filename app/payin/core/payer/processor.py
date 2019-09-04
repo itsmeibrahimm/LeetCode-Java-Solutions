@@ -7,7 +7,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
-
+from app.commons import tracing
 from app.commons.providers.stripe.stripe_models import (
     CreateCustomer,
     CustomerId,
@@ -45,6 +45,7 @@ from app.payin.repository.payer_repo import (
 )
 
 
+@tracing.set_processor_name("payers", only_trackable=False)
 class PayerClient:
     """
     Payer client wrapper that provides utilities to Payer.

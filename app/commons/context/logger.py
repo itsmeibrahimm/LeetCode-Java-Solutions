@@ -10,12 +10,16 @@ from pythonjsonlogger import jsonlogger
 # for a list of supported fields and reserved attributes for logging
 INCLUDED_LOG_FIELDS = "(req_id) (timestamp) (name) (message)"
 
+is_debug = os.environ.get("ENVIRONMENT") in ("local", "testing")
+
 _handler = logging.StreamHandler(sys.stdout)
 _formatter = jsonlogger.JsonFormatter(INCLUDED_LOG_FIELDS)
 _handler.setFormatter(_formatter)
 
 _sys_logger = logging.getLogger()
 _sys_logger.setLevel(logging.INFO)
+if is_debug:
+    _sys_logger.setLevel(logging.DEBUG)
 _sys_logger.addHandler(_handler)
 
 
@@ -57,6 +61,8 @@ def add_err_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict
 # configure structlog globally
 structlog.configure_once(
     processors=[
+        # filter out messages below the current level
+        structlog.stdlib.filter_by_level,
         # global
         structlog.processors.TimeStamper(fmt="iso"),
         # application info

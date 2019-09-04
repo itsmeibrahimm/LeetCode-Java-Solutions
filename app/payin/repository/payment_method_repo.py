@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 from typing_extensions import final
 
+from app.commons import tracing
 from app.commons.context.logger import get_logger
 from app.commons.database.model import DBEntity, DBRequestModel
 
@@ -153,6 +154,7 @@ class PaymentMethodRepositoryInterface:
         ...
 
 
+@tracing.set_repository_name("payment_method", only_trackable=False)
 @final
 @dataclass
 class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepository):
