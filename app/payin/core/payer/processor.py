@@ -85,7 +85,7 @@ class PayerClient:
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=True
             )
 
-    async def create_payer_raw_objects(
+    async def create_raw_payer(
         self,
         dd_payer_id: str,
         payer_type: str,
@@ -111,7 +111,7 @@ class PayerClient:
             default_payment_method_id=default_payment_method_id,
         )
 
-    async def get_payer_raw_objects(
+    async def get_raw_payer(
         self,
         payer_id: str,
         payer_id_type: Optional[str] = None,
@@ -138,27 +138,6 @@ class PayerClient:
         return await payer_interface.get_payer_raw_objects(
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
-
-    async def get_payer_raw_object(
-        self, payer_id: str, payer_id_type: Optional[str]
-    ) -> RawPayer:
-        input: GetPayerByIdInput
-        if not payer_id_type or payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID:
-            input = GetPayerByIdInput(id=payer_id)
-        elif payer_id_type == PayerIdType.DD_CONSUMER_ID:
-            input = GetPayerByIdInput(dd_payer_id=payer_id)
-        else:
-            # TODO: throw exception
-            ...
-
-        payer_entity: Optional[PayerDbEntity] = await self.payer_repo.get_payer_by_id(
-            request=input
-        )
-        if not payer_entity:
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
-            )
-        return RawPayer(payer_entity=payer_entity)
 
     async def update_payer_default_payment_method(
         self,
@@ -197,7 +176,7 @@ class PayerClient:
             payer_id_type=payer_id_type,
         )
         if lazy_create is True and updated_raw_payer.stripe_customer_entity:
-            return await self.lazy_create_payer(
+            return await self.lazy_create_raw_payer(
                 dd_payer_id=str(updated_raw_payer.stripe_customer_entity.owner_id),
                 country=updated_raw_payer.stripe_customer_entity.country_shortname,
                 pgp_customer_id=updated_raw_payer.stripe_customer_entity.stripe_id,
@@ -208,7 +187,7 @@ class PayerClient:
             )
         return updated_raw_payer
 
-    async def lazy_create_payer(
+    async def lazy_create_raw_payer(
         self,
         dd_payer_id: str,
         country: str,
@@ -232,7 +211,7 @@ class PayerClient:
             )
             return RawPayer(payer_entity=get_payer_entity)
 
-        return await self.create_payer_raw_objects(
+        return await self.create_raw_payer(
             dd_payer_id=dd_payer_id,
             payer_type=payer_type,
             country=country,
@@ -342,7 +321,7 @@ class PayerProcessor:
         )
 
         # step 3: create Payer/PgpCustomer/StripeCustomer objects
-        raw_payer: RawPayer = await self.payer_client.create_payer_raw_objects(
+        raw_payer: RawPayer = await self.payer_client.create_raw_payer(
             dd_payer_id=dd_payer_id,
             payer_type=payer_type,
             country=country,
@@ -377,7 +356,7 @@ class PayerProcessor:
 
         # TODO: if force_update is true, we should retrieve the customer from PGP
 
-        raw_payer: RawPayer = await self.payer_client.get_payer_raw_objects(
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
         return raw_payer.to_payer()
@@ -406,12 +385,12 @@ class PayerProcessor:
         :return: Payer object
         """
         # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
-        raw_payer: RawPayer = await self.payer_client.get_payer_raw_objects(
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
 
         # step 2: find PaymentMethod object to get pgp_resource_id.
-        raw_pm: RawPaymentMethod = await self.payment_method_client.get_payment_method(
+        raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method(
             payer_id=payer_id,
             payment_method_id=default_payment_method_id,
             payer_id_type=payer_id_type,

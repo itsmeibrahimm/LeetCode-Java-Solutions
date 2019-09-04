@@ -66,7 +66,7 @@ class PaymentMethodClient:
         self.log = log
         self.app_ctxt = app_ctxt
 
-    async def create_payment_method_raw_objects(
+    async def create_raw_payment_method(
         self,
         id: str,
         pgp_code: str,
@@ -115,7 +115,7 @@ class PaymentMethodClient:
             pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
         )
 
-    async def _get_payment_method(
+    async def _get_raw_payment_method(
         self,
         payment_method_id: str,
         payer_id: Optional[str] = None,
@@ -174,7 +174,7 @@ class PaymentMethodClient:
         )
         return raw_payment_method
 
-    async def get_payment_method(
+    async def get_raw_payment_method(
         self,
         payer_id: str,
         payment_method_id: str,
@@ -182,30 +182,33 @@ class PaymentMethodClient:
         payment_method_id_type: Optional[str] = None,
     ) -> RawPaymentMethod:
 
-        return await self._get_payment_method(
+        return await self._get_raw_payment_method(
             payment_method_id=payment_method_id,
             payer_id=payer_id,
             payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
 
-    async def get_payment_method_no_payer_auth(
+    async def get_raw_payment_method_no_payer_auth(
         self, payment_method_id: str, payment_method_id_type: Optional[str] = None
     ) -> RawPaymentMethod:
 
-        return await self._get_payment_method(
+        return await self._get_raw_payment_method(
             payment_method_id=payment_method_id,
             payment_method_id_type=payment_method_id_type,
         )
 
-    async def detach_payment_method(
+    async def detach_raw_payment_method(
         self,
         payer_id: str,
         pgp_payment_method_id: str,
         raw_payment_method: RawPaymentMethod,
     ) -> RawPaymentMethod:
-        now = datetime.utcnow()
+        updated_pm_entity: Optional[PgpPaymentMethodDbEntity] = None
+        updated_sc_entity: Optional[StripeCardDbEntity] = None
         try:
+            now = datetime.utcnow()
+
             if raw_payment_method.pgp_payment_method_entity:
                 updated_pm_entity = await self.payment_method_repo.delete_pgp_payment_method_by_id(
                     input_set=DeletePgpPaymentMethodByIdSetInput(
@@ -216,7 +219,6 @@ class PaymentMethodClient:
                     ),
                 )
 
-            # step 4: update stripe_card.active and remove_at
             if raw_payment_method.stripe_card_entity:
                 updated_sc_entity = await self.payment_method_repo.delete_stripe_card_by_id(
                     input_set=DeleteStripeCardByIdSetInput(
@@ -358,11 +360,11 @@ class PaymentMethodProcessor:
         else:
             raw_payer: RawPayer
             if payer_id:
-                raw_payer = await self.payer_client.get_payer_raw_object(
+                raw_payer = await self.payer_client.get_raw_payer(
                     payer_id, PayerIdType.DD_PAYMENT_PAYER_ID
                 )
             else:
-                raw_payer = await self.payer_client.get_payer_raw_object(
+                raw_payer = await self.payer_client.get_raw_payer(
                     dd_consumer_id, PayerIdType.DD_CONSUMER_ID
                 )
             pgp_customer_id = raw_payer.pgp_customer_id()
@@ -379,7 +381,7 @@ class PaymentMethodProcessor:
         )
 
         # step 3: crete pgp_payment_method and stripe_card objects
-        raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_payment_method_raw_objects(
+        raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
             id=generate_object_uuid(ResourceUuidPrefix.PGP_PAYMENT_METHOD),
             pgp_code=pgp_code,
             pgp_resource_id=stripe_payment_method.id,
@@ -413,14 +415,12 @@ class PaymentMethodProcessor:
         # TODO: step 1: if force_update is true, we should retrieve the payment_method from GPG
 
         # step 2: retrieve data from DB
-        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_payment_method(
+        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method(
             payment_method_id=payment_method_id,
             payer_id=payer_id,
             payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
-
-        # TODO: lazy create payer
 
         return raw_payment_method.to_payment_method()
 
@@ -451,7 +451,7 @@ class PaymentMethodProcessor:
         # step 1: get payer by for country information
         raw_payer: Optional[RawPayer] = None
         try:
-            raw_payer = await self.payer_client.get_payer_raw_objects(
+            raw_payer = await self.payer_client.get_raw_payer(
                 payer_id=payer_id, payer_id_type=payer_id_type
             )
         except PayerReadError as e:
@@ -462,7 +462,7 @@ class PaymentMethodProcessor:
             )
 
         # step 2: find payment_method.
-        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_payment_method(
+        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method(
             payer_id=payer_id,
             payment_method_id=payment_method_id,
             payer_id_type=payer_id_type,
@@ -488,7 +488,7 @@ class PaymentMethodProcessor:
         )
 
         # step 4: update pgp_payment_method.detached_at
-        updated_raw_pm: RawPaymentMethod = await self.payment_method_client.detach_payment_method(
+        updated_raw_pm: RawPaymentMethod = await self.payment_method_client.detach_raw_payment_method(
             payer_id=payer_id,
             pgp_payment_method_id=pgp_payment_method_id,
             raw_payment_method=raw_payment_method,

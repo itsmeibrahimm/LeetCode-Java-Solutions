@@ -91,7 +91,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = payment_intents.table.select().where(
             payment_intents.status == status
         )
-        results = await self.payment_database.master().fetch_all(statement)
+        results = await self.payment_database.replica().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
     async def find_payment_intents_that_require_capture(
@@ -108,7 +108,7 @@ class CartPaymentRepository(PayinDBRepository):
                 payment_intents.capture_after >= cutoff,
             )
         )
-        results = await self.payment_database.master().fetch_all(statement)
+        results = await self.payment_database.replica().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
     async def get_cart_payment_by_id(
@@ -117,7 +117,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = cart_payments.table.select().where(
             cart_payments.id == cart_payment_id
         )
-        row = await self.payment_database.master().fetch_one(statement)
+        row = await self.payment_database.replica().fetch_one(statement)
         return self.to_cart_payment(row) if row else None
 
     async def update_cart_payment_details(
@@ -265,7 +265,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = payment_intents.table.select().where(
             payment_intents.idempotency_key == idempotency_key
         )
-        row = await self.payment_database.master().fetch_one(statement)
+        row = await self.payment_database.replica().fetch_one(statement)
 
         if not row:
             return None
@@ -278,7 +278,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = payment_intents.table.select().where(
             payment_intents.cart_payment_id == cart_payment_id
         )
-        results = await self.payment_database.master().fetch_all(statement)
+        results = await self.payment_database.replica().fetch_all(statement)
 
         return [self.to_payment_intent(row) for row in results]
 
@@ -376,7 +376,7 @@ class CartPaymentRepository(PayinDBRepository):
             .where(pgp_payment_intents.payment_intent_id == payment_intent_id)
             .order_by(pgp_payment_intents.created_at.asc())
         )
-        query_results = await self.payment_database.master().fetch_all(statement)
+        query_results = await self.payment_database.replica().fetch_all(statement)
 
         matched_intents = []
         for row in query_results:

@@ -304,7 +304,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 payers.payer_type == input.payer_type,
             )
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self.payment_database.replica().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
 
     async def get_payer_by_id(
@@ -320,7 +320,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
             stmt = payers.table.select().where(
                 payers.dd_payer_id == request.dd_payer_id
             )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self.payment_database.replica().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
 
     async def get_payer_and_pgp_customer_by_id(
@@ -349,7 +349,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                     payers.legacy_stripe_customer_id == input.legacy_stripe_customer_id
                 )
             )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self.payment_database.replica().fetch_one(stmt)
         if not row:
             return None, None
         return (
@@ -376,7 +376,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         stmt = pgp_customers.table.select().where(
             pgp_customers.payer_id == request.payer_id
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self.payment_database.replica().fetch_one(stmt)
         return PgpCustomerDbEntity.from_row(row) if row else None
 
     async def update_pgp_customer(
@@ -408,7 +408,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         self, request: GetStripeCustomerByIdInput
     ) -> StripeCustomerDbEntity:
         stmt = stripe_customers.table.select().where(stripe_customers.id == request.id)
-        row = await self.main_database.master().fetch_one(stmt)
+        row = await self.main_database.replica().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
 
     async def get_stripe_customer_by_stripe_id(
@@ -417,7 +417,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         stmt = stripe_customers.table.select().where(
             stripe_customers.stripe_id == request.stripe_id
         )
-        row = await self.main_database.master().fetch_one(stmt)
+        row = await self.main_database.replica().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
 
     async def update_stripe_customer(

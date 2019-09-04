@@ -100,5 +100,5 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
             stmt = stripe_disputes.table.select().where(
                 stripe_disputes.id == dispute_input.stripe_dispute_id
             )
-        row = await self.main_database.master().fetch_one(stmt)
+        row = await self.main_database.replica().fetch_one(stmt)
         return StripeDisputeDbEntity.from_row(row) if row else None

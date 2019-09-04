@@ -50,7 +50,7 @@ class TestCartPaymentProcessor:
         mocked_method_fetch.side_effect = PaymentMethodReadError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
         )
-        payment_method_client.get_payment_method = mocked_method_fetch
+        payment_method_client.get_raw_payment_method = mocked_method_fetch
 
         cart_payment_interface = processor.CartPaymentInterface(
             app_context=MagicMock(),
@@ -83,7 +83,7 @@ class TestCartPaymentProcessor:
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
             retryable=False,
         )
-        payment_method_client.get_payment_method = mocked_method_fetch
+        payment_method_client.get_raw_payment_method = mocked_method_fetch
 
         request_cart_payment.payer_id = f"changed-{request_cart_payment.payer_id}"
         cart_payment_interface = processor.CartPaymentInterface(

@@ -220,7 +220,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         stmt = pgp_payment_methods.table.select().where(
             pgp_payment_methods.id == input.payment_method_id
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self.payment_database.replica().fetch_one(stmt)
         return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def get_pgp_payment_method_by_pgp_resource_id(
@@ -229,7 +229,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         stmt = pgp_payment_methods.table.select().where(
             pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self.payment_database.replica().fetch_one(stmt)
         return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def get_pgp_payment_method_by_id(
@@ -243,14 +243,14 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             stmt = pgp_payment_methods.table.select().where(
                 pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
             )
-            row = await self.payment_database.master().fetch_one(stmt)
+            row = await self.payment_database.replica().fetch_one(stmt)
         return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def delete_pgp_payment_method_by_id(
         self,
         input_set: DeletePgpPaymentMethodByIdSetInput,
         input_where: DeletePgpPaymentMethodByIdWhereInput,
-    ):
+    ) -> Optional[PgpPaymentMethodDbEntity]:
         stmt = (
             pgp_payment_methods.table.update()
             .where(pgp_payment_methods.id == input_where.id)
@@ -266,14 +266,14 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         stmt = stripe_cards.table.select().where(
             stripe_cards.stripe_id == input.stripe_id
         )
-        row = await self.main_database.master().fetch_one(stmt)
+        row = await self.main_database.replica().fetch_one(stmt)
         return StripeCardDbEntity.from_row(row) if row else None
 
     async def get_stripe_card_by_id(
         self, input: GetStripeCardByIdInput
     ) -> Optional[StripeCardDbEntity]:
         stmt = stripe_cards.table.select().where(stripe_cards.id == input.id)
-        row = await self.main_database.master().fetch_one(stmt)
+        row = await self.main_database.replica().fetch_one(stmt)
         return StripeCardDbEntity.from_row(row) if row else None
 
     async def delete_stripe_card_by_id(
