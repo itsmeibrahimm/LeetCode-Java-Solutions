@@ -45,7 +45,7 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
 
     async def get_payout_by_id(self, payout_id: int) -> Optional[Payout]:
         stmt = payouts.table.select().where(payouts.id == payout_id)
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return Payout.from_row(row) if row else None
 
     async def update_payout_by_id(

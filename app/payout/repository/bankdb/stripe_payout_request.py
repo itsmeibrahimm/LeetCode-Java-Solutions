@@ -67,7 +67,7 @@ class StripePayoutRequestRepository(
         stmt = stripe_payout_requests.table.select().where(
             stripe_payout_requests.payout_id == payout_id
         )
-        rows = await self._database.master().fetch_all(stmt)
+        rows = await self._database.replica().fetch_all(stmt)
         if rows:
             # since we have one-to-one mapping to payout
             assert len(rows) == 1
@@ -81,7 +81,7 @@ class StripePayoutRequestRepository(
         stmt = stripe_payout_requests.table.select().where(
             stripe_payout_requests.stripe_payout_id == stripe_payout_id
         )
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return StripePayoutRequest.from_row(row) if row else None
 
     async def update_stripe_payout_request_by_id(

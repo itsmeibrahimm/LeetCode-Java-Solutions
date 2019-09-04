@@ -55,7 +55,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
 
     async def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
         stmt = transactions.table.select().where(transactions.id == transaction_id)
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return Transaction.from_row(row) if row else None
 
     async def update_transaction_by_id(

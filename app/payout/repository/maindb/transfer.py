@@ -76,7 +76,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
 
     async def get_transfer_by_id(self, transfer_id: int) -> Optional[Transfer]:
         stmt = transfers.table.select().where(transfers.id == transfer_id)
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return Transfer.from_row(row) if row else None
 
     async def create_transfer(self, data: TransferCreate) -> Transfer:
@@ -109,7 +109,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         stmt = stripe_transfers.table.select().where(
             stripe_transfers.id == stripe_transfer_id
         )
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return StripeTransfer.from_row(row) if row else None
 
     async def get_stripe_transfer_by_stripe_id(
@@ -118,7 +118,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         stmt = stripe_transfers.table.select().where(
             stripe_transfers.stripe_id == stripe_id
         )
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return StripeTransfer.from_row(row) if row else None
 
     async def create_stripe_transfer(
@@ -156,7 +156,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
             stripe_transfers.transfer_id == transfer_id
         )
 
-        rows = await self._database.master().fetch_all(stmt)
+        rows = await self._database.replica().fetch_all(stmt)
         return [StripeTransfer.from_row(row) for row in rows]
 
     async def delete_stripe_transfer_by_stripe_id(self, stripe_id: str):

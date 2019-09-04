@@ -91,7 +91,7 @@ class PaymentAccountRepository(
         stmt = payment_accounts.table.select().where(
             payment_accounts.id == payment_account_id
         )
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return PaymentAccount.from_row(row) if row else None
 
     async def get_all_payment_accounts_by_account_id_account_type(
@@ -104,7 +104,7 @@ class PaymentAccountRepository(
             )
         )
 
-        rows = await self._database.master().fetch_all(stmt)
+        rows = await self._database.replica().fetch_all(stmt)
         if rows:
             return [PaymentAccount.from_row(row) for row in rows]
         else:
@@ -130,7 +130,7 @@ class PaymentAccountRepository(
             stripe_managed_accounts.id == stripe_managed_account_id
         )
 
-        row = await self._database.master().fetch_one(stmt)
+        row = await self._database.replica().fetch_one(stmt)
         return StripeManagedAccount.from_row(row) if row else None
 
     async def create_stripe_managed_account(
