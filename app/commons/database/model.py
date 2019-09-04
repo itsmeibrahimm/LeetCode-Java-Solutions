@@ -123,7 +123,7 @@ class DBEntity(BaseModel):
 
         :return:
         """
-        pass
+        return []
 
     def dict_after_json_to_string(self, *args, **kwargs):
         data_dict = self.dict(*args, **kwargs)

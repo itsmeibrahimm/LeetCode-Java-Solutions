@@ -386,7 +386,7 @@ CREATE TABLE payouts (
     transaction_ids integer[] NOT NULL,
     token text NOT NULL,
     fee_transaction_id integer,
-    error text
+    error json
 );
 
 
@@ -417,14 +417,14 @@ CREATE TABLE stripe_payout_requests (
     id integer NOT NULL,
     idempotency_key text NOT NULL,
     payout_method_id integer NOT NULL,
-    response text,
+    response json,
     created_at timestamp with time zone NOT NULL,
     received_at timestamp with time zone,
     updated_at timestamp with time zone NOT NULL,
     stripe_payout_id text,
-    request text,
+    request json,
     status text NOT NULL,
-    events text,
+    events json,
     stripe_account_id text,
     payout_id integer NOT NULL
 );

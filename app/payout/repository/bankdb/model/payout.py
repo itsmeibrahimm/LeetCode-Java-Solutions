@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import Json
 
-from sqlalchemy import ARRAY, Column, DateTime, Integer, Text, text
+from sqlalchemy import ARRAY, Column, DateTime, Integer, Text, text, JSON
 from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
@@ -47,7 +47,7 @@ class PayoutTable(TableDefinition):
     )
     token: Column = no_init_field(Column("token", Text, nullable=False))
     fee_transaction_id: Column = no_init_field(Column("fee_transaction_id", Integer))
-    error: Column = no_init_field(Column("error", Text))  # json string
+    error: Column = no_init_field(Column("error", JSON))  # json string
 
 
 class _PayoutPartial(DBEntity):
@@ -65,9 +65,6 @@ class _PayoutPartial(DBEntity):
     token: Optional[str]
     fee_transaction_id: Optional[int]
     error: Optional[Json]
-
-    def _fields_need_json_to_string_conversion(self):
-        return ["error"]
 
 
 class Payout(_PayoutPartial):

@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List, Dict
-from pydantic import Json
+from typing import Optional
 
-from sqlalchemy import Column, DateTime, Integer, Text, text, ForeignKey
+from sqlalchemy import Column, DateTime, Integer, Text, text, ForeignKey, JSON
 from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
+from ..types import BankDBBrokenJson
 
 
 @final
@@ -37,7 +37,7 @@ class StripePayoutRequestTable(TableDefinition):
     payout_method_id: Column = no_init_field(
         Column("payout_method_id", Integer, nullable=False)
     )
-    response: Column = no_init_field(Column("response", Text))  # json string
+    response: Column = no_init_field(Column("response", JSON))  # json string
     created_at: Column = no_init_field(
         Column("created_at", DateTime(True), nullable=False)
     )
@@ -50,9 +50,9 @@ class StripePayoutRequestTable(TableDefinition):
     stripe_payout_id: Column = no_init_field(
         Column("stripe_payout_id", Text, nullable=True)
     )
-    request: Column = no_init_field(Column("request", Text))  # json string
+    request: Column = no_init_field(Column("request", JSON))  # json string
     status: Column = no_init_field(Column("status", Text, nullable=False))
-    events: Column = no_init_field(Column("events", Text))  # json string
+    events: Column = no_init_field(Column("events", JSON))  # json string
     stripe_account_id: Column = no_init_field(
         Column("stripe_account_id", Text, nullable=True)
     )
@@ -62,18 +62,21 @@ class _StripePayoutRequestPartial(DBEntity):
     payout_id: Optional[int]
     idempotency_key: Optional[str]
     payout_method_id: Optional[int]
-    response: Optional[Json]
+    response: Optional[BankDBBrokenJson]
     created_at: Optional[datetime]
     received_at: Optional[datetime]
     updated_at: Optional[datetime]
     stripe_payout_id: Optional[str]
-    request: Optional[Json]
+    request: Optional[BankDBBrokenJson]
     status: Optional[str]
-    events: Optional[Json[List[Dict]]]  # type: ignore
+    events: Optional[BankDBBrokenJson]
     stripe_account_id: Optional[str]
 
     def _fields_need_json_to_string_conversion(self):
-        return ["response", "request", "events"]
+        # this field is saved as string even though it defined as json in DB
+        # https://github.com/doordash/bank-service/blob/99de03d82e132d599057bb5a8218eb661976418f/bankservice/adapters/database/repositories/stripe_payout_requests/stripe_payout_request_repository.py#L32
+        # keep the same behavior until we fix them all
+        return ["request"]
 
 
 class StripePayoutRequest(_StripePayoutRequestPartial):
