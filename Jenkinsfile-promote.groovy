@@ -90,7 +90,7 @@ pipeline {
           common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "started")
         }
         script {
-          common.deployPulse([params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
+          common.deployPulse(params['SHA'], params['BRANCH_NAME'], common.getServiceName(), 'staging')
         }
       }
     }
