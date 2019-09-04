@@ -12,6 +12,8 @@ from app.ledger.core.data_types import (
     GetMxLedgerByIdInput,
     GetMxScheduledLedgerByAccountInput,
 )
+from app.commons.types import CurrencyType
+from app.ledger.core.data_types import GetMxLedgerByIdInput
 from app.ledger.core.exceptions import (
     MxLedgerProcessError,
     LedgerErrorCode,
@@ -19,9 +21,10 @@ from app.ledger.core.exceptions import (
     MxLedgerReadError,
     MxLedgerInvalidProcessStateError,
     MxLedgerSubmissionError,
+    MxLedgerCreationError,
 )
 from app.ledger.core.mx_ledger.processor import MxLedgerProcessor
-from app.ledger.core.types import MxLedgerStateType
+from app.ledger.core.types import MxLedgerType, MxLedgerStateType, MxTransactionType
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
@@ -46,7 +49,6 @@ class TestMxLedgerProcessor:
     ):
         self.mx_ledger_processor = MxLedgerProcessor(
             mx_ledger_repo=mx_ledger_repository,
-            mx_scheduled_ledger_repo=mx_scheduled_ledger_repository,
             mx_transaction_repo=mx_transaction_repository,
             log=mocker.Mock(),
         )
@@ -312,7 +314,6 @@ class TestMxLedgerProcessor:
         self,
         mx_ledger_repository: MxLedgerRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
-        mx_transaction_repository: MxTransactionRepository,
     ):
         ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
@@ -329,7 +330,9 @@ class TestMxLedgerProcessor:
         scheduled_ledger_id = uuid.uuid4()
         routing_key = datetime(2019, 8, 1)
         open_mx_ledger_to_insert = await prepare_mx_ledger(
-            ledger_id=open_ledger_id, payment_account_id=payment_account_id
+            ledger_id=open_ledger_id,
+            payment_account_id=payment_account_id,
+            balance=2000,
         )
         await mx_ledger_repository.insert_mx_ledger(open_mx_ledger_to_insert)
         mx_scheduled_ledger_to_insert = await prepare_mx_scheduled_ledger(
@@ -414,3 +417,71 @@ class TestMxLedgerProcessor:
         assert updated_open_ledger.state == MxLedgerStateType.OPEN
         assert updated_open_ledger.balance == -1500
         assert updated_open_ledger.amount_paid is None
+
+    # todo: need to add exception cases after Min's pr is merged
+    async def test_create_mx_ledger_success(
+        self,
+        mocker: pytest_mock.MockFixture,
+        mx_ledger_repository: MxLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+    ):
+        payment_account_id = str(uuid.uuid4())
+        mx_ledger_processor = MxLedgerProcessor(
+            mx_ledger_repo=mx_ledger_repository,
+            mx_transaction_repo=mx_transaction_repository,
+            log=mocker.Mock(),
+        )
+
+        mx_ledger, mx_transaction = await mx_ledger_processor.create_mx_ledger(
+            payment_account_id=payment_account_id,
+            currency=CurrencyType.USD.value,
+            balance=2000,
+            type=MxLedgerType.MICRO_DEPOSIT.value,
+        )
+
+        assert mx_ledger is not None
+        assert mx_ledger.currency == CurrencyType.USD
+        assert mx_ledger.balance == 2000
+        assert mx_ledger.state == MxLedgerStateType.PROCESSING
+        assert mx_ledger.type == MxLedgerType.MICRO_DEPOSIT
+
+        assert mx_transaction is not None
+        assert mx_transaction.ledger_id == mx_ledger.id
+        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.amount == 2000
+        assert mx_transaction.target_type == MxTransactionType.MICRO_DEPOSIT
+
+    async def test_create_mx_ledger_data_error_raise_exception(
+        self,
+        mocker: pytest_mock.MockFixture,
+        mx_ledger_repository: MxLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+    ):
+        payment_account_id = str(uuid.uuid4())
+        error = DataError("Test data error.")
+        mocker.patch(
+            "app.ledger.repository.mx_transaction_repository.MxTransactionRepository.create_ledger_and_insert_mx_transaction",
+            side_effect=error,
+        )
+        with pytest.raises(MxLedgerCreationError) as e:
+            mx_ledger_processor = MxLedgerProcessor(
+                mx_ledger_repo=mx_ledger_repository,
+                mx_transaction_repo=mx_transaction_repository,
+                log=mocker.Mock(),
+            )
+            await mx_ledger_processor.create_mx_ledger(
+                payment_account_id=payment_account_id,
+                currency=CurrencyType.USD.value,
+                balance=2000,
+                type=MxLedgerType.MICRO_DEPOSIT.value,
+            )
+
+        # todo: add logic to confirm the creation would be rolled back when exception caught
+
+        assert e.value.error_code == LedgerErrorCode.MX_LEDGER_CREATE_ERROR
+        assert (
+            e.value.error_message
+            == ledger_error_message_maps[LedgerErrorCode.MX_LEDGER_CREATE_ERROR.value]
+        )

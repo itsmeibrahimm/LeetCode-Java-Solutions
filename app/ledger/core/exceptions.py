@@ -6,6 +6,7 @@ from app.commons.error.errors import PaymentError
 # mx_scheduled_ledger related error will use ledger_10~ledger_19
 # mx_txn related error will use ledger_20~ledger_29
 ledger_error_message_maps = {
+    "ledger_0": "Error encountered while inserting mx_ledger and creating mx_txn, please verify your input.",
     "ledger_1": "Cannot found mx_ledger with given id, please verify your input.",
     "ledger_2": "Cannot insert mx_ledger due to unique constraint violation, please verify your input.",
     "ledger_3": "Cannot update mx_ledger due to lock not available error.",
@@ -22,6 +23,7 @@ ledger_error_message_maps = {
 
 
 class LedgerErrorCode(str, Enum):
+    MX_LEDGER_CREATE_ERROR = "ledger_0"
     MX_LEDGER_NOT_FOUND = "ledger_1"
     MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR = "ledger_2"
     MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR = "ledger_3"

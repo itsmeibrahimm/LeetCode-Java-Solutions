@@ -10,6 +10,7 @@ from app.ledger.core.exceptions import (
     MxLedgerReadError,
     MxLedgerInvalidProcessStateError,
     MxLedgerSubmissionError,
+    MxLedgerCreationError,
 )
 from app.ledger.core.mx_ledger.model import MxLedger
 
@@ -18,7 +19,9 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_404_NOT_FOUND,
     HTTP_400_BAD_REQUEST,
+    HTTP_201_CREATED,
 )
+from app.ledger.api.mx_ledger.v1.request import CreateMxLedgerRequest
 
 from app.ledger.core.mx_ledger.processor import MxLedgerProcessor
 
@@ -139,6 +142,59 @@ def _mx_ledger_not_found(e: MxLedgerReadError) -> PaymentException:
 def _mx_ledger_bad_request(e: MxLedgerInvalidProcessStateError) -> PaymentException:
     return PaymentException(
         http_status_code=HTTP_400_BAD_REQUEST,
+        error_code=e.error_code,
+        error_message=e.error_message,
+        retryable=e.retryable,
+    )
+
+
+@router.post(
+    "/api/v1/mx_ledgers",
+    status_code=HTTP_201_CREATED,
+    response_model=MxLedger,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    operation_id="CreateMxLedger",
+    tags=api_tags,
+)
+async def create_mx_ledger(
+    mx_ledger_request: CreateMxLedgerRequest,
+    log: BoundLogger = Depends(get_logger_from_req),
+    mx_ledger_processor: MxLedgerProcessor = Depends(MxLedgerProcessor),
+):
+    """
+    Create a mx_ledger
+    - **payment_account_id**: str
+    - **currency**: str, mx_ledger currency
+    - **balance**: int, current balance of mx_ledger
+    - **type**: str, mx_ledger type
+    """
+    log.debug(
+        f"Create a mx_ledger for payment_account {mx_ledger_request.payment_account_id}"
+    )
+
+    try:
+        mx_ledger, mx_transaction = await mx_ledger_processor.create_mx_ledger(
+            payment_account_id=mx_ledger_request.payment_account_id,
+            currency=mx_ledger_request.currency,
+            balance=mx_ledger_request.balance,
+            type=mx_ledger_request.type,
+        )
+        log.info("create mx_ledger completed.")
+    except MxLedgerCreationError as e:
+        log.error(
+            f"[create_mx_ledger] [{mx_ledger_request.payment_account_id}] "
+            f"Exception caught when creating mx_ledger and mx_txn. {e}"
+        )
+        raise _mx_ledger_create_internal_error(e)
+    log.info(
+        f"Created mx_ledger {mx_ledger.id} for payment_account {mx_ledger.payment_account_id}"
+    )
+    return mx_ledger
+
+
+def _mx_ledger_create_internal_error(e: MxLedgerCreationError) -> PaymentException:
+    return PaymentException(
+        http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
         error_code=e.error_code,
         error_message=e.error_message,
         retryable=e.retryable,

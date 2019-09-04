@@ -113,9 +113,10 @@ class TestMxTransactionRepository:
         )
 
         async with mx_ledger_repository.payment_database.master().acquire() as connection:
-            mx_transaction = await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
+            mx_ledger_and_txn = await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                 request_input, connection
             )
+            mx_transaction = mx_ledger_and_txn[1]
             assert mx_transaction is not None
             assert mx_transaction.currency == CurrencyType.USD
             assert mx_transaction.amount == 2000
@@ -139,6 +140,62 @@ class TestMxTransactionRepository:
                 get_mx_ledger_request
             )
             assert mx_ledger is not None
+            assert mx_ledger.balance == 2000
+            get_mx_ledger_request = GetMxLedgerByIdInput(id=mx_transaction.ledger_id)
+            mx_ledger = await mx_ledger_repository.get_ledger_by_id(
+                get_mx_ledger_request
+            )
+            assert mx_ledger is not None
+            assert mx_ledger.id == mx_ledger_and_txn[0].id
+            assert mx_ledger.balance == 2000
+
+    async def test_create_ledger_and_insert_mx_transaction_as_micro_deposit(
+        self,
+        mx_ledger_repository: MxLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+    ):
+        payment_account_id = str(uuid.uuid4())
+        routing_key = datetime(2019, 8, 1)
+        request_input = InsertMxTransactionWithLedgerInput(
+            currency=CurrencyType.USD,
+            amount=2000,
+            type=MxTransactionType.MICRO_DEPOSIT,
+            payment_account_id=payment_account_id,
+            interval_type=MxScheduledLedgerIntervalType.WEEKLY,
+            routing_key=routing_key,
+            idempotency_key=str(uuid.uuid4()),
+            target_type=MxTransactionType.MERCHANT_DELIVERY,
+        )
+
+        async with mx_ledger_repository.payment_database.master().acquire() as connection:
+            mx_ledger_and_txn = await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
+                request_input, connection
+            )
+            mx_transaction = mx_ledger_and_txn[1]
+            assert mx_transaction is not None
+            assert mx_transaction.currency == CurrencyType.USD
+            assert mx_transaction.amount == 2000
+            assert mx_transaction.payment_account_id == payment_account_id
+            assert mx_transaction.routing_key == datetime(2019, 8, 1)
+            assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
+
+            get_scheduled_ledger_request = GetMxScheduledLedgerInput(
+                payment_account_id=payment_account_id,
+                routing_key=routing_key,
+                interval_type=MxScheduledLedgerIntervalType.WEEKLY,
+            )
+            mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
+                get_scheduled_ledger_request, connection
+            )
+            assert mx_scheduled_ledger is None
+
+            get_mx_ledger_request = GetMxLedgerByIdInput(id=mx_transaction.ledger_id)
+            mx_ledger = await mx_ledger_repository.get_ledger_by_id(
+                get_mx_ledger_request
+            )
+            assert mx_ledger is not None
+            assert mx_ledger.id == mx_ledger_and_txn[0].id
             assert mx_ledger.balance == 2000
 
     async def test_create_ledger_and_insert_mx_transaction_raise_exception(
@@ -185,6 +242,34 @@ class TestMxTransactionRepository:
                     request_input, connection
                 )
         assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
+
+    async def test_create_ledger_and_insert_mx_transaction_raise_exception_with_scheduled_type_and_without_interval_type(
+        self,
+        mx_ledger_repository: MxLedgerRepository,
+        mx_transaction_repository: MxTransactionRepository,
+        mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
+    ):
+        payment_account_id = str(uuid.uuid4())
+        routing_key = datetime(2019, 8, 1)
+        request_input = InsertMxTransactionWithLedgerInput(
+            currency=CurrencyType.USD,
+            amount=2000,
+            type=MxLedgerType.SCHEDULED,
+            payment_account_id=payment_account_id,
+            routing_key=routing_key,
+            idempotency_key=str(uuid.uuid4()),
+            target_type=MxTransactionType.MERCHANT_DELIVERY,
+        )
+
+        with pytest.raises(Exception) as e:
+            async with mx_ledger_repository.payment_database.master().acquire() as connection:
+                await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
+                    request_input, connection
+                )
+        assert (
+            e.value.args[0]
+            == "interval_type is required when leger type is in MX_LEDGER_TYPE_MUST_HAVE_MX_SCHEDULED_LEDGER"
+        )
 
     async def test_insert_mx_transaction_and_update_ledger_success(
         self,

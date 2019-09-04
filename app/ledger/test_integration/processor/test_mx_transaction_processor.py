@@ -9,7 +9,7 @@ from psycopg2._psycopg import DataError, OperationalError
 from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 from tenacity import RetryError
 
-from app.commons.database.client.interface import DBTransaction
+from app.commons.database.client.interface import DBConnection
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import (
     GetMxScheduledLedgerInput,
@@ -104,8 +104,7 @@ class TestMxTransactionProcessor:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_transaction_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
-            connection = tx.connection()
+        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 get_scheduled_ledger_request, connection
             )
@@ -234,8 +233,7 @@ class TestMxTransactionProcessor:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_transaction_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
-            connection = tx.connection()
+        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 get_scheduled_ledger_request, connection
             )

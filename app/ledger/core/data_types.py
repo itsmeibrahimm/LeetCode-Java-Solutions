@@ -53,7 +53,7 @@ class InsertMxTransactionWithLedgerInput(DBRequestModel):
     amount: int
     type: MxLedgerType
     payment_account_id: str
-    interval_type: MxScheduledLedgerIntervalType
+    interval_type: Optional[MxScheduledLedgerIntervalType]
     routing_key: datetime
     idempotency_key: str
     target_type: MxTransactionType

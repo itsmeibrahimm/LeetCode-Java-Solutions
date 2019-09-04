@@ -1,4 +1,5 @@
-from uuid import UUID
+import uuid
+from datetime import datetime
 
 from fastapi import Depends
 from psycopg2._psycopg import DataError, OperationalError, IntegrityError
@@ -19,6 +20,7 @@ from app.ledger.core.data_types import (
     UpdatePaidMxLedgerInput,
     RolloverNegativeLedgerInput,
     ProcessMxLedgerOutput,
+    InsertMxTransactionWithLedgerInput,
 )
 from app.ledger.core.exceptions import (
     LedgerErrorCode,
@@ -29,14 +31,12 @@ from app.ledger.core.exceptions import (
     MxLedgerLockError,
     MxLedgerSubmissionError,
     MxLedgerCreateUniqueViolationError,
+    MxLedgerCreationError,
 )
 from app.ledger.core.mx_ledger.model import MxLedger
-from app.ledger.core.types import MxLedgerStateType
+from app.ledger.core.types import MxLedgerStateType, MxLedgerType
 from app.ledger.core.utils import to_mx_ledger
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
-from app.ledger.repository.mx_scheduled_ledger_repository import (
-    MxScheduledLedgerRepository,
-)
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 
 
@@ -47,17 +47,13 @@ class MxLedgerProcessor:
             MxTransactionRepository.get_repository
         ),
         mx_ledger_repo: MxLedgerRepository = Depends(MxLedgerRepository.get_repository),
-        mx_scheduled_ledger_repo: MxScheduledLedgerRepository = Depends(
-            MxScheduledLedgerRepository.get_repository
-        ),
         log: BoundLogger = Depends(get_logger_from_req),
     ):
         self.mx_transaction_repo = mx_transaction_repo
-        self.mx_scheduled_ledger_repo = mx_scheduled_ledger_repo
         self.mx_ledger_repo = mx_ledger_repo
         self.log = log
 
-    async def process(self, mx_ledger_id: UUID) -> MxLedger:
+    async def process(self, mx_ledger_id: uuid.UUID) -> MxLedger:
         """
         Move mx_ledger to PROCESSING and close mx_scheduled_ledger.
         """
@@ -104,7 +100,7 @@ class MxLedgerProcessor:
         stop=stop_after_attempt(5),
         wait=wait_fixed(0.3),
     )
-    async def process_ledger_and_scheduled_ledger(self, mx_ledger_id: UUID):
+    async def process_ledger_and_scheduled_ledger(self, mx_ledger_id: uuid.UUID):
         process_mx_ledger_request = ProcessMxLedgerInput(id=mx_ledger_id)
         try:
             mx_ledger = await self.mx_ledger_repo.move_ledger_state_to_processing_and_close_schedule_ledger(
@@ -150,7 +146,7 @@ class MxLedgerProcessor:
             )
             raise e
 
-    async def submit(self, mx_ledger_id: UUID) -> MxLedger:
+    async def submit(self, mx_ledger_id: uuid.UUID) -> MxLedger:
         """
         Submit mx_ledger to Payout Service and handle negative balance rollover if exists.
         """
@@ -253,7 +249,7 @@ class MxLedgerProcessor:
         wait=wait_fixed(0.3),
     )
     async def _rollover_negative_balanced_ledger_impl(
-        self, mx_ledger_id: UUID
+        self, mx_ledger_id: uuid.UUID
     ) -> ProcessMxLedgerOutput:
         rollover_negative_ledger_request = RolloverNegativeLedgerInput(id=mx_ledger_id)
         try:
@@ -318,4 +314,44 @@ class MxLedgerProcessor:
                     LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR.value
                 ],
                 retryable=True,
+            )
+
+    async def create_mx_ledger(
+        self, currency: str, balance: int, payment_account_id: str, type: str
+    ):
+        """
+        Create a mx_ledger
+        """
+        try:
+            if type == MxLedgerType.MICRO_DEPOSIT:
+                request_input = InsertMxTransactionWithLedgerInput(
+                    currency=currency,
+                    amount=balance,
+                    type=type,
+                    payment_account_id=payment_account_id,
+                    routing_key=datetime.utcnow(),
+                    idempotency_key=str(uuid.uuid4()),
+                    target_type=MxLedgerType.MICRO_DEPOSIT,
+                )
+                mx_ledger, mx_transaction = await self.mx_transaction_repo.create_ledger_and_insert_mx_transaction_caller(
+                    request=request_input
+                )
+                return mx_ledger, mx_transaction
+            raise Exception(
+                "By now only is micro-deposit supported for mx_ledger creation"
+            )
+        except DataError as e:
+            self.log.error(
+                f"[create_mx_ledger] Invalid input data while creating ledger, {e}"
+            )
+            raise MxLedgerCreationError(
+                error_code=LedgerErrorCode.MX_LEDGER_CREATE_ERROR,
+                error_message=ledger_error_message_maps[
+                    LedgerErrorCode.MX_LEDGER_CREATE_ERROR.value
+                ],
+                retryable=True,
+            )
+        except Exception as e:
+            self.log.error(
+                f"[create_mx_ledger] Exception caught while creating mx_ledger, {e}"
             )

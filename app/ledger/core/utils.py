@@ -7,6 +7,7 @@ from pytz import timezone
 from app.ledger.core.mx_ledger.model import MxLedger
 from app.ledger.core.mx_transaction.model import MxTransaction
 from app.ledger.core.types import MxScheduledLedgerIntervalType
+from app.ledger.core.types import MxLedgerType
 
 
 def to_mx_ledger(row: Any) -> MxLedger:
@@ -52,3 +53,6 @@ def pacific_end_time_for_current_interval(
     num_intervals = ceil((routing_key_utc - base_timestamp) / interval_in_timedelta)
     start_time = base_timestamp + interval_in_timedelta * num_intervals
     return start_time.astimezone(timezone("UTC")).replace(tzinfo=None)
+
+
+MX_LEDGER_TYPE_MUST_HAVE_MX_SCHEDULED_LEDGER = [MxLedgerType.SCHEDULED]

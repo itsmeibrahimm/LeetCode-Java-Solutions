@@ -5,6 +5,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Optional
+from typing import Tuple
 from uuid import UUID
 
 from sqlalchemy import and_
@@ -30,6 +31,8 @@ from app.ledger.core.utils import (
     pacific_start_time_for_current_interval,
     pacific_end_time_for_current_interval,
 )
+from app.ledger.core.types import MxLedgerStateType, MxLedgerType
+from app.ledger.core.utils import MX_LEDGER_TYPE_MUST_HAVE_MX_SCHEDULED_LEDGER
 from app.ledger.models.paymentdb import (
     mx_transactions,
     mx_ledgers,
@@ -50,7 +53,7 @@ class MxTransactionRepositoryInterface:
     @abstractmethod
     async def create_ledger_and_insert_mx_transaction(
         self, request: InsertMxTransactionWithLedgerInput, db_connection: DBConnection
-    ) -> InsertMxTransactionOutput:
+    ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:
         ...
 
     @abstractmethod
@@ -97,9 +100,21 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         assert row
         return InsertMxTransactionOutput.from_row(row)
 
+    async def create_ledger_and_insert_mx_transaction_caller(
+        self, request: InsertMxTransactionWithLedgerInput
+    ):
+        async with self.payment_database.master().acquire() as connection:  # type: DBConnection
+            try:
+                mx_ledger, mx_transaction = await self.create_ledger_and_insert_mx_transaction(
+                    request, connection
+                )
+                return mx_ledger, mx_transaction
+            except Exception as e:
+                raise e
+
     async def create_ledger_and_insert_mx_transaction(
         self, request: InsertMxTransactionWithLedgerInput, db_connection: DBConnection
-    ) -> InsertMxTransactionOutput:
+    ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:
         async with db_connection.transaction():
             try:
                 # construct mx_ledger and insert
@@ -108,7 +123,9 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                     id=mx_ledger_id,
                     type=request.type,
                     currency=request.currency,
-                    state=MxLedgerStateType.OPEN.value,  # todo: update to Processing when input is micro deposit
+                    state=MxLedgerStateType.PROCESSING.value
+                    if request.type == MxLedgerType.MICRO_DEPOSIT
+                    else MxLedgerStateType.OPEN.value,
                     balance=request.amount,
                     payment_account_id=request.payment_account_id,
                 )
@@ -122,31 +139,36 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 created_mx_ledger = InsertMxLedgerOutput.from_row(ledger_row)
             except Exception as e:
                 raise e
-            # todo: skip mirco deposit type
-            try:
-                # construct mx_scheduled_ledger and insert
-                mx_scheduled_ledger_id = uuid.uuid4()
-                mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
-                    id=mx_scheduled_ledger_id,
-                    payment_account_id=request.payment_account_id,
-                    ledger_id=created_mx_ledger.id,
-                    interval_type=request.interval_type,
-                    closed_at=0,
-                    start_time=pacific_start_time_for_current_interval(
-                        request.routing_key, request.interval_type
-                    ),
-                    end_time=pacific_end_time_for_current_interval(
-                        request.routing_key, request.interval_type
-                    ),
-                )
-                scheduled_ledger_stmt = (
-                    mx_scheduled_ledgers.table.insert()
-                    .values(mx_scheduled_ledger_to_insert.dict(skip_defaults=True))
-                    .returning(*mx_scheduled_ledgers.table.columns.values())
-                )
-                await db_connection.fetch_one(scheduled_ledger_stmt)
-            except Exception as e:
-                raise e
+            # skip when created ledger type is micro-deposit
+            if request.type in MX_LEDGER_TYPE_MUST_HAVE_MX_SCHEDULED_LEDGER:
+                if request.interval_type is None:
+                    raise Exception(
+                        "interval_type is required when leger type is in MX_LEDGER_TYPE_MUST_HAVE_MX_SCHEDULED_LEDGER"
+                    )
+                try:
+                    # construct mx_scheduled_ledger and insert
+                    mx_scheduled_ledger_id = uuid.uuid4()
+                    mx_scheduled_ledger_to_insert = InsertMxScheduledLedgerInput(
+                        id=mx_scheduled_ledger_id,
+                        payment_account_id=request.payment_account_id,
+                        ledger_id=created_mx_ledger.id,
+                        interval_type=request.interval_type,
+                        closed_at=0,
+                        start_time=pacific_start_time_for_current_interval(
+                            request.routing_key, request.interval_type
+                        ),
+                        end_time=pacific_end_time_for_current_interval(
+                            request.routing_key, request.interval_type
+                        ),
+                    )
+                    scheduled_ledger_stmt = (
+                        mx_scheduled_ledgers.table.insert()
+                        .values(mx_scheduled_ledger_to_insert.dict(skip_defaults=True))
+                        .returning(*mx_scheduled_ledgers.table.columns.values())
+                    )
+                    await db_connection.fetch_one(scheduled_ledger_stmt)
+                except Exception as e:
+                    raise e
             try:
                 # construct mx_transaction and insert
                 mx_transaction_to_insert = InsertMxTransactionInput(
@@ -173,7 +195,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 mx_transaction = InsertMxTransactionOutput.from_row(txn_row)
             except Exception as e:
                 raise e
-            return mx_transaction
+        return created_mx_ledger, mx_transaction
 
     async def insert_mx_transaction_and_update_ledger(
         self,
@@ -339,10 +361,10 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
                 # if not found, create new mx_scheduled_ledger and mx_ledger
                 if not mx_scheduled_ledger:
                     try:
-                        created_mx_txn = await self.create_ledger_and_insert_mx_transaction(
+                        mx_ledger_and_tx = await self.create_ledger_and_insert_mx_transaction(
                             request_input, db_connection
                         )
-                        return to_mx_transaction(created_mx_txn)
+                        return to_mx_transaction(mx_ledger_and_tx[1])
                     except Exception as e:
                         raise e
                 else:
