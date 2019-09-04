@@ -383,8 +383,8 @@ def deployHelm(Map optArgs = [:], String tag, String serviceName, String env) {
       |# working together with k8s readiness probe to prevent uninitialized pod serving traffic
       |helm="docker run --rm -v ${k8sCredsFile}:/root/.kube/config -v ${WORKSPACE}:/apps alpine/helm:2.10.0"
       |HELM_OPTIONS="${o.helmCommand} ${o.helmRelease} ${o.helmChartPath} \\
-      | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${tag} --set cron.tag=${tag} ${o.helmFlags} \\
-      | --tiller-namespace ${o.tillerNamespace} --namespace ${o.k8sNamespace} \\
+      | --values ${o.helmChartPath}/${o.helmValuesFile} --set web.tag=${tag} --set cron.tag=${tag} --set migration.tag=${tag} \\
+      | ${o.helmFlags} --tiller-namespace ${o.tillerNamespace} --namespace ${o.k8sNamespace} \\
       | --wait --timeout ${o.timeoutSeconds}"
       |
       |# log manifest to CI/CD

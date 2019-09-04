@@ -26,7 +26,7 @@ spec:
           medium: Memory
       containers:
       - name: migration
-        image: "{{ .Values.job.repository }}:latest"
+        image: "{{ .Values.job.repository }}:{{ .Values.migration.tag }}"
         imagePullPolicy: {{ .Values.job.pullPolicy | default "IfNotPresent" }}
         command: ["python"]
         args:
