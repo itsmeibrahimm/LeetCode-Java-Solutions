@@ -78,14 +78,15 @@ Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddo
   - Regular deployment:
     1. `/ddops cut-release payment-service` -> output: `releaseTag`
     2. `/ddops build payment-service <releaseTag>`
-    3. `/ddops promote payment-service <releaseTag>`
+    3. `/ddops migrate payment-service <releaseTag>`
+    4. `/ddops promote payment-service <releaseTag>`
   - Hotfix:
     1. `/ddops add-to-release-branch payment-service <hotfix-sha> payment-service <deployed-release-branch> <hotfix-reason>` -> output: `releaseTag` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566873325021800))
     2. `/ddops hotfix payment-service <releaseTag>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566862402011100))
   - Rollback:
     1. `/ddops rollback payment-service <rollback-to-release-tag> <rollback reason>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566862671012400))
-  - Migration: (TODO: @hsinyuan.peng)
-
+  - Migration:
+    1. `/ddops migrate payment-service <releaseTag>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1567711383003500))
 # Development
 
 ## Environment Setup
