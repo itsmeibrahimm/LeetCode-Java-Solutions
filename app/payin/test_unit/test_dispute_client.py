@@ -2,7 +2,7 @@ from typing import List
 
 import pytest
 
-from app.payin.core.dispute.types import DISPUTE_ID_TYPE
+from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payment_method.model import RawPaymentMethod
@@ -40,7 +40,7 @@ class TestDisputeClient:
         )
         result = await dispute_client.get_dispute_object(
             dispute_id=dispute_db_entity.id,
-            dispute_id_type=DISPUTE_ID_TYPE.STRIPE_DISPUTE_ID,
+            dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
         )
         assert dispute_db_entity.to_stripe_dispute() == result
 
@@ -66,7 +66,7 @@ class TestDisputeClient:
         )
         with pytest.raises(DisputeReadError) as payment_error:
             await dispute_client.get_dispute_object(
-                dispute_id="NO_ID", dispute_id_type=DISPUTE_ID_TYPE.STRIPE_DISPUTE_ID
+                dispute_id="NO_ID", dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
             )
         assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
 

@@ -4,7 +4,7 @@ from typing import Optional, List
 from app.commons import tracing
 from app.commons.database.model import DBEntity, DBRequestModel
 from app.payin.core.dispute.model import StripeDispute
-from app.payin.core.dispute.types import DISPUTE_ID_TYPE
+from app.payin.core.dispute.types import DisputeIdType
 from app.payin.models.maindb import stripe_disputes
 from app.payin.repository.base import PayinDBRepository
 
@@ -103,7 +103,7 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
     ) -> Optional[StripeDisputeDbEntity]:
         if (
             dispute_input.dispute_id_type is None
-            or dispute_input.dispute_id_type is DISPUTE_ID_TYPE.PGP_DISPUTE_ID
+            or dispute_input.dispute_id_type is DisputeIdType.STRIPE_DISPUTE_ID
         ):
             stmt = stripe_disputes.table.select().where(
                 stripe_disputes.stripe_dispute_id == dispute_input.stripe_dispute_id

@@ -86,7 +86,7 @@ async def create_payer(
     status_code=HTTP_200_OK,
     operation_id="GetPayer",
     responses={
-        HTTP_422_UNPROCESSABLE_ENTITY: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
     },
     tags=api_tags,

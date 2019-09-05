@@ -7,7 +7,7 @@ from starlette.status import (
 )
 from structlog.stdlib import BoundLogger
 
-from app.commons.api.models import PaymentException
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute, DisputeList
@@ -15,10 +15,21 @@ from app.payin.core.dispute.processor import DisputeProcessor
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
 
+api_tags = ["DisputeV1"]
 router = APIRouter()
 
 
-@router.get("/api/v1/disputes/{dispute_id}", status_code=HTTP_200_OK)
+@router.get(
+    "/api/v1/disputes/{dispute_id}",
+    response_model=Dispute,
+    status_code=HTTP_200_OK,
+    operation_id="GetDispute",
+    responses={
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def get_dispute(
     dispute_id: str,
     dispute_id_type: str = None,
@@ -29,7 +40,7 @@ async def get_dispute(
     Get dispute.
     - **dispute_id**: id for dispute in dispute table
     - **dispute_id_type**: [string] identify the type of id for the dispute.
-        Valid values include "stripe_dispute_id", "pgp_dispute_id" (default is "pgp_dispute_id")
+        Valid values include "dd_stripe_dispute_id", "stripe_dispute_id" (default is "stripe_dispute_id")
     """
     log.info("[get_dispute] get_dispute started for dispute_id=%s", dispute_id)
     try:
@@ -51,7 +62,17 @@ async def get_dispute(
     return dispute
 
 
-@router.get("/api/v1/disputes/", status_code=HTTP_200_OK)
+@router.get(
+    "/api/v1/disputes",
+    response_model=DisputeList,
+    status_code=HTTP_200_OK,
+    operation_id="ListDisputes",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
 async def list_disputes(
     payer_id: str = None,
     payer_id_type: DisputePayerIdType = None,
@@ -96,5 +117,5 @@ async def list_disputes(
             error_message=e.error_message,
             retryable=e.retryable,
         )
-    dispute_list = DisputeList(len(disputes), False, disputes)
+    dispute_list = DisputeList(count=len(disputes), has_more=False, data=disputes)
     return dispute_list

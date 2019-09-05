@@ -39,10 +39,10 @@ class ReasonType(str, Enum):
     BANK_CANNOT_PROCESS = "bank_cannot_process"
 
 
-class DISPUTE_ID_TYPE(str, Enum):
+class DisputeIdType(str, Enum):
     """
     Enum definition for the type of dispute id
     """
 
-    PGP_DISPUTE_ID = "pgp_dispute_id"
     STRIPE_DISPUTE_ID = "stripe_dispute_id"
+    DD_STRIPE_DISPUTE_ID = "dd_stripe_dispute_id"

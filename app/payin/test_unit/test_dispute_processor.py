@@ -1,6 +1,6 @@
 import pytest
 
-from app.payin.core.dispute.types import DISPUTE_ID_TYPE
+from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
 from app.payin.tests.utils import generate_dispute, FunctionMock
@@ -30,7 +30,7 @@ class TestDisputeProcessor:
         )
         result = await dispute_processor.get(
             dispute_id=dispute.stripe_dispute_id,
-            dispute_id_type=DISPUTE_ID_TYPE.STRIPE_DISPUTE_ID,
+            dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
         )
         assert result == dispute
 

@@ -1,12 +1,11 @@
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
 
+from pydantic import BaseModel
 from typing_extensions import final
 
 
-@dataclass(frozen=True)
-class StripeDispute:
+class StripeDispute(BaseModel):
     id: int
     stripe_dispute_id: str
     disputed_at: datetime
@@ -29,8 +28,7 @@ class Dispute(StripeDispute):
     pass
 
 
-@dataclass()
-class DisputeList:
+class DisputeList(BaseModel):
     count: int
     has_more: bool  # Currently default to False. Returning all the disputes for a query
     data: List[Dispute]

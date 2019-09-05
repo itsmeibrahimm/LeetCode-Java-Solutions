@@ -7,9 +7,8 @@ from structlog.stdlib import BoundLogger
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute
-from app.payin.core.dispute.types import DISPUTE_ID_TYPE
+from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import (
     DisputeReadError,
     PayinErrorCode,
@@ -17,6 +16,7 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.processor import PayerClient
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import DisputePayerIdType
 from app.payin.repository.dispute_repo import (
@@ -52,8 +52,8 @@ class DisputeClient:
         self, dispute_id: str, dispute_id_type: Optional[str] = None
     ) -> Dispute:
         if dispute_id_type and dispute_id_type not in (
-            DISPUTE_ID_TYPE.PGP_DISPUTE_ID,
-            DISPUTE_ID_TYPE.STRIPE_DISPUTE_ID,
+            DisputeIdType.STRIPE_DISPUTE_ID,
+            DisputeIdType.DD_STRIPE_DISPUTE_ID,
         ):
             self.log.error(
                 f"[get_dispute_object][{dispute_id}] invalid dispute_id_type:[{dispute_id_type}]"
@@ -100,43 +100,36 @@ class DisputeClient:
                 error_code=PayinErrorCode.DISPUTE_LIST_NO_ID_PARAMETERS, retryable=False
             )
         if payment_method_id:
+            raw_payment_method: RawPaymentMethod
             if payer_id:
-                try:
-                    raw_payment_method = await self.payment_method_client.get_raw_payment_method(
-                        payer_id=payer_id,
-                        payer_id_type=payer_id_type,
-                        payment_method_id=payment_method_id,
-                        payment_method_id_type=payment_method_id_type,
-                    )
-                except PaymentError as e:
-                    self.log.error(
-                        f"[list_disputes_client] Payment method not associated to payer"
-                    )
-                    raise e
+                raw_payment_method = await self.payment_method_client.get_raw_payment_method(
+                    payer_id=payer_id,
+                    payer_id_type=payer_id_type,
+                    payment_method_id=payment_method_id,
+                    payment_method_id_type=payment_method_id_type,
+                )
             else:
                 raw_payment_method = await self.payment_method_client.get_raw_payment_method_no_payer_auth(
                     payment_method_id=payment_method_id,
                     payment_method_id_type=payment_method_id_type,
                 )
             legacy_dd_stripe_card_id = raw_payment_method.legacy_dd_stripe_card_id()
-            assert legacy_dd_stripe_card_id
-            stripe_card_id = int(legacy_dd_stripe_card_id)
-            dispute_db_entities = await self.dispute_repo.list_disputes_by_payment_method_id(
-                input=GetAllStripeDisputesByPaymentMethodIdInput(
-                    stripe_card_id=stripe_card_id
+            if legacy_dd_stripe_card_id:
+                dispute_db_entities = await self.dispute_repo.list_disputes_by_payment_method_id(
+                    input=GetAllStripeDisputesByPaymentMethodIdInput(
+                        stripe_card_id=int(legacy_dd_stripe_card_id)
+                    )
                 )
-            )
         elif payer_id:
+            stripe_customer_id: Optional[str] = None
             if payer_id_type is DisputePayerIdType.STRIPE_CUSTOMER_ID:
                 stripe_customer_id = payer_id
             else:
                 raw_payer_object: RawPayer = await self.payer_client.get_raw_payer(
                     payer_id=payer_id, payer_id_type=payer_id_type
                 )
-                pgp_customer_id = raw_payer_object.pgp_customer_id()
-                assert pgp_customer_id
-                stripe_customer_id = pgp_customer_id
-            if stripe_customer_id is None:
+                stripe_customer_id = raw_payer_object.pgp_customer_id()
+            if not stripe_customer_id:
                 self.log.error(
                     f"[list_disputes_client] No payer found for the payer_id"
                 )
