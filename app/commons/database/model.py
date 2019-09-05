@@ -106,11 +106,13 @@ class DBEntity(BaseModel):
     def from_row(cls, row: Mapping):
         """
         Construct a Pydantic Model from a row/mapping, ignoring extra fields
+
+        see pydantic.BaseModel.from_orm
         """
         obj = RecordDict(row)
         m = cls.__new__(cls)
         values, fields_set, _ = validate_model(m, obj)  # type: ignore
-        object.__setattr__(m, "__values__", values)
+        object.__setattr__(m, "__dict__", values)
         object.__setattr__(m, "__fields_set__", fields_set)
         return m
 

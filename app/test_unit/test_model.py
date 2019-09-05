@@ -45,6 +45,7 @@ class TestDBEntity:
         row = {"id": 5, "other": "three"}
         model = TestDBEntity.Model.from_row(row)
         assert model.id == 5
+        assert model.dict(skip_defaults=True) == {"id": 5}
 
     def test_model_dict_after_json_to_string(self):
         """

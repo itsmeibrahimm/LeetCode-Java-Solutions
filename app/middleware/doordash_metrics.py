@@ -40,7 +40,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch_func(
         self: Any, request: Request, call_next: RequestResponseEndpoint
     ):
-        breadcrumbs = reset_breadcrumbs(request._scope)
+        breadcrumbs = reset_breadcrumbs(request.scope)
 
         context = get_context_from_req(request)
 
@@ -59,7 +59,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
         status_type = f"{response.status_code // 100}XX"
         # from the ASGI spec
         # https://github.com/django/asgiref/blob/master/specs/www.rst#L56
-        path = request._scope.get("path", "")
+        path = request.scope.get("path", "")
 
         context.log.info(
             "request complete",
