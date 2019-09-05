@@ -187,3 +187,28 @@ class PaymentIntentConcurrentAccessError(Exception):
 ###########################################################
 class DisputeReadError(PayinError):
     pass
+
+
+###########################################################
+# Provider Errors                                         #
+###########################################################
+class BaseProviderError(Exception):
+    def __init__(self, orig_error: Exception) -> None:
+        self.orig_error = orig_error
+        super().__init__()
+
+
+class ProviderError(BaseProviderError):
+    pass
+
+
+class UnhandledProviderError(BaseProviderError):
+    """
+    An unknown error provided by the provider
+    """
+
+    pass
+
+
+class InvalidProviderRequestError(BaseProviderError):
+    pass

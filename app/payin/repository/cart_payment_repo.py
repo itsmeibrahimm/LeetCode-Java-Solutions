@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, List, Optional
 from uuid import UUID
 
+from IPython.utils.tz import utcnow
 from sqlalchemy import and_
 from typing_extensions import final
 
@@ -108,6 +109,23 @@ class CartPaymentRepository(PayinDBRepository):
             and_(
                 payment_intents.status == IntentStatus.REQUIRES_CAPTURE,
                 payment_intents.capture_after >= cutoff,
+            )
+        )
+        results = await self.payment_database.replica().fetch_all(statement)
+        return [self.to_payment_intent(row) for row in results]
+
+    async def find_payment_intents_in_capturing(
+        self, older_than: datetime
+    ) -> List[PaymentIntent]:
+        """
+
+        :param older_than: the date before which intent should have been updated
+        :return:
+        """
+        statement = payment_intents.table.select().where(
+            and_(
+                payment_intents.status == IntentStatus.CAPTURING,
+                payment_intents.updated_at <= older_than,
             )
         )
         results = await self.payment_database.replica().fetch_all(statement)
@@ -221,7 +239,7 @@ class CartPaymentRepository(PayinDBRepository):
                     payment_intents.id == id, payment_intents.status == previous_status
                 )
             )
-            .values(status=new_status)
+            .values(status=new_status, updated_at=utcnow())
             .returning(*payment_intents.table.columns.values())
         )
 

@@ -105,6 +105,16 @@ class MockedPaymentRepo:
             capture_after=capture_after,
         )
 
+    async def update_payment_intent(
+        self, id: UUID, status: str, amount_received: int, captured_at: datetime
+    ):
+        return utils.generate_payment_intent(
+            id=id,
+            status=status,
+            amount_received=amount_received,
+            captured_at=captured_at,
+        )
+
     async def update_payment_intent_status(
         self, id: UUID, new_status: str, previous_status: str
     ) -> PaymentIntent:
@@ -343,6 +353,7 @@ def cart_payment_repo():
 
     # Intent DB Functions
     payment_repo.insert_payment_intent = mocked_repo.insert_payment_intent
+    payment_repo.update_payment_intent = mocked_repo.update_payment_intent
     payment_repo.update_payment_intent_status = mocked_repo.update_payment_intent_status
     payment_repo.update_payment_intent_amount = mocked_repo.update_payment_intent_amount
     payment_repo.get_payment_intents_for_cart_payment = (

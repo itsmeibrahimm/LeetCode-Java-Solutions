@@ -671,7 +671,7 @@ class TestUpdatePaymentIntentStatus:
         payment_intent: PaymentIntent,
     ):
         with pytest.raises(PaymentIntentCouldNotBeUpdatedError):
-            payment_intent = await cart_payment_repository.update_payment_intent_status(
+            await cart_payment_repository.update_payment_intent_status(
                 payment_intent.id, IntentStatus.CAPTURING.value, IntentStatus.INIT.value
             )
 

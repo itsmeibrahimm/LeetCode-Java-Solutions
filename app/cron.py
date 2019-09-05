@@ -6,7 +6,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
-from app.payin.jobs import capture_uncaptured_payment_intents
+from app.payin.jobs import (
+    capture_uncaptured_payment_intents,
+    resolve_capturing_payment_intents,
+)
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
 
@@ -20,6 +23,13 @@ def run_scheduler():
 
     scheduler.add_job(
         capture_uncaptured_payment_intents,
+        "cron",
+        minute="*/5",
+        kwargs={"app_context": app_context, "cart_payment_repo": cart_payment_repo},
+    )
+
+    scheduler.add_job(
+        resolve_capturing_payment_intents,
         "cron",
         minute="*/5",
         kwargs={"app_context": app_context, "cart_payment_repo": cart_payment_repo},

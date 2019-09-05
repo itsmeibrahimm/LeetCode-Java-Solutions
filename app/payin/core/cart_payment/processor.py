@@ -1,14 +1,15 @@
 import uuid
 from asyncio import gather
 from datetime import datetime, timedelta
-from stripe.error import StripeError
 from typing import Tuple, List, Optional, Callable
 
 from fastapi import Depends
+from stripe.error import StripeError, InvalidRequestError
+from stripe.util import convert_to_stripe_object
 
+from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
-from app.commons import tracing
 from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
@@ -37,13 +38,14 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     CartPaymentCreateError,
     CartPaymentReadError,
-    PaymentIntentCaptureError,
     PaymentIntentCancelError,
     PaymentIntentRefundError,
     PaymentChargeRefundError,
     PaymentIntentCouldNotBeUpdatedError,
     PaymentIntentConcurrentAccessError,
     PaymentIntentNotInRequiresCaptureState,
+    InvalidProviderRequestError,
+    ProviderError,
 )
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
@@ -355,17 +357,44 @@ class CartPaymentInterface:
             self.req_context.log.info(
                 f"Capturing payment intent: {payment_intent.country}, key: {pgp_payment_intent.idempotency_key}"
             )
+            # Make call to Stripe
             provider_intent = await self.app_context.stripe.capture_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
                 idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
             )
-        except Exception as e:
-            self.req_context.log.error(f"Error capturing intent with provider: {e}")
-            raise PaymentIntentCaptureError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_CAPTURE_STRIPE_ERROR,
-                retryable=False,
+        except InvalidRequestError as e:
+            provider_intent = convert_to_stripe_object(
+                e.json_body["error"]["payment_intent"]
             )
+            # Payment intent has already been captured
+            if (
+                e.code == "payment_intent_unexpected_state"
+                and provider_intent.status == "succeeded"
+            ):
+                pass
+            else:
+                raise InvalidProviderRequestError(e)
+        except StripeError as e:
+            # All other Stripe errors (ie. not InvalidRequestError) can be considered retryable errors
+            # Re-setting the state back to REQUIRES_CAPTURE allows it to be picked up again by the regular cron
+            await self.payment_repo.update_payment_intent_status(
+                id=payment_intent.id,
+                new_status=IntentStatus.REQUIRES_CAPTURE,
+                previous_status=payment_intent.status,
+            )
+            self.req_context.log.exception(f"Provider error: {e}")
+            raise ProviderError(e)
+        except Exception as e:
+            await self.payment_repo.update_payment_intent_status(
+                id=payment_intent.id,
+                new_status=IntentStatus.CAPTURE_FAILED,
+                previous_status=payment_intent.status,
+            )
+            self.req_context.log.error(
+                f"Unknown error capturing intent with provider: {e}"
+            )
+            raise e
 
         new_intent_status = self._get_intent_status_from_provider_status(
             provider_intent.status
@@ -377,13 +406,16 @@ class CartPaymentInterface:
             f"Updating intent {payment_intent.id}, pgp intent {pgp_payment_intent.id} to status {new_intent_status}"
         )
 
+        assert provider_intent
+
         # Update state
         async with self.payment_repo.payment_database_transaction():
             # TODO try gather
-            await self.payment_repo.update_payment_intent_status(
+            payment_intent = await self.payment_repo.update_payment_intent(
                 id=payment_intent.id,
-                new_status=new_intent_status,
-                previous_status=payment_intent.status,
+                status=new_intent_status,
+                amount_received=payment_intent.amount,
+                captured_at=datetime.utcnow(),
             )
             await self.payment_repo.update_pgp_payment_intent_status(
                 pgp_payment_intent.id, new_intent_status
@@ -1248,13 +1280,6 @@ class CartPaymentInterface:
 
         # Call to provider to capture, with idempotency key
         await self._capture_payment_with_provider(payment_intent, pgp_payment_intent)
-
-        await self.payment_repo.update_payment_intent(
-            id=payment_intent.id,
-            status=IntentStatus.SUCCEEDED,
-            amount_received=payment_intent.amount,
-            captured_at=datetime.utcnow(),
-        )
 
 
 class CartPaymentProcessor:

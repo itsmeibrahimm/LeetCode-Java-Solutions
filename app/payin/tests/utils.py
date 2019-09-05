@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from unittest.mock import MagicMock
 import uuid
 from app.payin.core.cart_payment.model import (
@@ -35,6 +36,8 @@ def generate_payment_intent(
     amount: int = 500,
     capture_method: str = "manual",
     confirmation_method: str = "manual",
+    amount_received: Optional[int] = None,
+    captured_at: Optional[datetime] = None,
 ):
     return PaymentIntent(
         id=id if id else uuid.uuid4(),
@@ -43,7 +46,7 @@ def generate_payment_intent(
         amount_initiated=0,
         amount=amount,
         amount_capturable=0,
-        amount_received=0,
+        amount_received=amount_received,
         application_fee_amount=0,
         capture_method=capture_method,
         confirmation_method=confirmation_method,
@@ -54,7 +57,7 @@ def generate_payment_intent(
         payment_method_id=str(uuid.uuid4()),
         created_at=datetime.now(),
         updated_at=datetime.now(),
-        captured_at=None,
+        captured_at=captured_at,
         cancelled_at=None,
     )
 
