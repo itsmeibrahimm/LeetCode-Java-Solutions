@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Body, Depends
-from starlette.status import HTTP_200_OK, HTTP_201_CREATED
+from starlette.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 
-from app.payout.api.account.v1.models import PayoutAccount
+from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
 from app.payout.service import create_payout_account_processors
+from app.payout.types import PayoutAccountStatementDescriptor
 from . import models
 
 api_tags = ["AccountsV1"]
@@ -16,6 +21,7 @@ router = APIRouter()
     status_code=HTTP_201_CREATED,
     operation_id="CreatePayoutAccount",
     response_model=models.PayoutAccount,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def create_payout_account(
@@ -30,7 +36,7 @@ async def create_payout_account(
         internal_request
     )
 
-    return PayoutAccount(**internal_response.dict())
+    return models.PayoutAccount(**internal_response.dict())
 
 
 @router.get(
@@ -38,32 +44,23 @@ async def create_payout_account(
     status_code=HTTP_200_OK,
     operation_id="GetPayoutAccount",
     response_model=models.PayoutAccount,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def get_payout_account(payout_account_id: models.PayoutAccountId):
     ...
 
 
-@router.post(
+@router.patch(
     "/{payout_account_id}/statement_descriptor",
     operation_id="UpdatePayoutAccountStatementDescriptor",
     status_code=HTTP_200_OK,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def update_payout_account_statement_descriptor(
-    payout_account_id: models.PayoutAccountId
+    payout_account_id: models.PayoutAccountId, body: PayoutAccountStatementDescriptor
 ):
-    ...
-
-
-@router.get(
-    "/{payout_account_id}/details",
-    status_code=HTTP_200_OK,
-    operation_id="GetPayoutAccountDetails",
-    response_model=models.PayoutAccountDetails,
-    tags=api_tags,
-)
-async def get_payout_account_details(payout_account_id: models.PayoutAccountId):
     ...
 
 
@@ -71,7 +68,8 @@ async def get_payout_account_details(payout_account_id: models.PayoutAccountId):
     "/{payout_account_id}/verify",
     operation_id="VerifyPayoutAccount",
     status_code=HTTP_200_OK,
-    response_model=models.PayoutAccountDetails,
+    response_model=models.PayoutAccount,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def verify_payout_account(
@@ -85,7 +83,8 @@ async def verify_payout_account(
     "/{payout_account_id}/verify_token",
     operation_id="VerifyPayoutAccountWithToken",
     status_code=HTTP_200_OK,
-    response_model=models.PayoutAccountDetails,
+    response_model=models.PayoutAccount,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def verify_payout_account_with_token(
@@ -100,6 +99,7 @@ async def verify_payout_account_with_token(
     status_code=HTTP_201_CREATED,
     operation_id="CreatePayoutMethod",
     response_model=models.PayoutMethod,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def create_payout_method(
@@ -108,39 +108,14 @@ async def create_payout_method(
     ...
 
 
-@router.patch(
-    "/{payout_account_id}/payout_methods/{payout_method_id}",
-    operation_id="UpdatePayoutMethod",
-    status_code=HTTP_200_OK,
-    tags=api_tags,
-)
-async def update_payout_method(
-    payout_account_id: models.PayoutAccountId,
-    payout_method_id: models.PayoutMethodId,
-    body: models.CreatePayoutMethod,
-):
-    ...
-
-
 @router.post(
     "/{payout_account_id}/payouts",
     operation_id="CreatePayout",
-    response_model=models.Payout,
+    status_code=HTTP_200_OK,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def create_payout(
     payout_account_id: models.PayoutAccountId, body: models.PayoutRequest
-):
-    ...
-
-
-@router.get(
-    "/{payout_account_id}/payouts/{payout_id}",
-    operation_id="GetPayout",
-    response_model=models.Payout,
-    tags=api_tags,
-)
-async def get_payout(
-    payout_account_id: models.PayoutAccountId, payout_id: models.PayoutId
 ):
     ...

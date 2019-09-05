@@ -51,7 +51,7 @@ class PaymentErrorResponseBody(BaseModel):
     """
     Customized payment error http response body.
 
-    :param error_code: payin service predefined client-facing error codes.
+    :param error_code: payment service predefined client-facing error codes.
     :param error_message: friendly error message for client reference.
     :param retryable: identify if the error is retryable or not.
     """

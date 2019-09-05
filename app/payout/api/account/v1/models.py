@@ -1,8 +1,9 @@
 import pydantic
-import datetime
-from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
+from pydantic import Json
+
+from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, CurrencyType
 from app.payout.types import (
     PayoutAccountId,
@@ -10,57 +11,67 @@ from app.payout.types import (
     PayoutMethodId,
     PayoutMethodToken,
     PayoutId,
+    PayoutAccountTargetType,
+    PayoutAccountTargetId,
+    StripeManagedAccountId,
+    StripeFileHandle,
+    PayoutAmountType,
+    PayoutType,
+    PayoutMethodType,
 )
 
 __all__ = ["PayoutAccountId", "PayoutAccountToken"]
 
 
-class PayoutAccountTargetType(str, Enum):
-    Dasher = "dasher"
-    Store = "store"
-
-
-PayoutAccountTargetId = int  # NewType("PayoutAccountTargetId", int)
-
-
-class CreatePayoutAccount(pydantic.BaseModel):
-    country: CountryCode
-    target_type: PayoutAccountTargetType
+class CreatePayoutAccount(PaymentRequest):
     target_id: PayoutAccountTargetId
+    target_type: PayoutAccountTargetType
+    country: CountryCode
+    currency: CurrencyType
 
 
-class PayoutAccount(pydantic.BaseModel):
+class PayoutAccount(PaymentResponse):
     id: PayoutAccountId
-    stripe_managed_account_id: str
-    entity: str
+    stripe_managed_account_id: StripeManagedAccountId
     statement_descriptor: str
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-    verification_requirements: List[str]
-    payout_enabled_status: bool
+    verification_requirements: Json
+    # todo: add payout_methods, payout_schedule
 
 
-class PayoutAccountDetails(PayoutAccount):
-    verification_status: str
-
-
-class VerificationDetails(pydantic.BaseModel):
+class VerificationDetails(PaymentRequest):
     class DateOfBirth(pydantic.BaseModel):
         day: int
         month: int
         year: int
 
+    class Address(pydantic.BaseModel):
+        country: CountryCode
+        state: str
+        city: str
+        line1: str
+        line2: str
+        postal_code: str
+
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     date_of_birth: Optional[DateOfBirth] = None
+    business_name: Optional[str] = None
+    business_tax_id: Optional[str] = None
+    address: Optional[Address] = None
+    id_file: Optional[StripeFileHandle] = None
+    personal_identification_number: Optional[str] = None
+    ssn_last_four: Optional[str] = None
+    # we need pass in country and currency to create stripe account unless payment account table can store them
+    country: Optional[CountryCode] = None
+    currency: Optional[CurrencyType] = None
     ...
 
 
-class CreatePayoutMethod(pydantic.BaseModel):
+class CreatePayoutMethod(PaymentRequest):
     token: PayoutMethodToken
 
 
-class PayoutMethod(pydantic.BaseModel):
+class PayoutMethod(PaymentResponse):
     """
     Bank or Debit Card
     """
@@ -69,16 +80,14 @@ class PayoutMethod(pydantic.BaseModel):
     ...
 
 
-class PayoutRequestMethod(str, Enum):
-    Standard = "standard"
-    Instant = "instant"
+class PayoutRequest(PaymentRequest):
+    amount: PayoutAmountType
+    payout_type: PayoutType = PayoutType.Standard
+    transfer_id: Optional[str] = None
+    payout_id: Optional[str] = None
+    method: Optional[PayoutMethodType]
+    submitted_by: Optional[str] = None
 
 
-class PayoutRequest(pydantic.BaseModel):
-    amount: int
-    currency: CurrencyType
-    method: PayoutRequestMethod = PayoutRequestMethod.Standard
-
-
-class Payout(PayoutRequest):
+class Payout(PaymentResponse):
     id: PayoutId
