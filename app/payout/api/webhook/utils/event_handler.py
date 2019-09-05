@@ -71,7 +71,7 @@ async def _syncing_events_to_db(
 
             # TODO: check status mapping
             return await dsj_client.post(
-                f"/v1/payouts/{payout.id}/status_update", {"status": status}
+                f"/v1/payouts/{payout.id}/status_update/", {"status": status}
             )
 
 
