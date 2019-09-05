@@ -70,7 +70,7 @@ class TransferRepositoryInterface(ABC):
 
 
 @final
-@tracing.set_repository_name("transfer", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="transfer")
 class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     def __init__(self, database: DB):
         super().__init__(_database=database)

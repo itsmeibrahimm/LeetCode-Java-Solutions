@@ -45,7 +45,7 @@ from app.payin.repository.payer_repo import (
 )
 
 
-@tracing.set_processor_name("payers", only_trackable=False)
+@tracing.track_breadcrumb(processor_name="payers")
 class PayerClient:
     """
     Payer client wrapper that provides utilities to Payer.
@@ -637,7 +637,7 @@ class LegacyPayerOps(PayerOpsInterface):
             self.log.info(
                 "[create_payer_impl][%s] create stripe_customer completed. stripe_customer.id:%s",
                 payer_entity.id,
-                stripe_customer_entity.id,
+                stripe_customer_entity.id if stripe_customer_entity else None,
             )
         except DataError as e:
             self.log.error(f"[create_payer_impl] DataError when writing into db. {e}")

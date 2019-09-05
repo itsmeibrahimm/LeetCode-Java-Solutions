@@ -55,7 +55,7 @@ from app.payin.repository.cart_payment_repo import CartPaymentRepository
 CAPTURE_DELAY_IN_HOURS = 24 * 1
 
 
-@tracing.set_processor_name("cart_payments", only_trackable=False)
+@tracing.track_breadcrumb(processor_name="cart_payments", only_trackable=False)
 class CartPaymentInterface:
     def __init__(
         self,
@@ -1395,4 +1395,5 @@ class CartPaymentProcessor:
             client_description=client_description,
         )
 
+        assert cart_payment
         return cart_payment

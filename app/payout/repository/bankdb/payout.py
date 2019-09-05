@@ -27,7 +27,7 @@ class PayoutRepositoryInterface(ABC):
 
 
 @final
-@tracing.set_repository_name("payout", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="payout")
 class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
     def __init__(self, database: DB):
         super().__init__(_database=database)

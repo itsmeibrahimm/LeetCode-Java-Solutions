@@ -3,8 +3,19 @@ import asyncio
 import functools
 import inspect
 import time
+import pydantic
 
-from typing import TypeVar, Generic, Any, List, Callable, ContextManager
+from typing import (
+    TypeVar,
+    Generic,
+    Any,
+    List,
+    Callable,
+    ContextManager,
+    Deque,
+    Optional,
+)
+from collections import deque
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -30,16 +41,80 @@ NotSpecified = NotSpecifiedType()
 Trackable = TrackableType()
 T = TypeVar("T")
 
-# Service Cotnext
-APPLICATION_NAME: ContextVar[str] = ContextVar("APPLICATION_NAME", default="")
-PROCESSOR_NAME: ContextVar[str] = ContextVar("PROCESSOR_NAME", default="")
-REPOSITORY_NAME: ContextVar[str] = ContextVar("REPOSITORY_NAME", default="")
 
-# Database Context
-DATABASE_NAME: ContextVar[str] = ContextVar("DATABASE_NAME", default="")
-INSTANCE_NAME: ContextVar[str] = ContextVar("INSTANCE_NAME", default="")
-TRANSACTION_NAME: ContextVar[str] = ContextVar("TRANSACTION_NAME", default="")
-METHOD_NAME: ContextVar[str] = ContextVar("METHOD_NAME", default="")
+class Breadcrumb(pydantic.BaseModel):
+    # application level hierarchy
+    application_name: str = ""
+    processor_name: str = ""
+    repository_name: str = ""
+
+    # datastore hierarchy
+    database_name: str = ""
+    instance_name: str = ""
+    transaction_name: str = ""
+
+    # request hierarchy
+    country: str = ""
+    action: str = ""
+    resource: str = ""
+    status_code: str = ""  # should be string for stats
+
+    class Config:
+        allow_mutation = False
+        extra = "forbid"
+
+
+# Service Breadcrumbs (Latest first)
+BREADCRUMBS: ContextVar[Deque[Breadcrumb]] = ContextVar("BREADCRUMBS")
+
+
+def get_breadcrumbs() -> Deque[Breadcrumb]:
+    crumbs = BREADCRUMBS.get(deque())
+    return crumbs
+
+
+def get_current_breadcrumb() -> Breadcrumb:
+    crumbs = get_breadcrumbs()
+
+    if len(crumbs) > 0:
+        return crumbs[0]
+    return Breadcrumb()
+
+
+@contextmanager
+def breadcrumb_as(breadcrumb: Breadcrumb):
+    try:
+        crumbs = get_breadcrumbs()
+        crumb = _add_breadcrumb(crumbs, breadcrumb)
+        token = BREADCRUMBS.set(crumbs)
+        yield crumb
+    finally:
+        if token:
+            BREADCRUMBS.reset(token)
+        _remove_breadcrumb(crumbs)
+
+
+def _merge_breadcrumbs(a: Breadcrumb, b: Breadcrumb):
+    values = {**a.dict()}
+    # only override values that are set
+    values.update(b.dict(skip_defaults=True))
+    fields_set = set([*a.__fields_set__, *b.__fields_set__])
+    return Breadcrumb.construct(values, fields_set)
+
+
+def _add_breadcrumb(crumbs: Deque[Breadcrumb], breadcrumb: Breadcrumb) -> Breadcrumb:
+    previous_crumb = Breadcrumb() if not len(crumbs) else crumbs[0]
+    next_crumb = _merge_breadcrumbs(previous_crumb, breadcrumb)
+    crumbs.appendleft(next_crumb)
+    return next_crumb
+
+
+def _remove_breadcrumb(crumbs: Deque[Breadcrumb]) -> Breadcrumb:
+    stack = get_breadcrumbs()
+
+    if len(stack) > 0:
+        return stack.popleft()
+    return Breadcrumb()
 
 
 def trackable(func):
@@ -62,7 +137,7 @@ class Tracker(metaclass=abc.ABCMeta):
     __trackable__ = Trackable
     only_trackable: bool
 
-    def __init__(self, *, only_trackable=True):
+    def __init__(self, *, only_trackable=False):
         """
         Tracking helper to manage context.
         Can be used as a method decorator, class decorator
@@ -70,12 +145,14 @@ class Tracker(metaclass=abc.ABCMeta):
         Keyword Arguments:
             only_trackable {bool} -- (when used as a class decorator) enable tracking
                                      for methods marked with the @trackable decorator
-                                     (default: {True})
+                                     (default: {False})
         """
         self.only_trackable = only_trackable
 
     @abc.abstractmethod
-    def create_tracker(self, obj: Any = NotSpecified) -> ContextManager:
+    def create_tracker(
+        self, obj: Any = NotSpecified, *, func: Callable
+    ) -> ContextManager:
         """
         Generate a tracker
         """
@@ -116,7 +193,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             async def async_wrapper(obj, *args, **kwargs):
-                with self.create_tracker(obj):
+                with self.create_tracker(obj, func=func):
                     return await func(obj, *args, **kwargs)
 
             async_wrapper.__trackable__ = Trackable
@@ -127,7 +204,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             def sync_wrapper(obj, *args, **kwargs):
-                with self.create_tracker(obj):
+                with self.create_tracker(obj, func=func):
                     return func(obj, *args, **kwargs)
 
             sync_wrapper.__trackable__ = Trackable
@@ -152,7 +229,7 @@ class Tracker(metaclass=abc.ABCMeta):
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 obj = getattr(func, "__self__", NotSpecified)
-                with self.create_tracker(obj):
+                with self.create_tracker(obj, func=func):
                     return func(*args, **kwargs)
 
             sync_wrapper.__trackable__ = Trackable
@@ -164,7 +241,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with self.create_tracker():
+                with self.create_tracker(func=func):
                     return await func(*args, **kwargs)
 
             async_wrapper.__trackable__ = Trackable
@@ -175,7 +252,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
-                with self.create_tracker():
+                with self.create_tracker(func=func):
                     return func(*args, **kwargs)
 
             sync_wrapper.__trackable__ = Trackable
@@ -183,35 +260,57 @@ class Tracker(metaclass=abc.ABCMeta):
             return sync_wrapper
 
 
-class ContextVarTracker(Tracker, Generic[T]):
-    """
-    Helper class to set/restore ContextVars.
-    Can be called as a method decorator, as context manager, or on a class.
-    """
+class BreadcrumbTracker(Tracker):
+    breadcrumb: Breadcrumb
 
-    variable: ContextVar[T]
-    value: T
+    def __init__(self, breadcrumb: Breadcrumb, *, only_trackable=False):
+        super().__init__(only_trackable=only_trackable)
+        self.breadcrumb = breadcrumb
 
-    def __init__(self, variable: ContextVar[T], value: T, *, only_trackable=True):
-        """
-        ContextVar helper to manage contextually setting the contextvar;
-        can be used as a method decorator, class decorator, or context manager.
+    def create_tracker(self, obj=NotSpecified, *, func) -> ContextManager:
+        return breadcrumb_as(self.breadcrumb)
 
-        Arguments:
-            variable {ContextVar[T]} -- ContextVar to set/restore
-            value {T} -- value to set for the contextvar
 
-        Keyword Arguments:
-            only_trackable {bool} -- (when used as a class decorator) enable tracking
-                                     for methods marked with the @trackable decorator
-                                     (default: {True})
-        """
-        self.variable = variable
-        self.value = value
-        self.only_trackable = only_trackable
-
-    def create_tracker(self, obj: Any = NotSpecified) -> ContextManager:
-        return contextvar_as(self.variable, self.value)
+def track_breadcrumb(
+    *,
+    # application level hierarchy
+    application_name: Optional[str] = None,
+    processor_name: Optional[str] = None,
+    repository_name: Optional[str] = None,
+    # datastore hierarchy
+    database_name: Optional[str] = None,
+    instance_name: Optional[str] = None,
+    transaction_name: Optional[str] = None,
+    # request hierarchy
+    country: Optional[str] = None,
+    action: Optional[str] = None,
+    resource: Optional[str] = None,
+    status_code: Optional[str] = None,
+    # settings
+    only_trackable=False,
+):
+    kwargs = {}
+    if application_name is not None:
+        kwargs["application_name"] = application_name
+    if processor_name is not None:
+        kwargs["processor_name"] = processor_name
+    if repository_name is not None:
+        kwargs["repository_name"] = repository_name
+    if database_name is not None:
+        kwargs["database_name"] = database_name
+    if instance_name is not None:
+        kwargs["instance_name"] = instance_name
+    if transaction_name is not None:
+        kwargs["transaction_name"] = transaction_name
+    if country is not None:
+        kwargs["country"] = country
+    if action is not None:
+        kwargs["action"] = action
+    if resource is not None:
+        kwargs["resource"] = resource
+    if status_code is not None:
+        kwargs["status_code"] = status_code
+    return BreadcrumbTracker(Breadcrumb(**kwargs), only_trackable=only_trackable)
 
 
 class Timer(ContextManager):
@@ -262,9 +361,8 @@ class TimingTracker(Generic[T], Tracker):
         *,
         send=True,
         rate=1,
-        throttled_processors: List[Processor] = None,
         processors: List[Processor] = None,
-        only_trackable=True,
+        only_trackable=False,
     ):
         self.rate = rate
         self.send = send
@@ -272,7 +370,7 @@ class TimingTracker(Generic[T], Tracker):
             self.processors = processors or []
         self.only_trackable = only_trackable
 
-    def create_tracker(self, obj=NotSpecified) -> MetricTimer:
+    def create_tracker(self, obj=NotSpecified, *, func: Callable) -> MetricTimer:
         return MetricTimer(self.process_metrics)
 
     def process_metrics(self, timer: MetricTimer):
@@ -308,23 +406,26 @@ def contextvar_as(variable: ContextVar[T], value: T):
         variable.reset(token)
 
 
-# Service
-get_app_name = functools.partial(get_contextvar, APPLICATION_NAME)
-get_processor_name = functools.partial(get_contextvar, PROCESSOR_NAME)
-get_repository_name = functools.partial(get_contextvar, REPOSITORY_NAME)
+def get_application_name(default="") -> str:
+    return get_current_breadcrumb().application_name or default
 
-set_app_name = functools.partial(ContextVarTracker[str], APPLICATION_NAME)
-set_processor_name = functools.partial(ContextVarTracker[str], PROCESSOR_NAME)
-set_repository_name = functools.partial(ContextVarTracker[str], REPOSITORY_NAME)
+
+def get_processor_name(default="") -> str:
+    return get_current_breadcrumb().processor_name or default
+
+
+def get_repository_name(default="") -> str:
+    return get_current_breadcrumb().repository_name or default
 
 
 # Database
-get_database_name = functools.partial(get_contextvar, DATABASE_NAME)
-get_instance_name = functools.partial(get_contextvar, INSTANCE_NAME)
-get_transaction_name = functools.partial(get_contextvar, TRANSACTION_NAME)
-get_method_name = functools.partial(get_contextvar, METHOD_NAME)
+def get_database_name(default="") -> str:
+    return get_current_breadcrumb().database_name or default
 
-set_database_name = functools.partial(ContextVarTracker[str], DATABASE_NAME)
-set_instance_name = functools.partial(ContextVarTracker[str], INSTANCE_NAME)
-set_transaction_name = functools.partial(ContextVarTracker[str], TRANSACTION_NAME)
-set_method_name = functools.partial(ContextVarTracker[str], METHOD_NAME)
+
+def get_instance_name(default="") -> str:
+    return get_current_breadcrumb().instance_name or default
+
+
+def get_transaction_name(default="") -> str:
+    return get_current_breadcrumb().transaction_name or default

@@ -1,7 +1,7 @@
 import contextlib
 import functools
 import sys
-from typing import Any, Tuple
+from typing import Any, Callable, Tuple, Optional, List
 from typing_extensions import Protocol, AsyncContextManager, runtime_checkable
 
 from app.commons import tracing
@@ -51,8 +51,8 @@ class Logger(Protocol):
 
 class DatabaseTimer(tracing.MetricTimer):
     database: Database
-    module_name: str = ""
-    function_name: str = ""
+    calling_module_name: str = ""
+    calling_function_name: str = ""
     stack_frame: Any = None
 
     def __init__(self, send_metrics, database: Database, additional_ignores=None):
@@ -62,10 +62,10 @@ class DatabaseTimer(tracing.MetricTimer):
 
     def __enter__(self):
         super().__enter__()
-        self.stack_frame, self.module_name = _discover_caller(
+        self.stack_frame, self.calling_module_name = _discover_caller(
             additional_ignores=self.additional_ignores
         )
-        self.function_name = self.stack_frame.f_code.co_name
+        self.calling_function_name = self.stack_frame.f_code.co_name
         return self
 
 
@@ -91,14 +91,14 @@ def log_query_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
         "instance": timer.database.instance_name,
     }
     caller = {
-        "module": timer.module_name,
-        "service": tracing.get_app_name(),
+        "module": timer.calling_module_name,
+        "service": tracing.get_application_name(),
         "processor": tracing.get_processor_name(),
         "repository": tracing.get_repository_name(),
     }
     log.info(
         tracker.message,
-        query=timer.function_name,
+        query=timer.calling_function_name,
         latency_ms=round(timer.delta_ms, 3),
         database=database,
         caller=caller,
@@ -115,14 +115,14 @@ def log_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTime
         "instance": timer.database.instance_name,
     }
     caller = {
-        "module": timer.module_name,
-        "service": tracing.get_app_name(),
+        "module": timer.calling_module_name,
+        "service": tracing.get_application_name(),
         "processor": tracing.get_processor_name(),
         "repository": tracing.get_repository_name(),
     }
     log.info(
         tracker.message,
-        transaction=timer.function_name,
+        transaction=timer.calling_function_name,
         latency_ms=round(timer.delta_ms, 3),
         database=database,
         caller=caller,
@@ -137,7 +137,9 @@ def stat_query_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
     transaction_name = tracing.get_transaction_name()
 
-    stat_name = f"io.{timer.database.database_name}.query.{timer.function_name}.latency"
+    stat_name = (
+        f"io.{timer.database.database_name}.query.{timer.calling_function_name}.latency"
+    )
     tags = {
         # "query_type": "",
         "transaction": "yes" if transaction_name else "no",
@@ -155,9 +157,7 @@ def stat_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTim
     stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
 
-    stat_name = (
-        f"io.{timer.database.database_name}.transaction.{timer.function_name}.latency"
-    )
+    stat_name = f"io.{timer.database.database_name}.transaction.{timer.calling_function_name}.latency"
     tags = {"instance": timer.database.instance_name}
     stats.timing(stat_name, timer.delta_ms, tags=tags)
     log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
@@ -179,8 +179,13 @@ class DatabaseTimingTracker(tracing.TimingTracker[DatabaseTimer]):
         self.message = message
 
     def create_tracker(
-        self, obj=tracing.NotSpecified, additional_ignores=None
+        self,
+        obj=tracing.NotSpecified,
+        additional_ignores: Optional[List[str]] = None,
+        *,
+        func: Callable,
     ) -> DatabaseTimer:
+        additional_ignores = additional_ignores or ["app.commons.database"]
         return DatabaseTimer(
             self.process_metrics, database=obj, additional_ignores=additional_ignores
         )
@@ -198,14 +203,20 @@ class TransactionTimingTracker(DatabaseTimingTracker):
         @contextlib.asynccontextmanager
         async def wrap_transaction(obj: Database, manager: AsyncContextManager):
             async with contextlib.AsyncExitStack() as stack:
-                # timing: start timing tranasaction
+                # timing: start timing transaction
                 tracker: DatabaseTimer = stack.enter_context(
-                    self.create_tracker(obj=obj, additional_ignores=["contextlib"])
+                    self.create_tracker(
+                        obj=obj,
+                        additional_ignores=["app.commons.database", "contextlib"],
+                        func=func,
+                    )
                 )
                 # tracing: set transaction name
                 stack.enter_context(
-                    tracing.contextvar_as(
-                        tracing.TRANSACTION_NAME, tracker.function_name
+                    tracing.breadcrumb_as(
+                        tracing.Breadcrumb(
+                            transaction_name=tracker.calling_function_name
+                        )
                     )
                 )
                 # start transaction

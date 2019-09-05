@@ -65,7 +65,7 @@ class PaymentAccountRepositoryInterface(ABC):
 
 
 @final
-@tracing.set_repository_name("payment_account", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="payment_account")
 class PaymentAccountRepository(
     PayoutMainDBRepository, PaymentAccountRepositoryInterface
 ):

@@ -255,7 +255,7 @@ class PayerRepositoryInterface:
 
 
 @final
-@tracing.set_repository_name("payer", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="payer")
 @dataclass
 class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
     """

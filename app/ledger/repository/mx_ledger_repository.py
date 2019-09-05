@@ -98,7 +98,7 @@ class MxLedgerRepositoryInterface:
 
 
 @dataclass
-@tracing.set_repository_name("mx_ledger", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="mx_ledger")
 class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     async def insert_mx_ledger(
         self, request: InsertMxLedgerInput
@@ -267,6 +267,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
     # todo: PAY-3482: refactor type of the output
+
     async def rollover_negative_balanced_ledger(
         self,
         request: RolloverNegativeLedgerInput,

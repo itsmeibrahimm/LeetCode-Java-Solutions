@@ -41,7 +41,7 @@ class StripePayoutRequestRepositoryInterface(ABC):
 
 
 @final
-@tracing.set_repository_name("stripe_payout_request", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="stripe_payout_request")
 class StripePayoutRequestRepository(
     PayoutBankDBRepository, StripePayoutRequestRepositoryInterface
 ):

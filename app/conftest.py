@@ -1,16 +1,19 @@
 import os
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Any, List, Callable
+from unittest.mock import Mock
 
 import pytest
 from _pytest.nodes import Item
 from pytest_mock import MockFixture
 from starlette.testclient import TestClient
 
+from app.commons import stats
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.context.logger import get_logger
 from app.commons.database.infra import DB
+from app.commons.utils.testing import Stat, parse_raw_stat
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
     MxScheduledLedgerRepository,
@@ -83,12 +86,32 @@ def stripe_api():
     api_settings.restore()
 
 
+@pytest.fixture
+def service_statsd_client():
+    statsd_client = stats.init_statsd("dd.pay.payment-service", host="localhost")
+    with stats.set_service_stats_client(statsd_client):
+        yield statsd_client
+
+
 @pytest.fixture(autouse=True)
 def mock_statsd_client(mocker: MockFixture):
     def _send(data):
         stats_logger.info("statsd: sending: %s", data)
 
     return mocker.patch("statsd.StatsClient._send", side_effect=_send)
+
+
+@pytest.fixture
+def get_mock_statsd_events(mock_statsd_client: Mock) -> Callable[[], List[Stat]]:
+    def get():
+        stats: List[Stat] = []
+        for args, _ in mock_statsd_client.call_args_list:
+            stat = parse_raw_stat(args[0])
+            if stat:
+                stats.append(stat)
+        return stats
+
+    return get
 
 
 @pytest.fixture

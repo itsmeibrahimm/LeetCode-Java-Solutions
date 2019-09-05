@@ -1,30 +1,9 @@
 import contextlib
 import pytest
-import re
-from collections import namedtuple
-from unittest.mock import Mock
-from app.commons import timing, stats
+from typing import List
+from app.commons import timing
+from app.commons.utils.testing import Stat
 from app.commons.timing import _discover_caller
-
-STATSD_METRIC_FORMAT = re.compile(
-    r"^(?P<metric>[a-zA-Z0-9-_.]+)(?P<tags>[a-zA-Z0-9-_.~=]+)?:(?P<value>[0-9.]+)(|(?P<unit>\w+))"
-)
-StatsDMetric = namedtuple("StatsDMetric", ["metric", "value", "unit", "tags"])
-
-
-def tags_from_raw_metric(raw_tags):
-    raw_tags = raw_tags or ""
-
-    tags = {}
-    for key_value in raw_tags.split("~"):
-        if not key_value:
-            continue
-        key_value = key_value.split("=", 2)
-        if len(key_value) < 2:
-            continue
-        key, value = key_value
-        tags[key] = value
-    return tags
 
 
 class TestDiscover:
@@ -46,12 +25,11 @@ class TestDatabaseTimingTracker:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture(autouse=True)
-    def setup(self):
-        self.statsd_client = stats.init_statsd("dd.response", host="localhost")
-        with stats.set_service_stats_client(self.statsd_client):
-            yield
+    def setup(self, service_statsd_client):
+        # ensure that we mock the statsd service client
+        ...
 
-    async def test_transaction(self, mock_statsd_client: Mock):
+    async def test_transaction(self, get_mock_statsd_events):
         @contextlib.asynccontextmanager
         async def transaction_manager():
             yield "some transaction"
@@ -90,20 +68,20 @@ class TestDatabaseTimingTracker:
         await caller.do_something()
         # dd.response.io.some-db.query.enter_context.latency~cluster=master~transaction=no~transaction_name=:5.885283|ms
 
-        stats = []
-        for args, _ in mock_statsd_client.call_args_list:
-            match = STATSD_METRIC_FORMAT.match(args[0])
-            if not match:
-                pytest.fail(f"invalid metric {args[0]}")
-                return
-            metric, value, unit = match.group("metric", "value", "unit")
-            tags = tags_from_raw_metric(match.group("tags"))
-            stats.append(StatsDMetric(metric, value, unit, tags))
-        stat_names = [stat.metric for stat in stats]
+        events: List[Stat] = get_mock_statsd_events()
+        stat_names = [stat.stat_name for stat in events]
 
         # query timing
-        assert "dd.response.io.some-db.query.insert_into_table.latency" in stat_names
-        assert "dd.response.io.some-db.query.update_table.latency" in stat_names
+        assert (
+            "dd.pay.payment-service.io.some-db.query.insert_into_table.latency"
+            in stat_names
+        )
+        assert (
+            "dd.pay.payment-service.io.some-db.query.update_table.latency" in stat_names
+        )
 
         # transaction timing
-        assert "dd.response.io.some-db.transaction.do_something.latency" in stat_names
+        assert (
+            "dd.pay.payment-service.io.some-db.transaction.do_something.latency"
+            in stat_names
+        )

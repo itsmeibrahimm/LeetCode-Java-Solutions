@@ -20,8 +20,8 @@ class MxScheduledLedgerRepositoryInterface:
         ...
 
 
+@tracing.track_breadcrumb(repository_name="mx_scheduled_ledger")
 @dataclass
-@tracing.set_repository_name("mx_scheduled_ledger", only_trackable=False)
 class MxScheduledLedgerRepository(
     MxScheduledLedgerRepositoryInterface, LedgerDBRepository
 ):

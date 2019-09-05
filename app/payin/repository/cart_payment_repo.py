@@ -31,7 +31,7 @@ from app.payin.repository.base import PayinDBRepository
 
 
 @final
-@tracing.set_repository_name("cart_payment", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="cart_payment")
 @dataclass
 class CartPaymentRepository(PayinDBRepository):
     async def insert_cart_payment(

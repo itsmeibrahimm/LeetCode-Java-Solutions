@@ -92,7 +92,7 @@ class DisputeRepositoryInterface:
         ...
 
 
-@tracing.set_repository_name("dispute", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="dispute")
 class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
     """
     Dispute repository interface class that exposes complicated CRUD operations APIs for business layer.

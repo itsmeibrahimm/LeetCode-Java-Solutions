@@ -47,7 +47,7 @@ from app.payin.repository.payment_method_repo import (
 )
 
 
-@tracing.set_processor_name("payment_methods", only_trackable=False)
+@tracing.track_breadcrumb(processor_name="payment_methods")
 class PaymentMethodClient:
     """
     PaymentMethod client wrapper that provides utilities to PaymentMethod.

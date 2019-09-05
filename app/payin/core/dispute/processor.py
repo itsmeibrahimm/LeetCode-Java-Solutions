@@ -28,7 +28,7 @@ from app.payin.repository.dispute_repo import (
 )
 
 
-@tracing.set_processor_name("disputes", only_trackable=False)
+@tracing.track_breadcrumb(processor_name="disputes")
 class DisputeClient:
     """
     Dispute client wrapper that provides utilities to dispute.

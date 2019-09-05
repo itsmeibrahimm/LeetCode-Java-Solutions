@@ -158,7 +158,7 @@ class PaymentMethodRepositoryInterface:
         ...
 
 
-@tracing.set_repository_name("payment_method", only_trackable=False)
+@tracing.track_breadcrumb(repository_name="payment_method")
 @final
 @dataclass
 class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepository):

@@ -87,8 +87,8 @@ class MxTransactionRepositoryInterface:
         ...
 
 
+@tracing.track_breadcrumb(repository_name="mx_transaction")
 @dataclass
-@tracing.set_repository_name("mx_transaction", only_trackable=False)
 class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBRepository):
     async def insert_mx_transaction(
         self, request: InsertMxTransactionInput
