@@ -100,7 +100,7 @@ class DSJClient:
         :return:
         """
 
-        token = self.get_token()
+        token = await self.get_token()
         headers = {"Authorization": f"JWT {token}"}
         timeout = aiohttp.ClientTimeout(total=timeout_sec)
         async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
@@ -127,7 +127,7 @@ class DSJClient:
         :return:
         """
 
-        token = self.get_token()
+        token = await self.get_token()
         headers = {"Authorization": f"JWT {token}"}
         timeout = aiohttp.ClientTimeout(total=timeout_sec)
         async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
@@ -135,6 +135,6 @@ class DSJClient:
                 if resp.status != 200:
                     # TODO: provide specific HTTP error handlers
                     raise DSJAuthException(
-                        f"DSJ auth failed: {resp.status} {resp.reason}"
+                        f"DSJ REST call failed: {resp.status} {resp.reason}"
                     )
                 return await resp.json()
