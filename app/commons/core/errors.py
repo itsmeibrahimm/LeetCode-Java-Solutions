@@ -9,7 +9,7 @@ class PaymentError(Exception):
         """
         Base exception class.
 
-        :param error_code: payin service predefined client-facing error codes.
+        :param error_code: payment service predefined client-facing error codes.
         :param error_message: friendly error message for client reference.
         :param retryable: identify if the error is retryable or not.
         """
@@ -17,3 +17,14 @@ class PaymentError(Exception):
         self.error_code = error_code
         self.error_message = error_message
         self.retryable = retryable
+
+
+class UnknownInternalError(PaymentError):
+    pass
+
+
+DEFAULT_INTERNAL_ERROR = UnknownInternalError(
+    error_code="unknown_payment_internal_error",
+    error_message="payment service encountered unknown internal error",
+    retryable=False,
+)

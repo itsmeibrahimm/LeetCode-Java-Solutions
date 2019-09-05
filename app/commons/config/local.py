@@ -13,7 +13,7 @@ def create_app_config() -> AppConfig:
 
     return AppConfig(
         ENVIRONMENT="local",
-        DEBUG=True,
+        DEBUG=False,  # Set this to True for debugging
         REMOTE_SECRET_ENABLED=False,
         API_STATSD_CONFIG=ApiStatsDConfig(
             TAGS={"service_name": "payment-service", "cluster": "local"}

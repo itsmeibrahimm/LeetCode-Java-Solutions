@@ -64,7 +64,11 @@ async def payment_http_exception_handler(
     :return: Handled Http exception response
     """
     logger: BoundLogger = get_logger_from_req(request)
-    logger.info(f"Translating source exception={str(exception)}")
+    logger.exception(
+        f"Translating source exception",
+        exec_msg=str(exception),
+        exec_type=type(exception),
+    )
 
     exception_response = None
     if isinstance(exception, PaymentException):
@@ -88,7 +92,11 @@ async def payment_internal_error_handler(
     request: Request, exception: Exception
 ) -> Response:
     logger: BoundLogger = get_logger_from_req(request)
-    logger.exception(f"Translating source exception={exception}")
+    logger.exception(
+        f"Translating source exception",
+        exec_msg=str(exception),
+        exec_type=type(exception),
+    )
 
     return response_with_req_id(
         request,
@@ -102,7 +110,11 @@ async def payment_request_validation_exception_handler(
     request: Request, exception: RequestValidationError
 ) -> JSONResponse:
     logger: BoundLogger = get_logger_from_req(request)
-    logger.exception(f"Translating source exception={exception}")
+    logger.exception(
+        f"Translating source exception",
+        exec_msg=str(exception),
+        exec_type=type(exception),
+    )
     return response_with_req_id(
         request,
         JSONResponse(

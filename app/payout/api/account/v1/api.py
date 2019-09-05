@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 
+from app.payout.api.account.v1.models import PayoutAccount
+from app.payout.core.account.processor import PayoutAccountProcessors
+from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
+from app.payout.service import create_payout_account_processors
 from . import models
 
 api_tags = ["AccountsV1"]
@@ -14,8 +18,19 @@ router = APIRouter()
     response_model=models.PayoutAccount,
     tags=api_tags,
 )
-async def create_payout_account(body: models.CreatePayoutAccount):
-    ...
+async def create_payout_account(
+    body: models.CreatePayoutAccount,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+
+    internal_request = CreatePayoutAccountRequest(**body.dict())
+    internal_response = await payout_account_processors.create_payout_account(
+        internal_request
+    )
+
+    return PayoutAccount(**internal_response.dict())
 
 
 @router.get(

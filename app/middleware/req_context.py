@@ -1,5 +1,3 @@
-from app.commons.applications import FastAPI
-
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 

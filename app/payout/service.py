@@ -2,6 +2,7 @@ from fastapi import Depends
 from starlette.requests import Request
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
+from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.repository.bankdb import payout, stripe_payout_request
 from app.payout.repository.maindb import payment_account, transfer
 
@@ -78,3 +79,9 @@ def StripePayoutRequestRepository(
 
 def DSJClientHandle(payout_service: PayoutService = Depends()):
     return payout_service.dsj_client
+
+
+def create_payout_account_processors(payout_service: PayoutService = Depends()):
+    return PayoutAccountProcessors(
+        logger=payout_service.log, payment_account_repo=payout_service.payment_accounts
+    )

@@ -2,12 +2,15 @@ import logging
 import os
 import platform
 import sys
+from typing import Callable
 
 import structlog
 from pythonjsonlogger import jsonlogger
 
 # see https://github.com/madzak/python-json-logger/blob/master/src/pythonjsonlogger/jsonlogger.py#L18
 # for a list of supported fields and reserved attributes for logging
+from typing_extensions import Protocol
+
 INCLUDED_LOG_FIELDS = "(req_id) (timestamp) (name) (message)"
 
 is_debug = os.environ.get("ENVIRONMENT") in ("local", "testing")
@@ -83,9 +86,36 @@ structlog.configure_once(
     cache_logger_on_first_use=True,
 )
 
+
+class Log(Protocol):
+    """
+    Helper protocol to allow BoundLoggerLazyProxy has statical type hinting
+    """
+
+    def debug(self, event=None, *args, **kw):
+        pass
+
+    def info(self, event=None, *args, **kw):
+        pass
+
+    def warning(self, event=None, *args, **kw):
+        pass
+
+    warn: Callable = warning
+
+    def error(self, event=None, *args, **kw):
+        pass
+
+    def critical(self, event=None, *args, **kw):
+        pass
+
+    def exception(self, event=None, *args, **kw):
+        pass
+
+
 # used for application initialization
-init_logger = structlog.get_logger("initialization")
+init_logger: Log = structlog.get_logger("initialization")
 # used for general application usage
-root_logger = structlog.get_logger("application")
+root_logger: Log = structlog.get_logger("application")
 # get or create a named logger
-get_logger = structlog.get_logger
+get_logger: Callable[..., Log] = structlog.get_logger
