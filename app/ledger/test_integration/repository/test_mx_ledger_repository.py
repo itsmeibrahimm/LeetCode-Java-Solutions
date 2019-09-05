@@ -5,7 +5,7 @@ import psycopg2
 import pytest
 from psycopg2 import errorcodes
 
-from app.commons.database.client.interface import DBTransaction
+from app.commons.database.client.interface import DBConnection
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import (
     UpdatePaidMxLedgerInput,
@@ -15,11 +15,9 @@ from app.ledger.core.data_types import GetMxScheduledLedgerInput
 from app.ledger.core.types import (
     MxLedgerStateType,
     MxLedgerType,
-    MxTransactionType,
     MxScheduledLedgerIntervalType,
 )
 from app.ledger.repository.mx_ledger_repository import (
-    InsertMxLedgerInput,
     MxLedgerRepository,
     UpdateMxLedgerSetInput,
     UpdateMxLedgerWhereInput,
@@ -121,24 +119,25 @@ class TestMxLedgerRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_ledger_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
-            connection = tx.connection()
+        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
             scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, connection
             )
-            assert scheduled_ledger is not None
+        assert scheduled_ledger is not None
 
-            process_mx_ledger_input = ProcessMxLedgerInput(id=mx_ledger_id)
-            updated_mx_ledger = await mx_ledger_repository.move_ledger_state_to_processing_and_close_schedule_ledger(
-                process_mx_ledger_input
-            )
-            assert mx_ledger.id == updated_mx_ledger.id
-            assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
+        process_mx_ledger_input = ProcessMxLedgerInput(id=mx_ledger_id)
+        updated_mx_ledger = await mx_ledger_repository.move_ledger_state_to_processing_and_close_schedule_ledger(
+            process_mx_ledger_input
+        )
+        assert mx_ledger.id == updated_mx_ledger.id
+        assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
+
+        async with mx_transaction_repository.payment_database.master().acquire() as db_connection:  # type: DBConnection
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
-                scheduled_ledger_request, connection
+                scheduled_ledger_request, db_connection
             )
-            # make sure there is no open scheduled_ledger with given period after process
-            assert retrieved_scheduled_ledger is None
+        # make sure there is no open scheduled_ledger with given period after process
+        assert retrieved_scheduled_ledger is None
 
     # todo: need to confirm the scheduled_ledger closed_at still equals to original closed_at
     async def test_process_mx_ledger_state_and_close_schedule_ledger_close_at_not_zero_skip(
@@ -183,14 +182,13 @@ class TestMxLedgerRepository:
             routing_key=datetime(2019, 8, 1),
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_ledger_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
-            connection = tx.connection()
+        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, connection
             )
 
-            # make sure there is no open scheduled_ledger with given period after process
-            assert retrieved_scheduled_ledger is None
+        # make sure there is no open scheduled_ledger with given period after process
+        assert retrieved_scheduled_ledger is None
 
     async def test_get_ledger_by_id_success(
         self, mx_ledger_repository: MxLedgerRepository
@@ -299,8 +297,7 @@ class TestMxLedgerRepository:
         move_ledger_request = UpdatedRolledMxLedgerInput(
             id=mx_ledger_id, rolled_to_ledger_id=rolled_to_ledger_id
         )
-        async with mx_transaction_repository.payment_database.master().transaction() as db_tx:  # type: DBTransaction
-            connection = db_tx.connection()
+        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
             rolled_mx_ledger = await mx_ledger_repository.move_ledger_state_to_rolled(
                 move_ledger_request, connection
             )
@@ -337,32 +334,3 @@ class TestMxLedgerRepository:
         assert submitted_mx_ledger.state == MxLedgerStateType.SUBMITTED
         assert submitted_mx_ledger.submitted_at == submitted_mx_ledger.updated_at
         assert not submitted_mx_ledger.updated_at == mx_ledger.updated_at
-
-    async def test_create_one_off_mx_ledger(
-        self, mx_ledger_repository: MxLedgerRepository
-    ):
-        mx_ledger_id = uuid.uuid4()
-        mx_ledger_to_create = InsertMxLedgerInput(
-            id=mx_ledger_id,
-            type=MxLedgerType.MANUAL.value,
-            currency=CurrencyType.USD.value,
-            state=MxLedgerStateType.OPEN.value,
-            balance=2000,
-            payment_account_id="pay_act_test_id",
-        )
-        one_off_mx_ledger, mx_transaction = await mx_ledger_repository.create_one_off_mx_ledger(
-            mx_ledger_to_create
-        )
-
-        assert one_off_mx_ledger.id == mx_ledger_id
-        assert one_off_mx_ledger.type == MxLedgerType.MANUAL
-        assert one_off_mx_ledger.currency == CurrencyType.USD
-        assert one_off_mx_ledger.state == MxLedgerStateType.OPEN
-        assert one_off_mx_ledger.balance == 2000
-        assert one_off_mx_ledger.payment_account_id == "pay_act_test_id"
-
-        assert mx_transaction.ledger_id == mx_ledger_id
-        assert mx_transaction.amount == 2000
-        assert mx_transaction.currency == CurrencyType.USD
-        assert mx_transaction.payment_account_id == "pay_act_test_id"
-        assert mx_transaction.target_type == MxTransactionType.MICRO_DEPOSIT

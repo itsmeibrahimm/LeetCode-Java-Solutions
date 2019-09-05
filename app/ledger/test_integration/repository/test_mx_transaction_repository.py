@@ -607,11 +607,12 @@ class TestMxTransactionRepository:
             )
             assert mx_scheduled_ledger is None
 
-    async def test_upsert_mx_transaction_with_same_periods_and_route_to_same_ledgers_success(
+    async def test_upsert_mx_transaction_with_same_period_and_route_to_same_ledgers_success(
         self,
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
     ):
+        # when transactions with same start_time, end_time period are created, they need to be routed to same ledger
         payment_account_id = str(uuid.uuid4())
         # prepare mx_transaction with routing_key as datetime(2019, 8, 1) and insert
         insert_txn_request = InsertMxTransactionWithLedgerInput(
@@ -652,6 +653,8 @@ class TestMxTransactionRepository:
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
     ):
+        # when a transaction whose routing_key is later than end_time of any open ledgers,
+        # we do not route it to the open ledgers, instead we create new ledger and attach transaction to it
         payment_account_id = str(uuid.uuid4())
         # prepare mx_transaction with routing_key as datetime(2019, 8, 1) and insert
         insert_txn_request = InsertMxTransactionWithLedgerInput(
@@ -692,6 +695,8 @@ class TestMxTransactionRepository:
         mx_ledger_repository: MxLedgerRepository,
         mx_transaction_repository: MxTransactionRepository,
     ):
+        # when a transaction whose routing_key is earlier than end_time of found open ledger,
+        # we will not create new ledger for it and will route it to the found ledger
         payment_account_id = str(uuid.uuid4())
         # prepare mx_transaction with routing_key as datetime(2019, 8, 10) and insert
         insert_txn_request = InsertMxTransactionWithLedgerInput(

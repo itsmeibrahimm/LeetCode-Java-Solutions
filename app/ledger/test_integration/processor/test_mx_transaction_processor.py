@@ -237,8 +237,8 @@ class TestMxTransactionProcessor:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 get_scheduled_ledger_request, connection
             )
-            assert mx_scheduled_ledger is not None
-            assert mx_scheduled_ledger.ledger_id == mx_transaction.ledger_id
+        assert mx_scheduled_ledger is not None
+        assert mx_scheduled_ledger.ledger_id == mx_transaction.ledger_id
 
         get_mx_ledger_request = GetMxLedgerByIdInput(id=mx_transaction.ledger_id)
         mx_ledger = await mx_ledger_repository.get_ledger_by_id(get_mx_ledger_request)

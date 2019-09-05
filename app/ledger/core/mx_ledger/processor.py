@@ -68,7 +68,7 @@ class MxLedgerProcessor:
                 error_message=ledger_error_message_maps[
                     LedgerErrorCode.MX_LEDGER_NOT_FOUND.value
                 ],
-                retryable=True,
+                retryable=False,
             )
         # mx_ledger state needs to be OPEN in order to be processed, otherwise raise exception
         if not retrieved_ledger.state == MxLedgerStateType.OPEN:
@@ -77,7 +77,7 @@ class MxLedgerProcessor:
                 error_message=ledger_error_message_maps[
                     LedgerErrorCode.MX_LEDGER_INVALID_PROCESS_STATE.value
                 ],
-                retryable=True,
+                retryable=False,
             )
         # process mx_ledger and close scheduled_ledger
         try:
@@ -161,7 +161,7 @@ class MxLedgerProcessor:
                 error_message=ledger_error_message_maps[
                     LedgerErrorCode.MX_LEDGER_NOT_FOUND.value
                 ],
-                retryable=True,
+                retryable=False,
             )
 
         # mx_ledger state needs to be PROCESSING in order to be submitted, otherwise raise exception
@@ -171,7 +171,7 @@ class MxLedgerProcessor:
                 error_message=ledger_error_message_maps[
                     LedgerErrorCode.MX_LEDGER_INVALID_PROCESS_STATE.value
                 ],
-                retryable=True,
+                retryable=False,
             )
 
         if retrieved_ledger.balance > 0:
@@ -355,3 +355,4 @@ class MxLedgerProcessor:
             self.log.error(
                 f"[create_mx_ledger] Exception caught while creating mx_ledger, {e}"
             )
+            raise e

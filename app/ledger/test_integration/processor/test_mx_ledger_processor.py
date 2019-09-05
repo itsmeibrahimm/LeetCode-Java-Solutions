@@ -7,11 +7,8 @@ from asynctest import patch
 from psycopg2._psycopg import DataError, OperationalError
 from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 
-from app.commons.database.client.interface import DBTransaction
-from app.ledger.core.data_types import (
-    GetMxLedgerByIdInput,
-    GetMxScheduledLedgerByAccountInput,
-)
+from app.commons.database.client.interface import DBConnection
+from app.ledger.core.data_types import GetMxScheduledLedgerByAccountInput
 from app.commons.types import CurrencyType
 from app.ledger.core.data_types import GetMxLedgerByIdInput
 from app.ledger.core.exceptions import (
@@ -384,16 +381,15 @@ class TestMxLedgerProcessor:
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
-        async with mx_transaction_repository.payment_database.master().transaction() as tx:  # type: DBTransaction
-            connection = tx.connection()
-            # retrieve and check the updated open ledger
-            request = GetMxScheduledLedgerByAccountInput(
-                payment_account_id=payment_account_id
-            )
+        # retrieve and check the updated open ledger
+        request = GetMxScheduledLedgerByAccountInput(
+            payment_account_id=payment_account_id
+        )
+        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_for_payment_account_id(
                 request, connection
             )
-            assert retrieved_scheduled_ledger is None
+        assert retrieved_scheduled_ledger is None
 
         rolled_ledger = await self.mx_ledger_processor.submit(ledger_id)
         assert rolled_ledger
@@ -403,16 +399,15 @@ class TestMxLedgerProcessor:
         assert rolled_ledger.amount_paid == 0
         assert rolled_ledger.balance == -1500
 
-        async with mx_transaction_repository.payment_database.master().transaction() as db_tx:  # type: DBTransaction
-            connection = db_tx.connection()
+        async with mx_transaction_repository.payment_database.master().acquire() as db_connection:  # type: DBConnection
             # retrieve and check the updated open ledger
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_for_payment_account_id(
-                request, connection
+                request, db_connection
             )
-            assert retrieved_scheduled_ledger
-            retrieve_ledger_request = GetMxLedgerByIdInput(
-                id=retrieved_scheduled_ledger.ledger_id
-            )
+        assert retrieved_scheduled_ledger
+        retrieve_ledger_request = GetMxLedgerByIdInput(
+            id=retrieved_scheduled_ledger.ledger_id
+        )
         updated_open_ledger = await mx_ledger_repository.get_ledger_by_id(
             retrieve_ledger_request
         )
@@ -422,7 +417,6 @@ class TestMxLedgerProcessor:
         assert updated_open_ledger.balance == -1500
         assert updated_open_ledger.amount_paid is None
 
-    # todo: need to add exception cases after Min's pr is merged
     async def test_create_mx_ledger_success(
         self,
         mocker: pytest_mock.MockFixture,

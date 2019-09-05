@@ -4,7 +4,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
 
 from sqlalchemy import and_
 
@@ -19,8 +19,6 @@ from app.ledger.core.data_types import (
     UpdateMxLedgerOutput,
     GetMxLedgerByIdInput,
     GetMxLedgerByIdOutput,
-    InsertMxTransactionOutput,
-    InsertMxTransactionInput,
     ProcessMxLedgerInput,
     ProcessMxLedgerOutput,
     UpdatePaidMxLedgerInput,
@@ -34,11 +32,7 @@ from app.ledger.core.types import (
     MxScheduledLedgerIntervalType,
 )
 
-from app.ledger.models.paymentdb import (
-    mx_ledgers,
-    mx_transactions,
-    mx_scheduled_ledgers,
-)
+from app.ledger.models.paymentdb import mx_ledgers, mx_scheduled_ledgers
 from app.ledger.repository.base import LedgerDBRepository
 from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 
@@ -68,12 +62,6 @@ class MxLedgerRepositoryInterface:
     async def get_ledger_by_id(
         self, request: GetMxLedgerByIdInput
     ) -> Optional[GetMxLedgerByIdOutput]:
-        ...
-
-    @abstractmethod
-    async def create_one_off_mx_ledger(
-        self, request_ledger: InsertMxLedgerInput
-    ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:
         ...
 
     @abstractmethod
@@ -314,35 +302,3 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
                 return closed_mx_ledger
             except Exception as e:
                 raise e
-
-    # todo: lock db transaction here as well
-    async def create_one_off_mx_ledger(
-        self, request_ledger: InsertMxLedgerInput
-    ) -> Tuple[InsertMxLedgerOutput, InsertMxTransactionOutput]:
-        # create one off mx ledger
-        one_off_mx_ledger = await self.insert_mx_ledger(request_ledger)
-        # create mx transaction with given ledger id
-        mx_transaction_id = uuid.uuid4()
-        ide_key = str(uuid.uuid4())
-        mx_transaction_to_insert = InsertMxTransactionInput(
-            id=mx_transaction_id,
-            payment_account_id=one_off_mx_ledger.payment_account_id,
-            amount=one_off_mx_ledger.balance,
-            currency=one_off_mx_ledger.currency,
-            ledger_id=one_off_mx_ledger.id,
-            idempotency_key=ide_key,
-            target_type=MxTransactionType.MICRO_DEPOSIT,
-            routing_key=datetime.utcnow(),
-        )
-        stmt = (
-            mx_transactions.table.insert()
-            .values(mx_transaction_to_insert.dict(skip_defaults=True))
-            .returning(*mx_transactions.table.columns.values())
-        )
-        row = await self.payment_database.master().fetch_one(stmt)
-        assert row
-        mx_transaction = InsertMxTransactionOutput.from_row(row)
-
-        # todo: call payout service to payout the ledger and update corresponding status
-
-        return one_off_mx_ledger, mx_transaction

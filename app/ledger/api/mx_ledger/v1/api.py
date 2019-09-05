@@ -76,7 +76,11 @@ async def process(
     "/api/v1/mx_ledgers/{mx_ledger_id}/submit",
     status_code=HTTP_200_OK,
     response_model=MxLedger,
-    responses={},
+    responses={
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+    },
     operation_id="SubmitMxLedger",
     tags=api_tags,
 )
@@ -98,7 +102,7 @@ async def submit(
         raise _mx_ledger_not_found(e)
     except MxLedgerInvalidProcessStateError as e:
         log.error(
-            f"[submit mx_ledger] [{mx_ledger_id}] Cannot process invalid mx_ledger state to PROCESSING {e}"
+            f"[submit mx_ledger] [{mx_ledger_id}] Cannot submit ledger due to invalid mx_ledger state {e}"
         )
         raise _mx_ledger_bad_request(e)
     except MxLedgerSubmissionError as e:

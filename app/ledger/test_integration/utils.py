@@ -88,3 +88,22 @@ async def prepare_mx_scheduled_ledger(
         else end_time,
     )
     return scheduled_ledger_request
+
+
+def prepare_transaction_post_request(
+    payment_account_id=str(uuid.uuid4()), routing_key=datetime(2019, 8, 1)
+):
+    request = {
+        "payment_account_id": payment_account_id,
+        "target_type": MxTransactionType.MERCHANT_DELIVERY.value,
+        "amount": 3000,
+        "currency": CurrencyType.USD.value,
+        "idempotency_key": str(uuid.uuid4()),
+        "routing_key": routing_key.isoformat(),
+        "interval_type": MxScheduledLedgerIntervalType.WEEKLY.value,
+        "target_id": "optional_target_id",
+        "context": {"abc": 123, "def": 456},
+        "metadata": {},
+        "legacy_transaction_id": "optional_legacy_transaction_id",
+    }
+    return request
