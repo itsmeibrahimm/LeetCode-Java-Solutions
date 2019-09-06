@@ -10,7 +10,6 @@ from app.payout.types import (
     PayoutAccountToken,
     PayoutMethodId,
     PayoutMethodToken,
-    PayoutId,
     PayoutAccountTargetType,
     PayoutAccountTargetId,
     StripeManagedAccountId,
@@ -90,4 +89,4 @@ class PayoutRequest(PaymentRequest):
 
 
 class Payout(PaymentResponse):
-    id: PayoutId
+    pass

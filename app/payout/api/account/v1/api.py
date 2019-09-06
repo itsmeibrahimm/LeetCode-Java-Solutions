@@ -8,6 +8,9 @@ from starlette.status import (
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
+from app.payout.core.account.processors.create_standard_payout import (
+    CreateStandardPayoutRequest,
+)
 from app.payout.service import create_payout_account_processors
 from app.payout.types import PayoutAccountStatementDescriptor
 from . import models
@@ -116,6 +119,23 @@ async def create_payout_method(
     tags=api_tags,
 )
 async def create_payout(
-    payout_account_id: models.PayoutAccountId, body: models.PayoutRequest
+    payout_account_id: models.PayoutAccountId,
+    body: models.PayoutRequest,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
 ):
-    ...
+    internal_request = CreateStandardPayoutRequest(
+        payout_account_id=payout_account_id,
+        amount=body.amount,
+        payout_type=body.payout_type,
+        transfer_id=body.transfer_id,
+        payout_id=body.payout_id,
+        method=body.method,
+        submitted_by=body.submitted_by,
+    )
+    internal_response = await payout_account_processors.create_standard_payout(
+        internal_request
+    )
+
+    return models.Payout(**internal_response.dict())

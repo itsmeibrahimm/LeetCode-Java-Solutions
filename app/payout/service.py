@@ -4,7 +4,7 @@ from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.repository.bankdb import payout, stripe_payout_request
-from app.payout.repository.maindb import payment_account, transfer
+from app.payout.repository.maindb import payment_account, stripe_transfer, transfer
 
 __all__ = [
     "PayoutService",
@@ -24,6 +24,7 @@ PayoutRepositoryInterface = payout.PayoutRepositoryInterface
 StripePayoutRequestRepositoryInterface = (
     stripe_payout_request.StripePayoutRequestRepositoryInterface
 )
+StripeTransferRepositoryInterface = stripe_transfer.StripeTransferRepositoryInterface
 
 
 class PayoutService(BaseService):
@@ -32,6 +33,7 @@ class PayoutService(BaseService):
     transfers: transfer.TransferRepository
     payouts: payout.PayoutRepository
     stripe_payout_requests: stripe_payout_request.StripePayoutRequestRepository
+    stripe_transfers: stripe_transfer.StripeTransferRepositoryInterface
     dsj_client: DSJClient
 
     def __init__(self, request: Request):
@@ -41,6 +43,7 @@ class PayoutService(BaseService):
         maindb = self.app_context.payout_maindb
         self.payment_accounts = payment_account.PaymentAccountRepository(maindb)
         self.transfers = transfer.TransferRepository(maindb)
+        self.stripe_transfers = stripe_transfer.StripeTransferRepository(maindb)
 
         # bankdb
         bankdb = self.app_context.payout_bankdb
@@ -77,11 +80,19 @@ def StripePayoutRequestRepository(
     return payout_service.stripe_payout_requests
 
 
+def StripeTransferRepository(
+    payout_service: PayoutService = Depends()
+) -> stripe_transfer.StripeTransferRepositoryInterface:
+    return payout_service.stripe_transfers
+
+
 def DSJClientHandle(payout_service: PayoutService = Depends()):
     return payout_service.dsj_client
 
 
 def create_payout_account_processors(payout_service: PayoutService = Depends()):
     return PayoutAccountProcessors(
-        logger=payout_service.log, payment_account_repo=payout_service.payment_accounts
+        logger=payout_service.log,
+        payment_account_repo=payout_service.payment_accounts,
+        stripe_transfer_repo=payout_service.stripe_transfers,
     )
