@@ -305,8 +305,8 @@ CREATE TABLE payout_cards (
     exp_month integer NOT NULL,
     exp_year integer NOT NULL,
     brand text NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    created_at timestamp without time zone default now(),
+    updated_at timestamp without time zone default now(),
     fingerprint text
 );
 
@@ -340,11 +340,11 @@ CREATE TABLE payout_methods (
     currency text NOT NULL,
     country text NOT NULL,
     payment_account_id integer NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL default now(),
+    updated_at timestamp without time zone NOT NULL default now(),
     is_default boolean,
     token text NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp without time zone
 );
 
 
@@ -379,8 +379,8 @@ CREATE TABLE payouts (
     currency text NOT NULL,
     fee integer NOT NULL,
     type text NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    created_at timestamp without time zone default now(),
+    updated_at timestamp without time zone default now(),
     idempotency_key text NOT NULL,
     payout_method_id integer,
     transaction_ids integer[] NOT NULL,
@@ -415,17 +415,17 @@ ALTER SEQUENCE payouts_id_seq OWNED BY payouts.id;
 
 CREATE TABLE stripe_payout_requests (
     id integer NOT NULL,
-    idempotency_key text NOT NULL,
+    idempotency_key character varying NOT NULL,
     payout_method_id integer NOT NULL,
     response json,
-    created_at timestamp with time zone NOT NULL,
-    received_at timestamp with time zone,
-    updated_at timestamp with time zone NOT NULL,
-    stripe_payout_id text,
+    created_at timestamp without time zone default now(),
+    received_at timestamp without time zone,
+    updated_at timestamp without time zone default now(),
+    stripe_payout_id character varying,
     request json,
-    status text NOT NULL,
+    status character varying NOT NULL,
     events json,
-    stripe_account_id text,
+    stripe_account_id character varying,
     payout_id integer NOT NULL
 );
 
@@ -455,13 +455,13 @@ ALTER SEQUENCE stripe_payout_requests_id_seq OWNED BY stripe_payout_requests.id;
 
 CREATE TABLE stripe_transfer_requests (
     id integer NOT NULL,
-    response text,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
-    received_at timestamp with time zone,
-    request text NOT NULL,
+    response json,
+    created_at timestamp without time zone default now(),
+    updated_at timestamp without time zone default now(),
+    received_at timestamp without time zone,
+    request json NOT NULL,
     response_status_code integer,
-    stripe_transfer_id text,
+    stripe_transfer_id character varying,
     transfer_id integer NOT NULL
 );
 
@@ -629,12 +629,12 @@ ALTER SEQUENCE transfer_transactions_id_seq OWNED BY transfer_transactions.id;
 CREATE TABLE transfers (
     id integer NOT NULL,
     amount integer NOT NULL,
-    from_stripe_account_id text NOT NULL,
-    to_stripe_account_id text NOT NULL,
-    token text NOT NULL,
+    from_stripe_account_id character varying NOT NULL,
+    to_stripe_account_id character varying NOT NULL,
+    token character varying NOT NULL,
     fee integer,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL
+    created_at timestamp without time zone default now(),
+    updated_at timestamp without time zone default now()
 );
 
 

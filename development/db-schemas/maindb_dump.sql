@@ -1132,6 +1132,7 @@ CREATE TABLE consumer_charge (
     idempotency_key character varying(120),
     is_stripe_connect_based boolean NOT NULL,
     created_at timestamp with time zone,
+    updated_at timestamp with time zone,
     total integer NOT NULL,
     original_total integer NOT NULL,
     currency text,
