@@ -11,7 +11,12 @@ from app.payout.repository.maindb.model.stripe_transfer import StripeTransferCre
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
-from app.payout.types import PayoutAmountType, PayoutType, PayoutMethodType
+from app.payout.types import (
+    PayoutAmountType,
+    PayoutType,
+    PayoutMethodType,
+    PayoutAccountId,
+)
 
 
 class CreateStandardPayoutResponse(OperationResponse):
@@ -19,11 +24,10 @@ class CreateStandardPayoutResponse(OperationResponse):
 
 
 class CreateStandardPayoutRequest(OperationRequest):
-    payout_account_id: int
+    payout_account_id: PayoutAccountId
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.Standard
     transfer_id: Optional[str] = None
-    payout_id: Optional[str] = None
     method: Optional[PayoutMethodType]
     submitted_by: Optional[str] = None
 

@@ -8,11 +8,14 @@ from starlette.status import (
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
+from app.payout.core.account.processors.create_instant_payout import (
+    CreateInstantPayoutRequest,
+)
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
 )
 from app.payout.service import create_payout_account_processors
-from app.payout.types import PayoutAccountStatementDescriptor
+from app.payout.types import PayoutAccountStatementDescriptor, PayoutType
 from . import models
 
 api_tags = ["AccountsV1"]
@@ -125,17 +128,30 @@ async def create_payout(
         create_payout_account_processors
     ),
 ):
-    internal_request = CreateStandardPayoutRequest(
-        payout_account_id=payout_account_id,
-        amount=body.amount,
-        payout_type=body.payout_type,
-        transfer_id=body.transfer_id,
-        payout_id=body.payout_id,
-        method=body.method,
-        submitted_by=body.submitted_by,
-    )
-    internal_response = await payout_account_processors.create_standard_payout(
-        internal_request
-    )
-
-    return models.Payout(**internal_response.dict())
+    # The if-else check here is ok for now, since PayoutType only has "standard" and "instant"
+    if body.payout_type == PayoutType.Standard:
+        standard_payout_request = CreateStandardPayoutRequest(
+            payout_account_id=payout_account_id,
+            amount=body.amount,
+            payout_type=body.payout_type,
+            transfer_id=body.transfer_id,
+            method=body.method,
+            submitted_by=body.submitted_by,
+        )
+        standard_payout_response = await payout_account_processors.create_standard_payout(
+            standard_payout_request
+        )
+        return models.Payout(**standard_payout_response.dict())
+    else:
+        instant_payout_request = CreateInstantPayoutRequest(
+            payout_account_id=payout_account_id,
+            amount=body.amount,
+            payout_type=body.payout_type,
+            payout_id=body.payout_id,
+            method=body.method,
+            submitted_by=body.submitted_by,
+        )
+        instant_payout_response = await payout_account_processors.create_instant_payout(
+            instant_payout_request
+        )
+        return models.Payout(**instant_payout_response.dict())
