@@ -3,20 +3,19 @@ from typing import List
 from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 
-from app.payout.service import (
-    PaymentAccountRepository,
-    PaymentAccountRepositoryInterface,
-)
-from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.payout.repository.maindb.model.payment_account import (
+from app.commons.api.models import PaymentErrorResponseBody, PaymentException
+from app.payout.api.account.v0.models import (
     PaymentAccount,
     PaymentAccountCreate,
     PaymentAccountUpdate,
-)
-from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
     StripeManagedAccountCreate,
     StripeManagedAccountUpdate,
+)
+from app.payout.repository.maindb.model import payment_account, stripe_managed_account
+from app.payout.service import (
+    PaymentAccountRepository,
+    PaymentAccountRepositoryInterface,
 )
 
 api_tags = ["AccountsV0"]
@@ -34,7 +33,11 @@ async def create_payment_account(
     body: PaymentAccountCreate,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    return await repository.create_payment_account(body)
+    internal_request = payment_account.PaymentAccountCreate(
+        **body.dict(skip_defaults=True)
+    )
+    internal_account = await repository.create_payment_account(internal_request)
+    return PaymentAccount(**internal_account.dict())
 
 
 @router.get(
@@ -49,10 +52,13 @@ async def get_payment_accounts_by_account_type_account_id(
     stripe_account_id: int,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    payment_accounts = await repository.get_all_payment_accounts_by_account_id_account_type(
+    internal_payment_accounts = await repository.get_all_payment_accounts_by_account_id_account_type(
         account_id=stripe_account_id, account_type=stripe_account_type
     )
-    return payment_accounts
+    return [
+        PaymentAccount(**internal_account.dict())
+        for internal_account in internal_payment_accounts
+    ]
 
 
 @router.get(
@@ -67,10 +73,10 @@ async def get_payment_account_by_id(
     account_id: int,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    payment_account = await repository.get_payment_account_by_id(account_id)
-    if not payment_account:
+    internal_account = await repository.get_payment_account_by_id(account_id)
+    if not internal_account:
         raise _payment_account_not_found()
-    return payment_account
+    return PaymentAccount(**internal_account.dict())
 
 
 @router.patch(
@@ -86,14 +92,17 @@ async def update_payment_account_by_id(
     body: PaymentAccountUpdate,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    payment_account = await repository.update_payment_account_by_id(
-        payment_account_id=account_id, data=body
+    internal_request = payment_account.PaymentAccountUpdate(
+        **body.dict(skip_defaults=True)
+    )
+    internal_account = await repository.update_payment_account_by_id(
+        payment_account_id=account_id, data=internal_request
     )
 
-    if not payment_account:
+    if not internal_account:
         raise _payment_account_not_found()
 
-    return payment_account
+    return PaymentAccount(**internal_account.dict())
 
 
 @router.get(
@@ -108,13 +117,13 @@ async def get_stripe_managed_account_by_id(
     stripe_managed_account_id: int,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    stripe_managed_account = await repository.get_stripe_managed_account_by_id(
+    internal_stripe_managed_account = await repository.get_stripe_managed_account_by_id(
         stripe_managed_account_id=stripe_managed_account_id
     )
-    if not stripe_managed_account:
+    if not internal_stripe_managed_account:
         raise _stripe_managed_account_not_found()
 
-    return stripe_managed_account
+    return StripeManagedAccount(**internal_stripe_managed_account.dict())
 
 
 @router.post(
@@ -128,7 +137,13 @@ async def create_stripe_managed_account(
     body: StripeManagedAccountCreate,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    return await repository.create_stripe_managed_account(body)
+    internal_request = stripe_managed_account.StripeManagedAccountCreate(
+        **body.dict(skip_defaults=True)
+    )
+    internal_stripe_managed_account = await repository.create_stripe_managed_account(
+        internal_request
+    )
+    return StripeManagedAccount(**internal_stripe_managed_account.dict())
 
 
 @router.patch(
@@ -144,14 +159,19 @@ async def update_stripe_managed_account_by_id(
     body: StripeManagedAccountUpdate,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    stripe_managed_account = await repository.update_stripe_managed_account_by_id(
-        stripe_managed_account_id=stripe_managed_account_id, data=body
+
+    internal_request = stripe_managed_account.StripeManagedAccountUpdate(
+        **body.dict(skip_defaults=True)
     )
 
-    if not stripe_managed_account:
+    internal_stripe_managed_account = await repository.update_stripe_managed_account_by_id(
+        stripe_managed_account_id=stripe_managed_account_id, data=internal_request
+    )
+
+    if not internal_stripe_managed_account:
         raise _stripe_managed_account_not_found()
 
-    return stripe_managed_account
+    return StripeManagedAccount(**internal_stripe_managed_account.dict())
 
 
 def _payment_account_not_found() -> PaymentException:

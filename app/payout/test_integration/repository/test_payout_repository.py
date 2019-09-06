@@ -40,7 +40,7 @@ class TestPayoutRepository:
         ), "retrieved payout matches"
 
     async def test_update_payout_by_id(self, payout_repo: PayoutRepository):
-        ts_utc = datetime.now(timezone.utc)
+        ts_utc = datetime.utcnow()
         data = PayoutCreate(
             amount=1000,
             payment_account_id=123,
@@ -65,7 +65,7 @@ class TestPayoutRepository:
             created.id
         ), "retrieved payout matches"
 
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.utcnow()
         new_data = PayoutUpdate(status="OK", updated_at=timestamp)
         updated = await payout_repo.update_payout_by_id(created.id, new_data)
         assert updated, "updated"

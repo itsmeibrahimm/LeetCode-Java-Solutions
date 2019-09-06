@@ -3,10 +3,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 
+from app.payout.repository.maindb.model import stripe_transfer
 from app.payout.service import TransferRepository, TransferRepositoryInterface
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payout.api.response import Acknowledgement
-from app.payout.repository.maindb.model.stripe_transfer import (
+from app.payout.api.transfer.v0.models import (
     StripeTransfer,
     StripeTransferCreate,
     StripeTransferUpdate,
@@ -88,7 +89,13 @@ async def create_stripe_transfer(
     data: StripeTransferCreate,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
 ):
-    return await repository.create_stripe_transfer(data=data)
+    internal_request = stripe_transfer.StripeTransferCreate(
+        **data.dict(skip_defaults=True)
+    )
+    internal_stripe_transfer = await repository.create_stripe_transfer(
+        data=internal_request
+    )
+    return StripeTransfer(**internal_stripe_transfer.dict())
 
 
 @router.get(
@@ -102,7 +109,14 @@ async def get_stripe_transfer_by_stripe_id(
     stripe_id: str,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
 ):
-    return await repository.get_stripe_transfer_by_stripe_id(stripe_id=stripe_id)
+    internal_stripe_transfer = await repository.get_stripe_transfer_by_stripe_id(
+        stripe_id=stripe_id
+    )
+    return (
+        StripeTransfer(**internal_stripe_transfer.dict())
+        if internal_stripe_transfer
+        else None
+    )
 
 
 @router.get(
@@ -116,7 +130,13 @@ async def get_stripe_transfer_by_transfer_id(
     transfer_id: int,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
 ):
-    return await repository.get_stripe_transfers_by_transfer_id(transfer_id=transfer_id)
+    internal_stripe_transfers = await repository.get_stripe_transfers_by_transfer_id(
+        transfer_id=transfer_id
+    )
+    return [
+        StripeTransfer(**internal_stripe_transfer.dict())
+        for internal_stripe_transfer in internal_stripe_transfers
+    ]
 
 
 @router.get(
@@ -131,14 +151,14 @@ async def get_stripe_transfer_by_id(
     stripe_transfer_id: int,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
 ):
-    stripe_transfer = await repository.get_stripe_transfer_by_id(
+    internal_stripe_transfer = await repository.get_stripe_transfer_by_id(
         stripe_transfer_id=stripe_transfer_id
     )
 
-    if not stripe_transfer:
+    if not internal_stripe_transfer:
         raise _stripe_transfer_not_found()
 
-    return stripe_transfer
+    return StripeTransfer(**internal_stripe_transfer.dict())
 
 
 @router.patch(
@@ -154,14 +174,19 @@ async def update_stripe_transfer_by_id(
     body: StripeTransferUpdate,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
 ) -> Optional[StripeTransfer]:
-    updated_stripe_transfer = await repository.update_stripe_transfer_by_id(
-        stripe_transfer_id=stripe_transfer_id, data=body
+
+    internal_request = stripe_transfer.StripeTransferUpdate(
+        **body.dict(skip_defaults=True)
     )
 
-    if not updated_stripe_transfer:
+    internal_stripe_transfer = await repository.update_stripe_transfer_by_id(
+        stripe_transfer_id=stripe_transfer_id, data=internal_request
+    )
+
+    if not internal_stripe_transfer:
         raise _stripe_transfer_not_found()
 
-    return updated_stripe_transfer
+    return StripeTransfer(**internal_stripe_transfer.dict())
 
 
 @router.delete(

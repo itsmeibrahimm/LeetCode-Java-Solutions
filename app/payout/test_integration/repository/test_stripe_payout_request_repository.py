@@ -193,7 +193,7 @@ class TestPayoutRepository:
             )
         ), "retrieved stripe payout request matches"
 
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.utcnow()
 
         new_data = StripePayoutRequestUpdate(
             status="OK", updated_at=timestamp, events=json.dumps([{"a": "b"}])
