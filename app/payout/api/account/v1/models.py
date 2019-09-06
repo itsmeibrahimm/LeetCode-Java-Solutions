@@ -17,6 +17,7 @@ from app.payout.types import (
     PayoutAmountType,
     PayoutType,
     PayoutMethodType,
+    PayoutTargetType,
 )
 
 __all__ = ["PayoutAccountId", "PayoutAccountToken"]
@@ -82,6 +83,8 @@ class PayoutMethod(PaymentResponse):
 class PayoutRequest(PaymentRequest):
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.Standard
+    target_id: Optional[str] = None
+    target_type: Optional[PayoutTargetType] = None
     transfer_id: Optional[str] = None
     payout_id: Optional[str] = None
     method: Optional[PayoutMethodType]

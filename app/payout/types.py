@@ -32,3 +32,8 @@ class PayoutType(str, Enum):
 
 class PayoutMethodType(str, Enum):
     Stripe = "stripe"
+
+
+class PayoutTargetType(str, Enum):
+    Dasher = "dasher"
+    Store = "store"

@@ -134,6 +134,8 @@ async def create_payout(
             payout_account_id=payout_account_id,
             amount=body.amount,
             payout_type=body.payout_type,
+            target_id=body.target_id,
+            target_type=body.target_type,
             transfer_id=body.transfer_id,
             method=body.method,
             submitted_by=body.submitted_by,

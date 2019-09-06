@@ -16,6 +16,7 @@ from app.payout.types import (
     PayoutType,
     PayoutMethodType,
     PayoutAccountId,
+    PayoutTargetType,
 )
 
 
@@ -27,6 +28,8 @@ class CreateStandardPayoutRequest(OperationRequest):
     payout_account_id: PayoutAccountId
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.Standard
+    target_id: Optional[str] = None
+    target_type: Optional[PayoutTargetType] = None
     transfer_id: Optional[str] = None
     method: Optional[PayoutMethodType]
     submitted_by: Optional[str] = None
