@@ -1,7 +1,7 @@
 import stripe
 import time
 
-from . import payin_client_pulse
+from . import payer_v1_client, payment_method_v1_client
 
 # TODO: Add stripe API key to bond service
 API_KEY = "####"
@@ -23,11 +23,7 @@ class StripeUtil:
 class PaymentUtil:
     @staticmethod
     def get_payment_method_info(payer):
-        return {
-            "payer_id": payer["id"],
-            "payment_gateway": "stripe",
-            "token": "tok_visa",
-        }
+        return {"payer_id": payer.id, "payment_gateway": "stripe", "token": "tok_visa"}
 
     @staticmethod
     def get_payer_info(
@@ -43,14 +39,14 @@ class PaymentUtil:
 
     @staticmethod
     def create_payer():
-        return payin_client_pulse.create_payer_api_v1_payers_post_with_http_info(
+        return payer_v1_client.create_payer_with_http_info(
             create_payer_request=PaymentUtil.get_payer_info()
         )
 
     @staticmethod
     def create_payment_method(payer_id: str, payer_id_type: str):
         if payer_id_type == "dd_payer_id":
-            return payin_client_pulse.create_payment_method_api_v1_payment_methods_post(
+            return payment_method_v1_client.create_payment_method(
                 create_payment_method_request={
                     "payer_id": payer_id,
                     "payment_gateway": "stripe",
@@ -58,7 +54,7 @@ class PaymentUtil:
                 }
             )
         elif payer_id_type == "stripe_customer_id":
-            return payin_client_pulse.create_payment_method_api_v1_payment_methods_post(
+            return payment_method_v1_client.create_payment_method(
                 create_payment_method_request={
                     "payment_gateway": "stripe",
                     "token": "tok_visa",
@@ -76,13 +72,13 @@ class PaymentUtil:
         capture_method: str = "auto",
     ):
         return {
-            "payer_id": payer["id"],
+            "payer_id": payer.id,
             "payer_id_type": "dd_payer_id",
             "amount": amount,
             "payer_country": country,
             "payment_country": country,
             "currency": currency,
-            "payment_method_id": payment_method["id"],
+            "payment_method_id": payment_method.id,
             "payment_method_id_type": "dd_payment_method_id",
             "capture_method": capture_method,
             "idempotency_key": str(int(time.time())),
@@ -96,7 +92,7 @@ class PaymentUtil:
     def get_update_cart_payment_info(payer, updated_amount: int):
         return {
             "idempotency_key": str(int(time.time())),
-            "payer_id": payer["id"],
+            "payer_id": payer.id,
             "payer_id_type": "dd_payer_id",
             "amount": updated_amount,
         }
