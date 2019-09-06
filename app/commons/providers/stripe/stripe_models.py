@@ -246,6 +246,10 @@ class PaymentMethod(StripeBaseModel):
     _STRIPE_OBJECT_NAME: str = "payment_method"
 
     class Card(StripeBaseModel):
+        class Wallet(StripeBaseModel):
+            type: str
+            dynamic_last4: str
+
         exp_month: int
         exp_year: int
         fingerprint: str
@@ -254,6 +258,7 @@ class PaymentMethod(StripeBaseModel):
         brand: Optional[str]
         country: Optional[str]
         description: Optional[str]
+        wallet: Optional[Wallet]
 
     id: str
     type: str

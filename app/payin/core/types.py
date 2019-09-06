@@ -87,5 +87,5 @@ class DisputePaymentMethodIdType(str, Enum):
     type of input payment method id
     """
 
-    DD_PAYMENT_METHOD_ID = "dd_payment_method_id"
-    STRIPE_PAYMENT_METHOD_ID = "stripe_payment_method_id"
+    DD_PAYMENT_METHOD_ID = PaymentMethodIdType.DD_PAYMENT_METHOD_ID
+    STRIPE_PAYMENT_METHOD_ID = PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID

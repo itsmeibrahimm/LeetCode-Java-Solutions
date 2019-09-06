@@ -58,11 +58,12 @@ async def payment_method(payer, payment_method_repository: PaymentMethodReposito
         type="mastercard",
         active=True,
     )
-
-    insert_result = await payment_method_repository.insert_payment_method_and_stripe_card(
-        insert_payment_method, insert_stripe_card
+    insert_pm_result = await payment_method_repository.insert_pgp_payment_method(
+        insert_payment_method
     )
-    yield insert_result[0]
+    await payment_method_repository.insert_stripe_card(insert_stripe_card)
+
+    yield insert_pm_result
 
 
 @pytest.fixture

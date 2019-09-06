@@ -69,16 +69,23 @@ class PaymentMethodClient:
         self,
         id: str,
         pgp_code: str,
-        pgp_resource_id: str,
         stripe_payment_method: StripePaymentMethod,
         payer_id: Optional[str],
         legacy_consumer_id: Optional[str],
     ) -> RawPaymentMethod:
         now = datetime.utcnow()
         try:
-            pm_entity, sc_entity = await self.payment_method_repo.insert_payment_method_and_stripe_card(
+            dynamic_last4: Optional[
+                str
+            ] = ""  # stupid existing DSJ logic in add_payment_card_to_consumer()
+            tokenization_method: Optional[str] = None
+            if stripe_payment_method.card.wallet:
+                dynamic_last4 = stripe_payment_method.card.wallet.dynamic_last4
+                tokenization_method = stripe_payment_method.card.wallet.type
+
+            pm_entity = await self.payment_method_repo.insert_pgp_payment_method(
                 pm_input=InsertPgpPaymentMethodInput(
-                    id=generate_object_uuid(ResourceUuidPrefix.PGP_PAYMENT_METHOD),
+                    id=id,
                     payer_id=(payer_id if payer_id else None),
                     pgp_code=pgp_code,
                     pgp_resource_id=stripe_payment_method.id,
@@ -88,24 +95,31 @@ class PaymentMethodClient:
                     created_at=now,
                     updated_at=now,
                     attached_at=now,
-                ),
+                )
+            )
+
+            sc_entity = await self.payment_method_repo.insert_stripe_card(
                 sc_input=InsertStripeCardInput(
                     stripe_id=stripe_payment_method.id,
                     fingerprint=stripe_payment_method.card.fingerprint,
                     last4=stripe_payment_method.card.last4,
                     external_stripe_customer_id=stripe_payment_method.customer,
                     country_of_origin=stripe_payment_method.card.country,
-                    dynamic_last4=stripe_payment_method.card.last4,
+                    dynamic_last4=dynamic_last4,
+                    tokenization_method=tokenization_method,
                     exp_month=stripe_payment_method.card.exp_month,
                     exp_year=stripe_payment_method.card.exp_year,
                     type=stripe_payment_method.card.brand,
                     active=True,
                     created_at=now,  # FIXME: need to fix timezone
-                ),
+                )
             )
+
+            # TODO: add new state in pgp_payment_methods table to keep track of cross DB consistency
+
         except DataError as e:
             self.log.error(
-                f"[create_payment_method_raw_objects][{payer_id}] DataError when write db. {e}"
+                f"[create_raw_payment_method][{payer_id}] DataError when write db. {e}"
             )
             raise PaymentMethodCreateError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_DB_ERROR, retryable=True
@@ -402,7 +416,6 @@ class PaymentMethodProcessor:
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
             id=generate_object_uuid(ResourceUuidPrefix.PGP_PAYMENT_METHOD),
             pgp_code=pgp_code,
-            pgp_resource_id=stripe_payment_method.id,
             stripe_payment_method=stripe_payment_method,
             payer_id=payer_id,
             legacy_consumer_id=dd_consumer_id,

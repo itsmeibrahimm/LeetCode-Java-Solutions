@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
 
 from typing_extensions import final
 
@@ -128,9 +128,15 @@ class PaymentMethodRepositoryInterface:
     """
 
     @abstractmethod
-    async def insert_payment_method_and_stripe_card(
-        self, pm_input: InsertPgpPaymentMethodInput, sc_input: InsertStripeCardInput
-    ) -> Tuple[PgpPaymentMethodDbEntity, StripeCardDbEntity]:
+    async def insert_pgp_payment_method(
+        self, pm_input: InsertPgpPaymentMethodInput
+    ) -> PgpPaymentMethodDbEntity:
+        ...
+
+    @abstractmethod
+    async def insert_stripe_card(
+        self, sc_input: InsertStripeCardInput
+    ) -> StripeCardDbEntity:
         ...
 
     @abstractmethod
@@ -166,59 +172,33 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
     PaymentMethod repository class that exposes complicated CRUD operations APIs for business layer.
     """
 
-    async def insert_payment_method_and_stripe_card(
-        self, pm_input: InsertPgpPaymentMethodInput, sc_input: InsertStripeCardInput
-    ) -> Tuple[PgpPaymentMethodDbEntity, StripeCardDbEntity]:
-        maindb_conn = self.main_database.master()
+    async def insert_pgp_payment_method(
+        self, pm_input: InsertPgpPaymentMethodInput
+    ) -> PgpPaymentMethodDbEntity:
         paymentdb_conn = self.payment_database.master()
-        async with maindb_conn.transaction(), paymentdb_conn.transaction():
-            # insert object into stripe_card table
-            try:
-                log.info(
-                    "[insert_payment_method_and_stripe_card] ready to insert stripe_card table"
-                )
-                stmt = (
-                    stripe_cards.table.insert()
-                    .values(sc_input.dict(skip_defaults=True))
-                    .returning(*stripe_cards.table.columns.values())
-                )
-                row = await maindb_conn.fetch_one(stmt)
-                assert row
-                sc_output = StripeCardDbEntity.from_row(row)
-                log.info(
-                    "[insert_payment_method_and_stripe_card] insert stripe_card table completed."
-                )
-            except Exception as e:
-                log.error(
-                    "[insert_payment_method_and_stripe_card] exception caught by inserting stripe_card table. rollback from stripe_card table",
-                    e,
-                )
-                raise e
-
+        async with paymentdb_conn.transaction():
             # insert object into pgp_payment_methods table
-            try:
-                log.info(
-                    "[insert_payment_method_and_stripe_card] ready to insert pgp_payment_methods table"
-                )
-                stmt = (
-                    pgp_payment_methods.table.insert()
-                    .values(pm_input.dict(skip_defaults=True))
-                    .returning(*pgp_payment_methods.table.columns.values())
-                )
-                row = await self.payment_database.master().fetch_one(stmt)
-                assert row
-                pm_output = PgpPaymentMethodDbEntity.from_row(row)
-                log.info(
-                    "[insert_payment_method_and_stripe_card] insert pgp_payment_methods table completed."
-                )
-            except Exception as e:
-                log.error(
-                    "[insert_payment_method_and_stripe_card] exception caught by inserting pgp_customers table. rollback both stripe_customer and pgp_payment_method",
-                    e,
-                )
-                raise e
+            stmt = (
+                pgp_payment_methods.table.insert()
+                .values(pm_input.dict(skip_defaults=True))
+                .returning(*pgp_payment_methods.table.columns.values())
+            )
+            row = await self.payment_database.master().fetch_one(stmt)
+            return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
-            return pm_output, sc_output
+    async def insert_stripe_card(
+        self, sc_input: InsertStripeCardInput
+    ) -> StripeCardDbEntity:
+        maindb_conn = self.main_database.master()
+        async with maindb_conn.transaction():
+            # insert object into stripe_card table
+            stmt = (
+                stripe_cards.table.insert()
+                .values(sc_input.dict(skip_defaults=True))
+                .returning(*stripe_cards.table.columns.values())
+            )
+            row = await maindb_conn.fetch_one(stmt)
+            return StripeCardDbEntity.from_row(row) if row else None
 
     async def get_pgp_payment_method_by_payment_method_id(
         self, input: GetPgpPaymentMethodByPaymentMethodIdInput

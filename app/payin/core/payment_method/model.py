@@ -5,10 +5,17 @@ from pydantic import BaseModel
 from typing_extensions import final
 
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
+from app.payin.core.payment_method.types import WalletType
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
 )
+
+
+@final
+class Wallet(BaseModel):
+    type: WalletType
+    dynamic_last4: str
 
 
 @final
@@ -22,6 +29,7 @@ class Card(BaseModel):
     country: Optional[str]
     brand: Optional[str]
     payment_provider_card_id: Optional[str] = None
+    wallet: Optional[Wallet] = None
 
 
 @final
@@ -61,6 +69,13 @@ class RawPaymentMethod:
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
             )
 
+        wallet: Optional[Wallet] = None
+        if self.stripe_card_entity.tokenization_method:
+            wallet = Wallet(
+                type=self.stripe_card_entity.tokenization_method,
+                dynamic_last4=self.stripe_card_entity.dynamic_last4,
+            )
+
         card: Card = Card(
             country=self.stripe_card_entity.country_of_origin,
             last4=self.stripe_card_entity.last4,
@@ -71,6 +86,7 @@ class RawPaymentMethod:
             legacy_dd_stripe_card_id=self.stripe_card_entity.id,
             brand=self.stripe_card_entity.type,
             payment_provider_card_id=self.stripe_card_entity.stripe_id,
+            wallet=wallet,
         )
 
         return (
