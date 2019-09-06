@@ -1,11 +1,11 @@
 from datetime import datetime
 from typing import Optional
-
 from pydantic import BaseModel
 from typing_extensions import final
 
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
 from app.payin.core.payment_method.types import WalletType
+from app.payin.core.types import MixedUuidStrType
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -34,10 +34,10 @@ class Card(BaseModel):
 
 @final
 class PaymentMethod(BaseModel):
-    id: str
+    id: MixedUuidStrType
     payment_provider: str
     card: Card
-    payer_id: Optional[str]
+    payer_id: Optional[MixedUuidStrType]
     type: Optional[str]
     dd_consumer_id: Optional[str] = None
     payment_provider_customer_id: Optional[str] = None

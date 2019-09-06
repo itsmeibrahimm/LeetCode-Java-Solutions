@@ -80,7 +80,7 @@ class PaymentIntentFactory(factory.Factory):
     class Meta:
         model = PaymentIntent
 
-    id = factory.LazyAttribute(lambda o: str(uuid4()))
+    id = factory.LazyAttribute(lambda o: uuid4())
     cart_payment_id = factory.LazyAttribute(lambda o: str(uuid4()))
     idempotency_key = factory.LazyAttribute(lambda o: str(uuid4()))
     amount_initiated = 100
@@ -94,7 +94,7 @@ class PaymentIntentFactory(factory.Factory):
     currency = CurrencyType.USD
     status = IntentStatus.INIT
     statement_descriptor = "Maccas"
-    payment_method_id = "asdf"
+    payment_method_id = uuid4()
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)
     captured_at = None
@@ -105,7 +105,7 @@ class CartPaymentFactory(factory.Factory):
     class Meta:
         model = CartPayment
 
-    id = factory.LazyAttribute(lambda o: str(uuid4()))
+    id = factory.LazyAttribute(lambda o: uuid4())
     amount = 100
     payer_id = 1
     payment_method_id = None

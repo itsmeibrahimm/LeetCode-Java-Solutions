@@ -10,6 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
+from sqlalchemy.dialects import postgresql
+
 revision = "ca09cb90118d"
 down_revision = "c16c2d11e496"
 branch_labels = None
@@ -19,13 +21,15 @@ depends_on = None
 def upgrade():
     op.create_table(
         "pgp_customers",
-        sa.Column("id", sa.String(255), nullable=False, primary_key=True),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=False), nullable=False, primary_key=True
+        ),
         sa.Column("legacy_id", sa.BigInteger),
         sa.Column("pgp_code", sa.String(16)),
         sa.Column("pgp_resource_id", sa.Text(), nullable=False),
         sa.Column(
             "payer_id",
-            sa.String(255),
+            postgresql.UUID(as_uuid=False),
             sa.schema.ForeignKey("payers.id"),
             nullable=False,
         ),

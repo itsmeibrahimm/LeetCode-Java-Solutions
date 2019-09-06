@@ -2,12 +2,14 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Tuple
+from uuid import UUID
 
 from sqlalchemy import select, and_
 from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.model import DBRequestModel, DBEntity
+from app.payin.core.types import MixedUuidStrType
 from app.payin.models.maindb import stripe_customers
 from app.payin.models.paymentdb import payers, pgp_customers
 from app.payin.repository.base import PayinDBRepository
@@ -21,7 +23,7 @@ class PayerDbEntity(DBEntity):
     The variable name must be consistent with DB table column name
     """
 
-    id: str
+    id: UUID
     payer_type: str
     country: str
     legacy_stripe_customer_id: Optional[str] = None
@@ -43,7 +45,7 @@ class GetPayerByIdInput(DBRequestModel):
     The variable name must be consistent with DB table column name
     """
 
-    id: Optional[str]
+    id: Optional[MixedUuidStrType]
     legacy_stripe_customer_id: Optional[str]
     dd_payer_id: Optional[str]
 
@@ -65,8 +67,8 @@ class PgpCustomerDbEntity(DBEntity):
     The variable name must be consistent with DB table column name
     """
 
-    id: str
-    payer_id: str
+    id: UUID
+    payer_id: UUID
     pgp_resource_id: str
     currency: Optional[str] = None
     pgp_code: Optional[str] = None
@@ -100,7 +102,7 @@ class UpdatePgpCustomerSetInput(DBRequestModel):
 
 
 class UpdatePgpCustomerWhereInput(DBRequestModel):
-    id: str
+    id: UUID
 
 
 ###########################################################

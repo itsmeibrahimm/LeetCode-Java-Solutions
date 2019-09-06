@@ -38,7 +38,7 @@ class CartPaymentRepository(PayinDBRepository):
         self,
         *,
         id: UUID,
-        payer_id: Optional[str],
+        payer_id: Optional[UUID],
         type: str,
         client_description: Optional[str],
         reference_id: int,
@@ -168,7 +168,7 @@ class CartPaymentRepository(PayinDBRepository):
         status: str,
         statement_descriptor: Optional[str],
         capture_after: Optional[datetime],
-        payment_method_id: Optional[str],
+        payment_method_id: Optional[UUID],
     ) -> PaymentIntent:
         data = {
             payment_intents.id: id,
@@ -434,7 +434,7 @@ class CartPaymentRepository(PayinDBRepository):
     async def insert_payment_intent_adjustment_history(
         self,
         id: UUID,
-        payer_id: Optional[str],
+        payer_id: Optional[UUID],
         payment_intent_id: UUID,
         amount: int,
         amount_original: int,

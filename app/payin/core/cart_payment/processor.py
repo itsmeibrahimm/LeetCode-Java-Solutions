@@ -74,7 +74,7 @@ class CartPaymentInterface:
         self.payment_method_client = payment_method_client
 
     async def _find_existing(
-        self, payer_id: Optional[str], idempotency_key: str
+        self, payer_id: Optional[uuid.UUID], idempotency_key: str
     ) -> Tuple[Optional[CartPayment], Optional[PaymentIntent]]:
         # TODO support legacy payment case, where there is no payer_id
         payment_intent = await self.payment_repo.get_payment_intent_for_idempotency_key(
@@ -598,7 +598,7 @@ class CartPaymentInterface:
         self,
         cart_payment: CartPayment,
         idempotency_key: str,
-        payment_method_id: Optional[str],
+        payment_method_id: Optional[uuid.UUID],
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
         amount: int,
@@ -865,8 +865,8 @@ class CartPaymentInterface:
 
     async def _get_required_payment_resource_ids(
         self,
-        payer_id: Optional[str],
-        payment_method_id: Optional[str],
+        payer_id: Optional[uuid.UUID],
+        payment_method_id: Optional[uuid.UUID],
         legacy_payment: Optional[LegacyPayment],
     ) -> Tuple[str, str]:
         # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent

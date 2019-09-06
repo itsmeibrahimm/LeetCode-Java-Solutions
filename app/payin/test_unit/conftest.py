@@ -315,7 +315,7 @@ class MockedPaymentRepo:
     async def insert_payment_intent_adjustment_history(
         self,
         id: UUID,
-        payer_id: str,
+        payer_id: UUID,
         payment_intent_id: UUID,
         amount: int,
         amount_original: int,

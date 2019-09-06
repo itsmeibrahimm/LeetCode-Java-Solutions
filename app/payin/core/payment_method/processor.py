@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from fastapi import Depends
 from psycopg2._psycopg import DataError
@@ -18,7 +19,7 @@ from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
 )
 from app.commons.types import CountryCode
-from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
+from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PayinErrorCode,
@@ -28,7 +29,7 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payment_method.model import PaymentMethod, RawPaymentMethod
-from app.payin.core.types import PaymentMethodIdType, PayerIdType
+from app.payin.core.types import PaymentMethodIdType, PayerIdType, MixedUuidStrType
 from app.payin.repository.payment_method_repo import (
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
@@ -67,7 +68,7 @@ class PaymentMethodClient:
 
     async def create_raw_payment_method(
         self,
-        id: str,
+        id: UUID,
         pgp_code: str,
         stripe_payment_method: StripePaymentMethod,
         payer_id: Optional[str],
@@ -130,8 +131,8 @@ class PaymentMethodClient:
 
     async def _get_raw_payment_method(
         self,
-        payment_method_id: str,
-        payer_id: Optional[str] = None,
+        payment_method_id: MixedUuidStrType,
+        payer_id: Optional[MixedUuidStrType] = None,
         payer_id_type: Optional[str] = None,
         payment_method_id_type: Optional[str] = None,
     ) -> RawPaymentMethod:
@@ -189,8 +190,8 @@ class PaymentMethodClient:
 
     async def get_raw_payment_method(
         self,
-        payer_id: str,
-        payment_method_id: str,
+        payer_id: MixedUuidStrType,
+        payment_method_id: MixedUuidStrType,
         payer_id_type: Optional[str] = None,
         payment_method_id_type: Optional[str] = None,
     ) -> RawPaymentMethod:
@@ -213,7 +214,7 @@ class PaymentMethodClient:
 
     async def detach_raw_payment_method(
         self,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         pgp_payment_method_id: str,
         raw_payment_method: RawPaymentMethod,
     ) -> RawPaymentMethod:
@@ -221,7 +222,6 @@ class PaymentMethodClient:
         updated_sc_entity: Optional[StripeCardDbEntity] = None
         try:
             now = datetime.utcnow()
-
             if raw_payment_method.pgp_payment_method_entity:
                 updated_pm_entity = await self.payment_method_repo.delete_pgp_payment_method_by_id(
                     input_set=DeletePgpPaymentMethodByIdSetInput(
@@ -292,7 +292,7 @@ class PaymentMethodClient:
 
     async def pgp_detach_payment_method(
         self,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         pgp_payment_method_id: str,
         country: Optional[str] = CountryCode.US,
     ) -> StripePaymentMethod:
@@ -414,7 +414,7 @@ class PaymentMethodProcessor:
 
         # step 3: crete pgp_payment_method and stripe_card objects
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
-            id=generate_object_uuid(ResourceUuidPrefix.PGP_PAYMENT_METHOD),
+            id=generate_object_uuid(),
             pgp_code=pgp_code,
             stripe_payment_method=stripe_payment_method,
             payer_id=payer_id,
@@ -424,7 +424,7 @@ class PaymentMethodProcessor:
 
     async def get_payment_method(
         self,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payment_method_id: str,
         payer_id_type: str = None,
         payment_method_id_type: str = None,
@@ -462,7 +462,7 @@ class PaymentMethodProcessor:
 
     async def delete_payment_method(
         self,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payment_method_id: str,
         country: CountryCode,
         payer_id_type: str = None,
@@ -556,8 +556,8 @@ class PaymentMethodOpsInterface:
     @abstractmethod
     async def get_payment_method_raw_objects(
         self,
-        payment_method_id: str,
-        payer_id: Optional[str],
+        payment_method_id: MixedUuidStrType,
+        payer_id: Optional[MixedUuidStrType],
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:
@@ -567,8 +567,8 @@ class PaymentMethodOpsInterface:
 class PaymentMethodOps(PaymentMethodOpsInterface):
     async def get_payment_method_raw_objects(
         self,
-        payment_method_id: str,
-        payer_id: Optional[str],
+        payment_method_id: MixedUuidStrType,
+        payer_id: Optional[MixedUuidStrType],
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:
@@ -638,8 +638,8 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
 class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
     async def get_payment_method_raw_objects(
         self,
-        payment_method_id: str,
-        payer_id: Optional[str],
+        payment_method_id: MixedUuidStrType,
+        payer_id: Optional[MixedUuidStrType],
         payer_id_type: Optional[str],
         payment_method_id_type: Optional[str],
     ) -> RawPaymentMethod:

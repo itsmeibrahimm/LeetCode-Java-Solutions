@@ -10,6 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
+from sqlalchemy.dialects import postgresql
+
 revision = "0304ed952ab6"
 down_revision = "1320391a3ba3"
 branch_labels = None
@@ -21,7 +23,7 @@ def upgrade():
         "payment_intents",
         sa.Column(
             "payment_method_id",
-            sa.String(255),
+            postgresql.UUID(as_uuid=False),
             sa.schema.ForeignKey("pgp_payment_methods.id"),
             nullable=True,
         ),

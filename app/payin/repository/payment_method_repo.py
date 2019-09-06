@@ -2,6 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from typing_extensions import final
 
@@ -24,10 +25,10 @@ class PgpPaymentMethodDbEntity(DBEntity):
     The variable name must be consistent with DB table column name
     """
 
-    id: str
+    id: UUID
     pgp_code: str
     pgp_resource_id: str
-    payer_id: Optional[str] = None
+    payer_id: Optional[UUID] = None
     pgp_card_id: Optional[str] = None
     legacy_consumer_id: Optional[str] = None
     object: Optional[str] = None
@@ -44,7 +45,7 @@ class InsertPgpPaymentMethodInput(PgpPaymentMethodDbEntity):
 
 
 class GetPgpPaymentMethodByPaymentMethodIdInput(DBRequestModel):
-    payment_method_id: str
+    payment_method_id: UUID
 
 
 class GetPgpPaymentMethodByPgpResourceIdInput(DBRequestModel):
@@ -63,7 +64,7 @@ class DeletePgpPaymentMethodByIdSetInput(DBRequestModel):
 
 
 class DeletePgpPaymentMethodByIdWhereInput(DBRequestModel):
-    id: str
+    id: UUID
 
 
 ###########################################################

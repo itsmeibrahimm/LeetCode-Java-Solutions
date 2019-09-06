@@ -99,8 +99,8 @@ def generate_pgp_payment_intent(
 
 def generate_cart_payment(
     id: uuid.UUID = None,
-    payer_id: str = str(uuid.uuid4()),
-    payment_method_id: str = str(uuid.uuid4()),
+    payer_id: uuid.UUID = uuid.uuid4(),
+    payment_method_id: uuid.UUID = uuid.uuid4(),
     amount=500,
     capture_method=CaptureMethod.MANUAL.value,
 ) -> CartPayment:

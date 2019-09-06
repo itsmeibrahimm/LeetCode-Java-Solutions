@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from pydantic import ValidationError
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
@@ -131,6 +132,7 @@ async def create_cart_payment(
 
     try:
         cart_payment = await cart_payment_processor.submit_payment(
+            # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
             request_cart_payment=create_request_to_model(cart_payment_request),
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
@@ -145,7 +147,10 @@ async def create_cart_payment(
     except PaymentError as payment_error:
         log.info(f"exception from create_cart_payment() {payment_error}")
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        if payment_error.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
+        if payment_error.error_code in (
+            PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
+            PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+        ):
             http_status_code = HTTP_400_BAD_REQUEST
         elif (
             payment_error.error_code
@@ -213,33 +218,40 @@ def create_request_to_model(
             getattr(cart_payment_request, "legacy_payment", None)
         )
 
-    return CartPayment(
-        id=uuid4(),
-        payer_id=getattr(cart_payment_request, "payer_id", None),
-        amount=cart_payment_request.amount,
-        payment_method_id=getattr(cart_payment_request, "payment_method_id", None),
-        delay_capture=cart_payment_request.delay_capture,
-        cart_metadata=CartMetadata(
-            reference_id=cart_payment_request.metadata.reference_id,
-            ct_reference_id=cart_payment_request.metadata.ct_reference_id,
-            type=CartType(cart_payment_request.metadata.type),
-        ),
-        client_description=cart_payment_request.client_description,
-        payer_statement_description=cart_payment_request.payer_statement_description,
-        legacy_payment=legacy_payment,
-        split_payment=None
-        if not cart_payment_request.split_payment
-        else SplitPayment(
-            payout_account_id=getattr(
-                cart_payment_request.split_payment, "payout_account_id", None
+    try:
+        return CartPayment(
+            id=uuid4(),
+            payer_id=getattr(cart_payment_request, "payer_id", None),
+            amount=cart_payment_request.amount,
+            payment_method_id=getattr(cart_payment_request, "payment_method_id", None),
+            delay_capture=cart_payment_request.delay_capture,
+            cart_metadata=CartMetadata(
+                reference_id=cart_payment_request.metadata.reference_id,
+                ct_reference_id=cart_payment_request.metadata.ct_reference_id,
+                type=CartType(cart_payment_request.metadata.type),
             ),
-            application_fee_amount=getattr(
-                cart_payment_request.split_payment, "application_fee_amount", None
+            client_description=cart_payment_request.client_description,
+            payer_statement_description=cart_payment_request.payer_statement_description,
+            legacy_payment=legacy_payment,
+            split_payment=None
+            if not cart_payment_request.split_payment
+            else SplitPayment(
+                payout_account_id=getattr(
+                    cart_payment_request.split_payment, "payout_account_id", None
+                ),
+                application_fee_amount=getattr(
+                    cart_payment_request.split_payment, "application_fee_amount", None
+                ),
             ),
-        ),
-        created_at=None,
-        updated_at=None,
-    )
+            created_at=None,
+            updated_at=None,
+        )
+    except ValidationError as validation_error:
+        raise PaymentError(
+            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+            error_message=str(validation_error),
+            retryable=False,
+        )
 
 
 def get_legacy_payment_model(

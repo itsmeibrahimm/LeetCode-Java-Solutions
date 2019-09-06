@@ -2,6 +2,7 @@ from typing import List
 
 import pytest
 
+from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.payer.model import RawPayer
@@ -74,8 +75,9 @@ class TestDisputeClient:
     async def test_list_disputes_by_payer_id(self, dispute_client):
         dispute_list: List[StripeDisputeDbEntity] = [generate_dispute_db_entity()]
         raw_payer_mock = RawPayer()
+        payer_id = generate_object_uuid()
         raw_payer_mock.payer_entity = PayerDbEntity(
-            id="VALID_PAYED_ID",
+            id=payer_id,
             payer_type=DisputePayerIdType.DD_PAYMENT_PAYER_ID,
             country="usd",
             legacy_stripe_customer_id="VALID STRIPE CUSTOMER ID",
@@ -90,7 +92,7 @@ class TestDisputeClient:
             return_value=dispute_list
         )
         result = await dispute_client.get_disputes_list(
-            payer_id="VALID_PAYER_ID",
+            payer_id=payer_id,
             payer_id_type=DisputePayerIdType.DD_PAYMENT_PAYER_ID,
             payment_method_id=None,
             payment_method_id_type=None,
@@ -100,8 +102,9 @@ class TestDisputeClient:
     @pytest.mark.asyncio
     async def test_list_disputes_by_payment_method_id(self, dispute_client):
         dispute_entity_list = [generate_dispute_db_entity()]
+        pgp_payment_method_id = generate_object_uuid()
         pgp_entity_mock: PgpPaymentMethodDbEntity = PgpPaymentMethodDbEntity(
-            id="VALID_PGP_ID",
+            id=pgp_payment_method_id,
             pgp_code="STRIPE",
             pgp_resource_id="VALID_STRIPE_PAYMENT_METHOD_ID",
         )

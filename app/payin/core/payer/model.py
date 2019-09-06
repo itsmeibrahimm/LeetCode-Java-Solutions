@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing_extensions import final
 
 from app.commons.utils.types import PaymentProvider
+from app.payin.core.types import MixedUuidStrType
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
     PgpCustomerDbEntity,
@@ -25,7 +26,7 @@ PaymentGatewayProviderCustomer.update_forward_refs()
 
 @final
 class Payer(BaseModel):
-    id: str
+    id: MixedUuidStrType
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None

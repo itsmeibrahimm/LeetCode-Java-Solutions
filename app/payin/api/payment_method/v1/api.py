@@ -1,5 +1,4 @@
 from typing import Optional
-
 from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
@@ -23,7 +22,7 @@ from starlette.status import (
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
-from app.payin.core.types import PayerIdType, PaymentMethodIdType
+from app.payin.core.types import PayerIdType, PaymentMethodIdType, MixedUuidStrType
 
 api_tags = ["PaymentMethodV1"]
 router = APIRouter()
@@ -113,7 +112,7 @@ async def create_payment_method(
 )
 async def get_payment_method(
     request: Request,
-    payer_id: str,
+    payer_id: MixedUuidStrType,
     payment_method_id: str,
     country: CountryCode = CountryCode.US,
     payer_id_type: PayerIdType = None,
@@ -211,7 +210,7 @@ async def list_payment_methods(
 )
 async def delete_payment_method(
     request: Request,
-    payer_id: str,
+    payer_id: MixedUuidStrType,
     payment_method_id: str,
     country: CountryCode = CountryCode.US,
     payer_id_type: PayerIdType = None,

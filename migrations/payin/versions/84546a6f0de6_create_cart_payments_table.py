@@ -25,7 +25,7 @@ def upgrade():
         ),
         sa.Column(
             "payer_id",
-            sa.String(255),
+            postgresql.UUID(as_uuid=True),
             sa.schema.ForeignKey("payers.id"),
             nullable=False,
         ),

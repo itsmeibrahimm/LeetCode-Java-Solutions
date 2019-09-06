@@ -13,7 +13,7 @@ from app.commons.utils.dataclass_extensions import no_init_field
 class PaymentIntentAdjustmentTable(TableDefinition):
     name: str = no_init_field("payment_intents_adjustment_history")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    payer_id: Column = no_init_field(Column("payer_id", Text))
+    payer_id: Column = no_init_field(Column("payer_id", UUID(as_uuid=True)))
     payment_intent_id: Column = no_init_field(Column("payment_intent_id", Text))
     amount: Column = no_init_field(Column("amount", Integer))
     amount_original: Column = no_init_field(Column("amount_original", Integer))

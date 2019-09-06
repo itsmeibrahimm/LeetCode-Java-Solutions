@@ -1,4 +1,5 @@
-from uuid import uuid4
+from typing import cast
+from uuid import uuid4, UUID
 
 import pytest
 
@@ -70,7 +71,7 @@ async def payment_method(payer, payment_method_repository: PaymentMethodReposito
 async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Payer):
     yield await cart_payment_repository.insert_cart_payment(
         id=uuid4(),
-        payer_id=payer.id,
+        payer_id=cast(UUID, payer.id),
         type=CartType.ORDER_CART,
         amount_original=99,
         amount_total=100,

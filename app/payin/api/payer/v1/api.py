@@ -20,8 +20,7 @@ from starlette.status import (
 )
 
 from app.payin.core.payer.types import PayerType
-from app.payin.core.types import PayerIdType
-
+from app.payin.core.types import PayerIdType, MixedUuidStrType
 
 api_tags = ["PayerV1"]
 router = APIRouter()
@@ -147,7 +146,7 @@ async def get_payer(
     tags=api_tags,
 )
 async def update_payer(
-    payer_id: str,
+    payer_id: MixedUuidStrType,
     req_body: UpdatePayerRequest,
     log: BoundLogger = Depends(get_logger_from_req),
     payer_processor: PayerProcessor = Depends(PayerProcessor),

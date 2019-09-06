@@ -137,6 +137,7 @@ test-lint:
 
 .PHONY: test-typing
 test-typing:
+	rm -rf .mypy_cache; \
 	python -m mypy -p app $(MYPY_ADDOPTS)
 
 .PHONY: test-install-hooks

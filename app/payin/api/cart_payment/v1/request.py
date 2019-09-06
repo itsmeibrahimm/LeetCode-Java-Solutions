@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from app.commons.types import CountryCode
 from app.payin.core.cart_payment.types import CartType
-from app.payin.core.types import LegacyPaymentInfo
+from app.payin.core.types import LegacyPaymentInfo, MixedUuidStrType
 
 
 # Our Mypy type checking does not currently support Schema objects.
@@ -35,8 +35,8 @@ class CreateCartPaymentBaseRequest(BaseModel):
 
 
 class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
-    payer_id: str
-    payment_method_id: str
+    payer_id: MixedUuidStrType
+    payment_method_id: MixedUuidStrType
 
 
 class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):

@@ -15,7 +15,7 @@ from app.commons.providers.stripe.stripe_models import (
 )
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
-from app.commons.utils.uuid import generate_object_uuid, ResourceUuidPrefix
+from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
     PayerReadError,
     PayerCreationError,
@@ -25,7 +25,7 @@ from app.payin.core.exceptions import (
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod
-from app.payin.core.types import PayerIdType
+from app.payin.core.types import PayerIdType, MixedUuidStrType
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
     InsertPgpCustomerInput,
@@ -114,7 +114,7 @@ class PayerClient:
 
     async def get_raw_payer(
         self,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payer_id_type: Optional[str] = None,
         payer_type: Optional[str] = None,
     ) -> RawPayer:
@@ -144,7 +144,7 @@ class PayerClient:
         self,
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
         description: Optional[str] = None,
@@ -364,7 +364,7 @@ class PayerProcessor:
 
     async def update(
         self,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         default_payment_method_id: str,
         country: CountryCode = CountryCode.US,
         payer_id_type: Optional[str] = None,
@@ -443,7 +443,10 @@ class PayerOpsInterface:
 
     @abstractmethod
     async def get_payer_raw_objects(
-        self, payer_id: str, payer_id_type: Optional[str], payer_type: Optional[str]
+        self,
+        payer_id: MixedUuidStrType,
+        payer_id_type: Optional[str],
+        payer_type: Optional[str],
     ) -> RawPayer:
         ...
 
@@ -452,7 +455,7 @@ class PayerOpsInterface:
         self,
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:
@@ -473,7 +476,7 @@ class PayerOps(PayerOpsInterface):
         try:
             payer_entity: PayerDbEntity
             pgp_customer_entity: PgpCustomerDbEntity
-            payer_id = generate_object_uuid(ResourceUuidPrefix.PAYER)
+            payer_id = generate_object_uuid()
             payer_input = InsertPayerInput(
                 id=payer_id,
                 payer_type=payer_type,
@@ -484,7 +487,7 @@ class PayerOps(PayerOpsInterface):
             )
             # create Payer and PgpCustomer objects
             pgp_customer_input = InsertPgpCustomerInput(
-                id=generate_object_uuid(ResourceUuidPrefix.PGP_CUSTOMER),
+                id=generate_object_uuid(),
                 payer_id=payer_id,
                 pgp_code=pgp_code,
                 pgp_resource_id=pgp_customer_id,
@@ -510,7 +513,10 @@ class PayerOps(PayerOpsInterface):
         )
 
     async def get_payer_raw_objects(
-        self, payer_id: str, payer_id_type: Optional[str], payer_type: Optional[str]
+        self,
+        payer_id: MixedUuidStrType,
+        payer_id_type: Optional[str],
+        payer_type: Optional[str],
     ) -> RawPayer:
         payer_entity: Optional[PayerDbEntity] = None
         pgp_cus_entity: Optional[PgpCustomerDbEntity] = None
@@ -549,7 +555,7 @@ class PayerOps(PayerOpsInterface):
         self,
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:
@@ -594,7 +600,7 @@ class LegacyPayerOps(PayerOpsInterface):
         try:
             payer_entity: PayerDbEntity
             stripe_customer_entity: Optional[StripeCustomerDbEntity] = None
-            payer_id = generate_object_uuid(ResourceUuidPrefix.PAYER)
+            payer_id = generate_object_uuid()
             payer_input = InsertPayerInput(
                 id=payer_id,
                 payer_type=payer_type,
@@ -649,7 +655,10 @@ class LegacyPayerOps(PayerOpsInterface):
         )
 
     async def get_payer_raw_objects(
-        self, payer_id: str, payer_id_type: Optional[str], payer_type: Optional[str]
+        self,
+        payer_id: MixedUuidStrType,
+        payer_id_type: Optional[str],
+        payer_type: Optional[str],
     ) -> RawPayer:
         payer_entity: Optional[PayerDbEntity] = None
         pgp_cus_entity: Optional[PgpCustomerDbEntity] = None
@@ -709,7 +718,7 @@ class LegacyPayerOps(PayerOpsInterface):
         self,
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
-        payer_id: str,
+        payer_id: MixedUuidStrType,
         payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:

@@ -1,9 +1,13 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 
 from pydantic import BaseModel
 
 from app.commons.types import CountryCode
+
+
+MixedUuidStrType = Union[UUID, str]
 
 
 class LegacyPaymentInfo(BaseModel):
