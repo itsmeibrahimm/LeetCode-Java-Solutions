@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext, build_req_context
+from app.payin.core.cart_payment.model import PaymentIntent
 from app.payin.core.cart_payment.processor import CartPaymentInterface
 from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -82,10 +83,19 @@ async def resolve_capturing_payment_intents(
         datetime.utcnow() - timedelta(hours=1)
     )
 
-    for payment_intent in payment_intents:
-        async with resolve_capturing_payment_intent_semaphore:
-            await cart_payment_repo.update_payment_intent_status(
-                payment_intent.id,
-                new_status=IntentStatus.REQUIRES_CAPTURE.value,
-                previous_status=payment_intent.status,
-            )
+    futures = [
+        _resolve_capturing_payment_intents(cart_payment_repo, payment_intent)
+        for payment_intent in payment_intents
+    ]
+    await asyncio.gather(*futures)
+
+
+async def _resolve_capturing_payment_intents(
+    cart_payment_repo: CartPaymentRepository, payment_intent: PaymentIntent
+):
+    async with resolve_capturing_payment_intent_semaphore:
+        return await cart_payment_repo.update_payment_intent_status(
+            payment_intent.id,
+            new_status=IntentStatus.REQUIRES_CAPTURE.value,
+            previous_status=payment_intent.status,
+        )
