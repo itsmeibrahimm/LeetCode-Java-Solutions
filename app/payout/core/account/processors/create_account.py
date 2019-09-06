@@ -3,9 +3,9 @@ from typing import Union
 from app.commons.context.logger import Log
 from app.commons.core.errors import PaymentError, DEFAULT_INTERNAL_ERROR
 from app.commons.core.processor import (
-    AsyncProcessor,
-    ProcessorRequest,
-    ProcessorResponse,
+    AsyncOperation,
+    OperationRequest,
+    OperationResponse,
 )
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
@@ -16,16 +16,16 @@ from app.payout.repository.maindb.payment_account import (
 )
 
 
-class CreatePayoutAccountResponse(ProcessorResponse):
+class CreatePayoutAccountResponse(OperationResponse):
     payment_account: PaymentAccount
 
 
-class CreatePayoutAccountRequest(ProcessorRequest):
+class CreatePayoutAccountRequest(OperationRequest):
     statement_descriptor: str = "DoorDash, Inc."
 
 
 class CreatePayoutAccount(
-    AsyncProcessor[CreatePayoutAccountRequest, CreatePayoutAccountResponse]
+    AsyncOperation[CreatePayoutAccountRequest, CreatePayoutAccountResponse]
 ):
     """
     Processor to create a payout account

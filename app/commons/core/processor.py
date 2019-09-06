@@ -7,21 +7,21 @@ from app.commons.context.logger import Log, get_logger
 from app.commons.core.errors import PaymentError
 
 
-class ProcessorResponse(BaseModel):
+class OperationResponse(BaseModel):
     pass
 
 
-class ProcessorRequest(BaseModel):
+class OperationRequest(BaseModel):
     pass
 
 
-RespT = TypeVar("RespT", bound=ProcessorResponse)
-ReqT = TypeVar("ReqT", bound=ProcessorRequest)
+RespT = TypeVar("RespT", bound=OperationResponse)
+ReqT = TypeVar("ReqT", bound=OperationRequest)
 
 
-class AsyncProcessor(ABC, Generic[ReqT, RespT]):
+class AsyncOperation(ABC, Generic[ReqT, RespT]):
     """
-    Abstraction of an async processor running a specific set of business logic
+    Abstraction of an async operation running a specific set of business logic
     """
 
     logger: Log
@@ -31,7 +31,7 @@ class AsyncProcessor(ABC, Generic[ReqT, RespT]):
         self.logger = logger or get_logger(__name__)
         self.request = request
 
-    async def process(self) -> RespT:
+    async def execute(self) -> RespT:
         try:
             return await self._execute()
         except BaseException as internal_exec:

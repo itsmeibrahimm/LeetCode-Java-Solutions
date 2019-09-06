@@ -1,7 +1,11 @@
 from abc import ABCMeta
 
 from app.commons.context.app_context import AppContext, get_context_from_app
-from app.commons.context.req_context import ReqContext, get_context_from_req
+from app.commons.context.req_context import (
+    ReqContext,
+    get_context_from_req,
+    get_logger_from_req,
+)
 
 from starlette.requests import Request
 from structlog.stdlib import BoundLogger
@@ -32,4 +36,4 @@ class BaseService(metaclass=ABCMeta):
     def __init__(self, request: Request):
         self.app_context = get_context_from_app(request.app)
         self.req_context = get_context_from_req(request)
-        self.log = self.app_context.log.bind(app=self.service_name)
+        self.log = get_logger_from_req(request)

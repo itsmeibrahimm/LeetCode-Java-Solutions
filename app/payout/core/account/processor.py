@@ -22,9 +22,9 @@ class PayoutAccountProcessors:
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
     ) -> CreatePayoutAccountResponse:
-        processor = CreatePayoutAccount(
+        create_account_op = CreatePayoutAccount(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
             request=request,
         )
-        return await processor.process()
+        return await create_account_op.execute()
