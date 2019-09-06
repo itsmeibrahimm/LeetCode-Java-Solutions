@@ -9,3 +9,11 @@ class WalletType(str, Enum):
 
     GOOGLE_PAY = "google_pay"
     APPLE_PAY = "apple_pay"
+
+
+class SortKey(str, Enum):
+    """
+    Enum definition of sorting method of payment method list.
+    """
+
+    CREATED_AT = "created_at"

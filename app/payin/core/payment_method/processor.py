@@ -28,8 +28,14 @@ from app.payin.core.exceptions import (
     PayerReadError,
 )
 from app.payin.core.payer.model import RawPayer
-from app.payin.core.payment_method.model import PaymentMethod, RawPaymentMethod
+from app.payin.core.payment_method.model import (
+    PaymentMethod,
+    RawPaymentMethod,
+    PaymentMethodList,
+)
+from app.payin.core.payment_method.types import SortKey
 from app.payin.core.types import PaymentMethodIdType, PayerIdType, MixedUuidStrType
+
 from app.payin.repository.payment_method_repo import (
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
@@ -456,8 +462,14 @@ class PaymentMethodProcessor:
         return raw_payment_method.to_payment_method()
 
     async def list_payment_methods(
-        self, payer_id: str, payer_id_type: str = None
-    ) -> PaymentMethod:
+        self,
+        payer_id: str,
+        payer_id_type: str = None,
+        country: CountryCode = CountryCode.US,
+        active_only: bool = False,
+        sort_by: SortKey = SortKey.CREATED_AT,
+        force_update: bool = None,
+    ) -> PaymentMethodList:
         ...
 
     async def delete_payment_method(

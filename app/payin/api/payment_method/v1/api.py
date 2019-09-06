@@ -13,15 +13,15 @@ from starlette.requests import Request
 from starlette.status import (
     HTTP_201_CREATED,
     HTTP_200_OK,
-    HTTP_501_NOT_IMPLEMENTED,
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_404_NOT_FOUND,
     HTTP_400_BAD_REQUEST,
 )
 
 from app.payin.core.exceptions import PayinErrorCode
-from app.payin.core.payment_method.model import PaymentMethod
+from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
+from app.payin.core.payment_method.types import SortKey
 from app.payin.core.types import PayerIdType, PaymentMethodIdType, MixedUuidStrType
 
 api_tags = ["PaymentMethodV1"]
@@ -169,8 +169,9 @@ async def get_payment_method(
 
 @router.get(
     "/api/v1/payment_methods",
+    response_model=PaymentMethodList,
     status_code=HTTP_200_OK,
-    operation_id="ListPaymentMethod",
+    operation_id="ListPaymentMethods",
     responses={
         HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
@@ -179,21 +180,30 @@ async def get_payment_method(
 )
 async def list_payment_methods(
     request: Request,
-    payer_id: str = None,
-    payment_method_id: str = None,
-    payer_id_type: str = None,
-    payment_method_object_type: str = None,
+    payer_id: str,
+    country: CountryCode = CountryCode.US,
+    active_only: bool = False,
+    sort_by: SortKey = SortKey.CREATED_AT,
     force_update: bool = None,
     log: BoundLogger = Depends(get_logger_from_req),
+    payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
-    log.info("[list_payment_method] receive request")
-
-    raise PaymentException(
-        http_status_code=HTTP_501_NOT_IMPLEMENTED,
-        error_code="not implemented",
-        error_message="not implemented",
-        retryable=False,
+    log.info(
+        f"[list_payment_method] receive request payer_id:{payer_id} country:{country} active_only:{active_only} force_update:{force_update}"
     )
+
+    try:
+        payment_methods_list: PaymentMethodList = await payment_method_processor.list_payment_methods(
+            payer_id=payer_id,
+            country=country,
+            active_only=active_only,
+            sort_by=sort_by,
+            force_update=force_update,
+        )
+    except PaymentError as e:
+        log.warn(f"[list_payment_methods] PaymentError {e}")
+
+    return payment_methods_list
 
 
 @router.delete(

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from typing_extensions import final
 
@@ -44,6 +44,13 @@ class PaymentMethod(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
+
+
+@final
+class PaymentMethodList(BaseModel):
+    count: int
+    has_more: bool  # Currently default to False. Returning all the disputes for a query
+    data: List[PaymentMethod]
 
 
 class RawPaymentMethod:
