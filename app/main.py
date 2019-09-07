@@ -21,7 +21,7 @@ from app.ledger.ledger import create_ledger_app
 from app.commons.stats import init_global_statsd
 from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
 from app.middleware.req_context import ReqContextMiddleware
-from app.payin.payin import create_payin_app
+from app.payin.payin import create_payin_v0_app, create_payin_v1_app
 from app.payout.payout import create_payout_v0_app, create_payout_v1_app
 
 if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
@@ -105,8 +105,12 @@ async def startup():
         log.info("mounted", app="payout")
 
     if "payin" in config.INCLUDED_APPS:
-        payin_app = create_payin_app(context, config)
-        app.mount(payin_app.openapi_prefix, payin_app)
+        for payin_app in [
+            create_payin_v0_app(context, config),
+            create_payin_v1_app(context, config),
+        ]:
+            app.mount(payin_app.openapi_prefix, payin_app)
+
         log.info("mounted", app="payin")
 
     if "ledger" in config.INCLUDED_APPS:

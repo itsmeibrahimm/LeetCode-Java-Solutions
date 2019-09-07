@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/api/v1/payers",
+    "/payers",
     response_model=Payer,
     status_code=HTTP_201_CREATED,
     operation_id="CreatePayer",
@@ -80,7 +80,7 @@ async def create_payer(
 
 
 @router.get(
-    "/api/v1/payers/{payer_id}",
+    "/payers/{payer_id}",
     response_model=Payer,
     status_code=HTTP_200_OK,
     operation_id="GetPayer",
@@ -135,7 +135,7 @@ async def get_payer(
 
 
 @router.patch(
-    "/api/v1/payers/{payer_id}",
+    "/payers/{payer_id}",
     response_model=Payer,
     status_code=HTTP_200_OK,
     operation_id="UpdatePayer",

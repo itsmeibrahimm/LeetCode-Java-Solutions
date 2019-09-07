@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/api/v1/webhook/{country_code}",
+    "/webhook/{country_code}",
     status_code=HTTP_200_OK,
     operation_id="HandlePayinWebhook",
     tags=api_tags,

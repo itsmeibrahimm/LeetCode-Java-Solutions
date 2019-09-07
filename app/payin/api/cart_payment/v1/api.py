@@ -38,7 +38,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/api/v1/cart_payments/legacy",
+    "/cart_payments/legacy",
     response_model=CartPayment,
     status_code=HTTP_201_CREATED,
     operation_id="CreateCartPayment",
@@ -89,7 +89,7 @@ async def create_cart_payment_for_legacy_client(
 
 
 @router.post(
-    "/api/v1/cart_payments",
+    "/cart_payments",
     response_model=CartPayment,
     status_code=HTTP_201_CREATED,
     operation_id="CreateCartPayment",
@@ -167,7 +167,7 @@ async def create_cart_payment(
 
 
 @router.post(
-    "/api/v1/cart_payments/{cart_payment_id}/adjust",
+    "/cart_payments/{cart_payment_id}/adjust",
     response_model=CartPayment,
     status_code=HTTP_200_OK,
     operation_id="AdjustCartPayment",

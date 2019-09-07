@@ -29,7 +29,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/api/v1/payment_methods",
+    "/payment_methods",
     response_model=PaymentMethod,
     status_code=HTTP_201_CREATED,
     operation_id="CreatePaymentMethod",
@@ -100,7 +100,7 @@ async def create_payment_method(
 
 
 @router.get(
-    "/api/v1/payment_methods/{payer_id}/{payment_method_id}",
+    "/payment_methods/{payer_id}/{payment_method_id}",
     response_model=PaymentMethod,
     status_code=HTTP_200_OK,
     operation_id="GetPaymentMethod",
@@ -168,7 +168,7 @@ async def get_payment_method(
 
 
 @router.get(
-    "/api/v1/payment_methods",
+    "/payment_methods",
     response_model=PaymentMethodList,
     status_code=HTTP_200_OK,
     operation_id="ListPaymentMethods",
@@ -207,7 +207,7 @@ async def list_payment_methods(
 
 
 @router.delete(
-    "/api/v1/payment_methods/{payer_id}/{payment_method_id}",
+    "/payment_methods/{payer_id}/{payment_method_id}",
     response_model=PaymentMethod,
     status_code=HTTP_200_OK,
     operation_id="DeletePaymentMethod",

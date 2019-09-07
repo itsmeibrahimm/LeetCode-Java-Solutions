@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/api/v1/disputes/{dispute_id}",
+    "/disputes/{dispute_id}",
     response_model=Dispute,
     status_code=HTTP_200_OK,
     operation_id="GetDispute",
@@ -63,7 +63,7 @@ async def get_dispute(
 
 
 @router.get(
-    "/api/v1/disputes",
+    "/disputes",
     response_model=DisputeList,
     status_code=HTTP_200_OK,
     operation_id="ListDisputes",
