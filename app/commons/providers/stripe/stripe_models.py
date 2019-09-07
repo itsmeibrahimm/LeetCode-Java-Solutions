@@ -9,7 +9,7 @@ from app.commons.types import CountryCode
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
-STRIPE_API_VERSION = "2019-05-16"
+STRIPE_API_VERSION = "2019-08-14"
 
 
 IdempotencyKey = Optional[str]
