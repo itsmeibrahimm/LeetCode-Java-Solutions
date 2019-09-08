@@ -6,8 +6,8 @@ from app.commons.types import CountryCode
 
 
 class DefaultPaymentMethodV0(BaseModel):
+    payment_method_id: Optional[str]
     dd_stripe_card_id: Optional[str]
-    dd_payment_method_id: Optional[str]
 
 
 class UpdatePayerRequestV0(BaseModel):

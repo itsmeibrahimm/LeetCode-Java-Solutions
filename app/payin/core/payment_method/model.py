@@ -1,5 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
+from uuid import UUID
+
 from pydantic import BaseModel
 from typing_extensions import final
 
@@ -134,3 +136,10 @@ class RawPaymentMethod:
 
     def legacy_dd_stripe_card_id(self) -> Optional[str]:
         return str(self.stripe_card_entity.id) if self.stripe_card_entity else None
+
+    def payer_id(self) -> Optional[UUID]:
+        return (
+            self.pgp_payment_method_entity.payer_id
+            if self.pgp_payment_method_entity
+            else None
+        )

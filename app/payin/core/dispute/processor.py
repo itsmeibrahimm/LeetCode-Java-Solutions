@@ -18,7 +18,7 @@ from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
-from app.payin.core.types import DisputePayerIdType
+from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
 from app.payin.repository.dispute_repo import (
     DisputeRepository,
     GetStripeDisputeByIdInput,
@@ -109,7 +109,7 @@ class DisputeClient:
                     payment_method_id_type=payment_method_id_type,
                 )
             else:
-                raw_payment_method = await self.payment_method_client.get_raw_payment_method_no_payer_auth(
+                raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
                     payment_method_id=payment_method_id,
                     payment_method_id_type=payment_method_id_type,
                 )
@@ -189,7 +189,7 @@ class DisputeProcessor:
         payer_id: str = None,
         payer_id_type: str = None,
         payment_method_id: str = None,
-        payment_method_id_type: str = None,
+        payment_method_id_type: DisputePaymentMethodIdType = None,
     ):
         """
         Retrieve list of DoorDash dispute

@@ -23,7 +23,7 @@ class DefaultPaymentMethod(BaseModel):
     id: str
     payment_method_id_type: Optional[
         PaymentMethodIdType
-    ] = PaymentMethodIdType.DD_PAYMENT_METHOD_ID
+    ] = PaymentMethodIdType.PAYMENT_METHOD_ID
 
 
 class UpdatePayerRequest(BaseModel):

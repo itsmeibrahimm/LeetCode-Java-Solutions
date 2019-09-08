@@ -879,12 +879,12 @@ class CartPaymentInterface:
         if payer_id and payment_method_id:
             raw_payment_method = await self.payment_method_client.get_raw_payment_method(
                 payer_id=payer_id,
-                payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID,
+                payer_id_type=PayerIdType.PAYER_ID,
                 payment_method_id=payment_method_id,
-                payment_method_id_type=PaymentMethodIdType.DD_PAYMENT_METHOD_ID,
+                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
             )
             raw_payer = await self.payer_client.get_raw_payer(
-                payer_id=payer_id, payer_id_type=PayerIdType.DD_PAYMENT_PAYER_ID
+                payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
             )
             payer_resource_id = raw_payer.pgp_customer_id()
             payment_method_resource_id = raw_payment_method.pgp_payment_method_id()

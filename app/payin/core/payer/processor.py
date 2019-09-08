@@ -25,7 +25,7 @@ from app.payin.core.exceptions import (
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod
-from app.payin.core.types import PayerIdType, MixedUuidStrType
+from app.payin.core.types import PayerIdType, MixedUuidStrType, PaymentMethodIdType
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
     InsertPgpCustomerInput,
@@ -120,7 +120,7 @@ class PayerClient:
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
         if not payer_id_type or payer_id_type in (
-            PayerIdType.DD_PAYMENT_PAYER_ID,
+            PayerIdType.PAYER_ID,
             PayerIdType.DD_CONSUMER_ID,
         ):
             payer_interface = PayerOps(self.log, self.payer_repo)
@@ -152,7 +152,7 @@ class PayerClient:
         lazy_create: bool = False
         payer_interface: PayerOpsInterface
         if not payer_id_type or payer_id_type in (
-            PayerIdType.DD_PAYMENT_PAYER_ID,
+            PayerIdType.PAYER_ID,
             PayerIdType.DD_CONSUMER_ID,
         ):
             payer_interface = PayerOps(self.log, self.payer_repo)
@@ -367,9 +367,9 @@ class PayerProcessor:
         payer_id: MixedUuidStrType,
         default_payment_method_id: str,
         country: CountryCode = CountryCode.US,
-        payer_id_type: Optional[str] = None,
+        payer_id_type: Optional[PayerIdType] = None,
         payer_type: Optional[str] = None,
-        payment_method_id_type: Optional[str] = None,
+        payment_method_id_type: Optional[PaymentMethodIdType] = None,
     ):
         """
         Update DoorDash payer's default payment method.
@@ -387,14 +387,12 @@ class PayerProcessor:
         """
         # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
+            payer_id=payer_id, payer_type=payer_type
         )
 
         # step 2: find PaymentMethod object to get pgp_resource_id.
-        raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method(
-            payer_id=payer_id,
+        raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
             payment_method_id=default_payment_method_id,
-            payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
 

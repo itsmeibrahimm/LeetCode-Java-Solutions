@@ -148,9 +148,7 @@ async def get_payment_method(
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.get_payment_method(
-            payer_id=payer_id,
             payment_method_id=payment_method_id,
-            payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
             force_update=force_update,
         )
@@ -245,15 +243,13 @@ async def delete_payment_method(
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.delete_payment_method(
-            payer_id=payer_id,
             payment_method_id=payment_method_id,
             country=country,
-            payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
     except PaymentError as e:
         log.error(
-            f"[delete_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
+            f"[delete_payment_method][{payment_method_id}] PaymentMethodReadError."
         )
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
             http_status = HTTP_404_NOT_FOUND

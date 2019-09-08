@@ -25,7 +25,6 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
     PaymentMethodDeleteError,
-    PayerReadError,
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payment_method.model import (
@@ -160,7 +159,7 @@ class PaymentMethodClient:
         """
 
         pm_interface: PaymentMethodOpsInterface
-        if (payment_method_id_type == PaymentMethodIdType.DD_PAYMENT_METHOD_ID) or (
+        if (payment_method_id_type == PaymentMethodIdType.PAYMENT_METHOD_ID) or (
             not payment_method_id_type
         ):
             pm_interface = PaymentMethodOps(
@@ -209,7 +208,7 @@ class PaymentMethodClient:
             payment_method_id_type=payment_method_id_type,
         )
 
-    async def get_raw_payment_method_no_payer_auth(
+    async def get_raw_payment_method_without_payer_auth(
         self, payment_method_id: str, payment_method_id_type: Optional[str] = None
     ) -> RawPaymentMethod:
 
@@ -219,10 +218,7 @@ class PaymentMethodClient:
         )
 
     async def detach_raw_payment_method(
-        self,
-        payer_id: MixedUuidStrType,
-        pgp_payment_method_id: str,
-        raw_payment_method: RawPaymentMethod,
+        self, pgp_payment_method_id: str, raw_payment_method: RawPaymentMethod
     ) -> RawPaymentMethod:
         updated_pm_entity: Optional[PgpPaymentMethodDbEntity] = None
         updated_sc_entity: Optional[StripeCardDbEntity] = None
@@ -249,7 +245,7 @@ class PaymentMethodClient:
                 )
         except DataError as e:
             self.log.error(
-                f"[detach_payment_method][{payer_id}][{pgp_payment_method_id}] DataError when read db. {e}"
+                f"[detach_payment_method][{pgp_payment_method_id}] DataError when read db. {e}"
             )
             raise PaymentMethodDeleteError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR, retryable=True
@@ -297,10 +293,7 @@ class PaymentMethodClient:
         return attach_payment_method
 
     async def pgp_detach_payment_method(
-        self,
-        payer_id: MixedUuidStrType,
-        pgp_payment_method_id: str,
-        country: Optional[str] = CountryCode.US,
+        self, pgp_payment_method_id: str, country: Optional[str] = CountryCode.US
     ) -> StripePaymentMethod:
         try:
             stripe_payment_method = await self.app_ctxt.stripe.detach_payment_method(
@@ -308,13 +301,11 @@ class PaymentMethodClient:
                 request=DetachPaymentMethod(sid=pgp_payment_method_id),
             )
             self.log.info(
-                "[pgp_detach_payment_method][%s][%s] detach payment method completed. customer in stripe response blob:",
-                payer_id,
-                pgp_payment_method_id,
+                f"[pgp_detach_payment_method][{pgp_payment_method_id}] detach payment method completed. customer in stripe response blob:"
             )
         except Exception as e:
             self.log.error(
-                f"[pgp_detach_payment_method][{payer_id}] error while detaching stripe payment method {e}"
+                f"[pgp_detach_payment_method][{pgp_payment_method_id}] error while detaching stripe payment method {e}"
             )
             raise PaymentMethodDeleteError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR,
@@ -399,7 +390,7 @@ class PaymentMethodProcessor:
             raw_payer: RawPayer
             if payer_id:
                 raw_payer = await self.payer_client.get_raw_payer(
-                    payer_id, PayerIdType.DD_PAYMENT_PAYER_ID
+                    payer_id, PayerIdType.PAYER_ID
                 )
             else:
                 raw_payer = await self.payer_client.get_raw_payer(
@@ -430,10 +421,8 @@ class PaymentMethodProcessor:
 
     async def get_payment_method(
         self,
-        payer_id: MixedUuidStrType,
         payment_method_id: str,
-        payer_id_type: str = None,
-        payment_method_id_type: str = None,
+        payment_method_id_type: PaymentMethodIdType = None,
         country: Optional[str] = None,
         force_update: Optional[bool] = False,
     ) -> PaymentMethod:
@@ -452,10 +441,8 @@ class PaymentMethodProcessor:
         # TODO: step 1: if force_update is true, we should retrieve the payment_method from GPG
 
         # step 2: retrieve data from DB
-        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method(
+        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
             payment_method_id=payment_method_id,
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
 
@@ -474,10 +461,8 @@ class PaymentMethodProcessor:
 
     async def delete_payment_method(
         self,
-        payer_id: MixedUuidStrType,
         payment_method_id: str,
         country: CountryCode,
-        payer_id_type: str = None,
         payment_method_id_type: str = None,
     ) -> PaymentMethod:
         """
@@ -491,27 +476,19 @@ class PaymentMethodProcessor:
         :return: PaymentMethod object
         """
 
-        # step 1: get payer by for country information
-        raw_payer: Optional[RawPayer] = None
-        try:
-            raw_payer = await self.payer_client.get_raw_payer(
-                payer_id=payer_id, payer_id_type=payer_id_type
-            )
-        except PayerReadError as e:
-            if e.error_code != PayinErrorCode.PAYER_READ_NOT_FOUND:
-                raise e
-            self.log.info(
-                f"[delete_payment_method][{payer_id}][{payer_id_type}] can't find payer. could be DSJ consumer"
-            )
-
-        # step 2: find payment_method.
-        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method(
-            payer_id=payer_id,
+        # step 1: find payment_method.
+        raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
             payment_method_id=payment_method_id,
-            payer_id_type=payer_id_type,
             payment_method_id_type=payment_method_id_type,
         )
         pgp_payment_method_id: str = raw_payment_method.pgp_payment_method_id()
+
+        # step 2: find payer for country information
+        raw_payer: Optional[RawPayer] = None
+        if raw_payment_method.payer_id():
+            raw_payer = await self.payer_client.get_raw_payer(
+                payer_id=raw_payment_method.payer_id()
+            )
 
         # step 3: detach PGP payment method
         country_code: CountryCode = CountryCode.US
@@ -522,17 +499,14 @@ class PaymentMethodProcessor:
                 country_code = raw_payer.country()
             else:
                 self.log.info(
-                    f"[delete_payment_method][{payer_id}][{payer_id_type}] use default country code US"
+                    f"[delete_payment_method][{payment_method_id}][{payment_method_id_type}] use default country code US"
                 )
         await self.payment_method_client.pgp_detach_payment_method(
-            payer_id=payer_id,
-            pgp_payment_method_id=pgp_payment_method_id,
-            country=country_code,
+            pgp_payment_method_id=pgp_payment_method_id, country=country_code
         )
 
         # step 4: update pgp_payment_method.detached_at
         updated_raw_pm: RawPaymentMethod = await self.payment_method_client.detach_raw_payment_method(
-            payer_id=payer_id,
             pgp_payment_method_id=pgp_payment_method_id,
             raw_payment_method=raw_payment_method,
         )
@@ -547,12 +521,11 @@ class PaymentMethodProcessor:
                 await self.payer_client.update_payer_default_payment_method(
                     raw_payer=raw_payer,
                     pgp_default_payment_method_id=None,
-                    payer_id=payer_id,
-                    payer_id_type=payer_id_type,
+                    payer_id=raw_payment_method.payer_id(),
                 )
             else:
                 self.log.info(
-                    f"[delete_payment_method] no need to delete default payment method {raw_payer.pgp_default_payment_method_id}"
+                    f"[delete_payment_method] no need to delete default payment method {raw_payer.pgp_default_payment_method_id()}"
                 )
 
         # we dont automatically update the new default payment method for payer
@@ -619,9 +592,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
             # no need to authorize payment_method
             is_owner = True
         else:
-            if (payer_id_type == PayerIdType.DD_PAYMENT_PAYER_ID) or (
-                not payer_id_type
-            ):
+            if (payer_id_type == PayerIdType.PAYER_ID) or (not payer_id_type):
                 if pm_entity:
                     is_owner = payer_id == pm_entity.payer_id
             elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:

@@ -124,7 +124,7 @@ class TestDisputeClient:
             pgp_payment_method_entity=pgp_entity_mock,
             stripe_card_entity=stripe_entity_mock,
         )
-        dispute_client.payment_method_client.get_raw_payment_method_no_payer_auth = FunctionMock(
+        dispute_client.payment_method_client.get_raw_payment_method_without_payer_auth = FunctionMock(
             return_value=raw_payment_method_mock
         )
         dispute_client.dispute_repo.list_disputes_by_payment_method_id = FunctionMock(

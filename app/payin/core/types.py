@@ -43,7 +43,7 @@ class PayerIdType(str, Enum):
     backward compatibility purpose to identify the type of input payer_id.
     """
 
-    DD_PAYMENT_PAYER_ID = "dd_payer_id"
+    PAYER_ID = "payer_id"
     DD_CONSUMER_ID = "dd_consumer_id"
     DD_STRIPE_CUSTOMER_SERIAL_ID = "dd_stripe_customer_serial_id"  # used for payer APIs
     STRIPE_CUSTOMER_ID = "stripe_customer_id"  # used for payer/payment_method APIs
@@ -55,10 +55,8 @@ class PaymentMethodIdType(str, Enum):
     backward compatibility purpose to identify the type of input payment_method_id.
     """
 
-    DD_PAYMENT_METHOD_ID = "dd_payment_method_id"
-    DD_STRIPE_CARD_SERIAL_ID = (
-        "dd_stripe_card_serial_id"
-    )  # used for payment_methods APIs
+    PAYMENT_METHOD_ID = "payment_method_id"
+    DD_STRIPE_CARD_SERIAL_ID = "dd_stripe_card_id"  # used for payment_methods APIs
     STRIPE_PAYMENT_METHOD_ID = (
         "stripe_payment_method_id"
     )  # used for payment_methods APIs
@@ -91,5 +89,5 @@ class DisputePaymentMethodIdType(str, Enum):
     type of input payment method id
     """
 
-    DD_PAYMENT_METHOD_ID = PaymentMethodIdType.DD_PAYMENT_METHOD_ID
+    DD_PAYMENT_METHOD_ID = PaymentMethodIdType.PAYMENT_METHOD_ID
     STRIPE_PAYMENT_METHOD_ID = PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID
