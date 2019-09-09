@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 
 import pytest
@@ -88,7 +89,7 @@ class TestTransferRepository:
         data = StripeTransferCreate(
             stripe_status="status",
             transfer_id=existing_transfer.id,
-            stripe_id="stripe_id",
+            stripe_id=str(uuid.uuid4()),
             stripe_request_id="stripe_request_id",
             stripe_failure_code="stripe_failure_code",
             stripe_account_id="stripe_account_id",
@@ -136,9 +137,13 @@ class TestTransferRepository:
             expected=update_data.dict(skip_defaults=True), actual=updated.dict()
         )
 
-        await transfer_repo.delete_stripe_transfer_by_stripe_id(
+        deleted_count = await transfer_repo.delete_stripe_transfer_by_stripe_id(
             stripe_id=updated.stripe_id
         )
+
+        assert (
+            deleted_count == 1
+        ), "should be exactly one deleted"  # stripe_id was unique'd by uuid
 
         assert not await transfer_repo.get_stripe_transfer_by_id(
             stripe_transfer_id=updated.transfer_id
@@ -162,6 +167,6 @@ class TestTransferRepository:
         )
 
     async def test_delete_stripe_transfer_by_stripe_id_not_found(self, transfer_repo):
-        await transfer_repo.delete_stripe_transfer_by_stripe_id(
+        assert 0 == await transfer_repo.delete_stripe_transfer_by_stripe_id(
             stripe_id="heregoesnothing"
         )

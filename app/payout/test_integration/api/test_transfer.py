@@ -189,7 +189,10 @@ class TestTransferV0:
             )
         )
         assert response.status_code == 200
-        assert {"acknowledged": True}.items() == response.json().items()
+        assert {
+            "acknowledged": True,
+            "affected_record_count": 1,
+        }.items() == response.json().items()
 
     def test_get_stripe_transfer_by_id_not_found(self, client: TestClient):
         response = client.get(get_stripe_transfer_by_id_url(-1))

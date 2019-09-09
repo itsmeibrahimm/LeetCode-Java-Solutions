@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from typing import List, Optional
-from sqlalchemy import and_
+
+from sqlalchemy import and_, desc
 from typing_extensions import final
 
 from app.commons import tracing
@@ -10,13 +11,13 @@ from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import payment_accounts, stripe_managed_accounts
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
-    PaymentAccountUpdate,
     PaymentAccountCreate,
+    PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
-    StripeManagedAccountUpdate,
     StripeManagedAccountCreate,
+    StripeManagedAccountUpdate,
 )
 
 
@@ -98,10 +99,16 @@ class PaymentAccountRepository(
     async def get_all_payment_accounts_by_account_id_account_type(
         self, *, account_id: int, account_type: str
     ) -> List[PaymentAccount]:
-        stmt = payment_accounts.table.select().where(
-            and_(
-                payment_accounts.account_id == account_id,
-                payment_accounts.account_type == account_type,
+        stmt = (
+            payment_accounts.table.select()
+            .order_by(
+                desc(payment_accounts.id)
+            )  # set order_by pk desc as default for now
+            .where(
+                and_(
+                    payment_accounts.account_id == account_id,
+                    payment_accounts.account_type == account_type,
+                )
             )
         )
 

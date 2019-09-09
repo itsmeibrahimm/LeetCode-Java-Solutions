@@ -1,3 +1,4 @@
+from collections import Sequence
 from datetime import datetime
 
 import pytest
@@ -87,7 +88,7 @@ async def test_fetch_one_fetch_many_fetch_value_but_nothing(
 
     nothing_all = await payout_maindb_aio_engine.fetch_all(stmt=nothing_stmt)
     assert not nothing_all
-    assert isinstance(nothing_all, list)
+    assert isinstance(nothing_all, Sequence)
 
     nothing_value = await payout_maindb_aio_engine.fetch_value(stmt=nothing_stmt)
     assert nothing_value is None

@@ -1,5 +1,38 @@
 from abc import ABC, abstractmethod
-from typing import Awaitable, Callable, Optional, List, Mapping, Any
+from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence, TypeVar
+
+
+class DBResult(Mapping):
+    """
+    Wrapper interface holding single row returned by database query.
+    """
+
+    @property
+    @abstractmethod
+    def matched_row_count(self) -> int:
+        """
+        number of row matched by `where` clause if applicable, but **NOT** necessarily rows returned
+        """
+        pass
+
+
+DBResultT = TypeVar("DBResultT", bound=DBResult)
+
+
+class DBMultiResult(ABC, Sequence[DBResultT]):
+    """
+    Wrapper interface holding multiple rows returned by database query.
+
+    TODO: could add pagination support here when needed
+    """
+
+    @property
+    @abstractmethod
+    def matched_row_count(self) -> int:
+        """
+        number of row matched by `where` clause if applicable, but **NOT** necessarily rows returned
+        """
+        pass
 
 
 class DBTransaction(ABC):
@@ -76,15 +109,15 @@ class DBConnection(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, stmt) -> List[Mapping]:
+    async def execute(self, stmt) -> DBMultiResult:
         pass
 
     @abstractmethod
-    async def fetch_one(self, stmt) -> Optional[Mapping]:
+    async def fetch_one(self, stmt) -> Optional[DBResult]:
         pass
 
     @abstractmethod
-    async def fetch_all(self, stmt) -> List[Mapping]:
+    async def fetch_all(self, stmt) -> DBMultiResult:
         pass
 
     @abstractmethod
@@ -235,15 +268,15 @@ class DBEngine(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, stmt) -> List[Mapping]:
+    async def execute(self, stmt) -> DBMultiResult:
         pass
 
     @abstractmethod
-    async def fetch_one(self, stmt) -> Optional[Mapping]:
+    async def fetch_one(self, stmt) -> Optional[DBResult]:
         pass
 
     @abstractmethod
-    async def fetch_all(self, stmt) -> List[Mapping]:
+    async def fetch_all(self, stmt) -> DBMultiResult:
         pass
 
     @abstractmethod

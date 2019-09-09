@@ -65,7 +65,7 @@ class TransferRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def delete_stripe_transfer_by_stripe_id(self, stripe_id: str) -> bool:
+    async def delete_stripe_transfer_by_stripe_id(self, stripe_id: str) -> int:
         pass
 
 
@@ -160,8 +160,9 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         rows = await self._database.replica().fetch_all(stmt)
         return [StripeTransfer.from_row(row) for row in rows]
 
-    async def delete_stripe_transfer_by_stripe_id(self, stripe_id: str):
+    async def delete_stripe_transfer_by_stripe_id(self, stripe_id: str) -> int:
         stmt = stripe_transfers.table.delete().where(
             stripe_transfers.stripe_id == stripe_id
         )
-        await self._database.master().execute(stmt)
+        multi_result = await self._database.master().execute(stmt)
+        return multi_result.matched_row_count

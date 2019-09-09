@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
+import json
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 
 # Dummy v0 api models copied directly from db domain models. Just to make sure v0 API signature is stable
 # even if underlying db model changes, so we don't need to worry about DSJ v0 integration
+from app.payout.repository.maindb.model import stripe_managed_account
 
 
 class PaymentAccount(PaymentResponse):
@@ -62,7 +64,20 @@ class StripeManagedAccount(PaymentResponse):
     default_bank_name: Optional[str]
     verification_disabled_reason: Optional[str]
     verification_due_by: Optional[datetime]
-    verification_fields_needed: Optional[str]
+    verification_fields_needed: List[str]
+
+    @classmethod
+    def from_db_model(
+        cls, internal: stripe_managed_account.StripeManagedAccount
+    ) -> "StripeManagedAccount":
+        verification_fields_needed: List[str] = []
+        if internal.verification_fields_needed:
+            verification_fields_needed = json.loads(internal.verification_fields_needed)
+
+        return cls(
+            **internal.dict(exclude={"verification_fields_needed"}),
+            verification_fields_needed=verification_fields_needed
+        )
 
 
 class StripeManagedAccountCreate(PaymentRequest):
@@ -75,10 +90,21 @@ class StripeManagedAccountCreate(PaymentRequest):
     default_bank_name: Optional[str]
     verification_disabled_reason: Optional[str]
     verification_due_by: Optional[datetime]
-    verification_fields_needed: Optional[str]
+    verification_fields_needed: List[str] = []
+
+    def to_db_model(self) -> stripe_managed_account.StripeManagedAccountCreate:
+        verification_fields_needed = None
+        if self.verification_fields_needed:
+            verification_fields_needed = json.dumps(self.verification_fields_needed)
+        return stripe_managed_account.StripeManagedAccountCreate(
+            **self.dict(exclude={"verification_fields_needed"}, skip_defaults=True),
+            verification_fields_needed=verification_fields_needed
+        )
 
 
 class StripeManagedAccountUpdate(PaymentRequest):
+    country_shortname: Optional[str]
+    stripe_id: Optional[str]
     stripe_last_updated_at: Optional[datetime]
     bank_account_last_updated_at: Optional[datetime]
     fingerprint: Optional[str]
@@ -86,6 +112,13 @@ class StripeManagedAccountUpdate(PaymentRequest):
     default_bank_name: Optional[str]
     verification_disabled_reason: Optional[str]
     verification_due_by: Optional[datetime]
-    verification_fields_needed: Optional[str]
-    country_shortname: Optional[str]
-    stripe_id: Optional[str]
+    verification_fields_needed: List[str] = []
+
+    def to_db_model(self) -> stripe_managed_account.StripeManagedAccountUpdate:
+        verification_fields_needed = None
+        if self.verification_fields_needed:
+            verification_fields_needed = json.dumps(self.verification_fields_needed)
+        return stripe_managed_account.StripeManagedAccountUpdate(
+            **self.dict(exclude={"verification_fields_needed"}, skip_defaults=True),
+            verification_fields_needed=verification_fields_needed
+        )

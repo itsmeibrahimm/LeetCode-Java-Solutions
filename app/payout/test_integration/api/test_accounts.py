@@ -131,7 +131,7 @@ class TestAccountV0:
             "default_bank_name": "bank",
             "verification_disabled_reason": "no-reason",
             "verification_due_by": "2019-08-20T05:34:53+00:00",
-            "verification_fields_needed": "a lot",
+            "verification_fields_needed": ["a lot"],
         }
 
         # Create
@@ -147,7 +147,7 @@ class TestAccountV0:
         )
 
         # Update
-        verification_fields_needed = "need!"
+        verification_fields_needed = ["need!"]
         response = client.patch(
             update_stripe_managed_account_by_id_url(account_created["id"]),
             json={"verification_fields_needed": verification_fields_needed},
@@ -171,7 +171,7 @@ class TestAccountV0:
     def test_update_stripe_managed_account_by_id_not_found(self, client: TestClient):
         response = client.patch(
             update_stripe_managed_account_by_id_url(9999),
-            json={"verification_fields_needed": "everything!"},
+            json={"verification_fields_needed": ["everything!"]},
         )
 
         assert response.status_code == 404

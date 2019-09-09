@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any, Dict, Set
 
 
 def validate_expected_items_in_dict(
@@ -15,21 +15,28 @@ def validate_expected_items_in_dict(
     which relies on __eq__ being correctly implemented in complex data structure.
     """
 
-    expected_items: set = set(expected.items())
-    actual_items: set = set(actual.items())
+    expected_keys = set(expected.keys())
+    actual_keys = set(actual.keys())
 
     failed = False
-    if strict_equal:
-        failed = expected_items != actual_items
-    else:
-        failed = not (expected_items <= actual_items)
+    unexpected: Dict[str, Any] = {}
+    missing: Set[str] = set()
+    for ek in expected_keys:
+        expected_val = expected.get(ek)
+        actual_val = actual.get(ek, None)
+        if actual_val != expected_val:
+            failed = True
+            if not actual_val:
+                missing.add(ek)
+            else:
+                unexpected[ek] = actual.get(ek)
+
+    if strict_equal and (len(actual_keys) > len(expected_keys)):
+        failed = True
+        missing.update(set(actual_keys.difference(expected_keys)))
 
     if failed:
-        missing = expected_items.difference(actual_items)
-        unexpected: Dict[str, Any] = {}
-        if strict_equal:
-            unexpected.update(actual_items.difference(expected_items))
         raise AssertionError(
-            f"Dict validation failed. expected={expected}, actual={actual_items}, "
-            f"missing fields={missing}, unexpected fields={unexpected}"
+            f"Dict validation failed. expected={expected}, actual={actual}, "
+            f"missing fields={missing}, unexpected={unexpected}"
         )

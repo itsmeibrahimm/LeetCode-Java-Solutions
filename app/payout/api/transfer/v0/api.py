@@ -200,8 +200,10 @@ async def delete_stripe_transfer_by_stripe_id(
     stripe_id: str,
     repository: TransferRepositoryInterface = Depends(TransferRepository),
 ):
-    await repository.delete_stripe_transfer_by_stripe_id(stripe_id=stripe_id)
-    return Acknowledgement()
+    deleted_row = await repository.delete_stripe_transfer_by_stripe_id(
+        stripe_id=stripe_id
+    )
+    return Acknowledgement(affected_record_count=deleted_row)
 
 
 def _transfer_not_found() -> PaymentException:

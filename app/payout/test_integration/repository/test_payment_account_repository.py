@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+from typing import cast
 
 import pytest
 
@@ -74,7 +75,7 @@ class TestPaymentAccountRepository:
     ):
         account_1 = PaymentAccountCreate(
             account_type="type",
-            account_id=1,
+            account_id=int(datetime.utcnow().timestamp()),
             statement_descriptor="i am description yay",
             entity="dasher",
         )
@@ -94,11 +95,19 @@ class TestPaymentAccountRepository:
             ),
         )
 
+        cast(list, including_account_1_and_2)
+
         # Not verifying size of result set ... since we don't rollback test DB writes for now.
         assert (
             account_1_created in including_account_1_and_2
             and account_2_created in including_account_1_and_2  # noqa W503
         )
+        assert (
+            including_account_1_and_2.index(account_1_created) == 1
+        ), "first created should be returned last"
+        assert (
+            including_account_1_and_2.index(account_2_created) == 0
+        ), "most recently created should be returned first"
         assert len(nothing) == 0
 
     async def test_create_update_get_stripe_managed_account(

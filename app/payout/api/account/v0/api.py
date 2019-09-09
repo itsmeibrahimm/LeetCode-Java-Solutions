@@ -12,7 +12,7 @@ from app.payout.api.account.v0.models import (
     StripeManagedAccountCreate,
     StripeManagedAccountUpdate,
 )
-from app.payout.repository.maindb.model import payment_account, stripe_managed_account
+from app.payout.repository.maindb.model import payment_account
 from app.payout.service import (
     PaymentAccountRepository,
     PaymentAccountRepositoryInterface,
@@ -123,7 +123,7 @@ async def get_stripe_managed_account_by_id(
     if not internal_stripe_managed_account:
         raise _stripe_managed_account_not_found()
 
-    return StripeManagedAccount(**internal_stripe_managed_account.dict())
+    return StripeManagedAccount.from_db_model(internal_stripe_managed_account)
 
 
 @router.post(
@@ -137,13 +137,10 @@ async def create_stripe_managed_account(
     body: StripeManagedAccountCreate,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-    internal_request = stripe_managed_account.StripeManagedAccountCreate(
-        **body.dict(skip_defaults=True)
-    )
     internal_stripe_managed_account = await repository.create_stripe_managed_account(
-        internal_request
+        body.to_db_model()
     )
-    return StripeManagedAccount(**internal_stripe_managed_account.dict())
+    return StripeManagedAccount.from_db_model(internal_stripe_managed_account)
 
 
 @router.patch(
@@ -159,19 +156,14 @@ async def update_stripe_managed_account_by_id(
     body: StripeManagedAccountUpdate,
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
-
-    internal_request = stripe_managed_account.StripeManagedAccountUpdate(
-        **body.dict(skip_defaults=True)
-    )
-
     internal_stripe_managed_account = await repository.update_stripe_managed_account_by_id(
-        stripe_managed_account_id=stripe_managed_account_id, data=internal_request
+        stripe_managed_account_id=stripe_managed_account_id, data=body.to_db_model()
     )
 
     if not internal_stripe_managed_account:
         raise _stripe_managed_account_not_found()
 
-    return StripeManagedAccount(**internal_stripe_managed_account.dict())
+    return StripeManagedAccount.from_db_model(internal_stripe_managed_account)
 
 
 def _payment_account_not_found() -> PaymentException:

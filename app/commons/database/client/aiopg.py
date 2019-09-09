@@ -1,22 +1,80 @@
 import asyncio
-from typing import Any, List, Mapping, Optional
+from typing import Any, List, Optional, Sequence, Union, overload
 
 from aiopg.sa import connection, create_engine, engine, transaction
-from aiopg.sa.result import ResultProxy
+from aiopg.sa.result import ResultProxy, RowProxy
 
 from app.commons import timing
 from app.commons.database.client.interface import (
+    AwaitableConnectionContext,
+    AwaitableTransactionContext,
     DBConnection,
     DBEngine,
+    DBMultiResult,
+    DBResult,
     DBTransaction,
-    AwaitableTransactionContext,
-    AwaitableConnectionContext,
     EngineTransactionContext,
 )
 
 
-class AioTransaction(DBTransaction):
+class AioResult(DBResult):
+    _row_proxy: RowProxy
+    _matched_row_count: int
 
+    def __init__(self, row_proxy: RowProxy, matched_row_count: int):
+        self._row_proxy = row_proxy
+        self._matched_row_count = matched_row_count
+
+    def __getattr__(self, item):
+        return self._row_proxy.__getattribute__(item)
+
+    @property
+    def matched_row_count(self) -> int:
+        return self._matched_row_count
+
+    def __getitem__(self, key):
+        return self._row_proxy.__getitem__(key)
+
+    def __len__(self) -> int:
+        return len(self._row_proxy)
+
+    def __iter__(self):
+        return self._row_proxy.__iter__()
+
+
+class AioMultiResult(DBMultiResult[AioResult]):
+    _results: Sequence[AioResult]
+    _matched_row_count: int
+
+    def __init__(self, row_proxies: List[RowProxy], matched_row_count: int):
+        self._results = [
+            AioResult(row_proxy, matched_row_count=matched_row_count)
+            for row_proxy in row_proxies
+        ]
+        self._matched_row_count = matched_row_count
+
+    @property
+    def matched_row_count(self) -> int:
+        return self._matched_row_count
+
+    def __len__(self) -> int:
+        return len(self._results)
+
+    @overload
+    def __getitem__(self, i: int) -> AioResult:
+        return self._results[i]
+
+    @overload
+    def __getitem__(self, s: slice) -> Sequence[AioResult]:
+        return self._results[s]
+
+    def __getitem__(
+        self, i: Union[int, slice]
+    ) -> Union[AioResult, Sequence[AioResult]]:
+        return self._results[i]
+
+
+class AioTransaction(DBTransaction):
     _raw_transaction: Optional[transaction.Transaction]
     _connection: "AioConnection"
 
@@ -70,7 +128,6 @@ class AioTransaction(DBTransaction):
 
 
 class AioConnection(DBConnection, timing.Database):
-
     _raw_connection: Optional[connection.SAConnection]
     default_timeout: float
     engine: "AioEngine"
@@ -106,43 +163,43 @@ class AioConnection(DBConnection, timing.Database):
         return AwaitableTransactionContext(generator=new_transaction.start)
 
     @timing.track_query
-    async def execute(self, stmt, *, timeout: int = None) -> List[Mapping]:
+    async def execute(self, stmt, *, timeout: int = None) -> AioMultiResult:
         _timeout = timeout or self.default_timeout
         result_proxy: ResultProxy = await self.raw_connection.execute(
             stmt, timeout=_timeout
         )
-        result: List[Mapping] = []
+        row_proxies: List[RowProxy] = []
         if result_proxy.returns_rows:
-            result = await result_proxy.fetchall()
+            row_proxies = await result_proxy.fetchall()
         else:
             result_proxy.close()
-        return result
+        return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
     @timing.track_query
-    async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[Mapping]:
+    async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[AioResult]:
         _timeout = timeout or self.default_timeout
         result_proxy: ResultProxy = await self.raw_connection.execute(
             stmt, timeout=_timeout
         )
-        result: Optional[Mapping] = None
+        result: Optional[RowProxy] = None
         if result_proxy.returns_rows:
             result = await result_proxy.fetchone()
         else:
             result_proxy.close()
-        return result
+        return AioResult(result, result_proxy.rowcount) if result else None
 
     @timing.track_query
-    async def fetch_all(self, stmt, *, timeout: int = None) -> List[Mapping]:
+    async def fetch_all(self, stmt, *, timeout: int = None) -> AioMultiResult:
         _timeout = timeout or self.default_timeout
         result_proxy: ResultProxy = await self.raw_connection.execute(
             stmt, timeout=_timeout
         )
-        result: List[Mapping] = []
+        row_proxies: List[RowProxy] = []
         if result_proxy.returns_rows:
-            result = await result_proxy.fetchall()
+            row_proxies = await result_proxy.fetchall()
         else:
             result_proxy.close()
-        return result
+        return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
     @timing.track_query
     async def fetch_value(self, stmt, *, timeout: int = None):
@@ -266,17 +323,17 @@ class AioEngine(DBEngine, timing.Database):
 
         return EngineTransactionContext(generator=tx_generator)
 
-    async def execute(self, stmt, *, timeout: int = None) -> List[Mapping]:
+    async def execute(self, stmt, *, timeout: int = None) -> AioMultiResult:
         async with self.acquire() as conn:  # type: AioConnection
             result = await conn.execute(stmt, timeout=timeout)
         return result
 
-    async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[Mapping]:
+    async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[AioResult]:
         async with self.acquire() as conn:  # type: AioConnection
             result = await conn.fetch_one(stmt, timeout=timeout)
         return result
 
-    async def fetch_all(self, stmt, *, timeout: int = None) -> List[Mapping]:
+    async def fetch_all(self, stmt, *, timeout: int = None) -> AioMultiResult:
         async with self.acquire() as conn:  # type: AioConnection
             result = await conn.fetch_all(stmt, timeout=timeout)
         return result
