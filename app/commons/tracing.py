@@ -14,10 +14,12 @@ from typing import (
     ContextManager,
     Deque,
     Optional,
+    Dict,
 )
 from collections import deque
 from contextlib import contextmanager
 from contextvars import ContextVar
+from pydantic.fields import Field
 
 from app.commons.context.logger import root_logger as default_logger
 
@@ -54,9 +56,10 @@ class Breadcrumb(pydantic.BaseModel):
     transaction_name: str = ""
 
     # request hierarchy
+    provider_name: str = ""
     country: str = ""
-    action: str = ""
     resource: str = ""
+    action: str = ""
     status_code: str = ""  # should be string for stats
 
     class Config:
@@ -151,7 +154,12 @@ class Tracker(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def create_tracker(
-        self, obj: Any = NotSpecified, *, func: Callable
+        self,
+        obj: Any = NotSpecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
     ) -> ContextManager:
         """
         Generate a tracker
@@ -193,7 +201,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             async def async_wrapper(obj, *args, **kwargs):
-                with self.create_tracker(obj, func=func):
+                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
                     return await func(obj, *args, **kwargs)
 
             async_wrapper.__trackable__ = Trackable
@@ -204,7 +212,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             def sync_wrapper(obj, *args, **kwargs):
-                with self.create_tracker(obj, func=func):
+                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
                     return func(obj, *args, **kwargs)
 
             sync_wrapper.__trackable__ = Trackable
@@ -217,7 +225,7 @@ class Tracker(metaclass=abc.ABCMeta):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 obj = getattr(func, "__self__", NotSpecified)
-                with self.create_tracker(obj):
+                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
                     return await func(*args, **kwargs)
 
             async_wrapper.__trackable__ = Trackable
@@ -229,7 +237,7 @@ class Tracker(metaclass=abc.ABCMeta):
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 obj = getattr(func, "__self__", NotSpecified)
-                with self.create_tracker(obj, func=func):
+                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
                     return func(*args, **kwargs)
 
             sync_wrapper.__trackable__ = Trackable
@@ -241,7 +249,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with self.create_tracker(func=func):
+                with self.create_tracker(func=func, args=args, kwargs=kwargs):
                     return await func(*args, **kwargs)
 
             async_wrapper.__trackable__ = Trackable
@@ -252,7 +260,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
-                with self.create_tracker(func=func):
+                with self.create_tracker(func=func, args=args, kwargs=kwargs):
                     return func(*args, **kwargs)
 
             sync_wrapper.__trackable__ = Trackable
@@ -262,13 +270,72 @@ class Tracker(metaclass=abc.ABCMeta):
 
 class BreadcrumbTracker(Tracker):
     breadcrumb: Breadcrumb
+    from_kwargs: Dict[str, str]
 
-    def __init__(self, breadcrumb: Breadcrumb, *, only_trackable=False):
+    def __init__(
+        self,
+        breadcrumb: Breadcrumb,
+        *,
+        from_kwargs: Optional[Dict[str, str]] = None,
+        only_trackable=False,
+    ):
         super().__init__(only_trackable=only_trackable)
         self.breadcrumb = breadcrumb
+        self.from_kwargs = from_kwargs or {}
+        BreadcrumbTracker.validate_from_kwargs(self.from_kwargs)
 
-    def create_tracker(self, obj=NotSpecified, *, func) -> ContextManager:
-        return breadcrumb_as(self.breadcrumb)
+    @staticmethod
+    def validate_from_kwargs(from_kwargs: Dict[str, str]):
+        fields = Breadcrumb.__fields__
+        for arg_name, dest_name in from_kwargs.items():
+            if dest_name not in fields:
+                raise ValueError(
+                    f"`{dest_name}` is not a valid Breadcrumb field (mapping {arg_name} => {dest_name})"
+                )
+
+    @staticmethod
+    def breadcrumb_from_kwargs(from_kwargs: Dict[str, str], kwargs: Dict[str, Any]):
+        model_fields: Dict[str, Field] = Breadcrumb.__fields__
+
+        validated_fields = {}
+
+        for arg_name, dest_name in from_kwargs.items():
+            # silently ignore missing fields
+            known_field = model_fields.get(dest_name, None)
+            if not known_field or arg_name not in kwargs:
+                continue
+
+            value = kwargs[arg_name]
+
+            # silently ignore invalid fields
+            value, error = known_field.validate(value, {}, loc=dest_name)
+            if error:
+                continue
+
+            # field is validated
+            validated_fields[dest_name] = value
+
+        try:
+            return Breadcrumb(**validated_fields)
+        except pydantic.ValidationError:
+            # shouldn't happen, but in case we miss something
+            # return a empty breadcrumb
+            return Breadcrumb()
+
+    def create_tracker(
+        self,
+        obj=NotSpecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
+    ) -> ContextManager:
+        initial_fields = self.breadcrumb
+        additional_fields = BreadcrumbTracker.breadcrumb_from_kwargs(
+            self.from_kwargs, kwargs
+        )
+        combined_fields = _merge_breadcrumbs(initial_fields, additional_fields)
+        return breadcrumb_as(combined_fields)
 
 
 def track_breadcrumb(
@@ -282,14 +349,18 @@ def track_breadcrumb(
     instance_name: Optional[str] = None,
     transaction_name: Optional[str] = None,
     # request hierarchy
+    provider_name: Optional[str] = None,
     country: Optional[str] = None,
-    action: Optional[str] = None,
     resource: Optional[str] = None,
+    action: Optional[str] = None,
     status_code: Optional[str] = None,
     # settings
     only_trackable=False,
+    # extract from kwargs
+    from_kwargs: Optional[Dict[str, str]] = None,
 ):
     kwargs = {}
+
     if application_name is not None:
         kwargs["application_name"] = application_name
     if processor_name is not None:
@@ -302,15 +373,20 @@ def track_breadcrumb(
         kwargs["instance_name"] = instance_name
     if transaction_name is not None:
         kwargs["transaction_name"] = transaction_name
+    if provider_name is not None:
+        kwargs["provider_name"] = provider_name
     if country is not None:
         kwargs["country"] = country
-    if action is not None:
-        kwargs["action"] = action
     if resource is not None:
         kwargs["resource"] = resource
+    if action is not None:
+        kwargs["action"] = action
     if status_code is not None:
         kwargs["status_code"] = status_code
-    return BreadcrumbTracker(Breadcrumb(**kwargs), only_trackable=only_trackable)
+
+    return BreadcrumbTracker(
+        Breadcrumb(**kwargs), from_kwargs=from_kwargs, only_trackable=only_trackable
+    )
 
 
 class Timer(ContextManager):
@@ -370,7 +446,14 @@ class TimingTracker(Generic[T], Tracker):
             self.processors = processors or []
         self.only_trackable = only_trackable
 
-    def create_tracker(self, obj=NotSpecified, *, func: Callable) -> MetricTimer:
+    def create_tracker(
+        self,
+        obj=NotSpecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
+    ) -> MetricTimer:
         return MetricTimer(self.process_metrics)
 
     def process_metrics(self, timer: MetricTimer):

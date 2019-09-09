@@ -1,15 +1,24 @@
 import stripe
+import abc
+from stripe.http_client import HTTPClient
 from typing import Optional, Any
 
+from app.commons import tracing
 from app.commons.utils.pool import ThreadPoolHelper
 from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe.stripe_http_client import (
+    TimedRequestsClient,
+    set_default_http_client,
+)
 from app.commons.providers import errors
 
 
-class StripeClientInterface:
+class StripeClientInterface(metaclass=abc.ABCMeta):
     # TODO: Require idempotency key
+    @abc.abstractmethod
     def create_connected_account_token(
         self,
+        *,
         country: models.CountryCode,
         token: models.CreateConnectedAccountToken,
         idempotency_key: models.IdempotencyKey = None,
@@ -20,8 +29,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def create_customer(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreateCustomer,
         idempotency_key: models.IdempotencyKey = None,
@@ -32,8 +43,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def update_customer(
         self,
+        *,
         country: models.CountryCode,
         request: models.UpdateCustomer,
         idempotency_key: models.IdempotencyKey = None,
@@ -44,8 +57,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def create_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreatePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -56,8 +71,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def attach_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.AttachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -68,8 +85,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def detach_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.DetachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -80,8 +99,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def retrieve_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.RetrievePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -92,8 +113,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def create_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
@@ -104,8 +127,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def capture_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
@@ -116,8 +141,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def cancel_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CancelPaymentIntent,
         idempotency_key: models.IdempotencyKey,
@@ -128,8 +155,10 @@ class StripeClientInterface:
         """
         ...
 
+    @abc.abstractmethod
     def refund_charge(
         self,
+        *,
         country: models.CountryCode,
         request: models.RefundCharge,
         idempotency_key: models.IdempotencyKey,
@@ -141,19 +170,31 @@ class StripeClientInterface:
         ...
 
 
+@tracing.track_breadcrumb(provider_name="stripe", from_kwargs={"country": "country"})
 class StripeClient(StripeClientInterface):
     """
     production stripe client
     """
 
     client_settings: models.SettingsByCountryCode
+    http_client: HTTPClient
 
-    def __init__(self, settings_list: models.SettingsList):
+    def __init__(
+        self,
+        settings_list: models.SettingsList,
+        *,
+        http_client: Optional[HTTPClient] = None,
+    ):
         if len(settings_list) == 0:
             raise ValueError("at least one client configuration needs to be provided")
         self.client_settings = {
             settings.country: settings for settings in settings_list
         }
+
+        self.http_client = http_client or TimedRequestsClient()
+
+        # globally set the stripe client
+        set_default_http_client(self.http_client)
 
     def settings_for(self, country: models.CountryCode) -> dict:
         try:
@@ -163,8 +204,10 @@ class StripeClient(StripeClientInterface):
                 f"service provider is not configured for country {country}"
             ) from err
 
+    @tracing.track_breadcrumb(resource="token", action="create")
     def create_connected_account_token(
         self,
+        *,
         country: models.CountryCode,
         token: models.CreateConnectedAccountToken,
         idempotency_key: models.IdempotencyKey = None,
@@ -179,8 +222,10 @@ class StripeClient(StripeClientInterface):
         except stripe.error.InvalidRequestError as e:
             raise errors.InvalidRequestError() from e
 
+    @tracing.track_breadcrumb(resource="customer", action="create")
     def create_customer(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreateCustomer,
         idempotency_key: models.IdempotencyKey = None,
@@ -192,8 +237,10 @@ class StripeClient(StripeClientInterface):
         )
         return customer.id
 
+    @tracing.track_breadcrumb(resource="customer", action="modify")
     def update_customer(
         self,
+        *,
         country: models.CountryCode,
         request: models.UpdateCustomer,
         idempotency_key: models.IdempotencyKey = None,
@@ -205,8 +252,10 @@ class StripeClient(StripeClientInterface):
         )
         return customer
 
+    @tracing.track_breadcrumb(resource="paymentmethod", action="create")
     def create_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreatePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -218,8 +267,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_method
 
+    @tracing.track_breadcrumb(resource="paymentmethod", action="attach")
     def attach_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.AttachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -231,8 +282,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_method
 
+    @tracing.track_breadcrumb(resource="paymentmethod", action="detach")
     def detach_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.DetachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -244,8 +297,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_method
 
+    @tracing.track_breadcrumb(resource="paymentmethod", action="retrieve")
     def retrieve_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.RetrievePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
@@ -257,8 +312,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_method
 
+    @tracing.track_breadcrumb(resource="paymentintent", action="create")
     def create_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
@@ -270,8 +327,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_intent
 
+    @tracing.track_breadcrumb(resource="paymentintent", action="capture")
     def capture_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
@@ -283,8 +342,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_intent
 
+    @tracing.track_breadcrumb(resource="paymentintent", action="cancel")
     def cancel_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CancelPaymentIntent,
         idempotency_key: models.IdempotencyKey,
@@ -296,8 +357,10 @@ class StripeClient(StripeClientInterface):
         )
         return payment_intent.id
 
+    @tracing.track_breadcrumb(resource="refund", action="create")
     def refund_charge(
         self,
+        *,
         country: models.CountryCode,
         request: models.RefundCharge,
         idempotency_key: models.IdempotencyKey,
@@ -319,6 +382,7 @@ class StripeTestClient(StripeClient):
 
     def create_bank_account_token(
         self,
+        *,
         country: models.CountryCode,
         token: models.CreateBankAccountToken,
         idempotency_key: models.IdempotencyKey = None,
@@ -331,6 +395,7 @@ class StripeTestClient(StripeClient):
 
     def create_credit_card_token(
         self,
+        *,
         country: models.CountryCode,
         token: models.CreateCreditCardToken,
         idempotency_key: models.IdempotencyKey = None,
@@ -349,15 +414,17 @@ class StripeClientPool(ThreadPoolHelper):
 
     def __init__(
         self,
+        *,
         settings_list: models.SettingsList = None,
         max_workers: Optional[int] = None,
         client: Optional[StripeClient] = None,
+        http_client: Optional[HTTPClient] = None,
     ):
         # ensure threadpool workers get the right prefix
         if client is not None:
             self.client = client
         elif settings_list is not None:
-            self.client = StripeClient(settings_list)
+            self.client = StripeClient(settings_list, http_client=http_client)
         else:
             raise ValueError(
                 "either a Stripe Client `client` or the client `settings_list` must be specified"
@@ -367,27 +434,29 @@ class StripeClientPool(ThreadPoolHelper):
 
     async def create_connected_account_token(
         self,
+        *,
         country: models.CountryCode,
         token: models.CreateConnectedAccountToken,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.TokenId:
         return await self.submit(
             self.client.create_connected_account_token,
-            country,
-            token,
+            country=country,
+            token=token,
             idempotency_key=idempotency_key,
         )
 
     async def create_customer(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreateCustomer,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.CustomerId:
         return await self.submit(
             self.client.create_customer,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
@@ -399,108 +468,119 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> Any:
         return await self.submit(
             self.client.update_customer,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def create_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreatePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.submit(
             self.client.create_payment_method,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def attach_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.AttachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.submit(
             self.client.attach_payment_method,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def detach_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.DetachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.submit(
             self.client.detach_payment_method,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def retrieve_payment_method(
         self,
+        *,
         country: models.CountryCode,
         request: models.RetrievePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.submit(
             self.client.retrieve_payment_method,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def create_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         return await self.submit(
             self.client.create_payment_intent,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def capture_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         return await self.submit(
             self.client.capture_payment_intent,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def cancel_payment_intent(
         self,
+        *,
         country: models.CountryCode,
         request: models.CancelPaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         return await self.submit(
             self.client.cancel_payment_intent,
-            country,
-            request,
+            country=country,
+            request=request,
             idempotency_key=idempotency_key,
         )
 
     async def refund_charge(
         self,
+        *,
         country: models.CountryCode,
         request: models.RefundCharge,
         idempotency_key: models.IdempotencyKey,
     ) -> models.Refund:
         return await self.submit(
-            self.client.refund_charge, country, request, idempotency_key=idempotency_key
+            self.client.refund_charge,
+            country=country,
+            request=request,
+            idempotency_key=idempotency_key,
         )

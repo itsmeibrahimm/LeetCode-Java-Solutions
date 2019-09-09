@@ -1,7 +1,7 @@
 import contextlib
 import functools
 import sys
-from typing import Any, Callable, Tuple, Optional, List
+from typing import Any, Callable, Tuple, Optional, List, Dict
 from typing_extensions import Protocol, AsyncContextManager, runtime_checkable
 
 from app.commons import tracing
@@ -184,6 +184,8 @@ class DatabaseTimingTracker(tracing.TimingTracker[DatabaseTimer]):
         additional_ignores: Optional[List[str]] = None,
         *,
         func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
     ) -> DatabaseTimer:
         additional_ignores = additional_ignores or ["app.commons.database"]
         return DatabaseTimer(
@@ -199,33 +201,89 @@ class TransactionTimingTracker(DatabaseTimingTracker):
     processors = [log_query_timing, stat_transaction_timing]
 
     def __call__(self, func):
-        # chain together a context managers
-        @contextlib.asynccontextmanager
-        async def wrap_transaction(obj: Database, manager: AsyncContextManager):
-            async with contextlib.AsyncExitStack() as stack:
-                # timing: start timing transaction
-                tracker: DatabaseTimer = stack.enter_context(
-                    self.create_tracker(
-                        obj=obj,
-                        additional_ignores=["app.commons.database", "contextlib"],
-                        func=func,
-                    )
-                )
-                # tracing: set transaction name
-                stack.enter_context(
-                    tracing.breadcrumb_as(
-                        tracing.Breadcrumb(
-                            transaction_name=tracker.calling_function_name
-                        )
-                    )
-                )
-                # start transaction
-                transaction = await stack.enter_async_context(manager)
-                yield transaction
-
         @functools.wraps(func)
         def wrapper(obj: Database, *args, **kwargs):
+            # chain together a context managers
+            @contextlib.asynccontextmanager
+            async def wrap_transaction(obj: Database, manager: AsyncContextManager):
+                async with contextlib.AsyncExitStack() as stack:
+                    # timing: start timing transaction
+                    tracker: DatabaseTimer = stack.enter_context(
+                        self.create_tracker(
+                            obj=obj,
+                            additional_ignores=["app.commons.database", "contextlib"],
+                            func=func,
+                            args=args,
+                            kwargs=kwargs,
+                        )
+                    )
+                    # tracing: set transaction name
+                    stack.enter_context(
+                        tracing.breadcrumb_as(
+                            tracing.Breadcrumb(
+                                transaction_name=tracker.calling_function_name
+                            )
+                        )
+                    )
+                    # start transaction
+                    transaction = await stack.enter_async_context(manager)
+                    yield transaction
+
             transaction_manager = func(obj, *args, **kwargs)
             return wrap_transaction(obj, transaction_manager)
 
         return wrapper
+
+
+def log_request_timing(tracker: "ClientTimingTracker", timer: "ClientTimer"):
+    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
+
+    context = timer.breadcrumb.dict(
+        include={"provider_name", "action", "resource", "status_code", "country"},
+        skip_defaults=True,
+    )
+    log.info(
+        "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
+    )
+
+
+def stat_request_timing(tracker: "ClientTimingTracker", timer: "ClientTimer"):
+    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
+    stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
+
+    stat_name = "io.stripe-lib.latency"
+    tags = timer.breadcrumb.dict(
+        include={"provider_name", "action", "resource", "status_code", "country"},
+        skip_defaults=True,
+    )
+    stats.timing(stat_name, timer.delta_ms, tags=tags)
+    log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
+
+
+class ClientTimer(tracing.MetricTimer):
+    breadcrumb: tracing.Breadcrumb = tracing.Breadcrumb()
+
+    def __init__(self, send_metrics):
+        super().__init__(send_metrics)
+
+    def __enter__(self):
+        self.breadcrumb = tracing.get_current_breadcrumb()
+        return super().__enter__()
+
+
+class ClientTimingTracker(tracing.TimingTracker[ClientTimer]):
+    processors = [log_request_timing, stat_request_timing]
+
+    def create_tracker(
+        self,
+        obj=tracing.NotSpecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
+    ):
+        return ClientTimer(self.process_metrics)
+
+
+def track_client_response(**kwargs):
+    return ClientTimingTracker(**kwargs)

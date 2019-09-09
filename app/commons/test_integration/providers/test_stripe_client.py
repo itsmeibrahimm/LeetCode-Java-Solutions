@@ -61,8 +61,8 @@ class TestStripeClient:
     @pytest.mark.skip("requires connected account key")
     def test_token(self, mode: str, stripe: StripeClient):
         token_id = stripe.create_connected_account_token(
-            models.CountryCode.US,
-            models.CreateConnectedAccountToken(
+            country=models.CountryCode.US,
+            token=models.CreateConnectedAccountToken(
                 card="card_1F0HgE2eZvKYlo2CpI7aVFkd",
                 stripe_account="acct_1032D82eZvKYlo2C",
                 country="US",
@@ -73,8 +73,8 @@ class TestStripeClient:
 
     def test_customer(self, mode: str, stripe: StripeClient):
         customer_id = stripe.create_customer(
-            models.CountryCode.US,
-            models.CreateCustomer(
+            country=models.CountryCode.US,
+            request=models.CreateCustomer(
                 email="test@user.com", description="customer name", country="US"
             ),
         )
@@ -110,8 +110,8 @@ class TestStripePool:
     @pytest.mark.skip("requires connected account key")
     async def test_token(self, mode: str, stripe_pool: StripeClientPool):
         token_id = await stripe_pool.create_connected_account_token(
-            models.CountryCode.US,
-            models.CreateConnectedAccountToken(
+            country=models.CountryCode.US,
+            token=models.CreateConnectedAccountToken(
                 card="card_1F0HgE2eZvKYlo2CpI7aVFkd",
                 stripe_account="acct_1032D82eZvKYlo2C",
                 country="US",
@@ -122,8 +122,8 @@ class TestStripePool:
 
     async def test_customer(self, mode: str, stripe_pool: StripeClientPool):
         customer_id = await stripe_pool.create_customer(
-            models.CountryCode.US,
-            models.CreateCustomer(
+            country=models.CountryCode.US,
+            request=models.CreateCustomer(
                 email="test@user.com", description="customer name", country="US"
             ),
         )

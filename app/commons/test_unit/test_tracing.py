@@ -188,6 +188,41 @@ class TestBreadcrumbs:
         with pytest.raises(pydantic.error_wrappers.ValidationError):
             tracing.Breadcrumb(not_valid=None)
 
+    def test_validate_from_kwargs(self):
+        tracing.BreadcrumbTracker.validate_from_kwargs({})
+        tracing.BreadcrumbTracker.validate_from_kwargs({"valid": "country"})
+
+        with pytest.raises(ValueError, match=r"arg => field_does_not_exist"):
+            tracing.BreadcrumbTracker.validate_from_kwargs(
+                {"arg": "field_does_not_exist"}
+            )
+
+    def test_from_kwargs(self):
+        assert (
+            tracing.BreadcrumbTracker.breadcrumb_from_kwargs({}, {})
+            == tracing.Breadcrumb()
+        ), "empty"
+
+        assert (
+            tracing.BreadcrumbTracker.breadcrumb_from_kwargs(
+                {"non-existent": "application_name"}, {}
+            )
+            == tracing.Breadcrumb()
+        ), "non-existent field in kwargs"
+
+        assert tracing.BreadcrumbTracker.breadcrumb_from_kwargs(
+            {"appname": "application_name"}, {"appname": "blah"}
+        ) == tracing.Breadcrumb(
+            application_name="blah"
+        ), "successfully mapped breadcrumb"
+
+        assert tracing.BreadcrumbTracker.breadcrumb_from_kwargs(
+            {"appname": "application_name", "reponame": "repository_name"},
+            {"appname": "valid", "reponame": dict(invalid="value")},
+        ) == tracing.Breadcrumb(
+            application_name="valid"
+        ), "field with invalid type `repository_name` is silently ignored"
+
     def test_breadcrumb_utils(self):
         a = tracing.Breadcrumb(application_name="my-app-v2")
         b = tracing.Breadcrumb(processor_name="myproc")
@@ -256,3 +291,102 @@ class TestBreadcrumbs:
             )
 
         assert tracing.get_current_breadcrumb() == tracing.Breadcrumb()
+
+    def test_tracking(self):
+        @tracing.track_breadcrumb(application_name="nested", only_trackable=True)
+        class TrackedClass:
+            @tracing.track_breadcrumb(application_name="app")
+            def application_name(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(processor_name="proc")
+            def processor_name(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(repository_name="repo")
+            def repository_name(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(database_name="db")
+            def database_name(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(instance_name="inst")
+            def instance_name(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(provider_name="prov")
+            def provider_name(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(country="MX")
+            def country(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(resource="res")
+            def resource(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(action="yes")
+            def action(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(status_code="200")
+            def status_code(self):
+                return tracing.get_current_breadcrumb()
+
+            def not_tracked(self):
+                return tracing.get_current_breadcrumb()
+
+            @tracing.track_breadcrumb(
+                from_kwargs={
+                    "act": "action",
+                    "opt_resource": "resource",
+                    "opt_app": "application_name",
+                }
+            )
+            def override_app(self, *, act, opt_resource=None, opt_app=None):
+                return tracing.get_current_breadcrumb()
+
+        obj = TrackedClass()
+
+        assert obj.application_name() == tracing.Breadcrumb(
+            application_name="app"
+        ), "override app name"
+        assert obj.processor_name() == tracing.Breadcrumb(
+            application_name="nested", processor_name="proc"
+        ), "nested decorators are merged"
+
+        # verify that the decorators work
+        assert obj.repository_name().repository_name == "repo"
+        assert obj.database_name().database_name == "db"
+        assert obj.instance_name().instance_name == "inst"
+        assert obj.provider_name().provider_name == "prov"
+        assert obj.country().country == "MX"
+        assert obj.resource().resource == "res"
+        assert obj.action().action == "yes"
+        assert obj.status_code().status_code == "200"
+
+        assert obj.not_tracked() == tracing.Breadcrumb()
+
+        assert obj.override_app(act="kwargs_action") == tracing.Breadcrumb(
+            application_name="nested", action="kwargs_action"
+        ), "extract parameter `action` from kwargs"
+
+        assert obj.override_app(
+            act="kwargs_action", opt_resource="res_name"
+        ) == tracing.Breadcrumb(
+            application_name="nested", action="kwargs_action", resource="res_name"
+        ), "include optional param `action` if specified"
+
+        assert obj.override_app(
+            act="kwargs_action", opt_resource="res_name", opt_app="override_app"
+        ) == tracing.Breadcrumb(
+            application_name="override_app", action="kwargs_action", resource="res_name"
+        ), "override existing `application_name` with optional param"
+
+        assert obj.override_app(
+            act="kwargs_action", opt_resource={}
+        ) == tracing.Breadcrumb(
+            application_name="nested", action="kwargs_action"
+        ), "ignores parameter if it is not the right type"

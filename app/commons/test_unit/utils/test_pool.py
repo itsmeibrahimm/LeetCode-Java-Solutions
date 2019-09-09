@@ -46,7 +46,7 @@ class TestPool:
 
         # run 5 tasks, ensure they all execute concurrently (ie. within timeout)
         tasks = [pool.submit(sleep_task, i) for i in range(5)]
-        done, pending = await asyncio.wait(tasks, timeout=0.15)
+        done, pending = await asyncio.wait(tasks, timeout=0.5)
         assert (
             len(done) == 5
         ), "all tasks are finished within timeout when running in parallel"
