@@ -17,7 +17,7 @@ def create_app_config() -> AppConfig:
         ENVIRONMENT="staging",
         DEBUG=False,
         REMOTE_SECRET_ENABLED=True,
-        STATSD_SERVER="prod-proxy-internal.doordash.com",
+        STATSD_SERVER="staging-statsd-proxy.doorcrawl-int.com",
         API_STATSD_CONFIG=ApiStatsDConfig(
             TAGS={"service_name": "payment-service", "cluster": "staging"}
         ),
