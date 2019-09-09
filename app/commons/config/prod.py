@@ -57,7 +57,7 @@ def create_app_config() -> AppConfig:
         DSJ_API_JWT_TOKEN_TTL=1800,
         SENTRY_CONFIG=SentryConfig(
             dsn=Secret(name="sentry_dsn"),
-            environment="staging",
+            environment="prod",
             release=f"payment-service@release-{os.getenv('RELEASE_TAG')}",
         ),
     )
