@@ -1,8 +1,8 @@
 import pytest
 
+from app.payin.core.dispute.model import DisputeList
 from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
-from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
 from app.payin.tests.utils import generate_dispute, FunctionMock
 
 
@@ -35,41 +35,46 @@ class TestDisputeProcessor:
         assert result == dispute
 
     @pytest.mark.asyncio
-    async def test_list_disputes_by_payer_id(self, dispute_processor):
+    async def test_list_disputes_by_dd_payment_method_id(self, dispute_processor):
         dispute_list = [generate_dispute()]
+        dispute_list_object: DisputeList = DisputeList(
+            count=len(dispute_list),
+            has_more=False,
+            total_amount=sum([dispute.amount for dispute in dispute_list]),
+            data=dispute_list,
+        )
         dispute_processor.dispute_client.get_disputes_list = FunctionMock(
             return_value=dispute_list
         )
-        result = await dispute_processor.list_disputes(
-            payer_id="VALID_PAYER_ID",
-            payer_id_type=DisputePayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id=None,
-            payment_method_id_type=None,
-        )
-        assert result == dispute_list
-
-    @pytest.mark.asyncio
-    async def test_list_disputes_by_payment_method_id(self, dispute_processor):
-        dispute_list = [generate_dispute()]
-        dispute_processor.dispute_client.get_disputes_list = FunctionMock(
-            return_value=dispute_list
+        dispute_processor.dispute_client.get_dispute_list_object = FunctionMock(
+            return_value=dispute_list_object
         )
         result = await dispute_processor.list_disputes(
-            payer_id=None,
-            payer_id_type=None,
-            payment_method_id="VALID_PAYMENT_METHOD_ID",
-            payment_method_id_type=DisputePaymentMethodIdType.DD_PAYMENT_METHOD_ID,
+            dd_payment_method_id=1,
+            stripe_payment_method_id=None,
+            dd_stripe_card_id=None,
+            dd_payer_id=None,
+            stripe_customer_id=None,
+            dd_consumer_id=None,
+            start_time=None,
+            reasons=None,
+            distinct=None,
         )
-        assert result == dispute_list
+        assert result == dispute_list_object
 
     @pytest.mark.asyncio
     async def test_list_disputes_by_no_id(self, dispute_processor):
         with pytest.raises(DisputeReadError) as payment_error:
             await dispute_processor.list_disputes(
-                payer_id=None,
-                payer_id_type=None,
-                payment_method_id=None,
-                payment_method_id_type=None,
+                dd_payment_method_id=None,
+                stripe_payment_method_id=None,
+                dd_stripe_card_id=None,
+                dd_payer_id=None,
+                stripe_customer_id=None,
+                dd_consumer_id=None,
+                start_time=None,
+                reasons=None,
+                distinct=None,
             )
         assert (
             payment_error.value.error_code == PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS

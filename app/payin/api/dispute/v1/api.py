@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+from typing import List
+
+from fastapi import APIRouter, Depends, Query
 from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
@@ -13,7 +16,6 @@ from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute, DisputeList
 from app.payin.core.dispute.processor import DisputeProcessor
 from app.payin.core.exceptions import PayinErrorCode
-from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
 
 api_tags = ["DisputeV1"]
 router = APIRouter()
@@ -74,31 +76,71 @@ async def get_dispute(
     tags=api_tags,
 )
 async def list_disputes(
-    payer_id: str = None,
-    payer_id_type: DisputePayerIdType = None,
-    payment_method_id: str = None,
-    payment_method_id_type: DisputePaymentMethodIdType = None,
+    dd_payment_method_id: str = None,
+    stripe_payment_method_id: str = None,
+    dd_stripe_card_id: int = None,
+    dd_payer_id: str = None,
+    stripe_customer_id: str = None,
+    dd_consumer_id: int = None,
+    start_time: datetime = None,
+    reasons: List[str] = Query(None),
+    distinct: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
 ) -> DisputeList:
     """
     List disputes.
-    - **payer_id**: [string] DoorDash payer_id or stripe_customer_id
-    - **payer_id_type**: [string] identify the type of payer_id.
-                            Valid values include "payer_id" and "stripe_customer_id"(default is "payer_id")
-    - **payment_method_id**: [string] DoorDash payment method id or stripe_payment_method_id.
-    - **payment_method_id_type**: [string] identify the type of payment_method_id.
-                Valid values include "payment_method_id" and "stripe_payment_method_id"(default is "payment_method_id")
+    - **dd_payment_method_id**: [string] Doordash payment method id
+    - **stripe_payment_method_id**: [string] Stripe payment method id
+    - **dd_stripe_card_id**: [int] Primary key in Stripe Card table
+    - **dd_payer_id**: [string] Doordash payer id
+    - **stripe_customer_id**: [string] Stripe customer id
+    - **dd_consumer_id**: [int]: Primary key in Consumer table
+    - **start_time**: [datetime] Start date for disputes.Default will be the epoch time
+    - **reasons**: List[str] List of reasons for dispute. Default value considers all the reasons mentioned
+                    on https://stripe.com/docs/api/disputes/object#dispute_object-reason
+    - **distinct**: [bool] Gives count of distinct disputes according to charge id. Default to False
     """
+    parameters = [
+        dd_payment_method_id,
+        stripe_payment_method_id,
+        dd_stripe_card_id,
+        dd_payer_id,
+        stripe_customer_id,
+        dd_consumer_id,
+    ]
+    parameter_count = sum([1 if parameter else 0 for parameter in parameters])
+    if parameter_count > 1:
+        raise PaymentException(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayinErrorCode.DISPUTE_LIST_MORE_THAN_ID_ONE_PARAMETER,
+            error_message="More than 1 id parameter provided. Please verify your input",
+            retryable=False,
+        )
+    elif parameter_count == 0:
+        raise PaymentException(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayinErrorCode.DISPUTE_LIST_NO_ID_PARAMETERS,
+            error_message="No id parameters provides. Please verify your input",
+            retryable=False,
+        )
     log.info(
-        f"[list_disputes] list_disputes started for payer_id={payer_id} payer_id_type={payer_id_type} payment_method_id={payment_method_id} payment_method_id_type={payment_method_id_type}"
+        f"[list_disputes] list disputes started for payment_method_id: {dd_payment_method_id} "
+        f"stripe_payment_method_id: {stripe_payment_method_id} stripe_card_id: {dd_stripe_card_id} "
+        f"payer_id:{dd_payer_id} stripe_customer_id: {stripe_customer_id} consumer_id: {dd_consumer_id}"
+        f"start_time: {start_time} reasons: {reasons} distinct: {distinct}"
     )
     try:
-        disputes = await dispute_processor.list_disputes(
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
-            payment_method_id=payment_method_id,
-            payment_method_id_type=payment_method_id_type,
+        dispute_list = await dispute_processor.list_disputes(
+            dd_payment_method_id=dd_payment_method_id,
+            stripe_payment_method_id=stripe_payment_method_id,
+            dd_stripe_card_id=dd_stripe_card_id,
+            dd_payer_id=dd_payer_id,
+            stripe_customer_id=stripe_customer_id,
+            dd_consumer_id=dd_consumer_id,
+            start_time=start_time,
+            reasons=reasons,
+            distinct=distinct,
         )
         log.info("[list_disputes] list_disputes completed")
     except PaymentError as e:
@@ -109,7 +151,6 @@ async def list_disputes(
                 in (
                     PayinErrorCode.DISPUTE_READ_INVALID_DATA,
                     PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS,
-                    PayinErrorCode.DISPUTE_PAYMENT_METHOD_NOT_ASSOCIATED,
                 )
                 else HTTP_500_INTERNAL_SERVER_ERROR
             ),
@@ -117,5 +158,4 @@ async def list_disputes(
             error_message=e.error_message,
             retryable=e.retryable,
         )
-    dispute_list = DisputeList(count=len(disputes), has_more=False, data=disputes)
     return dispute_list

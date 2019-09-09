@@ -7,7 +7,7 @@ from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payment_method.model import RawPaymentMethod
-from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
+from app.payin.core.types import PayerIdType
 from app.payin.repository.dispute_repo import StripeDisputeDbEntity
 from app.payin.repository.payer_repo import PayerDbEntity
 from app.payin.repository.payment_method_repo import (
@@ -72,13 +72,13 @@ class TestDisputeClient:
         assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
 
     @pytest.mark.asyncio
-    async def test_list_disputes_by_payer_id(self, dispute_client):
+    async def test_list_disputes_by_dd_payer_id(self, dispute_client):
         dispute_list: List[StripeDisputeDbEntity] = [generate_dispute_db_entity()]
         raw_payer_mock = RawPayer()
-        payer_id = generate_object_uuid()
+        id = generate_object_uuid()
         raw_payer_mock.payer_entity = PayerDbEntity(
-            id=payer_id,
-            payer_type=DisputePayerIdType.DD_PAYMENT_PAYER_ID,
+            id=id,
+            payer_type=PayerIdType.PAYER_ID,
             country="usd",
             legacy_stripe_customer_id="VALID STRIPE CUSTOMER ID",
         )
@@ -92,10 +92,14 @@ class TestDisputeClient:
             return_value=dispute_list
         )
         result = await dispute_client.get_disputes_list(
-            payer_id=payer_id,
-            payer_id_type=DisputePayerIdType.DD_PAYMENT_PAYER_ID,
-            payment_method_id=None,
-            payment_method_id_type=None,
+            dd_payment_method_id=None,
+            stripe_payment_method_id=None,
+            dd_stripe_card_id=None,
+            dd_payer_id="VALID_PAYER_ID",
+            stripe_customer_id=None,
+            dd_consumer_id=None,
+            start_time=None,
+            reasons=None,
         )
         assert [entity.to_stripe_dispute() for entity in dispute_list] == result
 
@@ -131,10 +135,14 @@ class TestDisputeClient:
             return_value=dispute_entity_list
         )
         result = await dispute_client.get_disputes_list(
-            payer_id=None,
-            payer_id_type=None,
-            payment_method_id="VALID_PAYMENT_METHOD_ID",
-            payment_method_id_type=DisputePaymentMethodIdType.DD_PAYMENT_METHOD_ID,
+            dd_payment_method_id="VALID PAYMENT METHOD ID",
+            stripe_payment_method_id=None,
+            dd_stripe_card_id=None,
+            dd_payer_id=None,
+            stripe_customer_id=None,
+            dd_consumer_id=None,
+            start_time=None,
+            reasons=None,
         )
         assert [
             dispute_entity.to_stripe_dispute() for dispute_entity in dispute_entity_list

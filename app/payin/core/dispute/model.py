@@ -31,4 +31,5 @@ class Dispute(StripeDispute):
 class DisputeList(BaseModel):
     count: int
     has_more: bool  # Currently default to False. Returning all the disputes for a query
+    total_amount: int
     data: List[Dispute]

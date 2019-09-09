@@ -33,12 +33,11 @@ payin_error_message_maps = {
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
-    "payin_103": "No parameters provides. Provide either payer_id or payment_method_id",
-    "payin_104": "The payment method is not associated to the payer. Please validate the input",
-    "payin_105": "The given payer_id does not have a payer associated to it",
-    "payin_106": "The given payment_method_id does not have a payment_method associated to it",
-    "payin_107": "The given payment method does not have a stripe card associated to it",
-    "payin_108": "No parameters provides. Provide either payer_id_type or payment_method_id_type",
+    "payin_103": "No parameters provides. Provide verify your input",
+    "payin_104": "The given payer_id does not have a payer associated to it",
+    "payin_105": "The given payment_method_id does not have a payment_method associated to it",
+    "payin_106": "No id parameters provides. Please verify your input",
+    "payin_107": "More than 1 id parameter provided. Please verify your input",
 }
 
 
@@ -73,11 +72,10 @@ class PayinErrorCode(str, Enum):
     DISPUTE_READ_DB_ERROR = "payin_101"
     DISPUTE_READ_INVALID_DATA = "payin_102"
     DISPUTE_LIST_NO_PARAMETERS = "payin_103"
-    DISPUTE_PAYMENT_METHOD_NOT_ASSOCIATED = "payin_104"
-    DISPUTE_NO_PAYER_FOR_PAYER_ID = "payin_105"
-    DISPUTE_NO_PAYMENT_METHOD_FOR_PAYMENT_METHOD_ID = "payin_106"
-    DISPUTE_NO_STRIPE_CARD_FOR_PAYMENT_METHOD_ID = "payin_107"
-    DISPUTE_LIST_NO_ID_PARAMETERS = "payin_108"
+    DISPUTE_NO_PAYER_FOR_PAYER_ID = "payin_104"
+    DISPUTE_NO_STRIPE_CARD_FOR_PAYMENT_METHOD_ID = "payin_105"
+    DISPUTE_LIST_NO_ID_PARAMETERS = "payin_106"
+    DISPUTE_LIST_MORE_THAN_ID_ONE_PARAMETER = "payin_107"
 
 
 # TODO Enhance errors to allow us to declare here the response codes they should map to

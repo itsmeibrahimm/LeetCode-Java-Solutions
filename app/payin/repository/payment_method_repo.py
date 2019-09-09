@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from typing_extensions import final
@@ -121,6 +121,10 @@ class DeleteStripeCardByIdWhereInput(DBRequestModel):
 
 class GetStripeCardsByStripeCustomerIdInput(DBRequestModel):
     stripe_customer_id: str
+
+
+class GetStripeCardsByConsumerIdInput(DBRequestModel):
+    consumer_id: int
 
 
 class PaymentMethodRepositoryInterface:
@@ -288,3 +292,12 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             StripeCardDbEntity.from_row(row) for row in stripe_card_rows
         ]
         return stripe_card_db_entities
+
+    async def get_stripe_cards_by_consumer_id(
+        self, input=GetStripeCardsByConsumerIdInput
+    ) -> List[StripeCardDbEntity]:
+        stmt = stripe_cards.table.select().where(
+            stripe_cards.consumer_id == input.consumer_id
+        )
+        rows = await self.main_database.replica().fetch_all(stmt)
+        return [StripeCardDbEntity.from_row(row) for row in rows]

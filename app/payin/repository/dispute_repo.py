@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
 
+from sqlalchemy import and_
+
 from app.commons import tracing
 from app.commons.database.model import DBEntity, DBRequestModel
 from app.payin.core.dispute.model import StripeDispute
@@ -71,6 +73,18 @@ class UpdateStripeDisputeInput(DBRequestModel):
     evidence: Optional[dict]
 
 
+class GetCumulativeAmountInput(DBRequestModel):
+    card_ids: List[int]
+    start_time: datetime
+    reasons: List[str]
+
+
+class GetCumulativeCountInput(DBRequestModel):
+    stripe_card_id: int
+    reasons: List[str]
+    start_time: datetime
+
+
 class DisputeRepositoryInterface:
     """
     Stripe Dispute repository interface class that exposes complicated CRUD operations for business layer
@@ -134,3 +148,33 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
         rows = await self.main_database.replica().fetch_all(stmt)
         dispute_db_entities = [StripeDisputeDbEntity.from_row(row) for row in rows]
         return dispute_db_entities
+
+    async def get_disputes_by_dd_consumer_id(
+        self, cumulative_amount_input: GetCumulativeAmountInput
+    ):
+        stmt = stripe_disputes.table.select().where(
+            and_(
+                stripe_disputes.stripe_card_id.in_(cumulative_amount_input.card_ids),
+                stripe_disputes.reason.in_(cumulative_amount_input.reasons),
+                stripe_disputes.disputed_at > cumulative_amount_input.start_time,
+            )
+        )
+        stripe_dispute_rows = await self.main_database.replica().fetch_all(stmt)
+        stripe_dispute_entities = [
+            StripeDisputeDbEntity.from_row(row).amount for row in stripe_dispute_rows
+        ]
+        return stripe_dispute_entities
+
+    async def get_disputes_by_dd_stripe_card_id(
+        self, cumulative_count_input: GetCumulativeCountInput
+    ):
+        stmt = stripe_disputes.table.select().where(
+            and_(
+                stripe_disputes.stripe_card_id == cumulative_count_input.stripe_card_id,
+                stripe_disputes.reason.in_(cumulative_count_input.reasons),
+                stripe_disputes.disputed_at > cumulative_count_input.start_time,
+            )
+        )
+        rows = await self.main_database.replica().fetch_all(stmt)
+        stripe_dispute_entities = [StripeDisputeDbEntity.from_row(row) for row in rows]
+        return stripe_dispute_entities

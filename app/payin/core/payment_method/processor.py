@@ -50,6 +50,7 @@ from app.payin.repository.payment_method_repo import (
     DeleteStripeCardByIdSetInput,
     DeleteStripeCardByIdWhereInput,
     GetStripeCardsByStripeCustomerIdInput,
+    GetStripeCardsByConsumerIdInput,
 )
 
 
@@ -331,6 +332,12 @@ class PaymentMethodClient:
             )
         stripe_card_ids = [entity.id for entity in stripe_customer_db_entities]
         return stripe_card_ids
+
+    async def get_stripe_card_ids_for_consumer_id(self, consumer_id: int):
+        stripe_card_db_entities = await self.payment_method_repo.get_stripe_cards_by_consumer_id(
+            input=GetStripeCardsByConsumerIdInput(consumer_id=consumer_id)
+        )
+        return [entity.id for entity in stripe_card_db_entities]
 
 
 class PaymentMethodProcessor:

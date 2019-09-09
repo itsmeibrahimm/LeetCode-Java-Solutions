@@ -1,4 +1,5 @@
-from typing import Optional, List
+from datetime import datetime
+from typing import Optional, List, Union
 
 from fastapi import Depends
 from psycopg2._psycopg import DataError
@@ -7,8 +8,8 @@ from structlog.stdlib import BoundLogger
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
-from app.payin.core.dispute.model import Dispute
-from app.payin.core.dispute.types import DisputeIdType
+from app.payin.core.dispute.model import Dispute, DisputeList
+from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import (
     DisputeReadError,
     PayinErrorCode,
@@ -16,15 +17,16 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.processor import PayerClient
-from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
-from app.payin.core.types import DisputePayerIdType, DisputePaymentMethodIdType
+from app.payin.core.types import PaymentMethodIdType
 from app.payin.repository.dispute_repo import (
     DisputeRepository,
     GetStripeDisputeByIdInput,
     GetAllStripeDisputesByPayerIdInput,
     GetAllStripeDisputesByPaymentMethodIdInput,
     StripeDisputeDbEntity,
+    GetCumulativeAmountInput,
+    GetCumulativeCountInput,
 )
 
 
@@ -47,6 +49,7 @@ class DisputeClient:
         self.dispute_repo = dispute_repo
         self.payer_client = payer_client
         self.payment_method_client = payment_method_client
+        self.VALID_REASONS = [key.value for key in ReasonType]
 
     async def get_dispute_object(
         self, dispute_id: str, dispute_id_type: Optional[str] = None
@@ -81,57 +84,98 @@ class DisputeClient:
             )
         return dispute_entity.to_stripe_dispute()
 
+    def validate_reasons(self, reasons):
+        invalid_reasons = [
+            reason for reason in reasons if reason not in self.VALID_REASONS
+        ]
+        if len(invalid_reasons) > 0:
+            self.log.error(
+                f"[get_cumulative_count][{id}] invalid reasons provided:[{invalid_reasons}]"
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_READ_INVALID_DATA, retryable=False
+            )
+
     async def get_disputes_list(
         self,
-        payer_id: str = None,
-        payer_id_type: str = None,
-        payment_method_id: str = None,
-        payment_method_id_type: str = None,
+        dd_payment_method_id: str = None,
+        stripe_payment_method_id: str = None,
+        dd_stripe_card_id: int = None,
+        dd_payer_id: str = None,
+        stripe_customer_id: str = None,
+        dd_consumer_id: int = None,
+        start_time: datetime = None,
+        reasons: List[str] = None,
     ) -> List[Dispute]:
-        dispute_db_entities: List[StripeDisputeDbEntity] = []
-        if not (payer_id or payment_method_id):
+        if not (
+            dd_payment_method_id
+            or stripe_payment_method_id
+            or dd_stripe_card_id
+            or dd_payer_id
+            or stripe_customer_id
+            or dd_consumer_id
+        ):
             self.log.warn(f"[list_disputes] No parameters provided")
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
             )
-        if not (payer_id_type or payment_method_id_type):
-            self.log.warn(f"[list_disputes] No parameters provided")
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_LIST_NO_ID_PARAMETERS, retryable=False
+        # Setting defaults
+        dispute_db_entities: List[StripeDisputeDbEntity] = []
+        if reasons:
+            self.validate_reasons(reasons)
+        else:
+            reasons = self.VALID_REASONS
+        if start_time is None:
+            start_time = datetime(1970, 1, 1)  # Defaulting to epoch time
+        # Business logic to get disputes list
+        if dd_payment_method_id or stripe_payment_method_id:
+            payment_method_id: str = ""
+            if dd_payment_method_id:
+                payment_method_id = dd_payment_method_id
+            elif stripe_payment_method_id:
+                payment_method_id = stripe_payment_method_id
+            raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
+                payment_method_id=payment_method_id,
+                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID
+                if dd_payment_method_id
+                else PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID,
             )
-        if payment_method_id:
-            raw_payment_method: RawPaymentMethod
-            if payer_id:
-                raw_payment_method = await self.payment_method_client.get_raw_payment_method(
-                    payer_id=payer_id,
-                    payer_id_type=payer_id_type,
-                    payment_method_id=payment_method_id,
-                    payment_method_id_type=payment_method_id_type,
-                )
-            else:
-                raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
-                    payment_method_id=payment_method_id,
-                    payment_method_id_type=payment_method_id_type,
-                )
-            legacy_dd_stripe_card_id = raw_payment_method.legacy_dd_stripe_card_id()
-            if legacy_dd_stripe_card_id:
-                dispute_db_entities = await self.dispute_repo.list_disputes_by_payment_method_id(
-                    input=GetAllStripeDisputesByPaymentMethodIdInput(
-                        stripe_card_id=int(legacy_dd_stripe_card_id)
+            if raw_payment_method:
+                legacy_dd_stripe_card_id = raw_payment_method.legacy_dd_stripe_card_id()
+                if legacy_dd_stripe_card_id:
+                    dispute_db_entities = await self.dispute_repo.list_disputes_by_payment_method_id(
+                        input=GetAllStripeDisputesByPaymentMethodIdInput(
+                            stripe_card_id=int(legacy_dd_stripe_card_id)
+                        )
+                    )
+        elif dd_stripe_card_id:
+            try:
+                dispute_db_entities = await self.dispute_repo.get_disputes_by_dd_stripe_card_id(
+                    cumulative_count_input=GetCumulativeCountInput(
+                        stripe_card_id=dd_stripe_card_id,
+                        reasons=reasons,
+                        start_time=start_time,
                     )
                 )
-        elif payer_id:
-            stripe_customer_id: Optional[str] = None
-            if payer_id_type is DisputePayerIdType.STRIPE_CUSTOMER_ID:
-                stripe_customer_id = payer_id
+            except DataError as e:
+                self.log.error(
+                    f"[get_cumulative_count][{id} DataError while reading db. {e}"
+                )
+                raise DisputeReadError(
+                    error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
+                )
+        elif dd_payer_id or stripe_customer_id:
+            stripe_id: Optional[str] = None
+            if stripe_customer_id:
+                stripe_id = stripe_customer_id
             else:
                 raw_payer_object: RawPayer = await self.payer_client.get_raw_payer(
-                    payer_id=payer_id, payer_id_type=payer_id_type
+                    payer_id=Union[dd_payer_id, str]
                 )
-                stripe_customer_id = raw_payer_object.pgp_customer_id()
-            if not stripe_customer_id:
+                stripe_id = raw_payer_object.pgp_customer_id()
+            if not stripe_id:
                 self.log.error(
-                    f"[list_disputes_client] No payer found for the payer_id"
+                    f"[list_disputes_client] No payer found for the dd_payer_id/stripe_customer_id"
                 )
                 raise PaymentMethodReadError(
                     error_code=PayinErrorCode.DISPUTE_NO_PAYER_FOR_PAYER_ID,
@@ -139,7 +183,7 @@ class DisputeClient:
                 )
             try:
                 stripe_card_ids = await self.payment_method_client.get_dd_stripe_card_ids_by_stripe_customer_id(
-                    stripe_customer_id=stripe_customer_id
+                    stripe_customer_id=stripe_id
                 )
                 dispute_db_entities = await self.dispute_repo.list_disputes_by_payer_id(
                     input=GetAllStripeDisputesByPayerIdInput(
@@ -151,11 +195,46 @@ class DisputeClient:
                 raise DisputeReadError(
                     error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
                 )
+        elif dd_consumer_id:
+            try:
+                stripe_card_ids = await self.payment_method_client.get_stripe_card_ids_for_consumer_id(
+                    consumer_id=dd_consumer_id
+                )
+                dispute_db_entities = await self.dispute_repo.get_disputes_by_dd_consumer_id(
+                    cumulative_amount_input=GetCumulativeAmountInput(
+                        card_ids=stripe_card_ids, start_time=start_time, reasons=reasons
+                    )
+                )
+            except DataError as e:
+                self.log.error(
+                    f"[get_cumulative_amount][{id} DataError while reading db. {e}"
+                )
+                raise DisputeReadError(
+                    error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
+                )
         disputes = [
             dispute_db_entity.to_stripe_dispute()
             for dispute_db_entity in dispute_db_entities
         ]
         return disputes
+
+    async def get_dispute_list_object(
+        self, disputes_list: List[Dispute], distinct: bool
+    ) -> DisputeList:
+        total_amount = sum([dispute.amount for dispute in disputes_list])
+        has_more = (
+            False
+        )  # Currently default to False. Returning all the disputes for a query
+        if distinct:
+            count = len(set([dispute.stripe_charge_id for dispute in disputes_list]))
+        else:
+            count = len(disputes_list)
+        return DisputeList(
+            count=count,
+            has_more=has_more,
+            total_amount=total_amount,
+            data=disputes_list,
+        )
 
 
 class DisputeProcessor:
@@ -186,30 +265,53 @@ class DisputeProcessor:
 
     async def list_disputes(
         self,
-        payer_id: str = None,
-        payer_id_type: str = None,
-        payment_method_id: str = None,
-        payment_method_id_type: DisputePaymentMethodIdType = None,
-    ):
+        dd_payment_method_id: str = None,
+        stripe_payment_method_id: str = None,
+        dd_stripe_card_id: int = None,
+        dd_payer_id: str = None,
+        stripe_customer_id: str = None,
+        dd_consumer_id: int = None,
+        start_time: datetime = None,
+        reasons: List[str] = None,
+        distinct: bool = False,
+    ) -> DisputeList:
         """
         Retrieve list of DoorDash dispute
 
-        :param payer_id: [string] DoorDash payer_id or stripe_customer_id
-        :param payer_id_type: [string] identify the type of payer_id.
-        :param payment_method_id: [string] DoorDash payment method id or stripe_payment_method_id.
-        :param payment_method_id_type: [string] identify the type of payment_method_id
-        :return: List of Dispute Objects
+        :param  dd_payment_method_id: [string] DoorDash payment method id
+        :param stripe_payment_method_id: [string] Stripe payment method id
+        :param dd_stripe_card_id: [int] Primary key in Stripe Card table
+        :param dd_payer_id: [string] DoorDash payer id
+        :param stripe_customer_id: [string] Stripe customer id
+        :param dd_consumer_id: [int]: Primary key in Consumer table
+        :param start_time: [datetime] Start date for disputes.Default will be the epoch time
+        :param reasons: List[str] List of reasons for dispute.
+        :param distinct: [bool] Gives count of distinct disputes according to charge id. Defaults to False
+        :return: ListDispute Object
         """
-        if not (payer_id or payment_method_id):
+        if not (
+            dd_payment_method_id
+            or stripe_payment_method_id
+            or dd_stripe_card_id
+            or dd_payer_id
+            or stripe_customer_id
+            or dd_consumer_id
+        ):
             self.log.warn(f"[list_disputes] No parameters provided")
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
             )
-        if not (payer_id_type or payment_method_id_type):
-            self.log.warn(f"[list_disputes] No parameters provided")
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_LIST_NO_ID_PARAMETERS, retryable=False
-            )
-        return await self.dispute_client.get_disputes_list(
-            payer_id, payer_id_type, payment_method_id, payment_method_id_type
+        disputes_list: List[Dispute] = await self.dispute_client.get_disputes_list(
+            dd_payment_method_id=dd_payment_method_id,
+            stripe_payment_method_id=stripe_payment_method_id,
+            dd_stripe_card_id=dd_stripe_card_id,
+            dd_payer_id=dd_payer_id,
+            stripe_customer_id=stripe_customer_id,
+            dd_consumer_id=dd_consumer_id,
+            start_time=start_time,
+            reasons=reasons,
         )
+        dispute_list_object: DisputeList = await self.dispute_client.get_dispute_list_object(
+            disputes_list=disputes_list, distinct=distinct
+        )
+        return dispute_list_object
