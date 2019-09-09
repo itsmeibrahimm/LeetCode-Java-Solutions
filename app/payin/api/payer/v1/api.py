@@ -69,7 +69,7 @@ async def create_payer(
         raise PaymentException(
             http_status_code=(
                 HTTP_422_UNPROCESSABLE_ENTITY
-                if e.error_code == "payin_1"
+                if e.error_code == PayinErrorCode.PAYER_CREATE_INVALID_DATA
                 else HTTP_500_INTERNAL_SERVER_ERROR
             ),
             error_code=e.error_code,

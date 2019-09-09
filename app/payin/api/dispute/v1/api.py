@@ -66,8 +66,8 @@ async def get_dispute(
     return dispute
 
 
-@router.patch(
-    "/disputes/{stripe_dispute_id}",
+@router.post(
+    "/disputes/{stripe_dispute_id}/submit",
     response_model=Dispute,
     status_code=HTTP_200_OK,
     operation_id="SubmitDisputeEvidence",
