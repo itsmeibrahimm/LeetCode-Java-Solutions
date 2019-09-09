@@ -3,18 +3,21 @@ from typing import Optional, List, Union
 
 from fastapi import Depends
 from psycopg2._psycopg import DataError
+from stripe.error import StripeError
 from structlog.stdlib import BoundLogger
 
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
-from app.payin.core.dispute.model import Dispute, DisputeList
+from app.commons.providers.stripe.stripe_models import UpdateStripeDispute
+from app.payin.core.dispute.model import Dispute, DisputeList, Evidence
 from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import (
     DisputeReadError,
     PayinErrorCode,
     PaymentMethodReadError,
 )
+from app.payin.core.exceptions import DisputeUpdateError
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
@@ -27,6 +30,10 @@ from app.payin.repository.dispute_repo import (
     StripeDisputeDbEntity,
     GetCumulativeAmountInput,
     GetCumulativeCountInput,
+)
+from app.payin.repository.dispute_repo import (
+    UpdateStripeDisputeWhereInput,
+    UpdateStripeDisputeSetInput,
 )
 
 
@@ -83,6 +90,39 @@ class DisputeClient:
                 error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
             )
         return dispute_entity.to_stripe_dispute()
+
+    async def submit_dispute_evidence(self, dispute_id: str, evidence: Evidence):
+        try:
+            request = UpdateStripeDispute(sid=dispute_id, evidence=evidence)
+            response = await self.app_ctxt.stripe.update_stripe_dispute(request=request)
+        except StripeError as e:
+            self.log.error(f"Error updating the stripe dispute: {e}")
+            raise DisputeUpdateError(
+                error_code=PayinErrorCode.DISPUTE_UPDATE_STRIPE_ERROR, retryable=False
+            )
+        return response
+
+    async def update_dispute_details(self, dispute_id: str) -> Optional[Dispute]:
+        try:
+            updated_time = datetime.utcnow()
+            update_dispute_db_entity = await self.dispute_repo.update_dispute_details(
+                request_set=UpdateStripeDisputeSetInput(
+                    evidence_submitted_at=updated_time, updated_at=updated_time
+                ),
+                request_where=UpdateStripeDisputeWhereInput(id=dispute_id),
+            )
+        except DataError as e:
+            self.log.error(
+                f"[get_dispute_entity][{dispute_id} DataError while reading db. {e}"
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
+            )
+        return (
+            update_dispute_db_entity.to_stripe_dispute()
+            if update_dispute_db_entity
+            else None
+        )
 
     def validate_reasons(self, reasons):
         invalid_reasons = [
@@ -262,6 +302,18 @@ class DisputeProcessor:
             dispute_id=dispute_id, dispute_id_type=dispute_id_type
         )
         return dispute
+
+    async def submit_dispute_evidence(self, stripe_dispute_id: str, evidence: Evidence):
+        dispute: Dispute = await self.dispute_client.get_dispute_object(
+            dispute_id=stripe_dispute_id
+        )
+        await self.dispute_client.submit_dispute_evidence(
+            dispute_id=dispute.stripe_dispute_id, evidence=evidence
+        )
+        updated_dispute = await self.dispute_client.update_dispute_details(
+            dispute_id=dispute.stripe_dispute_id
+        )
+        return updated_dispute
 
     async def list_disputes(
         self,

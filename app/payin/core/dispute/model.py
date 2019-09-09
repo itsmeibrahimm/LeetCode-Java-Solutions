@@ -28,6 +28,36 @@ class Dispute(StripeDispute):
     pass
 
 
+class Evidence(BaseModel):
+    access_activity_log: Optional[str] = None
+    billing_address: Optional[str] = None
+    cancellation_policy: Optional[str] = None
+    cancellation_policy_disclosure: Optional[str] = None
+    cancellation_rebuttal: Optional[str] = None
+    customer_communication: Optional[str] = None
+    customer_email_address: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_purchase_ip: Optional[str] = None
+    customer_signature: Optional[str] = None
+    duplicate_charge_documentation: Optional[str] = None
+    duplicate_charge_explanation: Optional[str] = None
+    duplicate_charge_id: Optional[str] = None
+    product_description: Optional[str] = None
+    receipt: Optional[str] = None
+    refund_policy: Optional[str] = None
+    refund_policy_disclosure: Optional[str] = None
+    refund_refusal_explanation: Optional[str] = None
+    service_date: Optional[str] = None
+    service_documentation: Optional[str] = None
+    shipping_address: Optional[str] = None
+    shipping_carrier: Optional[str] = None
+    shipping_date: Optional[str] = None
+    shipping_documentation: Optional[str] = None
+    shipping_tracking_number: Optional[str] = None
+    uncategorized_file: Optional[str] = None
+    uncategorized_text: Optional[str] = None
+
+
 class DisputeList(BaseModel):
     count: int
     has_more: bool  # Currently default to False. Returning all the disputes for a query

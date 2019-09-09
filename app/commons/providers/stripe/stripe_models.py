@@ -1,11 +1,10 @@
 from datetime import datetime
+from enum import Enum
+from typing import Dict, List, NewType, Optional, Any
 
 import pydantic
-from typing import Dict, List, NewType, Optional, Any
-from enum import Enum
 
 from app.commons.types import CountryCode
-
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
@@ -21,6 +20,7 @@ ConnectedAccountId = NewType("ConnectedAccountId", str)
 PaymentMethodId = NewType("PaymentMethodId", str)
 PaymentIntentId = NewType("PaymentIntentId", str)
 PaymentIntentStatus = NewType("PaymentIntentStatus", str)
+StripeDisputeId = NewType("StripeDisputeId", str)
 
 
 class StripeBaseModel(pydantic.BaseModel):
@@ -190,6 +190,40 @@ class DetachPaymentMethod(StripeBaseModel):
 
 class RetrievePaymentMethod(StripeBaseModel):
     id: str
+
+
+class UpdateStripeDispute(StripeBaseModel):
+    class Evidence(StripeBaseModel):
+        access_activity_log: Optional[str] = None
+        billing_address: Optional[str] = None
+        cancellation_policy: Optional[str] = None
+        cancellation_policy_disclosure: Optional[str] = None
+        cancellation_rebuttal: Optional[str] = None
+        customer_communication: Optional[str] = None
+        customer_email_address: Optional[str] = None
+        customer_name: Optional[str] = None
+        customer_purchase_ip: Optional[str] = None
+        customer_signature: Optional[str] = None
+        duplicate_charge_documentation: Optional[str] = None
+        duplicate_charge_explanation: Optional[str] = None
+        duplicate_charge_id: Optional[str] = None
+        product_description: Optional[str] = None
+        receipt: Optional[str] = None
+        refund_policy: Optional[str] = None
+        refund_policy_disclosure: Optional[str] = None
+        refund_refusal_explanation: Optional[str] = None
+        service_date: Optional[str] = None
+        service_documentation: Optional[str] = None
+        shipping_address: Optional[str] = None
+        shipping_carrier: Optional[str] = None
+        shipping_date: Optional[str] = None
+        shipping_documentation: Optional[str] = None
+        shipping_tracking_number: Optional[str] = None
+        uncategorized_file: Optional[str] = None
+        uncategorized_text: Optional[str] = None
+
+    sid: str
+    evidence: Evidence
 
 
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------

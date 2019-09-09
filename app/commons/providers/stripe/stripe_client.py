@@ -11,6 +11,8 @@ from app.commons.providers.stripe.stripe_http_client import (
     set_default_http_client,
 )
 from app.commons.providers import errors
+from app.commons.providers.stripe import stripe_models as models
+from app.commons.utils.pool import ThreadPoolHelper
 
 
 class StripeClientInterface(metaclass=abc.ABCMeta):
@@ -166,6 +168,15 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         """
         Refund a Charge
         https://stripe.com/docs/api/refunds
+        """
+        ...
+
+    def update_stripe_dispute(
+        self, request: models.UpdateStripeDispute
+    ) -> models.StripeDisputeId:
+        """
+        Update a Dispute
+        https://stripe.com/docs/api/disputes/update
         """
         ...
 
@@ -371,6 +382,12 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return refund
+
+    def update_stripe_dispute(
+        self, request: models.UpdateStripeDispute
+    ) -> models.StripeDisputeId:
+        dispute = stripe.Dispute.modify(**request.dict(skip_defaults=True))
+        return dispute.id
 
 
 class StripeTestClient(StripeClient):
@@ -584,3 +601,8 @@ class StripeClientPool(ThreadPoolHelper):
             request=request,
             idempotency_key=idempotency_key,
         )
+
+    async def update_stripe_dispute(
+        self, request: models.UpdateStripeDispute
+    ) -> models.StripeDisputeId:
+        return await self.submit(self.client.update_stripe_dispute, request)

@@ -38,6 +38,7 @@ payin_error_message_maps = {
     "payin_105": "The given payment_method_id does not have a payment_method associated to it",
     "payin_106": "No id parameters provides. Please verify your input",
     "payin_107": "More than 1 id parameter provided. Please verify your input",
+    "payin_108": "Error returned from Payment Provider.",
 }
 
 
@@ -76,6 +77,7 @@ class PayinErrorCode(str, Enum):
     DISPUTE_NO_STRIPE_CARD_FOR_PAYMENT_METHOD_ID = "payin_105"
     DISPUTE_LIST_NO_ID_PARAMETERS = "payin_106"
     DISPUTE_LIST_MORE_THAN_ID_ONE_PARAMETER = "payin_107"
+    DISPUTE_UPDATE_STRIPE_ERROR = "payin_108"
 
 
 # TODO Enhance errors to allow us to declare here the response codes they should map to
@@ -184,6 +186,10 @@ class PaymentIntentConcurrentAccessError(Exception):
 # StripeDispute Errors                                      #
 ###########################################################
 class DisputeReadError(PayinError):
+    pass
+
+
+class DisputeUpdateError(PayinError):
     pass
 
 

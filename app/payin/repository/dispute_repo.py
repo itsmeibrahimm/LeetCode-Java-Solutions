@@ -68,9 +68,13 @@ class GetAllStripeDisputesByPaymentMethodIdInput(DBRequestModel):
     stripe_card_id: int
 
 
-class UpdateStripeDisputeInput(DBRequestModel):
+class UpdateStripeDisputeWhereInput(DBRequestModel):
     id: str
-    evidence: Optional[dict]
+
+
+class UpdateStripeDisputeSetInput(DBRequestModel):
+    evidence_submitted_at: datetime
+    updated_at: datetime
 
 
 class GetCumulativeAmountInput(DBRequestModel):
@@ -127,6 +131,20 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
                 stripe_disputes.id == dispute_input.stripe_dispute_id
             )
         row = await self.main_database.replica().fetch_one(stmt)
+        return StripeDisputeDbEntity.from_row(row) if row else None
+
+    async def update_dispute_details(
+        self,
+        request_set: UpdateStripeDisputeSetInput,
+        request_where: UpdateStripeDisputeWhereInput,
+    ) -> Optional[StripeDisputeDbEntity]:
+        stmt = (
+            stripe_disputes.table.update()
+            .where(stripe_disputes.stripe_dispute_id == request_where.id)
+            .values(request_set.dict())
+            .returning(*stripe_disputes.table.columns.values())
+        )
+        row = await self.main_database.master().fetch_one(stmt)
         return StripeDisputeDbEntity.from_row(row) if row else None
 
     async def list_disputes_by_payer_id(

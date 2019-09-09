@@ -12,9 +12,11 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
+from app.payin.core.dispute.model import Evidence
 from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute, DisputeList
 from app.payin.core.dispute.processor import DisputeProcessor
+from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import PayinErrorCode
 
 api_tags = ["DisputeV1"]
@@ -34,7 +36,7 @@ router = APIRouter()
 )
 async def get_dispute(
     dispute_id: str,
-    dispute_id_type: str = None,
+    dispute_id_type: DisputeIdType = None,
     log: BoundLogger = Depends(get_logger_from_req),
     dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
 ) -> Dispute:
@@ -61,6 +63,47 @@ async def get_dispute(
             error_message=e.error_message,
             retryable=e.retryable,
         )
+    return dispute
+
+
+@router.patch(
+    "/disputes/{stripe_dispute_id}",
+    response_model=Dispute,
+    status_code=HTTP_200_OK,
+    operation_id="SubmitDisputeEvidence",
+    responses={
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def submit_dispute_evidence(
+    stripe_dispute_id: str,
+    evidence: Evidence,
+    log: BoundLogger = Depends(get_logger_from_req),
+    dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
+) -> Dispute:
+    log.info(
+        "[update_dispute] update_dispute started for dispute_id=%s", stripe_dispute_id
+    )
+    try:
+        dispute: Dispute = await dispute_processor.submit_dispute_evidence(
+            stripe_dispute_id=stripe_dispute_id, evidence=evidence
+        )
+    except PaymentError as e:
+        raise PaymentException(
+            http_status_code=(
+                HTTP_404_NOT_FOUND
+                if e.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
+                else HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            error_code=e.error_code,
+            error_message=e.error_message,
+            retryable=e.retryable,
+        )
+    log.info(
+        "[update_dispute] update_dispute completed for dispute_id=%s", stripe_dispute_id
+    )
     return dispute
 
 
