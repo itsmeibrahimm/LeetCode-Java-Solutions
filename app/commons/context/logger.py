@@ -11,7 +11,7 @@ from pythonjsonlogger import jsonlogger
 # for a list of supported fields and reserved attributes for logging
 from typing_extensions import Protocol
 
-INCLUDED_LOG_FIELDS = "(req_id) (timestamp) (name) (message)"
+INCLUDED_LOG_FIELDS = "(req_id) (correlation_id) (timestamp) (name) (message)"
 
 is_debug = os.environ.get("ENVIRONMENT") in ("local", "testing")
 

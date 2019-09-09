@@ -1,13 +1,15 @@
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Optional, cast
 from uuid import UUID, uuid4
 
 from starlette.requests import Request
 from starlette.responses import Response
 from structlog.stdlib import BoundLogger
-from uuid import UUID, uuid4
 
-from app.commons.constants import PAYMENT_REQUEST_ID_HEADER
+from app.commons.constants import (
+    PAYMENT_REQUEST_ID_HEADER,
+    EXTERNAL_CORRELATION_ID_HEADER,
+)
 from app.commons.context.app_context import AppContext, get_context_from_app
 
 
@@ -15,6 +17,7 @@ from app.commons.context.app_context import AppContext, get_context_from_app
 class ReqContext:
     req_id: UUID
     log: BoundLogger
+    correlation_id: Optional[str] = None
 
 
 def set_context_for_req(request: Request) -> ReqContext:
@@ -22,8 +25,9 @@ def set_context_for_req(request: Request) -> ReqContext:
     app_context = get_context_from_app(request.app)
 
     req_id = uuid4()
-    log = app_context.log.bind(req_id=req_id)
-    req_context = ReqContext(req_id=req_id, log=log)
+    correlation_id = request.headers.get(EXTERNAL_CORRELATION_ID_HEADER, None)
+    log = app_context.log.bind(req_id=req_id, correlation_id=correlation_id)
+    req_context = ReqContext(req_id=req_id, log=log, correlation_id=correlation_id)
 
     state = cast(Any, request.state)
     state.context = req_context

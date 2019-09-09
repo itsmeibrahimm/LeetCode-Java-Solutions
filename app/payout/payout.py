@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Depends
-
+from app.commons.api.exceptions import register_payment_exception_handler
 from app.commons.applications import FastAPI
 from app.commons.auth.service_auth import RouteAuthorizer
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
-from app.commons.api.exceptions import register_payment_exception_handler
-from app.commons.routing import group_routers_with_path_prefix
-from app.payout.api import account, transfer, webhook
+from app.commons.routing import default_payment_router_builder
 from app.middleware.doordash_metrics import ServiceMetricsMiddleware
+from app.payout.api import account, transfer, webhook
 
 
 def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -25,16 +23,17 @@ def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
     )
 
     # Mount routers
-    route_authorizer = RouteAuthorizer(config.PAYOUT_SERVICE_ID)
-    grouped_routers = group_routers_with_path_prefix(
+    default_payment_router_builder().add_common_dependencies(
+        RouteAuthorizer(config.PAYOUT_SERVICE_ID)
+    ).add_sub_routers(
         {
             "/accounts": account.v0.router,
             "/transfers": transfer.v0.router,
             "/webhook": webhook.v0.router,
         }
+    ).attach_to_app(
+        app_v0
     )
-
-    app_v0.include_router(grouped_routers, dependencies=[Depends(route_authorizer)])
 
     register_payment_exception_handler(app_v0)
 
@@ -56,12 +55,11 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     )
 
     # Mount routers
-    route_authorizer = RouteAuthorizer(config.PAYOUT_SERVICE_ID)
-
-    router = APIRouter()
-    router.include_router(account.v1.router, prefix="/accounts")
-
-    app_v1.include_router(router, dependencies=[Depends(route_authorizer)])
+    default_payment_router_builder().add_sub_routers(
+        {"/accounts": account.v1.router}
+    ).add_common_dependencies(RouteAuthorizer(config.PAYOUT_SERVICE_ID)).attach_to_app(
+        app_v1
+    )
 
     register_payment_exception_handler(app_v1)
 

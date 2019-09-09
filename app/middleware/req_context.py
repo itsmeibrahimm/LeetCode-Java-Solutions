@@ -12,5 +12,6 @@ class ReqContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         context = set_context_for_req(request)
         context.log.debug("request context created")
+        context.log.info(f"incoming request method={request.method} url={request.url}")
         resp = await call_next(request)
         return response_with_req_id(request, resp)
