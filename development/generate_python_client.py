@@ -23,7 +23,7 @@ def mkdir_path(path):
         os.mkdir(path)
 
 
-supported_apps = ["payout_v0", "payout_v1", "payin", "ledger"]
+supported_apps = ["payout_v0", "payout_v1", "payin_v0", "payin_v1", "ledger"]
 
 parser = argparse.ArgumentParser(
     description="Generate Python Client for Payment Service"
@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-a",
     "--app",
-    help="payment service app name, should be payin, payout_v0, payout_v1, or ledger",
+    help="payment service app name, should be payin_v0, payin_v1, payout_v0, payout_v1, or ledger",
     required=True,
 )
 
@@ -43,10 +43,12 @@ if app not in supported_apps:
     print("The app your entered is not supported.")
     exit(1)
 
-if app in ["payout_v0", "payout_v1"]:
-    app_version = app.split("_")[1]
-    service_spec_url = "http://localhost:8001/payout/api/{}/openapi.json".format(
-        app_version
+if app in ["payout_v0", "payout_v1", "payin_v0", "payin_v1"]:
+    app_specs = app.split("_")
+    app_name = app_specs[0]
+    app_version = app_specs[1]
+    service_spec_url = "http://localhost:8001/{name}/api/{version}/openapi.json".format(
+        name=app_name, version=app_version
     )
 else:
     service_spec_url = "http://localhost:8001/{}/openapi.json".format(app)
