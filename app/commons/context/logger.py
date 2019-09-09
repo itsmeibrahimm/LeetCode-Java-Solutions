@@ -36,8 +36,9 @@ def add_log_level(logger: structlog.BoundLogger, log_level: str, event_dict: dic
 
 def add_app_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict):
     """
-    application info (environment, etc)
+    application info (pid, hostname, environment, etc)
     """
+    event_dict["pid"] = os.getpid()
     event_dict["hostname"] = platform.node()
     event_dict["app"] = {"name": "payment-service", "env": os.environ["ENVIRONMENT"]}
     return event_dict
