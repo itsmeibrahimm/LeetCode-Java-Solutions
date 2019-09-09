@@ -1,12 +1,14 @@
+import json
 import os
 from dataclasses import dataclass
-from typing import Any, List, Callable
+from typing import Any, List, Callable, Tuple, Dict, Union
 from unittest.mock import Mock
 
 import pytest
 from _pytest.nodes import Item
 from pytest_mock import MockFixture
 from starlette.testclient import TestClient
+import unittest.mock
 
 from app.commons import stats
 from app.commons.config.app_config import AppConfig
@@ -26,6 +28,8 @@ from app.payin.repository.payment_method_repo import PaymentMethodRepository
 os.environ["ENVIRONMENT"] = "testing"
 
 stats_logger = get_logger("statsd")
+
+RuntimeTypes = Union[Dict, List, Tuple, bool, str, int, float]
 
 
 @dataclass(frozen=True)
@@ -247,3 +251,55 @@ def client():
 
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def runtime_setter():
+    with RuntimeSetter() as runtime_setter:
+        yield runtime_setter
+
+
+class RuntimeSetter(object):
+    """
+    Used for setting runtime values for tests. Retrieve it using the runtime_setter fixture.
+
+    Example:
+        def test(runtime_setter):
+            runtime_setter.set('YOLO', True)
+
+    OR explicitly used
+
+        with RuntimeSetter() as runtime_setter:
+            ...
+    """
+
+    def __init__(self):
+        self._overrides: Dict[str, RuntimeTypes] = {}
+        self._patched_get_content: unittest.mock._patch = unittest.mock.patch(
+            "app.commons.runtime.runtime.get_content", side_effect=self._get_content
+        )
+
+    def __enter__(self):
+        self._patched_get_content.start()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self._patched_get_content.stop()
+
+    def set(self, filename: str, content: RuntimeTypes):
+        if isinstance(content, dict) or isinstance(content, (list, tuple)):
+            content_str = json.dumps(content)
+        else:
+            content_str = str(content)
+
+        self._overrides[filename] = content_str
+
+    def remove(self, filename: str):
+        del self._overrides[filename]
+
+    def _get_content(self, file_name: str):
+        return self.overrides.get(file_name, None)
+
+    @property
+    def overrides(self):
+        return self._overrides
