@@ -30,7 +30,7 @@ class CreateInstantPayoutResponse(OperationResponse):
 class CreateInstantPayoutRequest(OperationRequest):
     payout_account_id: PayoutAccountId
     amount: PayoutAmountType
-    payout_type: PayoutType = PayoutType.Standard
+    payout_type: PayoutType = PayoutType.Instant
     payout_id: Optional[str] = None
     method: Optional[PayoutMethodType]
     submitted_by: Optional[str] = None
@@ -40,7 +40,7 @@ class CreateInstantPayout(
     AsyncOperation[CreateInstantPayoutRequest, CreateInstantPayoutResponse]
 ):
     """
-    Processor to create a standard payout.
+    Processor to create a instant payout.
     """
 
     stripe_payout_request_repo: StripePayoutRequestRepositoryInterface
