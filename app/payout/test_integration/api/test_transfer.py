@@ -2,6 +2,7 @@ import pytest
 from starlette.testclient import TestClient
 from datetime import datetime
 
+from app.payout.types import StripePayoutStatus
 from app.testcase_utils import validate_expected_items_in_dict
 
 TRANSFER_ENDPOINT = "/payout/api/v0/transfers"
@@ -82,7 +83,7 @@ class TestTransferV0:
     @pytest.fixture
     def prepared_stripe_transfer(self, prepared_transfer: dict, client: TestClient):
         to_create = {
-            "stripe_status": "status",
+            "stripe_status": StripePayoutStatus.New.value,
             "transfer_id": prepared_transfer["id"],
             "stripe_id": f"stripe_id-{datetime.utcnow()}",
             "stripe_request_id": "stripe_request_id",
@@ -141,7 +142,7 @@ class TestTransferV0:
     def test_create_get_update_stripe_transfer(
         self, prepared_stripe_transfer: dict, client: TestClient
     ):
-        stripe_status_update = "newstatus"
+        stripe_status_update = StripePayoutStatus.New.value
         response = client.patch(
             update_stripe_transfer_by_id_url(prepared_stripe_transfer["id"]),
             json={"stripe_status": stripe_status_update},
@@ -200,7 +201,8 @@ class TestTransferV0:
 
     def test_update_stripe_transfer_by_id_not_found(self, client: TestClient):
         response = client.patch(
-            update_stripe_transfer_by_id_url(-1), json={"stripe_status": "new"}
+            update_stripe_transfer_by_id_url(-1),
+            json={"stripe_status": StripePayoutStatus.New.value},
         )
         assert response.status_code == 404
 

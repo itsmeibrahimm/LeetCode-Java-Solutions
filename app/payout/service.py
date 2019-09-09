@@ -33,7 +33,7 @@ class PayoutService(BaseService):
     transfers: transfer.TransferRepository
     payouts: payout.PayoutRepository
     stripe_payout_requests: stripe_payout_request.StripePayoutRequestRepository
-    stripe_transfers: stripe_transfer.StripeTransferRepositoryInterface
+    stripe_transfers: stripe_transfer.StripeTransferRepository
     dsj_client: DSJClient
 
     def __init__(self, request: Request):

@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 
 from app.payout.repository.maindb.model import stripe_transfer
-from app.payout.service import TransferRepository, TransferRepositoryInterface
+from app.payout.service import (
+    TransferRepository,
+    TransferRepositoryInterface,
+    StripeTransferRepositoryInterface,
+    StripeTransferRepository,
+)
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payout.api.response import Acknowledgement
 from app.payout.api.transfer.v0.models import (
@@ -87,7 +92,7 @@ async def update_transfer_by_id(
 )
 async def create_stripe_transfer(
     data: StripeTransferCreate,
-    repository: TransferRepositoryInterface = Depends(TransferRepository),
+    repository: StripeTransferRepositoryInterface = Depends(StripeTransferRepository),
 ):
     internal_request = stripe_transfer.StripeTransferCreate(
         **data.dict(skip_defaults=True)
@@ -107,7 +112,7 @@ async def create_stripe_transfer(
 )
 async def get_stripe_transfer_by_stripe_id(
     stripe_id: str,
-    repository: TransferRepositoryInterface = Depends(TransferRepository),
+    repository: StripeTransferRepositoryInterface = Depends(StripeTransferRepository),
 ):
     internal_stripe_transfer = await repository.get_stripe_transfer_by_stripe_id(
         stripe_id=stripe_id
@@ -128,7 +133,7 @@ async def get_stripe_transfer_by_stripe_id(
 )
 async def get_stripe_transfer_by_transfer_id(
     transfer_id: int,
-    repository: TransferRepositoryInterface = Depends(TransferRepository),
+    repository: StripeTransferRepositoryInterface = Depends(StripeTransferRepository),
 ):
     internal_stripe_transfers = await repository.get_stripe_transfers_by_transfer_id(
         transfer_id=transfer_id
@@ -149,7 +154,7 @@ async def get_stripe_transfer_by_transfer_id(
 )
 async def get_stripe_transfer_by_id(
     stripe_transfer_id: int,
-    repository: TransferRepositoryInterface = Depends(TransferRepository),
+    repository: StripeTransferRepositoryInterface = Depends(StripeTransferRepository),
 ):
     internal_stripe_transfer = await repository.get_stripe_transfer_by_id(
         stripe_transfer_id=stripe_transfer_id
@@ -172,7 +177,7 @@ async def get_stripe_transfer_by_id(
 async def update_stripe_transfer_by_id(
     stripe_transfer_id: int,
     body: StripeTransferUpdate,
-    repository: TransferRepositoryInterface = Depends(TransferRepository),
+    repository: StripeTransferRepositoryInterface = Depends(StripeTransferRepository),
 ) -> Optional[StripeTransfer]:
 
     internal_request = stripe_transfer.StripeTransferUpdate(
@@ -198,7 +203,7 @@ async def update_stripe_transfer_by_id(
 )
 async def delete_stripe_transfer_by_stripe_id(
     stripe_id: str,
-    repository: TransferRepositoryInterface = Depends(TransferRepository),
+    repository: StripeTransferRepositoryInterface = Depends(StripeTransferRepository),
 ):
     deleted_row = await repository.delete_stripe_transfer_by_stripe_id(
         stripe_id=stripe_id

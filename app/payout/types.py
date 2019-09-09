@@ -37,3 +37,12 @@ class PayoutMethodType(str, Enum):
 class PayoutTargetType(str, Enum):
     Dasher = "dasher"
     Store = "store"
+
+
+class StripePayoutStatus(str, Enum):
+    Failed = "failed"
+    In_Transit = "in_transit"
+    Canceled = "canceled"
+    Paid = "paid"
+    Pending = "pending"
+    New = "new"

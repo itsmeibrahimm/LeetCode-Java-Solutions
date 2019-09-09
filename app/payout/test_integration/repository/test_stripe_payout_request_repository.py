@@ -203,6 +203,4 @@ class TestPayoutRepository:
         )
         assert updated, "updated"
         assert updated.status == "OK", "updated correctly"
-        assert (
-            updated.updated_at.timestamp() == timestamp.timestamp()
-        ), "updated correctly"
+        assert updated.updated_at == timestamp, "updated correctly"
