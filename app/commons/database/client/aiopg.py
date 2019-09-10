@@ -285,10 +285,6 @@ class AioEngine(DBEngine, timing.Database):
     def closed(self):
         return (not self._raw_engine) or self._raw_engine.closed
 
-    @property
-    def statement_timeout_ms(self) -> int:
-        return int(round(self.default_stmt_timeout_sec * 1000.0, 0))
-
     async def connect(self) -> "AioEngine":
         if self.closed():
             self._raw_engine = await create_engine(
@@ -297,9 +293,6 @@ class AioEngine(DBEngine, timing.Database):
                 maxsize=self.maxsize,
                 timeout=self.connection_timeout_sec,
                 echo=self.debug,
-                # more client config options for libpq:
-                # https://www.postgresql.org/docs/9.6/runtime-config-client.html#GUC-STATEMENT-TIMEOUT
-                options=f"-c statement_timeout={self.statement_timeout_ms}ms",
             )
         return self
 

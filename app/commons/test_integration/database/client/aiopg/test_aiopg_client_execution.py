@@ -14,22 +14,12 @@ pytestmark = [pytest.mark.asyncio]
 async def payout_maindb_aio_engine(app_config: AppConfig):
     assert app_config.PAYOUT_MAINDB_MASTER_URL.value
     engine = AioEngine(
-        dsn=app_config.PAYOUT_MAINDB_MASTER_URL.value,
-        minsize=2,
-        maxsize=2,
-        debug=True,
-        default_stmt_timeout_sec=1.5,
+        dsn=app_config.PAYOUT_MAINDB_MASTER_URL.value, minsize=2, maxsize=2, debug=True
     )
     await engine.connect()
     async with engine:
         yield engine
     assert engine.closed(), "engine was not closed properly"
-
-
-async def test_statement_timeout(payout_maindb_aio_engine: AioEngine):
-    assert (
-        await payout_maindb_aio_engine.fetch_value("SHOW statement_timeout") == "1500ms"
-    ), "statement timeout is set (in ms)"
 
 
 async def test_create_and_fetch_one_fetch_many_fetch_value(
