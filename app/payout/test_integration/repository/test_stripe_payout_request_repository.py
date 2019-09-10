@@ -1,17 +1,19 @@
 import psycopg2
 import pytest
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.commons.database.infra import DB
-from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.stripe_payout_request import (
-    StripePayoutRequestCreate,
     StripePayoutRequestUpdate,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepository,
+)
+from app.payout.test_integration.utils import (
+    prepare_and_insert_payout,
+    prepare_and_insert_stripe_payout_request,
 )
 
 
@@ -33,54 +35,24 @@ class TestPayoutRepository:
         stripe_payout_request_repo: StripePayoutRequestRepository,
         payout_repo: PayoutRepository,
     ):
-        created = await payout_repo.create_payout(
-            PayoutCreate(
-                amount=1000,
-                payment_account_id=123,
-                status="failed",
-                currency="USD",
-                fee=199,
-                type="instant",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
-                idempotency_key="payout-idempotency-key-001",
-                payout_method_id=1,
-                transaction_ids=[1, 2, 3],
-                token="payout-test-token",
-                fee_transaction_id=10,
-                error=None,
-            )
+        # prepare payout and insert, validate data
+        payout = await prepare_and_insert_payout(payout_repo=payout_repo)
+        # prepare stripe_payout_request and insert, validate data
+        stripe_payout_request = await prepare_and_insert_stripe_payout_request(
+            stripe_payout_request_repo=stripe_payout_request_repo, payout_id=payout.id
         )
-        assert created.id, "payout is created, assigned an ID"
-
-        sp_create = StripePayoutRequestCreate(
-            payout_id=created.id,
-            idempotency_key="stripe-payout-request-idempotency-key-001",
-            payout_method_id=1,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-            status="failed",
-            stripe_payout_id=f"stripe_tr_xxx_{created.id}",
-            stripe_account_id="cus_xxxx_1",
-        )
-
-        created_sp = await stripe_payout_request_repo.create_stripe_payout_request(
-            sp_create
-        )
-        assert created_sp.id, "stripe payout request is created, assigned an ID"
-        assert created_sp.stripe_payout_id, "stripe payout request has stripe payout id"
 
         assert (
-            created_sp
+            stripe_payout_request
             == await stripe_payout_request_repo.get_stripe_payout_request_by_payout_id(
-                created_sp.payout_id
+                stripe_payout_request.payout_id
             )
         ), "retrieved stripe payout request matches"
 
         assert (
-            created_sp
+            stripe_payout_request
             == await stripe_payout_request_repo.get_stripe_payout_request_by_stripe_payout_id(
-                created_sp.stripe_payout_id
+                stripe_payout_request.stripe_payout_id
             )
         ), "retrieved stripe payout request matches"
 
@@ -89,57 +61,20 @@ class TestPayoutRepository:
         stripe_payout_request_repo: StripePayoutRequestRepository,
         payout_repo: PayoutRepository,
     ):
-        payout = await payout_repo.create_payout(
-            PayoutCreate(
-                amount=1000,
-                payment_account_id=123,
-                status="failed",
-                currency="USD",
-                fee=199,
-                type="instant",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
-                idempotency_key="payout-idempotency-key-001",
-                payout_method_id=1,
-                transaction_ids=[1, 2, 3],
-                token="payout-test-token",
-                fee_transaction_id=10,
-                error=None,
-            )
-        )
-        assert payout
+        # prepare payout and insert, validate data
+        payout = await prepare_and_insert_payout(payout_repo=payout_repo)
 
-        sp_create = StripePayoutRequestCreate(
-            payout_id=payout.id,
-            idempotency_key="stripe-payout-request-idempotency-key-001",
-            payout_method_id=1,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-            status="failed",
-            stripe_payout_id="stripe_tr_xxx_1",
-            stripe_account_id="cus_xxxx_1",
+        # prepare stripe_payout_request and insert, validate data
+        await prepare_and_insert_stripe_payout_request(
+            stripe_payout_request_repo=stripe_payout_request_repo, payout_id=payout.id
         )
-
-        created_sp = await stripe_payout_request_repo.create_stripe_payout_request(
-            sp_create
-        )
-        assert created_sp.id, "stripe payout request is created, assigned an ID"
-
-        dup = StripePayoutRequestCreate(
-            payout_id=payout.id,
-            idempotency_key="stripe-payout-request-idempotency-key-002",
-            payout_method_id=2,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-            status="failed",
-            stripe_payout_id="stripe_tr_xxx_1",
-            stripe_account_id="cus_xxxx_1",
-        )
-
+        # insert another stripe_payout_request with same payout id
         with pytest.raises(psycopg2.IntegrityError) as e:
-            await stripe_payout_request_repo.create_stripe_payout_request(dup)
+            await prepare_and_insert_stripe_payout_request(
+                stripe_payout_request_repo=stripe_payout_request_repo,
+                payout_id=payout.id,
+            )
         err_msg = str(e.value)
-
         assert (
             'duplicate key value violates unique constraint "stripe_payout_requests_payout_id_key"'
             in err_msg
@@ -150,46 +85,18 @@ class TestPayoutRepository:
         stripe_payout_request_repo: StripePayoutRequestRepository,
         payout_repo: PayoutRepository,
     ):
-        ts_utc = datetime.now(timezone.utc)
+        # prepare payout and insert, validate data
+        payout = await prepare_and_insert_payout(payout_repo=payout_repo)
 
-        payout = await payout_repo.create_payout(
-            PayoutCreate(
-                amount=1000,
-                payment_account_id=123,
-                status="failed",
-                currency="USD",
-                fee=199,
-                type="instant",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
-                idempotency_key="payout-idempotency-key-001",
-                payout_method_id=1,
-                transaction_ids=[1, 2, 3],
-                token="payout-test-token",
-                fee_transaction_id=10,
-                error=None,
-            )
+        # prepare stripe_payout_request and insert, validate data
+        stripe_payout_request = await prepare_and_insert_stripe_payout_request(
+            stripe_payout_request_repo=stripe_payout_request_repo, payout_id=payout.id
         )
-        assert payout
-
-        created = await stripe_payout_request_repo.create_stripe_payout_request(
-            StripePayoutRequestCreate(
-                payout_id=payout.id,
-                idempotency_key="stripe-payout-request-idempotency-key-001",
-                payout_method_id=1,
-                created_at=ts_utc,
-                updated_at=ts_utc,
-                status="failed",
-                stripe_payout_id="stripe_tr_xxx_1",
-                stripe_account_id="cus_xxxx_1",
-            )
-        )
-        assert created.id, "stripe payout request is created, assigned an ID"
 
         assert (
-            created
+            stripe_payout_request
             == await stripe_payout_request_repo.get_stripe_payout_request_by_payout_id(
-                created.payout_id
+                stripe_payout_request.payout_id
             )
         ), "retrieved stripe payout request matches"
 
@@ -199,7 +106,7 @@ class TestPayoutRepository:
             status="OK", updated_at=timestamp, events=json.dumps([{"a": "b"}])
         )
         updated = await stripe_payout_request_repo.update_stripe_payout_request_by_id(
-            created.id, new_data
+            stripe_payout_request.id, new_data
         )
         assert updated, "updated"
         assert updated.status == "OK", "updated correctly"

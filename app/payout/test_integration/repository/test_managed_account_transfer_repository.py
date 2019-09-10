@@ -7,11 +7,13 @@ from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepository,
 )
 from app.payout.repository.maindb.model.managed_account_transfer import (
-    ManagedAccountTransferCreate,
     ManagedAccountTransferUpdate,
 )
-from app.payout.repository.maindb.model.transfer import TransferCreate
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.test_integration.utils import (
+    prepare_and_insert_transfer,
+    prepare_and_insert_managed_account_transfer,
+)
 from app.payout.types import ManagedAccountTransferStatus
 
 
@@ -33,96 +35,35 @@ class TestTransferRepository:
         transfer_repo: TransferRepository,
         managed_account_transfer_repo: ManagedAccountTransferRepository,
     ):
-        payment_account_id = 12345678
-        data = TransferCreate(
-            subtotal=123,
-            adjustments="some-adjustment",
-            amount=123,
-            method="stripe",
-            currency="currency",
-            submitted_at=datetime.now(timezone.utc),
-            deleted_at=datetime.now(timezone.utc),
-            manual_transfer_reason="manual_transfer_reason",
-            status="status",
-            status_code="status_code",
-            submitting_at=datetime.now(timezone.utc),
-            should_retry_on_failure=True,
-            statement_description="statement_description",
-            created_by_id=123,
-            deleted_by_id=321,
-            payment_account_id=payment_account_id,
-            recipient_id=321,
-            recipient_ct_id=123,
-            submitted_by_id=321,
+        # prepare transfer and insert, then validate
+        payment_account_id = 123456
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_id
         )
-
-        assert len(data.__fields_set__) == len(
-            data.__fields__
-        ), "all fields should be set"
-
-        transfer = await transfer_repo.create_transfer(data)
-        assert transfer.id, "transfer is created, assigned an ID"
-
-        ma_transfer_data = ManagedAccountTransferCreate(
-            amount=2000,
+        # prepare managed_account_transfer and insert, then validate content
+        await prepare_and_insert_managed_account_transfer(
+            managed_account_transfer_repo=managed_account_transfer_repo,
+            payment_account_id=payment_account_id,
             transfer_id=transfer.id,
-            payment_account_id=payment_account_id,
-            currency="usd",
         )
-        ma_transfer = await managed_account_transfer_repo.create_managed_account_transfer(
-            ma_transfer_data
-        )
-        assert ma_transfer.id, "managed_account_transfer is created, assigned an ID"
-        assert ma_transfer.stripe_id == ""
-        assert ma_transfer.stripe_status == ""
 
     async def test_get_managed_account_transfer_by_id_success(
         self,
         transfer_repo: TransferRepository,
         managed_account_transfer_repo: ManagedAccountTransferRepository,
     ):
-        payment_account_id = 12345678
-        data = TransferCreate(
-            subtotal=123,
-            adjustments="some-adjustment",
-            amount=123,
-            method="stripe",
-            currency="currency",
-            submitted_at=datetime.now(timezone.utc),
-            deleted_at=datetime.now(timezone.utc),
-            manual_transfer_reason="manual_transfer_reason",
-            status="status",
-            status_code="status_code",
-            submitting_at=datetime.now(timezone.utc),
-            should_retry_on_failure=True,
-            statement_description="statement_description",
-            created_by_id=123,
-            deleted_by_id=321,
-            payment_account_id=payment_account_id,
-            recipient_id=321,
-            recipient_ct_id=123,
-            submitted_by_id=321,
+        # prepare transfer and insert, then validate
+        payment_account_id = 123456
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_id
         )
 
-        assert len(data.__fields_set__) == len(
-            data.__fields__
-        ), "all fields should be set"
-
-        transfer = await transfer_repo.create_transfer(data)
-        assert transfer.id, "transfer is created, assigned an ID"
-
-        ma_transfer_data = ManagedAccountTransferCreate(
-            amount=2000,
+        # prepare managed_account_transfer and insert, then validate content
+        ma_transfer = await prepare_and_insert_managed_account_transfer(
+            managed_account_transfer_repo=managed_account_transfer_repo,
+            payment_account_id=payment_account_id,
             transfer_id=transfer.id,
-            payment_account_id=payment_account_id,
-            currency="usd",
         )
-        ma_transfer = await managed_account_transfer_repo.create_managed_account_transfer(
-            ma_transfer_data
-        )
-        assert ma_transfer.id, "managed_account_transfer is created, assigned an ID"
-        assert ma_transfer.stripe_id == ""
-        assert ma_transfer.stripe_status == ""
 
         retrieved_ma_transfer = await managed_account_transfer_repo.get_managed_account_transfer_by_id(
             ma_transfer.id
@@ -136,48 +77,18 @@ class TestTransferRepository:
         transfer_repo: TransferRepository,
         managed_account_transfer_repo: ManagedAccountTransferRepository,
     ):
-        payment_account_id = 12345678
-        data = TransferCreate(
-            subtotal=123,
-            adjustments="some-adjustment",
-            amount=123,
-            method="stripe",
-            currency="currency",
-            submitted_at=datetime.now(timezone.utc),
-            deleted_at=datetime.now(timezone.utc),
-            manual_transfer_reason="manual_transfer_reason",
-            status="status",
-            status_code="status_code",
-            submitting_at=datetime.now(timezone.utc),
-            should_retry_on_failure=True,
-            statement_description="statement_description",
-            created_by_id=123,
-            deleted_by_id=321,
-            payment_account_id=payment_account_id,
-            recipient_id=321,
-            recipient_ct_id=123,
-            submitted_by_id=321,
+        # prepare transfer and insert, then validate
+        payment_account_id = 123456
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_id
         )
 
-        assert len(data.__fields_set__) == len(
-            data.__fields__
-        ), "all fields should be set"
-
-        transfer = await transfer_repo.create_transfer(data)
-        assert transfer.id, "transfer is created, assigned an ID"
-
-        ma_transfer_data = ManagedAccountTransferCreate(
-            amount=2000,
+        # prepare managed_account_transfer and insert, then validate content
+        ma_transfer = await prepare_and_insert_managed_account_transfer(
+            managed_account_transfer_repo=managed_account_transfer_repo,
+            payment_account_id=payment_account_id,
             transfer_id=transfer.id,
-            payment_account_id=payment_account_id,
-            currency="usd",
         )
-        ma_transfer = await managed_account_transfer_repo.create_managed_account_transfer(
-            ma_transfer_data
-        )
-        assert ma_transfer.id, "managed_account_transfer is created, assigned an ID"
-        assert ma_transfer.stripe_id == ""
-        assert ma_transfer.stripe_status == ""
 
         timestamp = datetime.now(timezone.utc)
         update_request = ManagedAccountTransferUpdate(
