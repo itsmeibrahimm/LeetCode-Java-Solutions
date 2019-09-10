@@ -90,7 +90,12 @@ class StripePayoutRequest(_StripePayoutRequestPartial):
 
 
 class StripePayoutRequestCreate(_StripePayoutRequestPartial):
-    pass
+    # based on the usage in DSJ
+    payout_id: int
+    idempotency_key: str
+    payout_method_id: int
+    stripe_account_id: str
+    status: str
 
 
 class StripePayoutRequestUpdate(_StripePayoutRequestPartial):
