@@ -83,7 +83,7 @@ class TestTransferV0:
     @pytest.fixture
     def prepared_stripe_transfer(self, prepared_transfer: dict, client: TestClient):
         to_create = {
-            "stripe_status": StripePayoutStatus.New.value,
+            "stripe_status": "",
             "transfer_id": prepared_transfer["id"],
             "stripe_id": f"stripe_id-{datetime.utcnow()}",
             "stripe_request_id": "stripe_request_id",
@@ -142,7 +142,7 @@ class TestTransferV0:
     def test_create_get_update_stripe_transfer(
         self, prepared_stripe_transfer: dict, client: TestClient
     ):
-        stripe_status_update = StripePayoutStatus.New.value
+        stripe_status_update = StripePayoutStatus.PENDING.value
         response = client.patch(
             update_stripe_transfer_by_id_url(prepared_stripe_transfer["id"]),
             json={"stripe_status": stripe_status_update},
@@ -202,7 +202,7 @@ class TestTransferV0:
     def test_update_stripe_transfer_by_id_not_found(self, client: TestClient):
         response = client.patch(
             update_stripe_transfer_by_id_url(-1),
-            json={"stripe_status": StripePayoutStatus.New.value},
+            json={"stripe_status": StripePayoutStatus.PENDING.value},
         )
         assert response.status_code == 404
 

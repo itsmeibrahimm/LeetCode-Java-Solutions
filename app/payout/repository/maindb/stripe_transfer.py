@@ -76,6 +76,7 @@ class StripeTransferRepository(
     async def create_stripe_transfer(
         self, data: StripeTransferCreate
     ) -> StripeTransfer:
+        # django will insert an empty string if some fields is required but not given as params
         stmt = (
             stripe_transfers.table.insert()
             .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
@@ -130,9 +131,9 @@ class StripeTransferRepository(
         stmt = stripe_transfers.table.select().where(
             and_(
                 stripe_transfers.transfer_id == transfer_id,
-                not_(stripe_transfers.stripe_status == StripePayoutStatus.Failed.value),
+                not_(stripe_transfers.stripe_status == StripePayoutStatus.FAILED.value),
                 not_(
-                    stripe_transfers.stripe_status == StripePayoutStatus.Canceled.value
+                    stripe_transfers.stripe_status == StripePayoutStatus.CANCELED.value
                 ),
             )
         )

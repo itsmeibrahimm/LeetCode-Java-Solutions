@@ -40,9 +40,14 @@ class PayoutTargetType(str, Enum):
 
 
 class StripePayoutStatus(str, Enum):
-    Failed = "failed"
-    In_Transit = "in_transit"
-    Canceled = "canceled"
-    Paid = "paid"
-    Pending = "pending"
-    New = "new"
+    # for dd stripe_transfer
+    FAILED = "failed"
+    IN_TRANSIT = "in_transit"
+    CANCELED = "canceled"
+    PAID = "paid"
+    PENDING = "pending"
+
+
+class ManagedAccountTransferStatus(str, Enum):
+    FAILED = "failed"
+    PAID = "paid"

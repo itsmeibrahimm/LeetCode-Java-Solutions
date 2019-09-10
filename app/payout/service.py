@@ -4,7 +4,12 @@ from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.repository.bankdb import payout, stripe_payout_request
-from app.payout.repository.maindb import payment_account, stripe_transfer, transfer
+from app.payout.repository.maindb import (
+    payment_account,
+    stripe_transfer,
+    transfer,
+    managed_account_transfer,
+)
 
 __all__ = [
     "PayoutService",
@@ -16,6 +21,8 @@ __all__ = [
     "PayoutRepositoryInterface",
     "StripePayoutRequestRepository",
     "StripePayoutRequestRepositoryInterface",
+    "ManagedAccountTransferRepository",
+    "ManagedAccountTransferRepositoryInterface",
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
@@ -25,6 +32,9 @@ StripePayoutRequestRepositoryInterface = (
     stripe_payout_request.StripePayoutRequestRepositoryInterface
 )
 StripeTransferRepositoryInterface = stripe_transfer.StripeTransferRepositoryInterface
+ManagedAccountTransferRepositoryInterface = (
+    managed_account_transfer.ManagedAccountTransferRepositoryInterface
+)
 
 
 class PayoutService(BaseService):
@@ -34,6 +44,7 @@ class PayoutService(BaseService):
     payouts: payout.PayoutRepository
     stripe_payout_requests: stripe_payout_request.StripePayoutRequestRepository
     stripe_transfers: stripe_transfer.StripeTransferRepository
+    managed_account_transfers: managed_account_transfer.ManagedAccountTransferRepository
     dsj_client: DSJClient
 
     def __init__(self, request: Request):
@@ -44,6 +55,9 @@ class PayoutService(BaseService):
         self.payment_accounts = payment_account.PaymentAccountRepository(maindb)
         self.transfers = transfer.TransferRepository(maindb)
         self.stripe_transfers = stripe_transfer.StripeTransferRepository(maindb)
+        self.managed_account_transfers = managed_account_transfer.ManagedAccountTransferRepository(
+            maindb
+        )
 
         # bankdb
         bankdb = self.app_context.payout_bankdb
@@ -84,6 +98,12 @@ def StripeTransferRepository(
     payout_service: PayoutService = Depends()
 ) -> stripe_transfer.StripeTransferRepositoryInterface:
     return payout_service.stripe_transfers
+
+
+def ManagedAccountTransferRepository(
+    payout_service: PayoutService = Depends()
+) -> managed_account_transfer.ManagedAccountTransferRepositoryInterface:
+    return payout_service.managed_account_transfers
 
 
 def DSJClientHandle(payout_service: PayoutService = Depends()):

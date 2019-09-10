@@ -17,7 +17,6 @@ from app.payout.types import (
     PayoutMethodType,
     PayoutAccountId,
     PayoutTargetType,
-    StripePayoutStatus,
 )
 
 
@@ -59,8 +58,7 @@ class CreateStandardPayout(
     async def _execute(self) -> CreateStandardPayoutResponse:
         self.logger.info(f"CreateStandardPayout")
         stripe_transfer_create = StripeTransferCreate(
-            transfer_id=self.request.transfer_id,
-            stripe_status=StripePayoutStatus.New.value,
+            transfer_id=self.request.transfer_id, stripe_status=""
         )
         stripe_transfer = await self.stripe_transfer_repo.create_stripe_transfer(
             stripe_transfer_create
