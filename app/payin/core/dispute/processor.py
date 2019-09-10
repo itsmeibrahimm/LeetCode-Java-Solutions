@@ -291,7 +291,7 @@ class DisputeProcessor:
         Retrieve DoorDash dispute
 
         :param dispute_id: [string] dispute unique id.
-        :param dispute_id_type: [string] identify the type of dispute_id. Valid values include "pgp_dispute_id",
+        :param dispute_id_type: [string] identify the type of dispute_id. Valid values include "dd_stripe_dispute_id",
                "stripe_dispute_id")
         :return: Dispute object
         """

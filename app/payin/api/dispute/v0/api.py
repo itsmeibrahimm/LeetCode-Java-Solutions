@@ -24,7 +24,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/disputes/{dispute_id}",
+    "/disputes/{dd_stripe_dispute_id}",
     response_model=Dispute,
     status_code=HTTP_200_OK,
     operation_id="GetDispute",
@@ -35,23 +35,27 @@ router = APIRouter()
     tags=api_tags,
 )
 async def get_dispute(
-    dispute_id: str,
-    dispute_id_type: DisputeIdType = None,
+    dd_stripe_dispute_id: str,
     log: BoundLogger = Depends(get_logger_from_req),
     dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
 ) -> Dispute:
     """
     Get dispute.
-    - **dispute_id**: id for dispute in dispute table
-    - **dispute_id_type**: [string] identify the type of id for the dispute.
-        Valid values include "dd_stripe_dispute_id", "stripe_dispute_id" (default is "stripe_dispute_id")
+    - **dd_stripe_dispute_id**: id for dispute in dispute table
     """
-    log.info("[get_dispute] get_dispute started for dispute_id=%s", dispute_id)
+    log.info(
+        "[get_dispute] get_dispute started for dd_stripe_dispute_id=%s",
+        dd_stripe_dispute_id,
+    )
     try:
         dispute: Dispute = await dispute_processor.get(
-            dispute_id=dispute_id, dispute_id_type=dispute_id_type
+            dispute_id=dd_stripe_dispute_id,
+            dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
         )
-        log.info("[get_dispute] get_dispute completed for dispute_id=%s", dispute_id)
+        log.info(
+            "[get_dispute] get_dispute completed for dd_stripe_dispute_id=%s",
+            dd_stripe_dispute_id,
+        )
     except PaymentError as e:
         raise PaymentException(
             http_status_code=(
