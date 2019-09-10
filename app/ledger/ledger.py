@@ -29,10 +29,9 @@ def create_ledger_app(context: AppContext, config: AppConfig) -> FastAPI:
     # allow tracking of service-level metrics
     app.add_middleware(
         ServiceMetricsMiddleware,
-        app_name="ledger-v1",
+        application_name="ledger-v1",
         host=config.STATSD_SERVER,
         config=config.LEDGER_STATSD_CONFIG,
-        additional_tags={"app": "ledger-v1"},
     )
 
     route_authorizer = RouteAuthorizer(config.LEDGER_SERVICE_ID)

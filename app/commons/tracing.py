@@ -294,7 +294,9 @@ class BreadcrumbTracker(Tracker):
                 )
 
     @staticmethod
-    def breadcrumb_from_kwargs(from_kwargs: Dict[str, str], kwargs: Dict[str, Any]):
+    def breadcrumb_from_kwargs(
+        from_kwargs: Dict[str, str], kwargs: Dict[str, Any]
+    ) -> Breadcrumb:
         model_fields: Dict[str, Field] = Breadcrumb.__fields__
 
         validated_fields = {}
@@ -393,6 +395,11 @@ class Timer(ContextManager):
     start_time: float = 0
     start_counter: float = 0
     end_counter: float = 0
+    breadcrumb: Breadcrumb
+
+    def __init__(self):
+        # empty breadcrumb by default
+        self.breadcrumb = Breadcrumb()
 
     @property
     def delta(self):
@@ -407,16 +414,22 @@ class Timer(ContextManager):
         return self.delta * 1000.0
 
     def __enter__(self):
+        # ensure we preserve the latest breadcrumb when we enter the contextmanager
+        self.breadcrumb = get_current_breadcrumb()
+
+        # start timing
         self.start_time = time.time()
         self.start_counter = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # stop timing
         self.end_counter = time.perf_counter()
 
 
 class MetricTimer(Timer):
     def __init__(self, send_metrics: Callable[["MetricTimer"], None]):
+        super().__init__()
         self.send_metrics = send_metrics
 
     def __exit__(self, exc_type, exc_val, exc_tb):

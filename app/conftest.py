@@ -90,6 +90,24 @@ def stripe_api():
     api_settings.restore()
 
 
+@pytest.fixture(autouse=True)
+def global_statsd_client():
+    """
+    always initialize the global statsd client
+    """
+    from doordash_python_stats import ddstats
+    from app.commons.stats import init_global_statsd
+
+    doorstats_global = ddstats.doorstats_global
+
+    ddstats.doorstats_global = init_global_statsd(
+        prefix="dd.pay.payment-service", host="localhost", fixed_tags={"env": "local"}
+    )
+    yield ddstats.doorstats_global
+
+    ddstats.doorstats_global = doorstats_global
+
+
 @pytest.fixture
 def service_statsd_client():
     statsd_client = stats.init_statsd("dd.pay.payment-service", host="localhost")
@@ -99,6 +117,10 @@ def service_statsd_client():
 
 @pytest.fixture(autouse=True)
 def mock_statsd_client(mocker: MockFixture):
+    """
+    prevent stats from actually being sent out in tests
+    """
+
     def _send(data):
         stats_logger.info("statsd: sending: %s", data)
 
@@ -116,6 +138,14 @@ def get_mock_statsd_events(mock_statsd_client: Mock) -> Callable[[], List[Stat]]
         return stats
 
     return get
+
+
+@pytest.fixture
+def reset_mock_statsd_events(mock_statsd_client: Mock) -> Callable[[], None]:
+    def reset():
+        mock_statsd_client.reset_mock()
+
+    return reset
 
 
 @pytest.fixture

@@ -125,9 +125,9 @@ class AppConfig(SecretAware):
     # service level metrics
     SERVICE_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payment-service")
 
-    PAYOUT_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payout-service")
-    PAYIN_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payin-service")
-    LEDGER_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.ledger-service")
+    PAYOUT_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payment-service")
+    PAYIN_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payment-service")
+    LEDGER_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payment-service")
 
     SENTRY_CONFIG: Optional[SentryConfig] = None
 

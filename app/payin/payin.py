@@ -18,10 +18,9 @@ def create_payin_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
     # allow tracking of service-level metrics
     app_v0.add_middleware(
         ServiceMetricsMiddleware,
-        app_name="payin-v0",
+        application_name="payin-v0",
         host=config.STATSD_SERVER,
         config=config.PAYIN_STATSD_CONFIG,
-        additional_tags={"app": "payin-v0"},
     )
 
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
@@ -50,10 +49,9 @@ def create_payin_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     # allow tracking of service-level metrics
     app_v1.add_middleware(
         ServiceMetricsMiddleware,
-        app_name="payin-v1",
+        application_name="payin-v1",
         host=config.STATSD_SERVER,
         config=config.PAYIN_STATSD_CONFIG,
-        additional_tags={"app": "payin-v1"},
     )
 
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)

@@ -17,6 +17,7 @@ from app.commons.stats import (
     set_service_stats_client,
     set_request_logger,
 )
+from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 
 NORMALIZATION_TABLE = str.maketrans("/", "|", "{}")
 
@@ -87,19 +88,26 @@ class ServiceMetricsMiddleware(BaseHTTPMiddleware):
     Middleware to Service level metrics for Superfund
     """
 
+    statsd_client: DoorStatsProxyMultiServer
+
     def __init__(
         self,
         app: ExceptionMiddleware,
         *,
-        app_name: str,
+        application_name: str,
         host: str,
         config: StatsDConfig,
         additional_tags: Optional[Dict[str, str]] = None,
     ):
         self.app = app
-        self.app_name = app_name
+        self.application_name = application_name
+
+        combined_tags = {"container": platform.node()}
+        if additional_tags:
+            combined_tags.update(additional_tags)
+
         self.statsd_client = init_statsd_from_config(
-            host, config, additional_tags={"hostname": platform.node()}
+            host, config, additional_tags=combined_tags
         )
 
     async def dispatch_func(
@@ -107,7 +115,7 @@ class ServiceMetricsMiddleware(BaseHTTPMiddleware):
     ):
         # use the service's client instead of the global statsd client
         with set_service_stats_client(self.statsd_client), tracing.breadcrumb_as(
-            tracing.Breadcrumb(application_name=self.app_name)
+            tracing.Breadcrumb(application_name=self.application_name)
         ):
             response = await call_next(request)
         return response

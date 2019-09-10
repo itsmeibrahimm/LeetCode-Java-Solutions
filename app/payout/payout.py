@@ -16,10 +16,9 @@ def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
     # allow tracking of service-level metrics
     app_v0.add_middleware(
         ServiceMetricsMiddleware,
-        app_name="payout-v0",
+        application_name="payout-v0",
         host=config.STATSD_SERVER,
         config=config.PAYOUT_STATSD_CONFIG,
-        additional_tags={"app": "payout-v0"},
     )
 
     # Mount routers
@@ -48,10 +47,9 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     # allow tracking of service-level metrics
     app_v1.add_middleware(
         ServiceMetricsMiddleware,
-        app_name="payout-v1",
+        application_name="payout-v1",
         host=config.STATSD_SERVER,
         config=config.PAYOUT_STATSD_CONFIG,
-        additional_tags={"app": "payout-v1"},
     )
 
     # Mount routers

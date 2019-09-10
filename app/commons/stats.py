@@ -38,7 +38,7 @@ def init_statsd(
     proxy: DoorStatsProxyMultiServer = None,
     host: str,
     fixed_tags: Optional[Dict[str, str]] = None,
-):
+) -> DoorStatsProxyMultiServer:
     """
     Initialize a StatsD client
     """
@@ -54,13 +54,15 @@ def init_statsd_from_config(
     proxy: DoorStatsProxyMultiServer = None,
     tags: Optional[Dict[str, str]] = None,
     additional_tags: Optional[Dict[str, str]] = None,
-):
+) -> DoorStatsProxyMultiServer:
     combined_tags = tags or dict(**config.TAGS)
     if additional_tags:
         combined_tags.update(additional_tags)
     return init_statsd(config.PREFIX, proxy=proxy, host=host, fixed_tags=combined_tags)
 
 
-def init_global_statsd(prefix: str, *, host: str, fixed_tags: Dict[str, Any] = {}):
+def init_global_statsd(
+    prefix: str, *, host: str, fixed_tags: Dict[str, Any]
+) -> DoorStatsProxyMultiServer:
     fixed_tags = {"hostname": platform.node(), **fixed_tags}
     return init_statsd(prefix, proxy=doorstats_global, host=host, fixed_tags=fixed_tags)

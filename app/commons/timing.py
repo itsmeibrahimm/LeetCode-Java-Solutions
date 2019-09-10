@@ -81,21 +81,22 @@ def log_query_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
     if not isinstance(timer.database, Database):
         return
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
+    breadcrumb = tracing.get_current_breadcrumb()
 
-    transaction_name = tracing.get_transaction_name()
-
+    # these are not currently available through context
     database = {
-        "name": timer.database.database_name,
-        "transaction": bool(transaction_name),
-        "transaction_name": transaction_name,
-        "instance": timer.database.instance_name,
+        "database_name": timer.database.database_name,
+        "instance_name": timer.database.instance_name,
+        "transaction": bool(breadcrumb.transaction_name),
+        "transaction_name": breadcrumb.transaction_name,
     }
-    caller = {
-        "module": timer.calling_module_name,
-        "service": tracing.get_application_name(),
-        "processor": tracing.get_processor_name(),
-        "repository": tracing.get_repository_name(),
-    }
+    caller = breadcrumb.dict(
+        include={"application_name", "processor_name", "repository_name"},
+        skip_defaults=True,
+    )
+    if timer.calling_module_name:
+        caller["module_name"] = timer.calling_module_name
+
     log.info(
         tracker.message,
         query=timer.calling_function_name,
@@ -109,17 +110,21 @@ def log_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTime
     if not isinstance(timer.database, Database):
         return
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
+    breadcrumb = tracing.get_current_breadcrumb()
 
+    # these are not currently available through context
     database = {
-        "name": timer.database.database_name,
-        "instance": timer.database.instance_name,
+        "database_name": timer.database.database_name,
+        "instance_name": timer.database.instance_name,
     }
-    caller = {
-        "module": timer.calling_module_name,
-        "service": tracing.get_application_name(),
-        "processor": tracing.get_processor_name(),
-        "repository": tracing.get_repository_name(),
-    }
+
+    caller = breadcrumb.dict(
+        include={"application_name", "processor_name", "repository_name"},
+        skip_defaults=True,
+    )
+    if timer.calling_module_name:
+        caller["module_name"] = timer.calling_module_name
+
     log.info(
         tracker.message,
         transaction=timer.calling_function_name,
@@ -129,38 +134,45 @@ def log_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTime
     )
 
 
-def stat_query_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
+def stat_query_timing(
+    tracker: "DatabaseTimingTracker", timer: DatabaseTimer, *, query_type=""
+):
     if not isinstance(timer.database, Database):
         return
 
     stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-    transaction_name = tracing.get_transaction_name()
+    breadcrumb = tracing.get_current_breadcrumb()
 
-    stat_name = (
-        f"io.{timer.database.database_name}.query.{timer.calling_function_name}.latency"
+    stat_name = "io.db.latency"
+    tags = breadcrumb.dict(
+        include={
+            "application_name",
+            # "database_name",
+            # "instance_name",
+            "transaction_name",
+        },
+        skip_defaults=True,
     )
-    tags = {
-        # "query_type": "",
-        "transaction": "yes" if transaction_name else "no",
-        "transaction_name": transaction_name,
-        "instance": timer.database.instance_name,
-    }
+    if query_type:
+        tags["query_type"] = query_type
+
+    if timer.calling_function_name:
+        tags["query_name"] = timer.calling_function_name
+
+    # not yet available in breadcrumbs
+    if timer.database.database_name:
+        tags["database_name"] = timer.database.database_name
+    if timer.database.instance_name:
+        tags["instance_name"] = timer.database.instance_name
+
+    # emit stats
     stats.timing(stat_name, timer.delta_ms, tags=tags)
     log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
 def stat_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
-    if not isinstance(timer.database, Database):
-        return
-
-    stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
-    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-
-    stat_name = f"io.{timer.database.database_name}.transaction.{timer.calling_function_name}.latency"
-    tags = {"instance": timer.database.instance_name}
-    stats.timing(stat_name, timer.delta_ms, tags=tags)
-    log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
+    return stat_query_timing(tracker, timer, query_type="transaction")
 
 
 class DatabaseTimingTracker(tracing.TimingTracker[DatabaseTimer]):
@@ -193,6 +205,7 @@ class DatabaseTimingTracker(tracing.TimingTracker[DatabaseTimer]):
         )
 
     def __call__(self, func_or_class):
+        # NOTE: we assume that this is only called to decorate a class
         return self._decorate_class_method(func_or_class)
 
 
@@ -235,7 +248,7 @@ class TransactionTimingTracker(DatabaseTimingTracker):
         return wrapper
 
 
-def log_request_timing(tracker: "ClientTimingTracker", timer: "ClientTimer"):
+def log_request_timing(tracker: "ClientTimingTracker", timer: tracing.MetricTimer):
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
 
     context = timer.breadcrumb.dict(
@@ -247,7 +260,7 @@ def log_request_timing(tracker: "ClientTimingTracker", timer: "ClientTimer"):
     )
 
 
-def stat_request_timing(tracker: "ClientTimingTracker", timer: "ClientTimer"):
+def stat_request_timing(tracker: "ClientTimingTracker", timer: tracing.MetricTimer):
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
     stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
 
@@ -260,29 +273,8 @@ def stat_request_timing(tracker: "ClientTimingTracker", timer: "ClientTimer"):
     log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
-class ClientTimer(tracing.MetricTimer):
-    breadcrumb: tracing.Breadcrumb = tracing.Breadcrumb()
-
-    def __init__(self, send_metrics):
-        super().__init__(send_metrics)
-
-    def __enter__(self):
-        self.breadcrumb = tracing.get_current_breadcrumb()
-        return super().__enter__()
-
-
-class ClientTimingTracker(tracing.TimingTracker[ClientTimer]):
+class ClientTimingTracker(tracing.TimingTracker[tracing.MetricTimer]):
     processors = [log_request_timing, stat_request_timing]
-
-    def create_tracker(
-        self,
-        obj=tracing.NotSpecified,
-        *,
-        func: Callable,
-        args: List[Any],
-        kwargs: Dict[str, Any],
-    ):
-        return ClientTimer(self.process_metrics)
 
 
 def track_client_response(**kwargs):

@@ -1,7 +1,7 @@
 import contextlib
 import pytest
 from typing import List
-from app.commons import timing
+from app.commons import tracing, timing
 from app.commons.utils.testing import Stat
 from app.commons.timing import _discover_caller
 
@@ -35,7 +35,7 @@ class TestDatabaseTimingTracker:
             yield "some transaction"
 
         class Database(timing.Database):
-            database_name = "some db"
+            database_name = "somedb"
             instance_name = "master"
 
             @timing.track_transaction
@@ -46,6 +46,8 @@ class TestDatabaseTimingTracker:
             async def query(self, *args, **kwargs):
                 ...
 
+        # ensure stats have app name
+        @tracing.track_breadcrumb(application_name="my-app")
         class Caller:
             db = Database()
 
@@ -54,6 +56,7 @@ class TestDatabaseTimingTracker:
                     ...
                     await self.insert_into_table()
                     await self.update_table()
+                    return 1
 
             async def insert_into_table(self):
                 await self.db.query()
@@ -65,23 +68,48 @@ class TestDatabaseTimingTracker:
                 await self.db.query()
 
         caller = Caller()
-        await caller.do_something()
-        # dd.response.io.some-db.query.enter_context.latency~cluster=master~transaction=no~transaction_name=:5.885283|ms
+        assert await caller.do_something() == 1
 
         events: List[Stat] = get_mock_statsd_events()
-        stat_names = [stat.stat_name for stat in events]
+        assert (
+            len(events) == 3
+        ), "one stat for the transaction, one for each query (2 total)"
+        stat_names = {
+            (event.stat_name, event.tags["query_name"]): event for event in events
+        }
 
         # query timing
-        assert (
-            "dd.pay.payment-service.io.some-db.query.insert_into_table.latency"
-            in stat_names
-        )
-        assert (
-            "dd.pay.payment-service.io.some-db.query.update_table.latency" in stat_names
-        )
+        insert_name = ("dd.pay.payment-service.io.db.latency", "insert_into_table")
+        assert insert_name in stat_names, "insert query exists"
+        insert_query = stat_names[insert_name]
+        assert insert_query.tags == {
+            "application_name": "my-app",
+            "database_name": "somedb",
+            "instance_name": "master",
+            "transaction_name": "do_something",
+            "query_name": "insert_into_table",
+        }
+
+        update_name = ("dd.pay.payment-service.io.db.latency", "update_table")
+        assert update_name in stat_names, "update query exists"
+        update_query = stat_names[update_name]
+        assert update_query.tags == {
+            "application_name": "my-app",
+            "database_name": "somedb",
+            "instance_name": "master",
+            "transaction_name": "do_something",
+            "query_name": "update_table",
+        }
 
         # transaction timing
-        assert (
-            "dd.pay.payment-service.io.some-db.transaction.do_something.latency"
-            in stat_names
-        )
+        transaction_name = ("dd.pay.payment-service.io.db.latency", "do_something")
+        assert transaction_name in stat_names, "transaction exists"
+        transaction = stat_names[transaction_name]
+        assert transaction.tags == {
+            "application_name": "my-app",
+            "database_name": "somedb",
+            "instance_name": "master",
+            # "transaction_name": "do_something",
+            "query_type": "transaction",
+            "query_name": "do_something",
+        }
