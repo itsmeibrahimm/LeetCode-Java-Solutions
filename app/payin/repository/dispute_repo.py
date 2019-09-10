@@ -179,7 +179,7 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
         )
         stripe_dispute_rows = await self.main_database.replica().fetch_all(stmt)
         stripe_dispute_entities = [
-            StripeDisputeDbEntity.from_row(row).amount for row in stripe_dispute_rows
+            StripeDisputeDbEntity.from_row(row) for row in stripe_dispute_rows
         ]
         return stripe_dispute_entities
 
