@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
-from pydantic import Json
 
 from sqlalchemy import ARRAY, Column, DateTime, Integer, Text, text, JSON
 from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
+from ..types import BankDBBrokenJson
 
 
 @final
@@ -64,7 +64,7 @@ class _PayoutPartial(DBEntity):
     transaction_ids: Optional[List[int]]
     token: Optional[str]
     fee_transaction_id: Optional[int]
-    error: Optional[Json]
+    error: Optional[BankDBBrokenJson]
 
 
 class Payout(_PayoutPartial):
