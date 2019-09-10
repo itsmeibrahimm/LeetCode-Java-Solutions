@@ -27,7 +27,7 @@ class TestCaptureUncapturedPaymentIntents:
         cart_payment_repository.find_payment_intents_that_require_capture.assert_called_once()  # type: ignore
 
     @pytest.mark.asyncio
-    @patch("app.payin.jobs.CartPaymentInterface.capture_payment")
+    @patch("app.payin.jobs.CartPaymentProcessor.capture_payment")
     async def test_capture_uncaptured_payment_intents_when_one_exists(
         self,
         mock_capture_payment,

@@ -34,3 +34,9 @@ class ChargeStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class LegacyStripeChargeStatus(str, Enum):
+    PENDING = "doordash_pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"

@@ -45,11 +45,15 @@ async def payment_intent(
         client_description=cart_payment.client_description,
         type=cart_payment.cart_metadata.type,
         reference_id=cart_payment.cart_metadata.reference_id,
-        reference_ct_id=cart_payment.cart_metadata.ct_reference_id,
+        reference_type=cart_payment.cart_metadata.reference_type,
         amount_original=100,
         legacy_consumer_id=None,
         amount_total=200,
         delay_capture=False,
+        legacy_stripe_card_id=1,
+        legacy_provider_customer_id="stripe_customer_id",
+        legacy_provider_payment_method_id="stripe_payment_method_id",
+        legacy_provider_card_id="stripe_card_id",
     )
 
     payment_intent = PaymentIntentFactory(
@@ -111,8 +115,8 @@ class CartPaymentFactory(factory.Factory):
     payment_method_id = None
     capture_method = None
     client_description = "Maccas Order"
-    cart_metadata = CartMetadata(
-        reference_id=1, ct_reference_id=2, type=CartType.ORDER_CART
+    metadata = CartMetadata(
+        reference_id="1", reference_type="2", type=CartType.ORDER_CART
     )
 
 

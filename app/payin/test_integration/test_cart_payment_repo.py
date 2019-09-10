@@ -2,11 +2,16 @@ from typing import cast
 from uuid import uuid4, UUID
 
 import pytest
+from datetime import datetime
 
-from app.commons.types import CountryCode
+from app.commons.types import CountryCode, LegacyCountryId, CurrencyType
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
+    CartMetadata,
     CartPayment,
+    LegacyPayment,
+    LegacyConsumerCharge,
+    LegacyStripeCharge,
     PaymentIntent,
     PaymentIntentAdjustmentHistory,
     PgpPaymentIntent,
@@ -19,6 +24,7 @@ from app.payin.core.cart_payment.types import (
     ConfirmationMethod,
     CartType,
     ChargeStatus,
+    LegacyStripeChargeStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.core.payer.model import Payer
@@ -76,10 +82,14 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
         amount_original=99,
         amount_total=100,
         client_description=None,
-        reference_id=99,
-        reference_ct_id=88,
-        legacy_consumer_id=None,
+        reference_id="99",
+        reference_type="88",
         delay_capture=False,
+        legacy_consumer_id=1,
+        legacy_stripe_card_id=1,
+        legacy_provider_customer_id="stripe_customer_id",
+        legacy_provider_payment_method_id="stripe_payment_method_id",
+        legacy_provider_card_id="stripe_card_id",
     )
 
 
@@ -95,10 +105,14 @@ async def payment_intent(
         amount_original=99,
         amount_total=100,
         client_description=None,
-        reference_id=99,
-        reference_ct_id=88,
+        reference_id="99",
+        reference_type="88",
         legacy_consumer_id=None,
         delay_capture=False,
+        legacy_stripe_card_id=1,
+        legacy_provider_customer_id="stripe_customer_id",
+        legacy_provider_payment_method_id="stripe_payment_method_id",
+        legacy_provider_card_id="stripe_card_id",
     )
 
     payment_intent = await cart_payment_repository.insert_payment_intent(
@@ -687,10 +701,213 @@ class TestCartPayment:
         result = await cart_payment_repository.get_cart_payment_by_id(
             cart_payment_id=uuid4()
         )
-        assert result is None
+        assert result == (None, None)
 
         # Match
         result = await cart_payment_repository.get_cart_payment_by_id(
             cart_payment_id=cart_payment.id
         )
-        assert result == cart_payment
+
+        expected_legacy_payment = LegacyPayment(
+            dd_consumer_id=1,
+            dd_country_id=None,
+            dd_stripe_card_id=1,
+            charge_id=None,
+            stripe_charge_id=None,
+            stripe_customer_id="stripe_customer_id",
+            stripe_payment_method_id="stripe_payment_method_id",
+            stripe_card_id="stripe_card_id",
+        )
+        assert result == (cart_payment, expected_legacy_payment)
+
+    @pytest.mark.asyncio
+    async def test_insert_cart_payment(
+        self, cart_payment_repository: CartPaymentRepository, payer: Payer
+    ):
+        id = uuid4()
+        result = await cart_payment_repository.insert_cart_payment(
+            id=id,
+            payer_id=UUID(str(payer.id)),
+            type=CartType.ORDER_CART,
+            amount_original=99,
+            amount_total=100,
+            client_description="Test description",
+            reference_id="99",
+            reference_type="88",
+            delay_capture=True,
+            legacy_consumer_id=1,
+            legacy_stripe_card_id=1,
+            legacy_provider_customer_id="stripe_customer_id",
+            legacy_provider_payment_method_id="stripe_payment_method_id",
+            legacy_provider_card_id="stripe_card_id",
+        )
+
+        expected_cart_payment = CartPayment(
+            id=id,
+            amount=100,
+            payer_id=payer.id,
+            payment_method_id=None,  # Derived field
+            delay_capture=True,
+            cart_metadata=CartMetadata(
+                reference_id="99", reference_type="88", type=CartType.ORDER_CART
+            ),
+            created_at=result.created_at,  # Generated field
+            updated_at=result.updated_at,  # Generated field
+            client_description="Test description",
+            payer_statement_description=None,  # Generated field
+            split_payment=None,  # Derived field
+            capture_after=None,
+            deleted_at=None,
+        )
+
+        assert result == expected_cart_payment
+
+
+class TestLegacyCharges:
+    @pytest.fixture
+    async def consumer_charge(self, cart_payment_repository: CartPaymentRepository):
+        yield await cart_payment_repository.insert_legacy_consumer_charge(
+            target_ct_id=1,
+            target_id=2,
+            consumer_id=1,  # Use of pre-seeded consumer to satisfy FK constraint
+            idempotency_key=str(uuid4()),
+            is_stripe_connect_based=False,
+            country_id=LegacyCountryId.US,
+            currency=CurrencyType.USD,
+            stripe_customer_id=None,
+            total=800,
+            original_total=800,
+        )
+
+    @pytest.fixture
+    async def stripe_charge(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        yield await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id=str(uuid4()),
+            card_id=None,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=CurrencyType.USD,
+            status=LegacyStripeChargeStatus.SUCCEEDED.value,
+            idempotency_key=str(uuid4()),
+        )
+
+    @pytest.mark.asyncio
+    async def test_insert_legacy_consumer_charge(
+        self, cart_payment_repository: CartPaymentRepository
+    ):
+        idempotency_key = str(uuid4())
+        result = await cart_payment_repository.insert_legacy_consumer_charge(
+            target_ct_id=1,
+            target_id=2,
+            consumer_id=1,  # Use of pre-seeded consumer to satisfy FK constraint
+            idempotency_key=idempotency_key,
+            is_stripe_connect_based=False,
+            country_id=LegacyCountryId.US,
+            currency=CurrencyType.USD,
+            stripe_customer_id=None,
+            total=800,
+            original_total=800,
+        )
+
+        expected_consumer_charge = LegacyConsumerCharge(
+            id=result.id,  # Generated
+            target_ct_id=1,
+            target_id=2,
+            idempotency_key=idempotency_key,
+            is_stripe_connect_based=False,
+            total=800,
+            original_total=800,
+            currency=CurrencyType.USD,
+            country_id=LegacyCountryId.US,
+            issue_id=None,
+            stripe_customer_id=None,
+            created_at=result.created_at,  # Generated
+        )
+
+        assert result == expected_consumer_charge
+
+    @pytest.mark.asyncio
+    async def test_insert_legacy_stripe_charge(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        idempotency_key = str(uuid4())
+        result = await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id="stripe_id",
+            card_id=None,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=CurrencyType.USD,
+            status=LegacyStripeChargeStatus.SUCCEEDED.value,
+            idempotency_key=idempotency_key,
+        )
+
+        expected_stripe_charge = LegacyStripeCharge(
+            id=result.id,  # Generated
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=CurrencyType.USD,
+            status=LegacyStripeChargeStatus.SUCCEEDED.value,
+            error_reason=None,
+            additional_payment_info=None,
+            description=None,
+            idempotency_key=idempotency_key,
+            card_id=None,
+            charge_id=consumer_charge.id,
+            stripe_id="stripe_id",
+            created_at=result.created_at,  # Generated
+            updated_at=result.updated_at,  # Generated
+            refunded_at=None,
+        )
+
+        assert result == expected_stripe_charge
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge: LegacyStripeCharge,
+    ):
+        result = await cart_payment_repository.update_legacy_stripe_charge(
+            stripe_charge_id=stripe_charge.stripe_id,
+            amount_refunded=200,
+            refunded_at=datetime.now(),
+        )
+
+        expected_result = stripe_charge
+        expected_result.amount_refunded = 200
+        expected_result.refunded_at = result.refunded_at
+        assert result == expected_result
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_status(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge: LegacyStripeCharge,
+    ):
+        result = await cart_payment_repository.update_legacy_stripe_charge_status(
+            stripe_charge_id=stripe_charge.stripe_id,
+            status=LegacyStripeChargeStatus.FAILED,
+        )
+
+        expected_result = stripe_charge
+        expected_result.status = LegacyStripeChargeStatus.FAILED
+        assert result == expected_result
+
+    @pytest.mark.asyncio
+    async def test_get_legacy_stripe_charge_by_stripe_id(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge: LegacyStripeCharge,
+    ):
+        result = await cart_payment_repository.get_legacy_stripe_charge_by_stripe_id(
+            stripe_charge_id=stripe_charge.stripe_id
+        )
+        assert result == stripe_charge

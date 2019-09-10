@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 from unittest.mock import MagicMock
 import uuid
+from app.commons.types import LegacyCountryId, CurrencyType
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
@@ -10,8 +11,16 @@ from app.payin.core.cart_payment.model import (
     CartType,
     PaymentCharge,
     PgpPaymentCharge,
+    LegacyPayment,
+    LegacyConsumerCharge,
+    LegacyStripeCharge,
 )
-from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus, CaptureMethod
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    ChargeStatus,
+    CaptureMethod,
+    LegacyStripeChargeStatus,
+)
 from app.payin.core.dispute.model import Dispute
 from app.payin.repository.dispute_repo import StripeDisputeDbEntity
 
@@ -111,9 +120,65 @@ def generate_cart_payment(
         payment_method_id=payment_method_id,
         capture_method=capture_method,
         cart_metadata=CartMetadata(
-            reference_id=0, ct_reference_id=0, type=CartType.ORDER_CART
+            reference_id="0", reference_type="2", type=CartType.ORDER_CART
         ),
         delay_capture=True,
+    )
+
+
+def generate_legacy_payment() -> LegacyPayment:
+    return LegacyPayment(
+        dd_consumer_id=1,
+        dd_country_id=1,
+        dd_stripe_card_id=1,
+        charge_id=None,
+        stripe_charge_id=None,
+        stripe_customer_id=str(uuid.uuid4()),
+        stripe_payment_method_id=str(uuid.uuid4()),
+        stripe_card_id=None,
+    )
+
+
+def generate_legacy_consumer_charge() -> LegacyConsumerCharge:
+    return LegacyConsumerCharge(
+        id=1,
+        target_id=1,
+        target_ct_id=2,
+        idempotency_key=str(uuid.uuid4()),
+        is_stripe_connect_based=False,
+        total=100,
+        original_total=100,
+        currency=CurrencyType.USD,
+        country_id=LegacyCountryId.US,
+        issue_id=None,
+        stripe_customer_id=None,
+        created_at=datetime.now(),
+    )
+
+
+def generate_legacy_stripe_charge(
+    charge_id: int = None,
+    stripe_id: str = None,
+    amount_refunded: int = 0,
+    refunded_at: datetime = None,
+    status: str = LegacyStripeChargeStatus.SUCCEEDED,
+) -> LegacyStripeCharge:
+    return LegacyStripeCharge(
+        id=1,
+        amount=100,
+        amount_refunded=amount_refunded,
+        currency=CurrencyType.USD,
+        status=status,
+        error_reason=None,
+        additional_payment_info=None,
+        description=None,
+        idempotency_key=str(uuid.uuid4),
+        card_id=None,
+        charge_id=charge_id if charge_id else 1,
+        stripe_id=stripe_id if stripe_id else str(uuid.uuid4()),
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        refunded_at=refunded_at,
     )
 
 
@@ -184,6 +249,8 @@ def _generate_provider_charge(
     provider_charge.payment_intent = pgp_payment_intent.resource_id
     provider_charge.invoice = str(uuid.uuid4())
     provider_charge.payment_method = str(uuid.uuid4())
+    provider_charge.status = "succeeded"
+    provider_charge.id = str(uuid.uuid4())
     return provider_charge
 
 

@@ -10,9 +10,11 @@ from uuid import UUID
 
 @final
 class LegacyPayment(BaseModel):
-    dd_consumer_id: Optional[str] = None
-    dd_stripe_card_id: Optional[str] = None
-    dd_charge_id: Optional[str] = None
+    dd_consumer_id: int
+    dd_country_id: Optional[int] = None
+    dd_stripe_card_id: Optional[int] = None
+    charge_id: Optional[int] = None
+    stripe_charge_id: Optional[str] = None
     stripe_customer_id: Optional[str] = None
     stripe_payment_method_id: Optional[str] = None
     stripe_card_id: Optional[str] = None
@@ -26,8 +28,8 @@ class SplitPayment(BaseModel):
 
 @final
 class CartMetadata(BaseModel):
-    reference_id: int
-    ct_reference_id: int
+    reference_id: str
+    reference_type: str
     type: CartType
 
 
@@ -42,7 +44,6 @@ class CartPayment(BaseModel):
     updated_at: Optional[datetime] = None
     client_description: Optional[str] = None
     payer_statement_description: Optional[str] = None
-    legacy_payment: Optional[LegacyPayment] = None
     split_payment: Optional[SplitPayment] = None
     capture_after: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
@@ -152,3 +153,40 @@ class PgpPaymentCharge:
     updated_at: datetime
     captured_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+
+
+@final
+@dataclass()
+class LegacyConsumerCharge:
+    id: int
+    target_id: int
+    target_ct_id: int
+    idempotency_key: str
+    is_stripe_connect_based: bool
+    total: int
+    original_total: int
+    currency: str
+    country_id: int
+    issue_id: Optional[int]
+    stripe_customer_id: Optional[int]
+    created_at: datetime
+
+
+@final
+@dataclass()
+class LegacyStripeCharge:
+    id: int
+    amount: int
+    amount_refunded: int
+    currency: str
+    status: str
+    error_reason: Optional[str]
+    additional_payment_info: Optional[str]
+    description: Optional[str]
+    idempotency_key: str
+    card_id: Optional[int]
+    charge_id: int
+    stripe_id: str
+    created_at: datetime
+    updated_at: datetime
+    refunded_at: Optional[datetime]

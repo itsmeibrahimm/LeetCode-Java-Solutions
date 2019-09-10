@@ -8,10 +8,12 @@ from app.payin.core.exceptions import (
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 import app.payin.core.cart_payment.processor as processor
+from app.payin.core.cart_payment.model import IntentStatus
 from app.payin.tests.utils import (
     generate_payment_intent,
     generate_pgp_payment_intent,
     generate_cart_payment,
+    generate_legacy_payment,
     FunctionMock,
 )
 import uuid
@@ -39,12 +41,12 @@ class TestCartPaymentProcessor:
             payer_repo=MagicMock(), log=MagicMock(), app_ctxt=MagicMock()
         )
 
-    @pytest.fixture
-    def cart_payment_processor(self, cart_payment_interface):
-        return processor.CartPaymentProcessor(cart_payment_interface)
-
-    async def test_submit_with_no_payment_method(
-        self, request_cart_payment, payer_client, payment_method_client
+    async def test_create_payment_with_no_payment_method(
+        self,
+        request_cart_payment,
+        payer_client,
+        payment_method_client,
+        cart_payment_repo,
     ):
         mocked_method_fetch = FunctionMock()
         mocked_method_fetch.side_effect = PaymentMethodReadError(
@@ -57,14 +59,22 @@ class TestCartPaymentProcessor:
             req_context=MagicMock(),
             payer_client=payer_client,
             payment_method_client=payment_method_client,
+            payment_repo=cart_payment_repo,
+        )
+        legacy_payment_interface = processor.LegacyPaymentInterface(
+            app_context=MagicMock(),
+            req_context=MagicMock(),
+            payment_repo=cart_payment_repo,
         )
         cart_payment_processor = processor.CartPaymentProcessor(
-            cart_payment_interface=cart_payment_interface
+            cart_payment_interface=cart_payment_interface,
+            legacy_payment_interface=legacy_payment_interface,
         )
 
         with pytest.raises(PaymentMethodReadError) as payment_error:
-            await cart_payment_processor.submit_payment(
+            await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
+                request_legacy_payment=None,
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
@@ -75,8 +85,12 @@ class TestCartPaymentProcessor:
             == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value
         )
 
-    async def test_submit_with_other_owner(
-        self, request_cart_payment, payer_client, payment_method_client
+    async def test_create_payment_with_other_owner(
+        self,
+        cart_payment_repo,
+        request_cart_payment,
+        payer_client,
+        payment_method_client,
     ):
         mocked_method_fetch = FunctionMock()
         mocked_method_fetch.side_effect = PaymentMethodReadError(
@@ -89,17 +103,24 @@ class TestCartPaymentProcessor:
         cart_payment_interface = processor.CartPaymentInterface(
             app_context=MagicMock(),
             req_context=MagicMock(),
-            payment_repo=MagicMock(),
+            payment_repo=cart_payment_repo,
             payer_client=payer_client,
             payment_method_client=payment_method_client,
         )
+        legacy_payment_interface = processor.LegacyPaymentInterface(
+            app_context=MagicMock(),
+            req_context=MagicMock(),
+            payment_repo=cart_payment_repo,
+        )
         cart_payment_processor = processor.CartPaymentProcessor(
-            cart_payment_interface=cart_payment_interface
+            cart_payment_interface=cart_payment_interface,
+            legacy_payment_interface=legacy_payment_interface,
         )
 
         with pytest.raises(PaymentMethodReadError) as payment_error:
-            await cart_payment_processor.submit_payment(
+            await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
+                request_legacy_payment=None,
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
@@ -120,9 +141,10 @@ class TestCartPaymentProcessor:
         # TODO legacy payment, including other payer_id_type
         pass
 
-    async def test_submit(self, cart_payment_processor, request_cart_payment):
-        result_cart_payment = await cart_payment_processor.submit_payment(
+    async def test_create_payment(self, cart_payment_processor, request_cart_payment):
+        result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
+            request_legacy_payment=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
@@ -143,13 +165,15 @@ class TestCartPaymentProcessor:
             return_value=[generate_pgp_payment_intent(payment_intent_id=intent.id)]
         )
 
+        legacy_payment = generate_legacy_payment()
         cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
-            return_value=request_cart_payment
+            return_value=(request_cart_payment, legacy_payment)
         )
 
         # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
-        result = await cart_payment_processor.submit_payment(
+        result = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
+            request_legacy_payment=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
@@ -158,12 +182,13 @@ class TestCartPaymentProcessor:
         assert result
 
         cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
-            return_value=result
+            return_value=(result, legacy_payment)
         )
 
         # Second submission attempt
-        second_result = await cart_payment_processor.submit_payment(
+        second_result = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
+            request_legacy_payment=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
@@ -175,7 +200,7 @@ class TestCartPaymentProcessor:
     @pytest.mark.asyncio
     async def test_update_fake_cart_payment(self, cart_payment_processor):
         cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
-            return_value=None
+            return_value=(None, None)
         )
 
         with pytest.raises(CartPaymentReadError) as payment_error:
@@ -184,7 +209,6 @@ class TestCartPaymentProcessor:
                 cart_payment_id=uuid.uuid4(),
                 payer_id="payer_id",
                 amount=500,
-                legacy_payment=None,
                 client_description=None,
             )
         assert (
@@ -201,26 +225,144 @@ class TestCartPaymentProcessor:
             cart_payment_id=cart_payment.id,
             payer_id=cart_payment.payer_id,
             amount=updated_amount,
-            legacy_payment=None,
             client_description=None,
         )
         assert result
         assert result.id == cart_payment.id
         assert result.amount == updated_amount
 
+    @pytest.mark.skip("Test not implemented yet")
     @pytest.mark.asyncio
     async def test_update_payment_higher_after_capture(self, cart_payment_processor):
-        # Mock interactions with other layers
+        pass
+
+    @pytest.mark.skip("Test not implemented yet")
+    @pytest.mark.asyncio
+    async def test_resubmit_updated_amount_higher(self, cart_payment_processor):
+        pass
+
+    @pytest.mark.asyncio
+    async def test_update_payment_amount_lower(self, cart_payment_processor):
         cart_payment = generate_cart_payment()
-        updated_amount = cart_payment.amount + 100
+
+        cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
+            return_value=[
+                generate_payment_intent(
+                    cart_payment_id=cart_payment.id,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                )
+            ]
+        )
+
+        updated_amount = cart_payment.amount - 100
         result = await cart_payment_processor.update_payment(
             idempotency_key=str(uuid.uuid4()),
             cart_payment_id=cart_payment.id,
             payer_id=cart_payment.payer_id,
             amount=updated_amount,
-            legacy_payment=None,
             client_description=None,
         )
         assert result
         assert result.id == cart_payment.id
         assert result.amount == updated_amount
+
+    @pytest.mark.skip("Test not implemented yet")
+    @pytest.mark.asyncio
+    async def test_resubmit_update_payment_amount_lower(self, cart_payment_processor):
+        pass
+
+    @pytest.mark.asyncio
+    async def test_cancel_payment_intent_for_uncaptured(self, cart_payment_processor):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id, status=IntentStatus.REQUIRES_CAPTURE
+        )
+        result_intent, result_pgp_intent = await cart_payment_processor._cancel_payment_intent(
+            cart_payment, payment_intent
+        )
+        assert result_intent.status == IntentStatus.CANCELLED
+        assert result_pgp_intent.status == IntentStatus.CANCELLED
+
+    @pytest.mark.asyncio
+    async def test_cancel_payment_intent_for_captured(self, cart_payment_processor):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id, status=IntentStatus.SUCCEEDED
+        )
+        result_intent, result_pgp_intent = await cart_payment_processor._cancel_payment_intent(
+            cart_payment, payment_intent
+        )
+        # TODO verify expected values
+        assert result_intent.amount == 0
+        assert result_pgp_intent.amount == 0
+
+    @pytest.mark.asyncio
+    async def test_update_state_after_refund_with_provider(
+        self, cart_payment_processor
+    ):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id, status=IntentStatus.SUCCEEDED
+        )
+        pgp_payment_intent = generate_pgp_payment_intent(
+            payment_intent_id=payment_intent.id, status=IntentStatus.SUCCEEDED
+        )
+
+        provider_refund = (
+            await cart_payment_processor.cart_payment_interface.app_context.stripe.refund_charge()
+        )
+
+        result_payment_intent, result_pgp_payment_intent = await cart_payment_processor._update_state_after_refund_with_provider(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_refund=provider_refund,
+            refund_amount=payment_intent.amount,
+        )
+
+        # TODO verify expected values
+        assert result_payment_intent.amount == 0
+        assert result_pgp_payment_intent.amount == 0
+
+    @pytest.mark.asyncio
+    async def test_update_state_after_cancel_with_provider(
+        self, cart_payment_processor
+    ):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id, status=IntentStatus.REQUIRES_CAPTURE
+        )
+        pgp_payment_intent = generate_pgp_payment_intent(
+            payment_intent_id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
+        )
+
+        result_payment_intent, result_pgp_payment_intent = await cart_payment_processor._update_state_after_cancel_with_provider(
+            payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
+        )
+
+        assert result_payment_intent.status == IntentStatus.CANCELLED
+        assert result_pgp_payment_intent.status == IntentStatus.CANCELLED
+
+    @pytest.mark.asyncio
+    async def test_update_state_after_submit_to_provider(self, cart_payment_processor):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id, status=IntentStatus.REQUIRES_CAPTURE
+        )
+        pgp_payment_intent = generate_pgp_payment_intent(
+            payment_intent_id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
+        )
+
+        provider_payment_intent = (
+            await cart_payment_processor.cart_payment_interface.app_context.stripe.create_payment_intent()
+        )
+
+        result_payment_intent, result_pgp_payment_intent = await cart_payment_processor._update_state_after_submit_to_provider(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_intent=provider_payment_intent,
+            cart_metadata=cart_payment.cart_metadata,
+            legacy_payment=generate_legacy_payment(),
+        )
+
+        assert result_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
+        assert result_pgp_payment_intent.status == IntentStatus.REQUIRES_CAPTURE

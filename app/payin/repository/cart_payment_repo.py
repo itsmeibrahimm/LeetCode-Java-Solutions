@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 from uuid import UUID
 
 from IPython.utils.tz import utcnow
@@ -16,9 +16,13 @@ from app.payin.core.cart_payment.model import (
     PaymentIntentAdjustmentHistory,
     PaymentCharge,
     PgpPaymentCharge,
+    LegacyConsumerCharge,
+    LegacyStripeCharge,
+    LegacyPayment,
 )
 from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
+from app.payin.models.maindb import consumer_charges, stripe_charges
 from app.payin.models.paymentdb import (
     cart_payments,
     payment_intents,
@@ -41,12 +45,16 @@ class CartPaymentRepository(PayinDBRepository):
         payer_id: Optional[UUID],
         type: str,
         client_description: Optional[str],
-        reference_id: int,
-        reference_ct_id: int,
+        reference_id: str,
+        reference_type: str,
         legacy_consumer_id: Optional[int],
         amount_original: int,
         amount_total: int,
         delay_capture: bool,
+        legacy_stripe_card_id: int,
+        legacy_provider_customer_id: str,
+        legacy_provider_payment_method_id: str,
+        legacy_provider_card_id: str,
     ) -> CartPayment:
         data = {
             cart_payments.id: id,
@@ -54,11 +62,15 @@ class CartPaymentRepository(PayinDBRepository):
             cart_payments.type: type,
             cart_payments.client_description: client_description,
             cart_payments.reference_id: reference_id,
-            cart_payments.reference_ct_id: reference_ct_id,
+            cart_payments.reference_type: reference_type,
             cart_payments.legacy_consumer_id: legacy_consumer_id,
             cart_payments.amount_original: amount_original,
             cart_payments.amount_total: amount_total,
             cart_payments.delay_capture: delay_capture,
+            cart_payments.legacy_stripe_card_id: legacy_stripe_card_id,
+            cart_payments.legacy_provider_customer_id: legacy_provider_customer_id,
+            cart_payments.legacy_provider_payment_method_id: legacy_provider_payment_method_id,
+            cart_payments.legacy_provider_card_id: legacy_provider_card_id,
         }
 
         statement = (
@@ -80,12 +92,23 @@ class CartPaymentRepository(PayinDBRepository):
             client_description=row[cart_payments.client_description],
             cart_metadata=CartMetadata(
                 reference_id=row[cart_payments.reference_id],
-                ct_reference_id=row[cart_payments.reference_ct_id],
+                reference_type=row[cart_payments.reference_type],
                 type=row[cart_payments.type],
             ),
             created_at=row[cart_payments.created_at],
             updated_at=row[cart_payments.updated_at],
             delay_capture=row[cart_payments.delay_capture],
+        )
+
+    def to_legacy_payment(self, row: Any) -> LegacyPayment:
+        return LegacyPayment(
+            dd_consumer_id=row[cart_payments.legacy_consumer_id],
+            dd_stripe_card_id=row[cart_payments.legacy_stripe_card_id],
+            stripe_customer_id=row[cart_payments.legacy_provider_customer_id],
+            stripe_payment_method_id=row[
+                cart_payments.legacy_provider_payment_method_id
+            ],
+            stripe_card_id=row[cart_payments.legacy_provider_card_id],
         )
 
     async def find_payment_intents_with_status(
@@ -133,12 +156,15 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def get_cart_payment_by_id(
         self, cart_payment_id: UUID
-    ) -> Optional[CartPayment]:
+    ) -> Tuple[Optional[CartPayment], Optional[LegacyPayment]]:
         statement = cart_payments.table.select().where(
             cart_payments.id == cart_payment_id
         )
-        row = await self.payment_database.replica().fetch_one(statement)
-        return self.to_cart_payment(row) if row else None
+        row = await self.payment_database.master().fetch_one(statement)
+        if not row:
+            return None, None
+
+        return self.to_cart_payment(row), self.to_legacy_payment(row)
 
     async def update_cart_payment_details(
         self, cart_payment_id: UUID, amount: int, client_description: Optional[str]
@@ -677,3 +703,142 @@ class CartPaymentRepository(PayinDBRepository):
 
         row = await self.payment_database.master().fetch_one(statement)
         return self.to_pgp_payment_charge(row)
+
+    async def insert_legacy_consumer_charge(
+        self,
+        target_ct_id: int,
+        target_id: int,
+        consumer_id: int,
+        idempotency_key: str,
+        is_stripe_connect_based: bool,
+        country_id: int,
+        currency: str,
+        stripe_customer_id: Optional[int],
+        total: int,
+        original_total: int,
+    ) -> LegacyConsumerCharge:
+        data = {
+            consumer_charges.target_ct_id: target_ct_id,
+            consumer_charges.target_id: target_id,
+            consumer_charges.consumer_id: consumer_id,
+            consumer_charges.idempotency_key: idempotency_key,
+            consumer_charges.is_stripe_connect_based: is_stripe_connect_based,
+            consumer_charges.country_id: country_id,
+            consumer_charges.currency: currency,
+            consumer_charges.stripe_customer_id: stripe_customer_id,
+            consumer_charges.total: total,
+            consumer_charges.original_total: original_total,
+            consumer_charges.created_at: datetime.now(),
+        }
+
+        statement = (
+            consumer_charges.table.insert()
+            .values(data)
+            .returning(*consumer_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_consumer_charge(row)
+
+    def to_legacy_consumer_charge(self, row: Any) -> LegacyConsumerCharge:
+        return LegacyConsumerCharge(
+            id=row[consumer_charges.id],
+            target_id=row[consumer_charges.target_id],
+            target_ct_id=row[consumer_charges.target_ct_id],
+            idempotency_key=row[consumer_charges.idempotency_key],
+            is_stripe_connect_based=row[consumer_charges.is_stripe_connect_based],
+            total=row[consumer_charges.total],
+            original_total=row[consumer_charges.original_total],
+            currency=row[consumer_charges.currency],
+            country_id=row[consumer_charges.country_id],
+            issue_id=row[consumer_charges.issue_id],
+            stripe_customer_id=row[consumer_charges.stripe_customer_id],
+            created_at=row[consumer_charges.created_at],
+        )
+
+    async def insert_legacy_stripe_charge(
+        self,
+        stripe_id: str,
+        card_id: Optional[int],
+        charge_id: int,
+        amount: int,
+        amount_refunded: int,
+        currency: str,
+        status: str,
+        idempotency_key: str,
+    ) -> LegacyStripeCharge:
+        data = {
+            stripe_charges.stripe_id: stripe_id,
+            stripe_charges.card_id: card_id,
+            stripe_charges.charge_id: charge_id,
+            stripe_charges.amount: amount,
+            stripe_charges.amount_refunded: amount_refunded,
+            stripe_charges.currency: currency,
+            stripe_charges.status: status,
+            stripe_charges.idempotency_key: idempotency_key,
+            stripe_charges.created_at: datetime.now(),
+            stripe_charges.updated_at: datetime.now(),
+        }
+
+        statement = (
+            stripe_charges.table.insert()
+            .values(data)
+            .returning(*stripe_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row)
+
+    def to_legacy_stripe_charge(self, row: Any) -> LegacyStripeCharge:
+        return LegacyStripeCharge(
+            id=row[stripe_charges.id],
+            amount=row[stripe_charges.amount],
+            amount_refunded=row[stripe_charges.amount_refunded],
+            currency=row[stripe_charges.currency],
+            status=row[stripe_charges.status],
+            error_reason=row[stripe_charges.error_reason],
+            additional_payment_info=row[stripe_charges.additional_payment_info],
+            description=row[stripe_charges.description],
+            idempotency_key=row[stripe_charges.idempotency_key],
+            card_id=row[stripe_charges.card_id],
+            charge_id=row[stripe_charges.charge_id],
+            stripe_id=row[stripe_charges.stripe_id],
+            created_at=row[stripe_charges.created_at],
+            updated_at=row[stripe_charges.updated_at],
+            refunded_at=row[stripe_charges.refunded_at],
+        )
+
+    async def update_legacy_stripe_charge(
+        self, stripe_charge_id: str, amount_refunded: int, refunded_at: datetime
+    ):
+        statement = (
+            stripe_charges.table.update()
+            .where(stripe_charges.stripe_id == stripe_charge_id)
+            .values(amount_refunded=amount_refunded, refunded_at=refunded_at)
+            .returning(*stripe_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row)
+
+    async def update_legacy_stripe_charge_status(
+        self, stripe_charge_id: str, status: str
+    ):
+        statement = (
+            stripe_charges.table.update()
+            .where(stripe_charges.stripe_id == stripe_charge_id)
+            .values(status=status)
+            .returning(*stripe_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row)
+
+    async def get_legacy_stripe_charge_by_stripe_id(
+        self, stripe_charge_id: str
+    ) -> Optional[LegacyStripeCharge]:
+        statement = stripe_charges.table.select().where(
+            stripe_charges.stripe_id == stripe_charge_id
+        )
+        row = await self.main_database.replica().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row) if row else None

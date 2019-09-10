@@ -7,6 +7,12 @@ class CountryCode(str, Enum):
     AU = "AU"
 
 
+class LegacyCountryId:
+    US = 1
+    CA = 2
+    AU = 3
+
+
 class CurrencyType(str, Enum):
     USD = "usd"
     CAD = "cad"

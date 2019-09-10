@@ -4,7 +4,11 @@ from datetime import datetime, timedelta
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext, build_req_context
 from app.payin.core.cart_payment.model import PaymentIntent
-from app.payin.core.cart_payment.processor import CartPaymentInterface
+from app.payin.core.cart_payment.processor import (
+    CartPaymentProcessor,
+    CartPaymentInterface,
+    LegacyPaymentInterface,
+)
 from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
@@ -57,9 +61,15 @@ async def _capture_payment_intent(
     cart_payment_interface = CartPaymentInterface(
         app_context, req_context, cart_payment_repo
     )
+    legacy_payment_interface = LegacyPaymentInterface(
+        app_context, req_context, cart_payment_repo
+    )
+    cart_payment_processor = CartPaymentProcessor(
+        req_context.log, cart_payment_interface, legacy_payment_interface
+    )
 
     async with capture_payment_intent_semaphore:
-        return await cart_payment_interface.capture_payment(uncaptured_payment_intent)
+        return await cart_payment_processor.capture_payment(uncaptured_payment_intent)
 
 
 async def resolve_capturing_payment_intents(

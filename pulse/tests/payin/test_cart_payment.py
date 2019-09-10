@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 CART_AMOUNT = 1000
 
 
+@pytest.mark.skip(reason="Metadata field requires API change and new client generation")
 def test_create_cart_payment():
     new_payer = PaymentUtil.create_payer()[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
@@ -25,6 +26,7 @@ def test_create_cart_payment():
     assert new_cart_payment[0].amount == CART_AMOUNT
 
 
+@pytest.mark.skip(reason="Metadata field requires API change and new client generation")
 def test_create_cart_payment_with_incorrect_payment_method():
     temp_payer = PaymentUtil.create_payer()[0]
     new_payer = PaymentUtil.create_payer()[0]
@@ -46,6 +48,7 @@ def test_create_cart_payment_with_incorrect_payment_method():
     assert error_reason == "Forbidden"
 
 
+@pytest.mark.skip(reason="Metadata field requires API change and new client generation")
 def test_create_cart_payment_with_invalid_payment_method():
     temp_payer = PaymentUtil.create_payer()[0]
     new_payer = PaymentUtil.create_payer()[0]
@@ -69,6 +72,7 @@ def test_create_cart_payment_with_invalid_payment_method():
     assert error_reason == "Bad Request"
 
 
+@pytest.mark.skip(reason="Metadata field requires API change and new client generation")
 def test_update_cart_payment_higher_manual_capture():
     new_payer = PaymentUtil.create_payer()[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
@@ -91,6 +95,7 @@ def test_update_cart_payment_higher_manual_capture():
     assert updated_cart_payment[0].amount == updated_cart_amount
 
 
+@pytest.mark.skip(reason="Metadata field requires API change and new client generation")
 def test_update_cart_payment_lower_manual_capture():
     new_payer = PaymentUtil.create_payer()[0]
     new_payment_method = payment_method_v1_client.create_payment_method(

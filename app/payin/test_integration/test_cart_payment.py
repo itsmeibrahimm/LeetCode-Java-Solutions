@@ -1,6 +1,5 @@
-import uuid
-
 import pytest
+import uuid
 from starlette.testclient import TestClient
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
@@ -12,7 +11,7 @@ class TestCartPayment:
     def _get_payer_create_request(self):
         unique_value = str(uuid.uuid4())
         request_body = {
-            "dd_payer_id": unique_value,
+            "dd_payer_id": "1",
             "payer_type": "marketplace",
             "email": f"{unique_value}@doordash.com",
             "country": "US",
@@ -46,9 +45,9 @@ class TestCartPayment:
             "delay_capture": delay_capture,
             "client_description": f"{payer['id']} description",
             "payer_statement_description": f"{payer['id'][0:10]} statement",
-            "metadata": {
-                "reference_id": 123,
-                "ct_reference_id": 5,
+            "cart_metadata": {
+                "reference_id": "123",
+                "reference_type": "5",
                 "type": "OrderCart",
             },
         }
@@ -75,14 +74,16 @@ class TestCartPayment:
             "payer_statement_description": f"{legacy_stripe_customer_id}",
             "payer_country": "US",
             "payment_country": "US",
-            "metadata": {
-                "reference_id": 123,
-                "ct_reference_id": 5,
+            "cart_metadata": {
+                "reference_id": "123",
+                "reference_type": "5",
                 "type": "OrderCart",
             },
             "legacy_payment": {
                 "stripe_customer_id": legacy_stripe_customer_id,
                 "stripe_payment_method_id": legacy_stripe_payment_method_id,
+                "dd_country_id": 1,
+                "dd_consumer_id": 1,
             },
         }
 
@@ -163,7 +164,7 @@ class TestCartPayment:
             legacy_stripe_customer_id, legacy_stripe_payment_method_id, amount
         )
 
-        response = client.post("/payin/api/v1/cart_payments/legacy", json=request_body)
+        response = client.post("/payin/api/v0/cart_payments", json=request_body)
         assert response.status_code == 201
         cart_payment = response.json()
 
@@ -177,16 +178,15 @@ class TestCartPayment:
         assert cart_payment["delay_capture"] == request_body["delay_capture"]
         assert cart_payment["cart_metadata"]
         metadata = cart_payment["cart_metadata"]
-        assert metadata["reference_id"] == request_body["metadata"]["reference_id"]
+        assert metadata["reference_id"] == request_body["cart_metadata"]["reference_id"]
         assert (
-            metadata["ct_reference_id"] == request_body["metadata"]["ct_reference_id"]
+            metadata["reference_type"]
+            == request_body["cart_metadata"]["reference_type"]
         )
-        assert metadata["type"] == request_body["metadata"]["type"]
+        assert metadata["type"] == request_body["cart_metadata"]["type"]
         assert cart_payment["client_description"] == request_body["client_description"]
         statement_description = cart_payment["payer_statement_description"]
         assert statement_description == request_body["payer_statement_description"]
-        # TODO fix legacy_payment that is missing in response
-        assert cart_payment["legacy_payment"] is None
         assert cart_payment["split_payment"] is None
         assert cart_payment["created_at"]
         assert cart_payment["updated_at"]
@@ -210,15 +210,15 @@ class TestCartPayment:
         assert cart_payment["delay_capture"] == request_body["delay_capture"]
         assert cart_payment["cart_metadata"]
         metadata = cart_payment["cart_metadata"]
-        assert metadata["reference_id"] == request_body["metadata"]["reference_id"]
+        assert metadata["reference_id"] == request_body["cart_metadata"]["reference_id"]
         assert (
-            metadata["ct_reference_id"] == request_body["metadata"]["ct_reference_id"]
+            metadata["reference_type"]
+            == request_body["cart_metadata"]["reference_type"]
         )
-        assert metadata["type"] == request_body["metadata"]["type"]
+        assert metadata["type"] == request_body["cart_metadata"]["type"]
         assert cart_payment["client_description"] == request_body["client_description"]
         statement_description = cart_payment["payer_statement_description"]
         assert statement_description == request_body["payer_statement_description"]
-        assert cart_payment["legacy_payment"] is None
         assert cart_payment["split_payment"] is None
         assert cart_payment["created_at"]
         assert cart_payment["updated_at"]
@@ -299,7 +299,7 @@ class TestCartPayment:
             client=client,
             payer=payer,
             payment_method=payment_method,
-            amount=500,
+            amount=600,
             delay_capture=False,
         )
 
@@ -326,7 +326,7 @@ class TestCartPayment:
         provider_card_id = payment_method["card"]["payment_provider_card_id"]
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
-        cart_payment = self._test_cart_payment_legacy_payment_creation(
+        self._test_cart_payment_legacy_payment_creation(
             stripe_api=stripe_api,
             client=client,
             legacy_stripe_customer_id=provider_account_id,
@@ -336,6 +336,6 @@ class TestCartPayment:
 
         # Adjustment for case where legacy payment was initially used
         # TODO: Replace this with use of legacy api, for handling when legacy charge_id is passed in
-        self._test_cart_payment_adjustment(
-            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=1000
-        )
+        # self._test_cart_payment_adjustment(
+        #     stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=1000
+        # )
