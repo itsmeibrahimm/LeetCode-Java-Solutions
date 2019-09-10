@@ -21,8 +21,11 @@ from app.payin.core.cart_payment.types import (
     CaptureMethod,
     LegacyStripeChargeStatus,
 )
-from app.payin.core.dispute.model import Dispute
-from app.payin.repository.dispute_repo import StripeDisputeDbEntity
+from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
+from app.payin.repository.dispute_repo import (
+    StripeDisputeDbEntity,
+    ConsumerChargeDbEntity,
+)
 
 
 class FunctionMock(MagicMock):
@@ -298,4 +301,29 @@ def generate_dispute_db_entity() -> StripeDisputeDbEntity:
         evidence_due_by=datetime.now(),
         stripe_charge_id=1,
         stripe_card_id=1,
+    )
+
+
+def generate_dispute_charge_metadata() -> DisputeChargeMetadata:
+    return DisputeChargeMetadata(
+        dd_order_cart_id="1",
+        dd_charge_id="1",
+        dd_consumer_id="1",
+        stripe_card_id="VALID_CARD_ID",
+        stripe_dispute_status="needs_response",
+        stripe_dispute_reason="subscription_cancelled",
+    )
+
+
+def generate_consumer_charge_entity() -> ConsumerChargeDbEntity:
+    return ConsumerChargeDbEntity(
+        id=1,
+        target_ct_id=1,
+        target_id=1,
+        is_stripe_connect_based=True,
+        country_id=1,
+        consumer_id=1,
+        stripe_customer_id=1,
+        total=100,
+        original_total=100,
     )

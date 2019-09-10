@@ -17,13 +17,10 @@ class ConsumerChargeTable(TableDefinition):
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     # TODO: this is not referenced in DSJ model and does not appeared to be filled in
     # updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
-
     # TODO: remove and/or replace after investigating DSJ usage, this is used in GenericForeignKey (puke)
     target_ct_id: Column = no_init_field(Column("target_ct_id", Integer))
     target_id: Column = no_init_field(Column("target_id", Integer))
-
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
-
     is_stripe_connect_based: Column = no_init_field(
         Column("is_stripe_connect_based", Boolean)
     )

@@ -39,6 +39,8 @@ payin_error_message_maps = {
     "payin_106": "No id parameters provides. Please verify your input",
     "payin_107": "More than 1 id parameter provided. Please verify your input",
     "payin_108": "Error returned from Payment Provider.",
+    "payin_109": "The given dispute_id does not have a stripe_card associated to it",
+    "payin_110": "The given dispute_id does not have a consumer_charge associated to it's stripe charge",
 }
 
 
@@ -78,6 +80,8 @@ class PayinErrorCode(str, Enum):
     DISPUTE_LIST_NO_ID_PARAMETERS = "payin_106"
     DISPUTE_LIST_MORE_THAN_ID_ONE_PARAMETER = "payin_107"
     DISPUTE_UPDATE_STRIPE_ERROR = "payin_108"
+    DISPUTE_NO_STRIPE_CARD_FOR_STRIPE_ID = "payin_109"
+    DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE = "payin_110"
 
 
 # TODO Enhance errors to allow us to declare here the response codes they should map to

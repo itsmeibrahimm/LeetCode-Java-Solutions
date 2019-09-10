@@ -1,8 +1,8 @@
 import sqlalchemy
 
 from app.payin.models.maindb.consumer_charge import ConsumerChargeTable
-from app.payin.models.maindb.stripe_charge import StripeChargeTable
 from app.payin.models.maindb.stripe_card import StripeCardTable
+from app.payin.models.maindb.stripe_charge import StripeChargeTable
 from app.payin.models.maindb.stripe_customer import StripeCustomerTable
 from app.payin.models.maindb.stripe_dispute import StripeDisputeTable
 

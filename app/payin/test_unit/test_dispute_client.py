@@ -14,7 +14,12 @@ from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
 )
-from app.payin.tests.utils import FunctionMock, generate_dispute_db_entity
+from app.payin.tests.utils import (
+    FunctionMock,
+    generate_dispute_db_entity,
+    generate_consumer_charge_entity,
+    generate_dispute_charge_metadata,
+)
 
 
 class TestDisputeClient:
@@ -147,3 +152,49 @@ class TestDisputeClient:
         assert [
             dispute_entity.to_stripe_dispute() for dispute_entity in dispute_entity_list
         ] == result
+
+    @pytest.mark.asyncio
+    async def test_get_dispute_charge_metadata_object(self, dispute_client):
+        charge_metadata_object = generate_dispute_charge_metadata()
+        dispute_client.dispute_repo.get_dispute_charge_metadata_attributes = FunctionMock(
+            return_value=(
+                generate_dispute_db_entity(),
+                generate_consumer_charge_entity(),
+            )
+        )
+        dispute_client.payment_method_client.get_stripe_card_id_by_id = FunctionMock(
+            return_value="VALID_CARD_ID"
+        )
+        result = await dispute_client.get_dispute_charge_metadata_object(
+            id=1, id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+        )
+        assert result == charge_metadata_object
+
+    @pytest.mark.asyncio
+    async def test_get_dispute_charge_metadata_object_no_dispute_found(
+        self, dispute_client
+    ):
+        dispute_client.dispute_repo.get_dispute_charge_metadata_attributes = FunctionMock(
+            return_value=(None, generate_consumer_charge_entity())
+        )
+        with pytest.raises(DisputeReadError) as payment_error:
+            await dispute_client.get_dispute_charge_metadata_object(
+                id=1, id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+            )
+        assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_get_dispute_charge_metadata_object_consumer_charge_found(
+        self, dispute_client
+    ):
+        dispute_client.dispute_repo.get_dispute_charge_metadata_attributes = FunctionMock(
+            return_value=(generate_dispute_db_entity(), None)
+        )
+        with pytest.raises(DisputeReadError) as payment_error:
+            await dispute_client.get_dispute_charge_metadata_object(
+                id=1, id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+            )
+        assert (
+            payment_error.value.error_code
+            == PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE
+        )

@@ -63,3 +63,12 @@ class DisputeList(BaseModel):
     has_more: bool  # Currently default to False. Returning all the disputes for a query
     total_amount: int
     data: List[Dispute]
+
+
+class DisputeChargeMetadata(BaseModel):
+    dd_order_cart_id: str
+    dd_charge_id: str
+    dd_consumer_id: str
+    stripe_card_id: str
+    stripe_dispute_status: str
+    stripe_dispute_reason: str

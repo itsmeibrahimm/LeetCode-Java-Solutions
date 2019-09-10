@@ -333,6 +333,20 @@ class PaymentMethodClient:
         stripe_card_ids = [entity.id for entity in stripe_customer_db_entities]
         return stripe_card_ids
 
+    async def get_stripe_card_id_by_id(self, id: int) -> Optional[str]:
+        try:
+            stripe_card_db_entity = await self.payment_method_repo.get_stripe_card_by_id(
+                input=GetStripeCardByIdInput(id=id)
+            )
+        except DataError as e:
+            self.log.error(
+                f"[get_stripe_card_id_by_id][{id}]DataError when read db: {e}"
+            )
+            raise PaymentMethodReadError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
+            )
+        return stripe_card_db_entity.stripe_id if stripe_card_db_entity else None
+
     async def get_stripe_card_ids_for_consumer_id(self, consumer_id: int):
         stripe_card_db_entities = await self.payment_method_repo.get_stripe_cards_by_consumer_id(
             input=GetStripeCardsByConsumerIdInput(consumer_id=consumer_id)

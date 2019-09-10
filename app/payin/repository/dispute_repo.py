@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
+
+from sqlalchemy import select
 
 from sqlalchemy import and_
 
@@ -7,7 +9,7 @@ from app.commons import tracing
 from app.commons.database.model import DBEntity, DBRequestModel
 from app.payin.core.dispute.model import StripeDispute
 from app.payin.core.dispute.types import DisputeIdType
-from app.payin.models.maindb import stripe_disputes
+from app.payin.models.maindb import stripe_disputes, stripe_charges, consumer_charges
 from app.payin.repository.base import PayinDBRepository
 
 
@@ -55,6 +57,27 @@ class StripeDisputeDbEntity(DBEntity):
         )
 
 
+class ConsumerChargeDbEntity(DBEntity):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: Optional[int] = None  # DB incremental id
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    target_ct_id: int
+    target_id: int
+    idempotency_key: Optional[str] = None
+    is_stripe_connect_based: bool
+    country_id: int
+    consumer_id: Optional[int] = None
+    stripe_customer_id: Optional[int] = None
+    issue_id: Optional[int] = None
+    total: int
+    original_total: int
+    currency: Optional[str] = None
+
+
 class GetStripeDisputeByIdInput(DBRequestModel):
     stripe_dispute_id: str
     dispute_id_type: Optional[str] = None
@@ -75,6 +98,11 @@ class UpdateStripeDisputeWhereInput(DBRequestModel):
 class UpdateStripeDisputeSetInput(DBRequestModel):
     evidence_submitted_at: datetime
     updated_at: datetime
+
+
+class GetDisputeChargeMetadataInput(DBRequestModel):
+    id: str
+    id_type: Optional[str]
 
 
 class GetCumulativeAmountInput(DBRequestModel):
@@ -166,6 +194,51 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
         rows = await self.main_database.replica().fetch_all(stmt)
         dispute_db_entities = [StripeDisputeDbEntity.from_row(row) for row in rows]
         return dispute_db_entities
+
+    async def get_dispute_charge_metadata_attributes(
+        self, input=GetDisputeChargeMetadataInput
+    ) -> Tuple[Optional[StripeDisputeDbEntity], Optional[ConsumerChargeDbEntity]]:
+        join_stmt = stripe_disputes.table.join(
+            stripe_charges.table, stripe_disputes.stripe_charge_id == stripe_charges.id
+        ).join(consumer_charges.table, consumer_charges.id == stripe_charges.charge_id)
+        if input.id_type == DisputeIdType.DD_STRIPE_DISPUTE_ID:
+            stmt = (
+                select(
+                    [
+                        stripe_disputes.table,
+                        stripe_charges.table,
+                        consumer_charges.table,
+                    ],
+                    use_labels=True,
+                )
+                .select_from(join_stmt)
+                .where(stripe_disputes.id == input.id)
+            )
+        else:
+            stmt = (
+                select(
+                    [
+                        stripe_disputes.table,
+                        stripe_charges.table,
+                        consumer_charges.table,
+                    ],
+                    use_labels=True,
+                )
+                .select_from(join_stmt)
+                .where(stripe_disputes.stripe_dispute_id == input.id)
+            )
+        row = await self.main_database.replica().fetch_one(stmt)
+        if not row:
+            return None, None
+        else:
+            return (
+                StripeDisputeDbEntity.from_row(
+                    stripe_disputes._extract_columns_from_row_record(row)
+                ),
+                ConsumerChargeDbEntity.from_row(
+                    consumer_charges._extract_columns_from_row_record(row)
+                ),
+            )
 
     async def get_disputes_by_dd_consumer_id(
         self, cumulative_amount_input: GetCumulativeAmountInput

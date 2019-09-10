@@ -9,8 +9,13 @@ from structlog.stdlib import BoundLogger
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import get_logger_from_req
+from app.payin.core.dispute.model import (
+    Dispute,
+    DisputeList,
+    DisputeChargeMetadata,
+    Evidence,
+)
 from app.commons.providers.stripe.stripe_models import UpdateStripeDispute
-from app.payin.core.dispute.model import Dispute, DisputeList, Evidence
 from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import (
     DisputeReadError,
@@ -28,6 +33,8 @@ from app.payin.repository.dispute_repo import (
     GetAllStripeDisputesByPayerIdInput,
     GetAllStripeDisputesByPaymentMethodIdInput,
     StripeDisputeDbEntity,
+    GetDisputeChargeMetadataInput,
+    ConsumerChargeDbEntity,
     GetCumulativeAmountInput,
     GetCumulativeCountInput,
 )
@@ -65,7 +72,7 @@ class DisputeClient:
             DisputeIdType.STRIPE_DISPUTE_ID,
             DisputeIdType.DD_STRIPE_DISPUTE_ID,
         ):
-            self.log.error(
+            self.log.warn(
                 f"[get_dispute_object][{dispute_id}] invalid dispute_id_type:[{dispute_id_type}]"
             )
             raise DisputeReadError(
@@ -258,6 +265,64 @@ class DisputeClient:
         ]
         return disputes
 
+    async def get_stripe_card_stripe_id(self, id: int):
+        stripe_card_stripe_id = await self.payment_method_client.get_stripe_card_id_by_id(
+            id=id
+        )
+        if stripe_card_stripe_id is None:
+            self.log.warn(
+                "[get_dispute_charge_metadata] No stripe card associated with the dispute"
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_NO_STRIPE_CARD_FOR_STRIPE_ID,
+                retryable=False,
+            )
+        return stripe_card_stripe_id
+
+    async def get_dispute_charge_metadata_object(
+        self, id: str, id_type: Optional[str] = None
+    ) -> DisputeChargeMetadata:
+        stripe_dispute_entity: Optional[StripeDisputeDbEntity] = None
+        consumer_charge_entity: Optional[ConsumerChargeDbEntity] = None
+        try:
+            stripe_dispute_entity, consumer_charge_entity = await self.dispute_repo.get_dispute_charge_metadata_attributes(
+                input=GetDisputeChargeMetadataInput(id=id, id_type=id_type)
+            )
+        except DataError as e:
+            self.log.error(
+                f"[get_disputes_charge_metadata] DataError while reading db. {e}"
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
+            )
+        if stripe_dispute_entity is None:
+            self.log.error(
+                "[get_dispute_charge_metadata_object] Dispute not found:[%s]", id
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
+            )
+        if consumer_charge_entity is None:
+            self.log.error(
+                "[get_dispute_charge_metadata_object] Dispute not found:[%s]", id
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE,
+                retryable=False,
+            )
+        stripe_card_id = await self.payment_method_client.get_stripe_card_id_by_id(
+            id=stripe_dispute_entity.stripe_card_id
+        )
+        dispute_charge_metadata_object = DisputeChargeMetadata(
+            dd_order_cart_id=str(consumer_charge_entity.target_id),
+            dd_charge_id=str(consumer_charge_entity.id),
+            dd_consumer_id=str(consumer_charge_entity.consumer_id),
+            stripe_card_id=stripe_card_id,
+            stripe_dispute_status=stripe_dispute_entity.status,
+            stripe_dispute_reason=stripe_dispute_entity.reason,
+        )
+        return dispute_charge_metadata_object
+
     async def get_dispute_list_object(
         self, disputes_list: List[Dispute], distinct: bool
     ) -> DisputeList:
@@ -367,3 +432,18 @@ class DisputeProcessor:
             disputes_list=disputes_list, distinct=distinct
         )
         return dispute_list_object
+
+    async def get_dispute_charge_metadata(
+        self, id: str, id_type: str = None
+    ) -> DisputeChargeMetadata:
+        """
+        Retrieve charge metadata for a dispute object
+
+        :param id: [string] id for dispute in dispute table
+        :param id_type: [string] identify the type of id for the dispute.
+                Valid values include "dd_stripe_dispute_id", "stripe_dispute_id" (default is "stripe_dispute_id")
+        :return: DisputeMetadata object
+        """
+        return await self.dispute_client.get_dispute_charge_metadata_object(
+            id=id, id_type=id_type
+        )

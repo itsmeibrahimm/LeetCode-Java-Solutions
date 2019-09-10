@@ -3,7 +3,11 @@ import pytest
 from app.payin.core.dispute.model import DisputeList
 from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
-from app.payin.tests.utils import generate_dispute, FunctionMock
+from app.payin.tests.utils import (
+    generate_dispute,
+    FunctionMock,
+    generate_dispute_charge_metadata,
+)
 
 
 class TestDisputeProcessor:
@@ -79,3 +83,29 @@ class TestDisputeProcessor:
         assert (
             payment_error.value.error_code == PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS
         )
+
+    @pytest.mark.asyncio
+    async def test_get_dispute_charge_metadata_by_stripe_dispute_id(
+        self, dispute_processor
+    ):
+        charge_metadata_object = generate_dispute_charge_metadata()
+        dispute_processor.dispute_client.get_dispute_charge_metadata_object = FunctionMock(
+            return_value=charge_metadata_object
+        )
+        result = await dispute_processor.get_dispute_charge_metadata(
+            id="VALID_STRIPE_DISPUTE_ID", id_type=DisputeIdType.STRIPE_DISPUTE_ID
+        )
+        assert charge_metadata_object == result
+
+    @pytest.mark.asyncio
+    async def test_get_dispute_charge_metadata_by_dd_dispute_id(
+        self, dispute_processor
+    ):
+        charge_metadata_object = generate_dispute_charge_metadata()
+        dispute_processor.dispute_client.get_dispute_charge_metadata_object = FunctionMock(
+            return_value=charge_metadata_object
+        )
+        result = await dispute_processor.get_dispute_charge_metadata(
+            id="VALID_DD_STRIPE_DISPUTE_ID", id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+        )
+        assert charge_metadata_object == result

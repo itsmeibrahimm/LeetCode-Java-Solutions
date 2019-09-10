@@ -12,7 +12,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
-from app.payin.core.dispute.model import Evidence
+from app.payin.core.dispute.model import Evidence, DisputeChargeMetadata
 from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute, DisputeList
 from app.payin.core.dispute.processor import DisputeProcessor
@@ -206,3 +206,54 @@ async def list_disputes(
             retryable=e.retryable,
         )
     return dispute_list
+
+
+@router.get(
+    "/disputes/charge_metadata/{dispute_id_type}/{dispute_id}",
+    response_model=DisputeChargeMetadata,
+    status_code=HTTP_200_OK,
+    operation_id="GetDisputeMetadata",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def get_dispute_charge_metadata(
+    dispute_id_type: DisputeIdType,
+    dispute_id: str,
+    log: BoundLogger = Depends(get_logger_from_req),
+    dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
+) -> DisputeChargeMetadata:
+    """
+    Get dispute charge metadata.
+    - **dispute_id**: [string] id for dispute in dispute table
+    - **dispute_id_type**: [string] identify the type of id for the dispute.
+        Valid values include "dd_stripe_dispute_id" and "stripe_dispute_id"
+    """
+    log.info(
+        f"[get_dispute_charge_metadata] get_dispute_charge_metadata started for dispute_id={dispute_id} dispute_id_type={dispute_id_type}"
+    )
+    try:
+        dispute_charge_metadata: DisputeChargeMetadata = await dispute_processor.get_dispute_charge_metadata(
+            id=dispute_id, id_type=dispute_id_type
+        )
+    except PaymentError as e:
+        raise PaymentException(
+            http_status_code=(
+                HTTP_404_NOT_FOUND
+                if e.error_code
+                in (
+                    PayinErrorCode.DISPUTE_NOT_FOUND,
+                    PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE,
+                )
+                else HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            error_code=e.error_code,
+            error_message=e.error_message,
+            retryable=e.retryable,
+        )
+    log.info(
+        f"[get_dispute_charge_metadata] get_dispute_charge_metadata completed for dispute_id={dispute_id} dispute_id_type={dispute_id_type}"
+    )
+    return dispute_charge_metadata
