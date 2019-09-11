@@ -1,12 +1,12 @@
 from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 from typing_extensions import final
 
 from app.commons.utils.types import PaymentProvider
-from app.payin.core.types import MixedUuidStrType
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
     PgpCustomerDbEntity,
@@ -26,7 +26,7 @@ PaymentGatewayProviderCustomer.update_forward_refs()
 
 @final
 class Payer(BaseModel):
-    id: MixedUuidStrType
+    id: Optional[UUID] = None  # make it optional for existing DSJ consumer
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None
@@ -159,9 +159,8 @@ class RawPayer:
                 )
             else:
                 payer = Payer(
-                    id=self.stripe_customer_entity.stripe_id,  # FIXME: ensure payer lazy creation
-                    created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
-                    updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
+                    # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
+                    # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                     country=self.stripe_customer_entity.country_shortname,
                     dd_payer_id=str(self.stripe_customer_entity.owner_id),
                     payer_type=self.stripe_customer_entity.owner_type,

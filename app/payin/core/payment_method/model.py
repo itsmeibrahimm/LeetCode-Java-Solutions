@@ -7,7 +7,6 @@ from typing_extensions import final
 
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
 from app.payin.core.payment_method.types import WalletType
-from app.payin.core.types import MixedUuidStrType
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -36,10 +35,10 @@ class Card(BaseModel):
 
 @final
 class PaymentMethod(BaseModel):
-    id: MixedUuidStrType
     payment_provider: str
     card: Card
-    payer_id: Optional[MixedUuidStrType]
+    id: Optional[UUID] = None  # make it optional for existing DSJ stripe_card
+    payer_id: Optional[UUID] = None
     type: Optional[str]
     dd_consumer_id: Optional[str] = None
     payment_provider_customer_id: Optional[str] = None
@@ -112,7 +111,6 @@ class RawPaymentMethod:
             )
             if self.pgp_payment_method_entity
             else PaymentMethod(
-                id=str(self.stripe_card_entity.id),
                 dd_consumer_id=str(self.stripe_card_entity.consumer_id),
                 payment_provider="stripe",
                 type="card",
