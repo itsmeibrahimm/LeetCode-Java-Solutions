@@ -41,6 +41,7 @@ payin_error_message_maps = {
     "payin_108": "Error returned from Payment Provider.",
     "payin_109": "The given dispute_id does not have a stripe_card associated to it",
     "payin_110": "The given dispute_id does not have a consumer_charge associated to it's stripe charge",
+    "payin_111": "Error. Empty data returned from DB after update",
     "payin_800": "API not accessible/usable in commando mode",
 }
 
@@ -83,6 +84,7 @@ class PayinErrorCode(str, Enum):
     DISPUTE_UPDATE_STRIPE_ERROR = "payin_108"
     DISPUTE_NO_STRIPE_CARD_FOR_STRIPE_ID = "payin_109"
     DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE = "payin_110"
+    DISPUTE_UPDATE_DB_ERROR = "payin_111"
     COMMANDO_DISABLED_ENDPOINT = "payin_800"
 
 

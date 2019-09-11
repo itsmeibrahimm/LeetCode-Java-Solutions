@@ -65,19 +65,9 @@ class DisputeClient:
         self.payment_method_client = payment_method_client
         self.VALID_REASONS = [key.value for key in ReasonType]
 
-    async def get_dispute_object(
-        self, dispute_id: str, dispute_id_type: Optional[str] = None
+    async def get_raw_dispute(
+        self, dispute_id: str, dispute_id_type: DisputeIdType
     ) -> Dispute:
-        if dispute_id_type and dispute_id_type not in (
-            DisputeIdType.STRIPE_DISPUTE_ID,
-            DisputeIdType.DD_STRIPE_DISPUTE_ID,
-        ):
-            self.log.warn(
-                f"[get_dispute_object][{dispute_id}] invalid dispute_id_type:[{dispute_id_type}]"
-            )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_READ_INVALID_DATA, retryable=False
-            )
         try:
             dispute_entity = await self.dispute_repo.get_dispute_by_dispute_id(
                 dispute_input=GetStripeDisputeByIdInput(
@@ -86,19 +76,19 @@ class DisputeClient:
             )
         except DataError as e:
             self.log.error(
-                f"[get_dispute_entity][{dispute_id} DataError while reading db. {e}"
+                f"[get_raw_dispute][{dispute_id} DataError while reading db. {e}"
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
             )
         if dispute_entity is None:
-            self.log.error("[get_dispute_entity] Dispute not found:[%s]", dispute_id)
+            self.log.error("[get_raw_dispute] Dispute not found:[%s]", dispute_id)
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
             )
         return dispute_entity.to_stripe_dispute()
 
-    async def submit_dispute_evidence(self, dispute_id: str, evidence: Evidence):
+    async def pgp_submit_dispute_evidence(self, dispute_id: str, evidence: Evidence):
         try:
             request = UpdateStripeDispute(sid=dispute_id, evidence=evidence)
             response = await self.app_ctxt.stripe.update_stripe_dispute(request=request)
@@ -109,27 +99,32 @@ class DisputeClient:
             )
         return response
 
-    async def update_dispute_details(self, dispute_id: str) -> Optional[Dispute]:
+    async def update_raw_dispute_submitted_time(
+        self, dd_stripe_dispute_id: str, submitted_at: datetime
+    ) -> Dispute:
         try:
-            updated_time = datetime.utcnow()
-            update_dispute_db_entity = await self.dispute_repo.update_dispute_details(
+            updated_time: datetime = datetime.utcnow()
+            updated_dispute_db_entity = await self.dispute_repo.update_dispute_details(
                 request_set=UpdateStripeDisputeSetInput(
-                    evidence_submitted_at=updated_time, updated_at=updated_time
+                    evidence_submitted_at=submitted_at, updated_at=updated_time
                 ),
-                request_where=UpdateStripeDisputeWhereInput(id=dispute_id),
+                request_where=UpdateStripeDisputeWhereInput(id=dd_stripe_dispute_id),
             )
         except DataError as e:
             self.log.error(
-                f"[get_dispute_entity][{dispute_id} DataError while reading db. {e}"
+                f"[update_raw_dispute_submitted_time][{dd_stripe_dispute_id}] DataError while reading db. {e}"
             )
             raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
+                error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR, retryable=True
             )
-        return (
-            update_dispute_db_entity.to_stripe_dispute()
-            if update_dispute_db_entity
-            else None
-        )
+        if not updated_dispute_db_entity:
+            self.log.warn(
+                f"[update_raw_dispute_submitted_time][{dd_stripe_dispute_id}] error. empty data returned from DB after update submitted_at"
+            )
+            raise DisputeReadError(
+                error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR, retryable=True
+            )
+        return updated_dispute_db_entity.to_stripe_dispute()
 
     def validate_reasons(self, reasons):
         invalid_reasons = [
@@ -143,7 +138,7 @@ class DisputeClient:
                 error_code=PayinErrorCode.DISPUTE_READ_INVALID_DATA, retryable=False
             )
 
-    async def get_disputes_list(
+    async def get_raw_disputes_list(
         self,
         dd_payment_method_id: str = None,
         stripe_payment_method_id: str = None,
@@ -154,6 +149,7 @@ class DisputeClient:
         start_time: datetime = None,
         reasons: List[str] = None,
     ) -> List[Dispute]:
+        # FIXME: code refactory needed here.
         if not (
             dd_payment_method_id
             or stripe_payment_method_id
@@ -280,13 +276,15 @@ class DisputeClient:
         return stripe_card_stripe_id
 
     async def get_dispute_charge_metadata_object(
-        self, id: str, id_type: Optional[str] = None
+        self, dispute_id: str, dispute_id_type: Optional[str] = None
     ) -> DisputeChargeMetadata:
         stripe_dispute_entity: Optional[StripeDisputeDbEntity] = None
         consumer_charge_entity: Optional[ConsumerChargeDbEntity] = None
         try:
             stripe_dispute_entity, consumer_charge_entity = await self.dispute_repo.get_dispute_charge_metadata_attributes(
-                input=GetDisputeChargeMetadataInput(id=id, id_type=id_type)
+                input=GetDisputeChargeMetadataInput(
+                    id=dispute_id, id_type=dispute_id_type
+                )
             )
         except DataError as e:
             self.log.error(
@@ -297,14 +295,16 @@ class DisputeClient:
             )
         if stripe_dispute_entity is None:
             self.log.error(
-                "[get_dispute_charge_metadata_object] Dispute not found:[%s]", id
+                "[get_dispute_charge_metadata_object] Dispute not found:[%s]",
+                dispute_id,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
             )
         if consumer_charge_entity is None:
             self.log.error(
-                "[get_dispute_charge_metadata_object] Dispute not found:[%s]", id
+                "[get_dispute_charge_metadata_object] Dispute not found:[%s]",
+                dispute_id,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE,
@@ -323,24 +323,6 @@ class DisputeClient:
         )
         return dispute_charge_metadata_object
 
-    async def get_dispute_list_object(
-        self, disputes_list: List[Dispute], distinct: bool
-    ) -> DisputeList:
-        total_amount = sum([dispute.amount for dispute in disputes_list])
-        has_more = (
-            False
-        )  # Currently default to False. Returning all the disputes for a query
-        if distinct:
-            count = len(set([dispute.stripe_charge_id for dispute in disputes_list]))
-        else:
-            count = len(disputes_list)
-        return DisputeList(
-            count=count,
-            has_more=has_more,
-            total_amount=total_amount,
-            data=disputes_list,
-        )
-
 
 class DisputeProcessor:
     def __init__(
@@ -351,33 +333,39 @@ class DisputeProcessor:
         self.dispute_client = dispute_client
         self.log = log
 
-    async def get(self, dispute_id: str, dispute_id_type: Optional[str] = None):
+    async def get_dispute(self, dd_stripe_dispute_id: str):
         """
-        Retrieve DoorDash dispute
+        Retrieve dispute object by dd_stripe_dispute_id.
 
-        :param dispute_id: [string] dispute unique id.
-        :param dispute_id_type: [string] identify the type of dispute_id. Valid values include "dd_stripe_dispute_id",
-               "stripe_dispute_id")
+        :param dd_stripe_dispute_id: [string] integer id of MainDB.stripe_dispute.id
         :return: Dispute object
         """
-        self.log.info(
-            f"[get] dispute_id:{dispute_id}, dispute_id_type:{dispute_id_type}"
-        )
-        dispute = await self.dispute_client.get_dispute_object(
-            dispute_id=dispute_id, dispute_id_type=dispute_id_type
+
+        self.log.info(f"[get_dispute] dispute_id:{dd_stripe_dispute_id}")
+        dispute = await self.dispute_client.get_raw_dispute(
+            dispute_id=dd_stripe_dispute_id,
+            dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
         )
         return dispute
 
     async def submit_dispute_evidence(self, stripe_dispute_id: str, evidence: Evidence):
-        dispute: Dispute = await self.dispute_client.get_dispute_object(
-            dispute_id=stripe_dispute_id
+        # Step 1: validate existence of dispute object from DB.
+        dispute: Dispute = await self.dispute_client.get_raw_dispute(
+            dispute_id=stripe_dispute_id,
+            dispute_id_type=DisputeIdType.STRIPE_DISPUTE_ID,
         )
-        await self.dispute_client.submit_dispute_evidence(
+
+        # Step 2: submit evidence to Payment Provider.
+        await self.dispute_client.pgp_submit_dispute_evidence(
             dispute_id=dispute.stripe_dispute_id, evidence=evidence
         )
-        updated_dispute = await self.dispute_client.update_dispute_details(
-            dispute_id=dispute.stripe_dispute_id
+        submitted_at: datetime = datetime.utcnow()
+
+        # Step 3: update both submitted_at and updated_at
+        updated_dispute = await self.dispute_client.update_raw_dispute_submitted_time(
+            dd_stripe_dispute_id=dispute.stripe_dispute_id, submitted_at=submitted_at
         )
+
         return updated_dispute
 
     async def list_disputes(
@@ -406,6 +394,7 @@ class DisputeProcessor:
         :param distinct: [bool] Gives count of distinct disputes according to charge id. Defaults to False
         :return: ListDispute Object
         """
+        # FIXME: code refactory needed here.
         if not (
             dd_payment_method_id
             or stripe_payment_method_id
@@ -418,7 +407,8 @@ class DisputeProcessor:
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
             )
-        disputes_list: List[Dispute] = await self.dispute_client.get_disputes_list(
+
+        disputes_list: List[Dispute] = await self.dispute_client.get_raw_disputes_list(
             dd_payment_method_id=dd_payment_method_id,
             stripe_payment_method_id=stripe_payment_method_id,
             dd_stripe_card_id=dd_stripe_card_id,
@@ -428,22 +418,30 @@ class DisputeProcessor:
             start_time=start_time,
             reasons=reasons,
         )
-        dispute_list_object: DisputeList = await self.dispute_client.get_dispute_list_object(
-            disputes_list=disputes_list, distinct=distinct
+
+        count: int = 0
+        if distinct:
+            count = len(set([dispute.stripe_charge_id for dispute in disputes_list]))
+        else:
+            count = len(disputes_list)
+        return DisputeList(
+            count=count,
+            has_more=False,  # Currently default to False. Returning all the disputes for a query
+            total_amount=sum([dispute.amount for dispute in disputes_list]),
+            data=disputes_list,
         )
-        return dispute_list_object
 
     async def get_dispute_charge_metadata(
-        self, id: str, id_type: str = None
+        self, dispute_id: str, dispute_id_type: DisputeIdType
     ) -> DisputeChargeMetadata:
         """
         Retrieve charge metadata for a dispute object
 
-        :param id: [string] id for dispute in dispute table
-        :param id_type: [string] identify the type of id for the dispute.
+        :param dispute_id: [string] id for dispute in dispute table
+        :param dispute_id_type: [string] identify the type of id for the dispute.
                 Valid values include "dd_stripe_dispute_id", "stripe_dispute_id" (default is "stripe_dispute_id")
         :return: DisputeMetadata object
         """
         return await self.dispute_client.get_dispute_charge_metadata_object(
-            id=id, id_type=id_type
+            dispute_id=dispute_id, dispute_id_type=dispute_id
         )

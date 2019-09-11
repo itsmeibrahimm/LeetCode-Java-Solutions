@@ -33,8 +33,9 @@ class TestDisputeClient:
         dispute_client.dispute_repo.get_dispute_by_dispute_id = FunctionMock(
             return_value=dispute_db_entity
         )
-        result = await dispute_client.get_dispute_object(
-            dispute_id=dispute_db_entity.stripe_dispute_id
+        result = await dispute_client.get_raw_dispute(
+            dispute_id=dispute_db_entity.stripe_dispute_id,
+            dispute_id_type=DisputeIdType.STRIPE_DISPUTE_ID,
         )
         assert dispute_db_entity.to_stripe_dispute() == result
 
@@ -44,26 +45,11 @@ class TestDisputeClient:
         dispute_client.dispute_repo.get_dispute_by_dispute_id = FunctionMock(
             return_value=dispute_db_entity
         )
-        result = await dispute_client.get_dispute_object(
+        result = await dispute_client.get_raw_dispute(
             dispute_id=dispute_db_entity.id,
             dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
         )
         assert dispute_db_entity.to_stripe_dispute() == result
-
-    @pytest.mark.asyncio
-    async def test_get_dispute_object_by_invalid_dispute_id_type(self, dispute_client):
-        dispute_db_entity = generate_dispute_db_entity()
-        dispute_client.dispute_repo.get_dispute_by_dispute_id = FunctionMock(
-            return_value=dispute_db_entity
-        )
-        with pytest.raises(DisputeReadError) as payment_error:
-            await dispute_client.get_dispute_object(
-                dispute_id=dispute_db_entity.id, dispute_id_type="INVALID_ID_TYPE"
-            )
-
-        assert (
-            payment_error.value.error_code == PayinErrorCode.DISPUTE_READ_INVALID_DATA
-        )
 
     @pytest.mark.asyncio
     async def test_dispute_not_found(self, dispute_client):
@@ -71,7 +57,7 @@ class TestDisputeClient:
             return_value=None
         )
         with pytest.raises(DisputeReadError) as payment_error:
-            await dispute_client.get_dispute_object(
+            await dispute_client.get_raw_dispute(
                 dispute_id="NO_ID", dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
             )
         assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
@@ -96,7 +82,7 @@ class TestDisputeClient:
         dispute_client.dispute_repo.list_disputes_by_payer_id = FunctionMock(
             return_value=dispute_list
         )
-        result = await dispute_client.get_disputes_list(
+        result = await dispute_client.get_raw_disputes_list(
             dd_payment_method_id=None,
             stripe_payment_method_id=None,
             dd_stripe_card_id=None,
@@ -139,7 +125,7 @@ class TestDisputeClient:
         dispute_client.dispute_repo.list_disputes_by_payment_method_id = FunctionMock(
             return_value=dispute_entity_list
         )
-        result = await dispute_client.get_disputes_list(
+        result = await dispute_client.get_raw_disputes_list(
             dd_payment_method_id="VALID PAYMENT METHOD ID",
             stripe_payment_method_id=None,
             dd_stripe_card_id=None,
@@ -166,7 +152,7 @@ class TestDisputeClient:
             return_value="VALID_CARD_ID"
         )
         result = await dispute_client.get_dispute_charge_metadata_object(
-            id=1, id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+            dispute_id=1, dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
         )
         assert result == charge_metadata_object
 
@@ -179,7 +165,7 @@ class TestDisputeClient:
         )
         with pytest.raises(DisputeReadError) as payment_error:
             await dispute_client.get_dispute_charge_metadata_object(
-                id=1, id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+                dispute_id=1, dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
             )
         assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
 
@@ -192,7 +178,7 @@ class TestDisputeClient:
         )
         with pytest.raises(DisputeReadError) as payment_error:
             await dispute_client.get_dispute_charge_metadata_object(
-                id=1, id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+                dispute_id=1, dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
             )
         assert (
             payment_error.value.error_code

@@ -18,23 +18,22 @@ class TestDisputeProcessor:
     @pytest.mark.asyncio
     async def test_get_dispute_by_pgp_dispute_id(self, dispute_processor):
         dispute = generate_dispute()
-        dispute_processor.dispute_client.get_dispute_object = FunctionMock(
+        dispute_processor.dispute_client.get_raw_dispute = FunctionMock(
             return_value=dispute
         )
-        result = await dispute_processor.get(
-            dispute_id=dispute.stripe_dispute_id, dispute_id_type=None
+        result = await dispute_processor.get_dispute(
+            dd_stripe_dispute_id=dispute.stripe_dispute_id
         )
         assert result == dispute
 
     @pytest.mark.asyncio
     async def test_get_dispute_by_stripe_dispute_id(self, dispute_processor):
         dispute = generate_dispute()
-        dispute_processor.dispute_client.get_dispute_object = FunctionMock(
+        dispute_processor.dispute_client.get_raw_dispute = FunctionMock(
             return_value=dispute
         )
-        result = await dispute_processor.get(
-            dispute_id=dispute.stripe_dispute_id,
-            dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
+        result = await dispute_processor.get_dispute(
+            dd_stripe_dispute_id=dispute.stripe_dispute_id
         )
         assert result == dispute
 
@@ -47,7 +46,7 @@ class TestDisputeProcessor:
             total_amount=sum([dispute.amount for dispute in dispute_list]),
             data=dispute_list,
         )
-        dispute_processor.dispute_client.get_disputes_list = FunctionMock(
+        dispute_processor.dispute_client.get_raw_disputes_list = FunctionMock(
             return_value=dispute_list
         )
         dispute_processor.dispute_client.get_dispute_list_object = FunctionMock(
@@ -93,7 +92,8 @@ class TestDisputeProcessor:
             return_value=charge_metadata_object
         )
         result = await dispute_processor.get_dispute_charge_metadata(
-            id="VALID_STRIPE_DISPUTE_ID", id_type=DisputeIdType.STRIPE_DISPUTE_ID
+            dispute_id="VALID_STRIPE_DISPUTE_ID",
+            dispute_id_type=DisputeIdType.STRIPE_DISPUTE_ID,
         )
         assert charge_metadata_object == result
 
@@ -106,6 +106,7 @@ class TestDisputeProcessor:
             return_value=charge_metadata_object
         )
         result = await dispute_processor.get_dispute_charge_metadata(
-            id="VALID_DD_STRIPE_DISPUTE_ID", id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+            dispute_id="VALID_DD_STRIPE_DISPUTE_ID",
+            dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
         )
         assert charge_metadata_object == result
