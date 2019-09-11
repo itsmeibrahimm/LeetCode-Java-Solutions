@@ -90,7 +90,7 @@ async def startup():
 
     # set up the global statsd client
     init_global_statsd(
-        config.STATSD_PREFIX,
+        config.GLOBAL_STATSD_PREFIX,
         host=config.STATSD_SERVER,
         fixed_tags={"env": config.ENVIRONMENT},
     )

@@ -32,37 +32,22 @@ def get_request_logger(default=NotSpecified) -> structlog.stdlib.BoundLogger:
     return get_contextvar(REQUEST_LOGGER, default=default)
 
 
-def init_statsd(
-    prefix: str,
-    *,
-    proxy: DoorStatsProxyMultiServer = None,
-    host: str,
-    fixed_tags: Optional[Dict[str, str]] = None,
-) -> DoorStatsProxyMultiServer:
-    """
-    Initialize a StatsD client
-    """
-    proxy = proxy or DoorStatsProxyMultiServer()
-    proxy.initialize(host=host, prefix=prefix, fixed_tags=fixed_tags)
-    return proxy
-
-
-def init_statsd_from_config(
+def create_statsd_client_from_config(
     host: str,
     config: StatsDConfig,
     *,
-    proxy: DoorStatsProxyMultiServer = None,
     tags: Optional[Dict[str, str]] = None,
     additional_tags: Optional[Dict[str, str]] = None,
 ) -> DoorStatsProxyMultiServer:
     combined_tags = tags or dict(**config.TAGS)
     if additional_tags:
         combined_tags.update(additional_tags)
-    return init_statsd(config.PREFIX, proxy=proxy, host=host, fixed_tags=combined_tags)
+
+    statsd_client = DoorStatsProxyMultiServer()
+    statsd_client.initialize(host=host, prefix=config.PREFIX, fixed_tags=combined_tags)
+    return statsd_client
 
 
-def init_global_statsd(
-    prefix: str, *, host: str, fixed_tags: Dict[str, Any]
-) -> DoorStatsProxyMultiServer:
+def init_global_statsd(prefix: str, *, host: str, fixed_tags: Dict[str, Any]) -> None:
     fixed_tags = {"hostname": platform.node(), **fixed_tags}
-    return init_statsd(prefix, proxy=doorstats_global, host=host, fixed_tags=fixed_tags)
+    doorstats_global.initialize(host=host, prefix=prefix, fixed_tags=fixed_tags)

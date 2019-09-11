@@ -117,7 +117,7 @@ class AppConfig(SecretAware):
 
     # Stats
     STATSD_SERVER: str = "localhost"
-    STATSD_PREFIX: str = "dd.pay.payment-service"
+    GLOBAL_STATSD_PREFIX: str = "dd.pay.payment-service"
 
     # general API responses, common across all apps
     API_STATSD_CONFIG: ApiStatsDConfig = ApiStatsDConfig()

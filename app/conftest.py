@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 from _pytest.nodes import Item
+from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 from pytest_mock import MockFixture
 from starlette.testclient import TestClient
 import unittest.mock
@@ -110,7 +111,8 @@ def global_statsd_client():
 
 @pytest.fixture
 def service_statsd_client():
-    statsd_client = stats.init_statsd("dd.pay.payment-service", host="localhost")
+    statsd_client = DoorStatsProxyMultiServer()
+    statsd_client.initialize(prefix="dd.pay.payment-service", host="localhost")
     with stats.set_service_stats_client(statsd_client):
         yield statsd_client
 

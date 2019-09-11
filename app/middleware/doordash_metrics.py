@@ -1,23 +1,21 @@
-import time
 import platform
-
+import time
 from typing import Any, Dict, Optional
 
+from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 from starlette.exceptions import ExceptionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.exceptions import ExceptionMiddleware
 
-from app.commons.context.req_context import get_context_from_req
-from app.commons.config.app_config import StatsDConfig
-from app.commons.routing import reset_breadcrumbs
 from app.commons import tracing
+from app.commons.config.app_config import StatsDConfig
+from app.commons.context.req_context import get_context_from_req
+from app.commons.routing import reset_breadcrumbs
 from app.commons.stats import (
-    init_statsd_from_config,
+    create_statsd_client_from_config,
     set_service_stats_client,
     set_request_logger,
 )
-from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 
 NORMALIZATION_TABLE = str.maketrans("/", "|", "{}")
 
@@ -34,7 +32,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: ExceptionMiddleware, *, host: str, config: StatsDConfig):
         self.app = app
-        self.statsd_client = init_statsd_from_config(
+        self.statsd_client = create_statsd_client_from_config(
             host, config, additional_tags={"hostname": platform.node()}
         )
 
@@ -106,7 +104,7 @@ class ServiceMetricsMiddleware(BaseHTTPMiddleware):
         if additional_tags:
             combined_tags.update(additional_tags)
 
-        self.statsd_client = init_statsd_from_config(
+        self.statsd_client = create_statsd_client_from_config(
             host, config, additional_tags=combined_tags
         )
 

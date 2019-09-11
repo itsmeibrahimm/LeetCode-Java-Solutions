@@ -1,6 +1,11 @@
 import os
 
-from app.commons.config.app_config import AppConfig, ApiStatsDConfig, DBConfig
+from app.commons.config.app_config import (
+    AppConfig,
+    ApiStatsDConfig,
+    DBConfig,
+    SentryConfig,
+)
 from app.commons.config.secrets import Secret
 
 
@@ -10,6 +15,14 @@ def create_app_config() -> AppConfig:
     """
     # allow db endpoint (host:port) be overridden in docker compose
     dsj_db_endpoint: str = os.getenv("DSJ_DB_ENDPOINT", "localhost:5435")
+
+    sentry_config = None
+    if os.getenv("SENTRY_DSN", None):
+        sentry_config = SentryConfig(
+            dsn=Secret.from_env(name="sentry_dsn", env="SENTRY_DSN"),
+            environment="local",
+            release=f"payment-service@release-{os.getenv('RELEASE_TAG', 'unknown')}",
+        )
 
     return AppConfig(
         ENVIRONMENT="local",
@@ -86,4 +99,5 @@ def create_app_config() -> AppConfig:
         DSJ_API_USER_EMAIL=Secret(name="dsj_api_user_email", value=""),
         DSJ_API_USER_PASSWORD=Secret(name="dsj_api_user_password", value=""),
         DSJ_API_JWT_TOKEN_TTL=1800,
+        SENTRY_CONFIG=sentry_config,
     )
