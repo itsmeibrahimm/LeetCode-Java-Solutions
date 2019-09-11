@@ -57,6 +57,7 @@ protobuf-identity = {version = "==0.2.29",index = "artifactory"}
 cachetools = "==3.1.1"
 aiopg = "==0.16.0"
 ipython = "==7.7.0"
+newrelic = "==5.0.2.126"
 
 [requires]
 python_version = "3.7"

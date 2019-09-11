@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dd8aa8ee4df5d9433ffb084536eced422105956c5a0fd81188375dd94184fb1b"
+            "sha256": "313d6cbb7bdfd18dbb152df9872fc13f8a7392ecbd92835883c5ea3843292b24"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -399,6 +399,7 @@
             "hashes": [
                 "sha256:e00cbd7ba01ff748e494248183abc6e153f49181169d8a3d41bb49132ca01dfc"
             ],
+            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.0.13"
         },
         "idna": {
@@ -515,6 +516,13 @@
                 "sha256:db603a1c235d110c860d5f39988ebc8218ee028f07a7cbc056ba6424372ca31b"
             ],
             "version": "==4.5.2"
+        },
+        "newrelic": {
+            "hashes": [
+                "sha256:9d6d3bf2e125410d485fd91279e1b0f50e8f0f5887284b345aed4ec81db33c0a"
+            ],
+            "index": "pypi",
+            "version": "==5.0.2.126"
         },
         "ninox": {
             "extras": [
@@ -865,6 +873,7 @@
                 "sha256:c48692bf4587ce281d641087658eca275a5ad3b63c78297bbded96570ae9ce8f",
                 "sha256:fefc3b2b947c99737c348887db2c32e539160dcbeb7af9aa6b53db7a283538fe"
             ],
+            "markers": "sys_platform != 'win32' and sys_platform != 'cygwin' and platform_python_implementation != 'pypy'",
             "version": "==0.12.2"
         },
         "wcwidth": {
@@ -1088,11 +1097,11 @@
         },
         "importlib-metadata": {
             "hashes": [
-                "sha256:0c505102757e7fa28b9f0958d8bc81301159dea16e2649858c92edc158b78a83",
-                "sha256:9a9f75ce32e78170905888acbf2376a81d3f21ecb3bb4867050413411d3ca7a9"
+                "sha256:652234b6ab8f2506ae58e528b6fbcc668831d3cc758e1bc01ef438d328b68cdb",
+                "sha256:6f264986fb88042bc1f0535fa9a557e6a376cfe5679dc77caac7fe8b5d43d05f"
             ],
             "markers": "python_version < '3.8'",
-            "version": "==0.21"
+            "version": "==0.22"
         },
         "jinja2": {
             "hashes": [

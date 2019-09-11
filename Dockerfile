@@ -33,6 +33,7 @@ COPY \
   Pipfile \
   Pipfile.lock \
   ninox.ini \
+  newrelic.ini \
   ./
 
 RUN apt-get update -y && \
