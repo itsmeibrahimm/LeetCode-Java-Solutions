@@ -443,5 +443,5 @@ class DisputeProcessor:
         :return: DisputeMetadata object
         """
         return await self.dispute_client.get_dispute_charge_metadata_object(
-            dispute_id=dispute_id, dispute_id_type=dispute_id
+            dispute_id=dispute_id, dispute_id_type=dispute_id_type
         )

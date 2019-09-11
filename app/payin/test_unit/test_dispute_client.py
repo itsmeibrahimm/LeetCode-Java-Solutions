@@ -152,7 +152,7 @@ class TestDisputeClient:
             return_value="VALID_CARD_ID"
         )
         result = await dispute_client.get_dispute_charge_metadata_object(
-            dispute_id=1, dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+            dispute_id="1", dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
         )
         assert result == charge_metadata_object
 
@@ -165,7 +165,7 @@ class TestDisputeClient:
         )
         with pytest.raises(DisputeReadError) as payment_error:
             await dispute_client.get_dispute_charge_metadata_object(
-                dispute_id=1, dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+                dispute_id="1", dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
             )
         assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
 
@@ -178,7 +178,7 @@ class TestDisputeClient:
         )
         with pytest.raises(DisputeReadError) as payment_error:
             await dispute_client.get_dispute_charge_metadata_object(
-                dispute_id=1, dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
+                dispute_id="1", dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
             )
         assert (
             payment_error.value.error_code

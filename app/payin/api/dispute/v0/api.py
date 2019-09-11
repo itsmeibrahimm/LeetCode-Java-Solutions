@@ -43,14 +43,12 @@ async def get_dispute(
     Get dispute.
     - **dd_stripe_dispute_id**: id for dispute in dispute table
     """
-    log.info("[get_dispute] started for dd_stripe_dispute_id=%s", dd_stripe_dispute_id)
+    log.info("[get_dispute] started", dd_stripe_dispute_id=dd_stripe_dispute_id)
     try:
         dispute: Dispute = await dispute_processor.get_dispute(
             dd_stripe_dispute_id=dd_stripe_dispute_id
         )
-        log.info(
-            "[get_dispute] completed for dd_stripe_dispute_id=%s", dd_stripe_dispute_id
-        )
+        log.info("[get_dispute] completed", dd_stripe_dispute_id=dd_stripe_dispute_id)
     except PaymentError as e:
         raise PaymentException(
             http_status_code=(
