@@ -46,6 +46,14 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
         method = request.method
         start_time = time.perf_counter()
 
+        # from the ASGI spec
+        # https://github.com/django/asgiref/blob/master/specs/www.rst#L56
+
+        # fetch the path BEFORE we pass it to the app
+        # the leading path components get stripped off
+        # as routing traverses sub-apps
+        path = request.scope.get("path", "")
+
         # make the request logger available to
         # app-level resources
         with set_request_logger(context.log):
@@ -53,12 +61,12 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
             # will append to the list of breadcrumbs
             response = await call_next(request)
 
+        # breadcrumbs are available after
         endpoint = normalize_path("".join(breadcrumbs))
+
+        # latency
         latency_ms = (time.perf_counter() - start_time) * 1000
         status_type = f"{response.status_code // 100}XX"
-        # from the ASGI spec
-        # https://github.com/django/asgiref/blob/master/specs/www.rst#L56
-        path = request.scope.get("path", "")
 
         context.log.info(
             "request complete",
