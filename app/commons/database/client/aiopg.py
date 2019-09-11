@@ -129,7 +129,6 @@ class AioTransaction(DBTransaction):
 
 class AioConnection(DBConnection, timing.Database):
     _raw_connection: Optional[connection.SAConnection]
-    default_timeout: float
     engine: "AioEngine"
     database_name: str
     instance_name: str
@@ -141,8 +140,6 @@ class AioConnection(DBConnection, timing.Database):
         self.engine = engine
         self.database_name = engine.database_name
         self.instance_name = engine.instance_name
-
-        self.default_timeout = self.engine.default_stmt_timeout_sec
         self._raw_connection = None
 
     async def open(self) -> "AioConnection":
@@ -163,11 +160,8 @@ class AioConnection(DBConnection, timing.Database):
         return AwaitableTransactionContext(generator=new_transaction.start)
 
     @timing.track_query
-    async def execute(self, stmt, *, timeout: int = None) -> AioMultiResult:
-        _timeout = timeout or self.default_timeout
-        result_proxy: ResultProxy = await self.raw_connection.execute(
-            stmt, timeout=_timeout
-        )
+    async def execute(self, stmt) -> AioMultiResult:
+        result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
         row_proxies: List[RowProxy] = []
         if result_proxy.returns_rows:
             row_proxies = await result_proxy.fetchall()
@@ -176,11 +170,8 @@ class AioConnection(DBConnection, timing.Database):
         return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
     @timing.track_query
-    async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[AioResult]:
-        _timeout = timeout or self.default_timeout
-        result_proxy: ResultProxy = await self.raw_connection.execute(
-            stmt, timeout=_timeout
-        )
+    async def fetch_one(self, stmt) -> Optional[AioResult]:
+        result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
         result: Optional[RowProxy] = None
         if result_proxy.returns_rows:
             result = await result_proxy.fetchone()
@@ -189,11 +180,8 @@ class AioConnection(DBConnection, timing.Database):
         return AioResult(result, result_proxy.rowcount) if result else None
 
     @timing.track_query
-    async def fetch_all(self, stmt, *, timeout: int = None) -> AioMultiResult:
-        _timeout = timeout or self.default_timeout
-        result_proxy: ResultProxy = await self.raw_connection.execute(
-            stmt, timeout=_timeout
-        )
+    async def fetch_all(self, stmt) -> AioMultiResult:
+        result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
         row_proxies: List[RowProxy] = []
         if result_proxy.returns_rows:
             row_proxies = await result_proxy.fetchall()
@@ -202,10 +190,9 @@ class AioConnection(DBConnection, timing.Database):
         return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
     @timing.track_query
-    async def fetch_value(self, stmt, *, timeout: int = None):
-        _timeout = timeout or self.default_timeout
+    async def fetch_value(self, stmt):
         return await self.raw_connection.scalar(
-            stmt, timeout=_timeout
+            stmt
         )  # result proxy is already closed at this time
 
     @property
@@ -226,13 +213,13 @@ class AioEngine(DBEngine, timing.Database):
     database_name: str
     instance_name: str
     _dsn: str
-    minsize: int = 1
-    maxsize: int = 1
-    connection_timeout_sec: float = 30
-    closing_timeout_sec: float = 60
-    default_stmt_timeout_sec: float = 30
-    force_rollback: bool = False
-    debug: bool = False
+    minsize: int
+    maxsize: int
+    connection_timeout_sec: float
+    closing_timeout_sec: float
+    default_client_stmt_timeout_sec: float
+    force_rollback: bool
+    debug: bool
     _raw_engine: Optional[engine.Engine]
 
     def __init__(
@@ -243,8 +230,8 @@ class AioEngine(DBEngine, timing.Database):
         instance_name: str = "",
         minsize: int = 1,
         maxsize: int = 1,
-        connection_timeout_sec: float = 30,
-        default_stmt_timeout_sec: float = 30,
+        connection_timeout_sec: float = 1,
+        default_client_stmt_timeout_sec: float = 1,
         closing_timeout_sec: float = 60,
         force_rollback: bool = False,
         debug: bool = False,
@@ -265,9 +252,9 @@ class AioEngine(DBEngine, timing.Database):
             raise ValueError(
                 f"closing_timeout_sec should be > 0 but found {closing_timeout_sec}"
             )
-        if default_stmt_timeout_sec <= 0:
+        if default_client_stmt_timeout_sec <= 0:
             raise ValueError(
-                f"default_stmt_timeout_sec should be > 0 but found {default_stmt_timeout_sec}"
+                f"default_stmt_timeout_sec should be > 0 but found {default_client_stmt_timeout_sec}"
             )
 
         self._dsn = dsn
@@ -275,7 +262,7 @@ class AioEngine(DBEngine, timing.Database):
         self.maxsize = maxsize
         self.connection_timeout_sec = connection_timeout_sec
         self.closing_timeout_sec = closing_timeout_sec
-        self.default_stmt_timeout_sec = default_stmt_timeout_sec
+        self.default_client_stmt_timeout_sec = default_client_stmt_timeout_sec
         self.database_name = database_name if database_name else "undefined"
         self.instance_name = instance_name
         self._raw_engine = None
@@ -291,7 +278,12 @@ class AioEngine(DBEngine, timing.Database):
                 dsn=self.dsn,
                 minsize=self.minsize,
                 maxsize=self.maxsize,
-                timeout=self.connection_timeout_sec,
+                # TODO connection_timeout doesn't guarantee connection acquire timeout
+                # currently connection_timeout (timeout) is used by aiopg as default statement timeout
+                # to init a new DB cursor every time connection.execute(...) is called
+                # see: https://github.com/doordash/payment-service/pull/312/files
+                timeout=self.default_client_stmt_timeout_sec,
+                # timeout=self.connection_timeout_sec,
                 echo=self.debug,
             )
         return self
@@ -323,24 +315,24 @@ class AioEngine(DBEngine, timing.Database):
 
         return EngineTransactionContext(generator=tx_generator)
 
-    async def execute(self, stmt, *, timeout: int = None) -> AioMultiResult:
+    async def execute(self, stmt) -> AioMultiResult:
         async with self.acquire() as conn:  # type: AioConnection
-            result = await conn.execute(stmt, timeout=timeout)
+            result = await conn.execute(stmt)
         return result
 
-    async def fetch_one(self, stmt, *, timeout: int = None) -> Optional[AioResult]:
+    async def fetch_one(self, stmt) -> Optional[AioResult]:
         async with self.acquire() as conn:  # type: AioConnection
-            result = await conn.fetch_one(stmt, timeout=timeout)
+            result = await conn.fetch_one(stmt)
         return result
 
-    async def fetch_all(self, stmt, *, timeout: int = None) -> AioMultiResult:
+    async def fetch_all(self, stmt) -> AioMultiResult:
         async with self.acquire() as conn:  # type: AioConnection
-            result = await conn.fetch_all(stmt, timeout=timeout)
+            result = await conn.fetch_all(stmt)
         return result
 
-    async def fetch_value(self, stmt, *, timeout: int = None) -> Optional[Any]:
+    async def fetch_value(self, stmt) -> Optional[Any]:
         async with self.acquire() as conn:  # type: AioConnection
-            result = await conn.fetch_value(stmt, timeout=timeout)
+            result = await conn.fetch_value(stmt)
         return result
 
     @property

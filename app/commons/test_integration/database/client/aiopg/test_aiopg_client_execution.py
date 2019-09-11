@@ -1,25 +1,52 @@
+from concurrent.futures import TimeoutError as ConcurrentTimeoutError
 from collections import Sequence
 from datetime import datetime
 
 import pytest
 
 from app.commons.config.app_config import AppConfig
-from app.commons.database.client.aiopg import AioEngine, AioTransaction
+from app.commons.database.client.aiopg import AioEngine, AioTransaction, AioConnection
 from app.payout.repository.maindb.model import payment_accounts
 
 pytestmark = [pytest.mark.asyncio]
+
+
+_CONNECTION_TIMEOUT_SEC = 1
 
 
 @pytest.fixture
 async def payout_maindb_aio_engine(app_config: AppConfig):
     assert app_config.PAYOUT_MAINDB_MASTER_URL.value
     engine = AioEngine(
-        dsn=app_config.PAYOUT_MAINDB_MASTER_URL.value, minsize=2, maxsize=2, debug=True
+        dsn=app_config.PAYOUT_MAINDB_MASTER_URL.value,
+        minsize=2,
+        maxsize=2,
+        debug=True,
+        connection_timeout_sec=_CONNECTION_TIMEOUT_SEC,
     )
     await engine.connect()
     async with engine:
         yield engine
     assert engine.closed(), "engine was not closed properly"
+
+
+async def test_client_side_execution_timeout_via_connection_timeout(
+    payout_maindb_aio_engine: AioEngine
+):
+    with pytest.raises(BaseException) as e:
+        await payout_maindb_aio_engine.execute(
+            f"select pg_sleep({_CONNECTION_TIMEOUT_SEC+1})"
+        )
+
+    assert isinstance(e.value, ConcurrentTimeoutError)
+
+    with pytest.raises(BaseException) as e:
+        async with payout_maindb_aio_engine.acquire() as conn:  # type: AioConnection
+            await conn.execute(f"select pg_sleep({_CONNECTION_TIMEOUT_SEC+1})")
+
+    assert isinstance(e.value, ConcurrentTimeoutError)
+    assert conn.closed()
+    assert conn.raw_connection.closed
 
 
 async def test_create_and_fetch_one_fetch_many_fetch_value(

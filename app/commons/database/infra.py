@@ -88,8 +88,8 @@ class DB:
             minsize=db_config.master_pool_min_size,
             debug=db_config.debug,
             force_rollback=db_config.force_rollback,
-            default_stmt_timeout_sec=db_config.statement_timeout,
-            closing_timeout_sec=db_config.closing_timeout,
+            default_client_stmt_timeout_sec=db_config.statement_timeout_sec,
+            closing_timeout_sec=db_config.closing_timeout_sec,
         )
 
         assert replica_url.value
@@ -101,8 +101,8 @@ class DB:
             minsize=db_config.replica_pool_min_size,
             debug=db_config.debug,
             force_rollback=db_config.force_rollback,
-            default_stmt_timeout_sec=db_config.statement_timeout,
-            closing_timeout_sec=db_config.closing_timeout,
+            default_client_stmt_timeout_sec=db_config.statement_timeout_sec,
+            closing_timeout_sec=db_config.closing_timeout_sec,
         )
 
         return cls(_master=master, _replica=replica, _id=db_id)

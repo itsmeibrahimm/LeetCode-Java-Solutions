@@ -84,7 +84,7 @@ def create_app_config() -> AppConfig:
             debug=False,
             # roll back all database transactions before shutting down
             force_rollback=True,
-            closing_timeout=0,  # instantly close unclosed connections
+            closing_timeout_sec=0,  # instantly close unclosed connections
         ),
         AVAILABLE_MAINDB_REPLICAS=["maindb_test"],
         DSJ_API_BASE_URL="https://api.doorcrawl.com",
