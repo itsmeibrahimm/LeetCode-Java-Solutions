@@ -3,6 +3,13 @@ env:
 
 web:
   replicaCount: 8
+  resources:
+    requests:
+      cpu: 1
+      memory: 2048Mi
+    limits:
+      cpu: 1
+      memory: 2048Mi
 
 cron:
   replicaCount: 0
