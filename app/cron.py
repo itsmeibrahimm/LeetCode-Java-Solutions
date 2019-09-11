@@ -5,6 +5,7 @@ import signal
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from app.commons import timing
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
@@ -53,6 +54,14 @@ def run_scheduler():
         minute="*/5",
         kwargs={"app_context": app_context, "cart_payment_repo": cart_payment_repo},
     )
+
+    @timing.track_func
+    async def test_job():
+        logger.info("ENTERING")
+        await asyncio.sleep(2)
+        logger.info("EXITING")
+
+    scheduler.add_job(test_job, "cron", second="*/5")
 
     scheduler.start()
 

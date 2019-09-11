@@ -3,8 +3,9 @@ import asyncio
 import functools
 import inspect
 import time
-import pydantic
-
+from collections import deque
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar
 from typing import (
     TypeVar,
     Generic,
@@ -17,9 +18,8 @@ from typing import (
     Dict,
     cast,
 )
-from collections import deque
-from contextlib import ExitStack, contextmanager
-from contextvars import ContextVar
+
+import pydantic
 from pydantic.fields import Field
 
 from app.commons.context.logger import root_logger as default_logger
@@ -503,6 +503,7 @@ class TimingManager(Generic[TTimer], TrackingManager[TTimer]):
         processors: Optional[List[Processor]] = None,
         only_trackable=False,
     ):
+        super(TimingManager, self).__init__(only_trackable=only_trackable)
         self.rate = rate
         self.send = send
         if processors is not None:
@@ -531,7 +532,7 @@ class TimingManager(Generic[TTimer], TrackingManager[TTimer]):
                 processor(self, timer)
             except Exception:  # noqa: E722
                 default_logger.warn(
-                    "exception occured in processor %s",
+                    "exception occurred in processor %s",
                     processor.__name__,
                     exc_info=True,
                 )

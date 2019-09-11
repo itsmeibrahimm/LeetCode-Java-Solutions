@@ -14,7 +14,7 @@ def set_default_http_client(http_client: Optional[HTTPClient]):
 
 class TimedSession(requests.Session):
     # track timing and response
-    @timing.track_client_response()
+    @timing.track_client_response(stat_name="io.stripe-lib.latency")
     def request(self, *args, **kwargs):
         response = super().request(*args, **kwargs)
         return response

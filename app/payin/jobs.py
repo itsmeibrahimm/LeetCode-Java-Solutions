@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from app.commons import timing
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext, build_req_context
 from app.payin.core.cart_payment.model import PaymentIntent
@@ -46,6 +47,7 @@ async def capture_uncaptured_payment_intents(
     await asyncio.gather(*coroutines)
 
 
+@timing.track_func
 async def _capture_payment_intent(
     app_context, req_context, cart_payment_repo, uncaptured_payment_intent
 ):
@@ -100,6 +102,7 @@ async def resolve_capturing_payment_intents(
     await asyncio.gather(*futures)
 
 
+@timing.track_func
 async def _resolve_capturing_payment_intents(
     cart_payment_repo: CartPaymentRepository, payment_intent: PaymentIntent
 ):
