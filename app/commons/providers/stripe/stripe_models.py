@@ -21,6 +21,12 @@ PaymentMethodId = NewType("PaymentMethodId", str)
 PaymentIntentId = NewType("PaymentIntentId", str)
 PaymentIntentStatus = NewType("PaymentIntentStatus", str)
 StripeDisputeId = NewType("StripeDisputeId", str)
+Currency = NewType("Currency", str)
+Amount = NewType("Amount", int)
+Destination = NewType("Destination", str)
+StatementDescriptor = NewType("StatementDescriptor", str)
+StripeAccountId = NewType("StripeAccountId", str)
+Metadata = NewType("Metadata", dict)
 
 
 class StripeBaseModel(pydantic.BaseModel):
@@ -192,6 +198,16 @@ class RetrievePaymentMethod(StripeBaseModel):
     id: str
 
 
+class RetrievePayout(StripeBaseModel):
+    id: str
+    stripe_account: str
+
+
+class CancelPayout(StripeBaseModel):
+    sid: str
+    stripe_account: str
+
+
 class UpdateStripeDispute(StripeBaseModel):
     class Evidence(StripeBaseModel):
         access_activity_log: Optional[str] = None
@@ -224,6 +240,23 @@ class UpdateStripeDispute(StripeBaseModel):
 
     sid: str
     evidence: Evidence
+
+
+class CreateTransfer(StripeBaseModel):
+    description: Optional[str]
+    metadata: Optional[Dict]
+    source_transaction: Optional[str]
+    source_type: Optional[str]
+    transfer_group: Optional[str]
+
+
+class CreatePayout(StripeBaseModel):
+    description: Optional[str]
+    destination: Optional[str]
+    metadata: Optional[Dict]
+    method: Optional[str]
+    source_type: Optional[str]
+    statement_descriptor: Optional[str]
 
 
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
@@ -484,9 +517,99 @@ class PaymentIntent(StripeBaseModel):
     payment_method_types: List[str]
     receipt_email: str
     review: str
-    setup_future_usuage: str
+    setup_future_usage: str
     shipping: Optional[Shipping]
     statement_descriptor: Optional[str]
     status: str
     transfer_data: Optional[TransferData]
     transfer_group: Optional[str]
+
+
+class TransferReversal(StripeBaseModel):
+    id: str
+    object: str
+    amount: int
+    balanced_transaction: str
+    created: datetime
+    currency: str
+    destination_payment_refund: str
+    metadata: dict
+    source_refund: str
+    transfer: str
+
+
+class Transfer(StripeBaseModel):
+    class Reversals(StripeBaseModel):
+        data: List[TransferReversal]
+        has_more: bool
+        object: str
+        url: Optional[str]
+
+    id: str
+    object: str
+    amount: int
+    amount_reversed: int
+    balance_transaction: str
+    created: datetime
+    currency: str
+    description: str
+    destination: str
+    destination_payment: str
+    livemode: bool
+    metadata: dict
+    reversals: Reversals
+    reversed: bool
+    source_transaction: str
+    source_type: str
+    transfer_group: str
+
+
+class Payout(StripeBaseModel):
+    id: str
+    object: str
+    amount: int
+    arrival_date: datetime
+    automatic: bool
+    balance_transaction: str
+    created: datetime
+    currency: str
+    description: str
+    destination: str
+    failure_balance_transaction: str
+    failure_code: str
+    failure_message: str
+    livemode: bool
+    metadata: dict
+    method: str
+    source_type: str
+    statement_descriptor: str
+    status: str
+    type: str
+
+
+class SourceTypes(StripeBaseModel):
+    bank_account: int
+    card: int
+
+
+class Balance(StripeBaseModel):
+    class Available(StripeBaseModel):
+        amount: int
+        currency: str
+        source_types: SourceTypes
+
+    class ConnectReserved(StripeBaseModel):
+        amount: int
+        currency: str
+        source_types: SourceTypes
+
+    class Pending(StripeBaseModel):
+        amount: int
+        currency: str
+        source_types: SourceTypes
+
+    object: str
+    available: List[Available]
+    connect_reserved: List[ConnectReserved]
+    livemode: bool
+    pending: List[Pending]

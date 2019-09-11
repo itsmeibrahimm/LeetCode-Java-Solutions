@@ -169,12 +169,92 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         """
         ...
 
+    @abc.abstractmethod
     def update_stripe_dispute(
         self, request: models.UpdateStripeDispute
     ) -> models.StripeDisputeId:
         """
         Update a Dispute
         https://stripe.com/docs/api/disputes/update
+        """
+        ...
+
+    @abc.abstractmethod
+    def create_transfer(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        destination: models.Destination,
+        amount: models.Amount,
+        request: models.CreateTransfer,
+    ) -> models.Transfer:
+        """
+        Create a Transfer
+        https://stripe.com/docs/api/transfers/create
+        """
+        ...
+
+    @abc.abstractmethod
+    def create_payout(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        amount: models.Amount,
+        request: models.CreatePayout,
+    ) -> models.Payout:
+        """
+        Create a Payout
+        https://stripe.com/docs/api/payouts/create
+        """
+        ...
+
+    @abc.abstractmethod
+    def create_transfer_for_payout(
+        self,
+        *,
+        currency: models.Currency,
+        amount: models.Amount,
+        statement_descriptor: models.StatementDescriptor,
+        stripe_account_id: models.StripeAccountId,
+        country: models.CountryCode,
+        metadata: models.Metadata,
+        request: models.CreatePayout,
+    ) -> models.Payout:
+        """
+        Create a Transfer Stripe api version 2016-02-29
+        https://stripe.com/docs/api/transfers/create
+        """
+        ...
+
+    @abc.abstractmethod
+    def retrieve_payout(
+        self, *, country: models.CountryCode, request: models.RetrievePayout
+    ) -> models.Payout:
+        """
+        Retrieve a Payout
+        https://stripe.com/docs/api/payouts/retrieve
+        """
+        ...
+
+    @abc.abstractmethod
+    def cancel_payout(
+        self, *, request: models.CancelPayout, country: models.CountryCode
+    ) -> models.Payout:
+        """
+        Cancel a Payout
+        https://stripe.com/docs/api/payouts/cancel
+        """
+        ...
+
+    @abc.abstractmethod
+    def retrieve_balance(
+        self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
+    ) -> models.Balance:
+        """
+        Retrieve Balance
+        https://stripe.com/docs/api/balance/balance_retrieve
         """
         ...
 
@@ -381,11 +461,104 @@ class StripeClient(StripeClientInterface):
         )
         return refund
 
+    @tracing.track_breadcrumb(resource="stripedispute", action="modify")
     def update_stripe_dispute(
         self, request: models.UpdateStripeDispute
     ) -> models.StripeDisputeId:
         dispute = stripe.Dispute.modify(**request.dict(skip_defaults=True))
         return dispute.id
+
+    @tracing.track_breadcrumb(resource="transfer", action="create")
+    def create_transfer(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        destination: models.Destination,
+        amount: models.Amount,
+        request: models.CreateTransfer,
+    ) -> models.Transfer:
+        transfer = stripe.Transfer.create(
+            currency=currency,
+            destination=destination,
+            amount=amount,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return transfer
+
+    @tracing.track_breadcrumb(resource="payout", action="create")
+    def create_payout(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        amount: models.Amount,
+        stripe_account: models.StripeAccountId,
+        request: models.CreatePayout,
+    ) -> models.Payout:
+        payout = stripe.Payout.create(
+            currency=currency,
+            amount=amount,
+            stripe_account=stripe_account,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payout
+
+    @tracing.track_breadcrumb(resource="transfer", action="create")
+    def create_transfer_for_payout(
+        self,
+        *,
+        currency: models.Currency,
+        amount: models.Amount,
+        statement_descriptor: models.StatementDescriptor,
+        stripe_account_id: models.StripeAccountId,
+        country: models.CountryCode,
+        metadata: models.Metadata,
+        request: models.CreatePayout,
+    ) -> models.Payout:
+        # we use 2016 stripe api create_transfer to payout to bank account, since in current version it requires
+        # external_account stripe_id which we did not save in our db
+        payout = stripe.Transfer.create(
+            currency=currency,
+            amount=amount,
+            stripe_version="2016-02-29",
+            country=country,
+            recipient="self",
+            statement_descriptor=statement_descriptor,
+            stripe_account_id=stripe_account_id,
+            metadata=metadata,
+            **request.dict(skip_defaults=True),
+        )
+        return payout
+
+    @tracing.track_breadcrumb(resource="payout", action="retrieve")
+    def retrieve_payout(
+        self, *, country: models.CountryCode, request: models.RetrievePayout
+    ) -> models.Payout:
+        payout = stripe.Payout.retrieve(
+            **self.settings_for(country), **request.dict(skip_defaults=True)
+        )
+        return payout
+
+    @tracing.track_breadcrumb(resource="payout", action="cancel")
+    def cancel_payout(
+        self, *, request: models.CancelPayout, country: models.CountryCode
+    ) -> models.Payout:
+        payout = stripe.Payout.cancel(
+            **self.settings_for(country), **request.dict(skip_defaults=True)
+        )
+        return payout
+
+    @tracing.track_breadcrumb(resource="balance", action="retrieve")
+    def retrieve_balance(
+        self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
+    ) -> models.Balance:
+        balance = stripe.Balance.retrieve(
+            stripe_account=stripe_account, **self.settings_for(country)
+        )
+        return balance
 
 
 class StripeTestClient(StripeClient):
@@ -604,3 +777,83 @@ class StripeClientPool(ThreadPoolHelper):
         self, request: models.UpdateStripeDispute
     ) -> models.StripeDisputeId:
         return await self.submit(self.client.update_stripe_dispute, request)
+
+    async def create_transfer(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        destination: models.Destination,
+        amount: models.Amount,
+        request: models.CreateTransfer,
+    ) -> models.Transfer:
+        return await self.submit(
+            self.client.create_transfer,
+            country=country,
+            currency=currency,
+            destination=destination,
+            amount=amount,
+            request=request,
+        )
+
+    async def create_payout(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        amount: models.Amount,
+        request: models.CreatePayout,
+    ) -> models.Payout:
+        return await self.submit(
+            self.client.create_payout,
+            currency=currency,
+            amount=amount,
+            country=country,
+            request=request,
+        )
+
+    async def create_transfer_for_payout(
+        self,
+        *,
+        currency: models.Currency,
+        amount: models.Amount,
+        statement_descriptor: models.StatementDescriptor,
+        stripe_account_id: models.StripeAccountId,
+        country: models.CountryCode,
+        metadata: models.Metadata,
+        request: models.CreatePayout,
+    ) -> models.Payout:
+        # we use 2016 stripe api create_transfer to payout to bank account, since in current venison it requires
+        # external_account stripe_id which we did not save in our db
+        return await self.submit(
+            self.client.create_transfer,
+            currency=currency,
+            amount=amount,
+            country=country,
+            recipient="self",
+            statement_descriptor=statement_descriptor,
+            stripe_account_id=stripe_account_id,
+            metadata=metadata,
+            request=request,
+        )
+
+    async def retrieve_payout(
+        self, *, request: models.RetrievePayout, country: models.CountryCode
+    ) -> models.Payout:
+        return await self.submit(
+            self.client.retrieve_payout, request=request, country=country
+        )
+
+    async def cancel_payout(
+        self, *, request: models.CancelPayout, country: models.CountryCode
+    ) -> models.Payout:
+        return await self.submit(
+            self.client.cancel_payout, request=request, country=country
+        )
+
+    async def retrieve_balance(
+        self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
+    ) -> models.Balance:
+        return await self.submit(
+            self.client.retrieve_balance, stripe_account=stripe_account, country=country
+        )

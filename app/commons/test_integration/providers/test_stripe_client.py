@@ -1,4 +1,6 @@
 import pytest
+from stripe.error import InvalidRequestError
+
 from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe.stripe_client import (
     StripeClient,
@@ -6,6 +8,7 @@ from app.commons.providers.stripe.stripe_client import (
     StripeClientPool,
 )
 from app.commons.providers.stripe import stripe_models as models
+from app.commons.types import CurrencyType
 
 pytestmark = [
     # mark all these tests as stripe tests
@@ -80,6 +83,68 @@ class TestStripeClient:
             ),
         )
         assert customer_id
+
+    def test_create_transfer(self, mode: str, stripe: StripeClient):
+        transfer = stripe.create_transfer(
+            country=models.CountryCode.US,
+            currency=models.Currency(CurrencyType.USD.value),
+            destination=models.Destination("acct_1A29cNCyrpkWaAxi"),
+            amount=models.Amount(200),
+            request=models.CreateTransfer(description="test description"),
+        )
+        assert transfer.destination == "acct_1A29cNCyrpkWaAxi"
+
+    def test_create_and_retrieve_payout(self, mode: str, stripe: StripeClient):
+        payout = stripe.create_payout(
+            country=models.CountryCode.US,
+            currency=models.Currency(CurrencyType.USD.value),
+            amount=models.Amount(2),
+            stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
+            request=models.CreatePayout(method="standard"),
+        )
+        assert payout.stripe_account == "acct_1FGdyOBOQHMRR5FG"
+        retrieved_payout = stripe.retrieve_payout(
+            country=models.CountryCode.US,
+            request=models.RetrievePayout(
+                stripe_account="acct_1FGdyOBOQHMRR5FG", id=payout.id
+            ),
+        )
+        assert retrieved_payout.stripe_account == "acct_1FGdyOBOQHMRR5FG"
+
+    def test_create_and_cancel_payout(self, mode: str, stripe: StripeClient):
+        payout = stripe.create_payout(
+            country=models.CountryCode.US,
+            currency=models.Currency(CurrencyType.USD.value),
+            amount=models.Amount(2),
+            stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
+            request=models.CreatePayout(method="standard"),
+        )
+        assert payout.stripe_account == "acct_1FGdyOBOQHMRR5FG"
+
+        try:
+            payout_cancelled = stripe.cancel_payout(
+                country=models.CountryCode.US,
+                request=models.CancelPayout(
+                    stripe_account="acct_1FGdyOBOQHMRR5FG", sid=payout.id
+                ),
+            )
+
+            # For testing against stripe_mock service locally, we should be able to cancel the payout
+            assert payout_cancelled
+        except InvalidRequestError as e:
+            # For testing against real stripe service with test api_key, we should get the InvalidRequestError
+            assert e.http_status == 400
+            assert (
+                e.json_body["error"]["message"]
+                == "Payouts can only be canceled while they are pending."
+            )
+
+    def test_retrieve_balance(self, mode: str, stripe: StripeClient):
+        balance = stripe.retrieve_balance(
+            country=models.CountryCode.US,
+            stripe_account=models.StripeAccountId("acct_1A29cNCyrpkWaAxi"),
+        )
+        assert balance.stripe_account == "acct_1A29cNCyrpkWaAxi"
 
 
 class TestStripePool:
