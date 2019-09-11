@@ -2,22 +2,12 @@ from typing import Union
 
 from app.commons.context.logger import Log
 from app.commons.core.errors import PaymentError, DEFAULT_INTERNAL_ERROR
-from app.commons.core.processor import (
-    AsyncOperation,
-    OperationRequest,
-    OperationResponse,
-)
-from app.payout.repository.maindb.model.payment_account import (
-    PaymentAccount,
-    PaymentAccountCreate,
-)
+from app.commons.core.processor import AsyncOperation, OperationRequest
+from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
-
-
-class CreatePayoutAccountResponse(OperationResponse):
-    payment_account: PaymentAccount
 
 
 class CreatePayoutAccountRequest(OperationRequest):
@@ -25,7 +15,7 @@ class CreatePayoutAccountRequest(OperationRequest):
 
 
 class CreatePayoutAccount(
-    AsyncOperation[CreatePayoutAccountRequest, CreatePayoutAccountResponse]
+    AsyncOperation[CreatePayoutAccountRequest, PayoutAccountInternal]
 ):
     """
     Processor to create a payout account
@@ -44,15 +34,15 @@ class CreatePayoutAccount(
         self.request = request
         self.payment_account_repo = payment_account_repo
 
-    async def _execute(self) -> CreatePayoutAccountResponse:
+    async def _execute(self) -> PayoutAccountInternal:
         payment_account_create = PaymentAccountCreate(**self.request.dict())
         payment_account = await self.payment_account_repo.create_payment_account(
             payment_account_create
         )
-        return CreatePayoutAccountResponse(payment_account=payment_account)
+        # todo: PAY-3566 implement the verification_requirements
+        return PayoutAccountInternal(payment_account=payment_account)
 
     def _handle_exception(
         self, dep_exec: BaseException
-    ) -> Union[PaymentError, CreatePayoutAccountResponse]:
-        # TODO write actual exception handling
+    ) -> Union[PaymentError, PayoutAccountInternal]:
         raise DEFAULT_INTERNAL_ERROR

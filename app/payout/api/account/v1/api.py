@@ -4,8 +4,10 @@ from starlette.status import (
     HTTP_201_CREATED,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
+from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentErrorResponseBody
+from app.commons.context.req_context import get_logger_from_req
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
 from app.payout.core.account.processors.create_instant_payout import (
@@ -14,6 +16,8 @@ from app.payout.core.account.processors.create_instant_payout import (
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
 )
+from app.payout.core.account.utils import to_external_payout_account
+from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
 from app.payout.service import create_payout_account_processors
 from app.payout.types import PayoutAccountStatementDescriptor, PayoutType
 from . import models
@@ -35,14 +39,16 @@ async def create_payout_account(
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
+    log: BoundLogger = Depends(get_logger_from_req),
 ):
 
+    log.debug(f"Creating payment_account for {body}.")
     internal_request = CreatePayoutAccountRequest(**body.dict())
     internal_response = await payout_account_processors.create_payout_account(
         internal_request
     )
-
-    return models.PayoutAccount(**internal_response.dict())
+    external_response = to_external_payout_account(internal_response)
+    return models.PayoutAccount(**external_response.dict())
 
 
 @router.get(
@@ -53,8 +59,17 @@ async def create_payout_account(
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
-async def get_payout_account(payout_account_id: models.PayoutAccountId):
-    ...
+async def get_payout_account(
+    payout_account_id: models.PayoutAccountId,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    internal_request = GetPayoutAccountRequest(payout_account_id=payout_account_id)
+    internal_response = await payout_account_processors.get_payout_account(
+        internal_request
+    )
+    return models.PayoutAccount(**internal_response.payment_account.dict())
 
 
 @router.patch(
@@ -129,7 +144,7 @@ async def create_payout(
     ),
 ):
     # The if-else check here is ok for now, since PayoutType only has "standard" and "instant"
-    if body.payout_type == PayoutType.Standard:
+    if body.payout_type == PayoutType.STANDARD:
         standard_payout_request = CreateStandardPayoutRequest(
             payout_account_id=payout_account_id,
             amount=body.amount,

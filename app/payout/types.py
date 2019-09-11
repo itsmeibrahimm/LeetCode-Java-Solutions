@@ -6,13 +6,8 @@ PayoutAccountToken = str
 PayoutAccountTargetId = int
 PayoutAccountStatementDescriptor = str
 
-
-class PayoutAccountTargetType(str, Enum):
-    Dasher = "dasher"
-    Store = "store"
-
-
-StripeManagedAccountId = int
+PgpAccountId = int
+PgpExternalAccountId = str
 
 StripeFileHandle = str
 
@@ -25,18 +20,27 @@ PayoutId = str
 PayoutAmountType = int
 
 
+class PayoutAccountTargetType(str, Enum):
+    DASHER = "dasher"
+    STORE = "store"
+
+
+class PgpAccountType(str, Enum):
+    STRIPE = "stripe_managed_account"
+
+
 class PayoutType(str, Enum):
-    Standard = "standard"
-    Instant = "instant"
+    STANDARD = "standard"
+    INSTANT = "instant"
 
 
 class PayoutMethodType(str, Enum):
-    Stripe = "stripe"
+    STRIPE = "stripe"
 
 
 class PayoutTargetType(str, Enum):
-    Dasher = "dasher"
-    Store = "store"
+    DASHER = "dasher"
+    STORE = "store"
 
 
 class StripePayoutStatus(str, Enum):

@@ -27,7 +27,7 @@ class CreateStandardPayoutResponse(OperationResponse):
 class CreateStandardPayoutRequest(OperationRequest):
     payout_account_id: PayoutAccountId
     amount: PayoutAmountType
-    payout_type: PayoutType = PayoutType.Standard
+    payout_type: PayoutType = PayoutType.STANDARD
     target_id: Optional[str] = None
     target_type: Optional[PayoutTargetType] = None
     transfer_id: Optional[str] = None

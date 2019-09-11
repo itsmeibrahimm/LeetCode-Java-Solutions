@@ -1,8 +1,6 @@
 import pydantic
 from typing import Optional
 
-from pydantic import Json
-
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, CurrencyType
 from app.payout.types import (
@@ -12,15 +10,18 @@ from app.payout.types import (
     PayoutMethodToken,
     PayoutAccountTargetType,
     PayoutAccountTargetId,
-    StripeManagedAccountId,
+    PgpAccountId,
     StripeFileHandle,
     PayoutAmountType,
     PayoutType,
     PayoutMethodType,
     PayoutTargetType,
+    PgpAccountType,
+    PgpExternalAccountId,
 )
+from app.payout.core.account.types import VerificationRequirements
 
-__all__ = ["PayoutAccountId", "PayoutAccountToken"]
+__all__ = ["PayoutAccountId", "PayoutAccount", "PayoutAccountToken"]
 
 
 class CreatePayoutAccount(PaymentRequest):
@@ -28,13 +29,16 @@ class CreatePayoutAccount(PaymentRequest):
     target_type: PayoutAccountTargetType
     country: CountryCode
     currency: CurrencyType
+    statement_descriptor: Optional[str]
 
 
 class PayoutAccount(PaymentResponse):
     id: PayoutAccountId
-    stripe_managed_account_id: StripeManagedAccountId
     statement_descriptor: str
-    verification_requirements: Json
+    pgp_account_type: Optional[PgpAccountType]
+    pgp_account_id: Optional[PgpAccountId]
+    pgp_external_account_id: Optional[PgpExternalAccountId]
+    verification_requirements: Optional[VerificationRequirements]
     # todo: add payout_methods, payout_schedule
 
 
@@ -82,7 +86,7 @@ class PayoutMethod(PaymentResponse):
 
 class PayoutRequest(PaymentRequest):
     amount: PayoutAmountType
-    payout_type: PayoutType = PayoutType.Standard
+    payout_type: PayoutType = PayoutType.STANDARD
     target_id: Optional[str] = None
     target_type: Optional[PayoutTargetType] = None
     transfer_id: Optional[str] = None

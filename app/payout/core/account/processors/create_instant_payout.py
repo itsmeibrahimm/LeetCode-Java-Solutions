@@ -30,7 +30,7 @@ class CreateInstantPayoutResponse(OperationResponse):
 class CreateInstantPayoutRequest(OperationRequest):
     payout_account_id: PayoutAccountId
     amount: PayoutAmountType
-    payout_type: PayoutType = PayoutType.Instant
+    payout_type: PayoutType = PayoutType.INSTANT
     payout_id: Optional[str] = None
     method: Optional[PayoutMethodType]
     submitted_by: Optional[str] = None

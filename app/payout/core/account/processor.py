@@ -1,7 +1,6 @@
 from app.commons.context.logger import Log
 from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
-    CreatePayoutAccountResponse,
     CreatePayoutAccount,
 )
 from app.payout.core.account.processors.create_standard_payout import (
@@ -13,6 +12,11 @@ from app.payout.core.account.processors.create_instant_payout import (
     CreateInstantPayoutRequest,
     CreateInstantPayoutResponse,
     CreateInstantPayout,
+)
+from app.payout.core.account.processors.get_account import (
+    GetPayoutAccountRequest,
+    PayoutAccountInternal,
+    GetPayoutAccount,
 )
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepositoryInterface,
@@ -45,13 +49,23 @@ class PayoutAccountProcessors:
 
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
-    ) -> CreatePayoutAccountResponse:
+    ) -> PayoutAccountInternal:
         create_account_op = CreatePayoutAccount(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
             request=request,
         )
         return await create_account_op.execute()
+
+    async def get_payout_account(
+        self, request: GetPayoutAccountRequest
+    ) -> PayoutAccountInternal:
+        get_account_op = GetPayoutAccount(
+            logger=self.logger,
+            payment_account_repo=self.payment_account_repo,
+            request=request,
+        )
+        return await get_account_op.execute()
 
     async def create_standard_payout(
         self, request: CreateStandardPayoutRequest

@@ -35,6 +35,8 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
         try:
             return await self._execute()
         except BaseException as internal_exec:
+            if isinstance(internal_exec, PaymentError):
+                raise
             self.logger.info(f"{__name__}: handling error={str(internal_exec)}")
             exec_or_result = self._handle_exception(internal_exec)
             if isinstance(exec_or_result, BaseException):

@@ -12,6 +12,7 @@ from app.payout.repository.maindb import (
 )
 
 __all__ = [
+    "create_payout_account_processors",
     "PayoutService",
     "PaymentAccountRepository",
     "PaymentAccountRepositoryInterface",
