@@ -9,6 +9,7 @@ from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
 )
+from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.model import CartPayment
@@ -117,6 +118,7 @@ async def create_cart_payment(
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
     },
     tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
 )
 async def update_cart_payment(
     cart_payment_id: UUID,

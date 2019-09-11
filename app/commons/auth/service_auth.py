@@ -14,8 +14,6 @@ class RouteAuthorizer:
         req_context: ReqContext = get_context_from_req(request)
         req_id = str(req_context.req_id)
         identity_client = app_context.identity_client
-        temp = await identity_client.verify_api_key_with_http(
+        await identity_client.verify_api_key_with_http(
             service_id=self.service_id, api_key=x_api_key, correlation_id=req_id
         )
-
-        req_context.log.info("Response: %s", temp)

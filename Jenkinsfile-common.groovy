@@ -146,13 +146,19 @@ def runCIcontainer(String serviceName, String sha, String releaseTag = null) {
   def dockerImageUrl = getDockerImageUrl()
   def imageTag = releaseTag ?: sha
   github.doClosureWithStatus({
-    sh """|#!/bin/bash
-          |set -eox
-          |docker rm ${serviceName}-ci || true
-          |make run-ci-container \\
-          |    CI_BASE_IMAGE="${dockerImageUrl}:${imageTag}" \\
-          |    CI_CONTAINER_NAME="${serviceName}-ci"
-          |""".stripMargin()
+  withCredentials([
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
+        string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS_URLENCODED', variable: 'ARTIFACTORY_PASSWORD'),
+        string(credentialsId: 'FURY_TOKEN', variable: 'FURY_TOKEN')
+      ]) {
+          sh """|#!/bin/bash
+                  |set -eox
+                  |docker rm ${serviceName}-ci || true
+                  |make run-ci-container \\
+                  |    CI_BASE_IMAGE="${dockerImageUrl}:${imageTag}" \\
+                  |    CI_CONTAINER_NAME="${serviceName}-ci"
+                  |""".stripMargin()
+      }
   }, gitUrl, sha, "Unit Tests", "${BUILD_URL}testReport")
 }
 

@@ -1,8 +1,10 @@
-from typing import Any, Callable, Dict, List, Mapping, Type, Union
+from typing import Any, Dict, Type, Union
 
-from fastapi import FastAPI, Header, routing as fastapi_routing
+from fastapi import FastAPI, Header
 from fastapi.params import Depends
 from pydantic import BaseModel
+from fastapi import routing as fastapi_routing, params
+from typing import Callable, List, Mapping, Sequence
 from starlette import routing as starlette_routing
 from starlette.status import (
     HTTP_422_UNPROCESSABLE_ENTITY,
@@ -40,11 +42,12 @@ def add_breadcrumb(scope: Scope, crumb: str):
 
 
 def group_routers(
-    routers: List[fastapi_routing.APIRouter]
+    routers: List[fastapi_routing.APIRouter],
+    dependencies: Sequence[params.Depends] = None,
 ) -> fastapi_routing.APIRouter:
     grouped_router = APIRouter()
     for router in routers:
-        grouped_router.include_router(router)
+        grouped_router.include_router(router=router, dependencies=dependencies)
 
     return grouped_router
 

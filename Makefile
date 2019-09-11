@@ -28,7 +28,7 @@ build:
 	.
 
 .PHONY: build-ci-container
-build-ci-container:
+build-ci-container: build
 	env \
 	CI_IMAGE_NAME="$(SERVICE_NAME):$(CI_TAG)" \
 	CI_BASE_IMAGE="$(CI_BASE_IMAGE)" \

@@ -4,8 +4,6 @@ from stripe.http_client import HTTPClient
 from typing import Optional, Any
 
 from app.commons import tracing
-from app.commons.utils.pool import ThreadPoolHelper
-from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import (
     TimedRequestsClient,
     set_default_http_client,

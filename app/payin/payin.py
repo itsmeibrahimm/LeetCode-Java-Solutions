@@ -8,6 +8,7 @@ from app.commons.routing import group_routers
 from app.commons.api.exceptions import register_payment_exception_handler
 from app.payin.api import cart_payment, payer, payment_method, webhook, dispute
 from app.middleware.doordash_metrics import ServiceMetricsMiddleware
+from app.payin.api.commando_mode import commando_route_dependency
 
 
 def create_payin_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -25,16 +26,15 @@ def create_payin_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
 
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
 
-    grouped_routers = group_routers(
-        [
-            cart_payment.v0.router,
-            dispute.v0.router,
-            payer.v0.router,
-            payment_method.v0.router,
-        ]
+    auto_commando_routers = group_routers(
+        [dispute.v0.router, payer.v0.router, payment_method.v0.router],
+        dependencies=[Depends(commando_route_dependency)],
     )
+    custom_commando_routers = group_routers([cart_payment.v0.router])
 
-    app_v0.include_router(grouped_routers, dependencies=[Depends(router_authorizer)])
+    all_routers = group_routers([auto_commando_routers, custom_commando_routers])
+
+    app_v0.include_router(all_routers, dependencies=[Depends(router_authorizer)])
 
     register_payment_exception_handler(app_v0)
 
@@ -56,17 +56,15 @@ def create_payin_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
 
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
 
-    grouped_routers = group_routers(
-        [
-            cart_payment.v1.router,
-            dispute.v1.router,
-            payer.v1.router,
-            payment_method.v1.router,
-            webhook.v1.router,
-        ]
+    auto_commando_routers = group_routers(
+        [dispute.v1.router, payer.v1.router, payment_method.v1.router],
+        dependencies=[Depends(commando_route_dependency)],
     )
+    custom_commando_routers = group_routers([cart_payment.v1.router, webhook.v1.router])
 
-    app_v1.include_router(grouped_routers, dependencies=[Depends(router_authorizer)])
+    all_routers = group_routers([auto_commando_routers, custom_commando_routers])
+
+    app_v1.include_router(all_routers, dependencies=[Depends(router_authorizer)])
 
     register_payment_exception_handler(app_v1)
 
