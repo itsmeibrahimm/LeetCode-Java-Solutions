@@ -1,4 +1,5 @@
 import pytest
+from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe.stripe_client import (
     StripeClient,
     StripeTestClient,
@@ -25,7 +26,7 @@ pytestmark = [
 
 class TestStripeClient:
     @pytest.fixture
-    def stripe(self, request, stripe_api):
+    def stripe(self, request, stripe_api, app_config: AppConfig):
         # allow external tests to directly call stripe
         if "external" in request.keywords:
             stripe_api.enable_outbound()
@@ -36,13 +37,13 @@ class TestStripeClient:
         return StripeClient(
             [
                 models.StripeClientSettings(
-                    api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ]
         )
 
     @pytest.fixture
-    def stripe_test(self, request, stripe_api):
+    def stripe_test(self, request, stripe_api, app_config: AppConfig):
         # allow external tests to directly call stripe
         if "external" in request.keywords:
             stripe_api.enable_outbound()
@@ -53,7 +54,7 @@ class TestStripeClient:
         return StripeTestClient(
             [
                 models.StripeClientSettings(
-                    api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ]
         )
@@ -88,7 +89,7 @@ class TestStripePool:
     ]
 
     @pytest.fixture
-    def stripe_pool(self, request, stripe_api):
+    def stripe_pool(self, request, stripe_api, app_config: AppConfig):
         # allow external tests to directly call stripe
         if "external" in request.keywords:
             stripe_api.enable_outbound()
@@ -100,7 +101,7 @@ class TestStripePool:
             max_workers=5,
             settings_list=[
                 models.StripeClientSettings(
-                    api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
         )

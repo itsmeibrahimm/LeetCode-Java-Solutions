@@ -164,14 +164,14 @@ class TestContextClassDecorator:
 
 class TestTimer:
     def test_sync(self):
-        with tracing.Timer() as timer:
+        with tracing.BaseTimer() as timer:
             time.sleep(0.125)
         assert timer.delta >= 0.125
         assert timer.delta_ms >= 125
 
     @pytest.mark.asyncio
     async def test_async(self):
-        with tracing.Timer() as timer:
+        with tracing.BaseTimer() as timer:
             await asyncio.sleep(0.125)
         assert timer.delta >= 0.125
         assert timer.delta_ms >= 125
@@ -189,34 +189,34 @@ class TestBreadcrumbs:
             tracing.Breadcrumb(not_valid=None)
 
     def test_validate_from_kwargs(self):
-        tracing.BreadcrumbTracker.validate_from_kwargs({})
-        tracing.BreadcrumbTracker.validate_from_kwargs({"valid": "country"})
+        tracing.BreadcrumbManager.validate_from_kwargs({})
+        tracing.BreadcrumbManager.validate_from_kwargs({"valid": "country"})
 
         with pytest.raises(ValueError, match=r"arg => field_does_not_exist"):
-            tracing.BreadcrumbTracker.validate_from_kwargs(
+            tracing.BreadcrumbManager.validate_from_kwargs(
                 {"arg": "field_does_not_exist"}
             )
 
     def test_from_kwargs(self):
         assert (
-            tracing.BreadcrumbTracker.breadcrumb_from_kwargs({}, {})
+            tracing.BreadcrumbManager.breadcrumb_from_kwargs({}, {})
             == tracing.Breadcrumb()
         ), "empty"
 
         assert (
-            tracing.BreadcrumbTracker.breadcrumb_from_kwargs(
+            tracing.BreadcrumbManager.breadcrumb_from_kwargs(
                 {"non-existent": "application_name"}, {}
             )
             == tracing.Breadcrumb()
         ), "non-existent field in kwargs"
 
-        assert tracing.BreadcrumbTracker.breadcrumb_from_kwargs(
+        assert tracing.BreadcrumbManager.breadcrumb_from_kwargs(
             {"appname": "application_name"}, {"appname": "blah"}
         ) == tracing.Breadcrumb(
             application_name="blah"
         ), "successfully mapped breadcrumb"
 
-        assert tracing.BreadcrumbTracker.breadcrumb_from_kwargs(
+        assert tracing.BreadcrumbManager.breadcrumb_from_kwargs(
             {"appname": "application_name", "reponame": "repository_name"},
             {"appname": "valid", "reponame": dict(invalid="value")},
         ) == tracing.Breadcrumb(

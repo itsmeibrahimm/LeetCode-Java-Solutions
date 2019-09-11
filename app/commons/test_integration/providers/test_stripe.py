@@ -1,6 +1,7 @@
 import pytest
 
 from typing import List
+from app.commons.config.app_config import AppConfig
 from app.commons.utils.testing import Stat
 from app.commons.providers.stripe import stripe_http_client
 from app.commons.providers.stripe import stripe_models as models
@@ -23,14 +24,14 @@ class TestStripePoolStats:
     ]
 
     @pytest.fixture
-    def stripe_pool(self, request, stripe_api):
+    def stripe_pool(self, request, stripe_api, app_config: AppConfig):
         stripe_api.enable_mock()
 
         pool = StripeClientPool(
             max_workers=5,
             settings_list=[
                 models.StripeClientSettings(
-                    api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
         )
@@ -58,5 +59,5 @@ class TestStripePoolStats:
             "country": "US",
             "resource": "customer",
             "action": "create",
-            # "status_code": "",  # not yet implemented
+            "status_code": "200",
         }

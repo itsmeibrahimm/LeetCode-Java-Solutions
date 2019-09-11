@@ -15,9 +15,10 @@ from typing import (
     Deque,
     Optional,
     Dict,
+    cast,
 )
 from collections import deque
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from pydantic.fields import Field
 
@@ -26,21 +27,17 @@ from app.commons.context.logger import root_logger as default_logger
 """
 Instrumentation for application metrics.
 
-- Trackers: instrument context managers for timing and other purposes
-- Timers: instantiated as context managers per-transaction
+- TrackingManagers are used to decorate classes, instances, methods, or functions.
+
+When called on classes or instances, they wrap the methods of the class with a context manager.
+
+- Trackers can be used to provide various tracking or timing functionality.
+
 """
 
 
-class NotSpecifiedType:
-    ...
-
-
-class TrackableType:
-    ...
-
-
-NotSpecified = NotSpecifiedType()
-Trackable = TrackableType()
+Unspecified = type("UnspecifiedType", (object,), {})()
+Trackable = type("TrackableType", (object,), {})()
 T = TypeVar("T")
 
 
@@ -122,8 +119,8 @@ def _remove_breadcrumb(crumbs: Deque[Breadcrumb]) -> Breadcrumb:
 
 def trackable(func):
     """
-    when using the class decorator variant of ContextVarDecorator,
-    mark the specified method as trackable
+    mark the specified method as trackable, so TrackingManager
+    will create trackers for these methods when used as a decorator
     """
     func.__trackable__ = Trackable
     return func
@@ -136,14 +133,19 @@ def is_trackable(func):
     return getattr(func, "__trackable__", None) is Trackable
 
 
-class Tracker(metaclass=abc.ABCMeta):
+TR = TypeVar("TR", bound=ContextManager)
+
+
+class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
     __trackable__ = Trackable
     only_trackable: bool
 
     def __init__(self, *, only_trackable=False):
         """
-        Tracking helper to manage context.
-        Can be used as a method decorator, class decorator
+        TrackingManagers are used to decorate classes, instances, methods, or functions.
+
+        When called on classes or instances, they wrap the methods with a context manager,
+        which can be used to provide various tracking or timing functionality.
 
         Keyword Arguments:
             only_trackable {bool} -- (when used as a class decorator) enable tracking
@@ -152,15 +154,21 @@ class Tracker(metaclass=abc.ABCMeta):
         """
         self.only_trackable = only_trackable
 
+    def process_tracker(self, tracker: TR):
+        """
+        callback receiving the tracker when it exits
+        """
+        ...
+
     @abc.abstractmethod
     def create_tracker(
         self,
-        obj: Any = NotSpecified,
+        obj: Any = Unspecified,
         *,
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> ContextManager:
+    ) -> TR:
         """
         Generate a tracker
         """
@@ -196,13 +204,59 @@ class Tracker(metaclass=abc.ABCMeta):
         # class or instance
         return func_or_class
 
+    def _sync_wrapper(self, *, obj=Unspecified, func, args, kwargs):
+        with ExitStack() as stack:
+            # NOTE: context manager exits are called in reverse order
+            tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
+            # process_tracker callback is the last thing called,
+            # will be called even if the exception is not suppressed
+            stack.callback(self.process_tracker, tracker)
+            # enter the context manager; __exit__ callback will be called
+            stack.enter_context(tracker)
+
+            # get and process the result; suppress any issues processing
+            result = func(*args, **kwargs)
+            try:
+                if isinstance(tracker, BaseTracker):
+                    tracker.process_result(result)
+            except Exception:
+                default_logger.warn(
+                    "exception occurred processing tracker", exc_info=True
+                )
+            finally:
+                return result
+
+    async def _async_wrapper(self, *, obj=Unspecified, func, args, kwargs):
+        with ExitStack() as stack:
+            # NOTE: context manager exits are called in reverse order
+            tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
+            # process_tracker callback is the last thing called,
+            # will be called even if the exception is not suppressed
+            stack.callback(self.process_tracker, tracker)
+            # enter the context manager; __exit__ callback will be called
+            stack.enter_context(tracker)
+
+            # get and process the result; suppress any issues processing
+            result = await func(*args, **kwargs)
+            try:
+                if isinstance(tracker, BaseTracker):
+                    tracker.process_result(result)
+            except Exception:
+                default_logger.warn(
+                    "exception occurred processing tracker", exc_info=True
+                )
+            finally:
+                return result
+
     def _decorate_class_method(self, func):
         if asyncio.iscoroutinefunction(func):
 
             @functools.wraps(func)
-            async def async_wrapper(obj, *args, **kwargs):
-                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
-                    return await func(obj, *args, **kwargs)
+            async def async_wrapper(*args, **kwargs):
+                obj = args[0]
+                return await self._async_wrapper(
+                    obj=obj, func=func, args=args, kwargs=kwargs
+                )
 
             async_wrapper.__trackable__ = Trackable
 
@@ -211,9 +265,9 @@ class Tracker(metaclass=abc.ABCMeta):
         else:
 
             @functools.wraps(func)
-            def sync_wrapper(obj, *args, **kwargs):
-                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
-                    return func(obj, *args, **kwargs)
+            def sync_wrapper(*args, **kwargs):
+                obj = args[0]
+                return self._sync_wrapper(obj=obj, func=func, args=args, kwargs=kwargs)
 
             sync_wrapper.__trackable__ = Trackable
 
@@ -224,9 +278,10 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                obj = getattr(func, "__self__", NotSpecified)
-                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
-                    return await func(*args, **kwargs)
+                obj = getattr(func, "__self__", Unspecified)
+                return await self._async_wrapper(
+                    obj=obj, func=func, args=args, kwargs=kwargs
+                )
 
             async_wrapper.__trackable__ = Trackable
 
@@ -236,9 +291,8 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
-                obj = getattr(func, "__self__", NotSpecified)
-                with self.create_tracker(obj, func=func, args=args, kwargs=kwargs):
-                    return func(*args, **kwargs)
+                obj = getattr(func, "__self__", Unspecified)
+                return self._sync_wrapper(obj=obj, func=func, args=args, kwargs=kwargs)
 
             sync_wrapper.__trackable__ = Trackable
 
@@ -249,8 +303,7 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with self.create_tracker(func=func, args=args, kwargs=kwargs):
-                    return await func(*args, **kwargs)
+                return await self._async_wrapper(func=func, args=args, kwargs=kwargs)
 
             async_wrapper.__trackable__ = Trackable
 
@@ -260,15 +313,14 @@ class Tracker(metaclass=abc.ABCMeta):
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
-                with self.create_tracker(func=func, args=args, kwargs=kwargs):
-                    return func(*args, **kwargs)
+                return self._sync_wrapper(func=func, args=args, kwargs=kwargs)
 
             sync_wrapper.__trackable__ = Trackable
 
             return sync_wrapper
 
 
-class BreadcrumbTracker(Tracker):
+class BreadcrumbManager(TrackingManager):
     breadcrumb: Breadcrumb
     from_kwargs: Dict[str, str]
 
@@ -282,7 +334,7 @@ class BreadcrumbTracker(Tracker):
         super().__init__(only_trackable=only_trackable)
         self.breadcrumb = breadcrumb
         self.from_kwargs = from_kwargs or {}
-        BreadcrumbTracker.validate_from_kwargs(self.from_kwargs)
+        BreadcrumbManager.validate_from_kwargs(self.from_kwargs)
 
     @staticmethod
     def validate_from_kwargs(from_kwargs: Dict[str, str]):
@@ -326,14 +378,14 @@ class BreadcrumbTracker(Tracker):
 
     def create_tracker(
         self,
-        obj=NotSpecified,
+        obj=Unspecified,
         *,
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
     ) -> ContextManager:
         initial_fields = self.breadcrumb
-        additional_fields = BreadcrumbTracker.breadcrumb_from_kwargs(
+        additional_fields = BreadcrumbManager.breadcrumb_from_kwargs(
             self.from_kwargs, kwargs
         )
         combined_fields = _merge_breadcrumbs(initial_fields, additional_fields)
@@ -386,12 +438,20 @@ def track_breadcrumb(
     if status_code is not None:
         kwargs["status_code"] = status_code
 
-    return BreadcrumbTracker(
+    return BreadcrumbManager(
         Breadcrumb(**kwargs), from_kwargs=from_kwargs, only_trackable=only_trackable
     )
 
 
-class Timer(ContextManager):
+class BaseTracker(ContextManager):
+    def process_result(self, result: Any):
+        """
+        callback receiving the result of the wrapped function call
+        """
+        ...
+
+
+class BaseTimer(BaseTracker):
     start_time: float = 0
     start_counter: float = 0
     end_counter: float = 0
@@ -427,30 +487,20 @@ class Timer(ContextManager):
         self.end_counter = time.perf_counter()
 
 
-class MetricTimer(Timer):
-    def __init__(self, send_metrics: Callable[["MetricTimer"], None]):
-        super().__init__()
-        self.send_metrics = send_metrics
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        super().__exit__(exc_type, exc_val, exc_tb)
-        self.send_metrics(self)
+TManager = TypeVar("TManager", bound="TimingManager")
+TTimer = TypeVar("TTimer", bound="BaseTimer")
+Processor = Callable[[TManager, TTimer], Any]
 
 
-TT = TypeVar("TT", bound="TimingTracker")
-Processor = Callable[[TT, T], None]
-
-
-class TimingTracker(Generic[T], Tracker):
+class TimingManager(Generic[TTimer], TrackingManager[TTimer]):
     send: bool
-    processors: List[Processor] = []
 
     def __init__(
-        self,
+        self: TManager,
         *,
         send=True,
         rate=1,
-        processors: List[Processor] = None,
+        processors: Optional[List[Processor]] = None,
         only_trackable=False,
     ):
         self.rate = rate
@@ -461,21 +511,21 @@ class TimingTracker(Generic[T], Tracker):
 
     def create_tracker(
         self,
-        obj=NotSpecified,
+        obj=Unspecified,
         *,
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> MetricTimer:
-        return MetricTimer(self.process_metrics)
+    ) -> TTimer:
+        return cast(TTimer, BaseTimer())
 
-    def process_metrics(self, timer: MetricTimer):
+    def process_tracker(self, timer: TTimer):
         if not self.send:
             return
 
         self.run_processors(self.processors, timer)
 
-    def run_processors(self, processors: List[Processor], timer: MetricTimer):
+    def run_processors(self: TManager, processors: List[Processor], timer: TTimer):
         for processor in processors:
             try:
                 processor(self, timer)
@@ -487,8 +537,8 @@ class TimingTracker(Generic[T], Tracker):
                 )
 
 
-def get_contextvar(variable: ContextVar[T], default=NotSpecified) -> T:
-    if default is NotSpecified:
+def get_contextvar(variable: ContextVar[T], default=Unspecified) -> T:
+    if default is Unspecified:
         return variable.get()
     return variable.get(default)
 

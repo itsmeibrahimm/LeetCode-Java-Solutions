@@ -24,4 +24,8 @@ def test_stripe_http_client(get_mock_statsd_events):
     assert len(events) == 1
     event = events[0]
     assert event.stat_name == "dd.pay.payment-service.io.stripe-lib.latency"
-    assert event.tags == {"country": "US", "status_code": "500"}
+    assert event.tags == {
+        "application_name": "myapp",
+        "country": "US",
+        "status_code": "500",
+    }

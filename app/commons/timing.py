@@ -1,9 +1,11 @@
 import contextlib
 import functools
 import sys
-from typing import Any, Callable, Tuple, Optional, List, Dict
+from typing import Any, Callable, Tuple, List, Dict
 from typing_extensions import Protocol, AsyncContextManager, runtime_checkable
 
+
+from requests import Response
 from app.commons import tracing
 from app.commons.stats import get_service_stats_client, get_request_logger
 from app.commons.context.logger import root_logger as default_logger
@@ -27,6 +29,8 @@ def _discover_caller(additional_ignores=None) -> Tuple[Any, str]:
         __name__,
         # tracing module
         "app.commons.tracing",
+        # context managers
+        "contextlib",
     ] + (additional_ignores or [])
     f = sys._getframe()
     name = f.f_globals.get("__name__") or "?"
@@ -49,14 +53,14 @@ class Logger(Protocol):
     log: structlog.BoundLoggerBase
 
 
-class DatabaseTimer(tracing.MetricTimer):
+class DatabaseTimer(tracing.BaseTimer):
     database: Database
     calling_module_name: str = ""
     calling_function_name: str = ""
     stack_frame: Any = None
 
-    def __init__(self, send_metrics, database: Database, additional_ignores=None):
-        super().__init__(send_metrics)
+    def __init__(self, database: Database, additional_ignores=None):
+        super().__init__()
         self.database = database
         self.additional_ignores = additional_ignores
 
@@ -70,14 +74,14 @@ class DatabaseTimer(tracing.MetricTimer):
 
 
 def track_query(func):
-    return DatabaseTimingTracker(message="query complete")(func)
+    return DatabaseTimingManager(message="query complete")(func)
 
 
 def track_transaction(func):
-    return TransactionTimingTracker(message="transaction complete")(func)
+    return TransactionTimingManager(message="transaction complete")(func)
 
 
-def log_query_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
+def log_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
     if not isinstance(timer.database, Database):
         return
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
@@ -106,7 +110,7 @@ def log_query_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
     )
 
 
-def log_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
+def log_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
     if not isinstance(timer.database, Database):
         return
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
@@ -134,8 +138,8 @@ def log_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTime
     )
 
 
-def stat_query_timing(
-    tracker: "DatabaseTimingTracker", timer: DatabaseTimer, *, query_type=""
+def _stat_query_timing(
+    tracker: "DatabaseTimingManager", timer: DatabaseTimer, *, query_type=""
 ):
     if not isinstance(timer.database, Database):
         return
@@ -171,20 +175,26 @@ def stat_query_timing(
     log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
-def stat_transaction_timing(tracker: "DatabaseTimingTracker", timer: DatabaseTimer):
-    return stat_query_timing(tracker, timer, query_type="transaction")
+def stat_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
+    _stat_query_timing(tracker, timer)
 
 
-class DatabaseTimingTracker(tracing.TimingTracker[DatabaseTimer]):
+def stat_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
+    _stat_query_timing(tracker, timer, query_type="transaction")
+
+
+class DatabaseTimingManager(tracing.TimingManager[DatabaseTimer]):
     """
     Tracker for database queries and transactions
     """
 
     message: str
+
     log: structlog.stdlib.BoundLogger
+    stats: ddstats.DoorStatsProxyMultiServer
+
     # database query processors
     processors = [log_query_timing, stat_query_timing]
-    stats: ddstats.DoorStatsProxyMultiServer
 
     def __init__(self, *, message: str):
         super().__init__()
@@ -192,44 +202,43 @@ class DatabaseTimingTracker(tracing.TimingTracker[DatabaseTimer]):
 
     def create_tracker(
         self,
-        obj=tracing.NotSpecified,
-        additional_ignores: Optional[List[str]] = None,
+        obj=tracing.Unspecified,
         *,
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
     ) -> DatabaseTimer:
-        additional_ignores = additional_ignores or ["app.commons.database"]
-        return DatabaseTimer(
-            self.process_metrics, database=obj, additional_ignores=additional_ignores
-        )
+        additional_ignores = ["app.commons.database"]
+        return DatabaseTimer(database=obj, additional_ignores=additional_ignores)
 
     def __call__(self, func_or_class):
         # NOTE: we assume that this is only called to decorate a class
         return self._decorate_class_method(func_or_class)
 
 
-class TransactionTimingTracker(DatabaseTimingTracker):
+class TransactionTimingManager(DatabaseTimingManager):
     # database transaction processors
     processors = [log_query_timing, stat_transaction_timing]
 
     def __call__(self, func):
         @functools.wraps(func)
-        def wrapper(obj: Database, *args, **kwargs):
+        def wrapper(*args, **kwargs):
+            obj: Database = args[0]
+            transaction_manager: AsyncContextManager = func(*args, **kwargs)
+
             # chain together a context managers
             @contextlib.asynccontextmanager
-            async def wrap_transaction(obj: Database, manager: AsyncContextManager):
+            async def wrapped_transaction():
                 async with contextlib.AsyncExitStack() as stack:
-                    # timing: start timing transaction
-                    tracker: DatabaseTimer = stack.enter_context(
-                        self.create_tracker(
-                            obj=obj,
-                            additional_ignores=["app.commons.database", "contextlib"],
-                            func=func,
-                            args=args,
-                            kwargs=kwargs,
-                        )
+                    # NOTE: context manager exits are called in reverse order
+                    tracker: DatabaseTimer = self.create_tracker(
+                        obj=obj, func=func, args=args, kwargs=kwargs
                     )
+                    # process_tracker callback is the last thing called,
+                    # will be called even if the exception is not suppressed
+                    stack.callback(self.process_tracker, tracker)
+                    # timing: start timing transaction
+                    stack.enter_context(tracker)
                     # tracing: set transaction name
                     stack.enter_context(
                         tracing.breadcrumb_as(
@@ -239,43 +248,82 @@ class TransactionTimingTracker(DatabaseTimingTracker):
                         )
                     )
                     # start transaction
-                    transaction = await stack.enter_async_context(manager)
+                    transaction = await stack.enter_async_context(transaction_manager)
                     yield transaction
 
-            transaction_manager = func(obj, *args, **kwargs)
-            return wrap_transaction(obj, transaction_manager)
+            return wrapped_transaction()
 
         return wrapper
 
 
-def log_request_timing(tracker: "ClientTimingTracker", timer: tracing.MetricTimer):
+class ClientTracker(tracing.BaseTimer):
+    status_code: str = ""
+    client_request_id: str = ""
+
+    def process_result(self, result: Response):
+        self.status_code = str(result.status_code)
+        # stripe returns their request id
+        self.client_request_id = result.headers.get("Request-Id", "")
+
+
+def log_request_timing(tracker: "ClientTimingManager", timer: ClientTracker):
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
 
     context = timer.breadcrumb.dict(
-        include={"provider_name", "action", "resource", "status_code", "country"},
+        include={
+            "application_name",
+            "provider_name",
+            "action",
+            "resource",
+            "status_code",
+            "country",
+        },
         skip_defaults=True,
     )
+    if timer.status_code:
+        context["status_code"] = timer.status_code
+    if timer.client_request_id:
+        context["client_request_id"] = timer.client_request_id
     log.info(
         "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
     )
 
 
-def stat_request_timing(tracker: "ClientTimingTracker", timer: tracing.MetricTimer):
+def stat_request_timing(tracker: "ClientTimingManager", timer: ClientTracker):
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
     stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
 
     stat_name = "io.stripe-lib.latency"
     tags = timer.breadcrumb.dict(
-        include={"provider_name", "action", "resource", "status_code", "country"},
+        include={
+            "application_name",
+            "provider_name",
+            "action",
+            "resource",
+            "status_code",
+            "country",
+        },
         skip_defaults=True,
     )
+    if timer.status_code:
+        tags["status_code"] = timer.status_code
     stats.timing(stat_name, timer.delta_ms, tags=tags)
     log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
-class ClientTimingTracker(tracing.TimingTracker[tracing.MetricTimer]):
+class ClientTimingManager(tracing.TimingManager[ClientTracker]):
     processors = [log_request_timing, stat_request_timing]
+
+    def create_tracker(
+        self,
+        obj=tracing.Unspecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
+    ):
+        return ClientTracker()
 
 
 def track_client_response(**kwargs):
-    return ClientTimingTracker(**kwargs)
+    return ClientTimingManager(**kwargs)

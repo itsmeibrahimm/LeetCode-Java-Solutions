@@ -6,7 +6,7 @@ from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
 from app.commons.context.logger import root_logger
-from app.commons.tracing import NotSpecified, contextvar_as, get_contextvar
+from app.commons.tracing import Unspecified, contextvar_as, get_contextvar
 from app.commons.config.app_config import StatsDConfig
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer, doorstats_global
 
@@ -24,11 +24,11 @@ set_service_stats_client = functools.partial(contextvar_as, SERVICE_STATS_CLIENT
 set_request_logger = functools.partial(contextvar_as, REQUEST_LOGGER)
 
 
-def get_service_stats_client(default=NotSpecified) -> DoorStatsProxyMultiServer:
+def get_service_stats_client(default=Unspecified) -> DoorStatsProxyMultiServer:
     return get_contextvar(SERVICE_STATS_CLIENT, default=default)
 
 
-def get_request_logger(default=NotSpecified) -> structlog.stdlib.BoundLogger:
+def get_request_logger(default=Unspecified) -> structlog.stdlib.BoundLogger:
     return get_contextvar(REQUEST_LOGGER, default=default)
 
 

@@ -4,6 +4,7 @@ import pytest
 import pytest_mock
 from starlette.testclient import TestClient
 
+from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.identity_client import StubbedIdentityClient
@@ -13,7 +14,7 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
-def client(mocker: pytest_mock.MockFixture):
+def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
     logger = mocker.Mock()
     payout_bankdb = mocker.Mock()
     payin_maindb = mocker.Mock()
@@ -35,7 +36,7 @@ def client(mocker: pytest_mock.MockFixture):
             max_workers=5,
             settings_list=[
                 models.StripeClientSettings(
-                    api_key="sk_test_4eC39HqLyjWDarjtT1zdp7dc", country="US"
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
         ),
