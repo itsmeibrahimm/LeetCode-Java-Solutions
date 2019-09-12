@@ -42,6 +42,7 @@ RUN apt-get update -y && \
   python-dev \
   procps \
   vim \
+  htop \
   curl && \
   python -m pip install --upgrade pip setuptools pipenv
 

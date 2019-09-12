@@ -71,47 +71,53 @@ class PayoutService(BaseService):
         self.dsj_client = self.app_context.dsj_client
 
 
+async def GetPayoutService(request: Request):
+    return PayoutService(request)
+
+
 def PaymentAccountRepository(
-    payout_service: PayoutService = Depends()
+    payout_service: PayoutService = Depends(GetPayoutService)
 ) -> payment_account.PaymentAccountRepositoryInterface:
     return payout_service.payment_accounts
 
 
 def TransferRepository(
-    payout_service: PayoutService = Depends()
+    payout_service: PayoutService = Depends(GetPayoutService)
 ) -> transfer.TransferRepository:
     return payout_service.transfers
 
 
 def PayoutRepository(
-    payout_service: PayoutService = Depends()
+    payout_service: PayoutService = Depends(GetPayoutService)
 ) -> payout.PayoutRepositoryInterface:
     return payout_service.payouts
 
 
 def StripePayoutRequestRepository(
-    payout_service: PayoutService = Depends()
+    payout_service: PayoutService = Depends(GetPayoutService)
 ) -> stripe_payout_request.StripePayoutRequestRepositoryInterface:
     return payout_service.stripe_payout_requests
 
 
 def StripeTransferRepository(
-    payout_service: PayoutService = Depends()
+    payout_service: PayoutService = Depends(GetPayoutService)
 ) -> stripe_transfer.StripeTransferRepositoryInterface:
     return payout_service.stripe_transfers
 
 
 def ManagedAccountTransferRepository(
-    payout_service: PayoutService = Depends()
+    payout_service: PayoutService = Depends(GetPayoutService)
 ) -> managed_account_transfer.ManagedAccountTransferRepositoryInterface:
     return payout_service.managed_account_transfers
 
 
-def DSJClientHandle(payout_service: PayoutService = Depends()):
+def DSJClientHandle(payout_service: PayoutService = Depends(GetPayoutService)):
     return payout_service.dsj_client
 
 
-def create_payout_account_processors(payout_service: PayoutService = Depends()):
+def create_payout_account_processors(
+    payout_service: PayoutService = Depends(GetPayoutService)
+):
     return PayoutAccountProcessors(
         logger=payout_service.log,
         payment_account_repo=payout_service.payment_accounts,

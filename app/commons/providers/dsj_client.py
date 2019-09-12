@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import aiohttp
 
 DEFAULT_HTTP_REQUEST_TIMEOUT = 10
+DEFAULT_CLIENT_DNS_CACHE = 300
 
 
 class DSJAuthException(Exception):
@@ -28,7 +29,13 @@ class DSJClient:
         "email": None,
         "password": None,
         "jwt_token_ttl": 0.0,
+        "timeout_sec": DEFAULT_HTTP_REQUEST_TIMEOUT,
     }
+
+    _timeout = aiohttp.ClientTimeout(total=client_config.get("timeout_sec"))
+    _connector = aiohttp.TCPConnector(
+        resolver=aiohttp.AsyncResolver(), ttl_dns_cache=DEFAULT_CLIENT_DNS_CACHE
+    )
 
     def __init__(self, client_config: Dict[str, Any]):
         self.client_config = client_config
@@ -85,12 +92,7 @@ class DSJClient:
         # return the token
         return self.auth_jwt_local_state["token"]
 
-    async def get(
-        self,
-        uri: str,
-        params: Dict[str, str],
-        timeout_sec: int = DEFAULT_HTTP_REQUEST_TIMEOUT,
-    ) -> Dict[str, Any]:
+    async def get(self, uri: str, params: Dict[str, str]) -> Dict[str, Any]:
         """
         DSJ REST get method (wrap around aiohttp get)
 
@@ -102,8 +104,9 @@ class DSJClient:
 
         token = await self.get_token()
         headers = {"Authorization": f"JWT {token}"}
-        timeout = aiohttp.ClientTimeout(total=timeout_sec)
-        async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+        async with aiohttp.ClientSession(
+            headers=headers, timeout=self._timeout, connector=self._connector
+        ) as session:
             async with session.get(self._dsj_uri(uri), params=params) as resp:
                 if resp.status != 200:
                     # TODO: provide specific HTTP error handlers
@@ -112,12 +115,7 @@ class DSJClient:
                     )
                 return await resp.json()
 
-    async def post(
-        self,
-        uri: str,
-        data: Dict[str, str],
-        timeout_sec: int = DEFAULT_HTTP_REQUEST_TIMEOUT,
-    ) -> Dict[str, Any]:
+    async def post(self, uri: str, data: Dict[str, str]) -> Dict[str, Any]:
         """
         DSJ REST post method (wrap around aiohttp post)
 
@@ -129,8 +127,10 @@ class DSJClient:
 
         token = await self.get_token()
         headers = {"Authorization": f"JWT {token}"}
-        timeout = aiohttp.ClientTimeout(total=timeout_sec)
-        async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+
+        async with aiohttp.ClientSession(
+            headers=headers, timeout=self._timeout, connector=self._connector
+        ) as session:
             async with session.post(self._dsj_uri(uri), data=data) as resp:
                 if resp.status != 200:
                     # TODO: provide specific HTTP error handlers
