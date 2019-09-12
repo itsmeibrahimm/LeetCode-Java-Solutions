@@ -368,6 +368,19 @@ class DisputeProcessor:
 
         return updated_dispute
 
+    def _get_distinct_dispute_list_by_charge_id(self, disputes_list):
+        # Returns distinct disputes based on stripe_charge_id and taking latest disputed_at as selection criteria
+        from collections import defaultdict
+
+        charge_id_group = defaultdict(list)
+        for dispute in disputes_list:
+            charge_id_group[dispute.stripe_charge_id].append(dispute)
+        distinct_dispute = []
+        for key, value in charge_id_group.items():
+            value.sort(key=lambda dispute: dispute.disputed_at, reverse=True)
+            distinct_dispute.append(value[0])
+        return distinct_dispute
+
     async def list_disputes(
         self,
         dd_payment_method_id: str = None,
@@ -418,17 +431,14 @@ class DisputeProcessor:
             start_time=start_time,
             reasons=reasons,
         )
-
-        count: int = 0
+        data: List[Dispute] = disputes_list
         if distinct:
-            count = len(set([dispute.stripe_charge_id for dispute in disputes_list]))
-        else:
-            count = len(disputes_list)
+            data = self._get_distinct_dispute_list_by_charge_id(disputes_list)
         return DisputeList(
-            count=count,
+            count=len(data),
             has_more=False,  # Currently default to False. Returning all the disputes for a query
-            total_amount=sum([dispute.amount for dispute in disputes_list]),
-            data=disputes_list,
+            total_amount=sum([dispute.amount for dispute in data]),
+            data=data,
         )
 
     async def get_dispute_charge_metadata(
