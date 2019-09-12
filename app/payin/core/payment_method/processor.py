@@ -378,9 +378,9 @@ class PaymentMethodProcessor:
         self,
         pgp_code: str,
         token: str,
-        payer_id: Optional[str],
-        dd_consumer_id: Optional[str],
-        stripe_customer_id: Optional[str],
+        payer_id: Optional[str] = None,
+        dd_consumer_id: Optional[str] = None,
+        stripe_customer_id: Optional[str] = None,
         country: Optional[CountryCode] = CountryCode.US,
     ) -> PaymentMethod:
         """

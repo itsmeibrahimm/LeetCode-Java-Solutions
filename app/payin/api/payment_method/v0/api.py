@@ -14,8 +14,11 @@ from starlette.status import (
     HTTP_404_NOT_FOUND,
     HTTP_400_BAD_REQUEST,
     HTTP_501_NOT_IMPLEMENTED,
+    HTTP_201_CREATED,
 )
 
+from app.commons.utils.types import PaymentProvider
+from app.payin.api.payment_method.v0.request import CreatePaymentMethodRequestV0
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
@@ -24,6 +27,73 @@ from app.payin.core.types import PaymentMethodIdType
 
 api_tags = ["PaymentMethodV0"]
 router = APIRouter()
+
+
+@router.post(
+    "/payment_methods",
+    response_model=PaymentMethod,
+    status_code=HTTP_201_CREATED,
+    operation_id="CreatePaymentMethod",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def create_payment_method(
+    request: Request,
+    req_body: CreatePaymentMethodRequestV0,
+    log: BoundLogger = Depends(get_logger_from_req),
+    payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
+):
+    """
+    Create a payment method for payer on DoorDash payments platform
+
+    - **token**: [string] Token from external PSP to collect sensitive card or bank account
+                 details, or personally identifiable information (PII), directly from your customers.
+    - **country**: [string] country code of DoorDash consumer
+    - **dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
+    - **stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
+    """
+    log.info(
+        "[create_payment_method] receive request. ",
+        dd_consumer_id=req_body.dd_consumer_id,
+        stripe_customer_id=req_body.stripe_customer_id,
+    )
+
+    try:
+        payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
+            pgp_code=PaymentProvider.STRIPE,
+            token=req_body.token,
+            dd_consumer_id=req_body.dd_consumer_id,
+            stripe_customer_id=req_body.stripe_customer_id,
+            country=req_body.country,
+        )
+        log.info(
+            f"[create_payment_method] completed.",
+            dd_consumer_id=req_body.dd_consumer_id,
+            stripe_customer_id=req_body.stripe_customer_id,
+        )
+    except PaymentError as e:
+        log.error(
+            f"[create_payment_method] PaymentError.",
+            dd_consumer_id=req_body.dd_consumer_id,
+            stripe_customer_id=req_body.stripe_customer_id,
+        )
+        if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
+            http_status = HTTP_400_BAD_REQUEST
+        elif e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value:
+            http_status = HTTP_404_NOT_FOUND
+        else:
+            http_status = HTTP_500_INTERNAL_SERVER_ERROR
+        raise PaymentException(
+            http_status_code=http_status,
+            error_code=e.error_code,
+            error_message=e.error_message,
+            retryable=e.retryable,
+        )
+    return payment_method
 
 
 @router.get(
