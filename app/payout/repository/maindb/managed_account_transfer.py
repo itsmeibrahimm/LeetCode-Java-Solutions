@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from typing_extensions import final
 
@@ -50,7 +50,7 @@ class ManagedAccountTransferRepository(
             managed_account_transfers.table.insert()
             .values(
                 data.dict(skip_defaults=True),
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
                 stripe_id="",
                 stripe_status="",
             )

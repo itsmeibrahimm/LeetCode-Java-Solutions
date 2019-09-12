@@ -93,9 +93,7 @@ async def prepare_and_insert_managed_account_transfer(
 
 
 async def prepare_and_insert_payout(
-    payout_repo: PayoutRepository,
-    timestamp=datetime.now(timezone.utc),
-    ide_key="stripe-payout-request-idempotency-key-001",
+    payout_repo: PayoutRepository, ide_key="stripe-payout-request-idempotency-key-001"
 ):
     data = PayoutCreate(
         amount=1000,
@@ -104,8 +102,6 @@ async def prepare_and_insert_payout(
         currency="USD",
         fee=199,
         type="instant",
-        created_at=timestamp,
-        updated_at=timestamp,
         idempotency_key=ide_key,
         payout_method_id=1,
         transaction_ids=[1, 2, 3],
@@ -115,6 +111,9 @@ async def prepare_and_insert_payout(
     )
 
     payout = await payout_repo.create_payout(data)
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=payout.dict()
+    )
     assert payout.id, "payout is created, assigned an ID"
     return payout
 
@@ -123,14 +122,11 @@ async def prepare_and_insert_stripe_payout_request(
     stripe_payout_request_repo: StripePayoutRequestRepository,
     payout_id,
     ide_key="stripe-payout-request-idempotency-key-001",
-    timestamp=datetime.now(timezone.utc),
 ):
     data = StripePayoutRequestCreate(
         payout_id=payout_id,
         idempotency_key=ide_key,
         payout_method_id=1,
-        created_at=timestamp,
-        updated_at=timestamp,
         status="failed",
         stripe_payout_id=f"stripe_tr_xxx_{payout_id}",
         stripe_account_id="cus_xxxx_1",
@@ -139,26 +135,25 @@ async def prepare_and_insert_stripe_payout_request(
         data
     )
     assert stripe_payout_request.id, "stripe payout request is created, assigned an ID"
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=stripe_payout_request.dict()
+    )
     assert (
         stripe_payout_request.stripe_payout_id
     ), "stripe payout request has stripe payout id"
     return stripe_payout_request
 
 
-async def prepare_and_insert_transaction(
-    transaction_repo: TransactionRepository, timestamp=datetime.now(timezone.utc)
-):
+async def prepare_and_insert_transaction(transaction_repo: TransactionRepository):
     data = TransactionCreate(
-        amount=1000,
-        payment_account_id=123,
-        amount_paid=800,
-        currency="USD",
-        created_at=timestamp,
-        updated_at=timestamp,
+        amount=1000, payment_account_id=123, amount_paid=800, currency="USD"
     )
 
     transaction = await transaction_repo.create_transaction(data)
     assert transaction.id, "transaction is created, assigned an ID"
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=transaction.dict()
+    )
     return transaction
 
 

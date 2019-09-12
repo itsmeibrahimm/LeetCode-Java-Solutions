@@ -29,6 +29,13 @@ class TestPaymentAccountRepository:
     def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
         return PaymentAccountRepository(database=payout_maindb)
 
+    async def test_create_payment_account(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+
     async def test_create_update_get_payment_account(
         self, payment_account_repo: PaymentAccountRepository
     ):
@@ -97,6 +104,13 @@ class TestPaymentAccountRepository:
             including_account_1_and_2.index(account_2_created) == 0
         ), "most recently created should be returned first"
         assert len(nothing) == 0
+
+    async def test_create_stripe_managed_account(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo
+        )
 
     async def test_create_update_get_stripe_managed_account(
         self, payment_account_repo: PaymentAccountRepository

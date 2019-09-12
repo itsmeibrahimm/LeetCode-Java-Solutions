@@ -23,6 +23,19 @@ class TestTransferRepository:
     def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
         return StripeTransferRepository(database=payout_maindb)
 
+    async def test_create_stripe_transfer(
+        self,
+        transfer_repo: TransferRepository,
+        stripe_transfer_repo: StripeTransferRepository,
+    ):
+        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+
+        await prepare_and_insert_stripe_transfer(
+            stripe_transfer_repo=stripe_transfer_repo,
+            transfer_id=transfer.id,
+            stripe_id=str(uuid.uuid4()),
+        )
+
     async def test_get_stripe_transfer_by_id_and_stripe_id(
         self,
         transfer_repo: TransferRepository,

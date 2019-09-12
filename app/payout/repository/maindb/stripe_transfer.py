@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
@@ -79,7 +79,9 @@ class StripeTransferRepository(
         # django will insert an empty string if some fields is required but not given as params
         stmt = (
             stripe_transfers.table.insert()
-            .values(data.dict(skip_defaults=True), created_at=datetime.utcnow())
+            .values(
+                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
+            )
             .returning(*stripe_transfers.table.columns.values())
         )
 

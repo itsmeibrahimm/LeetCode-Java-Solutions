@@ -19,6 +19,9 @@ class TestTransferRepository:
     def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
         return StripeTransferRepository(database=payout_maindb)
 
+    async def test_create_transfer(self, transfer_repo: TransferRepository):
+        await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+
     async def test_get_transfer(self, transfer_repo: TransferRepository):
         transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
         assert transfer == await transfer_repo.get_transfer_by_id(

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, List
 from typing_extensions import final
 
@@ -43,11 +43,10 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         super().__init__(_database=database)
 
     async def create_transaction(self, data: TransactionCreate) -> Transaction:
+        ts_now = datetime.utcnow()
         stmt = (
             transactions.table.insert()
-            .values(
-                data.dict(skip_defaults=True), created_at=datetime.now(timezone.utc)
-            )
+            .values(data.dict(skip_defaults=True), created_at=ts_now, updated_at=ts_now)
             .returning(*transactions.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)
@@ -65,7 +64,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         stmt = (
             transactions.table.update()
             .where(transactions.id == transaction_id)
-            .values(data.dict(skip_defaults=True))
+            .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
             .returning(*transactions.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)
@@ -77,7 +76,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         stmt = (
             transactions.table.update()
             .where(transactions.id.in_(transaction_ids))
-            .values(data.dict(skip_defaults=True))
+            .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
             .returning(*transactions.table.columns.values())
         )
         rows = await self._database.master().fetch_all(stmt)

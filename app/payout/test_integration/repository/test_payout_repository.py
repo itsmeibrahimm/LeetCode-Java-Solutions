@@ -14,9 +14,14 @@ class TestPayoutRepository:
     def payout_repo(self, payout_bankdb: DB) -> PayoutRepository:
         return PayoutRepository(database=payout_bankdb)
 
+    async def test_create_payout(self, payout_repo: PayoutRepository):
+        # prepare and insert payout, then validate
+        await prepare_and_insert_payout(payout_repo=payout_repo)
+
     async def test_create_get_payout(self, payout_repo: PayoutRepository):
         # prepare and insert payout, then validate
         payout = await prepare_and_insert_payout(payout_repo=payout_repo)
+
         assert payout == await payout_repo.get_payout_by_id(
             payout.id
         ), "retrieved payout matches"
@@ -24,15 +29,14 @@ class TestPayoutRepository:
     async def test_update_payout_by_id(self, payout_repo: PayoutRepository):
         # prepare and insert payout, then validate
         payout = await prepare_and_insert_payout(payout_repo=payout_repo)
+
         assert payout == await payout_repo.get_payout_by_id(
             payout.id
         ), "retrieved payout matches"
 
         timestamp = datetime.utcnow()
-        new_data = PayoutUpdate(status="OK", updated_at=timestamp)
+        new_data = PayoutUpdate(status="OK")
         updated = await payout_repo.update_payout_by_id(payout.id, new_data)
         assert updated, "updated"
         assert updated.status == "OK", "updated correctly"
-        assert (
-            updated.updated_at.timestamp() == timestamp.timestamp()
-        ), "updated correctly"
+        assert updated.updated_at >= timestamp, "updated correctly"

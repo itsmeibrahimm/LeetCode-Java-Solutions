@@ -1,5 +1,4 @@
 import pytest
-from datetime import datetime, timezone
 
 from app.commons.database.infra import DB
 from app.payout.repository.bankdb.model.transaction import TransactionUpdate
@@ -13,6 +12,9 @@ class TestTransactionRepository:
     @pytest.fixture
     def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
         return TransactionRepository(database=payout_bankdb)
+
+    async def test_create_transaction(self, transaction_repo: TransactionRepository):
+        await prepare_and_insert_transaction(transaction_repo=transaction_repo)
 
     async def test_create_get_transaction(
         self, transaction_repo: TransactionRepository
@@ -48,14 +50,12 @@ class TestTransactionRepository:
     async def test_set_transaction_payout_id_by_ids(
         self, transaction_repo: TransactionRepository
     ):
-        timestamp = datetime.now(timezone.utc)
         first_txn = await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo, timestamp=timestamp
+            transaction_repo=transaction_repo
         )
         second_txn = await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo, timestamp=timestamp
+            transaction_repo=transaction_repo
         )
-
         transaction_ids = [first_txn.id, second_txn.id]
         new_data = TransactionUpdate(payout_id=101)
 

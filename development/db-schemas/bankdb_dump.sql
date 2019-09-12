@@ -556,7 +556,7 @@ CREATE TABLE transactions (
     payment_account_id integer NOT NULL,
     transfer_id integer,
     amount_paid integer NOT NULL,
-    created_at timestamp with time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL,
     created_by_id integer,
     notes text,
     metadata text,
@@ -565,12 +565,11 @@ CREATE TABLE transactions (
     target_id integer,
     target_type text,
     state text,
-    updated_at timestamp with time zone NOT NULL,
+    updated_at timestamp without time zone default now(),
     dsj_id integer,
     payout_id integer,
     inserted_at timestamp with time zone
 );
-
 
 --
 -- Name: transactions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
