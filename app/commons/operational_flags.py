@@ -1,1 +1,1 @@
-COMMANDO_MODE_BOOLEAN = "ops/commando_mode.bool"
+STRIPE_COMMANDO_MODE_BOOLEAN = "ops/stripe_commando_mode.bool"

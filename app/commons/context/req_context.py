@@ -11,7 +11,7 @@ from app.commons.constants import (
     EXTERNAL_CORRELATION_ID_HEADER,
 )
 from app.commons.context.app_context import AppContext, get_context_from_app
-from app.commons.operational_flags import COMMANDO_MODE_BOOLEAN
+from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from app.commons.runtime import runtime
 
 
@@ -30,7 +30,7 @@ def set_context_for_req(request: Request) -> ReqContext:
     req_id = uuid4()
     correlation_id = request.headers.get(EXTERNAL_CORRELATION_ID_HEADER, None)
     log = app_context.log.bind(req_id=req_id, correlation_id=correlation_id)
-    commando_mode = runtime.get_bool(COMMANDO_MODE_BOOLEAN, False)
+    commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
 
     req_context = ReqContext(
         req_id=req_id,
@@ -53,7 +53,7 @@ def get_context_from_req(request: Request) -> ReqContext:
 
 def build_req_context(app_context: AppContext):
     req_id = uuid4()
-    commando_mode = runtime.get_bool(COMMANDO_MODE_BOOLEAN, False)
+    commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
     return ReqContext(
         req_id=req_id,
         log=app_context.log.bind(req_id=req_id),

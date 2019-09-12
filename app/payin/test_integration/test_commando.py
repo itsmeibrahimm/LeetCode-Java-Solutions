@@ -2,7 +2,7 @@ import uuid
 
 from requests.models import Response
 
-from app.commons.operational_flags import COMMANDO_MODE_BOOLEAN
+from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from starlette.testclient import TestClient
 
 from app.conftest import RuntimeSetter
@@ -13,7 +13,7 @@ class TestCommando:
     def test_commando_disables_unsupported_endpoints(
         self, runtime_setter: RuntimeSetter, client: TestClient
     ):
-        runtime_setter.set(COMMANDO_MODE_BOOLEAN, True)
+        runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, True)
         stripe_dispute_id = 1
         # router dependency
         url = f"payin/api/v0/disputes/{stripe_dispute_id}/submit"
@@ -34,7 +34,7 @@ class TestCommando:
         assert json_resp["error_message"] == payin_error_message_maps["payin_800"]
         assert json_resp["retryable"] is False
 
-        runtime_setter.set(COMMANDO_MODE_BOOLEAN, False)
+        runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, False)
 
         # router dependency
         url = f"payin/api/v0/disputes/{stripe_dispute_id}/submit"
