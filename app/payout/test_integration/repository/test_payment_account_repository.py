@@ -1,16 +1,18 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import cast
 
 import pytest
 
 from app.commons.database.infra import DB
+import uuid
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccountCreate,
     PaymentAccountUpdate,
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountUpdate,
+    StripeManagedAccountCreate,
 )
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.test_integration.utils import (
@@ -116,3 +118,58 @@ class TestPaymentAccountRepository:
         validate_expected_items_in_dict(
             expected=update_data.dict(skip_defaults=True), actual=updated_account.dict()
         )
+
+    async def test_get_last_stripe_managed_account_and_count_by_stripe_id(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        stripe_id = str(uuid.uuid4())
+
+        retrieved_sma, count = await payment_account_repo.get_last_stripe_managed_account_and_count_by_stripe_id(
+            stripe_id=stripe_id
+        )
+        assert retrieved_sma is None
+        assert count == 0
+
+        # prepare data
+        data_1 = StripeManagedAccountCreate(
+            stripe_id=stripe_id,
+            country_shortname="us",
+            stripe_last_updated_at=datetime.now(timezone.utc),
+            bank_account_last_updated_at=datetime.now(timezone.utc),
+            fingerprint="fingerprint",
+            default_bank_last_four="last4",
+            default_bank_name="bank",
+            verification_disabled_reason="no-reason",
+            verification_due_by=datetime.now(timezone.utc),
+            verification_fields_needed="a lot",
+        )
+
+        sma_1 = await payment_account_repo.create_stripe_managed_account(data_1)
+        retrieved_sma, count = await payment_account_repo.get_last_stripe_managed_account_and_count_by_stripe_id(
+            stripe_id=stripe_id
+        )
+        assert retrieved_sma == sma_1
+        assert count == 1
+
+        data_2 = StripeManagedAccountCreate(
+            stripe_id=stripe_id,
+            country_shortname="CA",
+            stripe_last_updated_at=datetime.now(timezone.utc),
+            bank_account_last_updated_at=datetime.now(timezone.utc),
+            fingerprint="fingerprint",
+            default_bank_last_four="last4",
+            default_bank_name="bank",
+            verification_disabled_reason="no-reason",
+            verification_due_by=datetime.now(timezone.utc),
+            verification_fields_needed="a lot",
+        )
+
+        sma_2 = await payment_account_repo.create_stripe_managed_account(data_2)
+        retrieved_sma, count = await payment_account_repo.get_last_stripe_managed_account_and_count_by_stripe_id(
+            stripe_id=stripe_id
+        )
+
+        assert retrieved_sma is not None
+        assert retrieved_sma.country_shortname == data_2.country_shortname
+        assert retrieved_sma == sma_2
+        assert count == 2

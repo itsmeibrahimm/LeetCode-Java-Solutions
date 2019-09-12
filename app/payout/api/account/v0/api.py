@@ -1,9 +1,11 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends
+from starlette.requests import Request
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
+from app.commons.context.req_context import get_logger_from_req
 from app.payout.api.account.v0.models import (
     PaymentAccount,
     PaymentAccountCreate,
@@ -103,6 +105,35 @@ async def update_payment_account_by_id(
         raise _payment_account_not_found()
 
     return PaymentAccount(**internal_account.dict())
+
+
+@router.get(
+    "/stripe/_get-by-stripe-id",
+    response_model=Optional[StripeManagedAccount],
+    status_code=HTTP_200_OK,
+    operation_id="GetStripeManagedAccountByStripeId",
+    tags=api_tags,
+)
+async def get_stripe_managed_account_by_stripe_id(
+    stripe_id: str,
+    request: Request,
+    repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
+):
+    internal_stripe_managed_account, count = await repository.get_last_stripe_managed_account_and_count_by_stripe_id(
+        stripe_id=stripe_id
+    )
+
+    if not internal_stripe_managed_account:
+        return None
+
+    if count > 1:
+        logger = get_logger_from_req(request)
+        logger.info(
+            "Found multiple StripeManagedAccounts with same stripe id",
+            stripe_id=stripe_id,
+        )
+
+    return StripeManagedAccount.from_db_model(internal_stripe_managed_account)
 
 
 @router.get(

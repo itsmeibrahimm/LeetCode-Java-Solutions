@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import and_, desc
 from typing_extensions import final
@@ -50,6 +50,12 @@ class PaymentAccountRepositoryInterface(ABC):
     async def get_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int
     ) -> Optional[StripeManagedAccount]:
+        pass
+
+    @abstractmethod
+    async def get_last_stripe_managed_account_and_count_by_stripe_id(
+        self, stripe_id: str
+    ) -> Tuple[Optional[StripeManagedAccount], int]:
         pass
 
     @abstractmethod
@@ -140,6 +146,22 @@ class PaymentAccountRepository(
 
         row = await self._database.replica().fetch_one(stmt)
         return StripeManagedAccount.from_row(row) if row else None
+
+    async def get_last_stripe_managed_account_and_count_by_stripe_id(
+        self, stripe_id: str
+    ) -> Tuple[Optional[StripeManagedAccount], int]:
+        stmt = (
+            stripe_managed_accounts.table.select()
+            .where(stripe_managed_accounts.stripe_id == stripe_id)
+            .order_by(desc(stripe_managed_accounts.id))
+        )
+        rows = await self._database.replica().execute(stmt)
+        last_row = await self._database.replica().fetch_one(stmt)
+
+        return (
+            StripeManagedAccount.from_row(last_row) if last_row else None,
+            rows.matched_row_count,
+        )
 
     async def create_stripe_managed_account(
         self, data: StripeManagedAccountCreate
