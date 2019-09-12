@@ -21,6 +21,7 @@ from app.ledger.ledger import create_ledger_app
 from app.commons.stats import init_global_statsd
 from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
 from app.middleware.req_context import ReqContextMiddleware
+from app.middleware.newrelic_metrics import NewRelicMetricsMiddleware
 from app.payin.payin import create_payin_v0_app, create_payin_v1_app
 from app.payout.payout import create_payout_v0_app, create_payout_v1_app
 
@@ -34,6 +35,7 @@ app = FastAPI(title="Payment Service", debug=config.DEBUG)
 
 # middleware needs to be added in reverse order due to:
 # https://github.com/encode/starlette/issues/479
+app.add_middleware(NewRelicMetricsMiddleware)
 app.add_middleware(
     DoorDashMetricsMiddleware,
     host=config.STATSD_SERVER,

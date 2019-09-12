@@ -1,4 +1,4 @@
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Type, Union, Optional
 
 from fastapi import FastAPI, Header
 from fastapi.params import Depends
@@ -21,6 +21,7 @@ of routes in the request path.
 
 Breadcrumbs = List[str]
 BREADCRUMB_SCOPE_KEY = "routing_breadcrumbs"
+RESOLVED_ROUTE_KEY = "routing_resolved_route"
 
 
 def reset_breadcrumbs(scope: Scope) -> Breadcrumbs:
@@ -39,6 +40,16 @@ def add_breadcrumb(scope: Scope, crumb: str):
         reset_breadcrumbs(scope)
     breadcrumbs: Breadcrumbs = scope[BREADCRUMB_SCOPE_KEY]
     breadcrumbs.append(crumb)
+
+
+def set_resolved_route(scope: Scope, route: "APIRoute"):
+    scope[RESOLVED_ROUTE_KEY] = route
+
+
+def get_resolved_route(
+    scope: Scope, default: Optional["APIRoute"] = None
+) -> Optional["APIRoute"]:
+    return scope.get(RESOLVED_ROUTE_KEY, default)
 
 
 def group_routers(
@@ -78,6 +89,7 @@ class APIRoute(fastapi_routing.APIRoute):
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         # for routers (included nested routers), they get merged together
         add_breadcrumb(scope, f"/{self.name}")
+        set_resolved_route(scope, self)
         await super().__call__(scope, receive, send)
 
 
