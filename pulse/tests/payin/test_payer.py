@@ -1,10 +1,12 @@
 import logging
 
 import pytest
-from payin_client import ApiException
+from payin_v0_client import (
+    ApiException,
+)  # use the ApiException of same version client whose ApiClient has been used
 
 from .utils import StripeUtil, PaymentUtil
-from . import payer_v1_client, payment_method_v1_client
+from . import payer_v0_client, payer_v1_client, payment_method_v1_client
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ def test_create_and_get_payer_with_non_numeric_id():
 )
 def test_create_and_get_with_stripe_customer_id():
     new_stripe_customer = StripeUtil.create_stripe_customer()
-    retrieved_payer = payer_v1_client.get_payer_with_http_info(
+    retrieved_payer = payer_v0_client.get_payer_with_http_info(
         payer_id=new_stripe_customer["id"],
         payer_id_type="stripe_customer_id",
         force_update=True,
@@ -56,7 +58,7 @@ def test_create_and_get_with_stripe_customer_serial_id():
     stripe_customer_serial_id = StripeUtil.get_stripe_customer_serial_id(
         new_stripe_customer["id"]
     )
-    retrieved_payer = payer_v1_client.get_payer_with_http_info(
+    retrieved_payer = payer_v0_client.get_payer_with_http_info(
         payer_id=stripe_customer_serial_id,
         payer_id_type="stripe_customer_serial_id",
         force_update=True,
@@ -156,10 +158,13 @@ def test_update_payer_with_payer_id():
 )
 def test_update_payer_with_stripe_customer_id():
     new_stripe_customer = StripeUtil.create_stripe_customer()
+    # todo - create a new payment_method with v0 client for legacy fields
     new_payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request=PaymentUtil.get_payment_method_info(
-            {"id": new_stripe_customer["id"]}
-        )
+        create_payment_method_request={
+            "payer_id": new_stripe_customer["id"],
+            "payment_gateway": "stripe",
+            "token": "tok_visa",
+        }
     )
     assert new_payment_method[1] == 201
     update_payment_method = payer_v1_client.update_payer_with_http_info(
@@ -196,10 +201,13 @@ def test_update_payer_with_stripe_customer_serial_id():
     stripe_customer_serial_id = StripeUtil.get_stripe_customer_serial_id(
         new_stripe_customer["id"]
     )
+    # todo - create a new payment_method with v0 client for legacy fields
     new_payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request=PaymentUtil.get_payment_method_info(
-            {"id": stripe_customer_serial_id}
-        )
+        create_payment_method_request={
+            "payer_id": stripe_customer_serial_id,
+            "payment_gateway": "stripe",
+            "token": "tok_visa",
+        }
     )
     assert new_payment_method[1] == 201
     update_payment_method = payer_v1_client.update_payer_with_http_info(

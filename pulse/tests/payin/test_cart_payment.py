@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from payin_client import ApiException
+from payin_v0_client import ApiException
 
 from tests.payin import cart_payment_v1_client, payment_method_v1_client
 from tests.payin.utils import PaymentUtil
