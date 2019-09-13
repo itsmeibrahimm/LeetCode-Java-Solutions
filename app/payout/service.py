@@ -3,7 +3,11 @@ from starlette.requests import Request
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
-from app.payout.repository.bankdb import payout, stripe_payout_request
+from app.payout.repository.bankdb import (
+    payout,
+    stripe_payout_request,
+    stripe_managed_account_transfer,
+)
 from app.payout.repository.maindb import (
     payment_account,
     stripe_transfer,
@@ -24,6 +28,8 @@ __all__ = [
     "StripePayoutRequestRepositoryInterface",
     "ManagedAccountTransferRepository",
     "ManagedAccountTransferRepositoryInterface",
+    "StripeManagedAccountTransferRepository",
+    "StripeManagedAccountTransferRepositoryInterface",
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
@@ -31,6 +37,9 @@ TransferRepositoryInterface = transfer.TransferRepositoryInterface
 PayoutRepositoryInterface = payout.PayoutRepositoryInterface
 StripePayoutRequestRepositoryInterface = (
     stripe_payout_request.StripePayoutRequestRepositoryInterface
+)
+StripeManagedAccountTransferRepositoryInterface = (
+    stripe_managed_account_transfer.StripeManagedAccountTransferRepositoryInterface
 )
 StripeTransferRepositoryInterface = stripe_transfer.StripeTransferRepositoryInterface
 ManagedAccountTransferRepositoryInterface = (
@@ -44,6 +53,7 @@ class PayoutService(BaseService):
     transfers: transfer.TransferRepository
     payouts: payout.PayoutRepository
     stripe_payout_requests: stripe_payout_request.StripePayoutRequestRepository
+    striped_managed_account_transfers: stripe_managed_account_transfer.StripeManagedAccountTransferRepository
     stripe_transfers: stripe_transfer.StripeTransferRepository
     managed_account_transfers: managed_account_transfer.ManagedAccountTransferRepository
     dsj_client: DSJClient
@@ -64,6 +74,9 @@ class PayoutService(BaseService):
         bankdb = self.app_context.payout_bankdb
         self.payouts = payout.PayoutRepository(bankdb)
         self.stripe_payout_requests = stripe_payout_request.StripePayoutRequestRepository(
+            bankdb
+        )
+        self.striped_managed_account_transfers = stripe_managed_account_transfer.StripeManagedAccountTransferRepository(
             bankdb
         )
 
@@ -93,6 +106,12 @@ def StripePayoutRequestRepository(
     payout_service: PayoutService = Depends()
 ) -> stripe_payout_request.StripePayoutRequestRepositoryInterface:
     return payout_service.stripe_payout_requests
+
+
+def StripeManagedAccountTransferRepository(
+    payout_service: PayoutService = Depends()
+) -> stripe_managed_account_transfer.StripeManagedAccountTransferRepositoryInterface:
+    return payout_service.striped_managed_account_transfers
 
 
 def StripeTransferRepository(

@@ -4,12 +4,18 @@ from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestCreate,
 )
+from app.payout.repository.bankdb.model.stripe_managed_account_transfer import (
+    StripeManagedAccountTransferCreate,
+)
 from app.payout.repository.bankdb.model.transaction import TransactionCreate
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepository,
 )
 from app.payout.repository.bankdb.transaction import TransactionRepository
+from app.payout.repository.bankdb.stripe_managed_account_transfer import (
+    StripeManagedAccountTransferRepository,
+)
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepository,
 )
@@ -19,6 +25,7 @@ from app.payout.repository.maindb.model.managed_account_transfer import (
 from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountCreate,
+    StripeManagedAccount,
 )
 from app.payout.repository.maindb.model.stripe_transfer import StripeTransferCreate
 from app.payout.repository.maindb.model.transfer import TransferCreate
@@ -26,6 +33,7 @@ from app.payout.repository.maindb.payment_account import PaymentAccountRepositor
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.testcase_utils import validate_expected_items_in_dict
+import uuid
 
 """
 For tables in maindb, it has timezone info, when initialize datetime fields in those tables, use datetiem.now(timezone.utc)
@@ -242,3 +250,25 @@ async def prepare_and_insert_stripe_managed_account(
         expected=data.dict(skip_defaults=True), actual=sma.dict()
     )
     return sma
+
+
+async def prepare_and_insert_stripe_managed_account_transfer(
+    sma: StripeManagedAccount,
+    stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepository,
+):
+    data = StripeManagedAccountTransferCreate(
+        amount=100,
+        from_stripe_account_id="dd_sma",
+        to_stripe_account_id=sma.stripe_id,
+        token=str(uuid.uuid4()),
+    )
+
+    sma_transfer = await stripe_managed_account_transfer_repo.create_stripe_managed_account_transfer(
+        data
+    )
+    assert sma_transfer.id, "stripe managed account transfer is created, assigned an ID"
+
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=sma_transfer.dict()
+    )
+    return sma_transfer
