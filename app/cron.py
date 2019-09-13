@@ -4,81 +4,79 @@ import signal
 
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from doordash_python_stats.ddstats import doorstats_global
 
-from app.commons import timing
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
+from app.commons.jobs.pool import monitor_pools, JobPool
 from app.commons.stats import init_global_statsd
 from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
 )
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
-config = init_app_config()
-if config.SENTRY_CONFIG:
+app_config = init_app_config()
+
+if app_config.SENTRY_CONFIG:
     sentry_sdk.init(
-        dsn=config.SENTRY_CONFIG.dsn.value,
-        environment=config.SENTRY_CONFIG.environment,
-        release=config.SENTRY_CONFIG.release,
+        dsn=app_config.SENTRY_CONFIG.dsn.value,
+        environment=app_config.SENTRY_CONFIG.environment,
+        release=app_config.SENTRY_CONFIG.release,
     )
 
 # set up global statsd
 init_global_statsd(
-    prefix=config.GLOBAL_STATSD_PREFIX,
-    host=config.STATSD_SERVER,
-    fixed_tags={"env": config.ENVIRONMENT},
+    prefix=app_config.GLOBAL_STATSD_PREFIX,
+    host=app_config.STATSD_SERVER,
+    fixed_tags={"env": app_config.ENVIRONMENT},
 )
 
 logger = get_logger("cron")
 
 
-def run_scheduler():
-    scheduler = AsyncIOScheduler()
-    loop = asyncio.get_event_loop()
-    context_coroutine = create_app_context(config)
-    app_context = loop.run_until_complete(context_coroutine)
-    cart_payment_repo = CartPaymentRepository(app_context)
+scheduler = AsyncIOScheduler()
+loop = asyncio.get_event_loop()
+app_context = loop.run_until_complete(create_app_context(app_config))
 
-    scheduler.add_job(
-        capture_uncaptured_payment_intents,
-        "cron",
-        minute="*/5",
-        kwargs={"app_context": app_context, "cart_payment_repo": cart_payment_repo},
-    )
-
-    scheduler.add_job(
-        resolve_capturing_payment_intents,
-        "cron",
-        minute="*/5",
-        kwargs={"app_context": app_context, "cart_payment_repo": cart_payment_repo},
-    )
-
-    @timing.track_func
-    async def test_job():
-        logger.info("ENTERING")
-        await asyncio.sleep(2)
-        logger.info("EXITING")
-
-    scheduler.add_job(test_job, "cron", second="*/5")
-
-    scheduler.start()
-
-    async def shutdown():
-        print("Received scheduler shutdown request")
-        scheduler.shutdown()
-        loop.stop()
-        print("Done shutting down!")
-
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(shutdown()))
-
-    print("Press Ctrl+{0} to exit".format("Break" if os.name == "nt" else "C"))
-
-    # Execution will block here until Ctrl+C (Ctrl+Break on Windows) is pressed.
-
-    loop.run_forever()
+stripe_pool = JobPool.create_pool(size=10, name="stripe")
 
 
-if __name__ == "__main__":
-    run_scheduler()
+scheduler.add_job(
+    capture_uncaptured_payment_intents,
+    trigger="cron",
+    minute="*/5",
+    kwargs={"app_context": app_context, "job_pool": stripe_pool},
+)
+
+scheduler.add_job(
+    resolve_capturing_payment_intents,
+    trigger="cron",
+    minute="*/5",
+    kwargs={"app_context": app_context, "job_pool": stripe_pool},
+)
+
+scheduler.add_job(
+    monitor_pools,
+    trigger="cron",
+    second="*/30",
+    kwargs={"statsd_client": doorstats_global},
+)
+
+scheduler.start()
+
+
+async def handle_shutdown():
+    logger.info("Received scheduler shutdown request")
+    scheduler.shutdown()
+    count, _results = await stripe_pool.cancel()
+    logger.info("Cancelled stripe pool", count=count)
+    loop.stop()
+    logger("Done shutting down!")
+
+
+loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(handle_shutdown()))
+
+print("Press Ctrl+{0} to exit".format("Break" if os.name == "nt" else "C"))
+
+loop.run_forever()

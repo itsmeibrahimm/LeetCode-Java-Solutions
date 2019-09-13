@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, AsyncIterator
 from uuid import UUID
 
 from IPython.utils.tz import utcnow
@@ -8,6 +8,7 @@ from sqlalchemy import and_
 from typing_extensions import final
 
 from app.commons import tracing
+from app.commons.database.query import paged_query
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CartMetadata,
@@ -122,20 +123,23 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def find_payment_intents_that_require_capture(
         self, cutoff: datetime
-    ) -> List[PaymentIntent]:
+    ) -> AsyncIterator[PaymentIntent]:
         """
 
         :param cutoff: The date after which capture_after should be
         :return:
         """
-        statement = payment_intents.table.select().where(
+        query = payment_intents.table.select().where(
             and_(
                 payment_intents.status == IntentStatus.REQUIRES_CAPTURE,
                 payment_intents.capture_after >= cutoff,
             )
         )
-        results = await self.payment_database.replica().fetch_all(statement)
-        return [self.to_payment_intent(row) for row in results]
+
+        async for result in paged_query(
+            self.payment_database.replica(), query, payment_intents.id
+        ):
+            yield self.to_payment_intent(result)
 
     async def find_payment_intents_in_capturing(
         self, older_than: datetime

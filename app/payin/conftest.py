@@ -20,6 +20,7 @@ from app.payin.core.cart_payment.types import (
 )
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
+from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
 
@@ -56,10 +57,16 @@ async def payment_intent(
         legacy_provider_card_id="stripe_card_id",
     )
 
+    payment_method_processor = PaymentMethodProcessor()
+    payment_method = await payment_method_processor.create_payment_method(
+        pgp_code=PaymentProvider.STRIPE.value, token="tok_visa", payer_id=str(payer.id)
+    )
+
     payment_intent = PaymentIntentFactory(
-        status=IntentStatus.REQUIRES_CAPTURE.value
+        status=IntentStatus.REQUIRES_CAPTURE.value, payment_method_id=payment_method.id
     )  # type: PaymentIntent
-    payment_intent = await cart_payment_repository.insert_payment_intent(
+
+    return await cart_payment_repository.insert_payment_intent(
         id=payment_intent.id,
         cart_payment_id=cart_payment.id,
         idempotency_key=payment_intent.idempotency_key,
@@ -72,7 +79,7 @@ async def payment_intent(
         confirmation_method=payment_intent.confirmation_method,
         status=payment_intent.status,
         statement_descriptor=payment_intent.statement_descriptor,
-        capture_after=None,
+        capture_after=datetime(2016, 1, 1),
         payment_method_id=payment_intent.payment_method_id,
     )
 
@@ -98,7 +105,7 @@ class PaymentIntentFactory(factory.Factory):
     currency = CurrencyType.USD
     status = IntentStatus.INIT
     statement_descriptor = "Maccas"
-    payment_method_id = uuid4()
+    payment_method_id = factory.LazyAttribute(lambda o: str(uuid4()))
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)
     captured_at = None
@@ -111,13 +118,20 @@ class CartPaymentFactory(factory.Factory):
 
     id = factory.LazyAttribute(lambda o: uuid4())
     amount = 100
-    payer_id = 1
+    payer_id = factory.LazyAttribute(lambda o: uuid4())
     payment_method_id = None
     capture_method = None
     client_description = "Maccas Order"
     metadata = CartMetadata(
         reference_id="1", reference_type="2", type=CartType.ORDER_CART
     )
+    delay_capture = True
+    cart_metadata = {
+        "reference_id": 1,
+        "reference_ct_id": 2,
+        "reference_type": "OrderCart",
+        "type": "Drive",
+    }
 
 
 class PayerFactory(factory.Factory):

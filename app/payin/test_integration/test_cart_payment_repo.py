@@ -128,7 +128,7 @@ async def payment_intent(
         confirmation_method=ConfirmationMethod.MANUAL,
         status=IntentStatus.REQUIRES_CAPTURE,
         statement_descriptor=None,
-        capture_after=None,
+        capture_after=datetime(2019, 1, 1),
         payment_method_id=payment_method.id,
     )
     yield payment_intent
@@ -248,6 +248,7 @@ class TestPaymentIntent:
             updated_at=result.updated_at,  # Don't know generated date ahead of time
             captured_at=payment_intent.captured_at,
             cancelled_at=payment_intent.cancelled_at,
+            capture_after=payment_intent.capture_after,
         )
         assert result == expected_result
 
@@ -911,3 +912,17 @@ class TestLegacyCharges:
             stripe_charge_id=stripe_charge.stripe_id
         )
         assert result == stripe_charge
+
+
+class TestFindPaymentIntentsThatRequireCapture:
+    @pytest.mark.asyncio
+    async def test_returns_batches(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        results = cart_payment_repository.find_payment_intents_that_require_capture(
+            cutoff=datetime(2016, 1, 1)
+        )
+        ids = [i.id async for i in results]
+        assert payment_intent.id in ids
