@@ -8,7 +8,11 @@ from structlog.stdlib import BoundLogger
 
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
-from app.commons.context.req_context import get_logger_from_req
+from app.commons.context.req_context import (
+    get_logger_from_req,
+    get_stripe_async_client_from_req,
+)
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payin.core.dispute.model import (
     Dispute,
     DisputeList,
@@ -57,6 +61,9 @@ class DisputeClient:
         dispute_repo: DisputeRepository = Depends(DisputeRepository.get_repository),
         payer_client: PayerClient = Depends(PayerClient),
         payment_method_client: PaymentMethodClient = Depends(PaymentMethodClient),
+        stripe_async_client: StripeAsyncClient = Depends(
+            get_stripe_async_client_from_req
+        ),
     ):
         self.app_ctxt = app_ctxt
         self.log = log
@@ -64,6 +71,7 @@ class DisputeClient:
         self.payer_client = payer_client
         self.payment_method_client = payment_method_client
         self.VALID_REASONS = [key.value for key in ReasonType]
+        self.stripe_async_client = stripe_async_client
 
     async def get_raw_dispute(
         self, dispute_id: str, dispute_id_type: DisputeIdType
@@ -91,7 +99,9 @@ class DisputeClient:
     async def pgp_submit_dispute_evidence(self, dispute_id: str, evidence: Evidence):
         try:
             request = UpdateStripeDispute(sid=dispute_id, evidence=evidence)
-            response = await self.app_ctxt.stripe.update_stripe_dispute(request=request)
+            response = await self.stripe_async_client.update_stripe_dispute(
+                request=request
+            )
         except StripeError as e:
             self.log.error(f"Error updating the stripe dispute: {e}")
             raise DisputeUpdateError(

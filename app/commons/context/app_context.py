@@ -17,8 +17,10 @@ from app.commons.providers.identity_client import (
     IdentityClient,
     StubbedIdentityClient,
 )
-from app.commons.providers.stripe.stripe_client import StripeClientPool
+from app.commons.providers.stripe.stripe_client import StripeClient
+from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
+from app.commons.utils.pool import ThreadPoolHelper
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,9 @@ class AppContext:
     ledger_maindb: DB
     ledger_paymentdb: DB
 
-    stripe: StripeClientPool
+    stripe_thread_pool: ThreadPoolHelper
+
+    stripe_client: StripeClient
 
     dsj_client: DSJClient
 
@@ -53,7 +57,7 @@ class AppContext:
             )
         finally:
             # shutdown the threadpool
-            self.stripe.shutdown(wait=False)
+            self.stripe_thread_pool.shutdown(wait=False)
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
@@ -121,13 +125,18 @@ async def create_app_context(config: AppConfig) -> AppContext:
     if "ledger" in config.INCLUDED_APPS:
         await asyncio.gather(ledger_maindb.connect(), ledger_paymentdb.connect())
 
-    stripe = StripeClientPool(
+    stripe_client = StripeClient(
         settings_list=[
+            # TODO: add CA/AU
             StripeClientSettings(
                 api_key=config.STRIPE_US_SECRET_KEY.value, country="US"
             )
         ],
-        max_workers=config.STRIPE_MAX_WORKERS,
+        http_client=TimedRequestsClient(),
+    )
+
+    stripe_thread_pool = ThreadPoolHelper(
+        max_workers=config.STRIPE_MAX_WORKERS, prefix="stripe"
     )
 
     dsj_client = DSJClient(
@@ -157,9 +166,10 @@ async def create_app_context(config: AppConfig) -> AppContext:
         payin_paymentdb=payin_paymentdb,
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
-        stripe=stripe,
         dsj_client=dsj_client,
         identity_client=identity_client,
+        stripe_client=stripe_client,
+        stripe_thread_pool=stripe_thread_pool,
     )
 
     context.log.debug("app context created")

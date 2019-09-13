@@ -16,7 +16,9 @@ from app.commons.context.req_context import (
     ReqContext,
     get_context_from_req,
     get_logger_from_req,
+    get_stripe_async_client_from_req,
 )
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
@@ -81,10 +83,14 @@ class LegacyPaymentInterface:
         payment_repo: CartPaymentRepository = Depends(
             CartPaymentRepository.get_repository
         ),
+        stripe_async_client: StripeAsyncClient = Depends(
+            get_stripe_async_client_from_req
+        ),
     ):
         self.app_context = app_context
         self.req_context = req_context
         self.payment_repo = payment_repo
+        self.stripe_async_client = stripe_async_client
 
     def get_country_id_by_code(self, country: str) -> int:
         if country == CountryCode.US.value:
@@ -212,12 +218,16 @@ class CartPaymentInterface:
         ),
         payer_client: PayerClient = Depends(PayerClient),
         payment_method_client: PaymentMethodClient = Depends(PaymentMethodClient),
+        stripe_async_client: StripeAsyncClient = Depends(
+            get_stripe_async_client_from_req
+        ),
     ):
         self.app_context = app_context
         self.req_context = req_context
         self.payment_repo = payment_repo
         self.payer_client = payer_client
         self.payment_method_client = payment_method_client
+        self.stripe_async_client = stripe_async_client
 
     def get_most_recent_intent(self, intent_list: List[PaymentIntent]) -> PaymentIntent:
         intent_list.sort(key=lambda x: x.created_at)
@@ -586,7 +596,7 @@ class CartPaymentInterface:
             self.req_context.log.debug(
                 f"[submit_payment_to_provider] Calling provider to create payment intent"
             )
-            response = await self.app_context.stripe.create_payment_intent(
+            response = await self.stripe_async_client.create_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
                 idempotency_key=pgp_payment_intent.idempotency_key,
@@ -659,7 +669,7 @@ class CartPaymentInterface:
                 f"Capturing payment intent: {payment_intent.country}, key: {pgp_payment_intent.idempotency_key}"
             )
             # Make call to Stripe
-            provider_intent = await self.app_context.stripe.capture_payment_intent(
+            provider_intent = await self.stripe_async_client.capture_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
                 idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
@@ -764,7 +774,7 @@ class CartPaymentInterface:
             self.req_context.log.info(
                 f"Cancelling payment intent: {payment_intent.id}, key: {pgp_payment_intent.idempotency_key}"
             )
-            response = await self.app_context.stripe.cancel_payment_intent(
+            response = await self.stripe_async_client.cancel_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
                 idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
@@ -795,7 +805,7 @@ class CartPaymentInterface:
             self.req_context.log.info(
                 f"Refunding charge {pgp_payment_intent.charge_resource_id}"
             )
-            response = await self.app_context.stripe.refund_charge(
+            response = await self.stripe_async_client.refund_charge(
                 country=CountryCode(payment_intent.country),
                 request=refund_request,
                 idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key

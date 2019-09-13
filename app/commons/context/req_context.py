@@ -12,6 +12,7 @@ from app.commons.constants import (
 )
 from app.commons.context.app_context import AppContext, get_context_from_app
 from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.runtime import runtime
 
 
@@ -20,6 +21,9 @@ class ReqContext:
     req_id: UUID
     log: BoundLogger
     commando_mode: bool
+    stripe_async_client: Optional[
+        StripeAsyncClient
+    ] = None  # cron worker does not need this
     correlation_id: Optional[str] = None
 
 
@@ -32,11 +36,19 @@ def set_context_for_req(request: Request) -> ReqContext:
     log = app_context.log.bind(req_id=req_id, correlation_id=correlation_id)
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
 
+    # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
+    # per request level
+    stripe_async_client = StripeAsyncClient(
+        executor_pool=app_context.stripe_thread_pool,
+        stripe_client=app_context.stripe_client,
+        commando=commando_mode,
+    )
     req_context = ReqContext(
         req_id=req_id,
         log=log,
         commando_mode=commando_mode,
         correlation_id=correlation_id,
+        stripe_async_client=stripe_async_client,
     )
 
     state = cast(Any, request.state)
@@ -73,3 +85,12 @@ def response_with_req_id(request: Request, response: Response):
     req_id = str(get_context_from_req(request).req_id)
     response.headers[PAYMENT_REQUEST_ID_HEADER] = req_id
     return response
+
+
+def get_stripe_async_client_from_req(request: Request) -> Optional[StripeAsyncClient]:
+    """
+    This should ALWAYS return a StripeAsyncClient when used in the context of a FastAPI request
+    :param request:
+    :return:
+    """
+    return get_context_from_req(request).stripe_async_client

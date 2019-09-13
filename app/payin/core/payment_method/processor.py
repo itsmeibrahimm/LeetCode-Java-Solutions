@@ -8,8 +8,12 @@ from psycopg2._psycopg import DataError
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context
-from app.commons.context.req_context import get_logger_from_req
+from app.commons.context.req_context import (
+    get_logger_from_req,
+    get_stripe_async_client_from_req,
+)
 from app.commons import tracing
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     CreatePaymentMethod,
     AttachPaymentMethod,
@@ -67,10 +71,14 @@ class PaymentMethodClient:
         ),
         log: BoundLogger = Depends(get_logger_from_req),
         app_ctxt: AppContext = Depends(get_global_app_context),
+        stripe_async_client: StripeAsyncClient = Depends(
+            get_stripe_async_client_from_req
+        ),
     ):
         self.payment_method_repo = payment_method_repo
         self.log = log
         self.app_ctxt = app_ctxt
+        self.stripe_async_client = stripe_async_client
 
     async def create_raw_payment_method(
         self,
@@ -265,7 +273,7 @@ class PaymentMethodClient:
     ) -> StripePaymentMethod:
         try:
             # create PGP payment method
-            stripe_payment_method = await self.app_ctxt.stripe.create_payment_method(
+            stripe_payment_method = await self.stripe_async_client.create_payment_method(
                 country=CountryCode(country),
                 request=CreatePaymentMethod(
                     type="card", card=CreatePaymentMethod.Card(token=token)
@@ -274,7 +282,7 @@ class PaymentMethodClient:
 
             # attach PGP payment method
             if attached:
-                attach_payment_method = await self.app_ctxt.stripe.attach_payment_method(
+                attach_payment_method = await self.stripe_async_client.attach_payment_method(
                     country=CountryCode(country),
                     request=AttachPaymentMethod(
                         sid=stripe_payment_method.id, customer=pgp_customer_id
@@ -297,7 +305,7 @@ class PaymentMethodClient:
         self, pgp_payment_method_id: str, country: Optional[str] = CountryCode.US
     ) -> StripePaymentMethod:
         try:
-            stripe_payment_method = await self.app_ctxt.stripe.detach_payment_method(
+            stripe_payment_method = await self.stripe_async_client.detach_payment_method(
                 country=CountryCode(country),  # TODO: get from payer
                 request=DetachPaymentMethod(sid=pgp_payment_method_id),
             )

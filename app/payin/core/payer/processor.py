@@ -6,8 +6,12 @@ from psycopg2._psycopg import DataError
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context
-from app.commons.context.req_context import get_logger_from_req
+from app.commons.context.req_context import (
+    get_logger_from_req,
+    get_stripe_async_client_from_req,
+)
 from app.commons import tracing
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     CreateCustomer,
     CustomerId,
@@ -56,10 +60,14 @@ class PayerClient:
         app_ctxt: AppContext = Depends(get_global_app_context),
         log: BoundLogger = Depends(get_logger_from_req),
         payer_repo: PayerRepository = Depends(PayerRepository.get_repository),
+        stripe_async_client: StripeAsyncClient = Depends(
+            get_stripe_async_client_from_req
+        ),
     ):
         self.app_ctxt = app_ctxt
         self.log = log
         self.payer_repo = payer_repo
+        self.stripe_async_client = stripe_async_client
 
     async def has_existing_payer(self, dd_payer_id: str, payer_type: str):
         try:
@@ -229,7 +237,7 @@ class PayerClient:
             email=email, description=description
         )
         try:
-            stripe_cus_id: CustomerId = await self.app_ctxt.stripe.create_customer(
+            stripe_cus_id: CustomerId = await self.stripe_async_client.create_customer(
                 country=CountryCode(country), request=creat_cus_req
             )
         except Exception as e:
@@ -252,7 +260,7 @@ class PayerClient:
         )
         try:
             input_country = CountryCode(country)
-            stripe_customer = await self.app_ctxt.stripe.update_customer(
+            stripe_customer = await self.stripe_async_client.update_customer(
                 country=input_country, request=update_cus_req
             )
         except Exception as e:

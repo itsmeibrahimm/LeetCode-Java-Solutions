@@ -276,7 +276,7 @@ class StripeClient(StripeClientInterface):
     ):
         if len(settings_list) == 0:
             raise ValueError("at least one client configuration needs to be provided")
-        self.client_settings = {
+        self.stripe_client_settings = {
             settings.country: settings for settings in settings_list
         }
 
@@ -287,7 +287,7 @@ class StripeClient(StripeClientInterface):
 
     def settings_for(self, country: models.CountryCode) -> dict:
         try:
-            return self.client_settings[country].client_settings
+            return self.stripe_client_settings[country].client_settings
         except KeyError as err:
             raise errors.ServiceProviderException(
                 f"service provider is not configured for country {country}"
@@ -596,29 +596,20 @@ class StripeTestClient(StripeClient):
         )
 
 
-class StripeClientPool(ThreadPoolHelper):
-    # worker prefix
-    prefix = "stripe"
+class StripeAsyncClient:
+    executor_pool: ThreadPoolHelper
+    stripe_client: StripeClient
+    commando: bool
 
     def __init__(
         self,
-        *,
-        settings_list: models.SettingsList = None,
-        max_workers: Optional[int] = None,
-        client: Optional[StripeClient] = None,
-        http_client: Optional[HTTPClient] = None,
+        executor_pool: ThreadPoolHelper,
+        stripe_client: StripeClient,
+        commando: bool = False,
     ):
-        # ensure threadpool workers get the right prefix
-        if client is not None:
-            self.client = client
-        elif settings_list is not None:
-            self.client = StripeClient(settings_list, http_client=http_client)
-        else:
-            raise ValueError(
-                "either a Stripe Client `client` or the client `settings_list` must be specified"
-            )
-
-        super().__init__(max_workers=max_workers)
+        self.executor_pool = executor_pool
+        self.stripe_client = stripe_client
+        self.commando = commando
 
     async def create_connected_account_token(
         self,
@@ -627,8 +618,8 @@ class StripeClientPool(ThreadPoolHelper):
         token: models.CreateConnectedAccountToken,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.TokenId:
-        return await self.submit(
-            self.client.create_connected_account_token,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_connected_account_token,
             country=country,
             token=token,
             idempotency_key=idempotency_key,
@@ -641,8 +632,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.CreateCustomer,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.CustomerId:
-        return await self.submit(
-            self.client.create_customer,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_customer,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -654,8 +645,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.UpdateCustomer,
         idempotency_key: models.IdempotencyKey = None,
     ) -> Any:
-        return await self.submit(
-            self.client.update_customer,
+        return await self.executor_pool.submit(
+            self.stripe_client.update_customer,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -668,8 +659,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.CreatePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
-        return await self.submit(
-            self.client.create_payment_method,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_payment_method,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -682,8 +673,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.AttachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
-        return await self.submit(
-            self.client.attach_payment_method,
+        return await self.executor_pool.submit(
+            self.stripe_client.attach_payment_method,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -696,8 +687,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.DetachPaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
-        return await self.submit(
-            self.client.detach_payment_method,
+        return await self.executor_pool.submit(
+            self.stripe_client.detach_payment_method,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -710,8 +701,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.RetrievePaymentMethod,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
-        return await self.submit(
-            self.client.retrieve_payment_method,
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_payment_method,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -724,8 +715,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.CreatePaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
-        return await self.submit(
-            self.client.create_payment_intent,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_payment_intent,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -738,8 +729,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.CapturePaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
-        return await self.submit(
-            self.client.capture_payment_intent,
+        return await self.executor_pool.submit(
+            self.stripe_client.capture_payment_intent,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -752,8 +743,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.CancelPaymentIntent,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
-        return await self.submit(
-            self.client.cancel_payment_intent,
+        return await self.executor_pool.submit(
+            self.stripe_client.cancel_payment_intent,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -766,8 +757,8 @@ class StripeClientPool(ThreadPoolHelper):
         request: models.RefundCharge,
         idempotency_key: models.IdempotencyKey,
     ) -> models.Refund:
-        return await self.submit(
-            self.client.refund_charge,
+        return await self.executor_pool.submit(
+            self.stripe_client.refund_charge,
             country=country,
             request=request,
             idempotency_key=idempotency_key,
@@ -776,7 +767,9 @@ class StripeClientPool(ThreadPoolHelper):
     async def update_stripe_dispute(
         self, request: models.UpdateStripeDispute
     ) -> models.StripeDisputeId:
-        return await self.submit(self.client.update_stripe_dispute, request)
+        return await self.executor_pool.submit(
+            self.stripe_client.update_stripe_dispute, request
+        )
 
     async def create_transfer(
         self,
@@ -787,8 +780,8 @@ class StripeClientPool(ThreadPoolHelper):
         amount: models.Amount,
         request: models.CreateTransfer,
     ) -> models.Transfer:
-        return await self.submit(
-            self.client.create_transfer,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_transfer,
             country=country,
             currency=currency,
             destination=destination,
@@ -804,8 +797,8 @@ class StripeClientPool(ThreadPoolHelper):
         amount: models.Amount,
         request: models.CreatePayout,
     ) -> models.Payout:
-        return await self.submit(
-            self.client.create_payout,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_payout,
             currency=currency,
             amount=amount,
             country=country,
@@ -825,8 +818,8 @@ class StripeClientPool(ThreadPoolHelper):
     ) -> models.Payout:
         # we use 2016 stripe api create_transfer to payout to bank account, since in current venison it requires
         # external_account stripe_id which we did not save in our db
-        return await self.submit(
-            self.client.create_transfer,
+        return await self.executor_pool.submit(
+            self.stripe_client.create_transfer,
             currency=currency,
             amount=amount,
             country=country,
@@ -840,20 +833,22 @@ class StripeClientPool(ThreadPoolHelper):
     async def retrieve_payout(
         self, *, request: models.RetrievePayout, country: models.CountryCode
     ) -> models.Payout:
-        return await self.submit(
-            self.client.retrieve_payout, request=request, country=country
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_payout, request=request, country=country
         )
 
     async def cancel_payout(
         self, *, request: models.CancelPayout, country: models.CountryCode
     ) -> models.Payout:
-        return await self.submit(
-            self.client.cancel_payout, request=request, country=country
+        return await self.executor_pool.submit(
+            self.stripe_client.cancel_payout, request=request, country=country
         )
 
     async def retrieve_balance(
         self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
     ) -> models.Balance:
-        return await self.submit(
-            self.client.retrieve_balance, stripe_account=stripe_account, country=country
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_balance,
+            stripe_account=stripe_account,
+            country=country,
         )

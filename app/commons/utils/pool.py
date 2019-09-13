@@ -10,7 +10,8 @@ class ThreadPoolHelper:
     prefix = ""
     executor: futures.ThreadPoolExecutor
 
-    def __init__(self, max_workers: Optional[int] = None):
+    def __init__(self, max_workers: Optional[int] = None, prefix: str = ""):
+        self.prefix = prefix
         self.executor = futures.ThreadPoolExecutor(max_workers, self.prefix)
 
     def shutdown(self, wait=True):

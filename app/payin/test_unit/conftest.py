@@ -556,6 +556,7 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
         payment_repo=cart_payment_repo,
         payer_client=MagicMock(),
         payment_method_client=MagicMock(),
+        stripe_async_client=stripe_interface,
     )
 
     # Lookup functions
@@ -578,7 +579,10 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
 @pytest.fixture
 def legacy_payment_interface(cart_payment_repo):
     return LegacyPaymentInterface(
-        app_context=MagicMock(), req_context=MagicMock(), payment_repo=cart_payment_repo
+        app_context=MagicMock(),
+        req_context=MagicMock(),
+        payment_repo=cart_payment_repo,
+        stripe_async_client=MagicMock(),
     )
 
 

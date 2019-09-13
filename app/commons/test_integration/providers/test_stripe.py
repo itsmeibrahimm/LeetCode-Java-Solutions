@@ -2,10 +2,12 @@ import pytest
 
 from typing import List
 from app.commons.config.app_config import AppConfig
+from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.utils.pool import ThreadPoolHelper
 from app.commons.utils.testing import Stat
 from app.commons.providers.stripe import stripe_http_client
 from app.commons.providers.stripe import stripe_models as models
-from app.commons.providers.stripe.stripe_client import StripeClientPool
+from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
 
 
 @pytest.fixture(autouse=True)
@@ -24,25 +26,34 @@ class TestStripePoolStats:
     ]
 
     @pytest.fixture
-    def stripe_pool(self, request, stripe_api, app_config: AppConfig):
+    def stripe_async_client(self, request, stripe_api, app_config: AppConfig):
         stripe_api.enable_mock()
 
-        pool = StripeClientPool(
-            max_workers=5,
+        stripe_client = StripeClient(
             settings_list=[
                 models.StripeClientSettings(
                     api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
+            http_client=TimedRequestsClient(),
         )
-        yield pool
-        pool.shutdown()
+
+        stripe_thread_pool = ThreadPoolHelper(
+            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
+        )
+
+        stripe_async_client = StripeAsyncClient(
+            executor_pool=stripe_thread_pool, stripe_client=stripe_client
+        )
+
+        yield stripe_async_client
+        stripe_thread_pool.shutdown()
 
     async def test_customer(
-        self, stripe_pool: StripeClientPool, get_mock_statsd_events
+        self, stripe_async_client: StripeAsyncClient, get_mock_statsd_events
     ):
 
-        customer_id = await stripe_pool.create_customer(
+        customer_id = await stripe_async_client.create_customer(
             country=models.CountryCode.US,
             request=models.CreateCustomer(
                 email="test@user.com", description="customer name", country="US"

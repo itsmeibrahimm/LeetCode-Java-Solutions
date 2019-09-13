@@ -8,8 +8,10 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.identity_client import StubbedIdentityClient
-from app.commons.providers.stripe.stripe_client import StripeClientPool
+from app.commons.providers.stripe.stripe_client import StripeClient
 from app.commons.providers.dsj_client import DSJClient
+from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.utils.pool import ThreadPoolHelper
 from app.main import app
 
 
@@ -32,16 +34,17 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         payin_paymentdb=payin_paymentdb,
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
-        stripe=StripeClientPool(
-            max_workers=5,
+        dsj_client=DSJClient({}),
+        identity_client=StubbedIdentityClient(),  # Does not matter
+        stripe_thread_pool=ThreadPoolHelper(),
+        stripe_client=StripeClient(
             settings_list=[
                 models.StripeClientSettings(
                     api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
+            http_client=TimedRequestsClient(),
         ),
-        dsj_client=DSJClient({}),
-        identity_client=StubbedIdentityClient(),  # Does not matter
     )
     app.extra["context"] = cast(Any, context)
 

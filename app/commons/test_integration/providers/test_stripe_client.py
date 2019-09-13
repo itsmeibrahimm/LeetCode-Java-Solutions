@@ -5,10 +5,12 @@ from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe.stripe_client import (
     StripeClient,
     StripeTestClient,
-    StripeClientPool,
+    StripeAsyncClient,
 )
 from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.types import CurrencyType
+from app.commons.utils.pool import ThreadPoolHelper
 
 pytestmark = [
     # mark all these tests as stripe tests
@@ -180,7 +182,7 @@ class TestStripePool:
     ]
 
     @pytest.fixture
-    def stripe_pool(self, request, stripe_api, app_config: AppConfig):
+    def stripe_async_client(self, request, stripe_api, app_config: AppConfig):
         # allow external tests to directly call stripe
         if "external" in request.keywords:
             stripe_api.enable_outbound()
@@ -188,20 +190,30 @@ class TestStripePool:
         elif "integration" in request.keywords:
             stripe_api.enable_mock()
 
-        pool = StripeClientPool(
-            max_workers=5,
+        stripe_client = StripeClient(
             settings_list=[
+                # TODO: add CA/AU
                 models.StripeClientSettings(
                     api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
+            http_client=TimedRequestsClient(),
         )
-        yield pool
-        pool.shutdown()
+
+        stripe_thread_pool = ThreadPoolHelper(
+            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
+        )
+
+        stripe_async_client = StripeAsyncClient(
+            executor_pool=stripe_thread_pool, stripe_client=stripe_client
+        )
+
+        yield stripe_async_client
+        stripe_thread_pool.shutdown()
 
     @pytest.mark.skip("requires connected account key")
-    async def test_token(self, mode: str, stripe_pool: StripeClientPool):
-        token_id = await stripe_pool.create_connected_account_token(
+    async def test_token(self, mode: str, stripe_async_client: StripeAsyncClient):
+        token_id = await stripe_async_client.create_connected_account_token(
             country=models.CountryCode.US,
             token=models.CreateConnectedAccountToken(
                 card="card_1F0HgE2eZvKYlo2CpI7aVFkd",
@@ -212,8 +224,8 @@ class TestStripePool:
         )
         assert token_id
 
-    async def test_customer(self, mode: str, stripe_pool: StripeClientPool):
-        customer_id = await stripe_pool.create_customer(
+    async def test_customer(self, mode: str, stripe_async_client: StripeAsyncClient):
+        customer_id = await stripe_async_client.create_customer(
             country=models.CountryCode.US,
             request=models.CreateCustomer(
                 email="test@user.com", description="customer name", country="US"
