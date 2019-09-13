@@ -1,9 +1,16 @@
 service_env:
   SERVICE_TEAM_EMAIL: "payments-team@doordash.com"
   SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
+  SERVICE_NAME: "payment-service"
   WAVEFRONT_ENABLED: true
 
-users: "1000"
-hatch_rate: "100"
+# use same secret as pulse
+secret_sources:
+  - payment-service-pulse
+
+users: "1"
+hatch_rate: "1"
 run_time: "10m"
-target_host: "http://payment-service-web.prod.svc.cluster.local"
+#target_host: "http://payment-service-web.prod.svc.cluster.local"
+# Point prod infra to staging to avoid accidentally running load testing against prod
+target_host: "http://payment-service-web.staging.svc.cluster.local"

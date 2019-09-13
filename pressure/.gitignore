@@ -1,4 +1,4 @@
-*.csv
+report.html
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -109,3 +109,7 @@ venv.bak/
 
 # jetbrain ide
 .idea/
+
+# ignore Pipfile for now as Pulse build doesn't support it yet
+Pipfile*
+*.csv
