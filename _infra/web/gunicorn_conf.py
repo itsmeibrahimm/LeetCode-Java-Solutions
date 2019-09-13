@@ -35,7 +35,7 @@ def post_fork(server, worker):
 # explicitly set thread number for each worker
 # because default asyncio because will spawn excess threads
 # https://bugs.python.org/issue35279
-max_threads_per_worker = 8
+max_threads_per_worker = 1
 multiprocessing.set_start_method("spawn", True)
 executor = None
 
