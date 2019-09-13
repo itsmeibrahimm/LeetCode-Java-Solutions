@@ -64,13 +64,13 @@ class StripeManagedAccount(PaymentResponse):
     default_bank_name: Optional[str]
     verification_disabled_reason: Optional[str]
     verification_due_by: Optional[datetime]
-    verification_fields_needed: List[str]
+    verification_fields_needed: Optional[list]
 
     @classmethod
     def from_db_model(
         cls, internal: stripe_managed_account.StripeManagedAccount
     ) -> "StripeManagedAccount":
-        verification_fields_needed: List[str] = []
+        verification_fields_needed: Optional[list] = None
         if internal.verification_fields_needed:
             verification_fields_needed = json.loads(internal.verification_fields_needed)
 
