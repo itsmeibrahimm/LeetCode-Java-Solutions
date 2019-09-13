@@ -149,7 +149,7 @@ class ApiRouterBuilder:
         return root_router
 
 
-async def _correlation_id_header(x_correlation_id: str = Header("")):
+def _correlation_id_header(x_correlation_id: str = Header("")):
     """
     Use FastApi Header injection trick to define "x-correlation-id" head in openapi model
     """
