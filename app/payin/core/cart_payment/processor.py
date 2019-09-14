@@ -27,7 +27,7 @@ from app.commons.providers.stripe.stripe_models import (
     PaymentIntent as ProviderPaymentIntent,
     Refund as ProviderRefund,
 )
-from app.commons.types import CountryCode, LegacyCountryId
+from app.commons.types import CountryCode, LegacyCountryId, CurrencyType
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     CartMetadata,
@@ -1635,17 +1635,18 @@ class CartPaymentProcessor:
         request_cart_payment: CartPayment,
         request_legacy_payment: Optional[LegacyPayment],
         idempotency_key: str,
-        country: str,
-        currency: str,
+        country: CountryCode,
+        currency: CurrencyType,
         client_description: Optional[str],
     ) -> Tuple[CartPayment, LegacyPayment]:
         """Submit a cart payment creation request.
 
         Arguments:
             request_cart_payment {CartPayment} -- CartPayment model containing request paramters provided by client.
+            request_legacy_payment {LegacyPayment} -- LegacyPayment model containing legacy fields.  For v0 use only.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
-            country {str} -- ISO country code.
-            currency {str} -- Currency for cart payment request.
+            country {CurrencyType} -- ISO country code.
+            currency {CurrencyType} -- Currency for cart payment request.
             client_description {str} -- Pass through value clients may associated with the cart payment.
 
         Returns:

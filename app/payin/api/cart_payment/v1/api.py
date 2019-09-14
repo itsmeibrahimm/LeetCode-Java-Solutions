@@ -49,9 +49,10 @@ async def create_cart_payment(
     Create a cart payment.
 
     - **payer_id**: DoorDash payer_id or stripe_customer_id
-    - **amount**: [int] amount in cent to charge the cart
-    - **payer_country**: [string] payer's country ISO code
-    - **currency**: [string] currency to charge the cart
+    - **amount**: [int] amount in cents for the payment.  Must be greater than 0.
+    - **payer_country**: [string] payer's country ISO code.  Example: "US".
+    - **payment_country**: [string] country ISO code for where payment is happening.  Example: "US".
+    - **currency**: [string] currency for the payment.  Must be a doordash supported currency.  Example: "usd".
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
                              can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
     - **delay_capture**: [bool] whether to capture immediately or delay
@@ -132,7 +133,7 @@ async def update_cart_payment(
 
     - **cart_payment_id**: unique cart_payment id
     - **payer_id**: DoorDash payer_id
-    - **amount**: [int] amount in cent to adjust the cart
+    - **amount**: [int] The new amount to use for the cart payment, in cents.  This is the new amount (not delta).  Must be greater than 0.
     - **payer_country**: [string] payer's country ISO code
     - **idempotency_key**: [string] idempotency key to sumibt the payment
     - **client_description** [string] client description

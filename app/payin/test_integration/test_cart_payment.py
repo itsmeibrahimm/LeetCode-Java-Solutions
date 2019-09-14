@@ -1,6 +1,8 @@
 import pytest
 import uuid
 from starlette.testclient import TestClient
+from typing import Any, Optional, Dict
+from app.conftest import StripeAPISettings
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
@@ -8,6 +10,11 @@ from starlette.testclient import TestClient
 # persist state.
 @pytest.mark.external
 class TestCartPayment:
+    @pytest.fixture
+    def payer(self, stripe_api: StripeAPISettings, client: TestClient):
+        stripe_api.enable_outbound()
+        return self._test_payer_creation(stripe_api, client)
+
     def _get_payer_create_request(self):
         unique_value = str(uuid.uuid4())
         request_body = {
@@ -19,91 +26,9 @@ class TestCartPayment:
         }
         return request_body
 
-    def _get_payer_payment_method_request(self, payer):
-        request_body = {
-            "payer_id": payer["id"],
-            "payment_gateway": "stripe",
-            "token": "tok_mastercard",
-        }
-        return request_body
-
-    def _get_cart_payment_create_request(
-        self,
-        payer,
-        payment_method,
-        amount=500,
-        delay_capture=True,
-        idempotency_key=None,
-    ):
-        request_body = {
-            "payer_id": payer["id"],
-            "amount": amount,
-            "payment_country": "US",
-            "currency": "USD",
-            "payment_method_id": payment_method["id"],
-            "delay_capture": delay_capture,
-            "client_description": f"{payer['id']} description",
-            "payer_statement_description": f"{payer['id'][0:10]} statement",
-            "cart_metadata": {
-                "reference_id": "123",
-                "reference_type": "5",
-                "type": "OrderCart",
-            },
-        }
-
-        if not idempotency_key:
-            request_body["idempotency_key"] = str(uuid.uuid4())
-
-        return request_body
-
-    def _get_cart_payment_create_legacy_payment_request(
-        self,
-        legacy_stripe_customer_id,
-        legacy_stripe_payment_method_id,
-        amount=500,
-        idempotency_key=None,
-    ):
-        # No payer_id or payment_method_id.  Instead we use legacy_payment.
-        request_body = {
-            "amount": amount,
-            "country": "US",
-            "currency": "USD",
-            "delay_capture": True,
-            "client_description": f"{legacy_stripe_customer_id} description",
-            "payer_statement_description": f"{legacy_stripe_customer_id}",
-            "payer_country": "US",
-            "payment_country": "US",
-            "cart_metadata": {
-                "reference_id": "123",
-                "reference_type": "5",
-                "type": "OrderCart",
-            },
-            "legacy_payment": {
-                "stripe_customer_id": legacy_stripe_customer_id,
-                "stripe_payment_method_id": legacy_stripe_payment_method_id,
-                "dd_country_id": 1,
-                "dd_consumer_id": 1,
-            },
-        }
-
-        if not idempotency_key:
-            request_body["idempotency_key"] = str(uuid.uuid4())
-
-        return request_body
-
-    def _get_cart_payment_update_request(
-        self, cart_payment, amount, client_description, idempotency_key=None
-    ):
-        request_body = {
-            "amount": amount,
-            "payer_id": cart_payment["payer_id"],
-            "client_description": client_description,
-        }
-        idempotency = idempotency_key if idempotency_key else str(uuid.uuid4())
-        request_body["idempotency_key"] = idempotency
-        return request_body
-
-    def _test_payer_creation(self, stripe_api, client):
+    def _test_payer_creation(
+        self, stripe_api: StripeAPISettings, client: TestClient
+    ) -> Dict[str, Any]:
         request_body = self._get_payer_create_request()
         response = client.post("/payin/api/v1/payers", json=request_body)
         assert response.status_code == 201
@@ -125,7 +50,26 @@ class TestCartPayment:
         assert provider_customer["payment_provider_customer_id"]
         return payer
 
-    def _test_payment_method_creation(self, stripe_api, client, payer):
+    @pytest.fixture
+    def payment_method(
+        self, stripe_api: StripeAPISettings, client: TestClient, payer: Dict[str, Any]
+    ):
+        stripe_api.enable_outbound()
+        return self._test_payment_method_creation(stripe_api, client, payer)
+
+    def _get_payer_payment_method_request(
+        self, payer: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        request_body = {
+            "payer_id": payer["id"],
+            "payment_gateway": "stripe",
+            "token": "tok_mastercard",
+        }
+        return request_body
+
+    def _test_payment_method_creation(
+        self, stripe_api: StripeAPISettings, client: TestClient, payer: Dict[str, Any]
+    ) -> Dict[str, Any]:
         request_body = self._get_payer_payment_method_request(payer)
         response = client.post("/payin/api/v1/payment_methods", json=request_body)
         assert response.status_code == 201
@@ -151,14 +95,93 @@ class TestCartPayment:
         assert payer["deleted_at"] is None
         return payment_method
 
+    def _get_cart_payment_create_request(
+        self,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        amount: int = 500,
+        delay_capture: bool = True,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        request_body = {
+            "payer_id": payer["id"],
+            "amount": amount,
+            "payment_country": "US",
+            "currency": "usd",
+            "payment_method_id": payment_method["id"],
+            "delay_capture": delay_capture,
+            "client_description": f"{payer['id']} description",
+            "payer_statement_description": f"{payer['id'][0:10]} statement",
+            "cart_metadata": {
+                "reference_id": "123",
+                "reference_type": "5",
+                "type": "OrderCart",
+            },
+        }
+
+        if not idempotency_key:
+            request_body["idempotency_key"] = str(uuid.uuid4())
+
+        return request_body
+
+    def _get_cart_payment_create_legacy_payment_request(
+        self,
+        legacy_stripe_customer_id: str,
+        legacy_stripe_payment_method_id: str,
+        amount: int = 500,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        # No payer_id or payment_method_id.  Instead we use legacy_payment.
+        request_body = {
+            "amount": amount,
+            "currency": "usd",
+            "delay_capture": True,
+            "client_description": f"{legacy_stripe_customer_id} description",
+            "payer_statement_description": f"{legacy_stripe_customer_id}",
+            "payer_country": "US",
+            "payment_country": "US",
+            "cart_metadata": {
+                "reference_id": "123",
+                "reference_type": "5",
+                "type": "OrderCart",
+            },
+            "legacy_payment": {
+                "stripe_customer_id": legacy_stripe_customer_id,
+                "stripe_payment_method_id": legacy_stripe_payment_method_id,
+                "dd_country_id": 1,
+                "dd_consumer_id": 1,
+            },
+        }
+
+        if not idempotency_key:
+            request_body["idempotency_key"] = str(uuid.uuid4())
+
+        return request_body
+
+    def _get_cart_payment_update_request(
+        self,
+        cart_payment: Dict[str, Any],
+        amount: int,
+        client_description: str,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        request_body = {
+            "amount": amount,
+            "payer_id": cart_payment["payer_id"],
+            "client_description": client_description,
+        }
+        idempotency = idempotency_key if idempotency_key else str(uuid.uuid4())
+        request_body["idempotency_key"] = idempotency
+        return request_body
+
     def _test_cart_payment_legacy_payment_creation(
         self,
-        stripe_api,
-        client,
-        legacy_stripe_customer_id,
-        legacy_stripe_payment_method_id,
-        amount,
-    ):
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        legacy_stripe_customer_id: str,
+        legacy_stripe_payment_method_id: str,
+        amount: int,
+    ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
             legacy_stripe_customer_id, legacy_stripe_payment_method_id, amount
         )
@@ -195,8 +218,14 @@ class TestCartPayment:
         return cart_payment
 
     def _test_cart_payment_creation(
-        self, stripe_api, client, payer, payment_method, amount, delay_capture
-    ):
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        amount: int,
+        delay_capture: bool,
+    ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_request(
             payer, payment_method, amount, delay_capture
         )
@@ -226,18 +255,17 @@ class TestCartPayment:
         assert cart_payment["deleted_at"] is None
         return cart_payment
 
-    def _test_cart_payment_creation_error(
+    def _test_cart_payment_error(
         self,
-        stripe_api,
-        client,
-        payer,
-        payment_method,
-        expected_http_status_status_code,
-        expected_body_error_code,
-        expected_retryable,
-    ):
-        request_body = self._get_cart_payment_create_request(payer, payment_method)
-        response = client.post("/payin/api/v1/cart_payments", json=request_body)
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        resource_path: str,
+        request_body: Dict[str, Any],
+        expected_http_status_status_code: int,
+        expected_body_error_code: str,
+        expected_retryable: bool,
+    ) -> None:
+        response = client.post(resource_path, json=request_body)
         body = response.json()
         assert response.status_code == expected_http_status_status_code
         assert "error_code" in body
@@ -247,8 +275,13 @@ class TestCartPayment:
         assert body["retryable"] == expected_retryable
 
     def _test_legacy_cart_payment_adjustment(
-        self, stripe_api, client, cart_payment, charge_id, amount
-    ):
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+        charge_id: int,
+        amount: int,
+    ) -> None:
         request_body = self._get_cart_payment_update_request(
             cart_payment=cart_payment,
             amount=amount,
@@ -269,7 +302,52 @@ class TestCartPayment:
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
 
-    def _test_cart_payment_adjustment(self, stripe_api, client, cart_payment, amount):
+    def _test_cart_payment_creation_error(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        request_body: Dict[str, Any],
+        expected_http_status_status_code: int,
+        expected_body_error_code: str,
+        expected_retryable: bool,
+    ) -> None:
+        self._test_cart_payment_error(
+            stripe_api,
+            client,
+            "/payin/api/v1/cart_payments",
+            request_body,
+            expected_http_status_status_code,
+            expected_body_error_code,
+            expected_retryable,
+        )
+
+    def _test_cart_payment_update_error(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+        request_body: Dict[str, Any],
+        expected_http_status_status_code: int,
+        expected_body_error_code: str,
+        expected_retryable: bool,
+    ) -> None:
+        self._test_cart_payment_error(
+            stripe_api,
+            client,
+            f"/payin/api/v1/cart_payments/{str(cart_payment['id'])}/adjust",
+            request_body,
+            expected_http_status_status_code,
+            expected_body_error_code,
+            expected_retryable,
+        )
+
+    def _test_cart_payment_adjustment(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+        amount: int,
+    ) -> None:
         request_body = self._get_cart_payment_update_request(
             cart_payment=cart_payment,
             amount=amount,
@@ -291,13 +369,14 @@ class TestCartPayment:
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
 
-    def test_cart_payment_use(self, stripe_api, client: TestClient):
+    def test_cart_payment_use(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
         stripe_api.enable_outbound()
-
-        payer = self._test_payer_creation(stripe_api=stripe_api, client=client)
-        payment_method = self._test_payment_method_creation(
-            stripe_api=stripe_api, client=client, payer=payer
-        )
 
         # Success case: intent created, not captured yet
         cart_payment = self._test_cart_payment_creation(
@@ -329,24 +408,91 @@ class TestCartPayment:
 
         # Other payer cannot use some else's payment method
         other_payer = payer = self._test_payer_creation(stripe_api, client)
+        request_body = self._get_cart_payment_create_request(
+            other_payer, payment_method
+        )
         self._test_cart_payment_creation_error(
-            stripe_api, client, other_payer, payment_method, 403, "payin_23", False
+            stripe_api, client, request_body, 403, "payin_23", False
         )
 
-    def test_legacy_payment(self, stripe_api, client: TestClient):
+    def test_cart_payment_validation(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
+        # Cart payment creation
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, 750, True
+        )
+        request_body["currency"] = "coffee beans"
+        self._test_cart_payment_creation_error(
+            stripe_api, client, request_body, 422, "request_validation_error", False
+        )
+
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, 750, True
+        )
+        request_body["payment_country"] = "SM"
+        self._test_cart_payment_creation_error(
+            stripe_api, client, request_body, 422, "request_validation_error", False
+        )
+
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, 0, True
+        )
+        self._test_cart_payment_creation_error(
+            stripe_api, client, request_body, 422, "request_validation_error", False
+        )
+        request_body["amount"] = "-1"
+        self._test_cart_payment_creation_error(
+            stripe_api, client, request_body, 422, "request_validation_error", False
+        )
+
+        # Cart payment update
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, 750, True
+        )
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=750,
+            delay_capture=False,
+        )
+        request_body = self._get_cart_payment_update_request(
+            cart_payment=cart_payment,
+            amount=-1,
+            client_description=f"{cart_payment['client_description']}-updated",
+        )
+        self._test_cart_payment_update_error(
+            stripe_api,
+            client,
+            cart_payment,
+            request_body,
+            422,
+            "request_validation_error",
+            False,
+        )
+
+    def test_legacy_payment(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
         stripe_api.enable_outbound()
 
         # Use payer, payment method api calls to seed data into legacy table.  It would be better to
         # create directly in legacy system without creating corresponding records in the new tables since
         # that is a more realistic case, but there is not yet an easy way to set this up.
-        payer = self._test_payer_creation(stripe_api=stripe_api, client=client)
         provider_account_id = payer["payment_gateway_provider_customers"][0][
             "payment_provider_customer_id"
         ]
 
-        payment_method = self._test_payment_method_creation(
-            stripe_api=stripe_api, client=client, payer=payer
-        )
         provider_card_id = payment_method["card"]["payment_provider_card_id"]
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id

@@ -1,8 +1,8 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PositiveInt
 
-from app.commons.types import CountryCode
+from app.commons.types import CountryCode, CurrencyType
 from app.payin.core.cart_payment.types import CartType
 
 
@@ -18,9 +18,9 @@ class CartMetadata(BaseModel):
 
 
 class CreateCartPaymentBaseRequest(BaseModel):
-    amount: int
+    amount: PositiveInt
     payment_country: CountryCode
-    currency: str
+    currency: CurrencyType
     delay_capture: bool
     idempotency_key: str
     client_description: Optional[str] = None
@@ -31,5 +31,5 @@ class CreateCartPaymentBaseRequest(BaseModel):
 
 class UpdateCartPaymentBaseRequest(BaseModel):
     idempotency_key: str
-    amount: int
+    amount: PositiveInt
     client_description: Optional[str] = None
