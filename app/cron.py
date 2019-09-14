@@ -4,7 +4,7 @@ import signal
 
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from doordash_python_stats.ddstats import doorstats_global
+from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
@@ -15,6 +15,17 @@ from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
 )
+
+
+def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
+    """
+    Sends a heartbeat from the scheduler
+
+    :param statsd_client: client to use to send heartbeat
+    :return: None
+    """
+    statsd_client.incr("scheduler.heartbeat")
+
 
 app_config = init_app_config()
 
@@ -54,6 +65,13 @@ scheduler.add_job(
     trigger="cron",
     minute="*/5",
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
+)
+
+scheduler.add_job(
+    scheduler_heartbeat,
+    trigger="cron",
+    minutes="*/1",
+    kwargs={"statsd_client": doorstats_global},
 )
 
 scheduler.add_job(
