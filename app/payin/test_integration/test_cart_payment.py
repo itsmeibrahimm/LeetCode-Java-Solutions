@@ -38,7 +38,6 @@ class TestCartPayment:
         request_body = {
             "payer_id": payer["id"],
             "amount": amount,
-            "payer_country": "US",
             "payment_country": "US",
             "currency": "USD",
             "payment_method_id": payment_method["id"],
@@ -191,6 +190,8 @@ class TestCartPayment:
         assert cart_payment["created_at"]
         assert cart_payment["updated_at"]
         assert cart_payment["deleted_at"] is None
+        assert cart_payment["dd_charge_id"]
+        assert type(cart_payment["dd_charge_id"]) is int
         return cart_payment
 
     def _test_cart_payment_creation(
@@ -244,6 +245,29 @@ class TestCartPayment:
         assert "error_message" in body
         assert "retryable" in body
         assert body["retryable"] == expected_retryable
+
+    def _test_legacy_cart_payment_adjustment(
+        self, stripe_api, client, cart_payment, charge_id, amount
+    ):
+        request_body = self._get_cart_payment_update_request(
+            cart_payment=cart_payment,
+            amount=amount,
+            client_description=f"{cart_payment['client_description']}-updated",
+        )
+        response = client.post(
+            f"/payin/api/v0/cart_payments/{str(charge_id)}/adjust", json=request_body
+        )
+        body = response.json()
+        assert response.status_code == 200
+        assert body["id"] == cart_payment["id"]
+        assert body["amount"] == request_body["amount"]
+        assert body["payer_id"] == cart_payment["payer_id"]
+        assert body["payment_method_id"] == cart_payment["payment_method_id"]
+        assert body["delay_capture"] == cart_payment["delay_capture"]
+        assert body["cart_metadata"] == cart_payment["cart_metadata"]
+        assert body["client_description"] == request_body["client_description"]
+        statement_description = body["payer_statement_description"]
+        assert statement_description == cart_payment["payer_statement_description"]
 
     def _test_cart_payment_adjustment(self, stripe_api, client, cart_payment, amount):
         request_body = self._get_cart_payment_update_request(
@@ -326,7 +350,7 @@ class TestCartPayment:
         provider_card_id = payment_method["card"]["payment_provider_card_id"]
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
-        self._test_cart_payment_legacy_payment_creation(
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
             stripe_api=stripe_api,
             client=client,
             legacy_stripe_customer_id=provider_account_id,
@@ -335,7 +359,10 @@ class TestCartPayment:
         )
 
         # Adjustment for case where legacy payment was initially used
-        # TODO: Replace this with use of legacy api, for handling when legacy charge_id is passed in
-        # self._test_cart_payment_adjustment(
-        #     stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=1000
-        # )
+        self._test_legacy_cart_payment_adjustment(
+            stripe_api=stripe_api,
+            client=client,
+            cart_payment=cart_payment,
+            charge_id=cart_payment["dd_charge_id"],
+            amount=1000,
+        )

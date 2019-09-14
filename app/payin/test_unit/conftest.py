@@ -329,6 +329,11 @@ class MockedPaymentRepo:
             payment_charge_id=payment_charge_id, amount=amount
         )
 
+    async def get_intent_pair_by_provider_charge_id(
+        self, provider_charge_id: str
+    ) -> Tuple[Optional[PaymentIntent], Optional[PgpPaymentIntent]]:
+        return utils.generate_payment_intent(), utils.generate_pgp_payment_intent()
+
     async def insert_payment_intent_adjustment_history(
         self,
         id: UUID,
@@ -428,6 +433,11 @@ class MockedPaymentRepo:
     ) -> Optional[LegacyStripeCharge]:
         return utils.generate_legacy_stripe_charge(stripe_id=stripe_charge_id)
 
+    async def get_legacy_stripe_charges_by_charge_id(
+        self, charge_id: int
+    ) -> List[LegacyStripeCharge]:
+        return [utils.generate_legacy_stripe_charge()]
+
 
 @pytest.fixture
 def cart_payment_repo():
@@ -468,6 +478,9 @@ def cart_payment_repo():
     payment_repo.get_payment_intent_for_idempotency_key = FunctionMock(
         return_value=None
     )
+    payment_repo.get_intent_pair_by_provider_charge_id = (
+        mocked_repo.get_intent_pair_by_provider_charge_id
+    )
 
     # Intent history table
     payment_repo.insert_payment_intent_adjustment_history = (
@@ -501,6 +514,9 @@ def cart_payment_repo():
     )
     payment_repo.get_legacy_stripe_charge_by_stripe_id = (
         mocked_repo.get_legacy_stripe_charge_by_stripe_id
+    )
+    payment_repo.get_legacy_stripe_charges_by_charge_id = (
+        mocked_repo.get_legacy_stripe_charges_by_charge_id
     )
 
     # Transaction function

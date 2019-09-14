@@ -14,6 +14,7 @@ from app.payin.tests.utils import (
     generate_pgp_payment_intent,
     generate_cart_payment,
     generate_legacy_payment,
+    generate_legacy_consumer_charge,
     FunctionMock,
 )
 import uuid
@@ -142,7 +143,7 @@ class TestCartPaymentProcessor:
         pass
 
     async def test_create_payment(self, cart_payment_processor, request_cart_payment):
-        result_cart_payment = await cart_payment_processor.create_payment(
+        result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
             idempotency_key=str(uuid.uuid4()),
@@ -171,7 +172,7 @@ class TestCartPaymentProcessor:
         )
 
         # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
-        result = await cart_payment_processor.create_payment(
+        result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
             idempotency_key=str(uuid.uuid4()),
@@ -179,14 +180,14 @@ class TestCartPaymentProcessor:
             currency="USD",
             client_description="Client description",
         )
-        assert result
+        assert result_cart_payment
 
         cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
-            return_value=(result, legacy_payment)
+            return_value=(result_cart_payment, legacy_payment)
         )
 
         # Second submission attempt
-        second_result = await cart_payment_processor.create_payment(
+        second_result_cart_payment, second_result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
             idempotency_key=str(uuid.uuid4()),
@@ -194,8 +195,8 @@ class TestCartPaymentProcessor:
             currency="USD",
             client_description="Client description",
         )
-        assert second_result
-        assert result == second_result
+        assert second_result_cart_payment
+        assert result_cart_payment == second_result_cart_payment
 
     @pytest.mark.asyncio
     async def test_update_fake_cart_payment(self, cart_payment_processor):
@@ -356,7 +357,7 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.cart_payment_interface.app_context.stripe.create_payment_intent()
         )
 
-        result_payment_intent, result_pgp_payment_intent = await cart_payment_processor._update_state_after_submit_to_provider(
+        result_payment_intent, result_pgp_payment_intent, legacy_charge, legacy_stripe_charge = await cart_payment_processor._update_state_after_submit_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
@@ -366,3 +367,16 @@ class TestCartPaymentProcessor:
 
         assert result_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
         assert result_pgp_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
+
+    @pytest.mark.asyncio
+    async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
+        legacy_charge = generate_legacy_consumer_charge()
+        result = await cart_payment_processor.update_payment_for_legacy_charge(
+            idempotency_key=str(uuid.uuid4()),
+            dd_charge_id=legacy_charge.id,
+            payer_id=None,
+            amount=1500,
+            client_description="description",
+        )
+        assert result
+        assert result.amount == 1500

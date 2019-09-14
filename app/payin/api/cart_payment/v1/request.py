@@ -1,19 +1,15 @@
-from typing import Optional
+from uuid import UUID
 
-from app.payin.core.types import MixedUuidStrType
 from app.payin.api.cart_payment.base.request import (
     CreateCartPaymentBaseRequest,
     UpdateCartPaymentBaseRequest,
 )
 
 
-# Our Mypy type checking does not currently support Schema objects.
-
-
 class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
-    payer_id: MixedUuidStrType
-    payment_method_id: MixedUuidStrType
+    payer_id: UUID
+    payment_method_id: UUID
 
 
 class UpdateCartPaymentRequest(UpdateCartPaymentBaseRequest):
-    payer_id: Optional[str]
+    payer_id: UUID

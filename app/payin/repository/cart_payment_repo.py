@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Tuple, AsyncIterator
 from uuid import UUID
 
 from IPython.utils.tz import utcnow
-from sqlalchemy import and_
+from sqlalchemy import and_, select
 from typing_extensions import final
 
 from app.commons import tracing
@@ -461,6 +461,37 @@ class CartPaymentRepository(PayinDBRepository):
             cancelled_at=row[pgp_payment_intents.cancelled_at],
         )
 
+    async def get_intent_pair_by_provider_charge_id(
+        self, provider_charge_id: str
+    ) -> Tuple[Optional[PaymentIntent], Optional[PgpPaymentIntent]]:
+        join_statement = payment_intents.table.join(
+            pgp_payment_intents.table,
+            payment_intents.id == pgp_payment_intents.payment_intent_id,
+        )
+
+        statement = (
+            select([payment_intents.table, pgp_payment_intents.table], use_labels=True)
+            .select_from(join_statement)
+            .where(pgp_payment_intents.charge_resource_id == provider_charge_id)
+        )
+
+        row = await self.payment_database.replica().fetch_one(statement)
+        if not row:
+            return None, None
+
+        row_intent = {
+            k: row[f"payment_intents_{k.name}"] for k in payment_intents.table.columns
+        }
+        row_pgp_intent = {
+            k: row[f"pgp_payment_intents_{k.name}"]
+            for k in pgp_payment_intents.table.columns
+        }
+
+        return (
+            self.to_payment_intent(row_intent),
+            self.to_pgp_payment_intent(row_pgp_intent),
+        )
+
     async def insert_payment_intent_adjustment_history(
         self,
         id: UUID,
@@ -846,3 +877,12 @@ class CartPaymentRepository(PayinDBRepository):
         )
         row = await self.main_database.replica().fetch_one(statement)
         return self.to_legacy_stripe_charge(row) if row else None
+
+    async def get_legacy_stripe_charges_by_charge_id(
+        self, charge_id: int
+    ) -> List[LegacyStripeCharge]:
+        statement = stripe_charges.table.select().where(
+            stripe_charges.charge_id == charge_id
+        )
+        results = await self.main_database.replica().fetch_all(statement)
+        return [self.to_legacy_stripe_charge(row) for row in results]

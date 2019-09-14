@@ -1,6 +1,4 @@
-from typing import Optional
-
-from app.payin.core.types import LegacyPaymentInfo
+from app.payin.core.types import LegacyPaymentInfo, CountryCode
 from app.payin.api.cart_payment.base.request import (
     CreateCartPaymentBaseRequest,
     UpdateCartPaymentBaseRequest,
@@ -8,8 +6,9 @@ from app.payin.api.cart_payment.base.request import (
 
 
 class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):
+    payer_country: CountryCode = CountryCode.US
     legacy_payment: LegacyPaymentInfo
 
 
 class UpdateCartPaymentLegacyRequest(UpdateCartPaymentBaseRequest):
-    legacy_payment: Optional[LegacyPaymentInfo] = None
+    payer_country: CountryCode = CountryCode.US

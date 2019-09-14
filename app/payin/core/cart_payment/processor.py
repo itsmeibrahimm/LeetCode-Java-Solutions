@@ -108,6 +108,41 @@ class LegacyPaymentInterface:
     ) -> LegacyStripeChargeStatus:
         return LegacyStripeChargeStatus(provider_status)
 
+    async def get_associated_cart_payment_id(
+        self, charge_id: int
+    ) -> Optional[uuid.UUID]:
+        # Based on legacy charge_id, look up legacy stripe_charges.  From one, grab the stripe id and use it to find the associated intent pair
+        # (we store the same stripe id in the pgp_payment_intent).  One the intent pair is in hand we can return the payment intent's cart_payment_id.
+        # This is a round about way to get the associated cart_payment id, but avoids the overhead and complexity of (a) persisting associated info
+        # in main db table,s (b) persisting legacy charge info in intents and recovering from partial failures when writing this info to multiple dbs.
+        # We keep the higher volume path (regular order creation) simpler at the expense of this more complicated lookup here.
+        # TODO: This is probably going away in favor of a direct relationship between payment_intent and legacy_charge_id, which will be introduced
+        # for command mode purposes (tbd).
+        self.req_context.log.debug(
+            f"Looking up stripe charges for charge_id {charge_id}"
+        )
+        legacy_stripe_charges = await self.payment_repo.get_legacy_stripe_charges_by_charge_id(
+            charge_id
+        )
+        if not legacy_stripe_charges:
+            self.req_context.log.warn(f"No stripe charges for charge_id {charge_id}")
+            return None
+
+        stripe_charge_id = legacy_stripe_charges[0].stripe_id
+        self.req_context.log.debug(
+            f"Looking up intent pair for stripe_charge_id {stripe_charge_id}"
+        )
+        payment_intent, pgp_payment_intent = await self.payment_repo.get_intent_pair_by_provider_charge_id(
+            stripe_charge_id
+        )
+        if not payment_intent:
+            return None
+
+        self.req_context.log.debug(
+            f"Found cart payment id {payment_intent.cart_payment_id}"
+        )
+        return payment_intent.cart_payment_id
+
     async def create_charge_after_payment_submitted(
         self,
         legacy_payment: LegacyPayment,
@@ -143,7 +178,8 @@ class LegacyPaymentInterface:
                     retryable=False,
                 )
             consumer_charge_id = existing_stripe_charge.charge_id
-            legacy_consumer_charge = None  # Nothing inserted so None will be returned.
+            # Nothing inserted so None will be returned.  Saves us from another query to maindb to get the full record.
+            legacy_consumer_charge = None
 
             # TODO check if legacy_charge amount needs updating
 
@@ -277,6 +313,15 @@ class CartPaymentInterface:
             payment_intents, self.can_payment_intent_be_refunded
         )
 
+    def get_submitted_or_captured_intents(self, payment_intents: List[PaymentIntent]):
+        return list(
+            filter(
+                lambda intent: intent.status
+                in [IntentStatus.REQUIRES_CAPTURE, IntentStatus.SUCCEEDED],
+                payment_intents,
+            )
+        )
+
     def _filter_payment_intents_by_function(
         self,
         payment_intents: List[PaymentIntent],
@@ -371,7 +416,7 @@ class CartPaymentInterface:
     def is_accessible(
         self,
         cart_payment: CartPayment,
-        request_payer_id: Optional[str],
+        request_payer_id: Optional[uuid.UUID],
         credential_owner: str,
     ) -> bool:
         # TODO verify the caller (as identified by the provided credentials for this request) owns the cart payment
@@ -1149,7 +1194,12 @@ class CartPaymentProcessor:
         provider_payment_intent: ProviderPaymentIntent,
         cart_metadata: CartMetadata,
         legacy_payment: LegacyPayment,
-    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+    ) -> Tuple[
+        PaymentIntent,
+        PgpPaymentIntent,
+        Optional[LegacyConsumerCharge],
+        LegacyStripeCharge,
+    ]:
         # Update state of payment in our system now that payment exists in provider
         payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_payment_after_submission_to_provider(
             payment_intent=payment_intent,
@@ -1158,7 +1208,7 @@ class CartPaymentProcessor:
         )
         # Also update state in our legacy system: ConsumerCharge/StripeCharge still used there until migration to new service
         # is entirely complete
-        await self.legacy_payment_interface.create_charge_after_payment_submitted(
+        legacy_consumer_charge, legacy_stripe_charge = await self.legacy_payment_interface.create_charge_after_payment_submitted(
             cart_metadata=cart_metadata,
             legacy_payment=legacy_payment,
             payment_intent=payment_intent,
@@ -1174,7 +1224,12 @@ class CartPaymentProcessor:
         ) and self.cart_payment_interface.does_intent_require_capture(payment_intent):
             await self.capture_payment(payment_intent)
 
-        return payment_intent, pgp_payment_intent
+        return (
+            payment_intent,
+            pgp_payment_intent,
+            legacy_consumer_charge,
+            legacy_stripe_charge,
+        )
 
     async def _update_state_after_refund_with_provider(
         self,
@@ -1309,9 +1364,25 @@ class CartPaymentProcessor:
             provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
         )
 
+        # Find the most recent intent that was submitted and get the stripe charge id from it.  It is used to update
+        # state in the legacy system (to find the charge record).
+        non_failed_intents = self.cart_payment_interface.get_submitted_or_captured_intents(
+            payment_intents
+        )
+        if non_failed_intents:
+            last_non_failed_intent = self.cart_payment_interface.get_most_recent_intent(
+                non_failed_intents
+            )
+            last_non_failed_pgp_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                last_non_failed_intent
+            )
+            legacy_payment.stripe_charge_id = (
+                last_non_failed_pgp_intent.charge_resource_id
+            )
+
         # Update state of payment in our system now that payment exists in provider.
         # Also takes care of triggering immediate capture if needed.
-        payment_intent, pgp_payment_intent = await self._update_state_after_submit_to_provider(
+        payment_intent, pgp_payment_intent, legacy_consumer_charge, legacy_stripe_charge = await self._update_state_after_submit_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
@@ -1390,11 +1461,57 @@ class CartPaymentProcessor:
 
         return payment_intent, pgp_payment_intent
 
+    async def update_payment_for_legacy_charge(
+        self,
+        idempotency_key: str,
+        dd_charge_id: int,
+        payer_id: Optional[str],
+        amount: int,
+        client_description: Optional[str],
+    ) -> CartPayment:
+        """Update an existing payment associated with a legacy consumer charge.
+
+        Arguments:
+            payment_method_repo {PaymentMethodRepository} -- Repo for accessing PaymentMethod and associated models.
+            idempotency_key {str} -- Client specified value for ensuring idempotency.
+            dd_charge_id {int} -- ID of the legacy consumer charge associated with the cart payment to adjust.
+            payer_id {str} -- ID of the payer who owns the specified cart payment.
+            amount {int} -- New amount to use for cart payment.
+            client_description {Optional[str]} -- New client description to use for cart payment.
+
+        Raises:
+            CartPaymentReadError: [description]
+            CartPaymentReadError: [description]
+            PaymentIntentNotInRequiresCaptureState: [description]
+            PaymentIntentConcurrentAccessError: [description]
+
+        Returns:
+            CartPayment -- [description]
+        """
+        cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(
+            dd_charge_id
+        )
+        if not cart_payment_id:
+            self.log.error(
+                f"Did not find cart payment for consumer charge {dd_charge_id}"
+            )
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
+
+        return await self.update_payment(
+            idempotency_key=idempotency_key,
+            cart_payment_id=cart_payment_id,
+            payer_id=None,  # Not currently used in udpate_payment
+            amount=amount,
+            client_description=client_description,
+        )
+
     async def update_payment(
         self,
         idempotency_key: str,
         cart_payment_id: uuid.UUID,
-        payer_id: Optional[str],
+        payer_id: Optional[uuid.UUID],
         amount: int,
         client_description: Optional[str],
     ) -> CartPayment:
@@ -1521,7 +1638,7 @@ class CartPaymentProcessor:
         country: str,
         currency: str,
         client_description: Optional[str],
-    ) -> CartPayment:
+    ) -> Tuple[CartPayment, LegacyPayment]:
         """Submit a cart payment creation request.
 
         Arguments:
@@ -1562,8 +1679,11 @@ class CartPaymentProcessor:
                 self.log.info(
                     f"[create_payment] Duplicate cart payment creation request for key {existing_payment_intent.idempotency_key}"
                 )
-                return self.cart_payment_interface.populate_cart_payment_for_response(
-                    existing_cart_payment, existing_payment_intent
+                return (
+                    self.cart_payment_interface.populate_cart_payment_for_response(
+                        existing_cart_payment, existing_payment_intent
+                    ),
+                    existing_legacy_payment,
                 )
 
             # We have record of the payment but it did not make it to provider.  Pick up where we left off by trying to submit to
@@ -1600,14 +1720,17 @@ class CartPaymentProcessor:
 
         # Update state of payment in our system now that payment exists in provider.
         # Also takes care of triggering immediate capture if needed.
-        payment_intent, pgp_payment_intent = await self._update_state_after_submit_to_provider(
+        payment_intent, pgp_payment_intent, legacy_consumer_charge, legacy_stripe_charge = await self._update_state_after_submit_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
             cart_metadata=request_cart_payment.cart_metadata,
             legacy_payment=legacy_payment,
         )
+        if legacy_consumer_charge:
+            legacy_payment.dd_charge_id = legacy_consumer_charge.id
 
-        return self.cart_payment_interface.populate_cart_payment_for_response(
+        self.cart_payment_interface.populate_cart_payment_for_response(
             cart_payment, payment_intent
         )
+        return cart_payment, legacy_payment

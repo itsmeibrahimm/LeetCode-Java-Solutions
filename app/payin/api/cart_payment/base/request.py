@@ -19,7 +19,6 @@ class CartMetadata(BaseModel):
 
 class CreateCartPaymentBaseRequest(BaseModel):
     amount: int
-    payer_country: CountryCode = CountryCode.US
     payment_country: CountryCode
     currency: str
     delay_capture: bool
@@ -33,5 +32,4 @@ class CreateCartPaymentBaseRequest(BaseModel):
 class UpdateCartPaymentBaseRequest(BaseModel):
     idempotency_key: str
     amount: int
-    payer_country: CountryCode = CountryCode.US
     client_description: Optional[str] = None
