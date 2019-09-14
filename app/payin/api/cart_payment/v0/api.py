@@ -1,10 +1,7 @@
 from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
-from app.payin.api.cart_payment.base.api import (
-    create_request_to_model,
-    get_legacy_payment_model,
-)
+from app.payin.api.cart_payment.base.api import create_request_to_model
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
@@ -18,6 +15,8 @@ from app.payin.core.exceptions import PayinErrorCode
 from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
+from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
+from typing import Optional
 
 from starlette.status import (
     HTTP_201_CREATED,
@@ -57,15 +56,15 @@ async def create_cart_payment_for_legacy_client(
             request_legacy_payment=get_legacy_payment_model(
                 cart_payment_request.legacy_payment
             ),
+            request_legacy_stripe_metadata=cart_payment_request.legacy_stripe_metadata,
+            request_legacy_correlation_ids=cart_payment_request.legacy_correlation_ids,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
             client_description=cart_payment_request.client_description,
         )
 
-        log.info(
-            f"Created cart_payment {cart_payment.id} of type {cart_payment.cart_metadata.type} for legacy client."
-        )
+        log.info(f"Created cart_payment {cart_payment.id} for legacy client.")
         return form_create_response(cart_payment, legacy_payment)
     except PaymentError as payment_error:
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
@@ -128,7 +127,7 @@ def form_create_response(
         payer_id=cart_payment.payer_id,
         payment_method_id=cart_payment.payment_method_id,
         delay_capture=cart_payment.delay_capture,
-        cart_metadata=cart_payment.cart_metadata,
+        correlation_ids=cart_payment.correlation_ids,
         created_at=cart_payment.created_at,
         updated_at=cart_payment.updated_at,
         client_description=cart_payment.client_description,
@@ -136,4 +135,24 @@ def form_create_response(
         split_payment=cart_payment.split_payment,
         capture_after=cart_payment.capture_after,
         deleted_at=cart_payment.deleted_at,
+    )
+
+
+def get_legacy_payment_model(
+    request_legacy_payment_info: Optional[RequestLegacyPaymentInfo]
+) -> Optional[LegacyPayment]:
+    if not request_legacy_payment_info:
+        return None
+
+    return LegacyPayment(
+        dd_consumer_id=request_legacy_payment_info.dd_consumer_id,
+        dd_stripe_card_id=request_legacy_payment_info.dd_stripe_card_id,
+        dd_country_id=request_legacy_payment_info.dd_country_id,
+        stripe_customer_id=getattr(
+            request_legacy_payment_info, "stripe_customer_id", None
+        ),
+        stripe_payment_method_id=getattr(
+            request_legacy_payment_info, "stripe_payment_method_id", None
+        ),
+        stripe_card_id=getattr(request_legacy_payment_info, "stripe_card_id", None),
     )

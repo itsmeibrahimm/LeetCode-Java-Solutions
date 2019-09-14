@@ -124,7 +124,7 @@ class CreatePaymentIntent(StripeBaseModel):
     confirmation_method: Optional[str]
     customer: Optional[CustomerId]
     description: Optional[str]
-    metadata: Optional[dict]
+    metadata: Optional[Dict[str, Any]]
     off_session: Optional[bool]  # only when confirm=True
     on_behalf_of: Optional[ConnectedAccountId]
     payment_method: Optional[PaymentMethodId]

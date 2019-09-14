@@ -1,7 +1,7 @@
 import pytest
 
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -15,8 +15,7 @@ from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
 from app.payin.tests.utils import FunctionMock, ContextMock
 from app.payin.core.cart_payment.model import (
     CartPayment,
-    CartMetadata,
-    CartType,
+    CorrelationIds,
     PaymentIntent,
     PgpPaymentIntent,
     PaymentCharge,
@@ -36,7 +35,6 @@ class MockedPaymentRepo:
         *,
         id: UUID,
         payer_id: str,
-        type: str,
         client_description: Optional[str],
         reference_id: str,
         reference_type: str,
@@ -44,6 +42,7 @@ class MockedPaymentRepo:
         amount_original: int,
         amount_total: int,
         delay_capture: bool,
+        metadata: Dict[str, Any],
         legacy_stripe_card_id: int,
         legacy_provider_customer_id: str,
         legacy_provider_payment_method_id: str,
@@ -55,11 +54,10 @@ class MockedPaymentRepo:
             amount=amount_total,
             payment_method_id=None,  # Not populated until after intent pair is also created
             client_description=client_description,
-            cart_metadata=CartMetadata(
-                reference_id=reference_id,
-                reference_type=reference_type,
-                type=CartType(type),
+            correlation_ids=CorrelationIds(
+                reference_id=reference_id, reference_type=reference_type
             ),
+            metadata=metadata,
             created_at=datetime.now(),
             updated_at=datetime.now(),
             delay_capture=delay_capture,
@@ -98,6 +96,7 @@ class MockedPaymentRepo:
         statement_descriptor: Optional[str],
         capture_after: Optional[datetime],
         payment_method_id: Optional[str],
+        metadata: Optional[Dict[str, Any]],
     ) -> PaymentIntent:
         return PaymentIntent(
             id=id,
@@ -115,6 +114,7 @@ class MockedPaymentRepo:
             status=IntentStatus.INIT,
             statement_descriptor=statement_descriptor,
             payment_method_id=payment_method_id,
+            metadata=metadata,
             created_at=datetime.now(),
             updated_at=datetime.now(),
             captured_at=None,

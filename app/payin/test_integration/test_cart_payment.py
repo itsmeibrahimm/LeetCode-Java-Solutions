@@ -112,11 +112,7 @@ class TestCartPayment:
             "delay_capture": delay_capture,
             "client_description": f"{payer['id']} description",
             "payer_statement_description": f"{payer['id'][0:10]} statement",
-            "cart_metadata": {
-                "reference_id": "123",
-                "reference_type": "5",
-                "type": "OrderCart",
-            },
+            "correlation_ids": {"reference_id": "123", "reference_type": "3"},
         }
 
         if not idempotency_key:
@@ -140,11 +136,8 @@ class TestCartPayment:
             "payer_statement_description": f"{legacy_stripe_customer_id}",
             "payer_country": "US",
             "payment_country": "US",
-            "cart_metadata": {
-                "reference_id": "123",
-                "reference_type": "5",
-                "type": "OrderCart",
-            },
+            "legacy_correlation_ids": {"reference_id": 123, "reference_type": 5},
+            "legacy_stripe_metadata": {"is_first_order": True},
             "legacy_payment": {
                 "stripe_customer_id": legacy_stripe_customer_id,
                 "stripe_payment_method_id": legacy_stripe_payment_method_id,
@@ -198,14 +191,13 @@ class TestCartPayment:
         assert cart_payment["payer_id"] is None
         assert cart_payment["payment_method_id"] is None
         assert cart_payment["delay_capture"] == request_body["delay_capture"]
-        assert cart_payment["cart_metadata"]
-        metadata = cart_payment["cart_metadata"]
-        assert metadata["reference_id"] == request_body["cart_metadata"]["reference_id"]
-        assert (
-            metadata["reference_type"]
-            == request_body["cart_metadata"]["reference_type"]
+        assert cart_payment["correlation_ids"]
+        assert cart_payment["correlation_ids"]["reference_id"] == str(
+            request_body["legacy_correlation_ids"]["reference_id"]
         )
-        assert metadata["type"] == request_body["cart_metadata"]["type"]
+        assert cart_payment["correlation_ids"]["reference_type"] == str(
+            request_body["legacy_correlation_ids"]["reference_type"]
+        )
         assert cart_payment["client_description"] == request_body["client_description"]
         statement_description = cart_payment["payer_statement_description"]
         assert statement_description == request_body["payer_statement_description"]
@@ -232,20 +224,23 @@ class TestCartPayment:
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
         cart_payment = response.json()
+        print(f"*** Response: {cart_payment}")
         assert cart_payment
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
         assert cart_payment["payer_id"] == payer["id"]
         assert cart_payment["payment_method_id"] == request_body["payment_method_id"]
         assert cart_payment["delay_capture"] == request_body["delay_capture"]
-        assert cart_payment["cart_metadata"]
-        metadata = cart_payment["cart_metadata"]
-        assert metadata["reference_id"] == request_body["cart_metadata"]["reference_id"]
+        assert cart_payment["correlation_ids"]
         assert (
-            metadata["reference_type"]
-            == request_body["cart_metadata"]["reference_type"]
+            cart_payment["correlation_ids"]["reference_id"]
+            == request_body["correlation_ids"]["reference_id"]
         )
-        assert metadata["type"] == request_body["cart_metadata"]["type"]
+        assert (
+            cart_payment["correlation_ids"]["reference_type"]
+            == request_body["correlation_ids"]["reference_type"]
+        )
+        assert cart_payment["metadata"] is None
         assert cart_payment["client_description"] == request_body["client_description"]
         statement_description = cart_payment["payer_statement_description"]
         assert statement_description == request_body["payer_statement_description"]
@@ -297,7 +292,7 @@ class TestCartPayment:
         assert body["payer_id"] == cart_payment["payer_id"]
         assert body["payment_method_id"] == cart_payment["payment_method_id"]
         assert body["delay_capture"] == cart_payment["delay_capture"]
-        assert body["cart_metadata"] == cart_payment["cart_metadata"]
+        assert body["correlation_ids"] == cart_payment["correlation_ids"]
         assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
@@ -364,7 +359,7 @@ class TestCartPayment:
         assert body["payer_id"] == cart_payment["payer_id"]
         assert body["payment_method_id"] == cart_payment["payment_method_id"]
         assert body["delay_capture"] == cart_payment["delay_capture"]
-        assert body["cart_metadata"] == cart_payment["cart_metadata"]
+        assert body["correlation_ids"] == cart_payment["correlation_ids"]
         assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]

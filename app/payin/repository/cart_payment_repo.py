@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List, Optional, Tuple, AsyncIterator
+from typing import Any, List, Optional, Tuple, Dict, AsyncIterator
 from uuid import UUID
 
 from IPython.utils.tz import utcnow
@@ -11,7 +11,6 @@ from app.commons import tracing
 from app.commons.database.query import paged_query
 from app.payin.core.cart_payment.model import (
     CartPayment,
-    CartMetadata,
     PaymentIntent,
     PgpPaymentIntent,
     PaymentIntentAdjustmentHistory,
@@ -20,6 +19,7 @@ from app.payin.core.cart_payment.model import (
     LegacyConsumerCharge,
     LegacyStripeCharge,
     LegacyPayment,
+    CorrelationIds,
 )
 from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
@@ -44,7 +44,6 @@ class CartPaymentRepository(PayinDBRepository):
         *,
         id: UUID,
         payer_id: Optional[UUID],
-        type: str,
         client_description: Optional[str],
         reference_id: str,
         reference_type: str,
@@ -52,6 +51,7 @@ class CartPaymentRepository(PayinDBRepository):
         amount_original: int,
         amount_total: int,
         delay_capture: bool,
+        metadata: Optional[Dict[str, Any]],
         legacy_stripe_card_id: int,
         legacy_provider_customer_id: str,
         legacy_provider_payment_method_id: str,
@@ -60,7 +60,6 @@ class CartPaymentRepository(PayinDBRepository):
         data = {
             cart_payments.id: id,
             cart_payments.payer_id: payer_id,
-            cart_payments.type: type,
             cart_payments.client_description: client_description,
             cart_payments.reference_id: reference_id,
             cart_payments.reference_type: reference_type,
@@ -68,6 +67,7 @@ class CartPaymentRepository(PayinDBRepository):
             cart_payments.amount_original: amount_original,
             cart_payments.amount_total: amount_total,
             cart_payments.delay_capture: delay_capture,
+            cart_payments.metadata: metadata,
             cart_payments.legacy_stripe_card_id: legacy_stripe_card_id,
             cart_payments.legacy_provider_customer_id: legacy_provider_customer_id,
             cart_payments.legacy_provider_payment_method_id: legacy_provider_payment_method_id,
@@ -91,11 +91,11 @@ class CartPaymentRepository(PayinDBRepository):
             capture_method=None,
             payment_method_id=None,
             client_description=row[cart_payments.client_description],
-            cart_metadata=CartMetadata(
+            correlation_ids=CorrelationIds(
                 reference_id=row[cart_payments.reference_id],
                 reference_type=row[cart_payments.reference_type],
-                type=row[cart_payments.type],
             ),
+            metadata=row[cart_payments.metadata],
             created_at=row[cart_payments.created_at],
             updated_at=row[cart_payments.updated_at],
             delay_capture=row[cart_payments.delay_capture],
@@ -199,6 +199,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement_descriptor: Optional[str],
         capture_after: Optional[datetime],
         payment_method_id: Optional[UUID],
+        metadata: Optional[Dict[str, Any]],
     ) -> PaymentIntent:
         data = {
             payment_intents.id: id,
@@ -215,6 +216,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents.statement_descriptor: statement_descriptor,
             payment_intents.capture_after: capture_after,
             payment_intents.payment_method_id: payment_method_id,
+            payment_intents.metadata: metadata,
         }
 
         statement = (
@@ -243,6 +245,7 @@ class CartPaymentRepository(PayinDBRepository):
             status=IntentStatus(row[payment_intents.status]),
             statement_descriptor=row[payment_intents.statement_descriptor],
             payment_method_id=row[payment_intents.payment_method_id],
+            metadata=row[payment_intents.metadata],
             created_at=row[payment_intents.created_at],
             updated_at=row[payment_intents.updated_at],
             captured_at=row[payment_intents.captured_at],

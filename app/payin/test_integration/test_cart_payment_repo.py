@@ -7,8 +7,8 @@ from datetime import datetime
 from app.commons.types import CountryCode, LegacyCountryId, CurrencyType
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
-    CartMetadata,
     CartPayment,
+    CorrelationIds,
     LegacyPayment,
     LegacyConsumerCharge,
     LegacyStripeCharge,
@@ -22,7 +22,6 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     CaptureMethod,
     ConfirmationMethod,
-    CartType,
     ChargeStatus,
     LegacyStripeChargeStatus,
 )
@@ -78,13 +77,13 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
     yield await cart_payment_repository.insert_cart_payment(
         id=uuid4(),
         payer_id=cast(UUID, payer.id),
-        type=CartType.ORDER_CART,
         amount_original=99,
         amount_total=100,
         client_description=None,
         reference_id="99",
         reference_type="88",
         delay_capture=False,
+        metadata=None,
         legacy_consumer_id=1,
         legacy_stripe_card_id=1,
         legacy_provider_customer_id="stripe_customer_id",
@@ -101,7 +100,6 @@ async def payment_intent(
     await cart_payment_repository.insert_cart_payment(
         id=cart_payment_id,
         payer_id=payer.id,
-        type=CartType.ORDER_CART,
         amount_original=99,
         amount_total=100,
         client_description=None,
@@ -109,6 +107,7 @@ async def payment_intent(
         reference_type="88",
         legacy_consumer_id=None,
         delay_capture=False,
+        metadata=None,
         legacy_stripe_card_id=1,
         legacy_provider_customer_id="stripe_customer_id",
         legacy_provider_payment_method_id="stripe_payment_method_id",
@@ -130,6 +129,7 @@ async def payment_intent(
         statement_descriptor=None,
         capture_after=datetime(2019, 1, 1),
         payment_method_id=payment_method.id,
+        metadata={"is_first_order": True},
     )
     yield payment_intent
 
@@ -244,6 +244,7 @@ class TestPaymentIntent:
             status=payment_intent.status,
             statement_descriptor=payment_intent.statement_descriptor,
             payment_method_id=payment_intent.payment_method_id,
+            metadata=payment_intent.metadata,
             created_at=payment_intent.created_at,
             updated_at=result.updated_at,  # Don't know generated date ahead of time
             captured_at=payment_intent.captured_at,
@@ -276,6 +277,7 @@ class TestPaymentIntentAdjustmentHistory:
             statement_descriptor=None,
             capture_after=None,
             payment_method_id=payment_method.id,
+            metadata=None,
         )
 
         id = uuid4()
@@ -729,13 +731,13 @@ class TestCartPayment:
         result = await cart_payment_repository.insert_cart_payment(
             id=id,
             payer_id=UUID(str(payer.id)),
-            type=CartType.ORDER_CART,
             amount_original=99,
             amount_total=100,
             client_description="Test description",
             reference_id="99",
             reference_type="88",
             delay_capture=True,
+            metadata=None,
             legacy_consumer_id=1,
             legacy_stripe_card_id=1,
             legacy_provider_customer_id="stripe_customer_id",
@@ -749,9 +751,8 @@ class TestCartPayment:
             payer_id=payer.id,
             payment_method_id=None,  # Derived field
             delay_capture=True,
-            cart_metadata=CartMetadata(
-                reference_id="99", reference_type="88", type=CartType.ORDER_CART
-            ),
+            correlation_ids=CorrelationIds(reference_id="99", reference_type="88"),
+            metadata=None,
             created_at=result.created_at,  # Generated field
             updated_at=result.updated_at,  # Generated field
             client_description="Test description",

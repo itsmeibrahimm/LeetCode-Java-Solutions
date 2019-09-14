@@ -1,10 +1,10 @@
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
 from typing_extensions import final
-from app.payin.core.cart_payment.types import CartType, IntentStatus, ChargeStatus
+from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
 from uuid import UUID
 
 
@@ -21,16 +21,21 @@ class LegacyPayment(BaseModel):
 
 
 @final
-class SplitPayment(BaseModel):
-    payout_account_id: str
-    application_fee_amount: int
+class LegacyCorrelationIds(BaseModel):
+    reference_type: int
+    reference_id: int
 
 
 @final
-class CartMetadata(BaseModel):
+class CorrelationIds(BaseModel):
     reference_id: str
     reference_type: str
-    type: CartType
+
+
+@final
+class SplitPayment(BaseModel):
+    payout_account_id: str
+    application_fee_amount: int
 
 
 class CartPayment(BaseModel):
@@ -39,7 +44,8 @@ class CartPayment(BaseModel):
     payer_id: Optional[UUID]
     payment_method_id: Optional[UUID]
     delay_capture: bool
-    cart_metadata: CartMetadata
+    correlation_ids: CorrelationIds
+    metadata: Optional[Dict[str, Any]]
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     client_description: Optional[str] = None
@@ -66,6 +72,7 @@ class PaymentIntent(BaseModel):
     status: IntentStatus
     statement_descriptor: Optional[str]
     payment_method_id: Optional[UUID]
+    metadata: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
     captured_at: Optional[datetime]

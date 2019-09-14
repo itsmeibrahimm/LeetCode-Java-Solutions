@@ -3,7 +3,7 @@ from asyncio import gather
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from structlog.stdlib import BoundLogger
-from typing import Tuple, List, Optional, Callable
+from typing import Tuple, List, Optional, Callable, Dict, Any
 from typing_extensions import final
 
 from fastapi import Depends
@@ -30,11 +30,12 @@ from app.commons.providers.stripe.stripe_models import (
 from app.commons.types import CountryCode, LegacyCountryId, CurrencyType
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
-    CartMetadata,
     CartPayment,
+    CorrelationIds,
     LegacyPayment,
     LegacyConsumerCharge,
     LegacyStripeCharge,
+    LegacyCorrelationIds,
     PaymentIntent,
     PgpPaymentIntent,
     PaymentCharge,
@@ -146,7 +147,7 @@ class LegacyPaymentInterface:
     async def create_charge_after_payment_submitted(
         self,
         legacy_payment: LegacyPayment,
-        cart_metadata: CartMetadata,
+        correlation_ids: CorrelationIds,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_intent: ProviderPaymentIntent,
@@ -192,8 +193,8 @@ class LegacyPaymentInterface:
                 f"[create_charge_after_payment_submitted] Creating new charge"
             )
             legacy_consumer_charge = await self.payment_repo.insert_legacy_consumer_charge(
-                target_ct_id=int(cart_metadata.reference_type),
-                target_id=int(cart_metadata.reference_id),
+                target_ct_id=int(correlation_ids.reference_type),
+                target_id=int(correlation_ids.reference_id),
                 consumer_id=legacy_payment.dd_consumer_id,
                 idempotency_key=payment_intent.idempotency_key,
                 is_stripe_connect_based=is_stripe_connect_based,
@@ -435,6 +436,7 @@ class CartPaymentInterface:
         legacy_payment: LegacyPayment,
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
+        provider_metadata: Optional[Dict[str, Any]],
         idempotency_key: str,
         country: str,
         currency: str,
@@ -465,13 +467,13 @@ class CartPaymentInterface:
             cart_payment = await self.payment_repo.insert_cart_payment(
                 id=request_cart_payment.id,
                 payer_id=request_cart_payment.payer_id,
-                type=request_cart_payment.cart_metadata.type,
                 client_description=request_cart_payment.client_description,
-                reference_id=request_cart_payment.cart_metadata.reference_id,
-                reference_type=request_cart_payment.cart_metadata.reference_type,
+                reference_id=request_cart_payment.correlation_ids.reference_id,
+                reference_type=request_cart_payment.correlation_ids.reference_type,
                 amount_original=request_cart_payment.amount,
                 amount_total=request_cart_payment.amount,
                 delay_capture=request_cart_payment.delay_capture,
+                metadata=request_cart_payment.metadata,
                 # Legacy fields are associated with the cart_payment instance to support idempotency and
                 # adjusting amount without the client having to provide full payment info again.  But these
                 # fields are considered deprecated and will be removed once clients upgrade to new payin API.
@@ -494,6 +496,7 @@ class CartPaymentInterface:
                 payment_method_id=request_cart_payment.payment_method_id,
                 provider_payment_resource_id=provider_payment_resource_id,
                 provider_customer_resource_id=provider_customer_resource_id,
+                provider_metadata=provider_metadata,
                 amount=request_cart_payment.amount,
                 country=country,
                 currency=currency,
@@ -562,6 +565,7 @@ class CartPaymentInterface:
         payment_method_id: Optional[uuid.UUID],
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
+        provider_metadata: Optional[Dict[str, Any]],
         amount: int,
         country: str,
         currency: str,
@@ -587,6 +591,7 @@ class CartPaymentInterface:
             statement_descriptor=payer_statement_description,
             capture_after=capture_after,
             payment_method_id=payment_method_id,
+            metadata=provider_metadata,
         )
 
         # Create PgpPaymentIntent
@@ -636,6 +641,7 @@ class CartPaymentInterface:
                 payment_method=provider_payment_resource_id,
                 customer=provider_customer_resource_id,
                 statement_descriptor=payment_intent.statement_descriptor,
+                metadata=payment_intent.metadata,
             )
 
             self.req_context.log.debug(
@@ -987,6 +993,7 @@ class CartPaymentInterface:
                 payment_method_id=most_recent_intent.payment_method_id,
                 provider_payment_resource_id=pgp_intent.payment_method_resource_id,
                 provider_customer_resource_id=pgp_intent.customer_resource_id,
+                provider_metadata=most_recent_intent.metadata,
                 amount=amount,
                 country=most_recent_intent.country,
                 currency=most_recent_intent.currency,
@@ -1192,7 +1199,7 @@ class CartPaymentProcessor:
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_intent: ProviderPaymentIntent,
-        cart_metadata: CartMetadata,
+        correlation_ids: CorrelationIds,
         legacy_payment: LegacyPayment,
     ) -> Tuple[
         PaymentIntent,
@@ -1209,7 +1216,7 @@ class CartPaymentProcessor:
         # Also update state in our legacy system: ConsumerCharge/StripeCharge still used there until migration to new service
         # is entirely complete
         legacy_consumer_charge, legacy_stripe_charge = await self.legacy_payment_interface.create_charge_after_payment_submitted(
-            cart_metadata=cart_metadata,
+            correlation_ids=correlation_ids,
             legacy_payment=legacy_payment,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
@@ -1386,7 +1393,7 @@ class CartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-            cart_metadata=cart_payment.cart_metadata,
+            correlation_ids=cart_payment.correlation_ids,
             legacy_payment=legacy_payment,
         )
 
@@ -1634,6 +1641,8 @@ class CartPaymentProcessor:
         self,
         request_cart_payment: CartPayment,
         request_legacy_payment: Optional[LegacyPayment],
+        request_legacy_stripe_metadata: Optional[Dict[str, Any]],
+        request_legacy_correlation_ids: Optional[LegacyCorrelationIds],
         idempotency_key: str,
         country: CountryCode,
         currency: CurrencyType,
@@ -1652,6 +1661,20 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- A CartPayment model for the created payment.
         """
+        # Overload the correlation IDs for the legacy case, since they end up persisted in the same fields of the cart payment.
+        if (
+            not request_cart_payment.correlation_ids.reference_id
+            and request_legacy_correlation_ids
+        ):
+            request_cart_payment.correlation_ids = CorrelationIds(
+                reference_id=str(request_legacy_correlation_ids.reference_id),
+                reference_type=str(request_legacy_correlation_ids.reference_type),
+            )
+
+        # TODO Check country, currency are supported values
+        # amount is positive
+        # reference_id/reference_type are supported values as defined by agreements with other teams
+
         # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
         # our exception handling middleware.
         payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_required_payment_resource_ids(
@@ -1704,6 +1727,7 @@ class CartPaymentProcessor:
                 legacy_payment=legacy_payment,
                 provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
                 provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
+                provider_metadata=request_legacy_stripe_metadata,
                 idempotency_key=idempotency_key,
                 country=country,
                 currency=currency,
@@ -1725,7 +1749,7 @@ class CartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-            cart_metadata=request_cart_payment.cart_metadata,
+            correlation_ids=request_cart_payment.correlation_ids,
             legacy_payment=legacy_payment,
         )
         if legacy_consumer_charge:

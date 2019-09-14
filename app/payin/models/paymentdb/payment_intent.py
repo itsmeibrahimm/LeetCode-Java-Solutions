@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, String, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -31,6 +31,7 @@ class PaymentIntentTable(TableDefinition):
     payment_method_id: Column = no_init_field(
         Column("payment_method_id", UUID(as_uuid=True))
     )
+    metadata: Column = no_init_field(Column("metadata", JSON))
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
     captured_at: Column = no_init_field(Column("captured_at", DateTime(False)))

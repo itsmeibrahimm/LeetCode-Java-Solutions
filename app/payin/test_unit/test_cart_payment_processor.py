@@ -76,6 +76,8 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 request_legacy_payment=None,
+                request_legacy_stripe_metadata=None,
+                request_legacy_correlation_ids=None,
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
@@ -122,6 +124,8 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 request_legacy_payment=None,
+                request_legacy_stripe_metadata=None,
+                request_legacy_correlation_ids=None,
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
@@ -146,6 +150,8 @@ class TestCartPaymentProcessor:
         result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
+            request_legacy_stripe_metadata=None,
+            request_legacy_correlation_ids=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
@@ -175,6 +181,8 @@ class TestCartPaymentProcessor:
         result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
+            request_legacy_stripe_metadata=None,
+            request_legacy_correlation_ids=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
@@ -190,6 +198,8 @@ class TestCartPaymentProcessor:
         second_result_cart_payment, second_result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
+            request_legacy_stripe_metadata=None,
+            request_legacy_correlation_ids=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
@@ -361,7 +371,7 @@ class TestCartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-            cart_metadata=cart_payment.cart_metadata,
+            correlation_ids=cart_payment.correlation_ids,
             legacy_payment=generate_legacy_payment(),
         )
 

@@ -102,7 +102,7 @@ class TestLegacyPaymentInterface:
         legacy_payment.stripe_charge_id = None
         result_consumer_charge, result_stripe_charge = await legacy_payment_interface.create_charge_after_payment_submitted(
             legacy_payment=legacy_payment,
-            cart_metadata=cart_payment.cart_metadata,
+            correlation_ids=cart_payment.correlation_ids,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_intent,
@@ -110,8 +110,8 @@ class TestLegacyPaymentInterface:
 
         expected_consumer_charge = LegacyConsumerCharge(
             id=result_consumer_charge.id,  # Generated
-            target_id=int(cart_payment.cart_metadata.reference_id),
-            target_ct_id=int(cart_payment.cart_metadata.reference_type),
+            target_id=int(cart_payment.correlation_ids.reference_id),
+            target_ct_id=int(cart_payment.correlation_ids.reference_type),
             idempotency_key=payment_intent.idempotency_key,
             is_stripe_connect_based=False,
             total=cart_payment.amount,
@@ -164,7 +164,7 @@ class TestLegacyPaymentInterface:
         legacy_payment.stripe_charge_id = str(uuid.uuid4())
         result_consumer_charge, result_stripe_charge = await legacy_payment_interface.create_charge_after_payment_submitted(
             legacy_payment=legacy_payment,
-            cart_metadata=cart_payment.cart_metadata,
+            correlation_ids=cart_payment.correlation_ids,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_intent,
@@ -567,14 +567,15 @@ class TestCartPaymentInterface:
         currency = "USD"
         client_description = "test"
         result_cart_payment, result_payment_intent, result_pgp_payment_intent = await cart_payment_interface.create_new_payment(
-            request_cart_payment,
-            legacy_payment,
-            payment_resource_id,
-            customer_resource_id,
-            idempotency_key,
-            country,
-            currency,
-            client_description,
+            request_cart_payment=request_cart_payment,
+            legacy_payment=legacy_payment,
+            provider_payment_resource_id=payment_resource_id,
+            provider_customer_resource_id=customer_resource_id,
+            provider_metadata=None,
+            idempotency_key=idempotency_key,
+            country=country,
+            currency=currency,
+            client_description=client_description,
         )
 
         expected_cart_payment = deepcopy(request_cart_payment)
@@ -704,6 +705,7 @@ class TestCartPaymentInterface:
             payment_method_id=cart_payment.payment_method_id,
             provider_payment_resource_id="provider_payment_resource_id",
             provider_customer_resource_id="provider_customer_resource_id",
+            provider_metadata={"is_first_order": False},
             amount=cart_payment.amount,
             country="US",
             currency="USD",
@@ -728,6 +730,7 @@ class TestCartPaymentInterface:
             status=IntentStatus.INIT,
             statement_descriptor=None,
             payment_method_id=cart_payment.payment_method_id,
+            metadata={"is_first_order": False},
             created_at=result_intent.created_at,  # Generated field
             updated_at=result_intent.updated_at,  # Generated field
             capture_after=capture_after,
@@ -1060,7 +1063,7 @@ class TestCartPaymentInterface:
         assert cart_payment.id == original_cart_payment.id
         assert cart_payment.amount == original_cart_payment.amount
         assert cart_payment.payer_id == original_cart_payment.payer_id
-        assert cart_payment.cart_metadata == original_cart_payment.cart_metadata
+        assert cart_payment.correlation_ids == original_cart_payment.correlation_ids
         assert cart_payment.created_at == original_cart_payment.created_at
         assert cart_payment.updated_at == original_cart_payment.updated_at
         assert cart_payment.deleted_at == original_cart_payment.deleted_at

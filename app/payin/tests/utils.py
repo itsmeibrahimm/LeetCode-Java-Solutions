@@ -7,8 +7,7 @@ from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
     CartPayment,
-    CartMetadata,
-    CartType,
+    CorrelationIds,
     PaymentCharge,
     PgpPaymentCharge,
     LegacyPayment,
@@ -122,9 +121,7 @@ def generate_cart_payment(
         payer_id=payer_id,
         payment_method_id=payment_method_id,
         capture_method=capture_method,
-        cart_metadata=CartMetadata(
-            reference_id="0", reference_type="2", type=CartType.ORDER_CART
-        ),
+        correlation_ids=CorrelationIds(reference_id="0", reference_type="2"),
         delay_capture=True,
     )
 

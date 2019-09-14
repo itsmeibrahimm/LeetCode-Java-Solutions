@@ -8,15 +8,14 @@ from app.commons.types import CountryCode, CurrencyType
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
-    CartMetadata,
     CartPayment,
+    CorrelationIds,
     PgpPaymentIntent,
 )
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     CaptureMethod,
     ConfirmationMethod,
-    CartType,
 )
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
@@ -44,13 +43,13 @@ async def payment_intent(
         id=cart_payment.id,
         payer_id=payer_db_entity.id,
         client_description=cart_payment.client_description,
-        type=cart_payment.cart_metadata.type,
-        reference_id=cart_payment.cart_metadata.reference_id,
-        reference_type=cart_payment.cart_metadata.reference_type,
+        reference_id=cart_payment.correlation_ids.reference_id,
+        reference_type=cart_payment.correlation_ids.reference_type,
         amount_original=100,
         legacy_consumer_id=None,
         amount_total=200,
         delay_capture=False,
+        metadata=None,
         legacy_stripe_card_id=1,
         legacy_provider_customer_id="stripe_customer_id",
         legacy_provider_payment_method_id="stripe_payment_method_id",
@@ -81,6 +80,7 @@ async def payment_intent(
         statement_descriptor=payment_intent.statement_descriptor,
         capture_after=datetime(2016, 1, 1),
         payment_method_id=payment_intent.payment_method_id,
+        metadata=None,
     )
 
 
@@ -122,16 +122,9 @@ class CartPaymentFactory(factory.Factory):
     payment_method_id = None
     capture_method = None
     client_description = "Maccas Order"
-    metadata = CartMetadata(
-        reference_id="1", reference_type="2", type=CartType.ORDER_CART
-    )
+    metadata = None
     delay_capture = True
-    cart_metadata = {
-        "reference_id": 1,
-        "reference_ct_id": 2,
-        "reference_type": "OrderCart",
-        "type": "Drive",
-    }
+    correlation_ids = CorrelationIds(reference_id="1", reference_type="2")
 
 
 class PayerFactory(factory.Factory):

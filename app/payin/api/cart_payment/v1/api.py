@@ -58,10 +58,10 @@ async def create_cart_payment(
     - **delay_capture**: [bool] whether to capture immediately or delay
     - **idempotency_key**: [string] idempotency key to submit the payment
     - **client_description** [string] client description
-    - **metadata** [json object] key-value map for cart metadata
-    - **metadata.reference_id** [int] DoorDash order_cart id
-    - **metadata.ct_reference_id** [int] DoorDash order_cart content-type id
-    - **metadata.type** [string] type of reference_id. Valid values are "OrderCart", "Drive", "Subscription"
+    - **metadata** [json object] key-value map for client specified metadata.  Not interpreted, but stored info with cart_payment.
+    - **correlation_ids** [json object] Container for referential information to store along with the payment.
+    - **correlation_ids.reference_id **- [string] Identifier of external entity this payment is for.  Currently supported: numeric order ID (pass in order ID within this string).
+    - **correlation_ids.reference_type **- [string] Type of external identifier provided.  Currently supported: numeric model type ID (pass in type ID within this string).
     - **payer_statement_description** [string] payer_statement_description
     - **split_payment** [json object] information for flow of funds
     - **split_payment.payout_account_id** [string] merchant's payout account id. Now it is stripe_managed_account_id
@@ -76,6 +76,8 @@ async def create_cart_payment(
             # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
             request_cart_payment=create_request_to_model(cart_payment_request),
             request_legacy_payment=None,
+            request_legacy_stripe_metadata=None,
+            request_legacy_correlation_ids=None,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
@@ -83,7 +85,7 @@ async def create_cart_payment(
         )
 
         log.info(
-            f"Created cart_payment {cart_payment.id} of type {cart_payment.cart_metadata.type} for payer {cart_payment.payer_id}"
+            f"Created cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
         )
         # Legacy info not returned for new V1 API
         return cart_payment
