@@ -9,13 +9,14 @@ from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiS
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
-from app.commons.jobs.pool import JobPool
+from app.commons.instrumentation.pool import stat_resource_pool_jobs
+from app.commons.jobs.pool import JobPool, adjust_pool_sizes
+from app.commons.runtime import runtime
 from app.commons.stats import init_global_statsd
 from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
 )
-from app.commons.instrumentation.pool import stat_resource_pool_jobs
 
 
 def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
@@ -80,6 +81,10 @@ scheduler.add_job(
     trigger="cron",
     minutes="*/1",
     kwargs={"statsd_client": doorstats_global},
+)
+
+scheduler.add_job(
+    adjust_pool_sizes, trigger="cron", second="*/30", kwargs={"runtime": runtime}
 )
 
 scheduler.start()
