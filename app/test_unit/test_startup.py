@@ -145,7 +145,7 @@ class TestStartup:
             # see https://github.com/benoitc/gunicorn/blob/f38f717539b1b7296720805b8ae3969c3509b9c1/gunicorn/arbiter.py#L581
             # current worker should shut down
             gunicorn.expect(
-                [f"Worker exiting \(pid: {worker.pid}\)"],
+                [f"Worker exiting \\(pid: {worker.pid}\\)"],
                 timeout=self.TIMEOUT_SECONDS,  # noqa W605
             )
 

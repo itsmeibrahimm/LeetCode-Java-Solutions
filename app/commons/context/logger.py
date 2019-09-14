@@ -1,22 +1,39 @@
 import logging
+import datetime
 import os
 import platform
 import sys
-from typing import Callable
+from typing import Callable, Dict, Optional
+from typing_extensions import Protocol
 
 import structlog
+from contextvars import ContextVar
+import uuid
 from pythonjsonlogger import jsonlogger
+
+REQUEST_ID: ContextVar[Optional[uuid.UUID]] = ContextVar("REQUEST_ID")
 
 # see https://github.com/madzak/python-json-logger/blob/master/src/pythonjsonlogger/jsonlogger.py#L18
 # for a list of supported fields and reserved attributes for logging
-from typing_extensions import Protocol
-
-INCLUDED_LOG_FIELDS = "(req_id) (correlation_id) (timestamp) (name) (message)"
+INCLUDED_LOG_FIELDS = "(name) (message)"
 
 is_debug = os.environ.get("ENVIRONMENT") in ("local", "testing")
 
+
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    def add_fields(
+        self, log_record: Dict, record: logging.LogRecord, message_dict: Dict
+    ):
+        super().add_fields(log_record, record, message_dict)
+        logger_add_timestamp(log_record, record, message_dict)
+        logger_add_log_level(log_record, record, message_dict)
+        logger_add_app_info(log_record, record, message_dict)
+        logger_add_thread(log_record, record, message_dict)
+        logger_add_request_id(log_record, record, message_dict)
+
+
 _handler = logging.StreamHandler(sys.stdout)
-_formatter = jsonlogger.JsonFormatter(INCLUDED_LOG_FIELDS)
+_formatter = CustomJsonFormatter(INCLUDED_LOG_FIELDS)
 _handler.setFormatter(_formatter)
 
 _sys_logger = logging.getLogger()
@@ -24,6 +41,56 @@ _sys_logger.setLevel(logging.INFO)
 if is_debug:
     _sys_logger.setLevel(logging.DEBUG)
 _sys_logger.addHandler(_handler)
+
+
+def set_request_id(uuid: uuid.UUID):
+    REQUEST_ID.set(uuid)
+
+
+def logger_add_timestamp(
+    log_record: Dict, record: logging.LogRecord, message_dict: Dict
+):
+    if "timestamp" not in log_record:
+        log_record["timestamp"] = (
+            datetime.datetime.fromtimestamp(record.created).isoformat() + "Z"
+        )
+
+
+def logger_add_log_level(
+    log_record: Dict, record: logging.LogRecord, message_dict: Dict
+):
+    if log_record.get("level"):
+        log_record["level"] = log_record["level"].upper()
+    else:
+        log_record["level"] = record.levelname
+
+
+def logger_add_app_info(
+    log_record: Dict, record: logging.LogRecord, message_dict: Dict
+):
+    if "pid" not in log_record:
+        log_record["pid"] = os.getpid()
+    if "hostname" not in log_record:
+        log_record["hostname"] = platform.node()
+    if "app" not in log_record:
+        log_record["app"] = {
+            "name": "payment-service",
+            "env": os.environ["ENVIRONMENT"],
+        }
+
+
+def logger_add_thread(log_record: Dict, record: logging.LogRecord, message_dict: Dict):
+    if record.threadName != "MainThread":
+        log_record["thread"] = record.threadName
+
+
+def logger_add_request_id(
+    log_record: Dict, record: logging.LogRecord, message_dict: Dict
+):
+    if "req_id" not in log_record:
+        req_id = REQUEST_ID.get(None)
+        if req_id:
+            log_record["req_id"] = str(req_id)
 
 
 def add_log_level(logger: structlog.BoundLogger, log_level: str, event_dict: dict):

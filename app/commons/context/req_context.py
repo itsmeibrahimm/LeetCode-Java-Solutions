@@ -14,6 +14,7 @@ from app.commons.context.app_context import AppContext, get_context_from_app
 from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.runtime import runtime
+from app.commons.context.logger import set_request_id
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ def set_context_for_req(request: Request) -> ReqContext:
     app_context = get_context_from_app(request.app)
 
     req_id = uuid4()
+    set_request_id(req_id)
     correlation_id = request.headers.get(EXTERNAL_CORRELATION_ID_HEADER, None)
     log = app_context.log.bind(req_id=req_id, correlation_id=correlation_id)
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
