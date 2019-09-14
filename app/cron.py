@@ -79,7 +79,7 @@ scheduler.add_job(
 scheduler.add_job(
     scheduler_heartbeat,
     trigger="cron",
-    minutes="*/1",
+    minute="*/1",
     kwargs={"statsd_client": doorstats_global},
 )
 
