@@ -357,10 +357,9 @@ def stat_func_timing(tracker: "FuncTimingManager", timer: "FuncTimer"):
 
 
 class FuncTimer(tracing.BaseTimer):
-    def __init__(self, func_name: str, additional_ignores: Optional[List[str]]):
+    def __init__(self, func_name: str):
         super().__init__()
         self.func_name = func_name
-        self.additional_ignores = additional_ignores
 
 
 class FuncTimingManager(tracing.TimingManager[FuncTimer]):
@@ -390,7 +389,7 @@ class FuncTimingManager(tracing.TimingManager[FuncTimer]):
         args: List[Any],
         kwargs: Dict[str, Any],
     ) -> FuncTimer:
-        return FuncTimer(func_name=self.func_name, additional_ignores=[])
+        return FuncTimer(func_name=self.func_name)
 
 
 def track_func(func=None, stat_name: str = None):

@@ -285,6 +285,7 @@ class AioEngine(DBEngine, timing.Database):
                 timeout=self.default_client_stmt_timeout_sec,
                 # timeout=self.connection_timeout_sec,
                 echo=self.debug,
+                enable_hstore=False,
             )
         return self
 

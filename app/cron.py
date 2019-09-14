@@ -9,12 +9,13 @@ from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiS
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
-from app.commons.jobs.pool import monitor_pools, JobPool
+from app.commons.jobs.pool import JobPool
 from app.commons.stats import init_global_statsd
 from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
 )
+from app.commons.instrumentation.pool import stat_resource_pool_jobs
 
 
 def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
@@ -51,6 +52,13 @@ loop = asyncio.get_event_loop()
 app_context = loop.run_until_complete(create_app_context(app_config))
 
 stripe_pool = JobPool.create_pool(size=10, name="stripe")
+app_context.monitor.add(
+    stat_resource_pool_jobs(
+        stat_prefix="resource.job_pools",
+        pool_name=stripe_pool.name,
+        pool_job_stats=stripe_pool,
+    )
+)
 
 
 scheduler.add_job(
@@ -71,13 +79,6 @@ scheduler.add_job(
     scheduler_heartbeat,
     trigger="cron",
     minutes="*/1",
-    kwargs={"statsd_client": doorstats_global},
-)
-
-scheduler.add_job(
-    monitor_pools,
-    trigger="cron",
-    second="*/30",
     kwargs={"statsd_client": doorstats_global},
 )
 

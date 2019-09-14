@@ -17,6 +17,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
+    monitor = mocker.Mock()
     logger = mocker.Mock()
     payout_bankdb = mocker.Mock()
     payin_maindb = mocker.Mock()
@@ -27,6 +28,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
 
     # fake context
     context = AppContext(
+        monitor=monitor,
         log=logger,
         payout_maindb=payout_maindb,
         payout_bankdb=payout_bankdb,

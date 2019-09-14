@@ -9,7 +9,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.applications import FastAPI
 from app.commons.config.app_config import AppConfig
-from app.commons.context.logger import root_logger
+from app.commons.context.logger import root_logger, get_logger
 from app.commons.database.infra import DB
 from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.identity_client import (
@@ -22,10 +22,17 @@ from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
 from app.commons.utils.pool import ThreadPoolHelper
 
+from doordash_python_stats.ddstats import doorstats_global
+from app.commons.instrumentation.monitor import MonitoringManager
+from app.commons.instrumentation.eventloop import stat_process_event_loop
+from app.commons.instrumentation.pool import stat_thread_pool_jobs
+
 
 @dataclass(frozen=True)
 class AppContext:
     log: BoundLogger
+
+    monitor: MonitoringManager
 
     payout_maindb: DB
     payout_bankdb: DB
@@ -43,6 +50,9 @@ class AppContext:
     identity_client: IdentityClientInterface
 
     async def close(self):
+        # stop monitoring various application resources
+        self.monitor.stop()
+
         try:
             await gather(
                 # Too many Databases here, we may need to create some "manager" to push them down
@@ -61,6 +71,13 @@ class AppContext:
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
+
+    # periodic monitoring for application resources
+    monitor_logger = get_logger("monitoring")
+    monitor = MonitoringManager(logger=monitor_logger, stats_client=doorstats_global)
+
+    # monitor: asyncio event loop
+    monitor.add(stat_process_event_loop())
 
     # Pick up a maindb replica upfront and use it for all instances targeting maindb
     # Not do randomization separately in each creation to reduce the chance that
@@ -138,6 +155,12 @@ async def create_app_context(config: AppConfig) -> AppContext:
     stripe_thread_pool = ThreadPoolHelper(
         max_workers=config.STRIPE_MAX_WORKERS, prefix="stripe"
     )
+    # monitor: stripe thread pool
+    monitor.add(
+        stat_thread_pool_jobs(
+            pool_name="stripe", pool_job_stats=stripe_thread_pool.executor
+        )
+    )
 
     dsj_client = DSJClient(
         {
@@ -160,6 +183,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     context = AppContext(
         log=root_logger,
+        monitor=monitor,
         payout_maindb=payout_maindb,
         payout_bankdb=payout_bankdb,
         payin_maindb=payin_maindb,
@@ -172,6 +196,8 @@ async def create_app_context(config: AppConfig) -> AppContext:
         stripe_thread_pool=stripe_thread_pool,
     )
 
+    # start monitoring
+    monitor.start()
     context.log.debug("app context created")
 
     return context

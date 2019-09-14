@@ -3,10 +3,10 @@ from typing import List
 from asyncio_pool import AioPool
 
 # Pool that should be used if the job makes a call to Stripe
-from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
+from app.commons.instrumentation.types import PoolJobStats
 
 
-class JobPool(AioPool):
+class JobPool(AioPool, PoolJobStats):
 
     pools: List["JobPool"] = []
 
@@ -20,18 +20,14 @@ class JobPool(AioPool):
         cls.pools.append(pool)
         return pool
 
+    @property
+    def waiting_job_count(self):
+        return len(self._waiting)
 
-async def monitor_pools(statsd_client: DoorStatsProxyMultiServer):
-    """
+    @property
+    def active_job_count(self):
+        return self.n_active
 
-    Monitors the size of job pools
-
-    :return:
-    """
-    for pool in JobPool.pools:
-        tags = {"pool": pool.name}
-        statsd_client.gauge(
-            "job_pools.waiting_job_count", len(pool._waiting), tags=tags
-        )
-        statsd_client.gauge("job_pools.active_job_count", pool.n_active, tags=tags)
-        statsd_client.gauge("job_pools.total_job_count", len(pool), tags=tags)
+    @property
+    def total_job_count(self):
+        return len(self)

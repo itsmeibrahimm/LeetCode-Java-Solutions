@@ -223,6 +223,7 @@ async def ledger_paymentdb(app_config: AppConfig):
 @pytest.fixture
 def dummy_app_context(mocker: MockFixture):
     return AppContext(
+        monitor=mocker.Mock(),
         log=mocker.Mock(),
         payout_bankdb=mocker.Mock(),
         payin_maindb=mocker.Mock(),

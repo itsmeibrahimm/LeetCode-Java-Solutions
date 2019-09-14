@@ -204,49 +204,42 @@ class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
         # class or instance
         return func_or_class
 
+    def _start_tracker(self, stack: ExitStack, *, obj=Unspecified, func, args, kwargs):
+        # NOTE: context manager exits are called in reverse order
+        tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
+        # process_tracker callback is the last thing called,
+        # will be called even if the exception is not suppressed
+        stack.callback(self.process_tracker, tracker)
+        # enter the context manager; __exit__ callback will be called
+        stack.enter_context(tracker)
+        return tracker
+
+    def _exit_tracker(self, tracker, result):
+        try:
+            if isinstance(tracker, BaseTracker):
+                tracker.process_result(result)
+        except Exception:
+            default_logger.warn("exception occurred processing tracker", exc_info=True)
+
     def _sync_wrapper(self, *, obj=Unspecified, func, args, kwargs):
         with ExitStack() as stack:
-            # NOTE: context manager exits are called in reverse order
-            tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
-            # process_tracker callback is the last thing called,
-            # will be called even if the exception is not suppressed
-            stack.callback(self.process_tracker, tracker)
-            # enter the context manager; __exit__ callback will be called
-            stack.enter_context(tracker)
-
+            tracker = self._start_tracker(
+                stack, obj=obj, func=func, args=args, kwargs=kwargs
+            )
             # get and process the result; suppress any issues processing
             result = func(*args, **kwargs)
-            try:
-                if isinstance(tracker, BaseTracker):
-                    tracker.process_result(result)
-            except Exception:
-                default_logger.warn(
-                    "exception occurred processing tracker", exc_info=True
-                )
-            finally:
-                return result
+            self._exit_tracker(tracker, result)
+            return result
 
     async def _async_wrapper(self, *, obj=Unspecified, func, args, kwargs):
         with ExitStack() as stack:
-            # NOTE: context manager exits are called in reverse order
-            tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
-            # process_tracker callback is the last thing called,
-            # will be called even if the exception is not suppressed
-            stack.callback(self.process_tracker, tracker)
-            # enter the context manager; __exit__ callback will be called
-            stack.enter_context(tracker)
-
+            tracker = self._start_tracker(
+                stack, obj=obj, func=func, args=args, kwargs=kwargs
+            )
             # get and process the result; suppress any issues processing
             result = await func(*args, **kwargs)
-            try:
-                if isinstance(tracker, BaseTracker):
-                    tracker.process_result(result)
-            except Exception:
-                default_logger.warn(
-                    "exception occurred processing tracker", exc_info=True
-                )
-            finally:
-                return result
+            self._exit_tracker(tracker, result)
+            return result
 
     def _decorate_class_method(self, func):
         if asyncio.iscoroutinefunction(func):

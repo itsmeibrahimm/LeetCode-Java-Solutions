@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 import contextvars
 import logging
@@ -5,10 +6,31 @@ import pytest
 import threading
 import time
 
-from app.commons.utils.pool import ThreadPoolHelper
+from app.commons.utils.pool import ThreadPoolHelper, MonitoredThreadPoolExecutor
 
 
-class TestPool:
+@pytest.mark.asyncio
+async def test_threadpool_stats():
+    def task():
+        time.sleep(0.2)
+
+    with MonitoredThreadPoolExecutor(max_workers=5) as executor:
+        assert executor.waiting_job_count == 0
+        assert executor.active_job_count == 0
+        assert executor.total_job_count == 0
+        tasks = [asyncio.wrap_future(executor.submit(task)) for i in range(10)]
+        assert executor.active_job_count <= 5, "some jobs may have started"
+        assert executor.waiting_job_count >= 5, "some jobs may have started"
+        assert executor.total_job_count == 10
+
+        done, pending = await asyncio.wait(tasks, timeout=0.5)
+
+        assert len(done) == 10, "all tasks are finished within timeout"
+        assert len(pending) == 0, "no tasks are pending"
+        assert executor.waiting_job_count == 0
+
+
+class TestPoolHelper:
     # ensure these tests run in the event loop
     pytestmark = pytest.mark.asyncio
 
