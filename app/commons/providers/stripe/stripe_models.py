@@ -208,7 +208,7 @@ class CancelPayout(StripeBaseModel):
     stripe_account: str
 
 
-class UpdateStripeDispute(StripeBaseModel):
+class UpdateDispute(StripeBaseModel):
     class Evidence(StripeBaseModel):
         access_activity_log: Optional[str] = None
         billing_address: Optional[str] = None

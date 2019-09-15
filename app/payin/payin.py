@@ -57,7 +57,7 @@ def create_payin_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
 
     auto_commando_routers = group_routers(
-        [dispute.v1.router, payer.v1.router, payment_method.v1.router],
+        [payer.v1.router, payment_method.v1.router],
         dependencies=[Depends(commando_route_dependency)],
     )
     custom_commando_routers = group_routers([cart_payment.v1.router, webhook.v1.router])

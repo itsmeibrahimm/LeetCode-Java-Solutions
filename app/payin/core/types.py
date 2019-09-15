@@ -56,7 +56,7 @@ class PaymentMethodIdType(str, Enum):
     """
 
     PAYMENT_METHOD_ID = "payment_method_id"
-    DD_STRIPE_CARD_SERIAL_ID = "dd_stripe_card_id"  # used for payment_methods APIs
+    DD_STRIPE_CARD_ID = "dd_stripe_card_id"  # used for payment_methods APIs
     STRIPE_PAYMENT_METHOD_ID = (
         "stripe_payment_method_id"
     )  # used for payment_methods APIs

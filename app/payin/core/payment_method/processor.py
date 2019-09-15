@@ -176,7 +176,7 @@ class PaymentMethodClient:
             )
         elif payment_method_id_type in (
             PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID,
-            PaymentMethodIdType.DD_STRIPE_CARD_SERIAL_ID,
+            PaymentMethodIdType.DD_STRIPE_CARD_ID,
         ):
             pm_interface = LegacyPaymentMethodOps(
                 log=self.log, payment_method_repo=self.payment_method_repo
@@ -341,20 +341,6 @@ class PaymentMethodClient:
         stripe_card_ids = [entity.id for entity in stripe_customer_db_entities]
         return stripe_card_ids
 
-    async def get_stripe_card_id_by_id(self, id: int) -> Optional[str]:
-        try:
-            stripe_card_db_entity = await self.payment_method_repo.get_stripe_card_by_id(
-                input=GetStripeCardByIdInput(id=id)
-            )
-        except DataError as e:
-            self.log.error(
-                f"[get_stripe_card_id_by_id][{id}]DataError when read db: {e}"
-            )
-            raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
-            )
-        return stripe_card_db_entity.stripe_id if stripe_card_db_entity else None
-
     async def get_stripe_card_ids_for_consumer_id(self, consumer_id: int):
         stripe_card_db_entities = await self.payment_method_repo.get_stripe_cards_by_consumer_id(
             input=GetStripeCardsByConsumerIdInput(consumer_id=consumer_id)
@@ -386,7 +372,7 @@ class PaymentMethodProcessor:
         self,
         pgp_code: str,
         token: str,
-        payer_id: Optional[str] = None,
+        payer_id: UUID = None,
         dd_consumer_id: Optional[str] = None,
         stripe_customer_id: Optional[str] = None,
         country: Optional[CountryCode] = CountryCode.US,
@@ -403,7 +389,7 @@ class PaymentMethodProcessor:
         :return:
         """
 
-        # step 1: lookup stripe_customer_id by payer_id from Payers table if not present
+        # step 1: lookup pgp_customer_resource_id and country information
         # TODO: retrieve pgp_resouce_id from pgp_customers table, instead of payers.legacy_stripe_customer_id
         if not (payer_id or dd_consumer_id or stripe_customer_id):
             self.log.info(f"[create_payment_method] invalid input. must provide id")
@@ -412,30 +398,39 @@ class PaymentMethodProcessor:
                 retryable=False,
             )
 
-        pgp_customer_id: Optional[str]
-        if stripe_customer_id:
-            pgp_customer_id = stripe_customer_id
-        else:
-            raw_payer: RawPayer
-            if payer_id:
-                raw_payer = await self.payer_client.get_raw_payer(
-                    payer_id, PayerIdType.PAYER_ID
-                )
+        pgp_customer_res_id: Optional[str]
+        pgp_country: Optional[CountryCode] = country
+        raw_payer: RawPayer
+        if payer_id:
+            raw_payer = await self.payer_client.get_raw_payer(
+                payer_id, PayerIdType.PAYER_ID
+            )
+            pgp_customer_res_id = raw_payer.pgp_customer_id()
+            pgp_country = raw_payer.country()
+        else:  # v0 path with legacy information
+            if stripe_customer_id:
+                pgp_customer_res_id = stripe_customer_id
             else:
                 raw_payer = await self.payer_client.get_raw_payer(
                     dd_consumer_id, PayerIdType.DD_CONSUMER_ID
                 )
-            pgp_customer_id = raw_payer.pgp_customer_id()
+                pgp_customer_res_id = raw_payer.pgp_customer_id()
 
         # TODO: perform Payer's lazy creation
 
         # step 2: create and attach PGP payment_method
         stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_create_and_attach_payment_method(
-            token=token, pgp_customer_id=pgp_customer_id, country=country, attached=True
+            token=token,
+            pgp_customer_id=pgp_customer_res_id,
+            country=pgp_country,
+            attached=True,
         )
 
         self.log.info(
-            f"[create_payment_method][{payer_id}] create stripe payment_method [{stripe_payment_method.id}] completed and attached to customer [{pgp_customer_id}]"
+            "[create_payment_method] create stripe payment_method completed and attached to customer",
+            payer_id=payer_id,
+            pgp_customer_res_id=pgp_customer_res_id,
+            pgp_payment_method_res_id=stripe_payment_method.id,
         )
 
         # step 3: crete pgp_payment_method and stripe_card objects
@@ -467,13 +462,13 @@ class PaymentMethodProcessor:
         :return: PaymentMethod object.
         """
 
-        # TODO: step 1: if force_update is true, we should retrieve the payment_method from GPG
-
-        # step 2: retrieve data from DB
+        # step 1: retrieve data from DB
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
             payment_method_id=payment_method_id,
             payment_method_id_type=payment_method_id_type,
         )
+
+        # TODO: step 2: if force_update is true, we should retrieve the payment_method from GPG
 
         return raw_payment_method.to_payment_method()
 
@@ -481,7 +476,7 @@ class PaymentMethodProcessor:
         self,
         payer_id: str,
         payer_id_type: str = None,
-        country: CountryCode = CountryCode.US,
+        country: Optional[CountryCode] = CountryCode.US,
         active_only: bool = False,
         sort_by: SortKey = SortKey.CREATED_AT,
         force_update: bool = None,
@@ -491,15 +486,13 @@ class PaymentMethodProcessor:
     async def delete_payment_method(
         self,
         payment_method_id: str,
-        country: CountryCode,
-        payment_method_id_type: str = None,
+        payment_method_id_type: Optional[str] = None,
+        country: Optional[CountryCode] = CountryCode.US,
     ) -> PaymentMethod:
         """
         Implementation of delete/detach a payment method.
 
-        :param payer_id:
         :param payment_method_id:
-        :param payer_id_type:
         :param payment_method_id_type:
         :param country:
         :return: PaymentMethod object
@@ -671,7 +664,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     GetStripeCardByStripeIdInput(stripe_id=payment_method_id)
                 )
 
-            elif payment_method_id_type == PaymentMethodIdType.DD_STRIPE_CARD_SERIAL_ID:
+            elif payment_method_id_type == PaymentMethodIdType.DD_STRIPE_CARD_ID:
                 # get stripe_card object
                 sc_entity = await self.payment_method_repo.get_stripe_card_by_id(
                     GetStripeCardByIdInput(id=int(payment_method_id))

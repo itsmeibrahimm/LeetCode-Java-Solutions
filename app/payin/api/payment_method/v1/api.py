@@ -1,11 +1,9 @@
-from typing import Optional
 from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.commons.types import CountryCode
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
 
 from starlette.requests import Request
@@ -22,7 +20,6 @@ from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import SortKey
-from app.payin.core.types import PayerIdType, PaymentMethodIdType, MixedUuidStrType
 
 api_tags = ["PaymentMethodV1"]
 router = APIRouter()
@@ -53,37 +50,21 @@ async def create_payment_method(
     - **payment_gateway**: [string] external payment gateway provider name.
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
-    - **legacy_payment_info**: [json object] legacy information for DSJ backward compatibility.
-    - **legacy_payment_info.country**: [string] country code of DoorDash consumer
-    - **legacy_payment_info.dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
-    - **legacy_payment_info.stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
     """
     log.info("[create_payment_method] receive request. payer_id:%s", req_body.payer_id)
 
-    dd_consumer_id: Optional[str] = None
-    stripe_customer_id: Optional[str] = None
-    country: Optional[CountryCode] = CountryCode.US
-    if req_body.legacy_payment_info:
-        dd_consumer_id = req_body.legacy_payment_info.dd_consumer_id
-        stripe_customer_id = req_body.legacy_payment_info.stripe_customer_id
-        if req_body.legacy_payment_info.country:
-            country = req_body.legacy_payment_info.country
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
             payer_id=req_body.payer_id,
             pgp_code=req_body.payment_gateway,
             token=req_body.token,
-            dd_consumer_id=dd_consumer_id,
-            stripe_customer_id=stripe_customer_id,
-            country=country,
+            # dd_consumer_id=dd_consumer_id,
+            # stripe_customer_id=stripe_customer_id,
+            # country=country,
         )
-        log.info(
-            f"[create_payment_method][{req_body.payer_id}][{dd_consumer_id}][{stripe_customer_id}] completed."
-        )
+        log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError as e:
-        log.error(
-            f"[create_payment_method][{req_body.payer_id}][{dd_consumer_id}][{stripe_customer_id}] PaymentError."
-        )
+        log.error(f"[create_payment_method][{req_body.payer_id}] PaymentError. {e}")
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
             http_status = HTTP_400_BAD_REQUEST
         elif e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value:
@@ -112,11 +93,7 @@ async def create_payment_method(
 )
 async def get_payment_method(
     request: Request,
-    payer_id: MixedUuidStrType,
     payment_method_id: str,
-    country: CountryCode = CountryCode.US,
-    payer_id_type: PayerIdType = None,
-    payment_method_id_type: PaymentMethodIdType = None,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
@@ -124,37 +101,22 @@ async def get_payment_method(
     """
     Get a payment method for payer on DoorDash payments platform
 
-    - **payer_id**: [string] DoorDash payer id. For backward compatibility, payer_id can be payer_id,
-                    stripe_customer_id, or stripe_customer_serial_id
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
                              can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
-    - **country**: country of DoorDash payer (consumer)
-    - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-                        "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
-    - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values include
-                                  "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
-                                  (default is "dd_payment_method_id")
     - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
     """
 
     log.info(
-        "[get_payment_method] receive request: payer_id=%s, payment_method_id=%s, payer_id_type=%s, payment_method_id_type=%s, force_update=%s",
-        payer_id,
-        payment_method_id,
-        payer_id_type,
-        payment_method_id_type,
-        force_update,
+        "[get_payment_method] receive request", payment_method_id=payment_method_id
     )
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.get_payment_method(
-            payment_method_id=payment_method_id,
-            payment_method_id_type=payment_method_id_type,
-            force_update=force_update,
+            payment_method_id=payment_method_id, force_update=force_update
         )
     except PaymentError as e:
         log.warn(
-            f"[get_payment_method][{payer_id}][{payment_method_id}] PaymentMethodReadError."
+            f"[get_payment_method][{payment_method_id}] PaymentMethodReadError. {e}"
         )
         raise PaymentException(
             http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -179,7 +141,6 @@ async def get_payment_method(
 async def list_payment_methods(
     request: Request,
     payer_id: str,
-    country: CountryCode = CountryCode.US,
     active_only: bool = False,
     sort_by: SortKey = SortKey.CREATED_AT,
     force_update: bool = None,
@@ -187,13 +148,15 @@ async def list_payment_methods(
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     log.info(
-        f"[list_payment_method] receive request payer_id:{payer_id} country:{country} active_only:{active_only} force_update:{force_update}"
+        f"[list_payment_method] receive request",
+        payer_id=payer_id,
+        active_only=active_only,
+        force_update=force_update,
     )
 
     try:
         payment_methods_list: PaymentMethodList = await payment_method_processor.list_payment_methods(
             payer_id=payer_id,
-            country=country,
             active_only=active_only,
             sort_by=sort_by,
             force_update=force_update,
@@ -218,38 +181,24 @@ async def list_payment_methods(
 )
 async def delete_payment_method(
     request: Request,
-    payer_id: MixedUuidStrType,
     payment_method_id: str,
-    country: CountryCode = CountryCode.US,
-    payer_id_type: PayerIdType = None,
-    payment_method_id_type: PaymentMethodIdType = None,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     """
     Detach a payment method for payer on DoorDash payments platform
 
-    - **payer_id**: [string] DoorDash payer id. For backward compatibility, payer_id can be payer_id,
-                    stripe_customer_id, or stripe_customer_serial_id
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id can
                              be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
-    - **country**: country of DoorDash payer (consumer)
-    - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-                         "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
-    - **payment_method_id_type**: [string] identify the type of payment_method_id. Valid values including
-                                  "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
-                                  (default is "dd_payment_method_id")
     """
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.delete_payment_method(
-            payment_method_id=payment_method_id,
-            country=country,
-            payment_method_id_type=payment_method_id_type,
+            payment_method_id=payment_method_id
         )
     except PaymentError as e:
         log.error(
-            f"[delete_payment_method][{payment_method_id}] PaymentMethodReadError."
+            f"[delete_payment_method][{payment_method_id}] PaymentMethodReadError. {e}"
         )
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
             http_status = HTTP_404_NOT_FOUND

@@ -13,13 +13,14 @@ from app.commons.context.req_context import (
     get_stripe_async_client_from_req,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.commons.types import CountryCode
 from app.payin.core.dispute.model import (
     Dispute,
     DisputeList,
     DisputeChargeMetadata,
     Evidence,
 )
-from app.commons.providers.stripe.stripe_models import UpdateStripeDispute
+from app.commons.providers.stripe.stripe_models import UpdateDispute
 from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import (
     DisputeReadError,
@@ -29,6 +30,7 @@ from app.payin.core.exceptions import (
 from app.payin.core.exceptions import DisputeUpdateError
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.processor import PayerClient
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import PaymentMethodIdType
 from app.payin.repository.dispute_repo import (
@@ -96,11 +98,13 @@ class DisputeClient:
             )
         return dispute_entity.to_stripe_dispute()
 
-    async def pgp_submit_dispute_evidence(self, dispute_id: str, evidence: Evidence):
+    async def pgp_submit_dispute_evidence(
+        self, dispute_id: str, evidence: Evidence, country: CountryCode
+    ):
         try:
-            request = UpdateStripeDispute(sid=dispute_id, evidence=evidence)
-            response = await self.stripe_async_client.update_stripe_dispute(
-                request=request
+            request = UpdateDispute(sid=dispute_id, evidence=evidence)
+            response = await self.stripe_async_client.update_dispute(
+                country=country, request=request
             )
         except StripeError as e:
             self.log.error(f"Error updating the stripe dispute: {e}")
@@ -271,20 +275,6 @@ class DisputeClient:
         ]
         return disputes
 
-    async def get_stripe_card_stripe_id(self, id: int):
-        stripe_card_stripe_id = await self.payment_method_client.get_stripe_card_id_by_id(
-            id=id
-        )
-        if stripe_card_stripe_id is None:
-            self.log.warn(
-                "[get_dispute_charge_metadata] No stripe card associated with the dispute"
-            )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_NO_STRIPE_CARD_FOR_STRIPE_ID,
-                retryable=False,
-            )
-        return stripe_card_stripe_id
-
     async def get_dispute_charge_metadata_object(
         self, dispute_id: str, dispute_id_type: Optional[str] = None
     ) -> DisputeChargeMetadata:
@@ -320,14 +310,15 @@ class DisputeClient:
                 error_code=PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE,
                 retryable=False,
             )
-        stripe_card_id = await self.payment_method_client.get_stripe_card_id_by_id(
-            id=stripe_dispute_entity.stripe_card_id
+        raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
+            payment_method_id=str(stripe_dispute_entity.stripe_card_id),
+            payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
         )
         dispute_charge_metadata_object = DisputeChargeMetadata(
             dd_order_cart_id=str(consumer_charge_entity.target_id),
             dd_charge_id=str(consumer_charge_entity.id),
             dd_consumer_id=str(consumer_charge_entity.consumer_id),
-            stripe_card_id=stripe_card_id,
+            stripe_card_id=raw_pm.pgp_payment_method_id(),
             stripe_dispute_status=stripe_dispute_entity.status,
             stripe_dispute_reason=stripe_dispute_entity.reason,
         )
@@ -358,7 +349,9 @@ class DisputeProcessor:
         )
         return dispute
 
-    async def submit_dispute_evidence(self, stripe_dispute_id: str, evidence: Evidence):
+    async def submit_dispute_evidence(
+        self, stripe_dispute_id: str, evidence: Evidence, country: CountryCode
+    ):
         # Step 1: validate existence of dispute object from DB.
         dispute: Dispute = await self.dispute_client.get_raw_dispute(
             dispute_id=stripe_dispute_id,
@@ -367,7 +360,7 @@ class DisputeProcessor:
 
         # Step 2: submit evidence to Payment Provider.
         await self.dispute_client.pgp_submit_dispute_evidence(
-            dispute_id=dispute.stripe_dispute_id, evidence=evidence
+            dispute_id=dispute.stripe_dispute_id, evidence=evidence, country=country
         )
         submitted_at: datetime = datetime.utcnow()
 

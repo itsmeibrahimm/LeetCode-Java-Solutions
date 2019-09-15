@@ -1,6 +1,7 @@
 from typing import List
 
 import pytest
+from asynctest import MagicMock
 
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.dispute.types import DisputeIdType
@@ -148,9 +149,16 @@ class TestDisputeClient:
                 generate_consumer_charge_entity(),
             )
         )
-        dispute_client.payment_method_client.get_stripe_card_id_by_id = FunctionMock(
-            return_value="VALID_CARD_ID"
+
+        mock_stripe_card_entity = MagicMock(stripe_id="VALID_CARD_ID")
+        mock_raw_payment_method: RawPaymentMethod = RawPaymentMethod(
+            stripe_card_entity=mock_stripe_card_entity
         )
+
+        dispute_client.payment_method_client.get_raw_payment_method_without_payer_auth = FunctionMock(
+            return_value=mock_raw_payment_method
+        )
+
         result = await dispute_client.get_dispute_charge_metadata_object(
             dispute_id="1", dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID
         )

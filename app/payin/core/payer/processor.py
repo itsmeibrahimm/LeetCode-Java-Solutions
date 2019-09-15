@@ -343,9 +343,9 @@ class PayerProcessor:
     async def get(
         self,
         payer_id: str,
-        country: CountryCode,
         payer_id_type: Optional[str],
         payer_type: Optional[str],
+        country: Optional[CountryCode] = CountryCode.US,
         force_update: Optional[bool] = False,
     ):
         """
@@ -363,11 +363,12 @@ class PayerProcessor:
             f"[get_payer_impl] payer_id:{payer_id}, payer_id_type:{payer_id_type}"
         )
 
-        # TODO: if force_update is true, we should retrieve the customer from PGP
-
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
+
+        # TODO: if force_update is true, we should retrieve the customer from PGP
+
         return raw_payer.to_payer()
 
     async def update(

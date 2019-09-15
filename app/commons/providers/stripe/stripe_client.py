@@ -171,7 +171,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def update_stripe_dispute(
-        self, request: models.UpdateStripeDispute
+        self, request: models.UpdateDispute
     ) -> models.StripeDisputeId:
         """
         Update a Dispute
@@ -463,7 +463,7 @@ class StripeClient(StripeClientInterface):
 
     @tracing.track_breadcrumb(resource="stripedispute", action="modify")
     def update_stripe_dispute(
-        self, request: models.UpdateStripeDispute
+        self, request: models.UpdateDispute
     ) -> models.StripeDisputeId:
         dispute = stripe.Dispute.modify(**request.dict(skip_defaults=True))
         return dispute.id
@@ -764,8 +764,8 @@ class StripeAsyncClient:
             idempotency_key=idempotency_key,
         )
 
-    async def update_stripe_dispute(
-        self, request: models.UpdateStripeDispute
+    async def update_dispute(
+        self, country: models.CountryCode, request: models.UpdateDispute
     ) -> models.StripeDisputeId:
         return await self.executor_pool.submit(
             self.stripe_client.update_stripe_dispute, request

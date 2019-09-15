@@ -12,6 +12,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
+from app.commons.types import CountryCode
 from app.payin.core.dispute.model import Evidence, DisputeChargeMetadata
 from app.commons.core.errors import PaymentError
 from app.payin.core.dispute.model import Dispute, DisputeList
@@ -77,6 +78,7 @@ async def get_dispute(
 async def submit_dispute_evidence(
     stripe_dispute_id: str,
     evidence: Evidence,
+    country: CountryCode = CountryCode.US,
     log: BoundLogger = Depends(get_logger_from_req),
     dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
 ) -> Dispute:
@@ -85,7 +87,7 @@ async def submit_dispute_evidence(
     )
     try:
         dispute: Dispute = await dispute_processor.submit_dispute_evidence(
-            stripe_dispute_id=stripe_dispute_id, evidence=evidence
+            stripe_dispute_id=stripe_dispute_id, evidence=evidence, country=country
         )
     except PaymentError as e:
         raise PaymentException(

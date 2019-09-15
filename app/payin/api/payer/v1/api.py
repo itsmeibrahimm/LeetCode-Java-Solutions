@@ -4,7 +4,6 @@ from structlog.stdlib import BoundLogger
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.commons.types import CountryCode
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payer.model import Payer
@@ -64,7 +63,7 @@ async def create_payer(
             country=req_body.country,
             description=req_body.description,
         )
-        log.info("[create_payer] onboard_payer() completed.")
+        log.info("[create_payer] completed.")
     except PaymentError as e:
         raise PaymentException(
             http_status_code=(
@@ -92,7 +91,6 @@ async def create_payer(
 )
 async def get_payer(
     payer_id: str,
-    country: CountryCode = CountryCode.US,
     payer_id_type: PayerIdType = None,
     payer_type: PayerType = None,
     force_update: bool = False,
@@ -114,7 +112,6 @@ async def get_payer(
     try:
         payer: Payer = await payer_processor.get(
             payer_id=payer_id,
-            country=country,
             payer_id_type=payer_id_type,
             payer_type=payer_type,
             force_update=force_update,

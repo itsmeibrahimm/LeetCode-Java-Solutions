@@ -23,7 +23,7 @@ def test_create_payment_method_with_invalid_input():
         assert e.status == 422
 
 
-def test_create_payment_method_with_missing_input():
+def test_create_payment_method_with_missing_payer_id():
     try:
         payment_method_v1_client.create_payment_method_with_http_info(
             create_payment_method_request={
@@ -32,7 +32,7 @@ def test_create_payment_method_with_missing_input():
             }
         )
     except ApiException as e:
-        assert e.status == 400
+        assert e.status == 422
 
 
 def test_get_payment_method_with_invalid_input():
@@ -101,6 +101,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     assert get_payment_method[0].deleted_at is not None
 
 
+@pytest.mark.skip(reason="need to update client lib to change to v0 api")
 def test_create_get_delete_payment_method_with_payer_id_and_stripe_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
