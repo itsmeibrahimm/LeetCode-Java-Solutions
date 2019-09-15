@@ -79,8 +79,8 @@ class RawPayer:
         self.pgp_customer_entity = pgp_customer_entity
         self.stripe_customer_entity = stripe_customer_entity
 
-    def country(self):
-        country: str
+    def country(self) -> Optional[str]:
+        country: Optional[str] = None
         if self.payer_entity:
             country = self.payer_entity.country
         elif self.stripe_customer_entity:

@@ -399,7 +399,7 @@ class PaymentMethodProcessor:
             )
 
         pgp_customer_res_id: Optional[str]
-        pgp_country: Optional[CountryCode] = country
+        pgp_country: Optional[str] = country
         raw_payer: RawPayer
         if payer_id:
             raw_payer = await self.payer_client.get_raw_payer(
@@ -513,7 +513,7 @@ class PaymentMethodProcessor:
             )
 
         # step 3: detach PGP payment method
-        country_code: CountryCode = CountryCode.US
+        country_code: Optional[str] = CountryCode.US
         if country:
             country_code = country
         else:
@@ -521,7 +521,9 @@ class PaymentMethodProcessor:
                 country_code = raw_payer.country()
             else:
                 self.log.info(
-                    f"[delete_payment_method][{payment_method_id}][{payment_method_id_type}] use default country code US"
+                    "[delete_payment_method] use default country code US",
+                    payment_method_id=payment_method_id,
+                    payment_method_id_type=payment_method_id_type,
                 )
         await self.payment_method_client.pgp_detach_payment_method(
             pgp_payment_method_id=pgp_payment_method_id, country=country_code

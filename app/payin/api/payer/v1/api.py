@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
@@ -19,7 +21,6 @@ from starlette.status import (
 )
 
 from app.payin.core.payer.types import PayerType
-from app.payin.core.types import PayerIdType, MixedUuidStrType
 
 api_tags = ["PayerV1"]
 router = APIRouter()
@@ -90,8 +91,7 @@ async def create_payer(
     tags=api_tags,
 )
 async def get_payer(
-    payer_id: str,
-    payer_id_type: PayerIdType = None,
+    payer_id: UUID,
     payer_type: PayerType = None,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
@@ -104,17 +104,12 @@ async def get_payer(
     - **country**: country of DoorDash payer (consumer)
     - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",
                       "drive", "merchant", "store", "business" (default is "marketplace")
-    - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-                        "stripe_customer_id", "dd_stripe_customer_serial_id" (default is "dd_payer_id")
     - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
     """
     log.info("[get_payer] payer_id=%s", payer_id)
     try:
         payer: Payer = await payer_processor.get(
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
-            payer_type=payer_type,
-            force_update=force_update,
+            payer_id=payer_id, payer_type=payer_type, force_update=force_update
         )
         log.info("[get_payer] retrieve_payer completed")
     except PaymentError as e:
@@ -143,7 +138,7 @@ async def get_payer(
     tags=api_tags,
 )
 async def update_payer(
-    payer_id: MixedUuidStrType,
+    payer_id: UUID,
     req_body: UpdatePayerRequest,
     log: BoundLogger = Depends(get_logger_from_req),
     payer_processor: PayerProcessor = Depends(PayerProcessor),
@@ -163,8 +158,6 @@ async def update_payer(
         payer: Payer = await payer_processor.update(
             payer_id=payer_id,
             default_payment_method_id=req_body.default_payment_method.id,
-            country=req_body.country,
-            payment_method_id_type=req_body.default_payment_method.payment_method_id_type,
         )
     except PaymentError as e:
         if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value:

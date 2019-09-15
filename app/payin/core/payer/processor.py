@@ -250,7 +250,10 @@ class PayerClient:
         return stripe_cus_id
 
     async def pgp_update_customer_default_payment_method(
-        self, country: str, pgp_customer_id: str, default_payment_method_id: str
+        self,
+        pgp_customer_id: str,
+        default_payment_method_id: str,
+        country: Optional[str],
     ):
         update_cus_req: UpdateCustomer = UpdateCustomer(
             sid=pgp_customer_id,
@@ -342,9 +345,9 @@ class PayerProcessor:
 
     async def get(
         self,
-        payer_id: str,
-        payer_id_type: Optional[str],
+        payer_id: MixedUuidStrType,
         payer_type: Optional[str],
+        payer_id_type: Optional[str] = None,
         country: Optional[CountryCode] = CountryCode.US,
         force_update: Optional[bool] = False,
     ):
@@ -375,7 +378,7 @@ class PayerProcessor:
         self,
         payer_id: MixedUuidStrType,
         default_payment_method_id: str,
-        country: CountryCode = CountryCode.US,
+        country: Optional[CountryCode] = CountryCode.US,
         payer_id_type: Optional[PayerIdType] = None,
         payer_type: Optional[str] = None,
         payment_method_id_type: Optional[PaymentMethodIdType] = None,
@@ -398,6 +401,9 @@ class PayerProcessor:
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
             payer_id=payer_id, payer_type=payer_type
         )
+        pgp_country: Optional[
+            str
+        ] = raw_payer.country() if raw_payer.country() else country
 
         # step 2: find PaymentMethod object to get pgp_resource_id.
         raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
@@ -409,14 +415,17 @@ class PayerProcessor:
         pgp_customer_id: Optional[str] = raw_payer.pgp_customer_id()
         if pgp_customer_id:
             stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
-                country=country,
+                country=pgp_country,
                 pgp_customer_id=pgp_customer_id,
                 default_payment_method_id=raw_pm.pgp_payment_method_id(),
             )
 
-        self.log.info(
-            f"[update_payer_impl][{payer_id}][{payer_id_type}] PGP update default_payment_method completed:[{stripe_customer.invoice_settings.default_payment_method}]"
-        )
+            self.log.info(
+                f"[update_payer_impl] PGP update default_payment_method completed",
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
+                default_payment_method=stripe_customer.invoice_settings.default_payment_method,
+            )
 
         # step 4: update default_payment_method in pgp_customers/stripe_customer table
         updated_raw_payer: RawPayer = await self.payer_client.update_payer_default_payment_method(

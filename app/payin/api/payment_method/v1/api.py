@@ -81,7 +81,7 @@ async def create_payment_method(
 
 
 @router.get(
-    "/payment_methods/{payer_id}/{payment_method_id}",
+    "/payment_methods/{payment_method_id}",
     response_model=PaymentMethod,
     status_code=HTTP_200_OK,
     operation_id="GetPaymentMethod",
@@ -168,7 +168,7 @@ async def list_payment_methods(
 
 
 @router.delete(
-    "/payment_methods/{payer_id}/{payment_method_id}",
+    "/payment_methods/{payment_method_id}",
     response_model=PaymentMethod,
     status_code=HTTP_200_OK,
     operation_id="DeletePaymentMethod",

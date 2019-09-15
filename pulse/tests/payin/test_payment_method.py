@@ -35,6 +35,7 @@ def test_create_payment_method_with_missing_payer_id():
         assert e.status == 422
 
 
+@pytest.mark.skip(reason="need to update client lib to get rid of payer_id")
 def test_get_payment_method_with_invalid_input():
     test_payer = PaymentUtil.create_payer()[0]
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
@@ -49,7 +50,7 @@ def test_get_payment_method_with_invalid_input():
 
     try:
         payment_method_v1_client.get_payment_method(
-            payer_id=[123], payment_method_id=payment_method[0].id
+            payment_method_id=payment_method[0].id
         )
     except ApiException as e:
         # Fixme - should raise a 400 bad_request error here, but raising a 500
@@ -63,6 +64,7 @@ def test_get_payment_method_with_missing_input():
 
 
 # test payment_methods with payer_id
+@pytest.mark.skip(reason="need to update client lib to get rid of payer_id")
 def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
@@ -78,7 +80,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
 
     # step 2: get payment method using payer_id and payment_method_id
     get_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
-        payer_id=test_payer.id, payment_method_id=payment_method[0].id
+        payment_method_id=payment_method[0].id
     )
     assert get_payment_method[1] == 200
     assert get_payment_method[0] == payment_method[0]
