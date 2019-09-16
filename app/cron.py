@@ -3,13 +3,13 @@ import os
 import signal
 
 import pytz
-from app.commons.instrumentation import sentry
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
 from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
+from app.commons.instrumentation import sentry
 from app.commons.instrumentation.pool import stat_resource_pool_jobs
 from app.commons.jobs.pool import JobPool, adjust_pool_sizes
 from app.commons.runtime import runtime
@@ -46,6 +46,8 @@ logger = get_logger("cron")
 
 
 scheduler = AsyncIOScheduler()
+scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC timezone
+
 loop = asyncio.get_event_loop()
 app_context = loop.run_until_complete(create_app_context(app_config))
 
@@ -63,7 +65,6 @@ scheduler.add_job(
     trigger="cron",
     hour="7-11",  # UTC hour
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
-    timezone=pytz.UTC,
 )
 
 scheduler.add_job(
@@ -71,7 +72,6 @@ scheduler.add_job(
     trigger="cron",
     hour="7-11",  # UTC hour
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
-    timezone=pytz.UTC,
 )
 
 scheduler.add_job(
