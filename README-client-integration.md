@@ -26,9 +26,12 @@ Before start integration, something developer should know first:
    ```bash
    kubectl port-forward deployment/payment-service-web 8080:80
    ```
-   3. open browser, and type:
+   3. open browser, and type the following url (note: v0 supports legacy information as input and is expected to be called only by DSJ for backward compatibility):
    ```bash
-   http://localhost:8080/payin/docs
+   http://localhost:8080/payin/api/v0/docs
+   ```
+   ```bash
+   http://localhost:8080/payin/api/v1/docs
    ```
    4. you will see the following view and able to issue request to Payin Servie on Staging (with valid API Key)
 ![payin_fastapi_dmeo_list](./development/payin_fastapi_dmeo_list.png)
@@ -37,7 +40,7 @@ Before start integration, something developer should know first:
 3. `Client Library`. We provided OpenAPI generated client library (python only for now). Please see [here](https://github.com/doordash/payment-service-python-client/tree/master/payin) for detailed information.
 
 
-# Golden Examples
+## Golden Examples
 (WIP) We will provide separate examples to showcase the major scenarios. Now we refer to our pulse tests as the golden workflows are already covered by pulse tests.
 - Payers:
   - [create payer and update default payment method](https://github.com/doordash/payment-service/blob/master/pulse/tests/payin/test_end_to_end.py#L9)
