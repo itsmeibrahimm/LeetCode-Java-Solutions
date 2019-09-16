@@ -3,7 +3,7 @@ import os
 import signal
 
 import pytz
-import sentry_sdk
+from app.commons.instrumentation import sentry
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
@@ -33,11 +33,7 @@ def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
 app_config = init_app_config()
 
 if app_config.SENTRY_CONFIG:
-    sentry_sdk.init(
-        dsn=app_config.SENTRY_CONFIG.dsn.value,
-        environment=app_config.SENTRY_CONFIG.environment,
-        release=app_config.SENTRY_CONFIG.release,
-    )
+    sentry.init_sentry_sdk(app_config.SENTRY_CONFIG)
 
 # set up global statsd
 init_global_statsd(

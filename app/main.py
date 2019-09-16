@@ -1,6 +1,6 @@
 import os
 
-import sentry_sdk
+from app.commons.instrumentation import sentry
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
@@ -43,11 +43,7 @@ app.add_middleware(
 )
 app.add_middleware(ReqContextMiddleware)
 if config.SENTRY_CONFIG:
-    sentry_sdk.init(
-        dsn=config.SENTRY_CONFIG.dsn.value,
-        environment=config.SENTRY_CONFIG.environment,
-        release=config.SENTRY_CONFIG.release,
-    )
+    sentry.init_sentry_sdk(config.SENTRY_CONFIG)
     app.add_middleware(SentryAsgiMiddleware)
 register_payment_exception_handler(app)
 
