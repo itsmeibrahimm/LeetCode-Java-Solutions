@@ -35,7 +35,6 @@ def test_create_payment_method_with_missing_payer_id():
         assert e.status == 422
 
 
-@pytest.mark.skip(reason="need to update client lib to get rid of payer_id")
 def test_get_payment_method_with_invalid_input():
     test_payer = PaymentUtil.create_payer()[0]
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
@@ -64,7 +63,6 @@ def test_get_payment_method_with_missing_input():
 
 
 # test payment_methods with payer_id
-@pytest.mark.skip(reason="need to update client lib to get rid of payer_id")
 def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
@@ -88,7 +86,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
 
     # step 3: delete payment method using payer_id and payment_method_id
     delete_payment_method = payment_method_v1_client.delete_payment_method_with_http_info(
-        payer_id=test_payer.id, payment_method_id=payment_method[0].id
+        payment_method_id=payment_method[0].id
     )
     assert delete_payment_method[1] == 200
     assert delete_payment_method[0] != get_payment_method[0]
@@ -96,14 +94,13 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
 
     # step 4: verify payment_method to be deleted
     get_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
-        payer_id=test_payer.id, payment_method_id=payment_method[0].id
+        payment_method_id=payment_method[0].id
     )
     assert get_payment_method[1] == 200
     assert get_payment_method[0] == delete_payment_method[0]
     assert get_payment_method[0].deleted_at is not None
 
 
-@pytest.mark.skip(reason="need to update client lib to change to v0 api")
 def test_create_get_delete_payment_method_with_payer_id_and_stripe_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
@@ -146,13 +143,13 @@ def test_create_get_delete_payment_method_with_payer_id_and_stripe_payment_metho
 
 
 @pytest.mark.skip(reason="cannot connect to StripeCard table")
-def test_create_get_delete_payment_method_with_payer_id_and_stripe_card_serial_id():
+def test_create_get_delete_payment_method_with_payer_id_and_dd_stripe_card_id():
     # step 1: create StripeCard and attach to payer
     # test_payer = PaymentUtil.create_payer()[0]
 
     # step 2: get payment_method using payer_id and stripe_card_serial_id
     get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert get_payment_method[1] == 200
     # assert get_payment_method[0] == payment_method
@@ -160,7 +157,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_stripe_card_serial_i
 
     # step 3: delete payment_method using payer_id and stripe_card_serial_id
     delete_payment_method = payment_method_v0_client.delete_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert delete_payment_method[1] == 200
     assert delete_payment_method[0] != get_payment_method[0]
@@ -168,7 +165,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_stripe_card_serial_i
 
     # step 4: verify payment_method to be deleted
     get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert get_payment_method[1] == 200
     assert get_payment_method[0] == delete_payment_method[0]
@@ -180,18 +177,17 @@ def test_create_get_delete_payment_method_with_payer_id_and_stripe_card_serial_i
 def test_create_get_delete_payment_method_with_stripe_customer_id_and_payment_method_id():
     # step 1: create a payment method using stripe_customer_id
     stripe_cus = StripeUtil.create_stripe_customer()
-    payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
-            "payment_gateway": "stripe",
+    payment_method = payment_method_v0_client.create_payment_method_with_http_info(
+        create_payment_method_request_v0={
+            "stripe_customer_id": stripe_cus["id"],
             "token": "tok_visa",
-            "legacy_payment_info": {"stripe_customer_id": stripe_cus["id"]},
         }
     )
     assert payment_method[1] == 201
     assert payment_method[0].deleted_at is None
 
     # step 2: get payment method using stripe_customer_id and payment_method_id
-    get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
+    get_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
         payment_method_id=payment_method[0].id
     )
     assert get_payment_method[1] == 200
@@ -219,12 +215,10 @@ def test_create_get_delete_payment_method_with_stripe_customer_id_and_payment_me
 def test_create_get_delete_payment_method_with_stripe_customer_id_and_stripe_payment_method_id():
     # step 1: create a payment method using stripe_customer_id
     stripe_cus = StripeUtil.create_stripe_customer()
-    # todo - create_payment_method with v0 version for legacy fields
-    payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
-            "payment_gateway": "stripe",
+    payment_method = payment_method_v0_client.create_payment_method_with_http_info(
+        create_payment_method_request_v0={
+            "stripe_customer_id": stripe_cus["id"],
             "token": "tok_visa",
-            "legacy_payment_info": {"stripe_customer_id": stripe_cus["id"]},
         }
     )
     assert payment_method[1] == 201
@@ -261,13 +255,13 @@ def test_create_get_delete_payment_method_with_stripe_customer_id_and_stripe_pay
 @pytest.mark.skip(
     reason="cannot connect to StripeCard table and test Stripe key not setup yet"
 )
-def test_create_get_delete_payment_method_with_stripe_customer_id_and_stripe_card_serial_id():
+def test_create_get_delete_payment_method_with_stripe_customer_id_and_dd_stripe_card_id():
     # step 1: create StripeCard and attach to StripeCustomer
     # stripe_cus = StripeUtil.create_stripe_customer()
 
     # step 2: get payment_method using stripe_customer_id and stripe_card_serial_id
     get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert get_payment_method[1] == 200
     # assert get_payment_method[0] == payment_method
@@ -275,7 +269,7 @@ def test_create_get_delete_payment_method_with_stripe_customer_id_and_stripe_car
 
     # step 3: delete payment_method using stripe_customer_id and stripe_card_serial_id
     delete_payment_method = payment_method_v0_client.delete_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert delete_payment_method[1] == 200
     assert delete_payment_method[0] != get_payment_method[0]
@@ -283,7 +277,7 @@ def test_create_get_delete_payment_method_with_stripe_customer_id_and_stripe_car
 
     # step 4: verify payment_method to be deleted
     get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert get_payment_method[1] == 200
     # assert get_payment_method[0] == payment_method
@@ -295,12 +289,10 @@ def test_create_get_delete_payment_method_with_stripe_customer_id_and_stripe_car
 def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_payment_method_id():
     # step 1: create a payment method using stripe_customer_id
     stripe_cus = StripeUtil.create_stripe_customer()
-    # todo - create_payment_method with v0 version for legacy fields
-    payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
-            "payment_gateway": "stripe",
+    payment_method = payment_method_v0_client.create_payment_method_with_http_info(
+        create_payment_method_request_v0={
+            "stripe_customer_id": stripe_cus["id"],
             "token": "tok_visa",
-            "legacy_payment_info": {"stripe_customer_id": stripe_cus["id"]},
         }
     )
     assert payment_method[1] == 201
@@ -335,12 +327,10 @@ def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_pa
 def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_stripe_payment_method_id():
     # step 1: create a payment method using stripe_customer_id
     stripe_cus = StripeUtil.create_stripe_customer()
-    # todo - create_payment_method with v0 version for legacy fields
-    payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
-            "payment_gateway": "stripe",
+    payment_method = payment_method_v0_client.create_payment_method_with_http_info(
+        create_payment_method_request_v0={
+            "stripe_customer_id": stripe_cus["id"],
             "token": "tok_visa",
-            "legacy_payment_info": {"stripe_customer_id": stripe_cus["id"]},
         }
     )
     assert payment_method[1] == 201
@@ -377,13 +367,13 @@ def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_st
 @pytest.mark.skip(
     reason="cannot connect to StripeCard table and test Stripe key not setup yet"
 )
-def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_stripe_card_serial_id():
+def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_dd_stripe_card_id():
     # step 1: create a StripeCard and attach it to StripeCustomer
     # stripe_cus = StripeUtil.create_stripe_customer()
 
     # step 2: get payment_method using stripe_customer_serial_id and stripe_card_serial_id
     get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert get_payment_method[1] == 200
     # assert get_payment_method0] == payment_method
@@ -391,7 +381,7 @@ def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_st
 
     # step 3: delete payment_method using stripe_customer_serial_id and stripe_card_serial_id
     delete_payment_method = payment_method_v0_client.delete_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert delete_payment_method[1] == 200
     assert delete_payment_method[0] != get_payment_method[0]
@@ -399,7 +389,7 @@ def test_create_get_delete_payment_method_using_stripe_customer_serial_id_and_st
 
     # step 4: verify payment_method to be deleted
     get_payment_method = payment_method_v0_client.get_payment_method_with_http_info(
-        payment_method_id="", payment_method_id_type="stripe_card_serial_id"
+        payment_method_id="", payment_method_id_type="dd_stripe_card_id"
     )
     assert get_payment_method[1] == 200
     assert get_payment_method[0] == delete_payment_method[0]
