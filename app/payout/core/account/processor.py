@@ -70,7 +70,6 @@ class PayoutAccountProcessors:
     async def create_standard_payout(
         self, request: CreateStandardPayoutRequest
     ) -> CreateStandardPayoutResponse:
-        # TODO: A repo for maindb.managed_account_transfer is needed
         create_standard_payout_op = CreateStandardPayout(
             logger=self.logger,
             stripe_transfer_repo=self.stripe_transfer_repo,

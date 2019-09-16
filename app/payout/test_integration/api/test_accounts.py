@@ -1,5 +1,6 @@
 from starlette.testclient import TestClient
 
+from app.payout.types import AccountType
 from app.testcase_utils import validate_expected_items_in_dict
 
 ACCOUNT_ENDPOINT = "/payout/api/v0/accounts"
@@ -45,7 +46,7 @@ class TestAccountV0:
     def test_create_get_update_payment_account(self, client: TestClient):
         account_to_create = {
             "account_id": 123,
-            "account_type": "sma",
+            "account_type": AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
             "entity": "dasher",
             "resolve_outstanding_balance_frequency": "daily",
             "payout_disabled": True,

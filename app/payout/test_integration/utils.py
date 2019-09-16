@@ -32,6 +32,7 @@ from app.payout.repository.maindb.model.transfer import TransferCreate
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.types import AccountType
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
 
@@ -197,11 +198,11 @@ async def prepare_and_insert_stripe_transfer(
 
 
 async def prepare_and_insert_payment_account(
-    payment_account_repo: PaymentAccountRepository
+    payment_account_repo: PaymentAccountRepository, account_id=123
 ):
     data = PaymentAccountCreate(
-        account_id=123,
-        account_type="sma",
+        account_id=account_id,
+        account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
         entity="dasher",
         resolve_outstanding_balance_frequency="daily",
         payout_disabled=True,
@@ -226,11 +227,13 @@ async def prepare_and_insert_payment_account(
 
 
 async def prepare_and_insert_stripe_managed_account(
-    payment_account_repo: PaymentAccountRepository
+    payment_account_repo: PaymentAccountRepository,
+    stripe_id="stripe_id",
+    country_shortname="US",
 ):
     data = StripeManagedAccountCreate(
-        stripe_id="stripe_id",
-        country_shortname="us",
+        stripe_id=stripe_id,
+        country_shortname=country_shortname,
         stripe_last_updated_at=datetime.now(timezone.utc),
         bank_account_last_updated_at=datetime.now(timezone.utc),
         fingerprint="fingerprint",

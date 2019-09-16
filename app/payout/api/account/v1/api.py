@@ -8,6 +8,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
+from app.payout.api.account.utils import to_external_payout_account
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
 from app.payout.core.account.processors.create_instant_payout import (
@@ -16,7 +17,7 @@ from app.payout.core.account.processors.create_instant_payout import (
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
 )
-from app.payout.core.account.utils import to_external_payout_account
+
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
 from app.payout.service import create_payout_account_processors
 from app.payout.types import PayoutAccountStatementDescriptor, PayoutType

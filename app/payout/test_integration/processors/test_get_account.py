@@ -21,6 +21,7 @@ from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
 )
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.payout.types import AccountType
 
 
 class TestGetPayoutAccount:
@@ -37,7 +38,7 @@ class TestGetPayoutAccount:
     ):
         data = PaymentAccountCreate(
             account_id=123,
-            account_type="sma",
+            account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
             entity="dasher",
             resolve_outstanding_balance_frequency="daily",
             payout_disabled=True,

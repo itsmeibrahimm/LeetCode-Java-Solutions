@@ -17,6 +17,7 @@ from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
+from app.payout.types import AccountType
 
 
 @final
@@ -66,7 +67,7 @@ class PaymentAccountTable(TableDefinition):
 
 class _PaymentAccountPartial(DBEntity):
     account_id: Optional[int]
-    account_type: Optional[str]
+    account_type: Optional[AccountType]
     entity: Optional[str]
     resolve_outstanding_balance_frequency: Optional[str]
     payout_disabled: Optional[bool]

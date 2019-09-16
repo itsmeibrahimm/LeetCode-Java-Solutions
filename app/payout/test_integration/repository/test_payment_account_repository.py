@@ -19,6 +19,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_and_insert_stripe_managed_account,
 )
+from app.payout.types import AccountType
 from app.testcase_utils import validate_expected_items_in_dict
 
 
@@ -53,9 +54,7 @@ class TestPaymentAccountRepository:
             payment_account_repo=payment_account_repo
         )
 
-        update_data = PaymentAccountUpdate(
-            account_type="some_other_type", statement_descriptor="new descriptor"
-        )
+        update_data = PaymentAccountUpdate(statement_descriptor="new descriptor")
         updated_account = await payment_account_repo.update_payment_account_by_id(
             payment_account_id=payment_account.id, data=update_data
         )
@@ -69,7 +68,7 @@ class TestPaymentAccountRepository:
         self, payment_account_repo: PaymentAccountRepository
     ):
         account_1 = PaymentAccountCreate(
-            account_type="type",
+            account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
             account_id=int(datetime.utcnow().timestamp()),
             statement_descriptor="i am description yay",
             entity="dasher",

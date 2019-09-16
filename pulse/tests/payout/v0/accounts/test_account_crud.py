@@ -10,6 +10,8 @@ from tests.payout.v0.client_operations import (
     update_payment_account_by_id,
 )
 
+from app.payout.types import AccountType
+
 
 class TestPaymentAccount:
     def test_create_get_update_account_by_id(
@@ -19,7 +21,7 @@ class TestPaymentAccount:
             entity="dasher",
             statement_descriptor="pulse-test-statement-descriptor",
             account_id=None,
-            account_type="stripe_managed_account",
+            account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
             charges_enabled=True,
             old_account_id=1234,
             upgraded_to_managed_account_at=datetime.now(timezone.utc),

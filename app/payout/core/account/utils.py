@@ -1,20 +1,45 @@
-from app.payout.api.account.v1.models import PayoutAccount
-from app.payout.core.account.types import (
-    PayoutAccountInternal,
-    VerificationRequirements,
+from typing import Optional
+
+from app.commons.providers.stripe.stripe_client import StripeClient
+from app.payout.repository.maindb.model.payment_account import PaymentAccount
+from app.payout.repository.maindb.model.stripe_managed_account import (
+    StripeManagedAccount,
 )
+from app.payout.repository.maindb.payment_account import (
+    PaymentAccountRepositoryInterface,
+)
+from app.commons.providers.stripe import stripe_models as models
 
 
-def to_external_payout_account(internal_response: PayoutAccountInternal):
-    return PayoutAccount(
-        id=internal_response.payment_account.id,
-        pgp_account_type=internal_response.payment_account.account_type,
-        pgp_account_id=internal_response.payment_account.account_id,
-        statement_descriptor=internal_response.payment_account.statement_descriptor,
-        pgp_external_account_id=internal_response.pgp_external_account_id,
-        verification_requirements=VerificationRequirements(
-            **internal_response.verification_requirements.dict()
+async def get_country_shortname(
+    payment_account: Optional[PaymentAccount],
+    payment_account_repository: PaymentAccountRepositoryInterface,
+) -> Optional[str]:
+    if payment_account and payment_account.account_id:
+        stripe_managed_account = await payment_account_repository.get_stripe_managed_account_by_id(
+            payment_account.account_id
         )
-        if internal_response.verification_requirements
-        else None,
-    )
+        if stripe_managed_account:
+            return stripe_managed_account.country_shortname
+    return None
+
+
+async def get_account_balance(
+    stripe_managed_account: Optional[StripeManagedAccount], stripe: StripeClient
+) -> int:
+    """
+    Get balance for stripe account, return 0 if sma is not created
+    :param stripe_managed_account: stripe managed account
+    :param stripe: StripeClient
+    :return: balance amount
+    """
+    if stripe_managed_account:
+        balance = stripe.retrieve_balance(
+            stripe_account=models.StripeAccountId(stripe_managed_account.stripe_id),
+            country=models.CountryCode(stripe_managed_account.country_shortname),
+        )
+        try:
+            return balance.available[0].amount
+        except KeyError:
+            return 0
+    return 0

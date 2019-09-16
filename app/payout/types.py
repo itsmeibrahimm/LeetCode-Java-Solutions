@@ -55,3 +55,8 @@ class StripePayoutStatus(str, Enum):
 class ManagedAccountTransferStatus(str, Enum):
     FAILED = "failed"
     PAID = "paid"
+
+
+class AccountType(str, Enum):
+    # payment_account.account_type
+    ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT = "Stripe Managed Account"
