@@ -2,6 +2,7 @@ import asyncio
 import os
 import signal
 
+import pytz
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
@@ -61,19 +62,20 @@ app_context.monitor.add(
     )
 )
 
-
 scheduler.add_job(
     capture_uncaptured_payment_intents,
     trigger="cron",
-    minute="*/5",
+    hour="7-11",  # UTC hour
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
+    timezone=pytz.UTC,
 )
 
 scheduler.add_job(
     resolve_capturing_payment_intents,
     trigger="cron",
-    minute="*/5",
+    hour="7-11",  # UTC hour
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
+    timezone=pytz.UTC,
 )
 
 scheduler.add_job(
