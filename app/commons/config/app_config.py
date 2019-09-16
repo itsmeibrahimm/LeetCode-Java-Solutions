@@ -22,7 +22,9 @@ class DBConfig:
     master_pool_min_size: int = 1
     replica_pool_min_size: int = 1
     statement_timeout_sec: float = 1
-    closing_timeout_sec: float = 60
+    # align with default gunicorn work graceful timeout 30 sec
+    # http://docs.gunicorn.org/en/stable/settings.html?highlight=grace#graceful-timeout
+    closing_timeout_sec: float = 30
     force_rollback: bool = False
 
     def __post_init__(self):
