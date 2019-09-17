@@ -1,5 +1,6 @@
 import pytest
 import pytest_mock
+from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.commons.database.infra import DB
 from app.payout.core.account.processors.create_standard_payout import (
@@ -111,6 +112,7 @@ class TestCreateStandardPayoutUtils:
                 payment_account=None,
                 payment_account_repository=payment_account_repository,
             )
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
         assert e.value.error_code == PayoutErrorCode.INVALID_STRIPE_ACCOUNT_ID
         assert (
             e.value.error_message
@@ -131,6 +133,7 @@ class TestCreateStandardPayoutUtils:
                 payment_account=payment_account,
                 payment_account_repository=payment_account_repository,
             )
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
         assert e.value.error_code == PayoutErrorCode.INVALID_STRIPE_ACCOUNT_ID
         assert (
             e.value.error_message
@@ -151,6 +154,7 @@ class TestCreateStandardPayoutUtils:
                 payment_account=payment_account,
                 payment_account_repository=payment_account_repository,
             )
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
         assert e.value.error_code == PayoutErrorCode.INVALID_STRIPE_ACCOUNT_ID
         assert (
             e.value.error_message
@@ -231,6 +235,7 @@ class TestCreateStandardPayoutUtils:
             await self.create_standard_payout_operation.validate_payment_account_of_managed_account_transfer(
                 payment_account=payment_account, managed_account_transfer=ma_transfer
             )
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
         assert e.value.error_code == PayoutErrorCode.MISMATCHED_TRANSFER_PAYMENT_ACCOUNT
         assert (
             e.value.error_message

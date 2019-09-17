@@ -2,7 +2,9 @@
 # payout_account Errors                                   #
 ###########################################################
 from enum import Enum
+from typing import Optional
 
+from app.commons.api.models import PaymentException
 from app.commons.core.errors import PaymentError
 
 payout_account_error_message_maps = {
@@ -39,7 +41,7 @@ class PayoutErrorCode(str, Enum):
     MISMATCHED_TRANSFER_PAYMENT_ACCOUNT = "payout_1"
 
 
-class PayoutError(PaymentError):
+class PayoutError(PaymentException):
     """
     Base exception class for payout submission. This is base class that can be inherited by
     each business operation layer with corresponding sub error class and
@@ -48,19 +50,25 @@ class PayoutError(PaymentError):
     """
 
     def __init__(
-        self, error_code: PayoutErrorCode, retryable: bool, error_message=None
+        self,
+        http_status_code: int,
+        error_code: PayoutErrorCode,
+        retryable: bool,
+        error_message: Optional[str] = None,
     ):
         """
         Base Payout exception class.
 
+        :param http_status_code: returned http status code.
         :param error_code: predefined client-facing error codes.
-        :param retryable: identify if the error is retryable or not.
         :param error_message: specific error_msg will be passed in if it formatted with params otherwise it will be None
+        :param retryable: identify if the error is retryable or not.
         """
         super(PayoutError, self).__init__(
+            http_status_code,
             error_code.value,
-            retryable=retryable,
             error_message=error_message
             if error_message
             else payout_error_message_maps[error_code.value],
+            retryable=retryable,
         )

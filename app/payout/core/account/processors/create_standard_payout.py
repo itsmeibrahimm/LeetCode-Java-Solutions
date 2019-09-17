@@ -1,6 +1,8 @@
 import re
 from typing import Optional, Tuple, Union
 
+from starlette.status import HTTP_400_BAD_REQUEST
+
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.context.logger import Log
 from app.commons.core.processor import (
@@ -106,7 +108,9 @@ class CreateStandardPayout(
             if stripe_managed_account:
                 return True
         raise PayoutError(
-            error_code=PayoutErrorCode.INVALID_STRIPE_ACCOUNT_ID, retryable=False
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayoutErrorCode.INVALID_STRIPE_ACCOUNT_ID,
+            retryable=False,
         )
 
     async def validate_payment_account_of_managed_account_transfer(
@@ -127,6 +131,7 @@ class CreateStandardPayout(
         ):
             if payment_account.id != managed_account_transfer.payment_account_id:
                 raise PayoutError(
+                    http_status_code=HTTP_400_BAD_REQUEST,
                     error_code=PayoutErrorCode.MISMATCHED_TRANSFER_PAYMENT_ACCOUNT,
                     error_message=f"Transfer: {payment_account.id}; Managed Account Transfer: {managed_account_transfer.payment_account_id}",
                     retryable=False,
