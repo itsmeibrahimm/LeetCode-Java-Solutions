@@ -25,6 +25,15 @@ cd <payment repo>/pressure
 pipenv shell
 pressure --data-file=$(pipenv --venv)/infra/local/data.yaml --data-file=infra/local/data.yaml --locust-args="--host http://localhost:8000 -f tests/locustfile.py --csv=report --no-web -c 1000 -r 100 --run-time 5m"
 ```
+#### Troubleshooting
+- Maximum number of open files (`[Errno 24] Too many open files`)
+
+Every HTTP connection on a machine opens a new file (technically a file descriptor). Operating systems may set a low limit for the maximum number of files that can be open. If the limit is less than the number of simulated users in a test, failures will occur.
+
+To increase this limit, Mac users do: 
+```bash
+ulimit -S -n 2048 # increase as needed
+```
 
 ### One-off load test against staging
 https://github.com/doordash/doordash-pressure#one-off-deployment
