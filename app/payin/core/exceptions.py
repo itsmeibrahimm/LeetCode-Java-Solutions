@@ -14,6 +14,9 @@ payin_error_message_maps = {
     "payin_8": "Invalid data types. Please verify your input again!",
     "payin_9": "Invalid payer type",
     "payin_10": "Error returned from Payment Provider.",
+    "payin_11": "Data I/O error. Please retry again!",
+    "payin_12": "Error returned from Payment Provider.",
+    "payin_13": "No such customer",
     "payin_20": "Invalid data types. Please verify your input again!",
     "payin_21": "Data I/O error. Please retry again!",
     "payin_22": "Invalid input payment method type!",
@@ -60,6 +63,9 @@ class PayinErrorCode(str, Enum):
     PAYER_UPDATE_DB_ERROR_INVALID_DATA = "payin_8"
     PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_9"
     PAYER_UPDATE_STRIPE_ERROR = "payin_10"
+    PAYER_UPDATE_DB_ERROR = "payin_11"
+    PAYER_READ_STRIPE_ERROR = "payin_12"
+    PAYER_READ_STRIPE_ERROR_NOT_FOUND = "payin_13"
     PAYMENT_INTENT_CREATE_STRIPE_ERROR = "payin_40"
     PAYMENT_INTENT_CAPTURE_STRIPE_ERROR = "payin_41"
     PAYMENT_INTENT_ADJUST_REFUND_ERROR = "payin_42"

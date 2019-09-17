@@ -94,6 +94,12 @@ class TestStripeClient:
         )
         assert customer_id
 
+        customer = stripe.retrieve_customer(
+            country=models.CountryCode.US,
+            request=models.RetrieveCustomer(id=customer_id),
+        )
+        assert customer
+
     @pytest.mark.skip(
         "requires to create the needed resource first in case it becomes flaky"
     )

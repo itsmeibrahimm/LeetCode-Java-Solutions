@@ -536,21 +536,12 @@ class PaymentMethodProcessor:
         )
 
         # step 5: update payer and pgp_customers / stripe_customer to remove the default_payment_method.
-        # we don’t need to if it’s DSJ marketplace consumer.
+        # No need to cleanup if it’s DSJ marketplace consumer because it's maintained in maindb_consumer by cx.
         if raw_payer:
-            if raw_payer.pgp_default_payment_method_id() == pgp_payment_method_id:
-                self.log.info(
-                    f"[delete_payment_method] delete default payment method {pgp_payment_method_id} from pgp_customers table "
-                )
-                await self.payer_client.update_payer_default_payment_method(
-                    raw_payer=raw_payer,
-                    pgp_default_payment_method_id=None,
-                    payer_id=raw_payment_method.payer_id(),
-                )
-            else:
-                self.log.info(
-                    f"[delete_payment_method] no need to delete default payment method {raw_payer.pgp_default_payment_method_id()}"
-                )
+            # force update for now to cover existing Cx with default_source.
+            await self.payer_client.force_update_payer(
+                raw_payer=raw_payer, country=country
+            )
 
         # we dont automatically update the new default payment method for payer
 
@@ -680,7 +671,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     )
             else:
                 self.log.error(
-                    "[get_payment_method_raw_objects][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
+                    f"[get_payment_method_raw_objects][{payment_method_id}] invalid payment_method_id_type {payment_method_id_type}"
                 )
                 raise PaymentMethodReadError(
                     error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
@@ -696,7 +687,8 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
 
         if not sc_entity:
             self.log.error(
-                f"[get_payment_method_raw_objects][{payment_method_id}] cant retrieve data from pgp_payment_method and stripe_card tables!"
+                "[get_payment_method_raw_objects] cant retrieve data from pgp_payment_method and stripe_card tables!",
+                payment_method_id=payment_method_id,
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
@@ -713,11 +705,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                 is_owner = payer_id == sc_entity.external_stripe_customer_id
         if is_owner is False:
             self.log.warn(
-                "[get_payment_method_raw_objects][%s][%s] payer doesn't own payment_method. payer_id_type:[%s] payment_method_id_type:[%s] ",
-                payment_method_id,
-                payer_id,
-                payer_id_type,
-                payment_method_id_type,
+                f"[get_payment_method_raw_objects][{payment_method_id}][{payer_id}] payer doesn't own payment_method. payer_id_type:[{payer_id_type}] payment_method_id_type:[{payment_method_id_type}] "
             )
             raise PaymentMethodReadError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
@@ -725,7 +713,9 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
             )
 
         self.log.info(
-            f"[get_payment_method_raw_objects][{payment_method_id}][{payer_id}] find payment_method!"
+            "[get_payment_method_raw_objects] find payment_method!",
+            payment_method_id=payment_method_id,
+            payer_id=payer_id,
         )
 
         return RawPaymentMethod(

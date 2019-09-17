@@ -60,7 +60,7 @@ async def get_payer(
 
     log.info("[get_payer] payer_id=%s", payer_id)
     try:
-        payer: Payer = await payer_processor.get(
+        payer: Payer = await payer_processor.get_payer(
             payer_id=payer_id,
             country=country,
             payer_id_type=payer_id_type,
@@ -72,7 +72,11 @@ async def get_payer(
         raise PaymentException(
             http_status_code=(
                 HTTP_404_NOT_FOUND
-                if e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value
+                if e.error_code
+                in (
+                    PayinErrorCode.PAYER_READ_NOT_FOUND,
+                    PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND,
+                )
                 else HTTP_500_INTERNAL_SERVER_ERROR
             ),
             error_code=e.error_code,
@@ -120,7 +124,7 @@ async def update_payer(
             req_body
         )
 
-        payer: Payer = await payer_processor.update(
+        payer: Payer = await payer_processor.update_payer(
             payer_id=payer_id,
             payer_id_type=payer_id_type,
             default_payment_method_id=default_payment_method_id,

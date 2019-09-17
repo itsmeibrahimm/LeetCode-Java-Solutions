@@ -45,6 +45,20 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
+    def retrieve_customer(
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.RetrieveCustomer,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.Customer:
+        """
+        Create a new Stripe Customer
+        https://stripe.com/docs/api/customers/retrieve
+        """
+        ...
+
+    @abc.abstractmethod
     def update_customer(
         self,
         *,
@@ -343,6 +357,19 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return customer.id
+
+    @tracing.track_breadcrumb(resource="customer", action="retrieve")
+    def retrieve_customer(
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.RetrieveCustomer,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.Customer:
+        customer = stripe.Customer.retrieve(
+            **self.settings_for(country), **request.dict(skip_defaults=True)
+        )
+        return customer
 
     @tracing.track_breadcrumb(resource="customer", action="modify")
     def update_customer(
@@ -673,6 +700,20 @@ class StripeAsyncClient:
     ) -> models.CustomerId:
         return await self.executor_pool.submit(
             self.stripe_client.create_customer,
+            country=country,
+            request=request,
+            idempotency_key=idempotency_key,
+        )
+
+    async def retrieve_customer(
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.RetrieveCustomer,
+        idempotency_key: models.IdempotencyKey = None,
+    ) -> models.Customer:
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_customer,
             country=country,
             request=request,
             idempotency_key=idempotency_key,

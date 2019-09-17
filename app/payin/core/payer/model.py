@@ -100,9 +100,16 @@ class RawPayer:
     def pgp_default_payment_method_id(self) -> Optional[str]:
         default_payment_method_id: Optional[str] = None
         if self.pgp_customer_entity:
-            default_payment_method_id = (
-                self.pgp_customer_entity.default_payment_method_id
-            )
+            # Stripe specific rule: default_payment_method_id has higher priority than default_source_id
+            # TODOs: update doc link for testing result for reference.
+            if self.pgp_customer_entity.default_payment_method_id:
+                default_payment_method_id = (
+                    self.pgp_customer_entity.default_payment_method_id
+                )
+            else:
+                default_payment_method_id = (
+                    self.pgp_customer_entity.legacy_default_source_id
+                )
         elif self.stripe_customer_entity:
             default_payment_method_id = self.stripe_customer_entity.default_source
         return default_payment_method_id
@@ -119,11 +126,15 @@ class RawPayer:
         payer: Payer
         provider_customer: PaymentGatewayProviderCustomer
         if self.payer_entity:
+            updated_at: datetime = self.payer_entity.updated_at
             if self.pgp_customer_entity:
+                updated_at = max(
+                    self.pgp_customer_entity.updated_at, self.payer_entity.updated_at
+                )
                 provider_customer = PaymentGatewayProviderCustomer(
                     payment_provider=self.pgp_customer_entity.pgp_code,
                     payment_provider_customer_id=self.pgp_customer_entity.pgp_resource_id,
-                    default_payment_method_id=self.pgp_customer_entity.default_payment_method_id,
+                    default_payment_method_id=self.pgp_default_payment_method_id(),
                 )
             else:
                 provider_customer = PaymentGatewayProviderCustomer(
@@ -138,7 +149,7 @@ class RawPayer:
                 dd_payer_id=self.payer_entity.dd_payer_id,
                 description=self.payer_entity.description,
                 created_at=self.payer_entity.created_at,
-                updated_at=self.payer_entity.updated_at,
+                updated_at=updated_at,
             )
         elif self.stripe_customer_entity:
             provider_customer = PaymentGatewayProviderCustomer(

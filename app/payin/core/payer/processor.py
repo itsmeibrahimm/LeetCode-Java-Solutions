@@ -1,8 +1,10 @@
 from abc import abstractmethod
+from datetime import datetime
 from typing import Optional
 
 from fastapi import Depends
 from psycopg2._psycopg import DataError
+from stripe.error import StripeError
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.app_context import AppContext, get_global_app_context
@@ -16,7 +18,11 @@ from app.commons.providers.stripe.stripe_models import (
     CreateCustomer,
     CustomerId,
     UpdateCustomer,
+    InvoiceSettings,
+    Customer as StripeCustomer,
+    RetrieveCustomer,
 )
+from app.commons.runtime import runtime
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
 from app.commons.utils.uuid import generate_object_uuid
@@ -26,7 +32,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PayerUpdateError,
 )
-from app.payin.core.payer.model import Payer, RawPayer
+from app.payin.core.payer.model import Payer, RawPayer, PaymentGatewayProviderCustomer
 from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.types import PayerIdType, MixedUuidStrType, PaymentMethodIdType
@@ -148,6 +154,89 @@ class PayerClient:
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
 
+    async def force_update_payer(
+        self, raw_payer: RawPayer, country: Optional[CountryCode] = CountryCode.US
+    ) -> RawPayer:
+        pgp_customer_id: Optional[
+            str
+        ] = raw_payer.pgp_customer_id() if raw_payer.pgp_customer_id() else None
+        if not pgp_customer_id:
+            self.log.info(
+                "[force_update_payer] pgp_customer_id is none, skip force update"
+            )
+            return raw_payer
+
+        # Step 1: retrieve customer from payment provider
+        input_country = raw_payer.country() if raw_payer.country() else country
+        pgp_customer: StripeCustomer = await self.pgp_get_customer(
+            pgp_customer_id=pgp_customer_id, country=CountryCode(input_country)
+        )
+
+        # Step 2: compare the elements
+        try:
+            need_updated: bool = False
+            if raw_payer.pgp_customer_entity:
+                pc_input: UpdatePgpCustomerSetInput = UpdatePgpCustomerSetInput(
+                    updated_at=datetime.utcnow()
+                )
+                if pgp_customer.currency != raw_payer.pgp_customer_entity.currency:
+                    pc_input.currency = pgp_customer.currency
+                    need_updated = True
+                if (
+                    pgp_customer.default_source
+                    != raw_payer.pgp_customer_entity.legacy_default_source_id
+                ):
+                    pc_input.legacy_default_source_id = pgp_customer.default_source
+                    need_updated = True
+                if (
+                    pgp_customer.invoice_settings.default_payment_method
+                    != raw_payer.pgp_customer_entity.default_payment_method_id
+                ):
+                    pc_input.default_payment_method_id = (
+                        pgp_customer.invoice_settings.default_payment_method
+                    )
+                    need_updated = True
+                if need_updated:
+                    raw_payer.pgp_customer_entity = await self.payer_repo.update_pgp_customer(
+                        request_set=pc_input,
+                        request_where=UpdatePgpCustomerWhereInput(
+                            id=raw_payer.pgp_customer_entity.id
+                        ),
+                    )
+            elif raw_payer.stripe_customer_entity:
+                sc_input: UpdateStripeCustomerSetInput = UpdateStripeCustomerSetInput()
+                # default_payment_method_id has higher priority than default_source
+                if (
+                    pgp_customer.default_source
+                    != raw_payer.stripe_customer_entity.default_source
+                ):
+                    sc_input.default_source = pgp_customer.default_source
+                    need_updated = True
+                if (
+                    pgp_customer.invoice_settings.default_payment_method
+                    and pgp_customer.invoice_settings.default_payment_method
+                    != raw_payer.stripe_customer_entity.default_source
+                ):
+                    sc_input.default_source = (
+                        pgp_customer.invoice_settings.default_payment_method
+                    )
+                    need_updated = True
+                if need_updated:
+                    raw_payer.stripe_customer_entity = await self.payer_repo.update_stripe_customer(
+                        request_set=sc_input,
+                        request_where=UpdateStripeCustomerWhereInput(
+                            id=raw_payer.stripe_customer_entity.id
+                        ),
+                    )
+        except DataError as e:
+            self.log.error(
+                f"[force_update_payer] DataError when reading data from db: {e}"
+            )
+            raise PayerUpdateError(
+                error_code=PayinErrorCode.PAYER_UPDATE_DB_ERROR, retryable=True
+            )
+        return raw_payer
+
     async def update_payer_default_payment_method(
         self,
         raw_payer: RawPayer,
@@ -184,6 +273,7 @@ class PayerClient:
             payer_type=payer_type,
             payer_id_type=payer_id_type,
         )
+
         if lazy_create is True and updated_raw_payer.stripe_customer_entity:
             return await self.lazy_create_raw_payer(
                 dd_payer_id=str(updated_raw_payer.stripe_customer_entity.owner_id),
@@ -249,6 +339,28 @@ class PayerClient:
             )
         return stripe_cus_id
 
+    async def pgp_get_customer(
+        self, pgp_customer_id: str, country: CountryCode
+    ) -> StripeCustomer:
+        get_cus_req: RetrieveCustomer = RetrieveCustomer(id=pgp_customer_id)
+        try:
+            stripe_customer: StripeCustomer = await self.stripe_async_client.retrieve_customer(
+                country=country, request=get_cus_req
+            )
+        except StripeError as e:
+            self.log.error(
+                f"[pgp_get_customer] error while creating stripe customer. {e}"
+            )
+            if e.http_status == 404:
+                raise PayerReadError(
+                    error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND,
+                    retryable=False,
+                )
+            raise PayerReadError(
+                error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR, retryable=False
+            )
+        return stripe_customer
+
     async def pgp_update_customer_default_payment_method(
         self,
         pgp_customer_id: str,
@@ -257,7 +369,7 @@ class PayerClient:
     ):
         update_cus_req: UpdateCustomer = UpdateCustomer(
             sid=pgp_customer_id,
-            invoice_settings=UpdateCustomer.InvoiceSettings(
+            invoice_settings=InvoiceSettings(
                 default_payment_method=default_payment_method_id
             ),
         )
@@ -290,7 +402,7 @@ class PayerProcessor:
         self.log = log
         self.payment_method_client = payment_method_client
 
-    async def create(
+    async def create_payer(
         self,
         dd_payer_id: str,
         payer_type: str,
@@ -312,7 +424,7 @@ class PayerProcessor:
         :return: Payer object
         """
         self.log.info(
-            f"[create_payer_impl] dd_payer_id:{dd_payer_id}, payer_type:{payer_type}"
+            "[create_payer] started.", dd_payer_id=dd_payer_id, payer_type=payer_type
         )
 
         # TODO: we should get pgp_code in different way
@@ -343,7 +455,7 @@ class PayerProcessor:
         )
         return raw_payer.to_payer()
 
-    async def get(
+    async def get_payer(
         self,
         payer_id: MixedUuidStrType,
         payer_type: Optional[str],
@@ -363,18 +475,63 @@ class PayerProcessor:
         :return: Payer object
         """
         self.log.info(
-            f"[get_payer_impl] payer_id:{payer_id}, payer_id_type:{payer_id_type}"
+            "[get_payer] started.",
+            payer_id=payer_id,
+            payer_id_type=payer_id_type,
+            force_update=force_update,
         )
 
-        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
+        force_retrieving = runtime.get_bool(
+            "feature-flags/payin/force_retrieve_stripe_customer.bool", True
         )
+        try:
+            raw_payer: RawPayer = await self.payer_client.get_raw_payer(
+                payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
+            )
+        except PayerReadError as e:
+            if (
+                e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND
+                and force_update
+                and force_retrieving
+                and payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID
+            ):
+                pgp_customer: StripeCustomer = await self.payer_client.pgp_get_customer(
+                    pgp_customer_id=str(payer_id), country=CountryCode(country)
+                )
 
-        # TODO: if force_update is true, we should retrieve the customer from PGP
+                default_pm_id: Optional[str] = None
+                if (
+                    pgp_customer.invoice_settings
+                    and pgp_customer.invoice_settings.default_payment_method
+                ):
+                    default_pm_id = pgp_customer.invoice_settings.default_payment_method
+                if not default_pm_id:
+                    default_pm_id = pgp_customer.default_source
+
+                provider_customer = PaymentGatewayProviderCustomer(
+                    payment_provider=PaymentProvider.STRIPE,
+                    payment_provider_customer_id=pgp_customer.id,
+                    default_payment_method_id=default_pm_id,
+                )
+
+                return Payer(
+                    country=country,
+                    created_at=pgp_customer.created,
+                    description=pgp_customer.description,
+                    payment_gateway_provider_customers=[provider_customer],
+                )
+            else:
+                raise e
+
+        if force_update:
+            # ensure DB record is update-to-date
+            raw_payer = await self.payer_client.force_update_payer(
+                raw_payer=raw_payer, country=country
+            )
 
         return raw_payer.to_payer()
 
-    async def update(
+    async def update_payer(
         self,
         payer_id: MixedUuidStrType,
         default_payment_method_id: str,
@@ -579,7 +736,8 @@ class PayerOps(PayerOpsInterface):
             # update pgp_customers.default_payment_method_id for marketplace payer
             raw_payer.pgp_customer_entity = await self.payer_repo.update_pgp_customer(
                 UpdatePgpCustomerSetInput(
-                    default_payment_method_id=pgp_default_payment_method_id
+                    default_payment_method_id=pgp_default_payment_method_id,
+                    updated_at=datetime.utcnow(),
                 ),
                 UpdatePgpCustomerWhereInput(id=raw_payer.pgp_customer_entity.id),
             )

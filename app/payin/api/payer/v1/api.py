@@ -57,7 +57,7 @@ async def create_payer(
         req_body.payer_type,
     )
     try:
-        payer: Payer = await payer_processor.create(
+        payer: Payer = await payer_processor.create_payer(
             dd_payer_id=req_body.dd_payer_id,
             payer_type=req_body.payer_type,
             email=req_body.email,
@@ -108,7 +108,7 @@ async def get_payer(
     """
     log.info("[get_payer] payer_id=%s", payer_id)
     try:
-        payer: Payer = await payer_processor.get(
+        payer: Payer = await payer_processor.get_payer(
             payer_id=payer_id, payer_type=payer_type, force_update=force_update
         )
         log.info("[get_payer] retrieve_payer completed")
@@ -116,7 +116,11 @@ async def get_payer(
         raise PaymentException(
             http_status_code=(
                 HTTP_404_NOT_FOUND
-                if e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value
+                if e.error_code
+                in (
+                    PayinErrorCode.PAYER_READ_NOT_FOUND,
+                    PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND,
+                )
                 else HTTP_500_INTERNAL_SERVER_ERROR
             ),
             error_code=e.error_code,
@@ -155,7 +159,7 @@ async def update_payer(
 
     log.info("[update_payer] payer_id=%s", payer_id)
     try:
-        payer: Payer = await payer_processor.update(
+        payer: Payer = await payer_processor.update_payer(
             payer_id=payer_id,
             default_payment_method_id=req_body.default_payment_method.id,
         )

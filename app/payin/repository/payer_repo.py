@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, Tuple
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import select, and_
 from typing_extensions import final
 
@@ -87,21 +88,31 @@ class InsertPgpCustomerInput(PgpCustomerDbEntity):
 
 
 class GetPgpCustomerInput(DBRequestModel):
-    payer_id: str
-    pgp_code: Optional[str]
-
-
-class UpdatePgpCustomerSetInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
     """
 
+    payer_id: str
+    pgp_code: Optional[str]
+
+
+class UpdatePgpCustomerSetInput(BaseModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    updated_at: datetime
+    currency: Optional[str]
     default_payment_method_id: Optional[str]
     legacy_default_source_id: Optional[str]
     legacy_default_card_id: Optional[str]
 
 
 class UpdatePgpCustomerWhereInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
     id: UUID
 
 
@@ -151,7 +162,7 @@ class GetStripeCustomerByStripeIdInput(DBRequestModel):
     stripe_id: str
 
 
-class UpdateStripeCustomerSetInput(DBRequestModel):
+class UpdateStripeCustomerSetInput(BaseModel):
     """
     The variable name must be consistent with DB table column name
     """
@@ -161,10 +172,18 @@ class UpdateStripeCustomerSetInput(DBRequestModel):
 
 
 class UpdateStripeCustomerWhereInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
     id: int
 
 
 class UpdateStripeCustomerByStripeIdWhereInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
     stripe_id: str
 
 

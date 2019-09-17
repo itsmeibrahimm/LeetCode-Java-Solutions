@@ -81,15 +81,20 @@ class CreateCreditCardToken(StripeBaseModel):
     cvc: str
 
 
+class InvoiceSettings(StripeBaseModel):
+    default_payment_method: str
+
+
 class CreateCustomer(StripeBaseModel):
     email: str
     description: str
 
 
-class UpdateCustomer(StripeBaseModel):
-    class InvoiceSettings(StripeBaseModel):
-        default_payment_method: str
+class RetrieveCustomer(StripeBaseModel):
+    id: str
 
+
+class UpdateCustomer(StripeBaseModel):
     sid: str
     invoice_settings: InvoiceSettings
 
@@ -359,6 +364,21 @@ class Outcome(StripeBaseModel):
     rule: str
     seller_message: str
     type: str
+
+
+class Customer(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/customers/object
+    """
+
+    id: str
+    object: str
+    created: datetime
+    currency: str
+    invoice_settings: InvoiceSettings
+    default_source: str
+    description: str
+    email: str
 
 
 class PaymentMethod(StripeBaseModel):
