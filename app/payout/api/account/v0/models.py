@@ -7,6 +7,7 @@ from app.commons.api.models import PaymentRequest, PaymentResponse
 # Dummy v0 api models copied directly from db domain models. Just to make sure v0 API signature is stable
 # even if underlying db model changes, so we don't need to worry about DSJ v0 integration
 from app.payout.repository.maindb.model import stripe_managed_account
+from app.payout.types import AccountType
 
 
 class PaymentAccount(PaymentResponse):
@@ -14,7 +15,7 @@ class PaymentAccount(PaymentResponse):
     statement_descriptor: str
     created_at: Optional[datetime]
     account_id: Optional[int]
-    account_type: Optional[str]
+    account_type: Optional[AccountType]
     entity: Optional[str]
     resolve_outstanding_balance_frequency: Optional[str]
     payout_disabled: Optional[bool]
@@ -28,7 +29,7 @@ class PaymentAccount(PaymentResponse):
 class PaymentAccountCreate(PaymentRequest):
     statement_descriptor: str
     account_id: Optional[int]
-    account_type: Optional[str]
+    account_type: Optional[AccountType]
     entity: Optional[str]
     resolve_outstanding_balance_frequency: Optional[str]
     payout_disabled: Optional[bool]
@@ -41,7 +42,7 @@ class PaymentAccountCreate(PaymentRequest):
 
 class PaymentAccountUpdate(PaymentRequest):
     account_id: Optional[int]
-    account_type: Optional[str]
+    account_type: Optional[AccountType]
     entity: Optional[str]
     resolve_outstanding_balance_frequency: Optional[str]
     payout_disabled: Optional[bool]
