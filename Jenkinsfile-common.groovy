@@ -640,8 +640,8 @@ def dockerClean() {
   sh """|#!/bin/bash
         |set -x
         |docker ps -a -q | xargs --no-run-if-empty docker rm -f || true
-        |make remove-docker-images
         |""".stripMargin()
+  // todo add back remove-docker-images
 }
 
 /**
