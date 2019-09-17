@@ -519,6 +519,12 @@ def deployPulse(Map optArgs = [:], String gitUrl, String sha, String env) {
     // install doorctl and grab its executable path
     String doorctlPath = new Doorctl().installIntoWorkspace(DOORCTL_VERSION)
     // deploy Pulse
+    {
+      sh """|#!/bin/bash
+            |set -x
+            |docker rmi -f ddartifacts-docker.jfrog.io/pulse-base || true
+            |""".stripMargin()
+    }
     new Pulse().deploy(PULSE_VERSION, SERVICE_NAME, KUBERNETES_CLUSTER, doorctlPath, PULSE_DIR, KUBERNETES_NAMESPACE, null, sha)
   }
 }
@@ -548,6 +554,12 @@ def deployBlockingPulse(Map optArgs = [:], String gitUrl, String sha, String env
   sshagent(credentials: ['DDGHMACHINEUSER_PRIVATE_KEY']) {
     // install doorctl and grab its executable path
     String doorctlPath = new Doorctl().installIntoWorkspace(DOORCTL_VERSION)
+    {
+      sh """|#!/bin/bash
+            |set -x
+            |docker rmi -f ddartifacts-docker.jfrog.io/pulse-base || true
+            |""".stripMargin()
+    }
     // deploy Pulse
     new Pulse().blockingDeploy(PULSE_VERSION, SERVICE_NAME, SERVICE_SHA, KUBERNETES_CLUSTER, doorctlPath, PULSE_DIR, TIMEOUT_S, SLEEP_S, KUBERNETES_NAMESPACE)
   }
