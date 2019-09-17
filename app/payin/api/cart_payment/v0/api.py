@@ -40,7 +40,6 @@ router = APIRouter()
         HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
     },
-    include_in_schema=False,
     tags=api_tags,
 )
 async def create_cart_payment_for_legacy_client(
