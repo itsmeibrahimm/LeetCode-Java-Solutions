@@ -1,6 +1,5 @@
-@Library('common-pipelines@10.16.0') _
+@Library('common-pipelines@10.17.0') _
 
-import groovy.transform.Field
 /**
  * Expected inputs:
  * ----------------
@@ -9,117 +8,69 @@ import groovy.transform.Field
  * params['JSON']               - Extensible json doc with extra information
  */
 
-@Field
-def runningStage = "Not Started"
-
 pipeline {
+  options {
+    timestamps()
+    skipStagesAfterUnstable()
+    timeout(time: 30, unit: 'MINUTES')
+  }
   agent {
     label 'universal'
   }
   stages {
-    stage('Startup') {
+    stage('Docker Build') {
       steps {
         script {
-          runningStage = env.STAGE_NAME
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-        }
-        artifactoryLogin()
-        script {
-          /**
-           * Beware: Github does not offer a way for us to "protect" git tags. Any
-           * developer can "force push" tags causing chaos and GitHub offers no way
-           * for us to prevent that.
-           *
-           * Ddops maintains it's own immutable database of sha/semvertag bindings and
-           * the getImmutableReleaseSemverTag() function will retrieve the semver tag
-           * value that was originally registered with the params['SHA'].
-           *
-           * If you decide to access the original semver value, please do not use it for
-           * anything important. In other words your "1.0.0" tag might have been "force
-           * pushed" around. You could unknowingly end up building/deploying (etc) a
-           * version of that code that doesn't match the params['SHA'] value.
-           */
-          env.tag = getImmutableReleaseSemverTag(params['SHA'])
-        }
-      }
-    }
-    stage('Docker Build Tag Push - [NoRelease]') {
-      steps {
-        script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.buildTagPushNoRelease(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName())
-        }
-      }
-    }
-    stage('Docker Tag Push - [Release]') {
-      steps {
-        script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.tagPushRelease(params['GITHUB_REPOSITORY'], params['SHA'], env.tag)
+          common.dockerBuild(params['GITHUB_REPOSITORY'], params['SHA'])
         }
       }
     }
     stage('Run CI container') {
       steps {
         script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.runCIcontainer(common.getServiceName(), params['SHA'], env.tag)
-        }
-      }
-    }
-    stage('Unit Tests') {
-      steps {
-        script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.runUnitTests(common.getServiceName())
-        }
-      }
-    }
-    stage('Integration Tests') {
-      steps {
-        script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.runIntegrationTests(common.getServiceName())
-        }
-      }
-    }
-    stage('Pulse tests') {
-      steps {
-        script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.runPulseTests(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runCIcontainer(params['GITHUB_REPOSITORY'], params['SHA'])
         }
       }
     }
     stage('Linting') {
       steps {
         script {
-          runningStage = env.STAGE_NAME
-        }
-        script {
-          common.runLinter(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runLinter()
         }
       }
     }
     stage('Typing') {
       steps {
         script {
-          runningStage = env.STAGE_NAME
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runTyping()
         }
+      }
+    }
+    stage('Unit Tests') {
+      steps {
         script {
-          common.runTyping(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runUnitTests()
+        }
+      }
+    }
+    stage('Integration Tests') {
+      steps {
+        script {
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runIntegrationTests()
+        }
+      }
+    }
+    stage('Pulse tests') {
+      steps {
+        script {
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runPulseTests()
         }
       }
     }
@@ -127,18 +78,20 @@ pipeline {
   post {
     always {
       script {
-        common.removeAllContainers()
-      }
-    }
-    failure {
-      script {
-        common.notifySlackChannelDeploymentStatus(runningStage, params['SHA'], "${env.BUILD_NUMBER}", "failure", true)
+        common.dockerClean()
       }
     }
     success {
       script {
-        common.notifySlackChannelDeploymentStatus("Successful Build Release", params['SHA'], "${env.BUILD_NUMBER}", "success", false)
+        tag = getImmutableReleaseSemverTag(params['SHA'])
       }
+      sendSlackMessage common.getSlackChannel(), "Successful build of ${common.getServiceName()} to ${tag}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
+    }
+    failure {
+      script {
+        tag = getImmutableReleaseSemverTag(params['SHA'])
+      }
+      sendSlackMessage common.getSlackChannel(), "Build failed for ${common.getServiceName()} to ${tag}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
     }
   }
 }

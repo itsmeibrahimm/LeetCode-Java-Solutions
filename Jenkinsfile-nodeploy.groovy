@@ -1,10 +1,7 @@
-@Library('common-pipelines@10.16.0') _
-
+@Library('common-pipelines@10.17.0') _
 // -----------------------------------------------------------------------------------
 // The following params are automatically provided by the callback gateway as inputs
 // to the Jenkins pipeline that starts this job.
-//
-// CI pipeline for payment-service
 //
 // params["SHA"]                    - Sha used to start the pipeline
 // params["BRANCH_NAME"]            - Name of GitHub branch the SHA is associated with
@@ -26,66 +23,70 @@ pipeline {
   stages {
     stage('Startup') {
       steps {
-        setGitHubStatus 'Start Jenkinsfile-nodeploy Pipeline', 'Started'
-        script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-        }
+        setGitHubStatus "Start Jenkinsfile-nodeploy Pipeline", "Started."
       }
     }
-    stage('Docker Build Tag Push') {
+    stage('Docker Build') {
       steps {
-        artifactoryLogin()
         script {
-          common.buildTagPushNoRelease(params['GITHUB_REPOSITORY'], params['SHA'], params['BRANCH_NAME'], common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.dockerBuild(params['GITHUB_REPOSITORY'], params['SHA'])
         }
       }
     }
     stage('Run CI container') {
       steps {
         script {
-          common.runCIcontainer(common.getServiceName(), params['SHA'])
-        }
-      }
-    }
-    stage('Unit Tests') {
-      steps {
-        script {
-          common.runUnitTests(common.getServiceName())
-        }
-      }
-    }
-    stage('Integration Tests') {
-      steps {
-        script {
-          common.runIntegrationTests(common.getServiceName())
-        }
-      }
-    }
-    stage('Pulse tests') {
-      steps {
-        script {
-          common.runPulseTests(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runCIcontainer(params['GITHUB_REPOSITORY'], params['SHA'])
         }
       }
     }
     stage('Linting') {
       steps {
         script {
-          common.runLinter(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runLinter()
         }
       }
     }
     stage('Typing') {
       steps {
         script {
-          common.runTyping(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runTyping()
         }
       }
     }
     stage('Hooks') {
       steps {
         script {
-          common.runHooks(common.getServiceName())
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runHooks()
+        }
+      }
+    }
+    stage('Unit Tests') {
+      steps {
+        script {
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runUnitTests()
+        }
+      }
+    }
+    stage('Integration Tests') {
+      steps {
+        script {
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runIntegrationTests()
+        }
+      }
+    }
+    stage('Pulse tests') {
+      steps {
+        script {
+          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
+          common.runPulseTests()
         }
       }
     }
@@ -93,7 +94,7 @@ pipeline {
   post {
     always {
       script {
-        common.removeAllContainers()
+        common.dockerClean()
       }
     }
   }

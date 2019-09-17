@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+!_infra/build/
 develop-eggs/
 dist/
 downloads/
@@ -114,3 +115,9 @@ venv.bak/
 *.code-workspace
 tmp/
 report.*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan

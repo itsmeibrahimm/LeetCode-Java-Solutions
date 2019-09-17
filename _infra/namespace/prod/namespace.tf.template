@@ -1,0 +1,43 @@
+variable "namespace" {
+  type = string
+}
+
+variable "service_account_namespace" {
+  type = "string"
+}
+
+variable "k8s_config_path" {
+  type = string
+}
+
+provider "aws" {
+  region  = "us-west-2"
+  version = "~> 2.19"
+}
+
+provider "kubernetes" {
+  config_path = var.k8s_config_path
+}
+
+provider "helm" {
+  kubernetes {
+    config_path = var.k8s_config_path
+  }
+  install_tiller = false
+  version = "0.10.1"
+}
+
+terraform {
+  backend "s3" {
+    bucket = "doordash-cluster-state"
+    dynamodb_table = "doordash-cluster-state"
+    key    = "resources/services/prod/_GITREPO_/namespace.tfstate"
+    region = "us-west-2"
+  }
+}
+
+module "namespace" {
+  source = "git::ssh://git@github.com/doordash/terraform-kubernetes-namespace.git?ref=master"
+  namespace = var.namespace
+  service_account_namespace = var.service_account_namespace
+}
