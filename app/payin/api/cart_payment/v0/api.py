@@ -61,7 +61,6 @@ async def create_cart_payment_for_legacy_client(
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
-            client_description=cart_payment_request.client_description,
         )
 
         log.info(f"Created cart_payment {cart_payment.id} for legacy client.")
@@ -112,6 +111,9 @@ async def update_cart_payment(
         payer_id=None,
         amount=cart_payment_request.amount,
         client_description=cart_payment_request.client_description,
+        request_legacy_payment=get_legacy_payment_model(
+            cart_payment_request.legacy_payment
+        ),
     )
     log.info(f"Updated cart_payment {cart_payment.id} for legacy charge {dd_charge_id}")
     return cart_payment
@@ -148,6 +150,7 @@ def get_legacy_payment_model(
         dd_consumer_id=request_legacy_payment_info.dd_consumer_id,
         dd_stripe_card_id=request_legacy_payment_info.dd_stripe_card_id,
         dd_country_id=request_legacy_payment_info.dd_country_id,
+        dd_additional_payment_info=request_legacy_payment_info.dd_additional_payment_info,
         stripe_customer_id=getattr(
             request_legacy_payment_info, "stripe_customer_id", None
         ),

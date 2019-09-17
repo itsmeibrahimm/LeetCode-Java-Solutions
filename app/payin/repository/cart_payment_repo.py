@@ -804,6 +804,8 @@ class CartPaymentRepository(PayinDBRepository):
         currency: str,
         status: str,
         idempotency_key: str,
+        additional_payment_info: Optional[str],
+        description: Optional[str],
     ) -> LegacyStripeCharge:
         data = {
             stripe_charges.stripe_id: stripe_id,
@@ -814,6 +816,8 @@ class CartPaymentRepository(PayinDBRepository):
             stripe_charges.currency: currency,
             stripe_charges.status: status,
             stripe_charges.idempotency_key: idempotency_key,
+            stripe_charges.additional_payment_info: additional_payment_info,
+            stripe_charges.description: description,
             stripe_charges.created_at: datetime.now(),
             stripe_charges.updated_at: datetime.now(),
         }

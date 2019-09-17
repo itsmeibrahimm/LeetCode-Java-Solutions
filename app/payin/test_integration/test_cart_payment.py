@@ -133,7 +133,7 @@ class TestCartPayment:
             "currency": "usd",
             "delay_capture": True,
             "client_description": f"{legacy_stripe_customer_id} description",
-            "payer_statement_description": f"{legacy_stripe_customer_id}",
+            "payer_statement_description": f"{legacy_stripe_customer_id} bill"[-22:],
             "payer_country": "US",
             "payment_country": "US",
             "legacy_correlation_ids": {"reference_id": 123, "reference_type": 5},
@@ -143,6 +143,11 @@ class TestCartPayment:
                 "stripe_payment_method_id": legacy_stripe_payment_method_id,
                 "dd_country_id": 1,
                 "dd_consumer_id": 1,
+                "dd_additional_payment_info": {
+                    "place_tag1": "place tag",
+                    "extra info": "details",
+                    "application_fee": 500,
+                },
             },
         }
 
@@ -162,7 +167,16 @@ class TestCartPayment:
             "amount": amount,
             "payer_id": cart_payment["payer_id"],
             "client_description": client_description,
+            "legacy_payment": {
+                "dd_country_id": 1,
+                "dd_consumer_id": 1,
+                "dd_additional_payment_info": {
+                    "place_tag2": "place tag two",
+                    "extra items": "churro",
+                },
+            },
         }
+
         idempotency = idempotency_key if idempotency_key else str(uuid.uuid4())
         request_body["idempotency_key"] = idempotency
         return request_body
@@ -418,6 +432,7 @@ class TestCartPayment:
         payment_method: Dict[str, Any],
     ):
         # Cart payment creation
+        # Currency
         request_body = self._get_cart_payment_create_request(
             payer, payment_method, 750, True
         )
@@ -426,6 +441,7 @@ class TestCartPayment:
             stripe_api, client, request_body, 422, "request_validation_error", False
         )
 
+        # Country
         request_body = self._get_cart_payment_create_request(
             payer, payment_method, 750, True
         )
@@ -434,6 +450,7 @@ class TestCartPayment:
             stripe_api, client, request_body, 422, "request_validation_error", False
         )
 
+        # Amount
         request_body = self._get_cart_payment_create_request(
             payer, payment_method, 0, True
         )
@@ -444,6 +461,12 @@ class TestCartPayment:
         self._test_cart_payment_creation_error(
             stripe_api, client, request_body, 422, "request_validation_error", False
         )
+
+        # Statement descriptor
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, 0, True
+        )
+        request_body["payer_statement_description"] = "01234567891123456789212"
 
         # Cart payment update
         request_body = self._get_cart_payment_create_request(

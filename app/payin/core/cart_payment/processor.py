@@ -76,6 +76,8 @@ class PaymentResourceIds:
 
 class LegacyPaymentInterface:
     DEFAULT_COUNTRY_ID = LegacyCountryId.US
+    ADDITIONAL_INFO_DESTINATION_KEY = "destination"
+    ADDITIONAL_INFO_APPLICATION_FEE_KEY = "application_fee"
 
     def __init__(
         self,
@@ -151,18 +153,13 @@ class LegacyPaymentInterface:
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_intent: ProviderPaymentIntent,
+        client_description: Optional[str],
     ) -> Tuple[Optional[LegacyConsumerCharge], LegacyStripeCharge]:
         self.req_context.log.debug(
             "[create_charge_after_payment_submitted] Creating charge records in legacy system"
         )
         provider_charges = provider_payment_intent.charges
         provider_charge = provider_charges.data[0]
-        is_stripe_connect_based = (
-            True if provider_charge.application_fee_amount else False
-        )
-        country_id = legacy_payment.dd_country_id
-        if not country_id:
-            country_id = self.get_country_id_by_code(payment_intent.country)
 
         if legacy_payment.stripe_charge_id:
             # For legacy model, when an adjustment is made, only a stripe charge is inserted, under the
@@ -189,6 +186,22 @@ class LegacyPaymentInterface:
             )
         else:
             # Brand new payment, create new consumer charge
+            is_stripe_connect_based = (
+                True
+                if legacy_payment.dd_additional_payment_info
+                and (
+                    self.ADDITIONAL_INFO_APPLICATION_FEE_KEY
+                    in legacy_payment.dd_additional_payment_info
+                    or self.ADDITIONAL_INFO_DESTINATION_KEY
+                    in legacy_payment.dd_additional_payment_info
+                )
+                else False
+            )
+
+            country_id = legacy_payment.dd_country_id
+            if not country_id:
+                country_id = self.get_country_id_by_code(payment_intent.country)
+
             self.req_context.log.debug(
                 f"[create_charge_after_payment_submitted] Creating new charge"
             )
@@ -208,7 +221,6 @@ class LegacyPaymentInterface:
             consumer_charge_id = legacy_consumer_charge.id
 
         legacy_stripe_charge = await self.payment_repo.insert_legacy_stripe_charge(
-            # TODO: additional_payment_info, description
             stripe_id=provider_charge.id,
             card_id=legacy_payment.dd_stripe_card_id,
             charge_id=consumer_charge_id,
@@ -219,6 +231,8 @@ class LegacyPaymentInterface:
                 provider_charge.status
             ),
             idempotency_key=payment_intent.idempotency_key,
+            additional_payment_info=str(legacy_payment.dd_additional_payment_info),
+            description=client_description,
         )
 
         return legacy_consumer_charge, legacy_stripe_charge
@@ -440,7 +454,6 @@ class CartPaymentInterface:
         idempotency_key: str,
         country: str,
         currency: str,
-        client_description: Optional[str],
     ) -> Tuple[CartPayment, PaymentIntent, PgpPaymentIntent]:
         # Create a new cart payment, with associated models
         self.req_context.log.info(
@@ -624,6 +637,7 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_resource_id: str,
         provider_customer_resource_id: str,
+        provider_description: Optional[str],
     ) -> ProviderPaymentIntent:
         # Call to stripe payment intent API
         try:
@@ -640,6 +654,7 @@ class CartPaymentInterface:
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
                 payment_method=provider_payment_resource_id,
                 customer=provider_customer_resource_id,
+                description=provider_description,
                 statement_descriptor=payment_intent.statement_descriptor,
                 metadata=payment_intent.metadata,
             )
@@ -1199,6 +1214,7 @@ class CartPaymentProcessor:
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_intent: ProviderPaymentIntent,
+        cart_payment: CartPayment,
         correlation_ids: CorrelationIds,
         legacy_payment: LegacyPayment,
     ) -> Tuple[
@@ -1221,6 +1237,7 @@ class CartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
+            client_description=cart_payment.client_description,
         )
 
         # When submitting a new intent, capture may happen if:
@@ -1314,6 +1331,7 @@ class CartPaymentProcessor:
         legacy_payment: LegacyPayment,
         idempotency_key: str,
         amount: int,
+        description: Optional[str],
     ):
         payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
             cart_payment
@@ -1329,6 +1347,10 @@ class CartPaymentProcessor:
             legacy_country_id=self.legacy_payment_interface.get_country_id_by_code(
                 payment_intents[0].country
             ),
+        )
+
+        intent_description = (
+            description if description else cart_payment.client_description
         )
 
         if existing_payment_intent:
@@ -1369,6 +1391,7 @@ class CartPaymentProcessor:
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
             provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
+            provider_description=intent_description,
         )
 
         # Find the most recent intent that was submitted and get the stripe charge id from it.  It is used to update
@@ -1393,6 +1416,7 @@ class CartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
+            cart_payment=cart_payment,
             correlation_ids=cart_payment.correlation_ids,
             legacy_payment=legacy_payment,
         )
@@ -1475,6 +1499,7 @@ class CartPaymentProcessor:
         payer_id: Optional[str],
         amount: int,
         client_description: Optional[str],
+        request_legacy_payment: Optional[LegacyPayment],
     ) -> CartPayment:
         """Update an existing payment associated with a legacy consumer charge.
 
@@ -1485,6 +1510,7 @@ class CartPaymentProcessor:
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             amount {int} -- New amount to use for cart payment.
             client_description {Optional[str]} -- New client description to use for cart payment.
+            request_legacy_payment: {Optional[LegacyPayment]} -- Optional legacy payment info containing additional_payment_info to use for legacy charge writes.
 
         Raises:
             CartPaymentReadError: [description]
@@ -1512,6 +1538,7 @@ class CartPaymentProcessor:
             payer_id=None,  # Not currently used in udpate_payment
             amount=amount,
             client_description=client_description,
+            request_legacy_payment=request_legacy_payment,
         )
 
     async def update_payment(
@@ -1521,6 +1548,7 @@ class CartPaymentProcessor:
         payer_id: Optional[uuid.UUID],
         amount: int,
         client_description: Optional[str],
+        request_legacy_payment: Optional[LegacyPayment] = None,
     ) -> CartPayment:
         """Update an existing payment.
 
@@ -1531,6 +1559,7 @@ class CartPaymentProcessor:
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             amount {int} -- New amount to use for cart payment.
             client_description {Optional[str]} -- New client description to use for cart payment.
+            request_legacy_payment: {Optional[LegacyPayment]} -- Optional legacy payment info containing additional_payment_info to use for legacy charge writes.
 
         Raises:
             CartPaymentReadError: Raised when there is an error retrieving the specified cart payment.
@@ -1547,6 +1576,12 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
             )
 
+        # V0 support: Clients may update additional_payment_info.
+        if request_legacy_payment and request_legacy_payment.dd_additional_payment_info:
+            legacy_payment.dd_additional_payment_info = (
+                request_legacy_payment.dd_additional_payment_info
+            )
+
         # Ensure the caller can access the cart payment being modified
         if not self.cart_payment_interface.is_accessible(
             cart_payment=cart_payment, request_payer_id=payer_id, credential_owner=""
@@ -1559,7 +1594,11 @@ class CartPaymentProcessor:
         # TODO concurrency control for attempts to update the same cart payment
         if self.cart_payment_interface.is_amount_adjusted_higher(cart_payment, amount):
             payment_intent, pgp_payment_intent = await self._update_payment_with_higher_amount(
-                cart_payment, legacy_payment, idempotency_key, amount
+                cart_payment=cart_payment,
+                legacy_payment=legacy_payment,
+                idempotency_key=idempotency_key,
+                amount=amount,
+                description=client_description,
             )
         elif self.cart_payment_interface.is_amount_adjusted_lower(cart_payment, amount):
             payment_intent, pgp_payment_intent = await self._update_payment_with_lower_amount(
@@ -1646,7 +1685,6 @@ class CartPaymentProcessor:
         idempotency_key: str,
         country: CountryCode,
         currency: CurrencyType,
-        client_description: Optional[str],
     ) -> Tuple[CartPayment, LegacyPayment]:
         """Submit a cart payment creation request.
 
@@ -1656,7 +1694,6 @@ class CartPaymentProcessor:
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             country {CurrencyType} -- ISO country code.
             currency {CurrencyType} -- Currency for cart payment request.
-            client_description {str} -- Pass through value clients may associated with the cart payment.
 
         Returns:
             CartPayment -- A CartPayment model for the created payment.
@@ -1731,7 +1768,6 @@ class CartPaymentProcessor:
                 idempotency_key=idempotency_key,
                 country=country,
                 currency=currency,
-                client_description=client_description,
             )
 
         # Call to provider to create payment on their side, and update state in our system based on the result
@@ -1741,6 +1777,7 @@ class CartPaymentProcessor:
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
             provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
+            provider_description=request_cart_payment.client_description,
         )
 
         # Update state of payment in our system now that payment exists in provider.
@@ -1749,6 +1786,7 @@ class CartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
+            cart_payment=request_cart_payment,
             correlation_ids=request_cart_payment.correlation_ids,
             legacy_payment=legacy_payment,
         )

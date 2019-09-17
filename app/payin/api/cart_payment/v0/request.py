@@ -17,4 +17,4 @@ class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):
 
 
 class UpdateCartPaymentLegacyRequest(UpdateCartPaymentBaseRequest):
-    payer_country: CountryCode = CountryCode.US
+    legacy_payment: LegacyPaymentInfo

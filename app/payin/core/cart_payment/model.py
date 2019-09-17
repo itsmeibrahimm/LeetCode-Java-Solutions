@@ -14,6 +14,7 @@ class LegacyPayment(BaseModel):
     dd_country_id: Optional[int] = None
     dd_stripe_card_id: Optional[int] = None
     dd_charge_id: Optional[int] = None
+    dd_additional_payment_info: Optional[Dict[str, Any]] = None
     stripe_charge_id: Optional[str] = None
     stripe_customer_id: Optional[str] = None
     stripe_payment_method_id: Optional[str] = None

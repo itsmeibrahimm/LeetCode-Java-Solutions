@@ -123,6 +123,7 @@ def generate_cart_payment(
         capture_method=capture_method,
         correlation_ids=CorrelationIds(reference_id="0", reference_type="2"),
         delay_capture=True,
+        client_description="Test description",
     )
 
 
@@ -131,6 +132,7 @@ def generate_legacy_payment() -> LegacyPayment:
         dd_consumer_id=1,
         dd_country_id=1,
         dd_stripe_card_id=1,
+        dd_additional_payment_info={"test_key": f"{uuid.uuid4()}"},
         charge_id=None,
         stripe_charge_id=None,
         stripe_customer_id=str(uuid.uuid4()),

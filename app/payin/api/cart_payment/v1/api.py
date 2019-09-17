@@ -62,7 +62,7 @@ async def create_cart_payment(
     - **correlation_ids** [json object] Container for referential information to store along with the payment.
     - **correlation_ids.reference_id **- [string] Identifier of external entity this payment is for.  Currently supported: numeric order ID (pass in order ID within this string).
     - **correlation_ids.reference_type **- [string] Type of external identifier provided.  Currently supported: numeric model type ID (pass in type ID within this string).
-    - **payer_statement_description** [string] payer_statement_description
+    - **payer_statement_description** [string] Description that shows up for charge on customer credit card bill.  Max length 22 characters.
     - **split_payment** [json object] information for flow of funds
     - **split_payment.payout_account_id** [string] merchant's payout account id. Now it is stripe_managed_account_id
     - **split_payment.application_fee_amount** [int] fees that we charge merchant on the order
@@ -81,7 +81,6 @@ async def create_cart_payment(
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
-            client_description=cart_payment_request.client_description,
         )
 
         log.info(

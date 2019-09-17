@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional, Union, Dict, Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ class LegacyPaymentInfo(BaseModel):
     dd_consumer_id: int
     dd_stripe_card_id: Optional[str] = None
     dd_country_id: int
+    dd_additional_payment_info: Optional[Dict[str, Any]] = None
     stripe_customer_id: Optional[str] = None
     stripe_payment_method_id: Optional[str] = None
     stripe_card_id: Optional[str] = None

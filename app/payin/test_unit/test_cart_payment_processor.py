@@ -81,7 +81,6 @@ class TestCartPaymentProcessor:
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
-                client_description="Client description",
             )
         assert (
             payment_error.value.error_code
@@ -129,7 +128,6 @@ class TestCartPaymentProcessor:
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
                 currency="USD",
-                client_description="Client description",
             )
         assert (
             payment_error.value.error_code
@@ -155,11 +153,14 @@ class TestCartPaymentProcessor:
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
-            client_description="Client description",
         )
         assert result_cart_payment
         assert result_cart_payment.id
         assert result_cart_payment.amount == request_cart_payment.amount
+        assert (
+            result_cart_payment.client_description
+            == request_cart_payment.client_description
+        )
 
     @pytest.mark.asyncio
     async def test_resubmit(self, cart_payment_processor, request_cart_payment):
@@ -186,7 +187,6 @@ class TestCartPaymentProcessor:
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
-            client_description="Client description",
         )
         assert result_cart_payment
 
@@ -203,7 +203,6 @@ class TestCartPaymentProcessor:
             idempotency_key=str(uuid.uuid4()),
             country="US",
             currency="USD",
-            client_description="Client description",
         )
         assert second_result_cart_payment
         assert result_cart_payment == second_result_cart_payment
@@ -371,6 +370,7 @@ class TestCartPaymentProcessor:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
+            cart_payment=cart_payment,
             correlation_ids=cart_payment.correlation_ids,
             legacy_payment=generate_legacy_payment(),
         )
@@ -381,12 +381,16 @@ class TestCartPaymentProcessor:
     @pytest.mark.asyncio
     async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
         legacy_charge = generate_legacy_consumer_charge()
+        legacy_payment = generate_legacy_payment()
+        client_description = f"updated description for {legacy_charge.id}"
         result = await cart_payment_processor.update_payment_for_legacy_charge(
             idempotency_key=str(uuid.uuid4()),
             dd_charge_id=legacy_charge.id,
             payer_id=None,
             amount=1500,
-            client_description="description",
+            client_description=client_description,
+            request_legacy_payment=legacy_payment,
         )
         assert result
         assert result.amount == 1500
+        assert result.client_description == client_description

@@ -394,6 +394,8 @@ class MockedPaymentRepo:
         currency: str,
         status: str,
         idempotency_key: str,
+        additional_payment_info: Optional[str],
+        description: Optional[str],
     ) -> LegacyStripeCharge:
         return LegacyStripeCharge(
             id=1,
@@ -402,8 +404,8 @@ class MockedPaymentRepo:
             currency=currency,
             status=status,
             error_reason=None,
-            additional_payment_info=None,
-            description=None,
+            additional_payment_info=additional_payment_info,
+            description=description,
             idempotency_key=idempotency_key,
             card_id=card_id,
             charge_id=charge_id,

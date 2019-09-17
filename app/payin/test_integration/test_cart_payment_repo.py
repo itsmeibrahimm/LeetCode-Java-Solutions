@@ -796,6 +796,8 @@ class TestLegacyCharges:
             currency=CurrencyType.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
             idempotency_key=str(uuid4()),
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="test description",
         )
 
     @pytest.mark.asyncio
@@ -849,6 +851,8 @@ class TestLegacyCharges:
             currency=CurrencyType.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
             idempotency_key=idempotency_key,
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="Test description",
         )
 
         expected_stripe_charge = LegacyStripeCharge(
@@ -858,8 +862,8 @@ class TestLegacyCharges:
             currency=CurrencyType.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
             error_reason=None,
-            additional_payment_info=None,
-            description=None,
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="Test description",
             idempotency_key=idempotency_key,
             card_id=None,
             charge_id=consumer_charge.id,

@@ -106,6 +106,7 @@ class TestLegacyPaymentInterface:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_intent,
+            client_description="Description for provider",
         )
 
         expected_consumer_charge = LegacyConsumerCharge(
@@ -131,8 +132,8 @@ class TestLegacyPaymentInterface:
             currency=payment_intent.currency,
             status="succeeded",
             error_reason=None,
-            additional_payment_info=None,
-            description=None,
+            additional_payment_info=str(legacy_payment.dd_additional_payment_info),
+            description="Description for provider",
             idempotency_key=payment_intent.idempotency_key,
             card_id=legacy_payment.dd_stripe_card_id,
             charge_id=1,
@@ -168,6 +169,7 @@ class TestLegacyPaymentInterface:
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_intent,
+            client_description=str(payment_intent.id),
         )
 
         assert result_consumer_charge is None
@@ -179,8 +181,8 @@ class TestLegacyPaymentInterface:
             currency=payment_intent.currency,
             status="succeeded",
             error_reason=None,
-            additional_payment_info=None,
-            description=None,
+            additional_payment_info=str(legacy_payment.dd_additional_payment_info),
+            description=str(payment_intent.id),
             idempotency_key=payment_intent.idempotency_key,
             card_id=legacy_payment.dd_stripe_card_id,
             charge_id=1,
@@ -565,7 +567,6 @@ class TestCartPaymentInterface:
         idempotency_key = str(uuid.uuid4())
         country = "US"
         currency = "USD"
-        client_description = "test"
         result_cart_payment, result_payment_intent, result_pgp_payment_intent = await cart_payment_interface.create_new_payment(
             request_cart_payment=request_cart_payment,
             legacy_payment=legacy_payment,
@@ -575,7 +576,6 @@ class TestCartPaymentInterface:
             idempotency_key=idempotency_key,
             country=country,
             currency=currency,
-            client_description=client_description,
         )
 
         expected_cart_payment = deepcopy(request_cart_payment)
@@ -784,7 +784,11 @@ class TestCartPaymentInterface:
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
         response = await cart_payment_interface.submit_payment_to_provider(
-            intent, pgp_intent, "payment_resource_id", "customer_resource_id"
+            intent,
+            pgp_intent,
+            "payment_resource_id",
+            "customer_resource_id",
+            "test_description",
         )
         assert response
 
@@ -801,7 +805,11 @@ class TestCartPaymentInterface:
 
         with pytest.raises(CartPaymentCreateError) as payment_error:
             await cart_payment_interface.submit_payment_to_provider(
-                intent, pgp_intent, "payment_resource_id", "customer_resource_id"
+                intent,
+                pgp_intent,
+                "payment_resource_id",
+                "customer_resource_id",
+                "test_description",
             )
 
         assert (
@@ -816,7 +824,11 @@ class TestCartPaymentInterface:
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
         provider_intent = await cart_payment_interface.submit_payment_to_provider(
-            intent, pgp_intent, "payment_resource_id", "customer_resource_id"
+            intent,
+            pgp_intent,
+            "payment_resource_id",
+            "customer_resource_id",
+            "test_description",
         )
 
         result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_submission_to_provider(

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Text, Integer, JSON
+from sqlalchemy import Column, DateTime, Text, Integer
 from typing_extensions import final
 
 from app.commons.database.model import TableDefinition
@@ -28,7 +28,7 @@ class StripeChargeTable(TableDefinition):
     error_reason: Column = no_init_field(Column("error_reason", Text))
 
     additional_payment_info: Column = no_init_field(
-        Column("additional_payment_info", JSON)
+        Column("additional_payment_info", Text)
     )
     description: Column = no_init_field(Column("description", Text))
 
