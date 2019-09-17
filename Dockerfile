@@ -52,7 +52,6 @@ RUN apt-get clean && \
   rm -rf /root/.cache
 
 COPY _infra/web/gunicorn_conf.py /home/
-COPY _infra/infra.mk /home/_infra/infra.mk
 COPY app /home/app
 COPY development /home/development
 COPY migrations /home/migrations
@@ -60,9 +59,7 @@ COPY pulse /home/pulse
 
 # Use a tmpfs mount to prevent heartbeat blocking event loop for EBS volumes
 # http://docs.gunicorn.org/en/stable/faq.html#how-do-i-avoid-gunicorn-excessively-blocking-in-os-fchmod
-# Updated from customized /tmpfs mount to /dev/shm per discussion here:
-# https://github.com/doordash/terraform-kubernetes-microservice/pull/17#issuecomment-531651499
-CMD ["gunicorn", "--worker-tmp-dir", "/dev/shm", "-k", "app.uvicorn_worker.UvicornWorker", "-c", "./gunicorn_conf.py", "app.main:app"]
+CMD ["gunicorn", "--worker-tmp-dir", "/tmpfs", "-k", "app.uvicorn_worker.UvicornWorker", "-c", "./gunicorn_conf.py", "app.main:app"]
 
 ARG BUILD_NUMBER=unknown
 ENV BUILD_NUMBER ${BUILD_NUMBER}

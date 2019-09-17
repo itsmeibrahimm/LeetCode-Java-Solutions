@@ -11,4 +11,4 @@ secret_sources:
 users: "10"
 hatch_rate: "10"
 run_time: "10m"
-target_host: "http://payment-service-web.payment-service.svc.cluster.local"
+target_host: "http://payment-service-web.staging.svc.cluster.local"
