@@ -2,7 +2,12 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 import aiohttp
 
+from app.commons.context.logger import get_logger
+
 DEFAULT_HTTP_REQUEST_TIMEOUT = 10
+
+# tentative before hooking up dsj client with req context
+dsj_client_logger = get_logger("dsj_client")
 
 
 class DSJAuthException(Exception):
@@ -97,6 +102,7 @@ class DSJClient:
         :param uri:
         :param params:
         :param timeout_sec: default 10 seconds for the request session
+        :param log
         :return:
         """
 
@@ -110,7 +116,11 @@ class DSJClient:
                     raise DSJRESTCallException(
                         f"DSJ REST call failed: {resp.status} {resp.reason}"
                     )
-                return await resp.json()
+                try:
+                    return await resp.json()
+                except aiohttp.client_exceptions.ContentTypeError:
+                    dsj_client_logger.warning("200 OK, but can not parse JSON")
+                    return {}
 
     async def post(
         self,
@@ -124,6 +134,7 @@ class DSJClient:
         :param uri:
         :param data:
         :param timeout_sec: default 10 seconds for the request session
+        :param log
         :return:
         """
 
@@ -137,4 +148,8 @@ class DSJClient:
                     raise DSJAuthException(
                         f"DSJ REST call failed: {resp.status} {resp.reason}"
                     )
-                return await resp.json()
+                try:
+                    return await resp.json()
+                except aiohttp.client_exceptions.ContentTypeError:
+                    dsj_client_logger.warning("200 OK, but can not parse JSON")
+                    return {}
