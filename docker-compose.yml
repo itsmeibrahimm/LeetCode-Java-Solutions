@@ -36,3 +36,22 @@ services:
     tty: true
     depends_on:
       - payment.dsj-postgres
+
+
+  admin:
+    container_name: payment.admin
+    build:
+      context: "."
+      args:
+        - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+    volumes:
+      - $PWD/app:/home/app
+      - $PWD/development:/home/development
+    environment:
+      - DSJ_DB_ENDPOINT=payment.dsj-postgres
+    command: ["tail", "-f", "/dev/null"]
+    tty: true
+    depends_on:
+      - payment.dsj-postgres

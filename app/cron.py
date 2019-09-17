@@ -10,14 +10,12 @@ import pytz
 from app.commons.jobs.scheduler import Scheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
-from app.commons.config.utils import init_app_config
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
-from app.commons.instrumentation import sentry
 from app.commons.instrumentation.pool import stat_resource_pool_jobs
-from app.commons.jobs.pool import JobPool, adjust_pool_sizes
+from app.commons.jobs.pool import adjust_pool_sizes
+from app.commons.jobs.startup_util import init_worker_resources
 from app.commons.runtime import runtime
-from app.commons.stats import init_global_statsd
 from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
@@ -34,20 +32,9 @@ def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
     statsd_client.incr("scheduler.heartbeat")
 
 
-app_config = init_app_config()
-
-if app_config.SENTRY_CONFIG:
-    sentry.init_sentry_sdk(app_config.SENTRY_CONFIG)
-
-# set up global statsd
-init_global_statsd(
-    prefix=app_config.GLOBAL_STATSD_PREFIX,
-    host=app_config.STATSD_SERVER,
-    fixed_tags={"env": app_config.ENVIRONMENT},
-)
-
 logger = get_logger("cron")
 
+(app_config, app_context, stripe_pool) = init_worker_resources(pool_name="stripe")
 
 scheduler = Scheduler()
 scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC timezone
@@ -55,7 +42,6 @@ scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC t
 loop = asyncio.get_event_loop()
 app_context = loop.run_until_complete(create_app_context(app_config))
 
-stripe_pool = JobPool.create_pool(size=10, name="stripe")
 app_context.monitor.add(
     stat_resource_pool_jobs(
         stat_prefix="resource.job_pools",
