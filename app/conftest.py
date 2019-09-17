@@ -235,6 +235,7 @@ def dummy_app_context(mocker: MockFixture):
         identity_client=mocker.Mock(),
         stripe_thread_pool=mocker.Mock(),
         stripe_client=mocker.Mock(),
+        capture_service=mocker.Mock(),
     )
 
 

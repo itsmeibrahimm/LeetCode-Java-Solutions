@@ -146,3 +146,5 @@ class AppConfig(SecretAware):
     # In local and staging, we want the capture jobs to run frequently so we can run integration tests
     # In prod, we override the schedule to run after-hours to mitigate Stripe rate-limiting
     CAPTURE_CRON_TRIGGER: CronTrigger = CronTrigger(minute="*/2")
+
+    DEFAULT_CAPTURE_DELAY_IN_MINUTES: int = 1  # set the capture delay to ~1 minute

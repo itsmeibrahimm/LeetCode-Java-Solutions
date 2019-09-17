@@ -68,4 +68,5 @@ def create_app_config() -> AppConfig:
             release=f"payment-service@release-{os.getenv('RELEASE_TAG')}",
         ),
         CAPTURE_CRON_TRIGGER=CronTrigger(hour="7-11"),  # in UTC!
+        DEFAULT_CAPTURE_DELAY_IN_MINUTES=24 * 60,  # 24 hours
     )

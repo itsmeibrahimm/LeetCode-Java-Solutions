@@ -2,6 +2,7 @@ from typing import Any, cast
 
 import pytest
 import pytest_mock
+from asynctest import MagicMock
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
@@ -47,6 +48,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
             ],
             http_client=TimedRequestsClient(),
         ),
+        capture_service=MagicMock(),
     )
     app.extra["context"] = cast(Any, context)
 

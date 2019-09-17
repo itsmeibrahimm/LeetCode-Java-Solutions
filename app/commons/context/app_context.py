@@ -26,6 +26,7 @@ from doordash_python_stats.ddstats import doorstats_global
 from app.commons.instrumentation.monitor import MonitoringManager
 from app.commons.instrumentation.eventloop import stat_process_event_loop
 from app.commons.instrumentation.pool import stat_thread_pool_jobs
+from app.payin.capture.service import CaptureService
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,8 @@ class AppContext:
     dsj_client: DSJClient
 
     identity_client: IdentityClientInterface
+
+    capture_service: CaptureService
 
     async def close(self):
         # stop monitoring various application resources
@@ -181,6 +184,10 @@ async def create_app_context(config: AppConfig) -> AppContext:
             grpc_endpoint=config.IDENTITY_SERVICE_GRPC_ENDPOINT,
         )
 
+    capture_service = CaptureService(
+        default_capture_delay_in_minutes=config.DEFAULT_CAPTURE_DELAY_IN_MINUTES
+    )
+
     context = AppContext(
         log=root_logger,
         monitor=monitor,
@@ -194,6 +201,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         identity_client=identity_client,
         stripe_client=stripe_client,
         stripe_thread_pool=stripe_thread_pool,
+        capture_service=capture_service,
     )
 
     # start monitoring

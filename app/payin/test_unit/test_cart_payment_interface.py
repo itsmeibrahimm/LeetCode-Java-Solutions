@@ -620,7 +620,9 @@ class TestCartPaymentInterface:
         assert result_payment_intent.updated_at
         assert result_payment_intent.capture_after == (
             datetime(2011, 1, 1)
-            + timedelta(hours=cart_payment_interface.CAPTURE_DELAY_IN_HOURS)
+            + timedelta(
+                minutes=cart_payment_interface.capture_service.default_capture_delay_in_minutes
+            )
         )
 
         # TODO check pgp_payment_intent as well

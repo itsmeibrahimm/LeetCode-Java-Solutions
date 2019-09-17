@@ -2,13 +2,13 @@ import uuid
 from asyncio import gather
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from structlog.stdlib import BoundLogger
 from typing import Tuple, List, Optional, Callable, Dict, Any
-from typing_extensions import final
 
 from fastapi import Depends
 from stripe.error import StripeError, InvalidRequestError
 from stripe.util import convert_to_stripe_object
+from structlog.stdlib import BoundLogger
+from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
@@ -244,7 +244,6 @@ class LegacyPaymentInterface:
 @tracing.track_breadcrumb(processor_name="cart_payments", only_trackable=False)
 class CartPaymentInterface:
     ENABLE_NEW_CHARGE_TABLES = False
-    CAPTURE_DELAY_IN_HOURS = 24 * 1
 
     def __init__(
         self,
@@ -265,6 +264,7 @@ class CartPaymentInterface:
         self.payer_client = payer_client
         self.payment_method_client = payment_method_client
         self.stripe_async_client = stripe_async_client
+        self.capture_service = self.app_context.capture_service
 
     def get_most_recent_intent(self, intent_list: List[PaymentIntent]) -> PaymentIntent:
         intent_list.sort(key=lambda x: x.created_at)
@@ -451,7 +451,7 @@ class CartPaymentInterface:
         capture_after = None
         if request_cart_payment.delay_capture:
             capture_after = datetime.utcnow() + timedelta(
-                hours=self.CAPTURE_DELAY_IN_HOURS
+                minutes=self.capture_service.default_capture_delay_in_minutes
             )
 
         # Capture Method

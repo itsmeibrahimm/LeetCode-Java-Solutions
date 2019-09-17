@@ -5,6 +5,7 @@ from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+from app.payin.capture.service import CaptureService
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
     LegacyPaymentInterface,
@@ -566,8 +567,10 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     Returns a cart payment interface with a default mocked stripe client and cart payment repository, where
     functions within these provide default (e.g. simple mock) responses.
     """
+    app_context = MagicMock()
+    app_context.capture_service = CaptureService(default_capture_delay_in_minutes=2)
     cart_payment_interface = CartPaymentInterface(
-        app_context=MagicMock(),
+        app_context=app_context,
         req_context=MagicMock(),
         payment_repo=cart_payment_repo,
         payer_client=MagicMock(),
