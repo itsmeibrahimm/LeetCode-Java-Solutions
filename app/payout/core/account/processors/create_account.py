@@ -1,7 +1,7 @@
 from typing import Union
 
+from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.context.logger import Log
-from app.commons.core.errors import PaymentError, DEFAULT_INTERNAL_ERROR
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account.types import PayoutAccountInternal
 from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
@@ -44,5 +44,5 @@ class CreatePayoutAccount(
 
     def _handle_exception(
         self, dep_exec: BaseException
-    ) -> Union[PaymentError, PayoutAccountInternal]:
-        raise DEFAULT_INTERNAL_ERROR
+    ) -> Union[PaymentException, PayoutAccountInternal]:
+        raise DEFAULT_INTERNAL_EXCEPTION

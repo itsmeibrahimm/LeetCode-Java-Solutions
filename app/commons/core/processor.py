@@ -3,8 +3,8 @@ from typing import Generic, Optional, TypeVar, Union
 
 from pydantic import BaseModel
 
+from app.commons.api.models import PaymentException
 from app.commons.context.logger import Log, get_logger
-from app.commons.core.errors import PaymentError
 
 
 class OperationResponse(BaseModel):
@@ -34,12 +34,15 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
     async def execute(self) -> RespT:
         try:
             return await self._execute()
-        except BaseException as internal_exec:
-            if isinstance(internal_exec, PaymentError):
+        except Exception as internal_exec:
+            if isinstance(internal_exec, PaymentException):
                 raise
-            self.logger.info(f"{__name__}: handling error={str(internal_exec)}")
+            self.logger.error(
+                f"{__name__}: handling internal exception.",
+                internal_exception=str(internal_exec),
+            )
             exec_or_result = self._handle_exception(internal_exec)
-            if isinstance(exec_or_result, BaseException):
+            if isinstance(exec_or_result, Exception):
                 raise exec_or_result
             return exec_or_result
 
@@ -52,8 +55,8 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
 
     @abstractmethod
     def _handle_exception(
-        self, internal_exec: BaseException
-    ) -> Union[PaymentError, RespT]:
+        self, internal_exec: Exception
+    ) -> Union[PaymentException, RespT]:
         """
         define how do handler or translate exceptions raised within this processor and its dependencies
         """

@@ -17,14 +17,3 @@ class PaymentError(Exception):
         self.error_code = error_code
         self.error_message = error_message
         self.retryable = retryable
-
-
-class UnknownInternalError(PaymentError):
-    pass
-
-
-DEFAULT_INTERNAL_ERROR = UnknownInternalError(
-    error_code="unknown_payment_internal_error",
-    error_message="payment service encountered unknown internal error",
-    retryable=False,
-)

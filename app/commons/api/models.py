@@ -2,6 +2,7 @@ from abc import ABC
 
 from fastapi import HTTPException
 from pydantic import BaseModel
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class PaymentRequest(BaseModel, ABC):
@@ -59,3 +60,15 @@ class PaymentErrorResponseBody(BaseModel):
     error_code: str
     error_message: str
     retryable: bool
+
+
+class UnknownInternalException(PaymentException):
+    pass
+
+
+DEFAULT_INTERNAL_EXCEPTION = UnknownInternalException(
+    http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+    error_code="unknown_payment_internal_error",
+    error_message="payment service encountered unknown internal error",
+    retryable=False,
+)

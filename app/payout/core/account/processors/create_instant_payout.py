@@ -1,25 +1,25 @@
 import uuid
 from datetime import datetime
-from typing import Union, Optional
+from typing import Optional, Union
 
+from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.context.logger import Log
-from app.commons.core.errors import PaymentError, DEFAULT_INTERNAL_ERROR
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
     OperationResponse,
 )
-from app.payout.repository.bankdb.stripe_payout_request import (
-    StripePayoutRequestRepositoryInterface,
-)
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestCreate,
 )
+from app.payout.repository.bankdb.stripe_payout_request import (
+    StripePayoutRequestRepositoryInterface,
+)
 from app.payout.types import (
-    PayoutAmountType,
-    PayoutType,
-    PayoutMethodType,
     PayoutAccountId,
+    PayoutAmountType,
+    PayoutMethodType,
+    PayoutType,
 )
 
 
@@ -77,7 +77,7 @@ class CreateInstantPayout(
         return CreateInstantPayoutResponse()
 
     def _handle_exception(
-        self, dep_exec: BaseException
-    ) -> Union[PaymentError, CreateInstantPayoutResponse]:
+        self, dep_exec: Exception
+    ) -> Union[PaymentException, CreateInstantPayoutResponse]:
         # TODO write actual exception handling
-        raise DEFAULT_INTERNAL_ERROR
+        raise DEFAULT_INTERNAL_EXCEPTION

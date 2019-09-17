@@ -1,14 +1,14 @@
 import re
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple, Union
 
+from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.context.logger import Log
-from app.commons.core.errors import PaymentError, DEFAULT_INTERNAL_ERROR
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
     OperationResponse,
 )
-from app.payout.core.exceptions import PayoutErrorCode, PayoutError
+from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.repository.maindb.model.managed_account_transfer import (
     ManagedAccountTransfer,
 )
@@ -19,12 +19,12 @@ from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
 from app.payout.types import (
-    PayoutAmountType,
-    PayoutType,
-    PayoutMethodType,
-    PayoutAccountId,
-    PayoutTargetType,
     AccountType,
+    PayoutAccountId,
+    PayoutAmountType,
+    PayoutMethodType,
+    PayoutTargetType,
+    PayoutType,
 )
 
 
@@ -78,9 +78,9 @@ class CreateStandardPayout(
 
     def _handle_exception(
         self, dep_exec: BaseException
-    ) -> Union[PaymentError, CreateStandardPayoutResponse]:
+    ) -> Union[PaymentException, CreateStandardPayoutResponse]:
         # TODO write actual exception handling
-        raise DEFAULT_INTERNAL_ERROR
+        raise DEFAULT_INTERNAL_EXCEPTION
 
     async def is_processing_or_processed_for_method(self, transfer_id: int) -> bool:
         stripe_transfers = await self.stripe_transfer_repo.get_all_ongoing_stripe_transfers_by_transfer_id(

@@ -1,8 +1,8 @@
-from typing import Union, Optional
+from typing import Optional, Union
 
+from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.context.logger import Log
-from app.commons.core.errors import PaymentError, DEFAULT_INTERNAL_ERROR
-from app.commons.core.processor import OperationRequest, AsyncOperation
+from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account.types import PayoutAccountInternal
 from app.payout.core.exceptions import PayoutAccountNotFoundError
 from app.payout.repository.maindb.model.stripe_managed_account import (
@@ -57,5 +57,5 @@ class GetPayoutAccount(AsyncOperation[GetPayoutAccountRequest, PayoutAccountInte
 
     def _handle_exception(
         self, internal_exec: BaseException
-    ) -> Union[PaymentError, PayoutAccountInternal]:
-        raise DEFAULT_INTERNAL_ERROR
+    ) -> Union[PaymentException, PayoutAccountInternal]:
+        raise DEFAULT_INTERNAL_EXCEPTION
