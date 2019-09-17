@@ -1,5 +1,7 @@
 import os
 
+from apscheduler.triggers.cron import CronTrigger
+
 from app.commons.config.app_config import (
     AppConfig,
     ApiStatsDConfig,
@@ -65,4 +67,5 @@ def create_app_config() -> AppConfig:
             environment="prod",
             release=f"payment-service@release-{os.getenv('RELEASE_TAG')}",
         ),
+        CAPTURE_CRON_TRIGGER=CronTrigger(hour="7-11"),  # in UTC!
     )

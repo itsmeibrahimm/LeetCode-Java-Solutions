@@ -1,5 +1,7 @@
 import os
 
+from apscheduler.triggers.cron import CronTrigger
+
 from app.commons.config.app_config import (
     AppConfig,
     ApiStatsDConfig,
@@ -100,4 +102,6 @@ def create_app_config() -> AppConfig:
         DSJ_API_USER_PASSWORD=Secret(name="dsj_api_user_password", value=""),
         DSJ_API_JWT_TOKEN_TTL=1800,
         SENTRY_CONFIG=sentry_config,
+        # Payin
+        CAPTURE_CRON_TRIGGER=CronTrigger(minute="*/2"),
     )

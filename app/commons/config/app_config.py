@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from apscheduler.triggers.cron import CronTrigger
 from typing_extensions import final
 
 from app.commons.config.secrets import Secret, SecretAware
@@ -136,3 +137,12 @@ class AppConfig(SecretAware):
     STRIPE_MAX_WORKERS: int = 10
 
     INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger"})
+
+    #
+    # Payin Config
+    #
+
+    # Configures the cron trigger for all capture-related scheduled jobs
+    # In local and staging, we want the capture jobs to run frequently so we can run integration tests
+    # In prod, we override the schedule to run after-hours to mitigate Stripe rate-limiting
+    CAPTURE_CRON_TRIGGER: CronTrigger = CronTrigger(minute="*/2")

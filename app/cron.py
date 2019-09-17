@@ -62,15 +62,13 @@ app_context.monitor.add(
 
 scheduler.add_job(
     capture_uncaptured_payment_intents,
-    trigger="cron",
-    hour="7-11",  # UTC hour
+    app_config.CAPTURE_CRON_TRIGGER,
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
 )
 
 scheduler.add_job(
     resolve_capturing_payment_intents,
-    trigger="cron",
-    hour="7-11",  # UTC hour
+    app_config.CAPTURE_CRON_TRIGGER,
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
 )
 
