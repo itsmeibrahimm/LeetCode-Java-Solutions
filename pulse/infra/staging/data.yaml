@@ -7,7 +7,7 @@ service_runtime_config:
 service_env:
   SERVICE_TEAM_EMAIL: "payments-team@doordash.com"
   SERVICE_TEAM_SLACK_CHANNEL: "#payment-v2-alerts"
-  SERVICE_URI: "http://payment-service-web.staging.svc.cluster.local"
+  SERVICE_URI: "http://payment-service-web.payment-service.svc.cluster.local"
   REPORT_ENABLED: true
   TEST_ENV: "staging"
 

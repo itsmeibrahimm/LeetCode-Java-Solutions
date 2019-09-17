@@ -8,9 +8,7 @@ service_env:
 secret_sources:
   - payment-service-pulse
 
-users: "1"
-hatch_rate: "1"
-run_time: "10m"
-#target_host: "http://payment-service-web.prod.svc.cluster.local"
-# Point prod infra to staging to avoid accidentally running load testing against prod
-target_host: "http://payment-service-web.staging.svc.cluster.local"
+users: "0"
+hatch_rate: "0"
+run_time: "0m"
+target_host: "http://payment-service-web.payment-service.svc.cluster.local"
