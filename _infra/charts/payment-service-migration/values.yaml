@@ -4,7 +4,7 @@ env:
   AWS_METADATA_SERVICE_NUM_ATTEMPTS: 5
 replicaCount: 1
 job:
-  repository: ddartifacts-docker.jfrog.io/doordash/payment-service
+  repository: 611706558220.dkr.ecr.us-west-2.amazonaws.com/payment-service
   resources:
     requests:
       cpu: 1
