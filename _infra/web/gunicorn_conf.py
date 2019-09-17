@@ -17,6 +17,11 @@ def post_fork(server, worker):
 
     from app.commons.config.newrelic import create_new_relic_config
 
+    from app.commons.instrumentation.newrelic_monkeypatch import monkeypatch_for_asyncio
+
+    # monkeypatch newrelic for asyncio to preserve the root transaction
+    monkeypatch_for_asyncio()
+
     environment = os.environ.get("ENVIRONMENT", "unknown")
 
     # new relic config
