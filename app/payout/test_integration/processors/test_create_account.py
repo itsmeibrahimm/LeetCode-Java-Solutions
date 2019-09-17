@@ -12,6 +12,7 @@ from app.payout.core.account.processors.create_account import (
 from app.payout.core.account.types import PayoutAccountInternal
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.payout.types import PayoutAccountTargetType
 
 
 class TestCreatePayoutAccount:
@@ -27,7 +28,8 @@ class TestCreatePayoutAccount:
         payment_account_repo: PaymentAccountRepository,
     ):
         request = CreatePayoutAccountRequest(
-            statement_descriptor="test_create_account_processor"
+            entity=PayoutAccountTargetType.DASHER,
+            statement_descriptor="test_create_account_processor",
         )
         payment_account = PaymentAccount(
             id=1,

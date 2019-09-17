@@ -1,5 +1,8 @@
 from fastapi import Depends
 from starlette.requests import Request
+
+from app.commons.context.req_context import get_stripe_async_client_from_req
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
@@ -17,6 +20,7 @@ from app.payout.repository.maindb import (
 
 __all__ = [
     "create_payout_account_processors",
+    "get_stripe_client",
     "PayoutService",
     "PaymentAccountRepository",
     "PaymentAccountRepositoryInterface",
@@ -57,6 +61,7 @@ class PayoutService(BaseService):
     stripe_transfers: stripe_transfer.StripeTransferRepository
     managed_account_transfers: managed_account_transfer.ManagedAccountTransferRepository
     dsj_client: DSJClient
+    stripe: StripeAsyncClient
 
     def __init__(self, request: Request):
         super().__init__(request)
@@ -83,6 +88,8 @@ class PayoutService(BaseService):
         # dsj_client
         self.dsj_client = self.app_context.dsj_client
 
+        # stripe
+        self.stripe = get_stripe_async_client_from_req(request)  # type:ignore
 
 def PaymentAccountRepository(
     payout_service: PayoutService = Depends()
@@ -137,4 +144,9 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
         stripe_transfer_repo=payout_service.stripe_transfers,
         stripe_payout_request_repo=payout_service.stripe_payout_requests,
         stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
+        stripe=payout_service.stripe,
     )
+
+
+def get_stripe_client(payout_service: PayoutService = Depends()) -> StripeAsyncClient:
+    return payout_service.stripe

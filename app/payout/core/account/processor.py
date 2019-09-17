@@ -1,4 +1,5 @@
 from app.commons.context.logger import Log
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
@@ -18,8 +19,14 @@ from app.payout.core.account.processors.get_account import (
     PayoutAccountInternal,
     GetPayoutAccount,
 )
-from app.payout.repository.bankdb.stripe_managed_account_transfer import (
-    StripeManagedAccountTransferRepositoryInterface,
+from app.payout.repository.bankdb.stripe_managed_account_transfer import StripeManagedAccountTransferRepositoryInterface
+from app.payout.core.account.processors.update_account_statement_descriptor import (
+    UpdatePayoutAccountStatementDescriptorRequest,
+    UpdatePayoutAccountStatementDescriptor,
+)
+from app.payout.core.account.processors.verify_account import (
+    VerifyPayoutAccountRequest,
+    VerifyPayoutAccount,
 )
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepositoryInterface,
@@ -37,6 +44,7 @@ class PayoutAccountProcessors:
     payment_account_repo: PaymentAccountRepositoryInterface
     stripe_transfer_repo: StripeTransferRepositoryInterface
     stripe_payout_request_repo: StripePayoutRequestRepositoryInterface
+    stripe: StripeAsyncClient
 
     def __init__(
         self,
@@ -45,12 +53,14 @@ class PayoutAccountProcessors:
         stripe_transfer_repo: StripeTransferRepositoryInterface,
         stripe_payout_request_repo: StripePayoutRequestRepositoryInterface,
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepositoryInterface,
+        stripe: StripeAsyncClient,
     ):
         self.logger = logger
         self.payment_account_repo = payment_account_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.stripe_payout_request_repo = stripe_payout_request_repo
         self.stripe_managed_account_transfer_repo = stripe_managed_account_transfer_repo
+        self.stripe = stripe
 
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
@@ -71,6 +81,27 @@ class PayoutAccountProcessors:
             request=request,
         )
         return await get_account_op.execute()
+
+    async def update_payout_account_statement_descriptor(
+        self, request: UpdatePayoutAccountStatementDescriptorRequest
+    ) -> PayoutAccountInternal:
+        update_account_op = UpdatePayoutAccountStatementDescriptor(
+            logger=self.logger,
+            payment_account_repo=self.payment_account_repo,
+            request=request,
+        )
+        return await update_account_op.execute()
+
+    async def verify_payout_account(
+        self, request: VerifyPayoutAccountRequest
+    ) -> PayoutAccountInternal:
+        verify_account_op = VerifyPayoutAccount(
+            logger=self.logger,
+            payment_account_repo=self.payment_account_repo,
+            request=request,
+            stripe=self.stripe,
+        )
+        return await verify_account_op.execute()
 
     async def create_standard_payout(
         self, request: CreateStandardPayoutRequest

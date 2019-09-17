@@ -10,6 +10,7 @@ from app.commons.providers.stripe.stripe_http_client import (
 )
 from app.commons.providers import errors
 from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe.stripe_models import CreateAccountTokenRequest
 from app.commons.utils.pool import ThreadPoolHelper
 
 
@@ -256,7 +257,24 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         Retrieve Balance
         https://stripe.com/docs/api/balance/balance_retrieve
         """
-        ...
+
+    @abc.abstractmethod
+    def create_account_token(
+        self, request: models.CreateAccountTokenRequest
+    ) -> models.AccountToken:
+        """
+        Create an Account Token
+        https://stripe.com/docs/api/tokens/create_account
+        """
+
+    @abc.abstractmethod
+    def create_stripe_account(
+        self, request: models.CreateAccountRequest
+    ) -> models.Account:
+        """
+        Create an Account
+        https://stripe.com/docs/api/accounts/create
+        """
 
 
 @tracing.track_breadcrumb(provider_name="stripe", from_kwargs={"country": "country"})
@@ -560,6 +578,27 @@ class StripeClient(StripeClientInterface):
         )
         return balance
 
+    @tracing.track_breadcrumb(resource="token", action="create")
+    def create_account_token(
+        self, *, request: CreateAccountTokenRequest
+    ) -> models.AccountToken:
+        account_token = stripe.Token.create(
+            account=request.account.dict(), **self.settings_for(request.country)
+        )
+        return account_token
+
+    @tracing.track_breadcrumb(resource="account", action="create")
+    def create_stripe_account(
+        self, *, request: models.CreateAccountRequest
+    ) -> models.Account:
+        account = stripe.Account.create(
+            type=request.type,
+            account_token=request.account_token,
+            requested_capabilities=request.requested_capabilities,
+            **self.settings_for(request.country),
+        )
+        return account
+
 
 class StripeTestClient(StripeClient):
     """
@@ -851,4 +890,18 @@ class StripeAsyncClient:
             self.stripe_client.retrieve_balance,
             stripe_account=stripe_account,
             country=country,
+        )
+
+    async def create_account_token(
+        self, *, request: models.CreateAccountTokenRequest
+    ) -> models.AccountToken:
+        return await self.executor_pool.submit(
+            self.stripe_client.create_account_token, request=request
+        )
+
+    async def create_stripe_account(
+        self, *, request: models.CreateAccountRequest
+    ) -> models.Account:
+        return await self.executor_pool.submit(
+            self.stripe_client.create_stripe_account, request=request
         )

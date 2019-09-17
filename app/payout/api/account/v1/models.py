@@ -1,8 +1,8 @@
-import pydantic
 from typing import Optional
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, CurrencyType
+from app.payout.core.account.types import DateOfBirth, Address
 from app.payout.types import (
     PayoutAccountId,
     PayoutAccountToken,
@@ -16,8 +16,10 @@ from app.payout.types import (
     PayoutType,
     PayoutMethodType,
     PayoutTargetType,
-    PgpAccountType,
     PgpExternalAccountId,
+    StripeAccountToken,
+    StripeBusinessType,
+    AccountType,
 )
 from app.payout.core.account.types import VerificationRequirements
 
@@ -35,7 +37,7 @@ class CreatePayoutAccount(PaymentRequest):
 class PayoutAccount(PaymentResponse):
     id: PayoutAccountId
     statement_descriptor: str
-    pgp_account_type: Optional[PgpAccountType]
+    pgp_account_type: Optional[AccountType]
     pgp_account_id: Optional[PgpAccountId]
     pgp_external_account_id: Optional[PgpExternalAccountId]
     verification_requirements: Optional[VerificationRequirements]
@@ -43,19 +45,6 @@ class PayoutAccount(PaymentResponse):
 
 
 class VerificationDetails(PaymentRequest):
-    class DateOfBirth(pydantic.BaseModel):
-        day: int
-        month: int
-        year: int
-
-    class Address(pydantic.BaseModel):
-        country: CountryCode
-        state: str
-        city: str
-        line1: str
-        line2: str
-        postal_code: str
-
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     date_of_birth: Optional[DateOfBirth] = None
@@ -65,10 +54,17 @@ class VerificationDetails(PaymentRequest):
     id_file: Optional[StripeFileHandle] = None
     personal_identification_number: Optional[str] = None
     ssn_last_four: Optional[str] = None
+    business_type: Optional[StripeBusinessType] = None
     # we need pass in country and currency to create stripe account unless payment account table can store them
-    country: Optional[CountryCode] = None
-    currency: Optional[CurrencyType] = None
-    ...
+    country: CountryCode
+    currency: CurrencyType
+
+
+class VerificationDetailsWithToken(PaymentRequest):
+    account_token: StripeAccountToken
+    # we need pass in country and currency to create stripe account unless payment account table can store them
+    country: CountryCode
+    currency: CurrencyType
 
 
 class CreatePayoutMethod(PaymentRequest):

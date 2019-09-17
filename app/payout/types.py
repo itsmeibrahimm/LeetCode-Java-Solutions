@@ -10,6 +10,7 @@ PgpAccountId = int
 PgpExternalAccountId = str
 
 StripeFileHandle = str
+StripeAccountToken = str
 
 # Payout Methods
 PayoutMethodId = str
@@ -27,6 +28,11 @@ class PayoutAccountTargetType(str, Enum):
 
 class PgpAccountType(str, Enum):
     STRIPE = "stripe_managed_account"
+
+
+class StripeBusinessType(str, Enum):
+    COMPANY = "company"
+    INDIVIDUAL = "individual"
 
 
 class PayoutType(str, Enum):

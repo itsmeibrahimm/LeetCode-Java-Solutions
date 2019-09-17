@@ -8,6 +8,8 @@ from app.commons.types import CountryCode
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
+from app.payout.types import StripeAccountToken, StripeBusinessType, StripeFileHandle
+
 STRIPE_API_VERSION = "2019-08-14"
 
 
@@ -259,7 +261,6 @@ class CreatePayout(StripeBaseModel):
     statement_descriptor: Optional[str]
 
 
-# --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
 class Address(StripeBaseModel):
     city: Optional[str]
     country: Optional[str]
@@ -269,6 +270,61 @@ class Address(StripeBaseModel):
     state: Optional[str]
 
 
+class DateOfBirth(StripeBaseModel):
+    day: int
+    month: int
+    year: int
+
+
+class Document(StripeBaseModel):
+    back: Optional[StripeFileHandle]
+    front: Optional[StripeFileHandle]
+
+
+class Verification(StripeBaseModel):
+    document: Document
+
+
+class Company(StripeBaseModel):
+    address: Optional[Address]
+    name: Optional[str]
+    phone: Optional[str]
+    tax_id: Optional[str]
+    verification: Optional[Verification]
+
+
+class Individual(StripeBaseModel):
+    address: Optional[Address]
+    dob: Optional[DateOfBirth]
+    email: Optional[str]
+    first_name: Optional[str]
+    last_name: Optional[str]
+    id_number: Optional[str]
+    phone: Optional[str]
+    ssn_last_4: Optional[str]
+    verification: Optional[Verification]
+
+
+class CreateAccountTokenMetaData(StripeBaseModel):
+    business_type: Optional[str]
+    company: Optional[Company]
+    individual: Optional[Individual]
+    tos_shown_and_accepted: bool = True
+
+
+class CreateAccountTokenRequest(StripeBaseModel):
+    country: CountryCode
+    account: CreateAccountTokenMetaData
+
+
+class CreateAccountRequest(StripeBaseModel):
+    country: CountryCode
+    type: str = "custom"
+    account_token: Optional[StripeAccountToken]
+    requested_capabilities: list = ["legacy_payments"]
+
+
+# --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
 class BillingDetails(StripeBaseModel):
     address: Optional[Address]
     email: Optional[str]
@@ -613,3 +669,36 @@ class Balance(StripeBaseModel):
     connect_reserved: List[ConnectReserved]
     livemode: bool
     pending: List[Pending]
+
+
+class AccountToken(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/tokens/object
+    """
+
+    _STRIPE_OBJECT_NAME: str = "token"
+
+    id: str
+    object: str
+    type: str
+    used: bool
+    created: datetime
+
+
+class Account(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/accounts/object
+    """
+
+    _STRIPE_OBJECT_NAME: str = "account"
+
+    id: str
+    object: str
+    business_type: StripeBusinessType
+    charges_enabled: bool
+    country: CountryCode
+    default_currency: Currency
+    company: Optional[Company] = None
+    individual: Optional[Individual] = None
+    details_submitted: bool
+    email: Optional[str]

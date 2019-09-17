@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.commons.core.processor import OperationResponse
+from app.commons.types import CountryCode
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.types import PgpExternalAccountId
 
@@ -14,6 +15,21 @@ class VerificationStatus(str, Enum):
     PENDING = "pending"
     VERIFIED = "verified"
     FAILED = "failed"
+
+
+class DateOfBirth(BaseModel):
+    day: int
+    month: int
+    year: int
+
+
+class Address(BaseModel):
+    country: CountryCode
+    state: str
+    city: str
+    line1: str
+    line2: str
+    postal_code: str
 
 
 class VerificationRequirements(BaseModel):

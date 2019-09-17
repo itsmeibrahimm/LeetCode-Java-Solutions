@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Depends
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -17,7 +17,10 @@ from app.payout.core.account.processors.create_instant_payout import (
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
 )
-
+from app.payout.core.account.processors.update_account_statement_descriptor import (
+    UpdatePayoutAccountStatementDescriptorRequest,
+)
+from app.payout.core.account.processors.verify_account import VerifyPayoutAccountRequest
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
 from app.payout.service import create_payout_account_processors
 from app.payout.types import PayoutAccountStatementDescriptor, PayoutType
@@ -44,7 +47,9 @@ async def create_payout_account(
 ):
 
     log.debug(f"Creating payment_account for {body}.")
-    internal_request = CreatePayoutAccountRequest(**body.dict())
+    internal_request = CreatePayoutAccountRequest(
+        entity=body.target_type, statement_descriptor=body.statement_descriptor
+    )
     internal_response = await payout_account_processors.create_payout_account(
         internal_request
     )
@@ -70,20 +75,60 @@ async def get_payout_account(
     internal_response = await payout_account_processors.get_payout_account(
         internal_request
     )
-    return models.PayoutAccount(**internal_response.payment_account.dict())
+    external_response = to_external_payout_account(internal_response)
+    return models.PayoutAccount(**external_response.dict())
 
 
 @router.patch(
     "/{payout_account_id}/statement_descriptor",
     operation_id="UpdatePayoutAccountStatementDescriptor",
     status_code=HTTP_200_OK,
+    response_model=models.PayoutAccount,
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def update_payout_account_statement_descriptor(
-    payout_account_id: models.PayoutAccountId, body: PayoutAccountStatementDescriptor
+    payout_account_id: models.PayoutAccountId,
+    statement_descriptor: PayoutAccountStatementDescriptor,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
 ):
-    ...
+    internal_request = UpdatePayoutAccountStatementDescriptorRequest(
+        payout_account_id=payout_account_id, statement_descriptor=statement_descriptor
+    )
+    internal_response = await payout_account_processors.update_payout_account_statement_descriptor(
+        internal_request
+    )
+    external_response = to_external_payout_account(internal_response)
+    return models.PayoutAccount(**external_response.dict())
+
+
+@router.post(
+    "/{payout_account_id}/verify/legacy",
+    operation_id="VerifyPayoutAccountLegacy",
+    status_code=HTTP_200_OK,
+    response_model=models.PayoutAccount,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def verify_payout_account_legacy(
+    payout_account_id: models.PayoutAccountId,
+    verification_details: models.VerificationDetailsWithToken,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    internal_request = VerifyPayoutAccountRequest(
+        payout_account_id=payout_account_id,
+        country=verification_details.country,
+        account_token=verification_details.account_token,
+    )
+    internal_response = await payout_account_processors.verify_payout_account(
+        internal_request
+    )
+    external_response = to_external_payout_account(internal_response)
+    return models.PayoutAccount(**external_response.dict())
 
 
 @router.post(
@@ -96,22 +141,10 @@ async def update_payout_account_statement_descriptor(
 )
 async def verify_payout_account(
     payout_account_id: models.PayoutAccountId,
-    verification_details: models.VerificationDetails,
-):
-    ...
-
-
-@router.post(
-    "/{payout_account_id}/verify_token",
-    operation_id="VerifyPayoutAccountWithToken",
-    status_code=HTTP_200_OK,
-    response_model=models.PayoutAccount,
-    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
-    tags=api_tags,
-)
-async def verify_payout_account_with_token(
-    payout_account_id: models.PayoutAccountId,
-    token: models.PayoutAccountToken = Body(..., embed=True),
+    verification_details: models.VerificationDetailsWithToken,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
 ):
     ...
 

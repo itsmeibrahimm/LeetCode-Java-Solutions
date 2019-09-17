@@ -9,8 +9,16 @@ from app.commons.providers.stripe.stripe_client import (
 )
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.types import CurrencyType
 from app.commons.utils.pool import ThreadPoolHelper
+from app.commons.providers.stripe.stripe_models import (
+    DateOfBirth,
+    CreateAccountRequest,
+    Address,
+    CreateAccountTokenRequest,
+    Individual,
+    CreateAccountTokenMetaData,
+)
+from app.commons.types import CurrencyType, CountryCode
 
 pytestmark = [
     # mark all these tests as stripe tests
@@ -173,6 +181,78 @@ class TestStripeClient:
             stripe_account=models.StripeAccountId("acct_1A29cNCyrpkWaAxi"),
         )
         assert balance
+
+    # this test doesn't work as expected for stripe mock
+    # it should returns an account token but returns a card token
+    # works fine for external
+    def test_create_account_token(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+
+        # generate account token
+        data = CreateAccountTokenMetaData(
+            business_type="individual",
+            individual=Individual(
+                first_name="Test",
+                last_name="Payment",
+                dob=DateOfBirth(day=1, month=1, year=1990),
+                address=Address(
+                    city="Mountain View",
+                    country=CountryCode.US.value,
+                    line1="123 Castro St",
+                    line2="",
+                    postal_code="94041",
+                    state="CA",
+                ),
+                ssn_last_4="1234",
+            ),
+            tos_shown_and_accepted=True,
+        )
+        account_token = stripe.create_account_token(
+            request=CreateAccountTokenRequest(account=data, country=CountryCode.US)
+        )
+        assert account_token
+
+    def test_create_account(self, mode: str, stripe: StripeClient):
+        # should use create_account_token to generate an account token
+        # stripe mock doesn't work as expected by returning a card token instead of account token
+        # test_account_token = "ct_Fny00gsFtsBBaU"
+
+        if mode == "mock":
+            pytest.skip()
+        data = CreateAccountTokenMetaData(
+            business_type="individual",
+            individual=Individual(
+                first_name="Test",
+                last_name="Payment",
+                dob=DateOfBirth(day=1, month=1, year=1990),
+                address=Address(
+                    city="Mountain View",
+                    country=CountryCode.US.value,
+                    line1="123 Castro St",
+                    line2="",
+                    postal_code="94041",
+                    state="CA",
+                ),
+                ssn_last_4="1234",
+            ),
+            tos_shown_and_accepted=True,
+        )
+        account_token = stripe.create_account_token(
+            request=CreateAccountTokenRequest(account=data, country=CountryCode.US)
+        )
+        assert account_token
+
+        account = stripe.create_stripe_account(
+            request=CreateAccountRequest(
+                country=CountryCode.US,
+                type="custom",
+                account_token=account_token.id,
+                requested_capabilities=["legacy_payments"],
+            )
+        )
+        assert account
+        assert account.id.startswith("acct_")
 
 
 class TestStripePool:
