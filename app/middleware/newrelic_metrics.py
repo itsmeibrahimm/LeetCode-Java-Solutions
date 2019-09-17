@@ -8,6 +8,7 @@ from starlette.responses import Response
 from app.commons.instrumentation.newrelic import (
     web_transaction_from_request,
     set_transaction_name_from_request,
+    set_request_id_from_request,
 )
 
 
@@ -32,8 +33,10 @@ class NewRelicMetricsMiddleware(BaseHTTPMiddleware):
             if web_transaction:
                 stack.enter_context(web_transaction)
 
-            # callback: set the transaction name from the resolved route
-            stack.callback(set_transaction_name_from_request, request)
+                # callback: set the request and correlation id
+                stack.callback(set_request_id_from_request, request)
+                # callback: set the transaction name from the resolved route
+                stack.callback(set_transaction_name_from_request, request)
 
             # get response
             response = await call_next(request)

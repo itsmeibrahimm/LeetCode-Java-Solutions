@@ -1,15 +1,35 @@
+import uuid
 from pytest_mock import MockFixture
 from unittest.mock import Mock
+from typing import Optional
 
 from app.middleware.newrelic_metrics import NewRelicMetricsMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from fastapi.applications import FastAPI
 from app.commons.routing import APIRouter
 from starlette.testclient import TestClient
+from app.commons.context.req_context import ReqContext
 
 
 def test_newrelic_middleware(mocker: MockFixture):
     app = FastAPI()
+    req_id = uuid.uuid4()
+    correlation_id: Optional[str] = "abc_123"
+
+    class ReqContextMiddleware(BaseHTTPMiddleware):
+        def __init__(self, app):
+            self.app = app
+
+        async def dispatch_func(self, request, call_next):
+            request.state.context = ReqContext(
+                req_id=req_id,
+                log=mocker.Mock(),
+                commando_mode=False,
+                correlation_id=correlation_id,
+                stripe_async_client=mocker.Mock(),
+            )
+            return await call_next(request)
 
     @app.get("/health")
     async def health():
@@ -28,6 +48,7 @@ def test_newrelic_middleware(mocker: MockFixture):
 
     # include middleware
     app.add_middleware(NewRelicMetricsMiddleware)
+    app.add_middleware(ReqContextMiddleware)
 
     mocker.patch("app.commons.instrumentation.newrelic.application_instance")
     mocker.patch(
@@ -48,6 +69,7 @@ def test_newrelic_middleware(mocker: MockFixture):
     mock_set_transaction: Mock = mocker.patch(
         "newrelic.agent.set_transaction_name", side_effect=check_transaction
     )
+    mock_add_custom_parameter = mocker.patch("newrelic.agent.add_custom_parameter")
 
     with TestClient(app) as client:
         response = client.get("/health")
@@ -61,10 +83,16 @@ def test_newrelic_middleware(mocker: MockFixture):
         args, kwargs = mock_set_transaction.call_args
         assert args[0] == "app.middleware.test_unit.test_newrelic_metrics.health"
 
+        assert mock_add_custom_parameter.call_count == 2
+        assert mock_add_custom_parameter.called_with("req_id", str(req_id))
+        assert mock_add_custom_parameter.called_with("correlation_id", "abc_123")
+
         mock_web_transaction.reset_mock()
         mock_set_transaction.reset_mock()
+        mock_add_custom_parameter.reset_mock()
 
         # nested router
+        correlation_id = None
         response = client.get("/nesting/nested/level2")
         assert response.status_code == 200
 
@@ -75,3 +103,6 @@ def test_newrelic_middleware(mocker: MockFixture):
         assert mock_set_transaction.called
         args, kwargs = mock_set_transaction.call_args
         assert args[0] == "app.middleware.test_unit.test_newrelic_metrics.get_level2"
+
+        assert mock_add_custom_parameter.call_count == 1
+        assert mock_add_custom_parameter.called_with("req_id", str(req_id))

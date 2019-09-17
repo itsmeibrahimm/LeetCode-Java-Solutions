@@ -1,7 +1,8 @@
 import asyncio
+from typing import Optional
 from contextvars import ContextVar
 
-NEWRELIC_TASK_ID: ContextVar[int] = ContextVar("NEWRELIC_TASK_ID")
+NEWRELIC_TASK_ID: ContextVar[Optional[int]] = ContextVar("NEWRELIC_TASK_ID")
 
 
 def monkeypatch_for_asyncio():
@@ -30,6 +31,14 @@ def monkeypatch_for_asyncio():
 
     # monkeypatched method
     def monkeypatched_thread_id(self):
+        # try getting the task id, we might have one even if
+        # we're not in an asyncio Task if we're running in a threadpool
+        task_id = NEWRELIC_TASK_ID.get(None)
+        if task_id is not None:
+            return task_id
+
+        # otherwise, try getting the current task, falling
+        # back to the old implementation based on thread id
         try:
             current_task = asyncio.current_task()
             # early exit if we're not in an asyncio task
@@ -39,11 +48,16 @@ def monkeypatch_for_asyncio():
             # no event loop
             return old_thread_id(self)
 
-        # get the task_id of the root task for asyncio
-        task_id = NEWRELIC_TASK_ID.get(id(current_task))
-        # and set it (preserving it for the entire asyncio context)
+        # if we have a task, get the id and set the contextvar
+        # (preserving it for the entire asyncio context)
+        task_id = id(current_task)
         NEWRELIC_TASK_ID.set(task_id)
         return task_id
 
     # apply the monkeypatch
     TraceCache.current_thread_id = monkeypatched_thread_id
+
+    def restore():
+        TraceCache.current_thread_id = old_thread_id
+
+    return restore

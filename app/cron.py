@@ -2,8 +2,12 @@ import asyncio
 import os
 import signal
 
+from app.commons.config.newrelic_loader import init_newrelic_agent
+
+init_newrelic_agent()
+
 import pytz
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.commons.jobs.scheduler import Scheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
 from app.commons.config.utils import init_app_config
@@ -45,7 +49,7 @@ init_global_statsd(
 logger = get_logger("cron")
 
 
-scheduler = AsyncIOScheduler()
+scheduler = Scheduler()
 scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC timezone
 
 loop = asyncio.get_event_loop()

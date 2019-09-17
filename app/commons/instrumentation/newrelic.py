@@ -8,6 +8,7 @@ from newrelic.api.application import Application, application_instance
 from newrelic.api.transaction import current_transaction
 
 from app.commons.routing import get_resolved_route
+from app.commons.context.req_context import get_context_from_req
 
 
 def transaction_params_from_request(request: Request):
@@ -37,6 +38,15 @@ def set_transaction_name_from_request(request: Request, *, priority=5):
     if route:
         transaction_name = f"{route.endpoint.__module__}.{route.name}"
         newrelic.agent.set_transaction_name(transaction_name, priority=priority)
+
+
+def set_request_id_from_request(request: Request):
+    req_context = get_context_from_req(request)
+    newrelic.agent.add_custom_parameter("req_id", str(req_context.req_id))
+    if req_context.correlation_id is not None:
+        newrelic.agent.add_custom_parameter(
+            "correlation_id", str(req_context.correlation_id)
+        )
 
 
 # newrelic/api/web_transaction.py
