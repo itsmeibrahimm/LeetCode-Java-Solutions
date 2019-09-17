@@ -3,20 +3,23 @@ from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
 )
-from app.payout.core.account.processors.create_standard_payout import (
-    CreateStandardPayoutRequest,
-    CreateStandardPayoutResponse,
-    CreateStandardPayout,
-)
 from app.payout.core.account.processors.create_instant_payout import (
     CreateInstantPayoutRequest,
     CreateInstantPayoutResponse,
     CreateInstantPayout,
 )
+from app.payout.core.account.processors.create_standard_payout import (
+    CreateStandardPayoutRequest,
+    CreateStandardPayoutResponse,
+    CreateStandardPayout,
+)
 from app.payout.core.account.processors.get_account import (
     GetPayoutAccountRequest,
     PayoutAccountInternal,
     GetPayoutAccount,
+)
+from app.payout.repository.bankdb.stripe_managed_account_transfer import (
+    StripeManagedAccountTransferRepositoryInterface,
 )
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepositoryInterface,
@@ -41,11 +44,13 @@ class PayoutAccountProcessors:
         payment_account_repo: PaymentAccountRepositoryInterface,
         stripe_transfer_repo: StripeTransferRepositoryInterface,
         stripe_payout_request_repo: StripePayoutRequestRepositoryInterface,
+        stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepositoryInterface,
     ):
         self.logger = logger
         self.payment_account_repo = payment_account_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.stripe_payout_request_repo = stripe_payout_request_repo
+        self.stripe_managed_account_transfer_repo = stripe_managed_account_transfer_repo
 
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
@@ -84,6 +89,8 @@ class PayoutAccountProcessors:
         create_instant_payout_op = CreateInstantPayout(
             logger=self.logger,
             stripe_payout_request_repo=self.stripe_payout_request_repo,
+            payment_account_repo=self.payment_account_repo,
+            stripe_managed_account_transfer_repo=self.stripe_managed_account_transfer_repo,
             request=request,
         )
         return await create_instant_payout_op.execute()

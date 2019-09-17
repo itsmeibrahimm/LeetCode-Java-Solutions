@@ -136,4 +136,5 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
         payment_account_repo=payout_service.payment_accounts,
         stripe_transfer_repo=payout_service.stripe_transfers,
         stripe_payout_request_repo=payout_service.stripe_payout_requests,
+        stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
     )

@@ -33,12 +33,16 @@ class PayoutAccountNotFoundError(PaymentError):
 payout_error_message_maps = {
     "payout_0": "Cannot make stripe transfer without stripe account id.",
     "payout_1": "This should not show up.",
+    "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
+    "payout_3": "Cannot process payment for the given country",
 }
 
 
 class PayoutErrorCode(str, Enum):
     INVALID_STRIPE_ACCOUNT_ID = "payout_0"
     MISMATCHED_TRANSFER_PAYMENT_ACCOUNT = "payout_1"
+    INVALID_STRIPE_MANAGED_ACCOUNT = "payout_2"
+    UNHANDLED_COUNTRY = "payout_3"
 
 
 class PayoutError(PaymentException):
