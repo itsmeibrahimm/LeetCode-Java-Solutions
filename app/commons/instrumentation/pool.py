@@ -27,7 +27,7 @@ def stat_resource_pool_jobs(
             tags=tags,
         )
 
-        log.info(
+        log.debug(
             "resource pool job stats",
             resource=stat_prefix,
             pool=pool_name,

@@ -91,4 +91,7 @@ def create_app_config() -> AppConfig:
         DSJ_API_USER_EMAIL=Secret(name="dsj_api_user_email", value=""),
         DSJ_API_USER_PASSWORD=Secret(name="dsj_api_user_password", value=""),
         DSJ_API_JWT_TOKEN_TTL=1800,
+        # don't need frequent monitoring for dev
+        MONITOR_INTERVAL_EVENT_LOOP_LATENCY=10,
+        MONITOR_INTERVAL_RESOURCE_JOB_POOL=10,
     )

@@ -138,6 +138,10 @@ class AppConfig(SecretAware):
 
     INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger"})
 
+    # Monitoring Intervals
+    MONITOR_INTERVAL_EVENT_LOOP_LATENCY: float = 0.5
+    MONITOR_INTERVAL_RESOURCE_JOB_POOL: float = 1
+
     #
     # Payin Config
     #

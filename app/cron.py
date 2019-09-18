@@ -47,7 +47,8 @@ app_context.monitor.add(
         stat_prefix="resource.job_pools",
         pool_name=stripe_pool.name,
         pool_job_stats=stripe_pool,
-    )
+    ),
+    interval_secs=app_config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
 )
 
 scheduler.add_job(

@@ -1,19 +1,98 @@
 import asyncio
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 from app.commons.instrumentation.types import MonitoringProcessor, Logger, StatsClient
 
 
 class MonitoringManager:
-    processors: List[MonitoringProcessor] = []
+    """
+    manage application-level asyncio monitors
+
+    these are intended to be scheduled and run in the event loop
+    """
+
+    loop: Optional[asyncio.AbstractEventLoop] = None
+    processors: Dict[float, "MonitoringLoop"]
     logger: Logger
     stats_client: StatsClient
-    _task: Optional[asyncio.Task] = None
+    default_interval_secs: float
+    started: bool = False
 
     def __init__(
         self,
         *,
         stats_client: StatsClient,
         logger: Logger,
+        default_processors: Optional[List[MonitoringProcessor]] = None,
+        default_interval_secs: float = 30,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+    ):
+        self.stats_client = stats_client
+        self.logger = logger
+        self.processors = {}
+        if default_interval_secs <= 0:
+            raise ValueError("default_interval_secs must be greater than 0")
+        self.default_interval_secs = default_interval_secs
+        self.loop = loop
+        if default_processors is not None:
+            for proc in default_processors:
+                self.add(proc, interval_secs=self.default_interval_secs)
+
+    def add(
+        self, processor: MonitoringProcessor, *, interval_secs: Optional[float] = None
+    ):
+        interval_secs = interval_secs or self.default_interval_secs
+        if interval_secs <= 0:
+            raise ValueError("interval_secs must be greater than 0")
+        manager = self.processors.get(interval_secs, None)
+        if not manager:
+            self.processors[interval_secs] = manager = MonitoringLoop(
+                interval_secs=interval_secs,
+                stats_client=self.stats_client,
+                logger=self.logger,
+                loop=self.loop,
+            )
+
+            # start the manager if we've already started the rest of them
+            if self.started:
+                manager.start(call_immediately=True)
+        manager.add(processor)
+
+    def start(self, *, call_immediately=False):
+        if self.started:
+            return False
+        self.started = True
+
+        for manager in self.processors.values():
+            manager.start(call_immediately=call_immediately)
+
+        return True
+
+    def stop(self):
+        if not self.started:
+            return False
+        self.started = False
+
+        for manager in self.processors.values():
+            manager.stop()
+
+        return True
+
+
+class MonitoringLoop:
+    interval_secs: float
+    processors: Set[MonitoringProcessor]
+    logger: Logger
+    stats_client: StatsClient
+    loop: Optional[asyncio.AbstractEventLoop] = None
+    _task: Optional[asyncio.Task] = None
+
+    def __init__(
+        self,
+        *,
+        interval_secs: float,
+        stats_client: StatsClient,
+        logger: Logger,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
         processors: Optional[List[MonitoringProcessor]] = None,
     ):
         """
@@ -22,15 +101,19 @@ class MonitoringManager:
         Keyword Arguments:
             processors {Optional[List[MonitoringProcessor]]} -- [description] (default: {None})
         """
+        self.interval_secs = interval_secs
         self.stats_client = stats_client
         self.logger = logger
+        self.loop = loop
         if processors:
-            self.processors = processors
+            self.processors = set(processors)
+        else:
+            self.processors = set()
 
-    async def _monitoring_loop(self, interval_secs: float, call_immediately: bool):
+    async def _monitoring_loop(self, call_immediately: bool):
         if not call_immediately:
             # sleep once before the first iteration
-            await asyncio.sleep(interval_secs)
+            await asyncio.sleep(self.interval_secs)
 
         while True:
             for processor in self.processors:
@@ -40,18 +123,12 @@ class MonitoringManager:
                     self.logger.warn(
                         "error processing monitor %s", processor.__name__, exc_info=True
                     )
-            await asyncio.sleep(interval_secs)
+            await asyncio.sleep(self.interval_secs)
 
     def add(self, processor: MonitoringProcessor):
-        self.processors.append(processor)
+        self.processors.add(processor)
 
-    def start(
-        self,
-        interval_secs: float = 30,
-        *,
-        call_immediately=False,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
-    ):
+    def start(self, *, call_immediately=False):
         """
         schedule the monitoring loop for execution
         """
@@ -59,10 +136,9 @@ class MonitoringManager:
             # task already started
             return False
 
-        if not loop:
-            loop = asyncio.get_event_loop()
+        loop = self.loop or asyncio.get_event_loop()
         self._task = loop.create_task(
-            self._monitoring_loop(interval_secs, call_immediately=call_immediately)
+            self._monitoring_loop(call_immediately=call_immediately)
         )
         return True
 
