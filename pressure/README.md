@@ -30,7 +30,7 @@ pressure --data-file=$(pipenv --venv)/infra/local/data.yaml --data-file=infra/lo
 
 Every HTTP connection on a machine opens a new file (technically a file descriptor). Operating systems may set a low limit for the maximum number of files that can be open. If the limit is less than the number of simulated users in a test, failures will occur.
 
-To increase this limit, Mac users do: 
+To increase this limit, Mac users do:
 ```bash
 ulimit -S -n 2048 # increase as needed
 ```

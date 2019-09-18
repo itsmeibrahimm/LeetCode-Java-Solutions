@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, asc
 from typing_extensions import final
 
 from app.commons import tracing
@@ -108,7 +108,7 @@ class PaymentAccountRepository(
         stmt = (
             payment_accounts.table.select()
             .order_by(
-                desc(payment_accounts.id)
+                asc(payment_accounts.id)
             )  # set order_by pk desc as default for now
             .where(
                 and_(

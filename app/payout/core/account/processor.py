@@ -19,7 +19,9 @@ from app.payout.core.account.processors.get_account import (
     PayoutAccountInternal,
     GetPayoutAccount,
 )
-from app.payout.repository.bankdb.stripe_managed_account_transfer import StripeManagedAccountTransferRepositoryInterface
+from app.payout.repository.bankdb.stripe_managed_account_transfer import (
+    StripeManagedAccountTransferRepositoryInterface,
+)
 from app.payout.core.account.processors.update_account_statement_descriptor import (
     UpdatePayoutAccountStatementDescriptorRequest,
     UpdatePayoutAccountStatementDescriptor,

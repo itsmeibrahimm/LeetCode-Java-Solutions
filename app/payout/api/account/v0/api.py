@@ -6,6 +6,7 @@ from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_404_NOT_FOUND
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import get_logger_from_req
+from app.commons.utils.types import Nullable
 from app.payout.api.account.v0.models import (
     PaymentAccount,
     PaymentAccountCreate,
@@ -36,7 +37,10 @@ async def create_payment_account(
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
     internal_request = payment_account.PaymentAccountCreate(
-        **body.dict(skip_defaults=True)
+        **{
+            k: v.value if issubclass(type(v), Nullable) else v
+            for k, v in body.dict(skip_defaults=True).items()
+        }
     )
     internal_account = await repository.create_payment_account(internal_request)
     return PaymentAccount(**internal_account.dict())
@@ -95,7 +99,10 @@ async def update_payment_account_by_id(
     repository: PaymentAccountRepositoryInterface = Depends(PaymentAccountRepository),
 ):
     internal_request = payment_account.PaymentAccountUpdate(
-        **body.dict(skip_defaults=True)
+        **{
+            k: v.value if issubclass(type(v), Nullable) else v
+            for k, v in body.dict(skip_defaults=True).items()
+        }
     )
     internal_account = await repository.update_payment_account_by_id(
         payment_account_id=account_id, data=internal_request

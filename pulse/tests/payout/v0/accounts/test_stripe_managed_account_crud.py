@@ -6,6 +6,9 @@ from payout_v0_client import (
     StripeManagedAccount,
     StripeManagedAccountCreate,
     StripeManagedAccountUpdate,
+    NullableDatetime,
+    NullableString,
+    NullableList,
 )
 
 from tests.payout.v0.client_operations import (
@@ -20,14 +23,16 @@ class TestStripeManagedAccount:
         request = StripeManagedAccountCreate(
             country_shortname="US",
             stripe_id="pulse-test-stripe-id",
-            stripe_last_updated_at=datetime.now(timezone.utc),
-            bank_account_last_updated_at=datetime.now(timezone.utc),
-            fingerprint="fingerprint",
-            verification_disabled_reason="no reason",
-            verification_due_by=datetime.now(timezone.utc),
-            default_bank_last_four="1234",
-            default_bank_name="bank name",
-            verification_fields_needed=[],
+            stripe_last_updated_at=NullableDatetime(value=datetime.now(timezone.utc)),
+            bank_account_last_updated_at=NullableDatetime(
+                value=datetime.now(timezone.utc)
+            ),
+            fingerprint=NullableString(value="fingerprint"),
+            verification_disabled_reason=NullableString(value="no reason"),
+            verification_due_by=NullableDatetime(value=datetime.now(timezone.utc)),
+            default_bank_last_four=NullableString(value="1234"),
+            default_bank_name=NullableString(value="bank name"),
+            verification_fields_needed=NullableList(value=[]),
         )
         created_account, status, _ = create_stripe_managed_account(
             request=request, accounts_api=accounts_api

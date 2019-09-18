@@ -58,8 +58,22 @@ class TestAccountV0:
             "statement_descriptor": "test_statement_descriptor",
         }
 
+        request_body = {
+            "account_id": {"value": 123},
+            "account_type": {"value": AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT},
+            "entity": {"value": "dasher"},
+            "resolve_outstanding_balance_frequency": {"value": "daily"},
+            "payout_disabled": {"value": True},
+            "charges_enabled": {"value": True},
+            "old_account_id": {"value": 1234},
+            "upgraded_to_managed_account_at": {"value": "2019-08-20T05:34:53+00:00"},
+            "is_verified_with_stripe": {"value": True},
+            "transfers_enabled": {"value": True},
+            "statement_descriptor": "test_statement_descriptor",
+        }
+
         #  Create
-        response = client.post(create_account_url(), json=account_to_create)
+        response = client.post(create_account_url(), json=request_body)
         assert response.status_code == 201
         account_created: dict = response.json()
 
@@ -134,11 +148,20 @@ class TestAccountV0:
             "verification_due_by": "2019-08-20T05:34:53+00:00",
             "verification_fields_needed": ["a lot"],
         }
-
+        request_body = {
+            "stripe_id": "stripe_id",
+            "country_shortname": "us",
+            "stripe_last_updated_at": {"value": "2019-08-20T05:34:53+00:00"},
+            "bank_account_last_updated_at": {"value": "2019-08-20T05:34:53+00:00"},
+            "fingerprint": {"value": "fingerprint"},
+            "default_bank_last_four": {"value": "last4"},
+            "default_bank_name": {"value": "bank"},
+            "verification_disabled_reason": {"value": "no-reason"},
+            "verification_due_by": {"value": "2019-08-20T05:34:53+00:00"},
+            "verification_fields_needed": {"value": ["a lot"]},
+        }
         # Create
-        response = client.post(
-            create_stripe_managed_account_url(), json=account_to_create
-        )
+        response = client.post(create_stripe_managed_account_url(), json=request_body)
         assert response.status_code == 201
 
         account_created: dict = response.json()
@@ -151,7 +174,7 @@ class TestAccountV0:
         verification_fields_needed = ["need!"]
         response = client.patch(
             update_stripe_managed_account_by_id_url(account_created["id"]),
-            json={"verification_fields_needed": verification_fields_needed},
+            json={"verification_fields_needed": {"value": verification_fields_needed}},
         )
 
         account_updated = response.json()
@@ -172,7 +195,7 @@ class TestAccountV0:
     def test_update_stripe_managed_account_by_id_not_found(self, client: TestClient):
         response = client.patch(
             update_stripe_managed_account_by_id_url(9999),
-            json={"verification_fields_needed": ["everything!"]},
+            json={"verification_fields_needed": {"value": ["everything!"]}},
         )
 
         assert response.status_code == 404

@@ -91,6 +91,7 @@ class PayoutService(BaseService):
         # stripe
         self.stripe = get_stripe_async_client_from_req(request)  # type:ignore
 
+
 def PaymentAccountRepository(
     payout_service: PayoutService = Depends()
 ) -> payment_account.PaymentAccountRepositoryInterface:

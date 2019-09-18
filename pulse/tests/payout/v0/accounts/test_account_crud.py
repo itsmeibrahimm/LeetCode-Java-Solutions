@@ -2,7 +2,15 @@ from datetime import timezone, datetime
 
 import payout_v0_client
 import pytest
-from payout_v0_client import PaymentAccount, PaymentAccountCreate, PaymentAccountUpdate
+from payout_v0_client import (
+    PaymentAccount,
+    PaymentAccountCreate,
+    PaymentAccountUpdate,
+    NullableString,
+    NullableBoolean,
+    NullableInteger,
+    NullableDatetime,
+)
 
 from tests.payout.v0.client_operations import (
     create_payment_account,
@@ -15,21 +23,34 @@ class TestPaymentAccount:
     def test_create_get_update_account_by_id(
         self, accounts_api: payout_v0_client.AccountsV0Api
     ):
+        current_time = datetime.now(timezone.utc)
         request = PaymentAccountCreate(
+            entity=NullableString(value="dasher"),
+            statement_descriptor="pulse-test-statement-descriptor",
+            account_id=None,
+            account_type=NullableString(value="stripe_managed_account"),
+            charges_enabled=NullableBoolean(value=True),
+            old_account_id=NullableInteger(value=1234),
+            upgraded_to_managed_account_at=NullableDatetime(value=current_time),
+            is_verified_with_stripe=NullableBoolean(value=True),
+        )
+
+        request_raw = PaymentAccountCreate(
             entity="dasher",
             statement_descriptor="pulse-test-statement-descriptor",
             account_id=None,
             account_type="stripe_managed_account",
             charges_enabled=True,
             old_account_id=1234,
-            upgraded_to_managed_account_at=datetime.now(timezone.utc),
+            upgraded_to_managed_account_at=current_time,
             is_verified_with_stripe=True,
         )
 
         created_account, status, _ = create_payment_account(
             request=request, accounts_api=accounts_api
         )
-        assert request.to_dict().items() <= created_account.to_dict().items()
+
+        assert request_raw.to_dict().items() <= created_account.to_dict().items()
         assert created_account
         assert status == 201
 
@@ -42,7 +63,7 @@ class TestPaymentAccount:
 
         updated_payment_account, status, _ = update_payment_account_by_id(
             payment_account_id=retrieved_payment_account.id,
-            request=PaymentAccountUpdate(entity="merchant"),
+            request=PaymentAccountUpdate(entity=NullableString(value="merchant")),
             accounts_api=accounts_api,
         )
 
