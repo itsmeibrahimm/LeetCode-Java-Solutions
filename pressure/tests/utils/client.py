@@ -3,6 +3,7 @@ import sys
 import time
 import uuid
 
+import urllib3
 from ledger_client.api_client import ApiClient as Ledger
 from ledger_client.configuration import Configuration as LedgerConfig
 from locust import events
@@ -58,6 +59,10 @@ def monkey_patch_api_client(api_client_cls):
         headers["x-correlation-id"] = correlation_id
         headers["x-api-key"] = _API_KEY
         start_time = time.time()
+
+        url_parsed = urllib3.util.parse_url(url)
+        path_name = url_parsed.request_uri
+
         try:
             result = original_request(
                 self,
@@ -75,7 +80,7 @@ def monkey_patch_api_client(api_client_cls):
             total_time = int((time.time() - start_time) * 1000)
             events.request_success.fire(
                 request_type=method,
-                name=url,
+                name=path_name,
                 response_time=total_time,
                 response_length=sys.getsizeof(result, 0),
             )
@@ -94,7 +99,10 @@ def monkey_patch_api_client(api_client_cls):
                 f"request-id={request_id} correlation-id={correlation_id} failed in {total_time}ms"
             )
             events.request_failure.fire(
-                request_type=method, name=url, response_time=total_time, exception=e
+                request_type=method,
+                name=path_name,
+                response_time=total_time,
+                exception=e,
             )
             raise
 
