@@ -121,8 +121,6 @@ async def list_disputes(
     dd_payment_method_id: str = None,
     stripe_payment_method_id: str = None,
     dd_stripe_card_id: int = None,
-    dd_payer_id: str = None,
-    stripe_customer_id: str = None,
     dd_consumer_id: int = None,
     start_time: datetime = None,
     reasons: List[str] = Query(None),
@@ -135,8 +133,6 @@ async def list_disputes(
     - **dd_payment_method_id**: [string] Doordash payment method id
     - **stripe_payment_method_id**: [string] Stripe payment method id
     - **dd_stripe_card_id**: [int] Primary key in Stripe Card table
-    - **dd_payer_id**: [string] Doordash payer id
-    - **stripe_customer_id**: [string] Stripe customer id
     - **dd_consumer_id**: [int]: Primary key in Consumer table
     - **start_time**: [datetime] Start date for disputes.Default will be the epoch time
     - **reasons**: List[str] List of reasons for dispute. Default value considers all the reasons mentioned
@@ -147,8 +143,6 @@ async def list_disputes(
         dd_payment_method_id,
         stripe_payment_method_id,
         dd_stripe_card_id,
-        dd_payer_id,
-        stripe_customer_id,
         dd_consumer_id,
     ]
     parameter_count = sum([1 if parameter else 0 for parameter in parameters])
@@ -169,7 +163,7 @@ async def list_disputes(
     log.info(
         f"[list_disputes] list disputes started for payment_method_id: {dd_payment_method_id} "
         f"stripe_payment_method_id: {stripe_payment_method_id} stripe_card_id: {dd_stripe_card_id} "
-        f"payer_id:{dd_payer_id} stripe_customer_id: {stripe_customer_id} consumer_id: {dd_consumer_id}"
+        f"consumer_id: {dd_consumer_id}"
         f"start_time: {start_time} reasons: {reasons} distinct: {distinct}"
     )
     try:
@@ -177,8 +171,6 @@ async def list_disputes(
             dd_payment_method_id=dd_payment_method_id,
             stripe_payment_method_id=stripe_payment_method_id,
             dd_stripe_card_id=dd_stripe_card_id,
-            dd_payer_id=dd_payer_id,
-            stripe_customer_id=stripe_customer_id,
             dd_consumer_id=dd_consumer_id,
             start_time=start_time,
             reasons=reasons,

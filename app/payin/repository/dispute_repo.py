@@ -83,10 +83,6 @@ class GetStripeDisputeByIdInput(DBRequestModel):
     dispute_id_type: Optional[str] = None
 
 
-class GetAllStripeDisputesByPayerIdInput(DBRequestModel):
-    stripe_card_ids: List[int]
-
-
 class GetAllStripeDisputesByPaymentMethodIdInput(DBRequestModel):
     stripe_card_id: int
 
@@ -125,11 +121,6 @@ class DisputeRepositoryInterface:
     async def get_dispute_by_dispute_id(
         self, dispute_input: GetStripeDisputeByIdInput
     ) -> Optional[StripeDisputeDbEntity]:
-        ...
-
-    async def list_disputes_by_payer_id(
-        self, list_dispute_input: GetAllStripeDisputesByPayerIdInput
-    ) -> List[StripeDisputeDbEntity]:
         ...
 
     async def list_disputes_by_payment_method_id(
@@ -174,16 +165,6 @@ class DisputeRepository(DisputeRepositoryInterface, PayinDBRepository):
         )
         row = await self.main_database.master().fetch_one(stmt)
         return StripeDisputeDbEntity.from_row(row) if row else None
-
-    async def list_disputes_by_payer_id(
-        self, input: GetAllStripeDisputesByPayerIdInput
-    ) -> List[StripeDisputeDbEntity]:
-        stmt = stripe_disputes.table.select().where(
-            stripe_disputes.stripe_card_id.in_(input.stripe_card_ids)
-        )
-        rows = await self.main_database.replica().fetch_all(stmt)
-        dispute_db_entities = [StripeDisputeDbEntity.from_row(row) for row in rows]
-        return dispute_db_entities
 
     async def list_disputes_by_payment_method_id(
         self, input: GetAllStripeDisputesByPaymentMethodIdInput

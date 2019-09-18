@@ -85,8 +85,6 @@ class DisputeProcessor:
         dd_payment_method_id: str = None,
         stripe_payment_method_id: str = None,
         dd_stripe_card_id: int = None,
-        dd_payer_id: str = None,
-        stripe_customer_id: str = None,
         dd_consumer_id: int = None,
         start_time: datetime = None,
         reasons: List[str] = None,
@@ -98,8 +96,6 @@ class DisputeProcessor:
         :param  dd_payment_method_id: [string] DoorDash payment method id
         :param stripe_payment_method_id: [string] Stripe payment method id
         :param dd_stripe_card_id: [int] Primary key in Stripe Card table
-        :param dd_payer_id: [string] DoorDash payer id
-        :param stripe_customer_id: [string] Stripe customer id
         :param dd_consumer_id: [int]: Primary key in Consumer table
         :param start_time: [datetime] Start date for disputes.Default will be the epoch time
         :param reasons: List[str] List of reasons for dispute.
@@ -111,8 +107,6 @@ class DisputeProcessor:
             dd_payment_method_id
             or stripe_payment_method_id
             or dd_stripe_card_id
-            or dd_payer_id
-            or stripe_customer_id
             or dd_consumer_id
         ):
             self.log.warn(f"[list_disputes] No parameters provided")
@@ -124,8 +118,6 @@ class DisputeProcessor:
             dd_payment_method_id=dd_payment_method_id,
             stripe_payment_method_id=stripe_payment_method_id,
             dd_stripe_card_id=dd_stripe_card_id,
-            dd_payer_id=dd_payer_id,
-            stripe_customer_id=stripe_customer_id,
             dd_consumer_id=dd_consumer_id,
             start_time=start_time,
             reasons=reasons,

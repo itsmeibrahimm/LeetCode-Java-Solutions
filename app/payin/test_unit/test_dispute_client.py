@@ -1,16 +1,10 @@
-from typing import List
-
 import pytest
 from asynctest import MagicMock
 
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
-from app.payin.core.payer.model import RawPayer
 from app.payin.core.payment_method.model import RawPaymentMethod
-from app.payin.core.types import PayerIdType
-from app.payin.repository.dispute_repo import StripeDisputeDbEntity
-from app.payin.repository.payer_repo import PayerDbEntity
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -64,38 +58,6 @@ class TestDisputeClient:
         assert payment_error.value.error_code == PayinErrorCode.DISPUTE_NOT_FOUND
 
     @pytest.mark.asyncio
-    async def test_list_disputes_by_dd_payer_id(self, dispute_client):
-        dispute_list: List[StripeDisputeDbEntity] = [generate_dispute_db_entity()]
-        raw_payer_mock = RawPayer()
-        id = generate_object_uuid()
-        raw_payer_mock.payer_entity = PayerDbEntity(
-            id=id,
-            payer_type=PayerIdType.PAYER_ID,
-            country="usd",
-            legacy_stripe_customer_id="VALID STRIPE CUSTOMER ID",
-        )
-        dispute_client.payer_client.get_raw_payer = FunctionMock(
-            return_value=raw_payer_mock
-        )
-        dispute_client.payment_method_client.get_dd_stripe_card_ids_by_stripe_customer_id = FunctionMock(
-            return_value=[]
-        )
-        dispute_client.dispute_repo.list_disputes_by_payer_id = FunctionMock(
-            return_value=dispute_list
-        )
-        result = await dispute_client.get_raw_disputes_list(
-            dd_payment_method_id=None,
-            stripe_payment_method_id=None,
-            dd_stripe_card_id=None,
-            dd_payer_id="VALID_PAYER_ID",
-            stripe_customer_id=None,
-            dd_consumer_id=None,
-            start_time=None,
-            reasons=None,
-        )
-        assert [entity.to_stripe_dispute() for entity in dispute_list] == result
-
-    @pytest.mark.asyncio
     async def test_list_disputes_by_payment_method_id(self, dispute_client):
         dispute_entity_list = [generate_dispute_db_entity()]
         pgp_payment_method_id = generate_object_uuid()
@@ -130,8 +92,6 @@ class TestDisputeClient:
             dd_payment_method_id="VALID PAYMENT METHOD ID",
             stripe_payment_method_id=None,
             dd_stripe_card_id=None,
-            dd_payer_id=None,
-            stripe_customer_id=None,
             dd_consumer_id=None,
             start_time=None,
             reasons=None,

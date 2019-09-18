@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List, Union
+from typing import Optional, List
 
 from fastapi import Depends
 from psycopg2._psycopg import DataError
@@ -13,17 +13,12 @@ from app.commons.context.req_context import (
     get_stripe_async_client_from_req,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.commons.providers.stripe.stripe_models import UpdateDispute
 from app.commons.types import CountryCode
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata, Evidence
-from app.commons.providers.stripe.stripe_models import UpdateDispute
 from app.payin.core.dispute.types import DisputeIdType, ReasonType
-from app.payin.core.exceptions import (
-    DisputeReadError,
-    PayinErrorCode,
-    PaymentMethodReadError,
-)
+from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.exceptions import DisputeUpdateError
-from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
@@ -31,7 +26,6 @@ from app.payin.core.types import PaymentMethodIdType
 from app.payin.repository.dispute_repo import (
     DisputeRepository,
     GetStripeDisputeByIdInput,
-    GetAllStripeDisputesByPayerIdInput,
     GetAllStripeDisputesByPaymentMethodIdInput,
     StripeDisputeDbEntity,
     GetDisputeChargeMetadataInput,
@@ -152,8 +146,6 @@ class DisputeClient:
         dd_payment_method_id: str = None,
         stripe_payment_method_id: str = None,
         dd_stripe_card_id: int = None,
-        dd_payer_id: str = None,
-        stripe_customer_id: str = None,
         dd_consumer_id: int = None,
         start_time: datetime = None,
         reasons: List[str] = None,
@@ -163,8 +155,6 @@ class DisputeClient:
             dd_payment_method_id
             or stripe_payment_method_id
             or dd_stripe_card_id
-            or dd_payer_id
-            or stripe_customer_id
             or dd_consumer_id
         ):
             self.log.warn(f"[list_disputes] No parameters provided")
@@ -213,37 +203,6 @@ class DisputeClient:
                 self.log.error(
                     f"[get_cumulative_count][{id} DataError while reading db. {e}"
                 )
-                raise DisputeReadError(
-                    error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
-                )
-        elif dd_payer_id or stripe_customer_id:
-            stripe_id: Optional[str] = None
-            if stripe_customer_id:
-                stripe_id = stripe_customer_id
-            else:
-                raw_payer_object: RawPayer = await self.payer_client.get_raw_payer(
-                    payer_id=Union[dd_payer_id, str]
-                )
-                stripe_id = raw_payer_object.pgp_customer_id()
-            if not stripe_id:
-                self.log.error(
-                    f"[list_disputes_client] No payer found for the dd_payer_id/stripe_customer_id"
-                )
-                raise PaymentMethodReadError(
-                    error_code=PayinErrorCode.DISPUTE_NO_PAYER_FOR_PAYER_ID,
-                    retryable=False,
-                )
-            try:
-                stripe_card_ids = await self.payment_method_client.get_dd_stripe_card_ids_by_stripe_customer_id(
-                    stripe_customer_id=stripe_id
-                )
-                dispute_db_entities = await self.dispute_repo.list_disputes_by_payer_id(
-                    input=GetAllStripeDisputesByPayerIdInput(
-                        stripe_card_ids=stripe_card_ids
-                    )
-                )
-            except DataError as e:
-                self.log.error(f"[get_disputes_list] DataError while reading db. {e}")
                 raise DisputeReadError(
                     error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
                 )
