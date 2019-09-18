@@ -137,30 +137,21 @@ class StripeManagedAccountUpdate(PaymentRequest):
     verification_fields_needed: Optional[NullableList]
 
     def to_db_model(self) -> stripe_managed_account.StripeManagedAccountUpdate:
-        verification_fields_needed = None
-        if (
-            self.verification_fields_needed
-            and self.verification_fields_needed.value is not None
+        internal_data = {
+            k: v.value if issubclass(type(v), Nullable) else v
+            for k, v in self.dict(
+                exclude={"verification_fields_needed"}, skip_defaults=True
+            ).items()
+        }
+
+        if self.verification_fields_needed and issubclass(
+            type(self.verification_fields_needed), Nullable
         ):
-            verification_fields_needed = json.dumps(
-                self.verification_fields_needed.value
-            )
-        if verification_fields_needed is not None:
-            return stripe_managed_account.StripeManagedAccountUpdate(
-                **{
-                    k: v.value if issubclass(type(v), Nullable) else v
-                    for k, v in self.dict(
-                        exclude={"verification_fields_needed"}, skip_defaults=True
-                    ).items()
-                },
-                verification_fields_needed=verification_fields_needed
-            )
-        else:
-            return stripe_managed_account.StripeManagedAccountUpdate(
-                **{
-                    k: v.value if issubclass(type(v), Nullable) else v
-                    for k, v in self.dict(
-                        exclude={"verification_fields_needed"}, skip_defaults=True
-                    ).items()
-                }
-            )
+            if self.verification_fields_needed.value is not None:
+                internal_data["verification_fields_needed"] = json.dumps(
+                    self.verification_fields_needed.value
+                )
+            else:
+                internal_data["verification_fields_needed"] = None
+
+        return stripe_managed_account.StripeManagedAccountUpdate(**internal_data)
