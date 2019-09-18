@@ -331,7 +331,7 @@ class CreateAccountRequest(StripeBaseModel):
 
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
 class BillingDetails(StripeBaseModel):
-    address: Optional[Address]
+    address: Address
     email: Optional[str]
     name: Optional[str]
     phone: Optional[str]
@@ -393,22 +393,29 @@ class PaymentMethod(StripeBaseModel):
             type: str
             dynamic_last4: str
 
+        class Checks(StripeBaseModel):
+            address_line1_check: Optional[str]
+            address_postal_code_check: Optional[str]
+            cvc_check: Optional[str]
+
         exp_month: int
         exp_year: int
         fingerprint: str
         last4: str
+        checks: Checks
         funding: Optional[str]
         brand: Optional[str]
         country: Optional[str]
         description: Optional[str]
         wallet: Optional[Wallet]
+        state: Optional[str]
 
     id: str
     type: str
-    object: Optional[str]
-    customer: Optional[str]
     card: Card
     billing_details: BillingDetails
+    object: Optional[str]
+    customer: Optional[str]
 
 
 class Event(StripeBaseModel):

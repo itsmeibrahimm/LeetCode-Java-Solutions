@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from typing_extensions import final
 
+from app.commons.utils.types import PaymentProvider
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
 from app.payin.core.payment_method.types import WalletType
 from app.payin.repository.payment_method_repo import (
@@ -26,25 +27,41 @@ class Card(BaseModel):
     exp_month: str
     fingerprint: str
     active: bool
-    legacy_dd_stripe_card_id: int  # primary key of maindb_stripe_card
     country: Optional[str]
     brand: Optional[str]
-    payment_provider_card_id: Optional[str] = None
     wallet: Optional[Wallet] = None
 
 
 @final
-class PaymentMethod(BaseModel):
+class Addresses(BaseModel):
+    postal_code: Optional[str] = None
+
+
+@final
+class BillingDetails(BaseModel):
+    addresses: Addresses
+
+
+@final
+class PaymentGatewayProviderDetails(BaseModel):
     payment_provider: str
-    card: Card
+    payment_method_id: Optional[str] = None
+    customer_id: Optional[str] = None
+
+
+@final
+class PaymentMethod(BaseModel):
     id: Optional[UUID] = None  # make it optional for existing DSJ stripe_card
     payer_id: Optional[UUID] = None
     type: Optional[str]
     dd_consumer_id: Optional[str] = None
-    payment_provider_customer_id: Optional[str] = None
+    dd_stripe_card_id: int  # primary key of maindb_stripe_card
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
+    card: Card
+    billing_details: BillingDetails
+    payment_gateway_provider_details: PaymentGatewayProviderDetails
 
 
 @final
@@ -91,10 +108,22 @@ class RawPaymentMethod:
             exp_month=self.stripe_card_entity.exp_month,
             fingerprint=self.stripe_card_entity.fingerprint,
             active=self.stripe_card_entity.active,
-            legacy_dd_stripe_card_id=self.stripe_card_entity.id,
             brand=self.stripe_card_entity.type,
-            payment_provider_card_id=self.stripe_card_entity.stripe_id,
             wallet=wallet,
+        )
+
+        payment_gateway_provider_details: PaymentGatewayProviderDetails = PaymentGatewayProviderDetails(
+            payment_provider=(
+                self.pgp_payment_method_entity.pgp_code
+                if self.pgp_payment_method_entity
+                else PaymentProvider.STRIPE
+            ),
+            payment_method_id=self.stripe_card_entity.stripe_id,
+            customer_id=self.stripe_card_entity.external_stripe_customer_id,
+        )
+
+        billing_details: BillingDetails = BillingDetails(
+            addresses=Addresses(postal_code=self.stripe_card_entity.zip_code)
         )
 
         return (
@@ -102,23 +131,26 @@ class RawPaymentMethod:
                 id=self.pgp_payment_method_entity.id,
                 payer_id=self.pgp_payment_method_entity.payer_id,
                 dd_consumer_id=self.pgp_payment_method_entity.legacy_consumer_id,
-                payment_provider=self.pgp_payment_method_entity.pgp_code,
                 type=self.pgp_payment_method_entity.type,
+                dd_stripe_card_id=self.stripe_card_entity.id,
                 card=card,
+                payment_gateway_provider_details=payment_gateway_provider_details,
+                billing_details=billing_details,
                 created_at=self.pgp_payment_method_entity.created_at,
                 updated_at=self.pgp_payment_method_entity.updated_at,
                 deleted_at=self.pgp_payment_method_entity.deleted_at,
             )
             if self.pgp_payment_method_entity
             else PaymentMethod(
+                payer_id=None,
                 dd_consumer_id=str(self.stripe_card_entity.consumer_id),
-                payment_provider="stripe",
                 type="card",
+                dd_stripe_card_id=self.stripe_card_entity.id,
                 card=card,
+                payment_gateway_provider_details=payment_gateway_provider_details,
+                billing_details=billing_details,
                 created_at=self.stripe_card_entity.created_at,
                 deleted_at=self.stripe_card_entity.removed_at,
-                payer_id=None,
-                payment_provider_customer_id=None,
                 updated_at=None,
             )
         )

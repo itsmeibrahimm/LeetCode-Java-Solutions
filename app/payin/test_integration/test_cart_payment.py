@@ -76,7 +76,10 @@ class TestCartPayment:
         payment_method = response.json()
         assert payment_method
         assert payment_method["id"]
-        assert payment_method["payment_provider"] == "stripe"
+        assert (
+            payment_method["payment_gateway_provider_details"]["payment_provider"]
+            == "stripe"
+        )
         assert payment_method["card"]
         assert payment_method["card"]["last4"]
         assert payment_method["card"]["exp_year"]
@@ -85,11 +88,10 @@ class TestCartPayment:
         assert payment_method["card"]["active"]
         assert payment_method["card"]["country"]
         assert payment_method["card"]["brand"]
-        assert payment_method["card"]["payment_provider_card_id"]
+        assert payment_method["payment_gateway_provider_details"]["payment_method_id"]
         assert payment_method["payer_id"] == payer["id"]
         assert payment_method["type"] == "card"
         assert payment_method["dd_consumer_id"] is None
-        assert payment_method["payment_provider_customer_id"] is None  # TODO
         assert payer["created_at"]
         assert payer["updated_at"]
         assert payer["deleted_at"] is None
@@ -511,7 +513,9 @@ class TestCartPayment:
             "payment_provider_customer_id"
         ]
 
-        provider_card_id = payment_method["card"]["payment_provider_card_id"]
+        provider_card_id = payment_method["payment_gateway_provider_details"][
+            "payment_method_id"
+        ]
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
         cart_payment = self._test_cart_payment_legacy_payment_creation(

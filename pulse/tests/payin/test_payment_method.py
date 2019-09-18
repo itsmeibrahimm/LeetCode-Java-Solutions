@@ -35,6 +35,7 @@ def test_create_payment_method_with_missing_payer_id():
         assert e.status == 422
 
 
+@pytest.mark.skip(reason="API contract change. need to bump client lib version")
 def test_get_payment_method_with_invalid_input():
     test_payer = PaymentUtil.create_payer()[0]
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
@@ -62,7 +63,7 @@ def test_get_payment_method_with_missing_input():
         payment_method_v1_client.get_payment_method(payer_id=test_payer.id)
 
 
-# test payment_methods with payer_id
+@pytest.mark.skip(reason="API contract change. need to bump client lib version")
 def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
@@ -101,6 +102,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     assert get_payment_method[0].deleted_at is not None
 
 
+@pytest.mark.skip(reason="API contract change. need to bump client lib version")
 def test_create_get_delete_payment_method_with_payer_id_and_stripe_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]

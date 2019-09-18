@@ -20,10 +20,6 @@ class PaymentGatewayProviderCustomer(BaseModel):
     default_payment_method_id: Optional[str] = None
 
 
-# https://pydantic-docs.helpmanual.io/#self-referencing-models
-PaymentGatewayProviderCustomer.update_forward_refs()
-
-
 @final
 class Payer(BaseModel):
     id: Optional[UUID] = None  # make it optional for existing DSJ consumer

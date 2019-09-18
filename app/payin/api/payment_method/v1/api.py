@@ -186,7 +186,9 @@ async def delete_payment_method(
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     """
-    Detach a payment method for payer on DoorDash payments platform
+    Detach a payment method for payer on DoorDash payments platform. If the detached payment method is the default
+    one, DD payments platform will cleanup the Payer.default_payment_payment_method_id flag and it is client's
+    responsibility to update the default payment method for invoice (Dashpass) use.
 
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id can
                              be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
