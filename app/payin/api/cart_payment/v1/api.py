@@ -5,6 +5,7 @@ from app.payin.api.cart_payment.base.api import create_request_to_model
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
+from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
@@ -76,7 +77,6 @@ async def create_cart_payment(
             # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
             request_cart_payment=create_request_to_model(cart_payment_request),
             request_legacy_payment=None,
-            request_legacy_stripe_metadata=None,
             request_legacy_correlation_ids=None,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
@@ -140,7 +140,7 @@ async def update_cart_payment(
     - **client_description** [string] client description
     """
     log.info(f"Updating cart_payment {cart_payment_id}")
-    cart_payment: CartPayment = await cart_payment_processor.update_payment(
+    cart_payment = await cart_payment_processor.update_payment(
         idempotency_key=cart_payment_request.idempotency_key,
         cart_payment_id=cart_payment_id,
         payer_id=cart_payment_request.payer_id,
@@ -150,4 +150,37 @@ async def update_cart_payment(
     log.info(
         f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
     )
+    return cart_payment
+
+
+@router.post(
+    "/cart_payments/{cart_payment_id}/cancel",
+    response_model=CartPayment,
+    status_code=HTTP_200_OK,
+    operation_id="CancelCartPayment",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def cancel_cart_payment(
+    cart_payment_id: UUID,
+    cart_payment_request: CancelCartPaymentRequest,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+):
+    """
+    Cancel an existing cart payment.  If the payment method associated with the cart payment was
+    charged, a full refund is issued.
+
+    - **cart_payment_id**: ID of cart payment to cancel.
+    """
+    log.info(f"Cancelling cart_payment {cart_payment_id}")
+    cart_payment = await cart_payment_processor.cancel_payment(
+        cart_payment_id=cart_payment_id
+    )
+    log.info(f"Cancelled cart_payment {cart_payment_id}")
     return cart_payment

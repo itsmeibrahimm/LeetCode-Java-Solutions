@@ -34,3 +34,7 @@ class UpdateCartPaymentBaseRequest(BaseModel):
     idempotency_key: str
     amount: PositiveInt
     client_description: Optional[str] = None
+
+
+class CancelCartPaymentRequest(BaseModel):
+    pass

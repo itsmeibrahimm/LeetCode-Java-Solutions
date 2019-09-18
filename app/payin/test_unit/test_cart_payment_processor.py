@@ -8,7 +8,7 @@ from app.payin.core.exceptions import (
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 import app.payin.core.cart_payment.processor as processor
-from app.payin.core.cart_payment.model import IntentStatus
+from app.payin.core.cart_payment.model import IntentStatus, CartPayment
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.tests.utils import (
     generate_payment_intent,
@@ -22,7 +22,6 @@ from app.payin.tests.utils import (
 import uuid
 
 
-@pytest.mark.asyncio
 class TestCartPaymentProcessor:
     """
     Test external facing functions exposed by app/payin/core/cart_payment/processor.py.
@@ -44,6 +43,7 @@ class TestCartPaymentProcessor:
             payer_repo=MagicMock(), log=MagicMock(), app_ctxt=MagicMock()
         )
 
+    @pytest.mark.asyncio
     async def test_create_payment_with_no_payment_method(
         self,
         request_cart_payment,
@@ -78,7 +78,6 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 request_legacy_payment=None,
-                request_legacy_stripe_metadata=None,
                 request_legacy_correlation_ids=None,
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
@@ -89,6 +88,7 @@ class TestCartPaymentProcessor:
             == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value
         )
 
+    @pytest.mark.asyncio
     async def test_create_payment_with_other_owner(
         self,
         cart_payment_repo,
@@ -125,7 +125,6 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 request_legacy_payment=None,
-                request_legacy_stripe_metadata=None,
                 request_legacy_correlation_ids=None,
                 idempotency_key=str(uuid.uuid4()),
                 country="US",
@@ -137,20 +136,22 @@ class TestCartPaymentProcessor:
         )
 
     @pytest.mark.skip("Not yet implemented")
+    @pytest.mark.asyncio
     async def test_invalid_country(self):
         # TODO Invalid currency/country
         pass
 
     @pytest.mark.skip("Not yet implemented")
+    @pytest.mark.asyncio
     async def test_legacy_payment(self):
         # TODO legacy payment, including other payer_id_type
         pass
 
+    @pytest.mark.asyncio
     async def test_create_payment(self, cart_payment_processor, request_cart_payment):
         result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
-            request_legacy_stripe_metadata=None,
             request_legacy_correlation_ids=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
@@ -184,7 +185,6 @@ class TestCartPaymentProcessor:
         result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
-            request_legacy_stripe_metadata=None,
             request_legacy_correlation_ids=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
@@ -200,7 +200,6 @@ class TestCartPaymentProcessor:
         second_result_cart_payment, second_result_legacy_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             request_legacy_payment=None,
-            request_legacy_stripe_metadata=None,
             request_legacy_correlation_ids=None,
             idempotency_key=str(uuid.uuid4()),
             country="US",
@@ -383,6 +382,25 @@ class TestCartPaymentProcessor:
         assert result_stripe_charge.status == LegacyStripeChargeStatus.SUCCEEDED
 
     @pytest.mark.asyncio
+    async def test_cancel_payment(self, cart_payment_processor, request_cart_payment):
+        result = await cart_payment_processor.cancel_payment(request_cart_payment.id)
+        assert result
+        assert type(result) == CartPayment
+
+    @pytest.mark.asyncio
+    async def test_cancel_payment_fake_cart_payment(self, cart_payment_processor):
+        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+            return_value=(None, None)
+        )
+
+        with pytest.raises(CartPaymentReadError) as payment_error:
+            await cart_payment_processor.cancel_payment(cart_payment_id=uuid.uuid4())
+        assert (
+            payment_error.value.error_code
+            == PayinErrorCode.CART_PAYMENT_NOT_FOUND.value
+        )
+
+    @pytest.mark.asyncio
     async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
         legacy_charge = generate_legacy_consumer_charge()
         legacy_payment = generate_legacy_payment(dd_charge_id=legacy_charge.id)
@@ -398,3 +416,52 @@ class TestCartPaymentProcessor:
         assert result
         assert result.amount == 1500
         assert result.client_description == client_description
+
+    @pytest.mark.asyncio
+    async def test_update_payment_for_legacy_charge_fake_cart_payment(
+        self, cart_payment_processor
+    ):
+        legacy_charge = generate_legacy_consumer_charge()
+        cart_payment_processor.legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+            return_value=None
+        )
+        with pytest.raises(CartPaymentReadError) as payment_error:
+            await cart_payment_processor.update_payment_for_legacy_charge(
+                idempotency_key=str(uuid.uuid4()),
+                dd_charge_id=legacy_charge.id,
+                payer_id=None,
+                amount=1500,
+                client_description="description",
+                request_legacy_payment=None,
+            )
+        assert (
+            payment_error.value.error_code
+            == PayinErrorCode.CART_PAYMENT_NOT_FOUND.value
+        )
+
+    @pytest.mark.asyncio
+    async def test_cancel_payment_for_legacy_charge(self, cart_payment_processor):
+        legacy_charge = generate_legacy_consumer_charge()
+        result = await cart_payment_processor.cancel_payment_for_legacy_charge(
+            dd_charge_id=legacy_charge.id
+        )
+        assert result
+        assert type(result) == CartPayment
+
+    @pytest.mark.asyncio
+    async def test_cancel_payment_for_legacy_charge_fake_cart_payment(
+        self, cart_payment_processor
+    ):
+        legacy_charge = generate_legacy_consumer_charge()
+        cart_payment_processor.legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+            return_value=None
+        )
+
+        with pytest.raises(CartPaymentReadError) as payment_error:
+            await cart_payment_processor.cancel_payment_for_legacy_charge(
+                dd_charge_id=legacy_charge.id
+            )
+        assert (
+            payment_error.value.error_code
+            == PayinErrorCode.CART_PAYMENT_NOT_FOUND.value
+        )

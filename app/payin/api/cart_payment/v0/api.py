@@ -5,6 +5,7 @@ from app.payin.api.cart_payment.base.api import create_request_to_model
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
+from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
 from app.payin.api.cart_payment.v0.request import (
     CreateCartPaymentLegacyRequest,
     UpdateCartPaymentLegacyRequest,
@@ -55,7 +56,6 @@ async def create_cart_payment_for_legacy_client(
             request_legacy_payment=get_legacy_payment_model(
                 cart_payment_request.legacy_payment
             ),
-            request_legacy_stripe_metadata=cart_payment_request.legacy_stripe_metadata,
             request_legacy_correlation_ids=cart_payment_request.legacy_correlation_ids,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
@@ -115,6 +115,37 @@ async def update_cart_payment(
         ),
     )
     log.info(f"Updated cart_payment {cart_payment.id} for legacy charge {dd_charge_id}")
+    return cart_payment
+
+
+@router.post(
+    "/cart_payments/{dd_charge_id}/cancel",
+    response_model=CartPayment,
+    status_code=HTTP_200_OK,
+    operation_id="CancelCartPayment",
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def cancel_cart_payment(
+    dd_charge_id: int,
+    cart_payment_request: CancelCartPaymentRequest,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+):
+    """
+    Cancel an existing cart payment.  If the payment method associated with the cart payment was
+    charged, a full refund is issued.
+    """
+    log.info(f"Cancelling cart_payment for legacy charge {dd_charge_id}")
+    cart_payment = await cart_payment_processor.cancel_payment_for_legacy_charge(
+        dd_charge_id=dd_charge_id
+    )
+    log.info(f"Cancelled cart_payment for legacy charge {dd_charge_id}")
     return cart_payment
 
 

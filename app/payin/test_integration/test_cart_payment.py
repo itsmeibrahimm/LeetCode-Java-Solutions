@@ -139,7 +139,6 @@ class TestCartPayment:
             "payer_country": "US",
             "payment_country": "US",
             "legacy_correlation_ids": {"reference_id": 123, "reference_type": 5},
-            "legacy_stripe_metadata": {"is_first_order": True},
             "legacy_payment": {
                 "stripe_customer_id": legacy_stripe_customer_id,
                 "stripe_payment_method_id": legacy_stripe_payment_method_id,
@@ -149,6 +148,7 @@ class TestCartPayment:
                     "place_tag1": "place tag",
                     "extra info": "details",
                     "application_fee": 500,
+                    "metadata": {"is_first_order": True},
                 },
             },
         }
@@ -240,7 +240,6 @@ class TestCartPayment:
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
         cart_payment = response.json()
-        print(f"*** Response: {cart_payment}")
         assert cart_payment
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
@@ -284,6 +283,45 @@ class TestCartPayment:
         assert "error_message" in body
         assert "retryable" in body
         assert body["retryable"] == expected_retryable
+
+    def _test_cart_payment_legacy_cancel(
+        self, stripe_api: StripeAPISettings, client: TestClient, charge_id: int
+    ) -> None:
+        response = client.post(
+            f"/payin/api/v0/cart_payments/{str(charge_id)}/cancel", json={}
+        )
+        assert response.status_code == 200
+        cart_payment = response.json()
+        assert cart_payment["id"]
+
+        # Idempotent delete
+        response = client.post(
+            f"/payin/api/v0/cart_payments/{str(charge_id)}/cancel", json={}
+        )
+        assert response.status_code == 200
+        cart_payment = response.json()
+        assert cart_payment["id"]
+
+    def _test_cancel_cart_payment(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+    ) -> None:
+        response = client.post(
+            f"/payin/api/v1/cart_payments/{str(cart_payment['id'])}/cancel", json={}
+        )
+        assert response.status_code == 200
+        cart_payment = response.json()
+        assert cart_payment["id"]
+
+        # Idempotent delete
+        response = client.post(
+            f"/payin/api/v1/cart_payments/{str(cart_payment['id'])}/cancel", json={}
+        )
+        assert response.status_code == 200
+        cart_payment = response.json()
+        assert cart_payment["id"]
 
     def _test_legacy_cart_payment_adjustment(
         self,
@@ -380,7 +418,165 @@ class TestCartPayment:
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
 
-    def test_cart_payment_use(
+    def test_cancellation(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
+        # Uncaptured payment
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=500,
+            delay_capture=True,
+        )
+        # Cancel previous cart payment - pending payment intent in provider will be cancelled.
+        self._test_cancel_cart_payment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment
+        )
+
+        # Auto captured payment
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=600,
+            delay_capture=False,
+        )
+        # Cancel previous cart payment, resulting in provider refund of already captured intent
+        self._test_cancel_cart_payment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment
+        )
+
+    def test_cart_payment_multiple_adjustments_up_then_down(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
+        stripe_api.enable_outbound()
+        payer = self._test_payer_creation(stripe_api, client)
+        payment_method = self._test_payment_method_creation(stripe_api, client, payer)
+
+        # Initial payment, delay capture
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=525,
+            delay_capture=True,
+        )
+
+        # Adjust up once
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=650
+        )
+
+        # Adjust up again
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=770
+        )
+
+        # Bring down once
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=680
+        )
+
+        # Reduce again
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=480
+        )
+
+    def test_cart_payment_multiple_adjustments_down_then_up(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
+        stripe_api.enable_outbound()
+        payer = self._test_payer_creation(stripe_api, client)
+        payment_method = self._test_payment_method_creation(stripe_api, client, payer)
+
+        # Initial payment, delay capture
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=560,
+            delay_capture=True,
+        )
+
+        # Bring down once
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=540
+        )
+
+        # Reduce again
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=430
+        )
+
+        # Adjust up once
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=535
+        )
+
+        # Adjust up again
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=870
+        )
+
+    def test_cart_payment_multiple_adjustments_mixed_up_and_down(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
+        stripe_api.enable_outbound()
+        payer = self._test_payer_creation(stripe_api, client)
+        payment_method = self._test_payment_method_creation(stripe_api, client, payer)
+
+        # Initial payment, delay capture
+        cart_payment = self._test_cart_payment_creation(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=440,
+            delay_capture=True,
+        )
+
+        # Adjust up once
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=690
+        )
+
+        # Bring down once
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=510
+        )
+
+        # Adjust up again
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=610
+        )
+
+        # Adjust down again
+        self._test_cart_payment_adjustment(
+            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=390
+        )
+
+    def test_cart_payment_creation(
         self,
         stripe_api: StripeAPISettings,
         client: TestClient,
@@ -390,7 +586,7 @@ class TestCartPayment:
         stripe_api.enable_outbound()
 
         # Success case: intent created, not captured yet
-        cart_payment = self._test_cart_payment_creation(
+        self._test_cart_payment_creation(
             stripe_api=stripe_api,
             client=client,
             payer=payer,
@@ -399,16 +595,8 @@ class TestCartPayment:
             delay_capture=True,
         )
 
-        # Order cart adjustment
-        self._test_cart_payment_adjustment(
-            stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=800
-        )
-        # self._test_cart_payment_adjustment(
-        #     stripe_api=stripe_api, client=client, cart_payment=cart_payment, amount=300
-        # )
-
         # Success case: intent created, auto captured
-        cart_payment = self._test_cart_payment_creation(
+        self._test_cart_payment_creation(
             stripe_api=stripe_api,
             client=client,
             payer=payer,
@@ -417,7 +605,7 @@ class TestCartPayment:
             delay_capture=False,
         )
 
-        # Other payer cannot use some else's payment method
+        # Other payer cannot use some else's payment method for cart payment creation
         other_payer = payer = self._test_payer_creation(stripe_api, client)
         request_body = self._get_cart_payment_create_request(
             other_payer, payment_method
@@ -533,4 +721,9 @@ class TestCartPayment:
             cart_payment=cart_payment,
             charge_id=cart_payment["dd_charge_id"],
             amount=1000,
+        )
+
+        # Cancel
+        self._test_cart_payment_legacy_cancel(
+            stripe_api=stripe_api, client=client, charge_id=cart_payment["dd_charge_id"]
         )

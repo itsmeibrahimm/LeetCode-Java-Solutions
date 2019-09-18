@@ -371,7 +371,10 @@ class CartPaymentInterface:
         return payment_intent.status in [IntentStatus.REQUIRES_CAPTURE]
 
     def can_payment_intent_be_refunded(self, payment_intent: PaymentIntent) -> bool:
-        return payment_intent.status == IntentStatus.SUCCEEDED
+        return (
+            payment_intent.status == IntentStatus.SUCCEEDED
+            and payment_intent.amount > 0
+        )
 
     def does_intent_require_capture(self, payment_intent: PaymentIntent) -> bool:
         return payment_intent.status == IntentStatus.REQUIRES_CAPTURE
@@ -1300,6 +1303,8 @@ class CartPaymentProcessor:
     async def _cancel_payment_intent(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+        # For the specified intent, either (a) cancel with provider if not captured, or (b) refund full amount if previously captured.
+        # If intent was already refunded, it will not be re-processed (please see cart_payment_interface.can_payment_intent_be_refunded).
         can_intent_be_cancelled = self.cart_payment_interface.can_payment_intent_be_cancelled(
             payment_intent
         )
@@ -1311,7 +1316,10 @@ class CartPaymentProcessor:
         )
 
         if not can_intent_be_cancelled and not can_intent_be_refunded:
-            # If not able to cancel or refund, no action is needed (for example, intent is in failed state).
+            # If not able to cancel or refund, no action is needed (for example, intent is in failed state or already fully refunded).
+            self.log.info(
+                f"[_cancel_payment_intent] Skipping intent {payment_intent.id} in state {payment_intent.status} with amount {payment_intent.amount}"
+            )
             return payment_intent, pgp_payment_intent
 
         if can_intent_be_cancelled:
@@ -1405,6 +1413,11 @@ class CartPaymentProcessor:
                 amount=amount,
                 idempotency_key=idempotency_key,
             )
+
+        # It may be possible that amount is higher yet still below original_amount of payment intent.  This may happen if: payment created
+        # with amount A, then reduced down to B, and then raised up to C, where B < C < A.  In this case we can update the existing intent
+        # rather than creating a new one, though that may make things a little bit harder to track and does not actually save calls out to
+        # the provider.
 
         # Call to provider to create payment on their side, and update state in our system based on the result
         # TODO catch error and update state accordingly: both payment_intent/pgp_payment_intent, and legacy charges
@@ -1549,6 +1562,7 @@ class CartPaymentProcessor:
             dd_charge_id
         )
         if not cart_payment_id:
+            # TODO handle case for old payments where there is no corresponding new model
             self.log.error(
                 f"Did not find cart payment for consumer charge {dd_charge_id}"
             )
@@ -1652,6 +1666,68 @@ class CartPaymentProcessor:
             updated_cart_payment, payment_intent
         )
 
+    async def cancel_payment_for_legacy_charge(self, dd_charge_id: int) -> CartPayment:
+        """Cancel cart payment associated with legacy consumer charge ID.
+
+        Arguments:
+            dd_charge_id {int} -- The consumer charge ID whose associated cart payment will be cancelled.
+
+        Returns:
+            None
+        """
+        cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(
+            dd_charge_id
+        )
+        if not cart_payment_id:
+            # TODO handle case for old payments where there is no corresponding new model
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
+
+        return await self.cancel_payment(cart_payment_id)
+
+    async def cancel_payment(self, cart_payment_id: uuid.UUID) -> CartPayment:
+        """Cancel a previously submitted cart payment.  Results in full refund if charge was made.
+
+        Arguments:
+            cart_payment_id {uuid.UUID} -- ID of the cart payment to cance.
+
+        Returns:
+            None
+        """
+        self.log.debug(f"Cancel cart_payment {cart_payment_id}")
+        cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
+            cart_payment_id
+        )
+        if not cart_payment or not legacy_payment:
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
+
+        # Ensure the caller can access the cart payment being modified
+        if not self.cart_payment_interface.is_accessible(
+            cart_payment=cart_payment, request_payer_id=None, credential_owner=""
+        ):
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
+            )
+
+        # Cancel old intents
+        payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
+            cart_payment
+        )
+        intent_operations = []
+        for intent in payment_intents:
+            intent_operations.append(
+                self._cancel_payment_intent(
+                    cart_payment=cart_payment, payment_intent=intent
+                )
+            )
+        if len(intent_operations) > 0:
+            await gather(*intent_operations)
+
+        return cart_payment
+
     async def capture_payment(self, payment_intent: PaymentIntent) -> None:
         """Capture a payment intent.
 
@@ -1704,7 +1780,6 @@ class CartPaymentProcessor:
         self,
         request_cart_payment: CartPayment,
         request_legacy_payment: Optional[LegacyPayment],
-        request_legacy_stripe_metadata: Optional[Dict[str, Any]],
         request_legacy_correlation_ids: Optional[LegacyCorrelationIds],
         idempotency_key: str,
         country: CountryCode,
@@ -1715,6 +1790,7 @@ class CartPaymentProcessor:
         Arguments:
             request_cart_payment {CartPayment} -- CartPayment model containing request paramters provided by client.
             request_legacy_payment {LegacyPayment} -- LegacyPayment model containing legacy fields.  For v0 use only.
+            request_legacy_correlation_ids {LegacyCorrelationIds} -- Legacy identifiers.  For v0 use only.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             country {CurrencyType} -- ISO country code.
             currency {CurrencyType} -- Currency for cart payment request.
@@ -1731,10 +1807,6 @@ class CartPaymentProcessor:
                 reference_id=str(request_legacy_correlation_ids.reference_id),
                 reference_type=str(request_legacy_correlation_ids.reference_type),
             )
-
-        # TODO Check country, currency are supported values
-        # amount is positive
-        # reference_id/reference_type are supported values as defined by agreements with other teams
 
         # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
         # our exception handling middleware.
@@ -1802,13 +1874,23 @@ class CartPaymentProcessor:
                 currency=currency,
             )
             legacy_payment.dd_charge_id = legacy_consumer_charge.id
+            provider_metadata = None
+            if (
+                legacy_payment
+                and legacy_payment.dd_additional_payment_info
+                and "metadata" in legacy_payment.dd_additional_payment_info
+            ):
+                provider_metadata = legacy_payment.dd_additional_payment_info[
+                    "metadata"
+                ]
+
             # New payment: Create records in our system for the new cart payment
             cart_payment, payment_intent, pgp_payment_intent = await self.cart_payment_interface.create_new_payment(
                 request_cart_payment=request_cart_payment,
                 legacy_payment=legacy_payment,
                 provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
                 provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
-                provider_metadata=request_legacy_stripe_metadata,
+                provider_metadata=provider_metadata,
                 idempotency_key=idempotency_key,
                 country=country,
                 currency=currency,
