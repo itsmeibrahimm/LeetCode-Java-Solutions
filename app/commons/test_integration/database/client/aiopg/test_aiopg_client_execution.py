@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 from app.commons.config.app_config import AppConfig
-from app.commons.database.client.aiopg import AioEngine, AioTransaction, AioConnection
+from app.commons.database.client.aiopg import AioEngine, AioTransaction
 from app.payout.repository.maindb.model import payment_accounts
 
 pytestmark = [pytest.mark.asyncio]
@@ -41,7 +41,7 @@ async def test_client_side_execution_timeout_via_connection_timeout(
     assert isinstance(e.value, ConcurrentTimeoutError)
 
     with pytest.raises(BaseException) as e:
-        async with payout_maindb_aio_engine.acquire() as conn:  # type: AioConnection
+        async with payout_maindb_aio_engine.acquire() as conn:
             await conn.execute(f"select pg_sleep({_CONNECTION_TIMEOUT_SEC+1})")
 
     assert isinstance(e.value, ConcurrentTimeoutError)
@@ -122,7 +122,7 @@ async def test_fetch_one_fetch_many_fetch_value_but_nothing(
 
 
 async def test_transaction_intentionally_rollback(payout_maindb_aio_engine: AioEngine):
-    async with payout_maindb_aio_engine.transaction() as tx:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx:
         account_stmt = (
             payment_accounts.table.insert()
             .values(
@@ -152,7 +152,7 @@ async def test_transaction_intentionally_rollback(payout_maindb_aio_engine: AioE
 async def test_transaction_error_rollback(payout_maindb_aio_engine: AioEngine):
 
     with pytest.raises(Exception):
-        async with payout_maindb_aio_engine.transaction() as tx:  # type: AioTransaction
+        async with payout_maindb_aio_engine.transaction() as tx:
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx
             )
@@ -167,7 +167,7 @@ async def test_multiple_level_intentionally_transaction_rollback(
 ):
 
     # [should be rollback]  execute with outer tx and rollback outer tx at outer level
-    async with payout_maindb_aio_engine.transaction() as tx11:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx11:
         async with payout_maindb_aio_engine.transaction() as tx12:
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx11
@@ -179,7 +179,7 @@ async def test_multiple_level_intentionally_transaction_rollback(
     assert not tx12.active()
 
     # [should be rollback]  execute with outer tx and rollback outer tx at inner level
-    async with payout_maindb_aio_engine.transaction() as tx21:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx21:
         async with payout_maindb_aio_engine.transaction() as tx22:
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx21
@@ -191,7 +191,7 @@ async def test_multiple_level_intentionally_transaction_rollback(
     assert not tx22.active()
 
     # [should be rollback] execute with inner tx and rollback inner tx at inner level
-    async with payout_maindb_aio_engine.transaction() as tx31:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx31:
         async with payout_maindb_aio_engine.transaction() as tx32:
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx32
@@ -204,7 +204,7 @@ async def test_multiple_level_intentionally_transaction_rollback(
 
     # [should fail at rollback] execute with inner tx and rollback inner tx at inner level
 
-    async with payout_maindb_aio_engine.transaction() as tx41:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx41:
         async with payout_maindb_aio_engine.transaction() as tx42:
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx42
@@ -222,7 +222,7 @@ async def test_multiple_level_error_transaction_rollback(
 ):
     # [should be rollback]  execute with outer tx and exception at outer level
     with pytest.raises(Exception):
-        async with payout_maindb_aio_engine.transaction() as tx11:  # type: AioTransaction
+        async with payout_maindb_aio_engine.transaction() as tx11:
             async with payout_maindb_aio_engine.transaction() as tx12:
                 retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                     tx11
@@ -235,7 +235,7 @@ async def test_multiple_level_error_transaction_rollback(
 
     # [should be rollback]  execute with outer tx and exception at inner level
     with pytest.raises(Exception):
-        async with payout_maindb_aio_engine.transaction() as tx21:  # type: AioTransaction
+        async with payout_maindb_aio_engine.transaction() as tx21:
             async with payout_maindb_aio_engine.transaction() as tx22:
                 retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                     tx21
@@ -248,7 +248,7 @@ async def test_multiple_level_error_transaction_rollback(
 
     # [should be rollback] execute with inner tx and exception at inner level
     with pytest.raises(Exception):
-        async with payout_maindb_aio_engine.transaction() as tx31:  # type: AioTransaction
+        async with payout_maindb_aio_engine.transaction() as tx31:
             async with payout_maindb_aio_engine.transaction() as tx32:
                 retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                     tx32
@@ -261,7 +261,7 @@ async def test_multiple_level_error_transaction_rollback(
 
     # [should fail at rollback] execute with inner tx and rollback inner tx at inner level
     with pytest.raises(Exception):
-        async with payout_maindb_aio_engine.transaction() as tx41:  # type: AioTransaction
+        async with payout_maindb_aio_engine.transaction() as tx41:
             async with payout_maindb_aio_engine.transaction() as tx42:
                 retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                     tx42
@@ -275,7 +275,7 @@ async def test_multiple_level_error_transaction_rollback(
 
 
 async def test_transaction_commit(payout_maindb_aio_engine: AioEngine):
-    async with payout_maindb_aio_engine.transaction() as tx:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx:
         retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
             tx
         )
@@ -287,7 +287,7 @@ async def test_transaction_commit(payout_maindb_aio_engine: AioEngine):
 async def test_transaction_commit_with_partial_rollback(
     payout_maindb_aio_engine: AioEngine
 ):
-    async with payout_maindb_aio_engine.transaction() as tx1:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx1:
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
             tx1
         )
@@ -311,11 +311,11 @@ async def test_only_outer_most_commit_is_effective_within_same_connection(
 ):
 
     #  Inner committed but outer rollback, so all should be rolled back
-    async with payout_maindb_aio_engine.transaction() as tx11:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx11:
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
             tx11
         )
-        async with tx11.connection().transaction() as tx12:  # type: AioTransaction
+        async with tx11.connection().transaction() as tx12:
             retrival_stmt_2, id_2 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx12
             )
@@ -330,11 +330,11 @@ async def test_only_outer_most_commit_is_effective_within_same_connection(
     assert not tx12.active()
 
     #  Inner rollback, so all should be rolled back
-    async with payout_maindb_aio_engine.transaction() as tx21:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx21:
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
             tx21
         )
-        async with tx21.connection().transaction() as tx22:  # type: AioTransaction
+        async with tx21.connection().transaction() as tx22:
             retrival_stmt_2, id_2 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx22
             )
@@ -348,11 +348,11 @@ async def test_only_outer_most_commit_is_effective_within_same_connection(
     assert not tx22.active()
 
     #  no rollback everything works fine
-    async with payout_maindb_aio_engine.transaction() as tx31:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx31:
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
             tx31
         )
-        async with tx31.connection().transaction() as tx32:  # type: AioTransaction
+        async with tx31.connection().transaction() as tx32:
             retrival_stmt_2, id_2 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
                 tx32
             )

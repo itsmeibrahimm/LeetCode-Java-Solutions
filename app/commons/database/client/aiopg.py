@@ -319,22 +319,22 @@ class AioEngine(DBEngine, timing.Database):
         return EngineTransactionContext(generator=tx_generator)
 
     async def execute(self, stmt) -> AioMultiResult:
-        async with self.acquire() as conn:  # type: AioConnection
+        async with self.acquire() as conn:
             result = await conn.execute(stmt)
         return result
 
     async def fetch_one(self, stmt) -> Optional[AioResult]:
-        async with self.acquire() as conn:  # type: AioConnection
+        async with self.acquire() as conn:
             result = await conn.fetch_one(stmt)
         return result
 
     async def fetch_all(self, stmt) -> AioMultiResult:
-        async with self.acquire() as conn:  # type: AioConnection
+        async with self.acquire() as conn:
             result = await conn.fetch_all(stmt)
         return result
 
     async def fetch_value(self, stmt) -> Optional[Any]:
-        async with self.acquire() as conn:  # type: AioConnection
+        async with self.acquire() as conn:
             result = await conn.fetch_value(stmt)
         return result
 

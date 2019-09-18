@@ -9,7 +9,6 @@ from typing import Optional
 from sqlalchemy import and_
 
 from app.commons import tracing
-from app.commons.database.client.aiopg import AioTransaction
 from app.commons.database.client.interface import DBConnection, DBTransaction
 from app.ledger.core.data_types import (
     InsertMxLedgerInput,
@@ -130,7 +129,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     async def move_ledger_state_to_processing_and_close_schedule_ledger(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
-        async with self.payment_database.master().transaction() as tx:  # type: AioTransaction
+        async with self.payment_database.master().transaction() as tx:
             connection = tx.connection()
             try:
                 # Lock mx_ledger row for updating state

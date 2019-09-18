@@ -102,7 +102,7 @@ async def test_engine_acquire_connection(payout_maindb_aio_engine: AioEngine):
     assert conn3.raw_connection.closed
 
     # Test use acquire connection as context manager
-    async with payout_maindb_aio_engine.acquire() as conn4:  # type: AioConnection
+    async with payout_maindb_aio_engine.acquire() as conn4:
         assert not conn4.closed()
         assert not conn4.raw_connection.closed
     assert conn4.closed()
@@ -111,8 +111,8 @@ async def test_engine_acquire_connection(payout_maindb_aio_engine: AioEngine):
 
 async def test_connection_acquire_transaction(payout_maindb_aio_engine: AioEngine):
 
-    async with payout_maindb_aio_engine.acquire() as conn1:  # type: AioConnection
-        async with conn1.transaction() as tx1:  # type: AioTransaction
+    async with payout_maindb_aio_engine.acquire() as conn1:
+        async with conn1.transaction() as tx1:
             validate_aio_transaction_active(tx1)
             await tx1.commit()
             validate_aio_transaction_inactive(tx1)
@@ -170,7 +170,7 @@ async def test_connection_acquire_transaction(payout_maindb_aio_engine: AioEngin
 async def test_engine_acquire_transaction(payout_maindb_aio_engine: AioEngine):
 
     # Use as cxt manager
-    async with payout_maindb_aio_engine.transaction() as tx:  # type: AioTransaction
+    async with payout_maindb_aio_engine.transaction() as tx:
         validate_aio_transaction_active(tx)
         await tx.commit()
         validate_aio_transaction_inactive(tx)

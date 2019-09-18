@@ -53,7 +53,7 @@ class DBTransaction(ABC):
         pass
 
     @abstractmethod
-    async def __aenter__(self):
+    async def __aenter__(self) -> "DBTransaction":
         pass
 
     @abstractmethod
@@ -70,7 +70,7 @@ class AwaitableTransactionContext:
         self._generator = generator
         self._transaction = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> DBTransaction:
         if self._transaction:
             raise Exception("Transaction already initialized")
         if not self._generator:
@@ -176,7 +176,7 @@ class EngineTransactionContext:
         self._generator = generator
         self._transaction = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> DBTransaction:
         if self._transaction:
             raise Exception("Transaction already initialized")
         if not self._generator:
