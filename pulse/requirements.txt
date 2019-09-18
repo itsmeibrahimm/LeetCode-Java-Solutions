@@ -2,5 +2,5 @@
 
 payin-v0-client==0.0.3
 payin-v1-client==0.0.2
-payout-v0-client==0.0.10
+payout-v0-client==0.0.3
 stripe==2.32.1

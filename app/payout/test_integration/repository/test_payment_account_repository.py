@@ -97,11 +97,11 @@ class TestPaymentAccountRepository:
             and account_2_created in including_account_1_and_2  # noqa W503
         )
         assert (
-            including_account_1_and_2.index(account_1_created) == 0
-        ), "first created should be returned first"
+            including_account_1_and_2.index(account_1_created) == 1
+        ), "first created should be returned last"
         assert (
-            including_account_1_and_2.index(account_2_created) == 1
-        ), "most recently created should be returned last"
+            including_account_1_and_2.index(account_2_created) == 0
+        ), "most recently created should be returned first"
         assert len(nothing) == 0
 
     async def test_create_stripe_managed_account(
