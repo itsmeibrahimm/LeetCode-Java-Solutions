@@ -66,3 +66,7 @@ class ManagedAccountTransferStatus(str, Enum):
 class AccountType(str, Enum):
     # payment_account.account_type
     ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT = "stripe_managed_account"
+
+
+class PayoutExternalAccountType(str, Enum):
+    CARD = "card"

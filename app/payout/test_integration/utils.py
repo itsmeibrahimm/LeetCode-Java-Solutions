@@ -1,6 +1,13 @@
 from datetime import datetime, timezone
+from typing import List
 
+from app.commons.types import CountryCode, CurrencyType
 from app.payout.repository.bankdb.model.payout import PayoutCreate
+from app.payout.repository.bankdb.model.payout_card import PayoutCardCreate, PayoutCard
+from app.payout.repository.bankdb.model.payout_method import (
+    PayoutMethodCreate,
+    PayoutMethod,
+)
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestCreate,
 )
@@ -9,6 +16,8 @@ from app.payout.repository.bankdb.model.stripe_managed_account_transfer import (
 )
 from app.payout.repository.bankdb.model.transaction import TransactionCreate
 from app.payout.repository.bankdb.payout import PayoutRepository
+from app.payout.repository.bankdb.payout_card import PayoutCardRepository
+from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepository,
 )
@@ -32,7 +41,7 @@ from app.payout.repository.maindb.model.transfer import TransferCreate
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
-from app.payout.types import AccountType
+from app.payout.types import AccountType, PayoutExternalAccountType
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
 
@@ -275,3 +284,113 @@ async def prepare_and_insert_stripe_managed_account_transfer(
         expected=data.dict(skip_defaults=True), actual=sma_transfer.dict()
     )
     return sma_transfer
+
+
+async def prepare_and_insert_payout_card(
+    payment_account_repo: PaymentAccountRepository,
+    payout_method_repo: PayoutMethodRepository,
+    payout_card_repo: PayoutCardRepository,
+    created_at: datetime = datetime.utcnow(),
+    updated_at: datetime = datetime.utcnow(),
+):
+    payout_method = await prepare_and_insert_payout_method(
+        payment_account_repo, payout_method_repo
+    )
+
+    data = PayoutCardCreate(
+        id=payout_method.id,
+        stripe_card_id="card_test_payout_card",
+        last4="1234",
+        brand="Bear Bank",
+        exp_month=12,
+        exp_year=23,
+        created_at=created_at,
+        updated_at=updated_at,
+        fingerprint="fingerprint",
+    )
+
+    payout_card = await payout_card_repo.create_payout_card(data)
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=payout_card.dict()
+    )
+    assert payout_card.id, "payout card is created, assigned an ID"
+    return payout_card
+
+
+async def prepare_payout_card_list(
+    payment_account_repo: PaymentAccountRepository,
+    payout_method_repo: PayoutMethodRepository,
+    payout_card_repo: PayoutCardRepository,
+    count: int = 5,
+):
+    payout_card_list: List[PayoutCard] = []
+    for i in range(0, count):
+        # create a payout_method
+        payout_method = await prepare_and_insert_payout_method(
+            payment_account_repo, payout_method_repo
+        )
+
+        data = PayoutCardCreate(
+            id=payout_method.id,
+            stripe_card_id="card_test_payout_card{}".format(i),
+            last4="1234",
+            brand="Bear Bank",
+            exp_month=12,
+            exp_year=23,
+            fingerprint="fingerprint{}".format(i),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+
+        payout_card = await payout_card_repo.create_payout_card(data)
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=payout_card.dict()
+        )
+        assert payout_card.id, "payout card is created, assigned an ID"
+        payout_card_list.insert(0, payout_card)
+    return payout_card_list
+
+
+async def prepare_and_insert_payout_method(
+    payment_account_repo: PaymentAccountRepository,
+    payout_method_repo: PayoutMethodRepository,
+):
+    payment_account = await prepare_and_insert_payment_account(payment_account_repo)
+    data = PayoutMethodCreate(
+        type=PayoutExternalAccountType.CARD.value,
+        currency=CurrencyType.USD.value,
+        country=CountryCode.US.value,
+        payment_account_id=payment_account.id,
+        is_default=True,
+        token=uuid.uuid4(),
+    )
+
+    payout_method = await payout_method_repo.create_payout_method(data)
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=payout_method.dict()
+    )
+    assert payout_method.id, "payout method is created, assigned an ID"
+    return payout_method
+
+
+async def prepare_payout_method_list(
+    payout_method_repo: PayoutMethodRepository, payout_account_id: int, count: int = 5
+):
+    payout_method_list: List[PayoutMethod] = []
+    for i in range(0, count):
+        # create a payout_method
+        data = PayoutMethodCreate(
+            type=PayoutExternalAccountType.CARD.value,
+            currency=CurrencyType.USD.value,
+            country=CountryCode.US.value,
+            payment_account_id=payout_account_id,
+            is_default=True,
+            token=uuid.uuid4(),
+        )
+
+        payout_method = await payout_method_repo.create_payout_method(data)
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=payout_method.dict()
+        )
+        payout_method_list.insert(0, payout_method)
+    return payout_method_list
