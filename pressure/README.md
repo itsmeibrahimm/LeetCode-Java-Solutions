@@ -7,6 +7,7 @@ While doordash-pressure still utilize `pip` + `requirements.txt` combination for
 #### Install dependencies
 ```bash
 cd <payment repo>/pressure
+deactivate > /dev/null 2>&1 # deactivate any existing pipenv shell in case parent pipenv shell exists
 ./update-local-env.sh # create virtual environment if necessary
 pipenv shell # login to virtual environment
 ```
@@ -17,11 +18,12 @@ pipenv shell # login to virtual environment
 
 ### Run locally
 
-Assuming you started your local service at port 8000
+Assuming you started your local service at port 8000 by `make local-server WEB_PORT=8000`
 
 
 ```bash
 cd <payment repo>/pressure
+deactivate > /dev/null 2>&1 # deactivate any existing pipenv shell in case parent pipenv shell exists
 pipenv shell
 pressure --data-file=$(pipenv --venv)/infra/local/data.yaml --data-file=infra/local/data.yaml --locust-args="--host http://localhost:8000 -f tests/locustfile.py --csv=report --no-web -c 1000 -r 100 --run-time 5m"
 ```

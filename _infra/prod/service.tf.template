@@ -26,7 +26,7 @@ module "payment-service-web" {
   service_hpa_enable                        = "true"
   service_hpa_min_replicas                  = "3"
   service_hpa_max_replicas                  = "15"
-  service_hpa_cpu_target_avg_util           = "75"
+  service_hpa_cpu_target_avg_util           = "50"
 
   service_resource_requests_memory          = "2Gi"
   service_resource_limits_memory            = "2Gi"

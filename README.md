@@ -4,14 +4,14 @@ This repo contains micros services including:
 
 - Payout service (WIP)
 - Payin service (WIP)
-
-The repo was created through python-flask-service-template [link to specific SHA used](https://github.com/doordash/python-flask-service-template/tree/d0c2115c2c3a822bdb065dfeb45abdb87c4d1527)
+- Ledger service (WIP)
 
 # Table of contents
 
 - [Architecture and Tech Stack](#architecture-and-tech-stack)
 - [Deployment](#deployment)
 - [Monitoring](#monitoring)
+- [Infrastructure](#infrastructure)
 - [Development](#development)
   - [Environment Setup](#environment-setup)
   - [Development Guide](#development-guide)
@@ -20,7 +20,6 @@ The repo was created through python-flask-service-template [link to specific SHA
   - [Update Dependencies](#update-dependencies)
   - [Work with secret](#work-with-secret)
   - [Live debugging](#live-debugging)
-  - [(Optional) Local k8s setup](#optional-k8s-environment)
   - [Make commands reference](#make-commands-reference)
 
 # Architecture and Tech Stack
@@ -56,8 +55,11 @@ The following technologies/frameworks are used across the entire stack:
 - **Jenkins/Groovy** for CICD
 
 # Monitoring
-- [Wavefront Dashboard](https://metrics.wavefront.com/dashboard/payment-service-health)
+- [Wavefront Dashboards](https://metrics.wavefront.com/u/NFqvPJ66SJ)
 - [Sentry Issues](https://sentry.io/organizations/doordash/issues/?project=1381528)
+
+# Infrastructure
+- [README-infra.md](README-infra.md)
 
 # Deployment
 
@@ -295,47 +297,12 @@ as source of all secret configurations, such as DB credentials and Stripe privat
    1. For local-server: `make local-server DEBUGGER=enabled`
    2. For tests: `make test-unit DEBUGGER=enabled`
 
-### (Optional) k8s environment
-
-#### Setup
-
-1. Install [docker for Mac](https://docs.docker.com/docker-for-mac/install/) and enable the local Kubernetes cluster by
-   clicking on Docker whale icon > `Preferences...` > `Kubernetes` > `Enable Kubernetes`
-2. Configure Kubernetes to use your local context: `kubectl config use-context docker-for-desktop`
-3. Install and initialize helm:
-
-   ```bash
-   brew install kubernetes-helm
-
-   # If your local k8s cluster complains `connection refused`, try to do the following:
-   #  - remove k8s config for this local cluster in your ~/.kube/config
-   #  - increase your local docker setting to have 4G swap space (Preferences -> Advanced)
-   helm init
-   ```
-
-4. Try to build and deploy your service on local Kubernetes: `make build local-deploy`
-
-#### Running service in local k8s cluster
-
-1. Ensure that Kubernetes is configured to use your local context: `kubectl config use-context docker-for-desktop`
-2. Build the docker image for your service: `make build`
-3. Deploy locally: `make local-deploy`
-4. Start the proxy: `kubectl proxy`
-5. Query the service APIs using a REST client (e.g. `curl`):
-   ```bash
-   curl http://localhost:8001/api/v1/namespaces/default/services/payment-service-web:80/proxy/health
-   ```
-
 ## Make commands reference
 
 Here's a reference to all available `make` commands:
 
 ```bash
-make build # use docker to build the service image
-
-make tag # uses doorctl to tag the service image
-
-make push # uses doorctl to push the service image to Artifactory
+make docker-build # use docker to build the service image
 
 make build-ci-container # build the docker container for CI, using docker-compose.ci.yml
 
@@ -360,19 +327,3 @@ make test-lint # runs linter only
 make test-install-hooks # installs pre-commit hooks
 
 make test-hooks # runs pre-commit hooks only
-```
-
-Also here are `make` targets if you like to deploy service to local k8s cluster
-
-```bash
-make local-deploy # uses helm to deploy the service on the local Kubernetes cluster
-
-make local-status # uses helm to show the local service deployment status
-
-make local-bash # opens a bash shell into the service container
-
-make local-clean # uses helm to undeploy the local service
-
-make local-tail # tails the local service logs
-
-```

@@ -67,7 +67,7 @@ module "payment-service-cron" {
   service_hpa_enable                        = "true"
   service_hpa_min_replicas                  = "2"
   service_hpa_max_replicas                  = "6"
-  service_hpa_cpu_target_avg_util           = "75"
+  service_hpa_cpu_target_avg_util           = "50"
 
   service_resource_requests_memory          = "256Mi"
   service_resource_limits_memory            = "256Mi"

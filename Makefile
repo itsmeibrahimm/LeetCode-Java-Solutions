@@ -55,8 +55,11 @@ stop-local-docker-server:
 	WEB_PORT=8001 docker-compose -f docker-compose.yml -f docker-compose.nodeploy.yml down
 
 .PHONY: local-server
+ifndef WEB_PORT
+override WEB_PORT = 8000
+endif
 local-server: local-dependency
-	./development/start-local-server.sh -e local -p 8000
+	./development/start-local-server.sh -e local -p $(WEB_PORT)
 
 .PHONY: local-dependency
 local-dependency:
