@@ -91,24 +91,6 @@ def stripe_api():
     api_settings.restore()
 
 
-@pytest.fixture(autouse=True)
-def global_statsd_client():
-    """
-    always initialize the global statsd client
-    """
-    from doordash_python_stats import ddstats
-    from app.commons.stats import init_global_statsd
-
-    doorstats_global = ddstats.doorstats_global
-
-    ddstats.doorstats_global = init_global_statsd(
-        prefix="dd.pay.payment-service", host="localhost", fixed_tags={"env": "local"}
-    )
-    yield ddstats.doorstats_global
-
-    ddstats.doorstats_global = doorstats_global
-
-
 @pytest.fixture
 def service_statsd_client():
     statsd_client = DoorStatsProxyMultiServer()
