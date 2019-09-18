@@ -69,6 +69,7 @@ Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddo
 - [Release build pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-build.groovy/)
 - [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)
 - [Migration pipeline](https://deployjenkins.doordash.com/job/payment-service/job/Jenkinsfile-migrate.groovy/)
+- [Dev CD pipeline](Jenkinsfile-deploy.groovy) (Always deploy merged code to staging only)
 
 ## Regular code contribution
 - All PRs running through CI steps defined in [CI pipeline](https://generaljenkins.doordash.com/job/payment-service/job/Jenkinsfile-nodeploy.groovy/)

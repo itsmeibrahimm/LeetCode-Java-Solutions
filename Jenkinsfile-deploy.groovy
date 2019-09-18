@@ -45,13 +45,13 @@ pipeline {
         }
       }
     }
-    post {
-      success {
-        sendSlackMessage common.getSlackChannel(), "Successful deploy to staging of ${common.getServiceName()} using sha ${params['SHA']} of branch ${params['BRANCH_NAME']}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
-      }
-      failure {
-        sendSlackMessage common.getSlackChannel(), "<!here> (dev CD) Deploy to staging failed for ${common.getServiceName()} using sha ${params['SHA']} of branch ${params['BRANCH_NAME']}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
-      }
+  }
+  post {
+    success {
+      sendSlackMessage common.getSlackChannel(), "Successful deploy to staging of ${common.getServiceName()} using sha ${params['SHA']} of branch ${params['BRANCH_NAME']}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
+    }
+    failure {
+      sendSlackMessage common.getSlackChannel(), "<!here> (dev CD) Deploy to staging failed for ${common.getServiceName()} using sha ${params['SHA']} of branch ${params['BRANCH_NAME']}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
     }
   }
 }
