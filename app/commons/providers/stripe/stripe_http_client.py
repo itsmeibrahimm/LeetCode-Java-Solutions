@@ -2,7 +2,7 @@ import stripe
 import requests
 
 from typing import Optional
-from app.commons import timing
+from app.commons.timing import http_client as http_client_timing
 from stripe.http_client import HTTPClient, RequestsClient
 
 
@@ -14,7 +14,7 @@ def set_default_http_client(http_client: Optional[HTTPClient]):
 
 class TimedSession(requests.Session):
     # track timing and response
-    @timing.track_client_response(stat_name="io.stripe-lib.latency")
+    @http_client_timing.track_stripe_http_client(stat_name="io.stripe-lib.latency")
     def request(self, *args, **kwargs):
         response = super().request(*args, **kwargs)
         return response

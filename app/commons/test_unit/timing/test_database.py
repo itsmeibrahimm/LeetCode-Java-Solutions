@@ -3,7 +3,7 @@ import pytest
 from typing import List
 from app.commons import tracing, timing
 from app.commons.utils.testing import Stat
-from app.commons.timing import _discover_caller
+from app.commons.timing.database import _discover_caller
 
 
 class TestDiscover:
@@ -12,13 +12,11 @@ class TestDiscover:
 
     def test_find(self):
         f, name = self.caller()
-        assert (
-            name == "app.commons.test_unit.test_timing"
-        ), "returns the name of the caller"
+        assert name == __name__, "returns the name of the caller"
 
     def test_find_exclude(self):
         f, name = self.caller(["app.commons.test_unit"])
-        assert name != "app.commons.test_unit.test_timing", "exclude unit tests"
+        assert name != __name__, "exclude unit tests"
 
 
 class TestDatabaseTimingTracker:
@@ -34,15 +32,15 @@ class TestDatabaseTimingTracker:
         async def transaction_manager():
             yield "some transaction"
 
-        class Database(timing.Database):
+        class Database(timing.database.Database):
             database_name = "somedb"
             instance_name = "master"
 
-            @timing.track_transaction
+            @timing.database.track_transaction
             def transaction(self):
                 return transaction_manager()
 
-            @timing.track_query
+            @timing.database.track_query
             async def query(self, *args, **kwargs):
                 ...
 

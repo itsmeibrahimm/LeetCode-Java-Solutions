@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Sequence, Union, overload
 from aiopg.sa import connection, create_engine, engine, transaction
 from aiopg.sa.result import ResultProxy, RowProxy
 
-from app.commons import timing
+from app.commons.timing import database as database_timing
 from app.commons.database.client.interface import (
     AwaitableConnectionContext,
     AwaitableTransactionContext,
@@ -127,7 +127,7 @@ class AioTransaction(DBTransaction):
             await self.commit()
 
 
-class AioConnection(DBConnection, timing.Database):
+class AioConnection(DBConnection, database_timing.Database):
     _raw_connection: Optional[connection.SAConnection]
     engine: "AioEngine"
     database_name: str
@@ -159,7 +159,7 @@ class AioConnection(DBConnection, timing.Database):
         new_transaction = AioTransaction(connection=self)
         return AwaitableTransactionContext(generator=new_transaction.start)
 
-    @timing.track_query
+    @database_timing.track_query
     async def execute(self, stmt) -> AioMultiResult:
         result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
         row_proxies: List[RowProxy] = []
@@ -169,7 +169,7 @@ class AioConnection(DBConnection, timing.Database):
             result_proxy.close()
         return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
-    @timing.track_query
+    @database_timing.track_query
     async def fetch_one(self, stmt) -> Optional[AioResult]:
         result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
         result: Optional[RowProxy] = None
@@ -179,7 +179,7 @@ class AioConnection(DBConnection, timing.Database):
             result_proxy.close()
         return AioResult(result, result_proxy.rowcount) if result else None
 
-    @timing.track_query
+    @database_timing.track_query
     async def fetch_all(self, stmt) -> AioMultiResult:
         result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
         row_proxies: List[RowProxy] = []
@@ -189,7 +189,7 @@ class AioConnection(DBConnection, timing.Database):
             result_proxy.close()
         return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
-    @timing.track_query
+    @database_timing.track_query
     async def fetch_value(self, stmt):
         return await self.raw_connection.scalar(
             stmt
@@ -209,7 +209,7 @@ class AioConnection(DBConnection, timing.Database):
         await self.close()
 
 
-class AioEngine(DBEngine, timing.Database):
+class AioEngine(DBEngine, database_timing.Database):
     database_name: str
     instance_name: str
     _dsn: str
@@ -310,7 +310,7 @@ class AioEngine(DBEngine, timing.Database):
         new_connection = AioConnection(engine=self)
         return AwaitableConnectionContext(generator=new_connection.open)
 
-    @timing.track_transaction
+    @database_timing.track_transaction
     def transaction(self):
         async def tx_generator() -> AioTransaction:
             opened_conn = await self.acquire()

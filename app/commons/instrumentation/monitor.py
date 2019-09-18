@@ -83,7 +83,7 @@ class MonitoringLoop:
     processors: Set[MonitoringProcessor]
     logger: Logger
     stats_client: StatsClient
-    loop: Optional[asyncio.AbstractEventLoop] = None
+    loop: asyncio.AbstractEventLoop
     _task: Optional[asyncio.Task] = None
 
     def __init__(
@@ -104,7 +104,7 @@ class MonitoringLoop:
         self.interval_secs = interval_secs
         self.stats_client = stats_client
         self.logger = logger
-        self.loop = loop
+        self.loop = loop or asyncio.get_event_loop()
         if processors:
             self.processors = set(processors)
         else:
@@ -136,8 +136,7 @@ class MonitoringLoop:
             # task already started
             return False
 
-        loop = self.loop or asyncio.get_event_loop()
-        self._task = loop.create_task(
+        self._task = self.loop.create_task(
             self._monitoring_loop(call_immediately=call_immediately)
         )
         return True

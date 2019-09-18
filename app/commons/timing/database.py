@@ -1,20 +1,25 @@
 import contextlib
 import functools
 import sys
-from typing import Any, Callable, Tuple, List, Dict, Optional
-
 import structlog
+
+from types import FrameType
+from typing import Tuple, Any, Callable, List, Dict
+from typing_extensions import AsyncContextManager, Protocol, runtime_checkable
 from doordash_python_stats import ddstats
-from requests import Response
-from typing_extensions import Protocol, AsyncContextManager, runtime_checkable
 
 from app.commons import tracing
 from app.commons.context.logger import root_logger as default_logger
 from app.commons.stats import get_service_stats_client, get_request_logger
-from app.commons.tracing import Processor, TManager, Unspecified
 
 
-def _discover_caller(additional_ignores=None) -> Tuple[Any, str]:
+@runtime_checkable
+class Database(Protocol):
+    database_name: str
+    instance_name: str
+
+
+def _discover_caller(additional_ignores=None) -> Tuple[FrameType, str]:
     """
     Remove all app.commons.tracing calls and return the relevant app frame.
 
@@ -43,16 +48,6 @@ def _discover_caller(additional_ignores=None) -> Tuple[Any, str]:
         f = f.f_back
         name = f.f_globals.get("__name__") or "?"
     return f, name
-
-
-@runtime_checkable
-class Database(Protocol):
-    database_name: str
-    instance_name: str
-
-
-class Logger(Protocol):
-    log: structlog.BoundLoggerBase
 
 
 class DatabaseTimer(tracing.BaseTimer):
@@ -256,146 +251,3 @@ class TransactionTimingManager(DatabaseTimingManager):
             return wrapped_transaction()
 
         return wrapper
-
-
-class ClientTracker(tracing.BaseTimer):
-    status_code: str = ""
-    client_request_id: str = ""
-
-    def process_result(self, result: Response):
-        self.status_code = str(result.status_code)
-        # stripe returns their request id
-        self.client_request_id = result.headers.get("Request-Id", "")
-
-
-def log_request_timing(tracker: "ClientTimingManager", timer: ClientTracker):
-    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-
-    context = timer.breadcrumb.dict(
-        include={
-            "application_name",
-            "provider_name",
-            "action",
-            "resource",
-            "status_code",
-            "country",
-        },
-        skip_defaults=True,
-    )
-    if timer.status_code:
-        context["status_code"] = timer.status_code
-    if timer.client_request_id:
-        context["client_request_id"] = timer.client_request_id
-    log.info(
-        "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
-    )
-
-
-def stat_request_timing(tracker: "ClientTimingManager", timer: ClientTracker):
-    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-    stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
-
-    tags = timer.breadcrumb.dict(
-        include={
-            "application_name",
-            "provider_name",
-            "action",
-            "resource",
-            "status_code",
-            "country",
-        },
-        skip_defaults=True,
-    )
-    if timer.status_code:
-        tags["status_code"] = timer.status_code
-    stats.timing(tracker.stat_name, timer.delta_ms, tags=tags)
-    log.debug("statsd: %s", tracker.stat_name, latency_ms=timer.delta_ms, tags=tags)
-
-
-class ClientTimingManager(tracing.TimingManager[ClientTracker]):
-    processors = [log_request_timing, stat_request_timing]
-
-    def __init__(
-        self: TManager,
-        *,
-        stat_name: str,
-        send=True,
-        rate=1,
-        processors: Optional[List[Processor]] = None,
-        only_trackable=False,
-    ):
-        self.stat_name = stat_name
-        super().__init__(
-            send=send, rate=rate, processors=processors, only_trackable=only_trackable
-        )
-
-    def create_tracker(
-        self,
-        obj=tracing.Unspecified,
-        *,
-        func: Callable,
-        args: List[Any],
-        kwargs: Dict[str, Any],
-    ):
-        return ClientTracker()
-
-
-def track_client_response(**kwargs):
-    return ClientTimingManager(**kwargs)
-
-
-def stat_func_timing(tracker: "FuncTimingManager", timer: "FuncTimer"):
-    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-    tags = {"func": timer.func_name}
-    stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
-    # Measure the duration of this func
-    duration_stat_name = f"funcs.{tracker.stat_name}.duration"
-    stats.timing(duration_stat_name, timer.delta_ms, tags=tags)
-    log.debug(
-        "duration stat", duration_stat_name=duration_stat_name, delta_ms=timer.delta_ms
-    )
-
-
-class FuncTimer(tracing.BaseTimer):
-    def __init__(self, func_name: str):
-        super().__init__()
-        self.func_name = func_name
-
-
-class FuncTimingManager(tracing.TimingManager[FuncTimer]):
-    processors = [stat_func_timing]
-
-    def __init__(
-        self: TManager,
-        *,
-        func_name: str,
-        stat_name: str,
-        send=True,
-        rate=1,
-        processors: Optional[List[Processor]] = None,
-        only_trackable=False,
-    ):
-        super().__init__(
-            send=send, rate=rate, processors=processors, only_trackable=only_trackable
-        )
-        self.func_name = func_name
-        self.stat_name = stat_name
-
-    def create_tracker(
-        self,
-        obj=Unspecified,
-        *,
-        func: Callable,
-        args: List[Any],
-        kwargs: Dict[str, Any],
-    ) -> FuncTimer:
-        return FuncTimer(func_name=self.func_name)
-
-
-def track_func(func=None, stat_name: str = None):
-    if func is None:
-        return functools.partial(track_func, stat_prefix=stat_name)
-    stat_name = stat_name or func.__name__
-    func_name = func.__name__
-
-    return FuncTimingManager(func_name=func_name, stat_name=stat_name)(func)
