@@ -1,19 +1,26 @@
 from typing import Dict, Any
 from datetime import datetime
 import json
+from structlog.stdlib import BoundLogger
+from fastapi import Depends
 
 from app.payout.service import (
     PayoutRepositoryInterface,
     StripePayoutRequestRepositoryInterface,
+    TransferRepositoryInterface,
+    StripeTransferRepositoryInterface,
 )
 from app.payout.repository.bankdb.model.payout import PayoutUpdate, Payout
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestUpdate,
     StripePayoutRequest,
 )
+from app.payout.repository.maindb.model.stripe_transfer import StripeTransferUpdate
+from app.payout.repository.maindb.model.transfer import TransferStatus, TransferUpdate
 from app.payout.service import PayoutService
 from app.commons.providers.dsj_client import DSJClient
-
+from app.payout.core import feature_flags
+from app.commons.context.req_context import get_logger_from_req
 
 STRIPE_RESOURCE_ALLOWED_ACTIONS_TRANSFER = [
     "created",
@@ -24,8 +31,87 @@ STRIPE_RESOURCE_ALLOWED_ACTIONS_TRANSFER = [
 ]
 
 
-async def _handle_stripe_transfer_event():
-    pass
+async def _handle_stripe_transfer_event(
+    event: Dict[str, Any],
+    country_code: str,
+    i_transfers: TransferRepositoryInterface,
+    i_stripe_transfers: StripeTransferRepositoryInterface,
+    dsj_client: DSJClient,
+    log: BoundLogger = Depends(get_logger_from_req),
+):
+    if not feature_flags.handle_stripe_transfer_event_enabled():
+        log.info("handle_stripe_transfer_event_enabled is off, skipping...")
+        return
+
+    stripe_id = event.get("data", {}).get("object", {}).get("id", None)
+    if not stripe_id:
+        log.info("not valid stripe_id, skipping...")
+        return
+
+    stripe_transfer = await i_stripe_transfers.get_stripe_transfer_by_stripe_id(
+        stripe_id=stripe_id
+    )
+    if not stripe_transfer:
+        log.info("stripe transfer not found, skipping...")
+        return
+
+    #
+    # update stripe_transfer
+    #
+    stripe_status = event.get("data", {}).get("object", {}).get("status", None)
+    stripe_failure_code = (
+        event.get("data", {}).get("object", {}).get("failure_code", None)
+    )
+
+    if stripe_status is None:
+        log.info("stripe status is none, skipping...")
+        return
+
+    # TODO: events may arrive out of order, need to prevent timeline mess up
+    # Possible Solutions:
+    #   1) update stripe_transfers table to have a last_status_update_time
+    #   2) fetch from stripe using stripe_id to get the latest status
+    # 1) is preferred since 2) will introduce much overhead and redundant traffic
+
+    # this is existing DSJ behavior, carry it over here until above is done
+    # logic behind this seems to be `failed` is the definite terminate state
+    if stripe_transfer.stripe_status == "failed":
+        # don't overwrite a failed status with anything
+        log.info("stripe transfer was failed (a terminated state), skipping...")
+        return
+
+    stripe_transfer_update_data = StripeTransferUpdate(
+        stripe_status=stripe_status, stripe_failure_code=stripe_failure_code
+    )
+    updated_stripe_transfer = await i_stripe_transfers.update_stripe_transfer_by_id(
+        stripe_transfer.id, stripe_transfer_update_data
+    )
+
+    assert updated_stripe_transfer
+    assert updated_stripe_transfer.id == stripe_transfer.id
+
+    transfer = await i_transfers.get_transfer_by_id(
+        transfer_id=stripe_transfer.transfer_id
+    )
+    if not transfer:
+        log.info("transfer not found, skipping...")
+        return
+
+    #
+    # update transfer
+    #
+    new_transfer_status = TransferStatus.stripe_status_to_transfer_status(stripe_status)
+    transfer_update_data = TransferUpdate(status=new_transfer_status)
+    updated_transfer = await i_transfers.update_transfer_by_id(
+        transfer.id, transfer_update_data
+    )
+    assert updated_transfer
+    assert updated_transfer.id == transfer.id
+
+    return await dsj_client.post(
+        f"/v1/transfers/{transfer.id}/status_update/",
+        {"status": stripe_status, "stripe_id": stripe_id},
+    )
 
 
 async def _syncing_events_to_db(
@@ -115,7 +201,13 @@ async def handle_stripe_webhook_transfer_event(
         tr_type = stripe_transfer_obj.get("method", None)
 
         if tr_type == "standard":
-            await _handle_stripe_transfer_event()
+            await _handle_stripe_transfer_event(
+                event=event,
+                country_code=country_code,
+                i_transfers=payout_service.transfers,
+                i_stripe_transfers=payout_service.stripe_transfers,
+                dsj_client=payout_service.dsj_client,
+            )
         elif tr_type == "instant":
             await _handle_stripe_instant_transfer_event(
                 event=event,

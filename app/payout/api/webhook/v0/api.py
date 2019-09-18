@@ -1,5 +1,7 @@
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from starlette.status import HTTP_400_BAD_REQUEST
+from app.commons.api.models import PaymentException
 
 from app.payout.api.webhook.utils.event_handler import (
     STRIPE_WEBHOOK_EVENT_TYPE_HANDLER_MAPPING,
@@ -29,4 +31,9 @@ async def handle_webhook_event(
         )
         return rv
 
-    raise HTTPException(status_code=400, detail="Error")
+    raise PaymentException(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_code="handle_webhook_event_error",  # not formalize error code yet,
+        error_message="handle_webhook_event no handler",
+        retryable=False,
+    )

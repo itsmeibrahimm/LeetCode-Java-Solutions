@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
+from enum import Enum
 
 from sqlalchemy import (
     Boolean,
@@ -115,3 +116,70 @@ class TransferCreate(_TransferPartial):
 
 class TransferUpdate(_TransferPartial):
     pass
+
+
+class TransferStatus(Enum):
+    # The following comments are all guesses, based on reading through code -- @sean
+    CREATING = (
+        "creating"
+    )  # When a Payout is created on DD, but also in the process of updating associated transactions
+    CREATED = "created"  # When a Payout is created on stripe side
+    NEW = (
+        "new"
+    )  # When a Payout has been created on DoorDash and ready for submission; Money is still in the Stripe Managed Account balance at this point
+    SUBMITTING = (
+        "submitting"
+    )  # When a Payout has been created on DoorDash, and submission to Stripe is in progress
+    PENDING = (
+        "pending"
+    )  # When a Payout is communicated to Stripe, but Stripe has yet to communicate to the Bank.  Money has left the Stripe Managed Account balance at this point
+    IN_TRANSIT = (
+        "in_transit"
+    )  # When a Payout has been communicated to the Bank by Stripe
+    PAID = (
+        "paid"
+    )  # When a Payout is confirmed to have depsited money into the managed account's Bank by Stripe
+    FAILED = (
+        "failed"
+    )  # When a Payout is confirmed to have been failed by the Bank, Money has re-entered the Stripe Managed Account balance at this point
+    CANCELLED = (
+        "cancelled"
+    )  # When a Payout is confirmed to have been cancelled (not sure by who), Money has re-entered the Stripe Managed Account balance at this point
+    DELETED = (
+        "deleted"
+    )  # When a Payout has been manually deleted by someone on the Payments team, Money is still in the Stripe Managed Account balance.
+    ERROR = (
+        "error"
+    )  # When a Payout fails for a systemic issue e.g. Connection/Timeout/RateLimiting
+
+    @classmethod
+    def stripe_status_to_transfer_status(cls, stripe_status):
+        _stripe_status_to_transfer_mapping = {
+            # NOTE: stripe used `canceled`, but we used `cancelled`
+            "canceled": TransferStatus.CANCELLED.value,
+            "paid": TransferStatus.PAID.value,
+            "pending": TransferStatus.PENDING.value,
+            "failed": TransferStatus.FAILED.value,
+            "in_transit": TransferStatus.IN_TRANSIT.value,
+            "created": TransferStatus.CREATED.value,
+        }
+        return _stripe_status_to_transfer_mapping.get(stripe_status, None)
+
+    @classmethod
+    def failed_statuses(cls):
+        """
+        Returns the statuses considered as failures
+        :return: collection of failure TransferStatus(s) values
+        """
+        return TransferStatus.ERROR.value, TransferStatus.FAILED.value
+
+
+class TransferStatusCode(object):
+    ERROR_AMOUNT_LIMIT_EXCEEDED = "amount_limit_exceeded_error"
+    ERROR_NO_GATEWAY_ACCOUNT = "no_gateway_account_error"
+    ERROR_GATEWAY_ACCOUNT_SETUP = "gateway_account_setup_error"
+    ERROR_AMOUNT_MISMATCH = "amount_mismatch_error"
+    ERROR_ACCOUNT_ID_MISMATCH = "account_id_mismatch_error"
+    ERROR_SUBMISSION = "gateway_submission_error"
+    ERROR_INVALID_STATE = "invalid_state"
+    UNKNOWN_ERROR = "unknown_error"

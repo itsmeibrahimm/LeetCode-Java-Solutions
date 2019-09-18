@@ -35,7 +35,11 @@ class TestWebhook:
             },
         )
         assert response.status_code == 400
-        assert json.loads(response.content) == {"detail": "Error"}
+        assert json.loads(response.content) == {
+            "error_code": "handle_webhook_event_error",
+            "error_message": "handle_webhook_event no handler",
+            "retryable": False,
+        }
 
     def test_transfer_event(self, client: TestClient, dsj_client: DSJClient):
         response = client.post(
