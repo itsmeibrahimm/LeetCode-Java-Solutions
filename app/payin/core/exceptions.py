@@ -33,6 +33,7 @@ payin_error_message_maps = {
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
+    "payin_63": "Cart Payment data is invalid.",
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
@@ -53,6 +54,7 @@ class PayinErrorCode(str, Enum):
     CART_PAYMENT_CREATE_INVALID_DATA = "payin_60"
     CART_PAYMENT_NOT_FOUND = "payin_61"
     CART_PAYMENT_OWNER_MISMATCH = "payin_62"
+    CART_PAYMENT_DATA_INVALID = "payin_63"
     PAYER_CREATE_INVALID_DATA = "payin_1"
     PAYER_CREATE_STRIPE_ERROR = "payin_2"
     PAYER_CREATE_PAYER_ALREADY_EXIST = "payin_3"

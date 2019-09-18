@@ -98,6 +98,7 @@ class MockedPaymentRepo:
         capture_after: Optional[datetime],
         payment_method_id: Optional[str],
         metadata: Optional[Dict[str, Any]],
+        legacy_consumer_charge_id: Optional[int],
     ) -> PaymentIntent:
         return PaymentIntent(
             id=id,
@@ -116,6 +117,7 @@ class MockedPaymentRepo:
             statement_descriptor=statement_descriptor,
             payment_method_id=payment_method_id,
             metadata=metadata,
+            legacy_consumer_charge_id=legacy_consumer_charge_id,
             created_at=datetime.now(),
             updated_at=datetime.now(),
             captured_at=None,
@@ -147,6 +149,11 @@ class MockedPaymentRepo:
         self, cart_payment_id: UUID
     ) -> List[PaymentIntent]:
         return [utils.generate_payment_intent(cart_payment_id=cart_payment_id)]
+
+    async def get_payment_intent_for_legacy_consumer_charge_id(
+        self, charge_id: int
+    ) -> Optional[PaymentIntent]:
+        return utils.generate_payment_intent()
 
     async def insert_pgp_payment_intent(
         self,
@@ -384,6 +391,11 @@ class MockedPaymentRepo:
             created_at=datetime.now(),
         )
 
+    async def get_legacy_consumer_charge_by_id(
+        self, id: int
+    ) -> Optional[LegacyConsumerCharge]:
+        return utils.generate_legacy_consumer_charge()
+
     async def insert_legacy_stripe_charge(
         self,
         stripe_id: str,
@@ -415,13 +427,30 @@ class MockedPaymentRepo:
             refunded_at=None,
         )
 
-    async def update_legacy_stripe_charge(
-        self, stripe_charge_id: str, amount_refunded: int, refunded_at: datetime
+    async def update_legacy_stripe_charge_refund(
+        self, stripe_id: str, amount_refunded: int, refunded_at: datetime
     ):
         return utils.generate_legacy_stripe_charge(
-            stripe_id=stripe_charge_id,
+            stripe_id=stripe_id,
             amount_refunded=amount_refunded,
             refunded_at=refunded_at,
+        )
+
+    async def update_legacy_stripe_charge_provider_details(
+        self,
+        id: int,
+        stripe_id: str,
+        amount: int,
+        amount_refunded: int,
+        currency: str,
+        status: str,
+    ):
+        return utils.generate_legacy_stripe_charge(
+            stripe_id=stripe_id,
+            amount=amount,
+            amount_refunded=amount_refunded,
+            status=status,
+            currency=currency,
         )
 
     async def update_legacy_stripe_charge_status(
@@ -467,6 +496,9 @@ def cart_payment_repo():
     payment_repo.get_payment_intents_for_cart_payment = (
         mocked_repo.get_payment_intents_for_cart_payment
     )
+    payment_repo.get_payment_intent_for_legacy_consumer_charge_id = (
+        mocked_repo.get_payment_intent_for_legacy_consumer_charge_id
+    )
 
     # Pgp Intent DB Functions
     payment_repo.insert_pgp_payment_intent = mocked_repo.insert_pgp_payment_intent
@@ -510,8 +542,16 @@ def cart_payment_repo():
     payment_repo.insert_legacy_consumer_charge = (
         mocked_repo.insert_legacy_consumer_charge
     )
+    payment_repo.get_legacy_consumer_charge_by_id = (
+        mocked_repo.get_legacy_consumer_charge_by_id
+    )
     payment_repo.insert_legacy_stripe_charge = mocked_repo.insert_legacy_stripe_charge
-    payment_repo.update_legacy_stripe_charge = mocked_repo.update_legacy_stripe_charge
+    payment_repo.update_legacy_stripe_charge_refund = (
+        mocked_repo.update_legacy_stripe_charge_refund
+    )
+    payment_repo.update_legacy_stripe_charge_provider_details = (
+        mocked_repo.update_legacy_stripe_charge_provider_details
+    )
     payment_repo.update_legacy_stripe_charge_status = (
         mocked_repo.update_legacy_stripe_charge_status
     )

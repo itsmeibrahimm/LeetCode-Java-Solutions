@@ -9,7 +9,7 @@ from asynctest import create_autospec
 from freezegun import freeze_time
 from stripe.error import StripeError, InvalidRequestError
 
-from app.commons.types import LegacyCountryId, CountryCode
+from app.commons.types import LegacyCountryId, CountryCode, CurrencyType
 from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
 from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
 from app.payin.core.cart_payment.model import (
@@ -43,6 +43,8 @@ from app.payin.tests.utils import (
     generate_cart_payment,
     generate_provider_charges,
     generate_legacy_payment,
+    generate_legacy_consumer_charge,
+    generate_legacy_stripe_charge,
     FunctionMock,
 )
 
@@ -83,30 +85,72 @@ class TestLegacyPaymentInterface:
             )
 
     @pytest.mark.asyncio
-    async def test_create_charge_after_payment_submitted_new_payment(
+    async def test_get_associated_cart_payment_id(self, legacy_payment_interface):
+        cart_payment = generate_cart_payment()
+        consumer_charge = generate_legacy_consumer_charge()
+        legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+            return_value=generate_payment_intent(cart_payment_id=cart_payment.id)
+        )
+
+        result = await legacy_payment_interface.get_associated_cart_payment_id(
+            consumer_charge.id
+        )
+        assert result == cart_payment.id
+
+    @pytest.mark.asyncio
+    async def test_get_associated_cart_payment_id_no_match(
+        self, legacy_payment_interface
+    ):
+        consumer_charge = generate_legacy_consumer_charge()
+        legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+            return_value=None
+        )
+
+        result = await legacy_payment_interface.get_associated_cart_payment_id(
+            consumer_charge.id
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_find_existing_payment_charge(self, legacy_payment_interface):
+        consumer_charge = generate_legacy_consumer_charge()
+        result_consumer_charge, result_stripe_charge = await legacy_payment_interface.find_existing_payment_charge(
+            consumer_charge.id
+        )
+        assert result_consumer_charge
+        assert type(result_consumer_charge) == LegacyConsumerCharge
+        assert result_stripe_charge
+        assert type(result_stripe_charge) == LegacyStripeCharge
+
+    @pytest.mark.asyncio
+    async def test_find_existing_payment_charge_no_match(
+        self, legacy_payment_interface
+    ):
+        consumer_charge = generate_legacy_consumer_charge()
+        legacy_payment_interface.payment_repo.get_legacy_consumer_charge_by_id = FunctionMock(
+            return_value=None
+        )
+
+        result = await legacy_payment_interface.find_existing_payment_charge(
+            consumer_charge.id
+        )
+        assert result == (None, None)
+
+    @pytest.mark.asyncio
+    async def test_create_new_payment_charges(
         self, cart_payment_interface, legacy_payment_interface
     ):
-        # New pair creation, following new payment
         cart_payment = generate_cart_payment()
         legacy_payment = generate_legacy_payment()
         payment_intent = generate_payment_intent()
-        pgp_payment_intent = generate_pgp_payment_intent()
-        provider_intent = (
-            await cart_payment_interface.app_context.stripe.capture_payment_intent()
-        )
-        provider_intent.charges = generate_provider_charges(
-            payment_intent, pgp_payment_intent
-        )
 
-        legacy_payment.dd_country_id = None
-        legacy_payment.stripe_charge_id = None
-        result_consumer_charge, result_stripe_charge = await legacy_payment_interface.create_charge_after_payment_submitted(
+        result_consumer_charge, result_stripe_charge = await legacy_payment_interface.create_new_payment_charges(
+            request_cart_payment=cart_payment,
             legacy_payment=legacy_payment,
             correlation_ids=cart_payment.correlation_ids,
-            payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
-            provider_payment_intent=provider_intent,
-            client_description="Description for provider",
+            country=CountryCode(payment_intent.country),
+            currency=CurrencyType(payment_intent.currency),
+            idempotency_key=payment_intent.idempotency_key,
         )
 
         expected_consumer_charge = LegacyConsumerCharge(
@@ -130,10 +174,10 @@ class TestLegacyPaymentInterface:
             amount=cart_payment.amount,
             amount_refunded=0,
             currency=payment_intent.currency,
-            status="succeeded",
+            status=LegacyStripeChargeStatus.PENDING,
             error_reason=None,
             additional_payment_info=str(legacy_payment.dd_additional_payment_info),
-            description="Description for provider",
+            description=cart_payment.client_description,
             idempotency_key=payment_intent.idempotency_key,
             card_id=legacy_payment.dd_stripe_card_id,
             charge_id=1,
@@ -145,15 +189,18 @@ class TestLegacyPaymentInterface:
         assert result_stripe_charge == expected_stripe_charge
 
     @pytest.mark.asyncio
-    async def test_create_charge_after_payment_submitted_update_payment(
+    async def test_update_charge_after_payment_submitted(
         self, cart_payment_interface, legacy_payment_interface
     ):
-        # Pair update following new intents after cart amount adjustment: insert new stripe charge, no change to consumer charge
-        # New pair creation, following new payment
-        cart_payment = generate_cart_payment()
+        legacy_consumer_charge = generate_legacy_consumer_charge()
+        legacy_stripe_charge = generate_legacy_stripe_charge(
+            charge_id=legacy_consumer_charge.id, stripe_id="test"
+        )
         legacy_payment = generate_legacy_payment()
-        payment_intent = generate_payment_intent()
-        pgp_payment_intent = generate_pgp_payment_intent()
+        payment_intent = generate_payment_intent(status="requires_capture", amount=490)
+        pgp_payment_intent = generate_pgp_payment_intent(
+            status="requires_capture", payment_intent_id=payment_intent.id
+        )
         provider_intent = (
             await cart_payment_interface.app_context.stripe.capture_payment_intent()
         )
@@ -161,31 +208,85 @@ class TestLegacyPaymentInterface:
             payment_intent, pgp_payment_intent
         )
 
-        legacy_payment.dd_country_id = None
-        legacy_payment.stripe_charge_id = str(uuid.uuid4())
-        result_consumer_charge, result_stripe_charge = await legacy_payment_interface.create_charge_after_payment_submitted(
+        result_stripe_charge = await legacy_payment_interface.update_charge_after_payment_submitted(
+            charge_id=legacy_consumer_charge.id,
             legacy_payment=legacy_payment,
-            correlation_ids=cart_payment.correlation_ids,
-            payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
+            legacy_stripe_charge=legacy_stripe_charge,
+            idempotency_key=payment_intent.idempotency_key,
             provider_payment_intent=provider_intent,
-            client_description=str(payment_intent.id),
         )
 
-        assert result_consumer_charge is None
+        expected_stripe_charge = legacy_stripe_charge
+        expected_stripe_charge.stripe_id = provider_intent.charges.data[0].id
+        expected_stripe_charge.amount = pgp_payment_intent.amount
+        expected_stripe_charge.amount_refunded = 0
+        expected_stripe_charge.status = LegacyStripeChargeStatus.SUCCEEDED
+        expected_stripe_charge.created_at = result_stripe_charge.created_at  # Generated
+        expected_stripe_charge.updated_at = result_stripe_charge.updated_at  # Generated
+        assert result_stripe_charge == expected_stripe_charge
+
+    @pytest.mark.asyncio
+    async def test_update_charge_after_payment_submitted_missing_charge_id(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_payment = generate_legacy_payment()
+        payment_intent = generate_payment_intent(status="requires_capture", amount=490)
+        provider_intent = (
+            await cart_payment_interface.app_context.stripe.capture_payment_intent()
+        )
+
+        with pytest.raises(CartPaymentCreateError) as payment_error:
+            await legacy_payment_interface.update_charge_after_payment_submitted(
+                charge_id=None,
+                legacy_payment=legacy_payment,
+                legacy_stripe_charge=None,
+                idempotency_key=payment_intent.idempotency_key,
+                client_description="Test client description",
+                provider_payment_intent=provider_intent,
+            )
+
+        assert (
+            payment_error.value.error_code == PayinErrorCode.CART_PAYMENT_DATA_INVALID
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_charge_after_payment_submitted_payment_update(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_consumer_charge = generate_legacy_consumer_charge()
+        legacy_payment = generate_legacy_payment()
+        payment_intent = generate_payment_intent(status="requires_capture", amount=490)
+        pgp_payment_intent = generate_pgp_payment_intent(
+            status="requires_capture", payment_intent_id=payment_intent.id
+        )
+        provider_intent = (
+            await cart_payment_interface.app_context.stripe.capture_payment_intent()
+        )
+        provider_intent.charges = generate_provider_charges(
+            payment_intent, pgp_payment_intent
+        )
+
+        result_stripe_charge = await legacy_payment_interface.update_charge_after_payment_submitted(
+            charge_id=legacy_consumer_charge.id,
+            legacy_payment=legacy_payment,
+            legacy_stripe_charge=None,  # New stripe_charge expected - order cart adjustment case
+            idempotency_key=payment_intent.idempotency_key,
+            client_description="Test client description",
+            provider_payment_intent=provider_intent,
+        )
 
         expected_stripe_charge = LegacyStripeCharge(
             id=result_stripe_charge.id,  # Generated
-            amount=cart_payment.amount,
+            amount=pgp_payment_intent.amount,  # Generate funtion uses amount from this object
             amount_refunded=0,
             currency=payment_intent.currency,
             status="succeeded",
             error_reason=None,
             additional_payment_info=str(legacy_payment.dd_additional_payment_info),
-            description=str(payment_intent.id),
+            description="Test client description",
             idempotency_key=payment_intent.idempotency_key,
             card_id=legacy_payment.dd_stripe_card_id,
-            charge_id=1,
+            charge_id=legacy_consumer_charge.id,
             stripe_id=result_stripe_charge.stripe_id,
             created_at=result_stripe_charge.created_at,  # Generated
             updated_at=result_stripe_charge.updated_at,  # Generated
@@ -700,6 +801,7 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_create_new_intent_pair(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
+        legacy_payment = generate_legacy_payment(dd_charge_id=560)
         capture_after = datetime.utcnow()
         result_intent, result_pgp_intent = await cart_payment_interface._create_new_intent_pair(
             cart_payment=cart_payment,
@@ -714,6 +816,7 @@ class TestCartPaymentInterface:
             capture_method=CaptureMethod.MANUAL,
             capture_after=capture_after,
             payer_statement_description=None,
+            legacy_payment=legacy_payment,
         )
 
         expected_payment_intent = PaymentIntent(
@@ -733,6 +836,7 @@ class TestCartPaymentInterface:
             statement_descriptor=None,
             payment_method_id=cart_payment.payment_method_id,
             metadata={"is_first_order": False},
+            legacy_consumer_charge_id=legacy_payment.dd_charge_id,
             created_at=result_intent.created_at,  # Generated field
             updated_at=result_intent.updated_at,  # Generated field
             capture_after=capture_after,
@@ -1034,6 +1138,7 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_increase_payment_amount(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
+        legacy_payment = generate_legacy_payment(dd_charge_id=440)
         result_intent, result_pgp_intent = await cart_payment_interface.increase_payment_amount(
             cart_payment=cart_payment,
             existing_payment_intents=[
@@ -1041,8 +1146,10 @@ class TestCartPaymentInterface:
             ],
             idempotency_key=str(uuid.uuid4()),
             amount=875,
+            legacy_payment=legacy_payment,
         )
         assert result_intent.amount == 875
+        assert result_intent.legacy_consumer_charge_id == legacy_payment.dd_charge_id
 
     @pytest.mark.asyncio
     async def test_lower_amount_for_uncaptured_payment(self, cart_payment_interface):

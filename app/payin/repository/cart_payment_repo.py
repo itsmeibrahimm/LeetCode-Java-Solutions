@@ -200,6 +200,7 @@ class CartPaymentRepository(PayinDBRepository):
         capture_after: Optional[datetime],
         payment_method_id: Optional[UUID],
         metadata: Optional[Dict[str, Any]],
+        legacy_consumer_charge_id: Optional[int],
     ) -> PaymentIntent:
         data = {
             payment_intents.id: id,
@@ -217,6 +218,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents.capture_after: capture_after,
             payment_intents.payment_method_id: payment_method_id,
             payment_intents.metadata: metadata,
+            payment_intents.legacy_consumer_charge_id: legacy_consumer_charge_id,
         }
 
         statement = (
@@ -246,6 +248,7 @@ class CartPaymentRepository(PayinDBRepository):
             statement_descriptor=row[payment_intents.statement_descriptor],
             payment_method_id=row[payment_intents.payment_method_id],
             metadata=row[payment_intents.metadata],
+            legacy_consumer_charge_id=row[payment_intents.legacy_consumer_charge_id],
             created_at=row[payment_intents.created_at],
             updated_at=row[payment_intents.updated_at],
             captured_at=row[payment_intents.captured_at],
@@ -317,6 +320,19 @@ class CartPaymentRepository(PayinDBRepository):
     ) -> Optional[PaymentIntent]:
         statement = payment_intents.table.select().where(
             payment_intents.idempotency_key == idempotency_key
+        )
+        row = await self.payment_database.replica().fetch_one(statement)
+
+        if not row:
+            return None
+
+        return self.to_payment_intent(row)
+
+    async def get_payment_intent_for_legacy_consumer_charge_id(
+        self, charge_id: int
+    ) -> Optional[PaymentIntent]:
+        statement = payment_intents.table.select().where(
+            payment_intents.legacy_consumer_charge_id == charge_id
         )
         row = await self.payment_database.replica().fetch_one(statement)
 
@@ -794,6 +810,15 @@ class CartPaymentRepository(PayinDBRepository):
             created_at=row[consumer_charges.created_at],
         )
 
+    async def get_legacy_consumer_charge_by_id(
+        self, id: int
+    ) -> Optional[LegacyConsumerCharge]:
+        statement = consumer_charges.table.select().where(consumer_charges.id == id)
+        row = await self.main_database.replica().fetch_one(statement)
+        if not row:
+            return None
+        return self.to_legacy_consumer_charge(row)
+
     async def insert_legacy_stripe_charge(
         self,
         stripe_id: str,
@@ -850,13 +875,38 @@ class CartPaymentRepository(PayinDBRepository):
             refunded_at=row[stripe_charges.refunded_at],
         )
 
-    async def update_legacy_stripe_charge(
-        self, stripe_charge_id: str, amount_refunded: int, refunded_at: datetime
+    async def update_legacy_stripe_charge_refund(
+        self, stripe_id: str, amount_refunded: int, refunded_at: datetime
     ):
         statement = (
             stripe_charges.table.update()
-            .where(stripe_charges.stripe_id == stripe_charge_id)
+            .where(stripe_charges.stripe_id == stripe_id)
             .values(amount_refunded=amount_refunded, refunded_at=refunded_at)
+            .returning(*stripe_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row)
+
+    async def update_legacy_stripe_charge_provider_details(
+        self,
+        id: int,
+        stripe_id: str,
+        amount: int,
+        amount_refunded: int,
+        currency: str,
+        status: str,
+    ):
+        statement = (
+            stripe_charges.table.update()
+            .where(stripe_charges.id == id)
+            .values(
+                stripe_id=stripe_id,
+                amount=amount,
+                amount_refunded=amount_refunded,
+                currency=currency,
+                status=status,
+            )
             .returning(*stripe_charges.table.columns.values())
         )
 

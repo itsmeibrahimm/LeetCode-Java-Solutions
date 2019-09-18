@@ -32,6 +32,9 @@ class PaymentIntentTable(TableDefinition):
         Column("payment_method_id", UUID(as_uuid=True))
     )
     metadata: Column = no_init_field(Column("metadata", JSON))
+    legacy_consumer_charge_id: Column = no_init_field(
+        Column("legacy_consumer_charge_id", Integer)
+    )
     created_at: Column = no_init_field(Column("created_at", DateTime(False)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
     captured_at: Column = no_init_field(Column("captured_at", DateTime(False)))

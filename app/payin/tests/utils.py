@@ -49,6 +49,7 @@ def generate_payment_intent(
     confirmation_method: str = "manual",
     amount_received: Optional[int] = None,
     captured_at: Optional[datetime] = None,
+    legacy_consumer_charge_id: Optional[int] = 1,
 ):
     return PaymentIntent(
         id=id if id else uuid.uuid4(),
@@ -62,10 +63,11 @@ def generate_payment_intent(
         capture_method=capture_method,
         confirmation_method=confirmation_method,
         country="US",
-        currency="USD",
+        currency=CurrencyType.USD.value,
         status=IntentStatus(status),
         statement_descriptor="descriptor",
         payment_method_id=str(uuid.uuid4()),
+        legacy_consumer_charge_id=legacy_consumer_charge_id,
         created_at=datetime.now(),
         updated_at=datetime.now(),
         captured_at=captured_at,
@@ -93,7 +95,7 @@ def generate_pgp_payment_intent(
         charge_resource_id="charge_resource_id",
         payment_method_resource_id=str(uuid.uuid4()),
         customer_resource_id=str(uuid.uuid4()),
-        currency="USD",
+        currency=CurrencyType.USD.value,
         amount=amount,
         amount_capturable=0,
         amount_received=0,
@@ -127,13 +129,13 @@ def generate_cart_payment(
     )
 
 
-def generate_legacy_payment() -> LegacyPayment:
+def generate_legacy_payment(dd_charge_id: int = None) -> LegacyPayment:
     return LegacyPayment(
         dd_consumer_id=1,
         dd_country_id=1,
         dd_stripe_card_id=1,
         dd_additional_payment_info={"test_key": f"{uuid.uuid4()}"},
-        charge_id=None,
+        dd_charge_id=dd_charge_id,
         stripe_charge_id=None,
         stripe_customer_id=str(uuid.uuid4()),
         stripe_payment_method_id=str(uuid.uuid4()),
@@ -159,17 +161,20 @@ def generate_legacy_consumer_charge() -> LegacyConsumerCharge:
 
 
 def generate_legacy_stripe_charge(
+    id: int = 1,
     charge_id: int = None,
     stripe_id: str = None,
+    amount: int = 100,
     amount_refunded: int = 0,
     refunded_at: datetime = None,
     status: str = LegacyStripeChargeStatus.SUCCEEDED,
+    currency: str = CurrencyType.USD.value,
 ) -> LegacyStripeCharge:
     return LegacyStripeCharge(
-        id=1,
-        amount=100,
+        id=id,
+        amount=amount,
         amount_refunded=amount_refunded,
-        currency=CurrencyType.USD,
+        currency=currency,
         status=status,
         error_reason=None,
         additional_payment_info=None,
@@ -196,7 +201,7 @@ def generate_payment_charge(
         provider="stripe",
         idempotency_key=str(uuid.uuid4()),
         status=status,
-        currency="USD",
+        currency=CurrencyType.USD.value,
         amount=amount,
         amount_refunded=amount_refunded,
         application_fee_amount=None,
@@ -220,7 +225,7 @@ def generate_pgp_payment_charge(
         provider="stripe",
         idempotency_key=str(uuid.uuid4()),
         status=status,
-        currency="USD",
+        currency=CurrencyType.USD.value,
         amount=amount,
         amount_refunded=amount_refunded,
         application_fee_amount=None,

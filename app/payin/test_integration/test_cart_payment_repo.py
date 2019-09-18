@@ -130,6 +130,7 @@ async def payment_intent(
         capture_after=datetime(2019, 1, 1),
         payment_method_id=payment_method.id,
         metadata={"is_first_order": True},
+        legacy_consumer_charge_id=0,
     )
     yield payment_intent
 
@@ -245,6 +246,7 @@ class TestPaymentIntent:
             statement_descriptor=payment_intent.statement_descriptor,
             payment_method_id=payment_intent.payment_method_id,
             metadata=payment_intent.metadata,
+            legacy_consumer_charge_id=payment_intent.legacy_consumer_charge_id,
             created_at=payment_intent.created_at,
             updated_at=result.updated_at,  # Don't know generated date ahead of time
             captured_at=payment_intent.captured_at,
@@ -278,6 +280,7 @@ class TestPaymentIntentAdjustmentHistory:
             capture_after=None,
             payment_method_id=payment_method.id,
             metadata=None,
+            legacy_consumer_charge_id=0,
         )
 
         id = uuid4()
@@ -836,6 +839,17 @@ class TestLegacyCharges:
         assert result == expected_consumer_charge
 
     @pytest.mark.asyncio
+    async def test_get_legacy_consumer_charge_by_id(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        result = await cart_payment_repository.get_legacy_consumer_charge_by_id(
+            consumer_charge.id
+        )
+        assert result == consumer_charge
+
+    @pytest.mark.asyncio
     async def test_insert_legacy_stripe_charge(
         self,
         cart_payment_repository: CartPaymentRepository,
@@ -876,13 +890,13 @@ class TestLegacyCharges:
         assert result == expected_stripe_charge
 
     @pytest.mark.asyncio
-    async def test_update_legacy_stripe_charge(
+    async def test_update_legacy_stripe_charge_refund(
         self,
         cart_payment_repository: CartPaymentRepository,
         stripe_charge: LegacyStripeCharge,
     ):
-        result = await cart_payment_repository.update_legacy_stripe_charge(
-            stripe_charge_id=stripe_charge.stripe_id,
+        result = await cart_payment_repository.update_legacy_stripe_charge_refund(
+            stripe_id=stripe_charge.stripe_id,
             amount_refunded=200,
             refunded_at=datetime.now(),
         )
@@ -890,6 +904,29 @@ class TestLegacyCharges:
         expected_result = stripe_charge
         expected_result.amount_refunded = 200
         expected_result.refunded_at = result.refunded_at
+        assert result == expected_result
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_provider_details(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge: LegacyStripeCharge,
+    ):
+        result = await cart_payment_repository.update_legacy_stripe_charge_provider_details(
+            id=stripe_charge.id,
+            stripe_id=f"stripe-{stripe_charge.id}",
+            amount=450,
+            amount_refunded=300,
+            currency="cad",
+            status=LegacyStripeChargeStatus.SUCCEEDED,
+        )
+
+        expected_result = stripe_charge
+        expected_result.stripe_id = f"stripe-{stripe_charge.id}"
+        expected_result.amount = 450
+        expected_result.amount_refunded = 300
+        expected_result.currency = "cad"
+        expected_result.status = LegacyStripeChargeStatus.SUCCEEDED
         assert result == expected_result
 
     @pytest.mark.asyncio

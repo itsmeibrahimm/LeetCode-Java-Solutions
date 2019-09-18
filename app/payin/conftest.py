@@ -81,6 +81,7 @@ async def payment_intent(
         capture_after=datetime(2016, 1, 1),
         payment_method_id=payment_intent.payment_method_id,
         metadata=None,
+        legacy_consumer_charge_id=0,
     )
 
 
@@ -106,6 +107,7 @@ class PaymentIntentFactory(factory.Factory):
     status = IntentStatus.INIT
     statement_descriptor = "Maccas"
     payment_method_id = factory.LazyAttribute(lambda o: str(uuid4()))
+    legacy_consumer_charge_id = 0
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)
     captured_at = None

@@ -74,6 +74,7 @@ class PaymentIntent(BaseModel):
     statement_descriptor: Optional[str]
     payment_method_id: Optional[UUID]
     metadata: Optional[Dict[str, Any]]
+    legacy_consumer_charge_id: Optional[int]
     created_at: datetime
     updated_at: datetime
     captured_at: Optional[datetime]

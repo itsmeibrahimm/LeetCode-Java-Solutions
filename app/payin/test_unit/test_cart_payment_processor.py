@@ -9,12 +9,14 @@ from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 import app.payin.core.cart_payment.processor as processor
 from app.payin.core.cart_payment.model import IntentStatus
+from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.tests.utils import (
     generate_payment_intent,
     generate_pgp_payment_intent,
     generate_cart_payment,
     generate_legacy_payment,
     generate_legacy_consumer_charge,
+    generate_legacy_stripe_charge,
     FunctionMock,
 )
 import uuid
@@ -366,22 +368,24 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.cart_payment_interface.app_context.stripe.create_payment_intent()
         )
 
-        result_payment_intent, result_pgp_payment_intent, legacy_charge, legacy_stripe_charge = await cart_payment_processor._update_state_after_submit_to_provider(
+        result_payment_intent, result_pgp_payment_intent, result_stripe_charge = await cart_payment_processor._update_state_after_submit_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
             cart_payment=cart_payment,
             correlation_ids=cart_payment.correlation_ids,
             legacy_payment=generate_legacy_payment(),
+            legacy_stripe_charge=generate_legacy_stripe_charge(),
         )
 
         assert result_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
         assert result_pgp_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
+        assert result_stripe_charge.status == LegacyStripeChargeStatus.SUCCEEDED
 
     @pytest.mark.asyncio
     async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
         legacy_charge = generate_legacy_consumer_charge()
-        legacy_payment = generate_legacy_payment()
+        legacy_payment = generate_legacy_payment(dd_charge_id=legacy_charge.id)
         client_description = f"updated description for {legacy_charge.id}"
         result = await cart_payment_processor.update_payment_for_legacy_charge(
             idempotency_key=str(uuid.uuid4()),
