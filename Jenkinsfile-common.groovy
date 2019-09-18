@@ -367,7 +367,7 @@ def runHooks() {
             |docker exec ${serviceName}-ci make test-hooks PRE_COMMIT_HOME=/home SKIP=flake8,mypy HOOKS_ADDOPTS="--show-diff-on-failure"
             |""".stripMargin()
     } catch (e) {
-      commentHooksFailed(serviceName)
+      commentHooksFailed()
       throw e
     } finally {
       sh """|#!/bin/bash
