@@ -875,6 +875,7 @@ class StripeAsyncClient:
         country: models.CountryCode,
         currency: models.Currency,
         amount: models.Amount,
+        stripe_account: models.StripeAccountId,
         request: models.CreatePayout,
     ) -> models.Payout:
         return await self.executor_pool.submit(
@@ -882,6 +883,7 @@ class StripeAsyncClient:
             currency=currency,
             amount=amount,
             country=country,
+            stripe_account=stripe_account,
             request=request,
         )
 

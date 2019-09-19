@@ -7,6 +7,7 @@ from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
+from app.payout.types import StripeTransferSubmissionStatus
 
 
 @final
@@ -65,7 +66,7 @@ class _StripeTransferPartial(DBEntity):
     bank_name: Optional[str]
     submission_error_code: Optional[str]
     submission_error_type: Optional[str]
-    submission_status: Optional[str]
+    submission_status: Optional[StripeTransferSubmissionStatus]
     submitted_at: Optional[datetime]
     stripe_status: Optional[str]
     transfer_id: Optional[int]

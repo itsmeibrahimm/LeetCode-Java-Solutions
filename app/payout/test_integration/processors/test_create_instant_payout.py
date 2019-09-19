@@ -143,9 +143,14 @@ class TestCreateInstantPayoutUtils:
         payment_account_repo: PaymentAccountRepository,
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepository,
     ):
+        # prepare Stripe Managed Account and insert, then validate
+        sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo
+        )
+
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=payment_account_repo, account_id=sma.id
         )
 
         @asyncio.coroutine
@@ -153,13 +158,14 @@ class TestCreateInstantPayoutUtils:
             return payment_account
 
         @asyncio.coroutine
-        def mock_get_sma(*args, **kwargs):
+        def mock_get_sma(*args):
             return None
 
         mocker.patch(
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_stripe_managed_account_by_id",
             side_effect=mock_get_sma,
         )
+
         mocker.patch(
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_payment_account_by_id",
             side_effect=mock_get_payment_account,

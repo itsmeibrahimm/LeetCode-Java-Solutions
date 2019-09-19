@@ -72,6 +72,30 @@ class TestTransferRepository:
             retrieved_ma_transfer == ma_transfer
         ), "retrieved managed account transfer matches"
 
+    async def test_get_managed_account_transfer_by_transfer_id_success(
+        self,
+        transfer_repo: TransferRepository,
+        managed_account_transfer_repo: ManagedAccountTransferRepository,
+    ):
+        # prepare transfer and insert, then validate
+        payment_account_id = 123456
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_id
+        )
+
+        # prepare managed_account_transfer and insert, then validate content
+        ma_transfer = await prepare_and_insert_managed_account_transfer(
+            managed_account_transfer_repo=managed_account_transfer_repo,
+            payment_account_id=payment_account_id,
+            transfer_id=transfer.id,
+        )
+        retrieved_ma_transfer = await managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
+            transfer_id=transfer.id
+        )
+        assert (
+            retrieved_ma_transfer == ma_transfer
+        ), "retrieved managed account transfer matches"
+
     async def test_update_managed_account_transfer_by_id_success(
         self,
         transfer_repo: TransferRepository,
@@ -114,6 +138,13 @@ class TestTransferRepository:
     ):
         assert not await managed_account_transfer_repo.get_managed_account_transfer_by_id(
             managed_account_transfer_id=-1
+        )
+
+    async def test_get_ma_transfer_by_transfer_id_not_found(
+        self, managed_account_transfer_repo: ManagedAccountTransferRepository
+    ):
+        assert not await managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
+            transfer_id=-1
         )
 
     async def test_update_ma_transfer_by_id_not_found(

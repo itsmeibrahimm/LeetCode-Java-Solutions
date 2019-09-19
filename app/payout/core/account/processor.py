@@ -33,6 +33,9 @@ from app.payout.core.account.processors.verify_account import (
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepositoryInterface,
 )
+from app.payout.repository.maindb.managed_account_transfer import (
+    ManagedAccountTransferRepositoryInterface,
+)
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
@@ -56,6 +59,7 @@ class PayoutAccountProcessors:
         stripe_payout_request_repo: StripePayoutRequestRepositoryInterface,
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepositoryInterface,
         stripe: StripeAsyncClient,
+        managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
     ):
         self.logger = logger
         self.payment_account_repo = payment_account_repo
@@ -63,6 +67,7 @@ class PayoutAccountProcessors:
         self.stripe_payout_request_repo = stripe_payout_request_repo
         self.stripe_managed_account_transfer_repo = stripe_managed_account_transfer_repo
         self.stripe = stripe
+        self.managed_account_transfer_repo = managed_account_transfer_repo
 
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
@@ -111,6 +116,9 @@ class PayoutAccountProcessors:
         create_standard_payout_op = CreateStandardPayout(
             logger=self.logger,
             stripe_transfer_repo=self.stripe_transfer_repo,
+            payment_account_repo=self.payment_account_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
+            stripe=self.stripe,
             request=request,
         )
         return await create_standard_payout_op.execute()

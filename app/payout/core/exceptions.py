@@ -35,8 +35,16 @@ payout_error_message_maps = {
     "payout_1": "This should not show up.",
     "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
     "payout_3": "Cannot process payment for the given country",
+    "payout_4": "This should not show up.",
+    "payout_5": "This should not show up.",
+    "payout_6": "This should not show up.",
+    "payout_7": "Already submitted stripe transfer",
+    "payout_8": "This should not show up.",
+    "payout_9": "Payment account has no corresponding stripe_account",
     "payout_10": "Failed to submit sma transfer due to connection error",
     "payout_11": "Failed to submit sma transfer due to other error",
+    "payout_12": "All existing Stripe transfers must be failed or canceled.",
+    "payout_13": "Cannot find payment_account with given id.",
 }
 
 
@@ -44,9 +52,17 @@ class PayoutErrorCode(str, Enum):
     INVALID_STRIPE_ACCOUNT_ID = "payout_0"
     MISMATCHED_TRANSFER_PAYMENT_ACCOUNT = "payout_1"
     INVALID_STRIPE_MANAGED_ACCOUNT = "payout_2"
-    UNHANDLED_COUNTRY = "payout_3"
+    UNSUPPORTED_COUNTRY = "payout_3"
+    STRIPE_PAYOUT_ACCT_MISSING = "payout_4"
+    STRIPE_PAYOUT_DISALLOWED = "payout_5"
+    STRIPE_INVALID_REQUEST_ERROR = "payout_6"
+    DUPLICATE_STRIPE_TRANSFER = "payout_7"
+    STRIPE_SUBMISSION_ERROR = "payout_8"
+    INVALID_STRIPE_ACCOUNT = "payout_9"
     API_CONNECTION_ERROR = "payout_10"
     OTHER_ERROR = "payout_11"
+    TRANSFER_PROCESSING = "payout_12"
+    INVALID_PAYMENT_ACCOUNT_ID = "payout_13"
 
 
 class PayoutError(PaymentException):

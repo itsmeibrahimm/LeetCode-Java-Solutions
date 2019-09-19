@@ -2,7 +2,7 @@ import pytest
 from starlette.testclient import TestClient
 from datetime import datetime
 
-from app.payout.types import StripePayoutStatus
+from app.payout.types import StripePayoutStatus, StripeTransferSubmissionStatus
 from app.testcase_utils import validate_expected_items_in_dict
 
 TRANSFER_ENDPOINT = "/payout/api/v0/transfers"
@@ -95,7 +95,7 @@ class TestTransferV0:
             "bank_name": "bank_name",
             "submission_error_code": "submission_error_code",
             "submission_error_type": "submission_error_type",
-            "submission_status": "submission_status",
+            "submission_status": StripeTransferSubmissionStatus.SUBMITTING,
             "submitted_at": "2019-08-20T05:34:53+00:00",
         }
 

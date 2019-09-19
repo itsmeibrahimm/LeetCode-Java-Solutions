@@ -2,18 +2,30 @@ import asyncio
 
 import pytest
 import pytest_mock
+from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.commons.config.app_config import AppConfig
 from app.commons.database.infra import DB
-from app.commons.providers.stripe import stripe_models as models
-from app.commons.providers.stripe.stripe_client import StripeAsyncClient, StripeClient
+from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
 from app.commons.utils.pool import ThreadPoolHelper
-from app.payout.core.account.utils import get_country_shortname, get_account_balance
+from app.payout.core.account.utils import (
+    get_country_shortname,
+    get_account_balance,
+    get_currency_code,
+)
+from app.payout.core.exceptions import (
+    PayoutError,
+    PayoutErrorCode,
+    payout_error_message_maps,
+)
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
-from app.payout.test_integration.utils import prepare_and_insert_payment_account
-from app.payout.test_integration.utils import prepare_and_insert_stripe_managed_account
+from app.payout.test_integration.utils import (
+    prepare_and_insert_payment_account,
+    prepare_and_insert_stripe_managed_account,
+    mock_balance,
+)
 
 
 class TestUtils:
@@ -83,11 +95,22 @@ class TestUtils:
         assert not country_shortname
 
     async def test_get_country_shortname_no_sma(
-        self, payment_account_repository: PaymentAccountRepository
+        self,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repository: PaymentAccountRepository,
     ):
-        # prepare and insert payment_account, update its account_id field as None
+        @asyncio.coroutine
+        def mock_get_sma(*args):
+            return None
+
+        mocker.patch(
+            "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_stripe_managed_account_by_id",
+            side_effect=mock_get_sma,
+        )
+
+        # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository, account_id=None
+            payment_account_repo=payment_account_repository
         )
         country_shortname = await get_country_shortname(
             payment_account=payment_account,
@@ -95,38 +118,33 @@ class TestUtils:
         )
         assert not country_shortname
 
+    async def test_get_currency_code_unsupported_country(self):
+        with pytest.raises(PayoutError) as e:
+            get_currency_code(country_shortname="ABC")
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
+        assert e.value.error_code == PayoutErrorCode.UNSUPPORTED_COUNTRY
+        assert (
+            e.value.error_message
+            == payout_error_message_maps[PayoutErrorCode.UNSUPPORTED_COUNTRY.value]
+        )
+
     async def test_get_account_balance_success(
         self,
         mocker: pytest_mock.MockFixture,
         stripe: StripeAsyncClient,
         payment_account_repository: PaymentAccountRepository,
     ):
-        source_type = models.SourceTypes(bank_account=1, card=2)
-        availables = models.Balance.Available(
-            amount=20, currency="usd", source_types=source_type
-        )
-        connect_reserves = models.Balance.ConnectReserved(
-            amount=20, currency="usd", source_types=source_type
-        )
-        pendings = models.Balance.Pending(
-            amount=20, currency="usd", source_types=source_type
-        )
-        stripe_balance = models.Balance(
-            object="obj",
-            available=[availables],
-            connect_reserved=[connect_reserves],
-            livemode=True,
-            pending=[pendings],
-        )
+        mocked_balance = mock_balance()  # amount = 20
 
         @asyncio.coroutine
-        def mock_balance(*args, **kwargs):
-            return stripe_balance
+        def mock_retrieve_balance(*args, **kwargs):
+            return mocked_balance
 
         mocker.patch(
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_balance",
-            side_effect=mock_balance,
+            side_effect=mock_retrieve_balance,
         )
+
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
             payment_account_repo=payment_account_repository

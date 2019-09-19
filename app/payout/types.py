@@ -21,6 +21,10 @@ PayoutId = str
 PayoutAmountType = int
 
 
+STRIPE_TRANSFER_FAILED_STATUS = "failed"
+UNKNOWN_ERROR_STR = "err"
+
+
 class PayoutAccountTargetType(str, Enum):
     DASHER = "dasher"
     STORE = "store"
@@ -70,3 +74,16 @@ class AccountType(str, Enum):
 
 class PayoutExternalAccountType(str, Enum):
     CARD = "card"
+
+
+class StripeTransferSubmissionStatus(str, Enum):
+    SUBMITTING = "submitting"
+    SUBMITTED = "submitted"
+    UNKNOWN = "unknown"
+    FAILED_TO_SUBMIT = "failed_to_submit"
+
+
+class StripeErrorCode(str, Enum):
+    NO_EXT_ACCOUNT_IN_CURRENCY = "no_external_account_in_currency"
+    PAYOUT_NOT_ALLOWED = "payouts_not_allowed"
+    INVALID_REQUEST_ERROR = "invalid_request_error"

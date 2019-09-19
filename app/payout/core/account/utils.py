@@ -1,6 +1,9 @@
 from typing import Optional
 
+from starlette.status import HTTP_400_BAD_REQUEST
+
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
@@ -9,6 +12,20 @@ from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
 from app.commons.providers.stripe import stripe_models as models
+
+
+COUNTRY_TO_CURRENCY_CODE = {
+    "US": "USD",
+    "CA": "CAD",
+    "United States": "USD",
+    "Canada": "CAD",
+    "Indonesia": "IDR",
+    "ID": "IDR",
+    "SG": "SGD",
+    "MY": "MYR",
+    "JP": "JPY",
+    "AU": "AUD",
+}
 
 
 async def get_country_shortname(
@@ -24,13 +41,26 @@ async def get_country_shortname(
     return None
 
 
+def get_currency_code(country_shortname: str) -> str:
+    """
+    Shortname country code in 2-letter ISO format.  Return none if not valid country.
+    """
+    if country_shortname in COUNTRY_TO_CURRENCY_CODE:
+        return COUNTRY_TO_CURRENCY_CODE[country_shortname]
+    raise PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
+        retryable=False,
+    )
+
+
 async def get_account_balance(
     stripe_managed_account: Optional[StripeManagedAccount], stripe: StripeAsyncClient
 ) -> int:
     """
     Get balance for stripe account, return 0 if sma is not created
     :param stripe_managed_account: stripe managed account
-    :param stripe: StripeClient
+    :param stripe: StripeAsyncClient
     :return: balance amount
     """
     if stripe_managed_account:

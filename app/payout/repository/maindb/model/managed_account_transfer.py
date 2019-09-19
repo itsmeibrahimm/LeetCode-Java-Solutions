@@ -89,6 +89,7 @@ class ManagedAccountTransfer(_ManagedAccountTransferPartial):
     transfer_id: int
     stripe_id: str
     stripe_status: str
+    currency: str
 
 
 class ManagedAccountTransferCreate(_ManagedAccountTransferPartial):
@@ -96,7 +97,6 @@ class ManagedAccountTransferCreate(_ManagedAccountTransferPartial):
     transfer_id: int
 
     payment_account_id: int
-    currency: str
 
 
 class ManagedAccountTransferUpdate(_ManagedAccountTransferPartial):

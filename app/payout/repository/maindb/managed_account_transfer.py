@@ -28,6 +28,12 @@ class ManagedAccountTransferRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_managed_account_transfer_by_transfer_id(
+        self, transfer_id: int
+    ) -> Optional[ManagedAccountTransfer]:
+        pass
+
+    @abstractmethod
     async def update_managed_account_transfer_by_id(
         self, managed_account_transfer_id: int, data: ManagedAccountTransferUpdate
     ) -> Optional[ManagedAccountTransfer]:
@@ -66,6 +72,16 @@ class ManagedAccountTransferRepository(
     ) -> Optional[ManagedAccountTransfer]:
         stmt = managed_account_transfers.table.select().where(
             managed_account_transfers.id == managed_account_transfer_id
+        )
+
+        row = await self._database.replica().fetch_one(stmt)
+        return ManagedAccountTransfer.from_row(row) if row else None
+
+    async def get_managed_account_transfer_by_transfer_id(
+        self, transfer_id: int
+    ) -> Optional[ManagedAccountTransfer]:
+        stmt = managed_account_transfers.table.select().where(
+            managed_account_transfers.transfer_id == transfer_id
         )
 
         row = await self._database.replica().fetch_one(stmt)

@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from typing import List
 
 from app.commons.types import CountryCode, CurrencyType
+from stripe.error import StripeError
+
 from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.payout_card import PayoutCardCreate, PayoutCard
 from app.payout.repository.bankdb.model.payout_method import (
@@ -41,9 +43,15 @@ from app.payout.repository.maindb.model.transfer import TransferCreate
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
-from app.payout.types import AccountType, PayoutExternalAccountType
+from app.payout.types import (
+    PayoutExternalAccountType,
+    AccountType,
+    StripeTransferSubmissionStatus,
+)
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
+from app.commons.providers.stripe import stripe_models as models
+
 
 """
 For tables in maindb, it has timezone info, when initialize datetime fields in those tables, use datetiem.now(timezone.utc)
@@ -91,9 +99,10 @@ async def prepare_and_insert_managed_account_transfer(
     managed_account_transfer_repo: ManagedAccountTransferRepository,
     payment_account_id,
     transfer_id,
+    amount=2000,
 ):
     data = ManagedAccountTransferCreate(
-        amount=2000,
+        amount=amount,
         transfer_id=transfer_id,
         payment_account_id=payment_account_id,
         currency="usd",
@@ -194,7 +203,7 @@ async def prepare_and_insert_stripe_transfer(
         bank_name="bank_name",
         submission_error_code="submission_error_code",
         submission_error_type="submission_error_type",
-        submission_status="submission_status",
+        submission_status=StripeTransferSubmissionStatus.SUBMITTING,
         submitted_at=datetime.now(timezone.utc),
     )
 
@@ -207,12 +216,15 @@ async def prepare_and_insert_stripe_transfer(
 
 
 async def prepare_and_insert_payment_account(
-    payment_account_repo: PaymentAccountRepository, account_id=123
+    payment_account_repo: PaymentAccountRepository,
+    account_id=None,
+    entity="dasher",
+    account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
 ):
     data = PaymentAccountCreate(
         account_id=account_id,
-        account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
-        entity="dasher",
+        account_type=account_type,
+        entity=entity,
         resolve_outstanding_balance_frequency="daily",
         payout_disabled=True,
         charges_enabled=True,
@@ -394,3 +406,82 @@ async def prepare_payout_method_list(
         )
         payout_method_list.insert(0, payout_method)
     return payout_method_list
+
+
+def mock_transfer() -> models.Transfer:
+    mock_reversals = models.Transfer.Reversals(data=[], has_more=False, object="obj")
+    mocked_transfer = models.Transfer(
+        id=str(uuid.uuid4()),
+        object="obj",
+        amount=10,
+        amount_reversed=0,
+        balance_transaction="mock_balance_txn",
+        created=datetime.utcnow(),
+        currency="usd",
+        description="description",
+        destination="destination",
+        destination_payment="destination_payment",
+        livemode=True,
+        metadata={},
+        reversals=mock_reversals,
+        reversed=False,
+        source_transaction="source_transaction",
+        source_type="source_type",
+        transfer_group="transfer_group",
+    )
+    return mocked_transfer
+
+
+def mock_payout() -> models.Payout:
+    mocked_payout = models.Payout(
+        id=str(uuid.uuid4()),
+        object="obj",
+        amount=10,
+        arrival_date=datetime.utcnow(),
+        automatic=False,
+        balance_transaction="balance_transaction",
+        created=datetime.utcnow(),
+        currency="usd",
+        description="description",
+        destination="destination",
+        failure_balance_transaction="failure_balance_transaction",
+        failure_code="failure_code",
+        failure_message="hey this is failed",
+        livemode=True,
+        metadata={},
+        method="method",
+        source_type="source_type",
+        statement_descriptor="statement_descriptor",
+        status="status",
+        type="type",
+    )
+    return mocked_payout
+
+
+def mock_balance() -> models.Balance:
+    source_type = models.SourceTypes(bank_account=1, card=2)
+    availables = models.Balance.Available(
+        amount=20, currency="usd", source_types=source_type
+    )
+    connect_reserves = models.Balance.ConnectReserved(
+        amount=20, currency="usd", source_types=source_type
+    )
+    pendings = models.Balance.Pending(
+        amount=20, currency="usd", source_types=source_type
+    )
+    mocked_balance = models.Balance(
+        object="obj",
+        available=[availables],
+        connect_reserved=[connect_reserves],
+        livemode=True,
+        pending=[pendings],
+    )
+    return mocked_balance
+
+
+def construct_stripe_error(code="error_code", error_type="error_type") -> StripeError:
+    # code can be either StripeErrorCode or str if not given
+    error = StripeError(
+        json_body={"error": {"code": code, "message": "error_msg", "type": error_type}}
+    )
+    return error
