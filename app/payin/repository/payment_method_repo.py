@@ -230,6 +230,7 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             stmt = pgp_payment_methods.table.select().where(
                 pgp_payment_methods.id == input.id
             )
+            row = await self.payment_database.replica().fetch_one(stmt)
         else:
             stmt = pgp_payment_methods.table.select().where(
                 pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
