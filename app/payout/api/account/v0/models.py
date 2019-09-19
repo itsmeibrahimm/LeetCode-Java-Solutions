@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 import json
 
@@ -10,14 +11,27 @@ from app.payout.repository.maindb.model import stripe_managed_account
 from app.payout.types import AccountType
 
 
+class Entity(str, Enum):
+    DASHER = "dasher"
+    STORE = "store"
+    MERCHANT = "merchant"
+    OTHER = "other"
+    PARTNER = "partner"
+
+
+class ResolveOutStandingBalanceFrequency(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
 class PaymentAccount(PaymentResponse):
     id: int
     statement_descriptor: str
     created_at: Optional[datetime]
     account_id: Optional[int]
     account_type: Optional[AccountType]
-    entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
+    entity: Optional[Entity]
+    resolve_outstanding_balance_frequency: Optional[ResolveOutStandingBalanceFrequency]
     payout_disabled: Optional[bool]
     charges_enabled: Optional[bool]
     old_account_id: Optional[int]
@@ -30,8 +44,8 @@ class PaymentAccountCreate(PaymentRequest):
     statement_descriptor: str
     account_id: Optional[int]
     account_type: Optional[AccountType]
-    entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
+    entity: Optional[Entity]
+    resolve_outstanding_balance_frequency: Optional[ResolveOutStandingBalanceFrequency]
     payout_disabled: Optional[bool]
     charges_enabled: Optional[bool]
     old_account_id: Optional[int]
@@ -43,8 +57,8 @@ class PaymentAccountCreate(PaymentRequest):
 class PaymentAccountUpdate(PaymentRequest):
     account_id: Optional[int]
     account_type: Optional[AccountType]
-    entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
+    entity: Optional[Entity]
+    resolve_outstanding_balance_frequency: Optional[ResolveOutStandingBalanceFrequency]
     payout_disabled: Optional[bool]
     charges_enabled: Optional[bool]
     old_account_id: Optional[int]

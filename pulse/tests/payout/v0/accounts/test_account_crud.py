@@ -1,4 +1,5 @@
-from datetime import timezone, datetime
+from copy import deepcopy
+from datetime import datetime, timezone
 
 import payout_v0_client
 import pytest
@@ -12,19 +13,25 @@ from tests.payout.v0.client_operations import (
 
 
 class TestPaymentAccount:
+
+    base_account_create = PaymentAccountCreate(
+        statement_descriptor="pulse-test-statement-descriptor",
+        account_id=123,
+        account_type="stripe_managed_account",
+        entity="dasher",
+        resolve_outstanding_balance_frequency="daily",
+        payout_disabled=True,
+        charges_enabled=True,
+        old_account_id=123,
+        upgraded_to_managed_account_at=datetime.now(timezone.utc),
+        is_verified_with_stripe=True,
+        transfers_enabled=True,
+    )
+
     def test_create_get_update_account_by_id(
         self, accounts_api: payout_v0_client.AccountsV0Api
     ):
-        request = PaymentAccountCreate(
-            entity="dasher",
-            statement_descriptor="pulse-test-statement-descriptor",
-            account_id=None,
-            account_type="stripe_managed_account",
-            charges_enabled=True,
-            old_account_id=1234,
-            upgraded_to_managed_account_at=datetime.now(timezone.utc),
-            is_verified_with_stripe=True,
-        )
+        request = self.base_account_create
 
         created_account, status, _ = create_payment_account(
             request=request, accounts_api=accounts_api
@@ -57,7 +64,39 @@ class TestPaymentAccount:
         # after change back entity locally, updated payment account should be same as before update
         updated_payment_account.entity = retrieved_payment_account.entity
         assert updated_payment_account == retrieved_payment_account
-        print(updated_payment_account)
+
+    def test_create_account_malformed(
+        self, accounts_api: payout_v0_client.AccountsV0Api
+    ):
+        request = deepcopy(self.base_account_create)
+        with pytest.raises(Exception) as e:
+            request.account_type = "somethingelse"
+        assert e.type == ValueError
+
+        request = deepcopy(self.base_account_create)
+        with pytest.raises(Exception) as e:
+            request.entity = "somethingelse"
+        assert e.type == ValueError
+
+        request = deepcopy(self.base_account_create)
+        with pytest.raises(Exception) as e:
+            request.resolve_outstanding_balance_frequency = "somethingelse"
+        assert e.type == ValueError
+
+    def test_update_account_malformed(
+        self, accounts_api: payout_v0_client.AccountsV0Api
+    ):
+        with pytest.raises(Exception) as e:
+            PaymentAccountUpdate(account_type="somethingelse")
+        assert e.type == ValueError
+
+        with pytest.raises(Exception) as e:
+            PaymentAccountUpdate(entity="somethingelse")
+        assert e.type == ValueError
+
+        with pytest.raises(Exception) as e:
+            PaymentAccountUpdate(resolve_outstanding_balance_frequency="somethingelse")
+        assert e.type == ValueError
 
     @pytest.mark.run_in_prod_only
     def test_get_prod_account(self, accounts_api: payout_v0_client.AccountsV0Api):

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from sqlalchemy import (
@@ -65,11 +66,24 @@ class PaymentAccountTable(TableDefinition):
     )
 
 
+class Entity(str, Enum):
+    DASHER = "dasher"
+    STORE = "store"
+    MERCHANT = "merchant"
+    OTHER = "other"
+    PARTNER = "partner"
+
+
+class ResolveOutStandingBalanceFrequency(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
 class _PaymentAccountPartial(DBEntity):
     account_id: Optional[int]
     account_type: Optional[AccountType]
-    entity: Optional[str]
-    resolve_outstanding_balance_frequency: Optional[str]
+    entity: Optional[Entity]
+    resolve_outstanding_balance_frequency: Optional[ResolveOutStandingBalanceFrequency]
     payout_disabled: Optional[bool]
     charges_enabled: Optional[bool]
     old_account_id: Optional[int]

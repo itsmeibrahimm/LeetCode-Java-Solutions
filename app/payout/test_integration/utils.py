@@ -197,7 +197,7 @@ async def prepare_and_insert_stripe_transfer(
         stripe_request_id="stripe_request_id",
         stripe_failure_code="stripe_failure_code",
         stripe_account_id="stripe_account_id",
-        stripe_account_type="stripe_account_type",
+        stripe_account_type="stripe_managed_account",
         country_shortname="country_shortname",
         bank_last_four="bank_last_four",
         bank_name="bank_name",

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, text
@@ -55,12 +56,19 @@ class StripeTransferTable(TableDefinition):
     submitted_at: Column = no_init_field(Column("submitted_at", DateTime(True)))
 
 
+class StripeAccountType(str, Enum):
+    STRIPE_MANAGED_ACCOUNT = "stripe_managed_account"
+    STRIPE_RECIPIENT = (
+        "stripe_recipient"
+    )  # there is still data in db, keep for backward compatibility
+
+
 class _StripeTransferPartial(DBEntity):
     stripe_id: Optional[str]
     stripe_request_id: Optional[str]
     stripe_failure_code: Optional[str]
     stripe_account_id: Optional[str]
-    stripe_account_type: Optional[str]
+    stripe_account_type: Optional[StripeAccountType]
     country_shortname: Optional[str]
     bank_last_four: Optional[str]
     bank_name: Optional[str]

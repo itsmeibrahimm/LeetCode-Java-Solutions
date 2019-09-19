@@ -73,7 +73,7 @@ class TestPaymentAccountRepository:
             statement_descriptor="i am description yay",
             entity="dasher",
         )
-        account_2 = account_1.copy(deep=True, update={"entity": "some other entity!"})
+        account_2 = account_1.copy(deep=True, update={"entity": "merchant"})
 
         account_1_created = await payment_account_repo.create_payment_account(account_1)
         account_2_created = await payment_account_repo.create_payment_account(account_2)
