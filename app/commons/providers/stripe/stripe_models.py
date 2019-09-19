@@ -10,7 +10,7 @@ from app.commons.types import CountryCode
 # hard code this because we'll need code changes anyway to support newer versions
 from app.payout.types import StripeAccountToken, StripeBusinessType, StripeFileHandle
 
-STRIPE_API_VERSION = "2019-08-14"
+STRIPE_API_VERSION = "2019-09-09"
 
 
 IdempotencyKey = Optional[str]
