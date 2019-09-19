@@ -124,6 +124,7 @@ class PayoutAccountProcessors:
             stripe_payout_request_repo=self.stripe_payout_request_repo,
             payment_account_repo=self.payment_account_repo,
             stripe_managed_account_transfer_repo=self.stripe_managed_account_transfer_repo,
+            stripe_async_client=self.stripe,
             request=request,
         )
         return await create_instant_payout_op.execute()

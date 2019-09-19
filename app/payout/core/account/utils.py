@@ -1,6 +1,6 @@
 from typing import Optional
 
-from app.commons.providers.stripe.stripe_client import StripeClient
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
@@ -25,7 +25,7 @@ async def get_country_shortname(
 
 
 async def get_account_balance(
-    stripe_managed_account: Optional[StripeManagedAccount], stripe: StripeClient
+    stripe_managed_account: Optional[StripeManagedAccount], stripe: StripeAsyncClient
 ) -> int:
     """
     Get balance for stripe account, return 0 if sma is not created
@@ -34,7 +34,7 @@ async def get_account_balance(
     :return: balance amount
     """
     if stripe_managed_account:
-        balance = stripe.retrieve_balance(
+        balance = await stripe.retrieve_balance(
             stripe_account=models.StripeAccountId(stripe_managed_account.stripe_id),
             country=models.CountryCode(stripe_managed_account.country_shortname),
         )

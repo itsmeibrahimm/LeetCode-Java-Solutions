@@ -35,6 +35,8 @@ payout_error_message_maps = {
     "payout_1": "This should not show up.",
     "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
     "payout_3": "Cannot process payment for the given country",
+    "payout_10": "Failed to submit sma transfer due to connection error",
+    "payout_11": "Failed to submit sma transfer due to other error",
 }
 
 
@@ -43,6 +45,8 @@ class PayoutErrorCode(str, Enum):
     MISMATCHED_TRANSFER_PAYMENT_ACCOUNT = "payout_1"
     INVALID_STRIPE_MANAGED_ACCOUNT = "payout_2"
     UNHANDLED_COUNTRY = "payout_3"
+    API_CONNECTION_ERROR = "payout_10"
+    OTHER_ERROR = "payout_11"
 
 
 class PayoutError(PaymentException):
