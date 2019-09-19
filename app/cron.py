@@ -2,6 +2,9 @@ import asyncio
 import os
 import signal
 
+# ensure logger is loaded before newrelic init,
+# so we don't reload the module and get duplicate log messages
+from app.commons.context.logger import get_logger
 from app.commons.config.newrelic_loader import init_newrelic_agent
 
 init_newrelic_agent()
@@ -11,7 +14,6 @@ from app.commons.jobs.scheduler import Scheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
 from app.commons.context.app_context import create_app_context
-from app.commons.context.logger import get_logger
 from app.commons.instrumentation.pool import stat_resource_pool_jobs
 from app.commons.jobs.pool import adjust_pool_sizes
 from app.commons.jobs.startup_util import init_worker_resources

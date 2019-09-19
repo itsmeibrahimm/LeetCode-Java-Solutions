@@ -40,6 +40,10 @@ _sys_logger = logging.getLogger()
 _sys_logger.setLevel(logging.INFO)
 if is_debug:
     _sys_logger.setLevel(logging.DEBUG)
+if _sys_logger.hasHandlers():
+    raise RuntimeError(
+        f"logging is already initialized. import {__name__} earlier in the application entrypoint"
+    )
 _sys_logger.addHandler(_handler)
 
 
