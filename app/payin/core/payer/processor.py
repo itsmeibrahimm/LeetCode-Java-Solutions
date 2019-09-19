@@ -168,7 +168,7 @@ class PayerProcessor:
     async def update_payer(
         self,
         payer_id: MixedUuidStrType,
-        default_payment_method_id: str,
+        default_payment_method_id: MixedUuidStrType,
         country: Optional[CountryCode] = CountryCode.US,
         payer_id_type: Optional[PayerIdType] = None,
         payer_type: Optional[str] = None,

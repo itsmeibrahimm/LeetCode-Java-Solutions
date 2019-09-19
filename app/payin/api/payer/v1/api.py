@@ -1,3 +1,4 @@
+from typing import Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -7,7 +8,7 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
-from app.payin.core.exceptions import PayinErrorCode
+from app.payin.core.exceptions import PayinErrorCode, payin_error_message_maps
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.processor import PayerProcessor
 
@@ -21,6 +22,7 @@ from starlette.status import (
 )
 
 from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PaymentMethodIdType, MixedUuidStrType
 
 api_tags = ["PayerV1"]
 router = APIRouter()
@@ -52,10 +54,28 @@ async def create_payer(
     - **description**: a description of payer
     """
     log.info(
-        "[create_payer] dd_payer_id:%s payer_type:%s",
-        req_body.dd_payer_id,
-        req_body.payer_type,
+        "[create_payer] receive request.",
+        dd_payer_id=req_body.dd_payer_id,
+        payer_type=req_body.payer_type,
     )
+
+    # Verify dd_payer_id is numeric if it is provided.
+    if req_body.dd_payer_id:
+        try:
+            int(req_body.dd_payer_id)
+        except ValueError as e:
+            log.error(
+                f"[create_payer][{req_body.dd_payer_id}] Value error for non-numeric value. {e}"
+            )
+            raise PaymentException(
+                http_status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+                error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
+                error_message=payin_error_message_maps[
+                    PayinErrorCode.PAYER_CREATE_INVALID_DATA.value
+                ],
+                retryable=False,
+            )
+
     try:
         payer: Payer = await payer_processor.create_payer(
             dd_payer_id=req_body.dd_payer_id,
@@ -151,17 +171,21 @@ async def update_payer(
     Update payer's default payment method
 
     - **default_payment_method**: payer's payment method (source) on authorized Payment Provider
-    - **default_payment_method.id**: [string] identity of the payment method.
-    - **default_payment_method.payment_method_id_type**: [string] identify the type of payment_method_id.
-        Valid values include "dd_payment_method_id", "stripe_payment_method_id", "stripe_card_serial_id"
-        (default is "dd_payment_method_id")
+    - **default_payment_method.payment_method_id**: [UUID] identity of the payment method.
+    - **default_payment_method.dd_stripe_card_id**: [string] legacy primary id of StripeCard object
     """
 
-    log.info("[update_payer] payer_id=%s", payer_id)
+    log.info("[update_payer] received request", payer_id=payer_id)
     try:
+        # verify default_payment_method to ensure only one id is provided
+        default_payment_method_id, payment_method_id_type = _verify_payment_method_id(
+            req_body
+        )
+
         payer: Payer = await payer_processor.update_payer(
             payer_id=payer_id,
-            default_payment_method_id=req_body.default_payment_method.id,
+            default_payment_method_id=default_payment_method_id,
+            payment_method_id_type=payment_method_id_type,
         )
     except PaymentError as e:
         if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value:
@@ -175,3 +199,28 @@ async def update_payer(
             retryable=e.retryable,
         )
     return payer
+
+
+def _verify_payment_method_id(
+    request: UpdatePayerRequest
+) -> Tuple[MixedUuidStrType, PaymentMethodIdType]:
+    payment_method_id: str
+    payment_method_id_type: PaymentMethodIdType
+    count: int = 0
+    for key, value in request.default_payment_method:
+        if value:
+            payment_method_id = value
+            payment_method_id_type = key
+            count += 1
+
+    if count != 1:
+        raise PaymentException(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
+            error_message=payin_error_message_maps[
+                PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE
+            ],
+            retryable=False,
+        )
+
+    return payment_method_id, payment_method_id_type

@@ -120,7 +120,7 @@ async def update_payer(
     try:
 
         # verify default_payment_method to ensure only one id is provided
-        default_payment_method_id, payment_method_id_type = verify_and_convert_legacy_payment_method_id(
+        default_payment_method_id, payment_method_id_type = _verify_legacy_payment_method_id(
             req_body
         )
 
@@ -145,7 +145,7 @@ async def update_payer(
     return payer
 
 
-def verify_and_convert_legacy_payment_method_id(
+def _verify_legacy_payment_method_id(
     request: UpdatePayerRequestV0
 ) -> Tuple[str, PaymentMethodIdType]:
     payment_method_id: str

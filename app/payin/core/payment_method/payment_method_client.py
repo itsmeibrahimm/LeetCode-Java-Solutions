@@ -214,7 +214,9 @@ class PaymentMethodClient:
         )
 
     async def get_raw_payment_method_without_payer_auth(
-        self, payment_method_id: str, payment_method_id_type: Optional[str] = None
+        self,
+        payment_method_id: MixedUuidStrType,
+        payment_method_id_type: Optional[str] = None,
     ) -> RawPaymentMethod:
 
         return await self._get_raw_payment_method(

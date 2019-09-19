@@ -1,10 +1,10 @@
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 
 from app.commons.types import CountryCode
 from app.payin.core.payer.types import PayerType
-from app.payin.core.types import PaymentMethodIdType
 
 
 class CreatePayerRequest(BaseModel):
@@ -15,15 +15,11 @@ class CreatePayerRequest(BaseModel):
     description: str
 
 
-# https://pydantic-docs.helpmanual.io/#self-referencing-models
-CreatePayerRequest.update_forward_refs()
-
-
 class DefaultPaymentMethod(BaseModel):
-    id: str
-    payment_method_id_type: Optional[
-        PaymentMethodIdType
-    ] = PaymentMethodIdType.PAYMENT_METHOD_ID
+    payment_method_id: Optional[UUID]
+    dd_stripe_card_id: Optional[
+        str
+    ]  # first-class support for dd_stripe_card_id in v1 API because we can't backfill all the existing Cx's card objects.
 
 
 class UpdatePayerRequest(BaseModel):
