@@ -24,6 +24,7 @@ Assuming you started your local service at port 8000 by `make local-server WEB_P
 ```bash
 cd <payment repo>/pressure
 deactivate > /dev/null 2>&1 # deactivate any existing pipenv shell in case parent pipenv shell exists
+./update-local-env.sh # need this if client lib versions in requirements.txt bumped recently
 pipenv shell
 pressure --data-file=$(pipenv --venv)/infra/local/data.yaml --data-file=infra/local/data.yaml --locust-args="--host http://localhost:8000 -f tests/locustfile.py --csv=report --no-web -c 1000 -r 100 --run-time 5m"
 ```
