@@ -7,6 +7,7 @@ from cachetools import TTLCache
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_200_OK
 
 from app.commons.providers.identity_models import VerifyTokenResponse
+from app.commons.tracing import track_breadcrumb
 
 CORRELATION_ID_KEY = "x-correlation-id"
 TOKEN_KEY = "authorization"
@@ -66,6 +67,12 @@ class StubbedIdentityClient(IdentityClientInterface):
         pass
 
 
+@track_breadcrumb(
+    provider_name="Identity",
+    resource="verify",
+    action="get",
+    from_kwargs={"correlation_id": "req_id"},
+)
 class IdentityClient(IdentityClientInterface):
     """
     Handles communication with Identity Service and serves as a L0 cache for returned results if needed

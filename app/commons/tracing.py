@@ -58,6 +58,7 @@ class Breadcrumb(pydantic.BaseModel):
     resource: str = ""
     action: str = ""
     status_code: str = ""  # should be string for stats
+    req_id: str = ""
 
     class Config:
         allow_mutation = False
@@ -401,6 +402,7 @@ def track_breadcrumb(
     resource: Optional[str] = None,
     action: Optional[str] = None,
     status_code: Optional[str] = None,
+    req_id: Optional[str] = None,
     # settings
     only_trackable=False,
     # extract from kwargs
@@ -430,6 +432,8 @@ def track_breadcrumb(
         kwargs["action"] = action
     if status_code is not None:
         kwargs["status_code"] = status_code
+    if req_id is not None:
+        kwargs["req_id"] = req_id
 
     return BreadcrumbManager(
         Breadcrumb(**kwargs), from_kwargs=from_kwargs, only_trackable=only_trackable

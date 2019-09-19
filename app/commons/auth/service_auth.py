@@ -40,7 +40,7 @@ class ApiSecretRouteAuthorizer:
         identity_client = app_context.identity_client
         token = dd_api_secret or x_api_key
         try:
-            await identity_client.verify_api_key_with_http(
+            return await identity_client.verify_api_key_with_http(
                 service_id=self.service_id, api_key=token, correlation_id=req_id
             )
         except UnauthorizedError as e:

@@ -12,6 +12,7 @@ from app.commons.applications import FastAPI
 from app.commons.config.app_config import AppConfig
 from app.commons.context.logger import root_logger, get_logger
 from app.commons.database.infra import DB
+from app.commons.providers.TimedAioClient import TrackedIdentityClientSession
 from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.identity_client import (
     IdentityClientInterface,
@@ -184,10 +185,10 @@ async def create_app_context(config: AppConfig) -> AppContext:
         }
     )
 
-    ids_session: aiohttp.ClientSession = aiohttp.ClientSession()
+    ids_session: aiohttp.ClientSession = TrackedIdentityClientSession()
 
     identity_client: IdentityClientInterface
-    if config.ENVIRONMENT in ["testing", "local"]:
+    if config.ENVIRONMENT in ["testing"]:
         # disable testing
         identity_client = StubbedIdentityClient()
     else:
