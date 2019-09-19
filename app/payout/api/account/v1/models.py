@@ -85,6 +85,8 @@ class PayoutRequest(PaymentRequest):
     payout_type: PayoutType = PayoutType.STANDARD
     target_id: Optional[str] = None
     target_type: Optional[PayoutTargetType] = None
+    statement_descriptor: Optional[str] = None
+    payout_idempotency_key: Optional[str] = None
     transfer_id: Optional[str] = None
     payout_id: Optional[str] = None
     method: Optional[PayoutMethodType]
