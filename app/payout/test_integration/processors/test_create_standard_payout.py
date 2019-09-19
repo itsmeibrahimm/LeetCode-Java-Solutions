@@ -274,20 +274,6 @@ class TestCreateStandardPayoutUtils:
         assert not stripe_id
         assert account_type == AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT
 
-    async def test_get_stripe_account_id_and_payment_account_type_no_sma(
-        self, payment_account_repository: PaymentAccountRepository
-    ):
-        # prepare and insert payment_account, update its account_id field as None
-        payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository
-        )
-        stripe_id, account_type = await self.create_standard_payout_operation.get_stripe_account_id_and_payment_account_type(
-            payment_account=payment_account,
-            payment_account_repository=payment_account_repository,
-        )
-        assert not stripe_id
-        assert account_type == AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT
-
     async def test_extract_failure_code_from_exception_message_success(self):
         msg = "Sorry, you don't have any external accounts in that currency (usd)"
         failure_msg = self.create_standard_payout_operation.extract_failure_code_from_exception_message(
