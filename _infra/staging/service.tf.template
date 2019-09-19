@@ -69,6 +69,11 @@ module "payment-service-cron" {
   service_hpa_max_replicas                  = "6"
   service_hpa_cpu_target_avg_util           = "50"
 
+  service_liveness_probe_init_delay         = "20"
+  service_liveness_probe_period             = "10"
+  service_liveness_probe_failure_threshold  = "3"
+  service_liveness_probe_path               = "/"
+
   service_resource_requests_memory          = "256Mi"
   service_resource_limits_memory            = "256Mi"
   service_resource_requests_cpu             = "1024m"

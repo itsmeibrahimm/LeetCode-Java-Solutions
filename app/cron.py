@@ -9,6 +9,8 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 
 init_newrelic_agent()
 
+from aiohttp import web
+
 import pytz
 from app.commons.jobs.scheduler import Scheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
@@ -22,6 +24,24 @@ from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
 )
+
+
+async def run_health_server(port: int = 80):
+    """
+    Starts a dumb web server used for k8s liveness probes
+
+    :param port: Port on which web server runs
+    :return:
+    """
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    server = web.Server(handler)
+    runner = web.ServerRunner(server)
+    await runner.setup()
+    site = web.TCPSite(runner, "localhost", port)
+    await site.start()
 
 
 def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
@@ -87,6 +107,9 @@ async def handle_shutdown():
     loop.stop()
     logger("Done shutting down!")
 
+
+# Run health server in background
+loop.create_task(run_health_server())
 
 loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(handle_shutdown()))
 

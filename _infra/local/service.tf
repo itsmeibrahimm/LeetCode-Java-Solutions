@@ -75,6 +75,11 @@ module "payment-service-cron" {
   service_resource_requests_cpu             = "1024m"
   service_resource_limits_cpu               = "1024m"
 
+  service_liveness_probe_init_delay         = "20"
+  service_liveness_probe_period             = "10"
+  service_liveness_probe_failure_threshold  = "3"
+  service_liveness_probe_path               = "/"
+
   runtime_enable                            = "false"
 
   net_service_enable                        = "true"
