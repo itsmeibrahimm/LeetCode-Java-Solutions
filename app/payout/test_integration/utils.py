@@ -299,14 +299,15 @@ async def prepare_and_insert_stripe_managed_account_transfer(
 
 
 async def prepare_and_insert_payout_card(
-    payment_account_repo: PaymentAccountRepository,
     payout_method_repo: PayoutMethodRepository,
     payout_card_repo: PayoutCardRepository,
+    payout_account_id: int,
+    is_default: bool = True,
     created_at: datetime = datetime.utcnow(),
     updated_at: datetime = datetime.utcnow(),
 ):
     payout_method = await prepare_and_insert_payout_method(
-        payment_account_repo, payout_method_repo
+        payout_method_repo, payout_account_id, is_default
     )
 
     data = PayoutCardCreate(
@@ -329,17 +330,41 @@ async def prepare_and_insert_payout_card(
     return payout_card
 
 
+async def prepare_and_insert_payout_method(
+    payout_method_repo: PayoutMethodRepository,
+    payout_account_id: int,
+    is_default: bool = True,
+):
+    data = PayoutMethodCreate(
+        type=PayoutExternalAccountType.CARD.value,
+        currency=CurrencyType.USD.value,
+        country=CountryCode.US.value,
+        payment_account_id=payout_account_id,
+        is_default=is_default,
+        token=uuid.uuid4(),
+    )
+
+    payout_method = await payout_method_repo.create_payout_method(data)
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=payout_method.dict()
+    )
+    assert payout_method.id, "payout method is created, assigned an ID"
+    return payout_method
+
+
 async def prepare_payout_card_list(
-    payment_account_repo: PaymentAccountRepository,
     payout_method_repo: PayoutMethodRepository,
     payout_card_repo: PayoutCardRepository,
+    payout_account_id: int,
     count: int = 5,
 ):
     payout_card_list: List[PayoutCard] = []
     for i in range(0, count):
         # create a payout_method
         payout_method = await prepare_and_insert_payout_method(
-            payment_account_repo, payout_method_repo
+            payout_method_repo,
+            payout_account_id,
+            is_default=True if (i + 1) == count else False,
         )
 
         data = PayoutCardCreate(
@@ -361,28 +386,6 @@ async def prepare_payout_card_list(
         assert payout_card.id, "payout card is created, assigned an ID"
         payout_card_list.insert(0, payout_card)
     return payout_card_list
-
-
-async def prepare_and_insert_payout_method(
-    payment_account_repo: PaymentAccountRepository,
-    payout_method_repo: PayoutMethodRepository,
-):
-    payment_account = await prepare_and_insert_payment_account(payment_account_repo)
-    data = PayoutMethodCreate(
-        type=PayoutExternalAccountType.CARD.value,
-        currency=CurrencyType.USD.value,
-        country=CountryCode.US.value,
-        payment_account_id=payment_account.id,
-        is_default=True,
-        token=uuid.uuid4(),
-    )
-
-    payout_method = await payout_method_repo.create_payout_method(data)
-    validate_expected_items_in_dict(
-        expected=data.dict(skip_defaults=True), actual=payout_method.dict()
-    )
-    assert payout_method.id, "payout method is created, assigned an ID"
-    return payout_method
 
 
 async def prepare_payout_method_list(

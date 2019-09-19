@@ -1,11 +1,12 @@
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 
 from app.commons.core.processor import OperationResponse
-from app.commons.types import CountryCode
+from app.commons.types import CountryCode, CurrencyType
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.types import PgpExternalAccountId
 
@@ -48,3 +49,21 @@ class PayoutAccountInternal(OperationResponse):
     payment_account: PaymentAccount
     pgp_external_account_id: Optional[PgpExternalAccountId]
     verification_requirements: Optional[VerificationRequirements]
+
+
+class PayoutCardMethod(OperationResponse):
+    stripe_card_id: str
+    payout_account_id: int
+    currency: CurrencyType
+    country: CountryCode
+    last4: str
+    brand: str
+    exp_month: int
+    exp_year: int
+    is_default: bool
+    fingerprint: Optional[str]
+    id: Optional[int]
+    token: Optional[UUID]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    deleted_at: Optional[datetime]

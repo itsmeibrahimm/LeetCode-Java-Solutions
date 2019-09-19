@@ -12,9 +12,10 @@ from app.payout.core.account.processors.get_account import (
 )
 from app.payout.core.account.types import PayoutAccountInternal
 from app.payout.core.exceptions import (
-    PayoutAccountNotFoundError,
-    PayoutAccountErrorCode,
-    payout_account_error_message_maps,
+    payout_account_not_found_error,
+    PayoutErrorCode,
+    payout_error_message_maps,
+    PayoutError,
 )
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccountCreate,
@@ -90,17 +91,15 @@ class TestGetPayoutAccount:
             == data.statement_descriptor
         )
 
-        get_error = PayoutAccountNotFoundError()
+        get_error = payout_account_not_found_error()
         mocker.patch(
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_payment_account_by_id",
             side_effect=get_error,
         )
-        with pytest.raises(PayoutAccountNotFoundError) as e:
+        with pytest.raises(PayoutError) as e:
             await get_account_op._execute()
-        assert e.value.error_code == PayoutAccountErrorCode.PAYOUT_ACCOUNT_NOT_FOUND
+        assert e.value.error_code == PayoutErrorCode.PAYOUT_ACCOUNT_NOT_FOUND
         assert (
             e.value.error_message
-            == payout_account_error_message_maps[
-                PayoutAccountErrorCode.PAYOUT_ACCOUNT_NOT_FOUND.value
-            ]
+            == payout_error_message_maps[PayoutErrorCode.PAYOUT_ACCOUNT_NOT_FOUND.value]
         )

@@ -30,7 +30,7 @@ class PayoutMethodRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def list_payout_cards_by_payout_account_id(
+    async def list_payout_methods_by_payout_account_id(
         self, payout_account_id: int
     ) -> List[PayoutMethod]:
         pass
@@ -66,7 +66,7 @@ class PayoutMethodRepository(PayoutBankDBRepository, PayoutMethodRepositoryInter
         row = await self._database.replica().fetch_one(stmt)
         return PayoutMethod.from_row(row) if row else None
 
-    async def list_payout_cards_by_payout_account_id(
+    async def list_payout_methods_by_payout_account_id(
         self, payout_account_id: int
     ) -> List[PayoutMethod]:
         stmt = (

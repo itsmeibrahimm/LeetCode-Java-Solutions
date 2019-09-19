@@ -1,36 +1,15 @@
-###########################################################
-# payout_account Errors                                   #
-###########################################################
 from enum import Enum
 from typing import Optional
 
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+
 from app.commons.api.models import PaymentException
-from app.commons.core.errors import PaymentError
-
-payout_account_error_message_maps = {
-    "account_0": "Cannot found payout_account with given id, please verify your input."
-}
-
-
-class PayoutAccountErrorCode(str, Enum):
-    PAYOUT_ACCOUNT_NOT_FOUND = "account_0"
-
-
-class PayoutAccountNotFoundError(PaymentError):
-    def __init__(self):
-        super().__init__(
-            error_message=payout_account_error_message_maps[
-                PayoutAccountErrorCode.PAYOUT_ACCOUNT_NOT_FOUND.value
-            ],
-            error_code=PayoutAccountErrorCode.PAYOUT_ACCOUNT_NOT_FOUND,
-            retryable=False,
-        )
-
 
 ###########################################################
 #                 Payout Errors                           #
 ###########################################################
 payout_error_message_maps = {
+    # payout errors
     "payout_0": "Cannot make stripe transfer without stripe account id.",
     "payout_1": "This should not show up.",
     "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
@@ -45,10 +24,17 @@ payout_error_message_maps = {
     "payout_11": "Failed to submit sma transfer due to other error",
     "payout_12": "All existing Stripe transfers must be failed or canceled.",
     "payout_13": "Cannot find payment_account with given id.",
+    # payout account errors
+    "account_0": "Cannot found payout_account with given id, please verify your input.",
+    # payout method errors
+    "payout_method_0": "Cannot find a payout method for the given payout account id.",
+    "payout_method_1": "Cannot find a payout card for the given payout account id.",
+    "payout_method_2": "Cannot find a default payout card for the given payout account id.",
 }
 
 
 class PayoutErrorCode(str, Enum):
+    # payout error code
     INVALID_STRIPE_ACCOUNT_ID = "payout_0"
     MISMATCHED_TRANSFER_PAYMENT_ACCOUNT = "payout_1"
     INVALID_STRIPE_MANAGED_ACCOUNT = "payout_2"
@@ -63,6 +49,14 @@ class PayoutErrorCode(str, Enum):
     OTHER_ERROR = "payout_11"
     TRANSFER_PROCESSING = "payout_12"
     INVALID_PAYMENT_ACCOUNT_ID = "payout_13"
+
+    # payout account error code
+    PAYOUT_ACCOUNT_NOT_FOUND = "account_0"
+
+    # payout method error code
+    PAYOUT_METHOD_NOT_FOUND = "payout_method_0"
+    PAYOUT_CARD_NOT_FOUND = "payout_method_1"
+    DEFAULT_PAYOUT_CARD_NOT_FOUND = "payout_method_2"
 
 
 class PayoutError(PaymentException):
@@ -96,3 +90,53 @@ class PayoutError(PaymentException):
             else payout_error_message_maps[error_code.value],
             retryable=retryable,
         )
+
+
+###########################################################
+# payout_account Errors                                   #
+###########################################################
+def payout_account_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_ACCOUNT_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_ACCOUNT_NOT_FOUND,
+        retryable=False,
+    )
+
+
+###########################################################
+# payout_method Errors                                    #
+###########################################################
+def payout_method_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_404_NOT_FOUND,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def payout_card_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_404_NOT_FOUND,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_CARD_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_CARD_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def default_payout_card_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_404_NOT_FOUND,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND,
+        retryable=False,
+    )

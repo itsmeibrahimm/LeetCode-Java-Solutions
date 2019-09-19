@@ -4,7 +4,7 @@ from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.context.logger import Log
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account.types import PayoutAccountInternal
-from app.payout.core.exceptions import PayoutAccountNotFoundError
+from app.payout.core.exceptions import payout_account_not_found_error
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
 )
@@ -41,7 +41,7 @@ class GetPayoutAccount(AsyncOperation[GetPayoutAccountRequest, PayoutAccountInte
             self.request.payout_account_id
         )
         if not payment_account:
-            raise PayoutAccountNotFoundError()
+            raise payout_account_not_found_error()
         stripe_managed_account: Optional[StripeManagedAccount] = None
         if payment_account and payment_account.account_id:
             stripe_managed_account = await self.payment_account_repo.get_stripe_managed_account_by_id(

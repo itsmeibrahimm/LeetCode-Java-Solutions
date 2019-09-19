@@ -34,10 +34,10 @@ class TestPayoutMethodRepository:
         payment_account_repo: PaymentAccountRepository,
         payout_method_repo: PayoutMethodRepository,
     ):
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
         # prepare and insert payout_method, then validate
         await prepare_and_insert_payout_method(
-            payment_account_repo=payment_account_repo,
-            payout_method_repo=payout_method_repo,
+            payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
         )
 
     async def test_create_get_payout_method(
@@ -45,10 +45,10 @@ class TestPayoutMethodRepository:
         payment_account_repo: PaymentAccountRepository,
         payout_method_repo: PayoutMethodRepository,
     ):
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
         # prepare and insert payout_method, then validate
         payout_method = await prepare_and_insert_payout_method(
-            payment_account_repo=payment_account_repo,
-            payout_method_repo=payout_method_repo,
+            payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
         )
 
         assert payout_method == await payout_method_repo.get_payout_method_by_id(
@@ -60,10 +60,10 @@ class TestPayoutMethodRepository:
         payment_account_repo: PaymentAccountRepository,
         payout_method_repo: PayoutMethodRepository,
     ):
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
         # prepare and insert payout_method, then validate
         payout_method = await prepare_and_insert_payout_method(
-            payment_account_repo=payment_account_repo,
-            payout_method_repo=payout_method_repo,
+            payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
         )
         deleted_at = datetime.utcnow()
         updated_payout_method = await payout_method_repo.update_payout_method_deleted_at(
@@ -85,7 +85,7 @@ class TestPayoutMethodRepository:
         payout_method_list = await prepare_payout_method_list(
             payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
         )
-        retrieved_payout_account_list = await payout_method_repo.list_payout_cards_by_payout_account_id(
+        retrieved_payout_account_list = await payout_method_repo.list_payout_methods_by_payout_account_id(
             payout_account_id=payment_account.id
         )
         assert (

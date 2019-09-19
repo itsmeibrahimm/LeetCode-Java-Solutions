@@ -9,7 +9,7 @@ from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import CreateAccountRequest
 from app.commons.types import CountryCode
 from app.payout.core.account.types import PayoutAccountInternal
-from app.payout.core.exceptions import PayoutAccountNotFoundError
+from app.payout.core.exceptions import payout_account_not_found_error
 from app.payout.repository.maindb.model.payment_account import PaymentAccountUpdate
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountCreate,
@@ -55,7 +55,7 @@ class VerifyPayoutAccount(
             self.request.payout_account_id
         )
         if not payment_account:
-            raise PayoutAccountNotFoundError()
+            raise payout_account_not_found_error()
 
         # create stripe account
         create_account = CreateAccountRequest(
