@@ -70,8 +70,8 @@ module "payment-service-cron" {
   service_replica_count                     = "1"
   service_container_port                    = "80"
 
-  service_resource_requests_memory          = "256Mi"
-  service_resource_limits_memory            = "256Mi"
+  service_resource_requests_memory          = "2Gi"
+  service_resource_limits_memory            = "2Gi"
   service_resource_requests_cpu             = "1024m"
   service_resource_limits_cpu               = "1024m"
 
