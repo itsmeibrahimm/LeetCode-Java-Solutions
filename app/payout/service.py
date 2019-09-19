@@ -10,6 +10,8 @@ from app.payout.repository.bankdb import (
     payout,
     stripe_payout_request,
     stripe_managed_account_transfer,
+    payout_card,
+    payout_method,
 )
 from app.payout.repository.maindb import (
     payment_account,
@@ -49,6 +51,8 @@ StripeTransferRepositoryInterface = stripe_transfer.StripeTransferRepositoryInte
 ManagedAccountTransferRepositoryInterface = (
     managed_account_transfer.ManagedAccountTransferRepositoryInterface
 )
+PayoutCardRepositoryInterface = payout_card.PayoutCardRepositoryInterface
+PayoutMethodRepositoryInterface = payout_method.PayoutMethodRepositoryInterface
 
 
 class PayoutService(BaseService):
@@ -60,6 +64,8 @@ class PayoutService(BaseService):
     striped_managed_account_transfers: stripe_managed_account_transfer.StripeManagedAccountTransferRepository
     stripe_transfers: stripe_transfer.StripeTransferRepository
     managed_account_transfers: managed_account_transfer.ManagedAccountTransferRepository
+    payout_cards: payout_card.PayoutCardRepository
+    payout_methods: payout_method.PayoutMethodRepository
     dsj_client: DSJClient
     stripe: StripeAsyncClient
 
@@ -84,6 +90,8 @@ class PayoutService(BaseService):
         self.striped_managed_account_transfers = stripe_managed_account_transfer.StripeManagedAccountTransferRepository(
             bankdb
         )
+        self.payout_cards = payout_card.PayoutCardRepository(bankdb)
+        self.payout_methods = payout_method.PayoutMethodRepository(bankdb)
 
         # dsj_client
         self.dsj_client = self.app_context.dsj_client
@@ -134,6 +142,18 @@ def ManagedAccountTransferRepository(
     return payout_service.managed_account_transfers
 
 
+def PayoutCardRepository(
+    payout_service: PayoutService = Depends()
+) -> payout_card.PayoutCardRepositoryInterface:
+    return payout_service.payout_cards
+
+
+def PayoutMethodRepository(
+    payout_service: PayoutService = Depends()
+) -> payout_method.PayoutMethodRepositoryInterface:
+    return payout_service.payout_methods
+
+
 def DSJClientHandle(payout_service: PayoutService = Depends()):
     return payout_service.dsj_client
 
@@ -147,6 +167,8 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
         stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
         stripe=payout_service.stripe,
         managed_account_transfer_repo=payout_service.managed_account_transfers,
+        payout_card_repo=payout_service.payout_cards,
+        payout_method_repo=payout_service.payout_methods,
     )
 
 

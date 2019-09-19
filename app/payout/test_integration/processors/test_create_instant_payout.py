@@ -55,6 +55,8 @@ class TestCreateInstantPayoutUtils:
             logger=mocker.Mock(),
             request=CreateInstantPayoutRequest(
                 payout_account_id=self.payment_account_id,
+                payout_card_id=1234,
+                payout_idempotency_key="temp_ide_key",
                 amount=self.amount,
                 payout_type=PayoutType.INSTANT,
             ),

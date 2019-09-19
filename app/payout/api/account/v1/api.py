@@ -3,6 +3,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
 
@@ -17,11 +18,15 @@ from app.payout.core.account.processors.create_instant_payout import (
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
 )
+from app.payout.core.account.processors.get_default_payout_card import (
+    GetDefaultPayoutCardRequest,
+)
 from app.payout.core.account.processors.update_account_statement_descriptor import (
     UpdatePayoutAccountStatementDescriptorRequest,
 )
 from app.payout.core.account.processors.verify_account import VerifyPayoutAccountRequest
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
+from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.service import create_payout_account_processors
 from app.payout.types import PayoutAccountStatementDescriptor, PayoutType
 from . import models
@@ -167,7 +172,10 @@ async def create_payout_method(
     "/{payout_account_id}/payouts",
     operation_id="CreatePayout",
     status_code=HTTP_200_OK,
-    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    responses={
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+    },
     tags=api_tags,
 )
 async def create_payout(
@@ -183,6 +191,7 @@ async def create_payout(
             payout_account_id=payout_account_id,
             amount=body.amount,
             payout_type=body.payout_type,
+            statement_descriptor=body.statement_descriptor,
             target_id=body.target_id,
             target_type=body.target_type,
             transfer_id=body.transfer_id,
@@ -194,11 +203,30 @@ async def create_payout(
         )
         return models.Payout(**standard_payout_response.dict())
     else:
+        retrieve_method_request = GetDefaultPayoutCardRequest(
+            payout_account_id=payout_account_id
+        )
+        try:
+            payout_card_method = await payout_account_processors.get_default_payout_card(
+                retrieve_method_request
+            )
+            # todo: remove this after id of payout_card_method updated to required
+            assert payout_card_method.id, "payout_card_method id is required"
+        except Exception:
+            return PayoutError(
+                http_status_code=HTTP_400_BAD_REQUEST,
+                error_code=PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND,
+                retryable=False,
+            )
+
+        payout_card_id = payout_card_method.id
         instant_payout_request = CreateInstantPayoutRequest(
             payout_account_id=payout_account_id,
             amount=body.amount,
             payout_type=body.payout_type,
             payout_id=body.payout_id,
+            payout_card_ids=payout_card_id,
+            payout_idempotency_key=body.payout_idempotency_key,
             method=body.method,
             submitted_by=body.submitted_by,
         )

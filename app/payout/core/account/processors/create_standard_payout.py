@@ -67,6 +67,7 @@ class CreateStandardPayoutRequest(OperationRequest):
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.STANDARD
     transfer_id: str
+    statement_descriptor: str
     target_id: Optional[str] = None
     target_type: Optional[PayoutTargetType] = None
     method: Optional[PayoutMethodType]
@@ -146,6 +147,7 @@ class CreateStandardPayout(
             transfer_id=transfer_id,
             payment_account=payment_account,
             amount=self.request.amount,
+            statement_descriptor=self.request.statement_descriptor,
             target_type=self.request.target_type,
             target_id=self.request.target_id,
             stripe=self.stripe,
@@ -304,6 +306,7 @@ class CreateStandardPayout(
         transfer_id: int,
         payment_account: PaymentAccount,
         amount: int,
+        statement_descriptor: str,
         stripe: StripeAsyncClient,
         target_type: Optional[PayoutTargetType],
         target_id: Optional[str],
@@ -313,6 +316,7 @@ class CreateStandardPayout(
         :param transfer_id: transfer_id, int
         :param payment_account: PaymentAccount
         :param amount: int, amount of the transfer
+        :param statement_descriptor: str, used to create payout
         :param target_type: dasher or store
         :param target_id: dasher id or store id
         :param stripe: StripeAsyncClient
@@ -331,6 +335,7 @@ class CreateStandardPayout(
                 stripe_transfer=stripe_transfer,
                 payment_account=payment_account,
                 amount=amount,
+                statement_descriptor=statement_descriptor,
                 transfer_id=transfer_id,
                 target_type=target_type,
                 target_id=target_id,
@@ -357,6 +362,7 @@ class CreateStandardPayout(
         payment_account: PaymentAccount,
         amount: int,
         transfer_id: int,
+        statement_descriptor: str,
         stripe: StripeAsyncClient,
         target_type: Optional[PayoutTargetType],
         target_id: Optional[str],
@@ -378,6 +384,7 @@ class CreateStandardPayout(
                 amount=amount,
                 transfer_id=transfer_id,
                 payment_account=payment_account,
+                statement_descriptor=statement_descriptor,
                 target_type=target_type,
                 target_id=target_id,
                 stripe_account_id=stripe_account_id,
@@ -496,6 +503,7 @@ class CreateStandardPayout(
         payment_account: PaymentAccount,
         stripe: StripeAsyncClient,
         stripe_account_id: str,
+        statement_descriptor: str,
         target_type: Optional[PayoutTargetType],
         target_id: Optional[str],
     ) -> models.Payout:
@@ -528,7 +536,7 @@ class CreateStandardPayout(
                 retryable=False,
             )
         create_payout_request = CreatePayout(
-            statement_descriptor=payment_account.statement_descriptor,
+            statement_descriptor=statement_descriptor,
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
                 payment_account=payment_account,

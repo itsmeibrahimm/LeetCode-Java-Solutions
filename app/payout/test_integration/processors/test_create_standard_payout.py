@@ -70,6 +70,7 @@ class TestCreateStandardPayoutUtils:
                 payout_account_id=self.payment_account_id,
                 amount=200,
                 transfer_id="1234",
+                statement_descriptor="statement_descriptor",
                 payout_type=PayoutType.STANDARD,
             ),
         )
@@ -137,6 +138,7 @@ class TestCreateStandardPayoutUtils:
         request = CreateStandardPayoutRequest(
             transfer_id=str(transfer.id),
             payout_account_id=payment_account.id,
+            statement_descriptor="statement_descriptor",
             amount=100,
             target_type=PayoutTargetType.DASHER,
             target_id="12345",
@@ -182,7 +184,10 @@ class TestCreateStandardPayoutUtils:
         stripe: StripeAsyncClient,
     ):
         request = CreateStandardPayoutRequest(
-            transfer_id="123", payout_account_id=-1, amount=100
+            transfer_id="123",
+            payout_account_id=-1,
+            amount=100,
+            statement_descriptor="statement_descriptor",
         )
         create_payout_op = CreateStandardPayout(
             request=request,
@@ -215,7 +220,10 @@ class TestCreateStandardPayoutUtils:
             payment_account_repo=payment_account_repo, account_type=None
         )
         request = CreateStandardPayoutRequest(
-            transfer_id="123", payout_account_id=payment_account.id, amount=100
+            transfer_id="123",
+            payout_account_id=payment_account.id,
+            amount=100,
+            statement_descriptor="statement_descriptor",
         )
         create_payout_op = CreateStandardPayout(
             request=request,
@@ -258,6 +266,7 @@ class TestCreateStandardPayoutUtils:
         request = CreateStandardPayoutRequest(
             transfer_id=str(transfer.id),
             payout_account_id=payment_account.id,
+            statement_descriptor="statement_descriptor",
             amount=100,
         )
         create_payout_op = CreateStandardPayout(
@@ -543,6 +552,7 @@ class TestCreateStandardPayoutUtils:
             transfer_id=transfer.id,
             payment_account=payment_account,
             amount=100,
+            statement_descriptor="statement_descriptor",
             target_type=PayoutTargetType.DASHER,
             target_id="target_id",
             stripe=stripe,
@@ -600,6 +610,7 @@ class TestCreateStandardPayoutUtils:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
+                statement_descriptor="statement_descriptor",
                 target_type=PayoutTargetType.DASHER,
                 target_id="target_id",
                 stripe=stripe,
@@ -646,6 +657,7 @@ class TestCreateStandardPayoutUtils:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
+                statement_descriptor="statement_descriptor",
                 target_type=PayoutTargetType.DASHER,
                 target_id="target_id",
                 stripe=stripe,
@@ -708,6 +720,7 @@ class TestCreateStandardPayoutUtils:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
+                statement_descriptor="statement_descriptor",
                 target_type=PayoutTargetType.DASHER,
                 target_id="target_id",
                 stripe=stripe,
@@ -770,6 +783,7 @@ class TestCreateStandardPayoutUtils:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
+                statement_descriptor="statement_descriptor",
                 target_type=PayoutTargetType.DASHER,
                 target_id="target_id",
                 stripe=stripe,
@@ -832,6 +846,7 @@ class TestCreateStandardPayoutUtils:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
+                statement_descriptor="statement_descriptor",
                 target_type=PayoutTargetType.DASHER,
                 target_id="target_id",
                 stripe=stripe,
