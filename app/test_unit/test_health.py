@@ -49,6 +49,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
             http_client=TimedRequestsClient(),
         ),
         capture_service=MagicMock(),
+        ids_session=MagicMock(),
     )
     app.extra["context"] = cast(Any, context)
 

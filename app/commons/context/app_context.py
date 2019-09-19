@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from random import choice
 from typing import Any, cast
 
+import aiohttp
 from starlette.requests import Request
 from structlog.stdlib import BoundLogger
 
@@ -52,6 +53,8 @@ class AppContext:
 
     capture_service: CaptureService
 
+    ids_session: aiohttp.ClientSession
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -67,6 +70,7 @@ class AppContext:
                 self.payin_paymentdb.disconnect(),
                 self.ledger_maindb.disconnect(),
                 self.ledger_paymentdb.disconnect(),
+                self.ids_session.close(),
             )
         finally:
             # shutdown the threadpool
@@ -180,6 +184,8 @@ async def create_app_context(config: AppConfig) -> AppContext:
         }
     )
 
+    ids_session: aiohttp.ClientSession = aiohttp.ClientSession()
+
     identity_client: IdentityClientInterface
     if config.ENVIRONMENT in ["testing", "local"]:
         # disable testing
@@ -188,6 +194,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         identity_client = IdentityClient(
             http_endpoint=config.IDENTITY_SERVICE_HTTP_ENDPOINT,
             grpc_endpoint=config.IDENTITY_SERVICE_GRPC_ENDPOINT,
+            session=ids_session,
         )
 
     capture_service = CaptureService(
@@ -208,6 +215,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         stripe_client=stripe_client,
         stripe_thread_pool=stripe_thread_pool,
         capture_service=capture_service,
+        ids_session=ids_session,
     )
 
     # start monitoring

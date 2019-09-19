@@ -1,7 +1,7 @@
 from fastapi import Depends
 
 from app.commons.applications import FastAPI
-from app.commons.auth.service_auth import RouteAuthorizer
+from app.commons.auth.service_auth import ApiSecretRouteAuthorizer
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import group_routers
@@ -24,7 +24,7 @@ def create_payin_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
         config=config.PAYIN_STATSD_CONFIG,
     )
 
-    router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
+    router_authorizer = ApiSecretRouteAuthorizer(config.PAYIN_SERVICE_ID)
 
     auto_commando_routers = group_routers(
         [dispute.v0.router, payer.v0.router, payment_method.v0.router],
@@ -54,7 +54,7 @@ def create_payin_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
         config=config.PAYIN_STATSD_CONFIG,
     )
 
-    router_authorizer = RouteAuthorizer(config.PAYIN_SERVICE_ID)
+    router_authorizer = ApiSecretRouteAuthorizer(config.PAYIN_SERVICE_ID)
 
     auto_commando_routers = group_routers(
         [payer.v1.router, payment_method.v1.router],

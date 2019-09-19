@@ -1,7 +1,7 @@
 from fastapi import Depends
 
 from app.commons.applications import FastAPI
-from app.commons.auth.service_auth import RouteAuthorizer
+from app.commons.auth.service_auth import ApiSecretRouteAuthorizer
 from app.commons.config.app_config import AppConfig
 
 from app.commons.context.app_context import AppContext, set_context_for_app
@@ -34,7 +34,7 @@ def create_ledger_app(context: AppContext, config: AppConfig) -> FastAPI:
         config=config.LEDGER_STATSD_CONFIG,
     )
 
-    route_authorizer = RouteAuthorizer(config.LEDGER_SERVICE_ID)
+    route_authorizer = ApiSecretRouteAuthorizer(config.LEDGER_SERVICE_ID)
     grouped_routers = group_routers([mx_transaction.v1.router, mx_ledger.v1.router])
 
     app.include_router(grouped_routers, dependencies=[Depends(route_authorizer)])

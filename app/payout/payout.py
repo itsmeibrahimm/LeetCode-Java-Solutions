@@ -1,6 +1,6 @@
 from app.commons.api.exceptions import register_payment_exception_handler
 from app.commons.applications import FastAPI
-from app.commons.auth.service_auth import RouteAuthorizer
+from app.commons.auth.service_auth import ApiSecretRouteAuthorizer
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import default_payment_router_builder
@@ -23,7 +23,7 @@ def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
 
     # Mount routers
     default_payment_router_builder().add_common_dependencies(
-        RouteAuthorizer(config.PAYOUT_SERVICE_ID)
+        ApiSecretRouteAuthorizer(config.PAYOUT_SERVICE_ID)
     ).add_sub_routers(
         {
             "/accounts": account.v0.router,
@@ -55,7 +55,9 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Mount routers
     default_payment_router_builder().add_sub_routers(
         {"/accounts": account.v1.router}
-    ).add_common_dependencies(RouteAuthorizer(config.PAYOUT_SERVICE_ID)).attach_to_app(
+    ).add_common_dependencies(
+        ApiSecretRouteAuthorizer(config.PAYOUT_SERVICE_ID)
+    ).attach_to_app(
         app_v1
     )
 
