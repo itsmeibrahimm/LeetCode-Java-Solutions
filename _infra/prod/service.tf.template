@@ -66,7 +66,7 @@ module "payment-service-cron" {
 
   service_max_surge                         = "200%"
   service_max_unavailable                   = "0"
-  service_replica_count                     = "0"
+  service_replica_count                     = "1"
   service_container_port                    = "80"
 
   service_liveness_probe_init_delay         = "20"
