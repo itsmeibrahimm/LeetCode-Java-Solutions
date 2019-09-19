@@ -10,15 +10,16 @@ from app.commons.api.models import PaymentException
 ###########################################################
 payout_error_message_maps = {
     # payout errors
+    # payout_1, payout_4, payout_5, payout_6, payout_8 requires customized error message
     "payout_0": "Cannot make stripe transfer without stripe account id.",
-    "payout_1": "This should not show up.",
+    "payout_1": "",
     "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
-    "payout_3": "Cannot process payment for the given country",
-    "payout_4": "This should not show up.",
-    "payout_5": "This should not show up.",
-    "payout_6": "This should not show up.",
+    "payout_3": "Cannot process payment for the given country.",
+    "payout_4": "",
+    "payout_5": "",
+    "payout_6": "",
     "payout_7": "Already submitted stripe transfer",
-    "payout_8": "This should not show up.",
+    "payout_8": "",
     "payout_9": "Payment account has no corresponding stripe_account",
     "payout_10": "Failed to submit sma transfer due to connection error",
     "payout_11": "Failed to submit sma transfer due to other error",
@@ -61,7 +62,7 @@ class PayoutErrorCode(str, Enum):
 
 class PayoutError(PaymentException):
     """
-    Base exception class for payout submission. This is base class that can be inherited by
+    Base exception class for payout. This is base class that can be inherited by
     each business operation layer with corresponding sub error class and
     raise to application layers.  Provides automatic supplying of error message
     based on provided code.
