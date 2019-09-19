@@ -21,10 +21,10 @@ module "payment-service-web" {
 
   service_max_surge                         = "200%"
   service_max_unavailable                   = "0"
-  service_replica_count                     = "3"
+  service_replica_count                     = "8"
   service_container_port                    = "80"
   service_hpa_enable                        = "true"
-  service_hpa_min_replicas                  = "3"
+  service_hpa_min_replicas                  = "8"
   service_hpa_max_replicas                  = "15"
   service_hpa_cpu_target_avg_util           = "50"
 
