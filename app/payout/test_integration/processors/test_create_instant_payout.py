@@ -113,7 +113,19 @@ class TestCreateInstantPayoutUtils:
         assert sma_transfer.amount == self.amount
         assert sma_transfer.to_stripe_account_id == sma.stripe_id
 
-    async def test_create_instant_payout_without_payment_account(self):
+    async def test_create_instant_payout_without_payment_account(
+        self,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repo: PaymentAccountRepository,
+    ):
+        @asyncio.coroutine
+        def mock_get_payment_account(*args, **kwargs):
+            return None
+
+        mocker.patch(
+            "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_payment_account_by_id",
+            side_effect=mock_get_payment_account,
+        )
         with pytest.raises(PayoutError) as e:
             await self.create_instant_payout_operation._execute()
         assert e.value.status_code == HTTP_400_BAD_REQUEST
