@@ -23,7 +23,6 @@ class PaymentIntentTable(TableDefinition):
         Column("application_fee_amount", Integer)
     )
     capture_method: Column = no_init_field(Column("capture_method", String))
-    confirmation_method: Column = no_init_field(Column("confirmation_method", String))
     country: Column = no_init_field(Column("country", String))
     currency: Column = no_init_field(Column("currency", String))
     status: Column = no_init_field(Column("status", String))

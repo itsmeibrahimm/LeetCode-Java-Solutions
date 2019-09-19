@@ -44,7 +44,6 @@ from app.payin.core.cart_payment.model import (
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
     ChargeStatus,
-    ConfirmationMethod,
     IntentStatus,
     LegacyStripeChargeStatus,
 )
@@ -409,14 +408,6 @@ class CartPaymentInterface:
         )
         return CreatePaymentIntent.CaptureMethod(target_method)
 
-    def _get_provider_confirmation_method(
-        self, pgp_payment_intent: PgpPaymentIntent
-    ) -> CreatePaymentIntent.ConfirmationMethod:
-        target_method = self._transform_method_for_stripe(
-            pgp_payment_intent.confirmation_method
-        )
-        return CreatePaymentIntent.ConfirmationMethod(target_method)
-
     def _get_provider_future_usage(self, payment_intent: PaymentIntent) -> str:
         if payment_intent.capture_method == CaptureMethod.AUTO:
             return CreatePaymentIntent.SetupFutureUsage.ON_SESSION
@@ -623,7 +614,6 @@ class CartPaymentInterface:
             country=country,
             currency=currency,
             capture_method=capture_method,
-            confirmation_method=ConfirmationMethod.MANUAL,
             status=IntentStatus.INIT,
             statement_descriptor=payer_statement_description,
             capture_after=capture_after,
@@ -649,7 +639,6 @@ class CartPaymentInterface:
                 cart_payment.split_payment, "payout_account_id", None
             ),
             capture_method=capture_method,
-            confirmation_method=ConfirmationMethod.MANUAL,
             status=IntentStatus.INIT,
             statement_descriptor=payer_statement_description,
         )
@@ -672,9 +661,10 @@ class CartPaymentInterface:
                 application_fee_amount=pgp_payment_intent.application_fee_amount,
                 capture_method=self._get_provider_capture_method(pgp_payment_intent),
                 confirm=True,
-                confirmation_method=self._get_provider_confirmation_method(
-                    pgp_payment_intent
-                ),
+                # Set confirmation method to "manual". Do not change this!
+                # See link below for more details on what confirmation_method is
+                # https://stripe.com/docs/api/payment_intents/create#create_payment_intent-confirmation_method
+                confirmation_method="manual",
                 on_behalf_of=pgp_payment_intent.payout_account_id,
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
                 payment_method=provider_payment_resource_id,

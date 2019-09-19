@@ -113,10 +113,6 @@ class CreatePaymentIntent(StripeBaseModel):
         AUTOMATIC = "automatic"
         MANUAL = "manual"
 
-    class ConfirmationMethod(str, Enum):
-        AUTOMATIC = "automatic"
-        MANUAL = "manual"
-
     class SetupFutureUsage(str, Enum):
         ON_SESSION = "on_session"
         OFF_SESSION = "off_session"
@@ -584,7 +580,6 @@ class PaymentIntent(StripeBaseModel):
     cancellation_reason: Optional[str]
     capture_method: str
     charges: Charges
-    confirmation_method: str
     created: datetime
     currency: str
     customer: str

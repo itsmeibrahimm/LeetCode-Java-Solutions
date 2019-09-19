@@ -21,7 +21,6 @@ from app.payin.core.cart_payment.model import (
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     CaptureMethod,
-    ConfirmationMethod,
     ChargeStatus,
     LegacyStripeChargeStatus,
 )
@@ -124,7 +123,6 @@ async def payment_intent(
         country=CountryCode.US,
         currency="USD",
         capture_method=CaptureMethod.MANUAL,
-        confirmation_method=ConfirmationMethod.MANUAL,
         status=IntentStatus.REQUIRES_CAPTURE,
         statement_descriptor=None,
         capture_after=datetime(2019, 1, 1),
@@ -151,7 +149,6 @@ async def pgp_payment_intent(
         application_fee_amount=None,
         payout_account_id=None,
         capture_method=CaptureMethod.MANUAL,
-        confirmation_method=ConfirmationMethod.MANUAL,
         status=IntentStatus.REQUIRES_CAPTURE,
         statement_descriptor="Test",
     )
@@ -239,7 +236,6 @@ class TestPaymentIntent:
             amount_received=payment_intent.amount_received,
             application_fee_amount=payment_intent.application_fee_amount,
             capture_method=payment_intent.capture_method,
-            confirmation_method=payment_intent.confirmation_method,
             country=payment_intent.country,
             currency=payment_intent.currency,
             status=payment_intent.status,
@@ -274,7 +270,6 @@ class TestPaymentIntentAdjustmentHistory:
             country=CountryCode.US,
             currency="USD",
             capture_method=CaptureMethod.MANUAL,
-            confirmation_method=ConfirmationMethod.MANUAL,
             status=IntentStatus.REQUIRES_CAPTURE,
             statement_descriptor=None,
             capture_after=None,
@@ -338,7 +333,6 @@ class TestPgpPaymentIntent:
             application_fee_amount=pgp_payment_intent.application_fee_amount,
             payout_account_id=pgp_payment_intent.payout_account_id,
             capture_method=pgp_payment_intent.capture_method,
-            confirmation_method=pgp_payment_intent.confirmation_method,
             created_at=pgp_payment_intent.created_at,
             updated_at=result.updated_at,  # Don't know exact date ahead of time
             captured_at=pgp_payment_intent.captured_at,
@@ -375,7 +369,6 @@ class TestPgpPaymentIntent:
             application_fee_amount=pgp_payment_intent.application_fee_amount,
             payout_account_id=pgp_payment_intent.payout_account_id,
             capture_method=pgp_payment_intent.capture_method,
-            confirmation_method=pgp_payment_intent.confirmation_method,
             created_at=pgp_payment_intent.created_at,
             updated_at=result.updated_at,  # Don't know exact date ahead of time
             captured_at=pgp_payment_intent.captured_at,

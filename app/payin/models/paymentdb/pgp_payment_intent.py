@@ -31,7 +31,6 @@ class PgpPaymentIntentTable(TableDefinition):
         Column("application_fee_amount", Integer)
     )
     capture_method: Column = no_init_field(Column("capture_method", String))
-    confirmation_method: Column = no_init_field(Column("confirmation_method", String))
     payout_account_id: Column = no_init_field(Column("payout_account_id", Text))
     status: Column = no_init_field(Column("status", String))
     statement_descriptor: Column = no_init_field(Column("statement_descriptor", String))

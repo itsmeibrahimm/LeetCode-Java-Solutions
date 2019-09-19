@@ -67,7 +67,6 @@ class PaymentIntent(BaseModel):
     amount_received: Optional[int]
     application_fee_amount: Optional[int]
     capture_method: str
-    confirmation_method: str
     country: str
     currency: str
     status: IntentStatus
@@ -102,7 +101,6 @@ class PgpPaymentIntent:
     application_fee_amount: Optional[int]
     payout_account_id: Optional[str]
     capture_method: str
-    confirmation_method: str
     created_at: datetime
     updated_at: datetime
     captured_at: Optional[datetime]

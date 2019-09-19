@@ -13,11 +13,6 @@ class CaptureMethod(str, Enum):
     MANUAL = "manual"
 
 
-class ConfirmationMethod(str, Enum):
-    AUTO = "auto"
-    MANUAL = "manual"
-
-
 class IntentStatus(str, Enum):
     INIT = "init"
     PROCESSING = "processing"

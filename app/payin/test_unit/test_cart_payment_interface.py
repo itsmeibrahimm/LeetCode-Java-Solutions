@@ -564,15 +564,6 @@ class TestCartPaymentInterface:
         result = cart_payment_interface._get_provider_capture_method(intent)
         assert result == CreatePaymentIntent.CaptureMethod.AUTOMATIC
 
-    def test_get_provider_confirmation_method(self, cart_payment_interface):
-        intent = generate_payment_intent(confirmation_method="manual")
-        result = cart_payment_interface._get_provider_confirmation_method(intent)
-        assert result == CreatePaymentIntent.ConfirmationMethod.MANUAL
-
-        intent = generate_payment_intent(confirmation_method="auto")
-        result = cart_payment_interface._get_provider_confirmation_method(intent)
-        assert result == CreatePaymentIntent.ConfirmationMethod.AUTOMATIC
-
     def test_get_provider_future_usage(self, cart_payment_interface):
         intent = generate_payment_intent(capture_method="manual")
         result = cart_payment_interface._get_provider_future_usage(intent)
@@ -705,7 +696,6 @@ class TestCartPaymentInterface:
             amount_received=None,
             application_fee_amount=None,
             capture_method=CaptureMethod.MANUAL.value,
-            confirmation_method="manual",
             country=country,
             currency=currency,
             status=IntentStatus.INIT,
@@ -832,7 +822,6 @@ class TestCartPaymentInterface:
             amount_received=None,
             application_fee_amount=None,
             capture_method="manual",
-            confirmation_method="manual",
             country="US",
             currency="USD",
             status=IntentStatus.INIT,
@@ -871,7 +860,6 @@ class TestCartPaymentInterface:
             amount_received=None,
             application_fee_amount=None,
             capture_method="manual",
-            confirmation_method="manual",
             payout_account_id=None,
             created_at=result_pgp_intent.created_at,  # Generated field
             updated_at=result_pgp_intent.updated_at,  # Generated field

@@ -12,11 +12,7 @@ from app.payin.core.cart_payment.model import (
     CorrelationIds,
     PgpPaymentIntent,
 )
-from app.payin.core.cart_payment.types import (
-    IntentStatus,
-    CaptureMethod,
-    ConfirmationMethod,
-)
+from app.payin.core.cart_payment.types import IntentStatus, CaptureMethod
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
@@ -75,7 +71,6 @@ async def payment_intent(
         country=payment_intent.country,
         currency=payment_intent.currency,
         capture_method=payment_intent.capture_method,
-        confirmation_method=payment_intent.confirmation_method,
         status=payment_intent.status,
         statement_descriptor=payment_intent.statement_descriptor,
         capture_after=datetime(2016, 1, 1),
@@ -101,7 +96,6 @@ class PaymentIntentFactory(factory.Factory):
     amount_received = 0
     application_fee_amount = 0
     capture_method = CaptureMethod.MANUAL
-    confirmation_method = ConfirmationMethod.MANUAL
     country = CountryCode.US
     currency = CurrencyType.USD
     status = IntentStatus.INIT
@@ -157,7 +151,6 @@ class PgpPaymentIntentFactory(factory.Factory):
     payment_method_resource_id = "asdf"
     customer_resource_id = "asdf"
     capture_method = CaptureMethod.MANUAL.value
-    confirmation_method = ConfirmationMethod.MANUAL.value
     currency = CurrencyType.USD
     amount = 100
     amount_capturable = 100
