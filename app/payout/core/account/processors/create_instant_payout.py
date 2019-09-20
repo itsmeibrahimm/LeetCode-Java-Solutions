@@ -54,6 +54,7 @@ class CreateInstantPayoutRequest(OperationRequest):
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.INSTANT
     payout_card_id: int
+    payout_stripe_card_id: str
     payout_idempotency_key: str
     payout_id: Optional[str] = None
     method: Optional[PayoutMethodType]
