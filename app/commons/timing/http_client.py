@@ -1,5 +1,8 @@
 import abc
-from typing import Any, Callable, List, Dict, Optional
+from enum import Enum
+from types import TracebackType
+from typing import Any, Callable, List, Dict, Optional, Type
+from typing_extensions import Literal
 
 import structlog
 import requests
@@ -8,12 +11,17 @@ from doordash_python_stats import ddstats
 
 from app.commons import tracing
 from app.commons.context.logger import root_logger as default_logger
+from app.commons.timing.base import format_exc_name
 from app.commons.stats import get_service_stats_client, get_request_logger
 from app.commons.tracing import Processor
 
-UNKNOWN_STATUS_CODE = (
-    "UNKNOWN"
-)  # likely indicates an exception occured while processing the client request
+
+class RequestStatus(str, Enum):
+    success = "success"
+    client_error = "client_error"  # 4XX
+    server_error = "server_error"  # 5XX
+    timeout = "timeout"  # client timeout
+    exception = "exception"  # client exception
 
 
 class HttpClientTracker(tracing.BaseTimer, metaclass=abc.ABCMeta):
@@ -23,6 +31,9 @@ class HttpClientTracker(tracing.BaseTimer, metaclass=abc.ABCMeta):
 
     status_code: str = ""
     client_request_id: str = ""
+
+    request_status: str = RequestStatus.success
+    exception_name: str = ""
 
     @abc.abstractmethod
     def process_result(self, result):
@@ -58,6 +69,11 @@ def log_http_client_timing(
         context["status_code"] = timer.status_code
     if timer.client_request_id:
         context["client_request_id"] = timer.client_request_id
+
+    context["request_status"] = timer.request_status
+    if timer.exception_name:
+        context["exception_name"] = timer.exception_name
+
     log.info(
         "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
     )
@@ -85,6 +101,8 @@ def stat_http_client_timing(
     )
     if timer.status_code:
         tags["status_code"] = timer.status_code
+
+    tags["request_status"] = timer.request_status
 
     stats.timing(tracker.stat_name, timer.delta_ms, tags=tags)
     log.debug("statsd: %s", tracker.stat_name, latency_ms=timer.delta_ms, tags=tags)
@@ -127,17 +145,48 @@ class HttpClientTimingManager(
 
 
 class StripeClientTracker(HttpClientTracker):
-    status_code: str = ""
-    client_request_id: str = ""
-
     def process_result(self, result: requests.Response):
         """
         Process a requests HTTP response to get the status code
         and Request ID (from stripe)
         """
         self.status_code = str(result.status_code)
+
+        if 400 <= result.status_code < 500:
+            self.request_status = RequestStatus.client_error
+        elif 500 <= result.status_code < 600:
+            self.request_status = RequestStatus.server_error
+
         # stripe returns their request id
         self.client_request_id = result.headers.get("Request-Id", "")
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> Optional[Literal[False]]:
+        # ensure we get timing information
+        super().__exit__(exc_type, exc_value, traceback)
+
+        # no error, request is successful
+        if exc_type is None:
+            return False
+
+        # record exception info
+        self.exception_name = format_exc_name(exc_type)
+
+        if isinstance(
+            # known timeout errors
+            exc_value,
+            (requests.Timeout),
+        ):
+            self.request_status = RequestStatus.timeout
+        else:
+            # something else
+            self.request_status = RequestStatus.exception
+
+        return False
 
 
 class StripeTimingManager(HttpClientTimingManager):
@@ -220,15 +269,13 @@ def stat_identity_client_security(
         include={"application_name", "provider_name", "action", "resource"},
         skip_defaults=True,
     )
-    tags["status_code"] = (
-        timer.status_code if timer.status_code else UNKNOWN_STATUS_CODE
-    )
+    tags["status_code"] = timer.status_code
     stats.incr(tracker.stat_name, tags=tags)
     log.debug("statsd: %s", tracker.stat_name, tags=tags)
 
 
 class IdentityAioSecurityTracker(tracing.BaseTimer):
-    status_code: str = ""
+    status_code: str = "UNKNOWN"
 
     def process_result(self, result: ClientResponse):
         """

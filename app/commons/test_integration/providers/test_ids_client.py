@@ -22,12 +22,9 @@ class TestIdentityClient:
     route = f"/api/v1/verify/{str(service_id)}"
 
     async def _make_ids_client(
-        self,
-        ids_app: aiohttp.web.Application,
-        aiohttp_client: aiohttp.test_utils.TestClient,
-        timeout: int = 3,
+        self, ids_app: aiohttp.web.Application, aiohttp_client, timeout: int = 3
     ):
-        client = await aiohttp_client(ids_app)
+        client: aiohttp.test_utils.TestClient = await aiohttp_client(ids_app)
         identity_client = IdentityClient(
             http_endpoint=f"http://{client.host}:{client.port}",
             grpc_endpoint="Nah nah nah Zohaib",

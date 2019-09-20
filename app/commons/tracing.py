@@ -6,6 +6,9 @@ import time
 from collections import deque
 from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
+import pydantic
+
+from types import TracebackType
 from typing import (
     TypeVar,
     Generic,
@@ -16,10 +19,15 @@ from typing import (
     Deque,
     Optional,
     Dict,
+    Type,
     cast,
 )
 
 import pydantic
+from typing_extensions import Literal
+from collections import deque
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar
 from pydantic.fields import Field
 
 from app.commons.context.logger import root_logger as default_logger
@@ -441,6 +449,15 @@ def track_breadcrumb(
 
 
 class BaseTracker(ContextManager):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> Optional[Literal[False]]:
+        # trackers should not suppress exceptions
+        return False
+
     def process_result(self, result: Any):
         """
         callback receiving the result of the wrapped function call
@@ -479,9 +496,15 @@ class BaseTimer(BaseTracker):
         self.start_counter = time.perf_counter()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> Optional[Literal[False]]:
         # stop timing
         self.end_counter = time.perf_counter()
+        return False
 
 
 TManager = TypeVar("TManager", bound="TimingManager")

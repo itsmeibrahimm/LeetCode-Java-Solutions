@@ -86,6 +86,7 @@ class TestDatabaseTimingTracker:
             "instance_name": "master",
             "transaction_name": "do_something",
             "query_name": "insert_into_table",
+            "request_status": "success",
         }
 
         update_name = ("dd.pay.payment-service.io.db.latency", "update_table")
@@ -97,6 +98,7 @@ class TestDatabaseTimingTracker:
             "instance_name": "master",
             "transaction_name": "do_something",
             "query_name": "update_table",
+            "request_status": "success",
         }
 
         # transaction timing
@@ -110,4 +112,5 @@ class TestDatabaseTimingTracker:
             # "transaction_name": "do_something",
             "query_type": "transaction",
             "query_name": "do_something",
+            "request_status": "success",
         }

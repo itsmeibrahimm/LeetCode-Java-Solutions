@@ -1,5 +1,5 @@
 import functools
-from typing import Any, Callable, List, Dict, Optional
+from typing import Any, Callable, List, Dict, Optional, Type
 
 import structlog
 from doordash_python_stats import ddstats
@@ -8,6 +8,17 @@ from app.commons import tracing
 from app.commons.context.logger import root_logger as default_logger
 from app.commons.stats import get_service_stats_client, get_request_logger
 from app.commons.tracing import Processor, TManager, Unspecified
+
+
+def format_exc_name(exc_type: Type[BaseException]) -> str:
+    if not exc_type:
+        return ""
+    # lifted from traceback
+    stype = exc_type.__qualname__
+    smod = exc_type.__module__
+    if smod not in ("__main__", "builtins"):
+        stype = smod + "." + stype
+    return stype
 
 
 def stat_func_timing(tracker: "FuncTimingManager", timer: "FuncTimer"):

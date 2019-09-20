@@ -71,4 +71,5 @@ class TestStripePoolStats:
             "resource": "customer",
             "action": "create",
             "status_code": "200",
+            "request_status": "success",
         }

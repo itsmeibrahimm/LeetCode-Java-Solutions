@@ -3,20 +3,40 @@ import functools
 import sys
 import structlog
 
-from types import FrameType
-from typing import Tuple, Any, Callable, List, Dict
-from typing_extensions import AsyncContextManager, Protocol, runtime_checkable
+from enum import Enum
+from types import FrameType, TracebackType
+from typing import Tuple, Any, Callable, List, Dict, Optional, Type
+from typing_extensions import AsyncContextManager, Literal, Protocol, runtime_checkable
 from doordash_python_stats import ddstats
 
 from app.commons import tracing
+from app.commons.timing.base import format_exc_name
 from app.commons.context.logger import root_logger as default_logger
 from app.commons.stats import get_service_stats_client, get_request_logger
+
+import asyncio
+import concurrent.futures
+
+try:
+    from psycopg2.errors import QueryCanceledError
+except ImportError:
+    from psycopg2.extensions import QueryCanceledError
 
 
 @runtime_checkable
 class Database(Protocol):
     database_name: str
     instance_name: str
+
+
+class RequestStatus(str, Enum):
+    """
+    Request Status categories for Database Queries
+    """
+
+    success = "success"
+    timeout = "timeout"
+    error = "error"
 
 
 def _discover_caller(additional_ignores=None) -> Tuple[FrameType, str]:
@@ -56,6 +76,9 @@ class DatabaseTimer(tracing.BaseTimer):
     calling_function_name: str = ""
     stack_frame: Any = None
 
+    request_status: str = RequestStatus.success
+    exception_name: str = ""
+
     def __init__(self, database: Database, additional_ignores=None):
         super().__init__()
         self.database = database
@@ -68,6 +91,39 @@ class DatabaseTimer(tracing.BaseTimer):
         )
         self.calling_function_name = self.stack_frame.f_code.co_name
         return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> Optional[Literal[False]]:
+        # ensure we get timing information
+        super().__exit__(exc_type, exc_value, traceback)
+
+        # no error, request is successful
+        if exc_type is None:
+            return False
+
+        # record exception info
+        self.exception_name = format_exc_name(exc_type)
+
+        if isinstance(
+            # known timeout errors
+            exc_value,
+            (
+                asyncio.TimeoutError,
+                asyncio.CancelledError,
+                concurrent.futures.TimeoutError,
+                QueryCanceledError,
+            ),
+        ):
+            self.request_status = RequestStatus.timeout
+        else:
+            # something else
+            self.request_status = RequestStatus.error
+
+        return False
 
 
 def track_query(func):
@@ -90,6 +146,7 @@ def log_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
         "instance_name": timer.database.instance_name,
         "transaction": bool(breadcrumb.transaction_name),
         "transaction_name": breadcrumb.transaction_name,
+        "request_status": timer.request_status,
     }
     caller = breadcrumb.dict(
         include={"application_name", "processor_name", "repository_name"},
@@ -97,6 +154,8 @@ def log_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
     )
     if timer.calling_module_name:
         caller["module_name"] = timer.calling_module_name
+    if timer.exception_name:
+        database["exception_name"] = timer.exception_name
 
     log.info(
         tracker.message,
@@ -117,6 +176,7 @@ def log_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTime
     database = {
         "database_name": timer.database.database_name,
         "instance_name": timer.database.instance_name,
+        "request_status": timer.request_status,
     }
 
     caller = breadcrumb.dict(
@@ -125,6 +185,8 @@ def log_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTime
     )
     if timer.calling_module_name:
         caller["module_name"] = timer.calling_module_name
+    if timer.exception_name:
+        database["exception_name"] = timer.exception_name
 
     log.info(
         tracker.message,
@@ -166,6 +228,9 @@ def _stat_query_timing(
         tags["database_name"] = timer.database.database_name
     if timer.database.instance_name:
         tags["instance_name"] = timer.database.instance_name
+
+    if timer.request_status:
+        tags["request_status"] = timer.request_status
 
     # emit stats
     stats.timing(stat_name, timer.delta_ms, tags=tags)
