@@ -25,6 +25,7 @@ payout_error_message_maps = {
     "payout_11": "Failed to submit sma transfer due to other error",
     "payout_12": "All existing Stripe transfers must be failed or canceled.",
     "payout_13": "Cannot find payment_account with given id.",
+    "payout_14": "Failed to submit stripe payout due to RateLimitError",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     # payout method errors
@@ -50,6 +51,7 @@ class PayoutErrorCode(str, Enum):
     OTHER_ERROR = "payout_11"
     TRANSFER_PROCESSING = "payout_12"
     INVALID_PAYMENT_ACCOUNT_ID = "payout_13"
+    RATE_LIMIT_ERROR = "payout_14"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"

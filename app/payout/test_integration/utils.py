@@ -154,7 +154,7 @@ async def prepare_and_insert_stripe_payout_request(
         payout_id=payout_id,
         idempotency_key=ide_key,
         payout_method_id=1,
-        status="failed",
+        status="new",
         stripe_payout_id=f"stripe_tr_xxx_{payout_id}",
         stripe_account_id="cus_xxxx_1",
     )
