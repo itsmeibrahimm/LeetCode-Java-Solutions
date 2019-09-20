@@ -51,16 +51,13 @@ async def create_payment_method(
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
     """
-    log.info("[create_payment_method] receive request. payer_id:%s", req_body.payer_id)
+    log.info("[create_payment_method] receive request", payer_id=req_body.payer_id)
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
             payer_id=req_body.payer_id,
             pgp_code=req_body.payment_gateway,
             token=req_body.token,
-            # dd_consumer_id=dd_consumer_id,
-            # stripe_customer_id=stripe_customer_id,
-            # country=country,
         )
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError as e:

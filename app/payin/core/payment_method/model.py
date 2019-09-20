@@ -53,8 +53,8 @@ class PaymentGatewayProviderDetails(BaseModel):
 class PaymentMethod(BaseModel):
     id: Optional[UUID] = None  # make it optional for existing DSJ stripe_card
     payer_id: Optional[UUID] = None
-    type: Optional[str]
-    dd_consumer_id: Optional[str] = None
+    type: str
+    dd_payer_id: Optional[str] = None
     dd_stripe_card_id: int  # primary key of maindb_stripe_card
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -130,7 +130,7 @@ class RawPaymentMethod:
             PaymentMethod(
                 id=self.pgp_payment_method_entity.id,
                 payer_id=self.pgp_payment_method_entity.payer_id,
-                dd_consumer_id=self.pgp_payment_method_entity.legacy_consumer_id,
+                dd_payer_id=self.pgp_payment_method_entity.legacy_consumer_id,
                 type=self.pgp_payment_method_entity.type,
                 dd_stripe_card_id=self.stripe_card_entity.id,
                 card=card,
@@ -143,7 +143,7 @@ class RawPaymentMethod:
             if self.pgp_payment_method_entity
             else PaymentMethod(
                 payer_id=None,
-                dd_consumer_id=str(self.stripe_card_entity.consumer_id),
+                dd_payer_id=str(self.stripe_card_entity.consumer_id),
                 type="card",
                 dd_stripe_card_id=self.stripe_card_entity.id,
                 card=card,

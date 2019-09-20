@@ -64,8 +64,6 @@ class PaymentMethodProcessor:
         :return:
         """
 
-        # step 1: lookup pgp_customer_resource_id and country information
-        # TODO: retrieve pgp_resouce_id from pgp_customers table, instead of payers.legacy_stripe_customer_id
         if not (payer_id or dd_consumer_id or stripe_customer_id):
             self.log.info(f"[create_payment_method] invalid input. must provide id")
             raise PaymentMethodCreateError(
@@ -73,6 +71,7 @@ class PaymentMethodProcessor:
                 retryable=False,
             )
 
+        # step 1: lookup pgp_customer_resource_id and country information
         pgp_customer_res_id: Optional[str]
         pgp_country: Optional[str] = country
         raw_payer: RawPayer
@@ -109,12 +108,17 @@ class PaymentMethodProcessor:
         )
 
         # step 3: crete pgp_payment_method and stripe_card objects
+        dd_payer_id: Optional[str] = None
+        if dd_consumer_id:
+            dd_payer_id = dd_consumer_id
+        elif raw_payer and raw_payer.payer_entity:
+            dd_payer_id = raw_payer.payer_entity.dd_payer_id
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
             id=generate_object_uuid(),
             pgp_code=pgp_code,
             stripe_payment_method=stripe_payment_method,
             payer_id=payer_id,
-            legacy_consumer_id=dd_consumer_id,
+            legacy_consumer_id=dd_payer_id,
         )
         return raw_payment_method.to_payment_method()
 

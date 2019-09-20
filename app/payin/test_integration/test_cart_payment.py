@@ -91,7 +91,7 @@ class TestCartPayment:
         assert payment_method["payment_gateway_provider_details"]["payment_method_id"]
         assert payment_method["payer_id"] == payer["id"]
         assert payment_method["type"] == "card"
-        assert payment_method["dd_consumer_id"] is None
+        assert payment_method["dd_payer_id"] is not None
         assert payer["created_at"]
         assert payer["updated_at"]
         assert payer["deleted_at"] is None

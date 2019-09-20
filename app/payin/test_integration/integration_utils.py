@@ -5,8 +5,8 @@ from starlette.testclient import TestClient
 from typing import Any, Dict, Optional
 
 V1_PAYERS_ENDPOINT = "/payin/api/v1/payers"
-V0_PAYMENT_METHOD_ENDPOINT = "/payin/api/v0/payment_methods"
-V1_PAYMENT_METHOD_ENDPOINT = "/payin/api/v1/payment_methods"
+V0_PAYMENT_METHODS_ENDPOINT = "/payin/api/v0/payment_methods"
+V1_PAYMENT_METHODS_ENDPOINT = "/payin/api/v1/payment_methods"
 
 
 class CreatePayerV1Request(BaseModel):
@@ -34,11 +34,15 @@ def _create_payer_v1_url():
 
 
 def _create_payment_method_v0_url():
-    return V0_PAYMENT_METHOD_ENDPOINT
+    return V0_PAYMENT_METHODS_ENDPOINT
 
 
 def _create_payment_method_v1_url():
-    return V1_PAYMENT_METHOD_ENDPOINT
+    return V1_PAYMENT_METHODS_ENDPOINT
+
+
+def _delete_payment_methods_url(payment_method_id: str):
+    return f"{V1_PAYMENT_METHODS_ENDPOINT}/{payment_method_id}"
 
 
 def create_payer_v1(
@@ -99,7 +103,9 @@ def create_payment_method_v1(
         "payment_gateway": request.payment_gateway,
         "token": request.token,
     }
-    response = client.post(_create_payer_v1_url(), json=create_payment_method_request)
+    response = client.post(
+        _create_payment_method_v1_url(), json=create_payment_method_request
+    )
     assert response.status_code == 201
     payment_method: dict = response.json()
     assert UUID(payment_method["id"], version=4)
@@ -123,4 +129,17 @@ def create_payment_method_v1(
     assert payment_method["card"]["exp_year"] is not None
     assert payment_method["card"]["exp_month"] is not None
     assert payment_method["card"]["fingerprint"] is not None
+    assert payment_method["dd_payer_id"] is not None
+    return payment_method
+
+
+def delete_payment_methods_v1(
+    client: TestClient, payment_method_id: Any
+) -> Dict[str, Any]:
+    response = client.delete(
+        _delete_payment_methods_url(payment_method_id=payment_method_id)
+    )
+    assert response.status_code == 200
+    payment_method: dict = response.json()
+    assert payment_method["deleted_at"] is not None
     return payment_method
