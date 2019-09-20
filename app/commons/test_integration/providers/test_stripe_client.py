@@ -18,7 +18,7 @@ from app.commons.providers.stripe.stripe_models import (
     Individual,
     CreateAccountTokenMetaData,
 )
-from app.commons.types import CurrencyType, CountryCode
+from app.commons.types import Currency, CountryCode
 
 pytestmark = [
     # mark all these tests as stripe tests
@@ -106,7 +106,7 @@ class TestStripeClient:
     def test_create_transfer(self, mode: str, stripe: StripeClient):
         transfer = stripe.create_transfer(
             country=models.CountryCode.US,
-            currency=models.Currency(CurrencyType.USD.value),
+            currency=models.Currency(Currency.USD.value),
             destination=models.Destination("acct_1A29cNCyrpkWaAxi"),
             amount=models.Amount(200),
             request=models.CreateTransfer(description="test description"),
@@ -119,7 +119,7 @@ class TestStripeClient:
     def test_create_payout(self, mode: str, stripe: StripeClient):
         payout = stripe.create_payout(
             country=models.CountryCode.US,
-            currency=models.Currency(CurrencyType.USD.value),
+            currency=models.Currency(Currency.USD.value),
             amount=models.Amount(2),
             stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
             request=models.CreatePayout(method="standard"),
@@ -132,7 +132,7 @@ class TestStripeClient:
     def test_create_and_retrieve_payout(self, mode: str, stripe: StripeClient):
         payout = stripe.create_payout(
             country=models.CountryCode.US,
-            currency=models.Currency(CurrencyType.USD.value),
+            currency=models.Currency(Currency.USD.value),
             amount=models.Amount(2),
             stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
             request=models.CreatePayout(method="standard"),
@@ -153,7 +153,7 @@ class TestStripeClient:
     def test_create_and_cancel_payout(self, mode: str, stripe: StripeClient):
         payout = stripe.create_payout(
             country=models.CountryCode.US,
-            currency=models.Currency(CurrencyType.USD.value),
+            currency=models.Currency(Currency.USD.value),
             amount=models.Amount(2),
             stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
             request=models.CreatePayout(method="standard"),

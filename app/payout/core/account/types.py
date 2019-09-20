@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.commons.core.processor import OperationResponse
-from app.commons.types import CountryCode, CurrencyType
+from app.commons.types import CountryCode, Currency
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.types import PgpExternalAccountId
 
@@ -54,7 +54,7 @@ class PayoutAccountInternal(OperationResponse):
 class PayoutCardMethod(OperationResponse):
     stripe_card_id: str
     payout_account_id: int
-    currency: CurrencyType
+    currency: Currency
     country: CountryCode
     last4: str
     brand: str

@@ -4,7 +4,7 @@ from uuid import uuid4
 import factory
 import pytest
 
-from app.commons.types import CountryCode, CurrencyType
+from app.commons.types import CountryCode, Currency
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
@@ -97,7 +97,7 @@ class PaymentIntentFactory(factory.Factory):
     application_fee_amount = 0
     capture_method = CaptureMethod.MANUAL
     country = CountryCode.US
-    currency = CurrencyType.USD
+    currency = Currency.USD
     status = IntentStatus.INIT
     statement_descriptor = "Maccas"
     payment_method_id = factory.LazyAttribute(lambda o: str(uuid4()))
@@ -151,7 +151,7 @@ class PgpPaymentIntentFactory(factory.Factory):
     payment_method_resource_id = "asdf"
     customer_resource_id = "asdf"
     capture_method = CaptureMethod.MANUAL.value
-    currency = CurrencyType.USD
+    currency = Currency.USD
     amount = 100
     amount_capturable = 100
     amount_received = 100

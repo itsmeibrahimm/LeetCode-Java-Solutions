@@ -1,7 +1,7 @@
 from typing import Optional
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
-from app.commons.types import CountryCode, CurrencyType
+from app.commons.types import CountryCode, Currency
 from app.payout.core.account.types import DateOfBirth, Address
 from app.payout.types import (
     PayoutAccountId,
@@ -30,7 +30,7 @@ class CreatePayoutAccount(PaymentRequest):
     target_id: PayoutAccountTargetId
     target_type: PayoutAccountTargetType
     country: CountryCode
-    currency: CurrencyType
+    currency: Currency
     statement_descriptor: Optional[str]
 
 
@@ -57,14 +57,14 @@ class VerificationDetails(PaymentRequest):
     business_type: Optional[StripeBusinessType] = None
     # we need pass in country and currency to create stripe account unless payment account table can store them
     country: CountryCode
-    currency: CurrencyType
+    currency: Currency
 
 
 class VerificationDetailsWithToken(PaymentRequest):
     account_token: StripeAccountToken
     # we need pass in country and currency to create stripe account unless payment account table can store them
     country: CountryCode
-    currency: CurrencyType
+    currency: Currency
 
 
 class CreatePayoutMethod(PaymentRequest):

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from unittest.mock import MagicMock
 import uuid
-from app.commons.types import LegacyCountryId, CurrencyType
+from app.commons.types import LegacyCountryId, Currency
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
@@ -61,7 +61,7 @@ def generate_payment_intent(
         application_fee_amount=0,
         capture_method=capture_method,
         country="US",
-        currency=CurrencyType.USD.value,
+        currency=Currency.USD.value,
         status=IntentStatus(status),
         statement_descriptor="descriptor",
         payment_method_id=str(uuid.uuid4()),
@@ -93,7 +93,7 @@ def generate_pgp_payment_intent(
         charge_resource_id="charge_resource_id",
         payment_method_resource_id=str(uuid.uuid4()),
         customer_resource_id=str(uuid.uuid4()),
-        currency=CurrencyType.USD.value,
+        currency=Currency.USD.value,
         amount=amount,
         amount_capturable=0,
         amount_received=0,
@@ -149,7 +149,7 @@ def generate_legacy_consumer_charge() -> LegacyConsumerCharge:
         is_stripe_connect_based=False,
         total=100,
         original_total=100,
-        currency=CurrencyType.USD,
+        currency=Currency.USD,
         country_id=LegacyCountryId.US,
         issue_id=None,
         stripe_customer_id=None,
@@ -165,7 +165,7 @@ def generate_legacy_stripe_charge(
     amount_refunded: int = 0,
     refunded_at: datetime = None,
     status: str = LegacyStripeChargeStatus.SUCCEEDED,
-    currency: str = CurrencyType.USD.value,
+    currency: str = Currency.USD.value,
 ) -> LegacyStripeCharge:
     return LegacyStripeCharge(
         id=id,
@@ -198,7 +198,7 @@ def generate_payment_charge(
         provider="stripe",
         idempotency_key=str(uuid.uuid4()),
         status=status,
-        currency=CurrencyType.USD.value,
+        currency=Currency.USD.value,
         amount=amount,
         amount_refunded=amount_refunded,
         application_fee_amount=None,
@@ -222,7 +222,7 @@ def generate_pgp_payment_charge(
         provider="stripe",
         idempotency_key=str(uuid.uuid4()),
         status=status,
-        currency=CurrencyType.USD.value,
+        currency=Currency.USD.value,
         amount=amount,
         amount_refunded=amount_refunded,
         application_fee_amount=None,

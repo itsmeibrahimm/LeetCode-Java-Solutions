@@ -13,7 +13,7 @@ class LegacyCountryId:
     AU = 3
 
 
-class CurrencyType(str, Enum):
+class Currency(str, Enum):
     USD = "usd"
     CAD = "cad"
     AUD = "aud"

@@ -10,7 +10,7 @@ from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 from tenacity import RetryError
 
 from app.commons.database.client.interface import DBConnection
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.data_types import (
     GetMxScheduledLedgerInput,
     GetMxLedgerByIdInput,
@@ -85,7 +85,7 @@ class TestMxTransactionProcessor:
         mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             routing_key=routing_key,
             interval_type=interval_type,
             idempotency_key=str(uuid.uuid4()),
@@ -94,7 +94,7 @@ class TestMxTransactionProcessor:
 
         assert mx_transaction is not None
         assert mx_transaction.ledger_id == ledger_id
-        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.currency == Currency.USD
         assert mx_transaction.routing_key == routing_key
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
@@ -185,7 +185,7 @@ class TestMxTransactionProcessor:
         mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             idempotency_key=str(uuid.uuid4()),
@@ -193,7 +193,7 @@ class TestMxTransactionProcessor:
         )
         assert mx_transaction is not None
         assert mx_transaction.ledger_id == ledger_id
-        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.currency == Currency.USD
         assert mx_transaction.routing_key == routing_key
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
@@ -215,7 +215,7 @@ class TestMxTransactionProcessor:
         mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             idempotency_key=str(uuid.uuid4()),
@@ -223,7 +223,7 @@ class TestMxTransactionProcessor:
         )
 
         assert mx_transaction is not None
-        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.currency == Currency.USD
         assert mx_transaction.routing_key == routing_key
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
@@ -262,7 +262,7 @@ class TestMxTransactionProcessor:
             await self.mx_transaction_processor.create(
                 payment_account_id=payment_account_id,
                 amount=2000,
-                currency=CurrencyType.USD,
+                currency=Currency.USD,
                 routing_key=datetime(2019, 8, 1),
                 interval_type=MxScheduledLedgerIntervalType.WEEKLY,
                 idempotency_key=str(uuid.uuid4()),
@@ -335,7 +335,7 @@ class TestMxTransactionProcessor:
         mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,
             amount=2000,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
             idempotency_key=str(uuid.uuid4()),
@@ -387,7 +387,7 @@ class TestMxTransactionProcessor:
             await self.mx_transaction_processor.create(
                 payment_account_id=payment_account_id,
                 amount=2000,
-                currency=CurrencyType.USD,
+                currency=Currency.USD,
                 routing_key=datetime(2019, 8, 1),
                 interval_type=MxScheduledLedgerIntervalType.WEEKLY,
                 idempotency_key=str(uuid.uuid4()),
@@ -426,7 +426,7 @@ class TestMxTransactionProcessor:
         )
 
         insert_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=1000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
@@ -459,7 +459,7 @@ class TestMxTransactionProcessor:
         interval_type = MxScheduledLedgerIntervalType.WEEKLY
 
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=1000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,

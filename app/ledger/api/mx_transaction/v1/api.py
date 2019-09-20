@@ -42,7 +42,7 @@ async def create_mx_transaction(
         - **payment_account_id**: str
         - **target_type**: MxTransactionType, type of mx_transaction
         - **amount**: int, mx_transaction amount
-        - **currency**: CurrencyType, mx_transaction currency
+        - **currency**: Currency, mx_transaction currency
         - **idempotency_key**: str, mx_transaction idempotency_key.
         - **routing_key**: datetime, created_at of txn in DSJ or POS confirmation time
         - **interval_type**: MxLedgerIntervalType, specify how long the mx_ledger will be opened

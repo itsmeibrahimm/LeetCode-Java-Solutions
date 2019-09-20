@@ -6,7 +6,7 @@ import pytest
 from psycopg2 import errorcodes
 
 from app.commons.database.client.interface import DBConnection
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.data_types import (
     UpdatePaidMxLedgerInput,
     UpdatedRolledMxLedgerInput,
@@ -48,7 +48,7 @@ class TestMxLedgerRepository:
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
         assert mx_ledger.id == mx_ledger_id
         assert mx_ledger.type == MxLedgerType.SCHEDULED
-        assert mx_ledger.currency == CurrencyType.USD
+        assert mx_ledger.currency == Currency.USD
         assert mx_ledger.state == MxLedgerStateType.OPEN
         assert mx_ledger.balance == 2000
         assert mx_ledger.payment_account_id == payment_account_id

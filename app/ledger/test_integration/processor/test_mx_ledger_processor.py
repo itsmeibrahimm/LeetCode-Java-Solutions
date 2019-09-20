@@ -9,7 +9,7 @@ from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 
 from app.commons.database.client.interface import DBConnection
 from app.ledger.core.data_types import GetMxScheduledLedgerByAccountInput
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.data_types import GetMxLedgerByIdInput
 from app.ledger.core.exceptions import (
     MxLedgerProcessError,
@@ -433,20 +433,20 @@ class TestMxLedgerProcessor:
 
         mx_ledger, mx_transaction = await mx_ledger_processor.create_mx_ledger(
             payment_account_id=payment_account_id,
-            currency=CurrencyType.USD.value,
+            currency=Currency.USD.value,
             balance=2000,
             type=MxLedgerType.MICRO_DEPOSIT.value,
         )
 
         assert mx_ledger is not None
-        assert mx_ledger.currency == CurrencyType.USD
+        assert mx_ledger.currency == Currency.USD
         assert mx_ledger.balance == 2000
         assert mx_ledger.state == MxLedgerStateType.PROCESSING
         assert mx_ledger.type == MxLedgerType.MICRO_DEPOSIT
 
         assert mx_transaction is not None
         assert mx_transaction.ledger_id == mx_ledger.id
-        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.currency == Currency.USD
         assert mx_transaction.amount == 2000
         assert mx_transaction.target_type == MxTransactionType.MICRO_DEPOSIT
 
@@ -471,7 +471,7 @@ class TestMxLedgerProcessor:
             )
             await mx_ledger_processor.create_mx_ledger(
                 payment_account_id=payment_account_id,
-                currency=CurrencyType.USD.value,
+                currency=Currency.USD.value,
                 balance=2000,
                 type=MxLedgerType.MICRO_DEPOSIT.value,
             )

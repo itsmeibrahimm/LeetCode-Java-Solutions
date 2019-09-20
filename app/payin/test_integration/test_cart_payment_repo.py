@@ -4,7 +4,7 @@ from uuid import uuid4, UUID
 import pytest
 from datetime import datetime
 
-from app.commons.types import CountryCode, LegacyCountryId, CurrencyType
+from app.commons.types import CountryCode, LegacyCountryId, Currency
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -771,7 +771,7 @@ class TestLegacyCharges:
             idempotency_key=str(uuid4()),
             is_stripe_connect_based=False,
             country_id=LegacyCountryId.US,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             stripe_customer_id=None,
             total=800,
             original_total=800,
@@ -789,7 +789,7 @@ class TestLegacyCharges:
             charge_id=consumer_charge.id,
             amount=consumer_charge.total,
             amount_refunded=0,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
             idempotency_key=str(uuid4()),
             additional_payment_info="{'test_key': 'test_value'}",
@@ -808,7 +808,7 @@ class TestLegacyCharges:
             idempotency_key=idempotency_key,
             is_stripe_connect_based=False,
             country_id=LegacyCountryId.US,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             stripe_customer_id=None,
             total=800,
             original_total=800,
@@ -822,7 +822,7 @@ class TestLegacyCharges:
             is_stripe_connect_based=False,
             total=800,
             original_total=800,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             country_id=LegacyCountryId.US,
             issue_id=None,
             stripe_customer_id=None,
@@ -855,7 +855,7 @@ class TestLegacyCharges:
             charge_id=consumer_charge.id,
             amount=consumer_charge.total,
             amount_refunded=0,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
             idempotency_key=idempotency_key,
             additional_payment_info="{'test_key': 'test_value'}",
@@ -866,7 +866,7 @@ class TestLegacyCharges:
             id=result.id,  # Generated
             amount=consumer_charge.total,
             amount_refunded=0,
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
             error_reason=None,
             additional_payment_info="{'test_key': 'test_value'}",

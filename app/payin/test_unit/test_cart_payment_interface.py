@@ -9,7 +9,7 @@ from asynctest import create_autospec
 from freezegun import freeze_time
 from stripe.error import StripeError, InvalidRequestError
 
-from app.commons.types import LegacyCountryId, CountryCode, CurrencyType
+from app.commons.types import LegacyCountryId, CountryCode, Currency
 from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
 from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
 from app.payin.core.cart_payment.model import (
@@ -149,7 +149,7 @@ class TestLegacyPaymentInterface:
             legacy_payment=legacy_payment,
             correlation_ids=cart_payment.correlation_ids,
             country=CountryCode(payment_intent.country),
-            currency=CurrencyType(payment_intent.currency),
+            currency=Currency(payment_intent.currency),
             idempotency_key=payment_intent.idempotency_key,
         )
 

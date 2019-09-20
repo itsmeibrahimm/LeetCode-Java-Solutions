@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel, PositiveInt, ConstrainedStr
 
-from app.commons.types import CountryCode, CurrencyType
+from app.commons.types import CountryCode, Currency
 from app.commons.types import CountryCode
 
 
@@ -22,7 +22,7 @@ class SplitPayment(BaseModel):
 class CreateCartPaymentBaseRequest(BaseModel):
     amount: PositiveInt
     payment_country: CountryCode
-    currency: CurrencyType
+    currency: Currency
     delay_capture: bool
     idempotency_key: str
     client_description: Optional[str] = None

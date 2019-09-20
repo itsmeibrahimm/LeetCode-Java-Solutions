@@ -6,7 +6,7 @@ import pytest
 from psycopg2 import errorcodes
 
 from app.commons.database.client.interface import DBConnection
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.data_types import (
     GetMxLedgerByIdInput,
     GetMxScheduledLedgerInput,
@@ -60,7 +60,7 @@ class TestMxTransactionRepository:
 
         assert mx_transaction.id == mx_transaction_id
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
-        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.currency == Currency.USD
         assert mx_transaction.ledger_id == mx_ledger_id
         assert mx_transaction.amount == 2000
         assert mx_transaction.payment_account_id == payment_account_id
@@ -102,7 +102,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
@@ -117,7 +117,7 @@ class TestMxTransactionRepository:
                 request_input, connection
             )
         assert created_txn is not None
-        assert created_txn.currency == CurrencyType.USD
+        assert created_txn.currency == Currency.USD
         assert created_txn.amount == 2000
         assert created_txn.payment_account_id == payment_account_id
         assert created_txn.routing_key == datetime(2019, 8, 1)
@@ -151,7 +151,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             type=MxTransactionType.MICRO_DEPOSIT,
             payment_account_id=payment_account_id,
@@ -166,7 +166,7 @@ class TestMxTransactionRepository:
                 request_input, connection
             )
         assert created_txn is not None
-        assert created_txn.currency == CurrencyType.USD
+        assert created_txn.currency == Currency.USD
         assert created_txn.amount == 2000
         assert created_txn.payment_account_id == payment_account_id
         assert created_txn.routing_key == datetime(2019, 8, 1)
@@ -217,7 +217,7 @@ class TestMxTransactionRepository:
         )
 
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
@@ -243,7 +243,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         routing_key = datetime(2019, 8, 1)
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
@@ -277,7 +277,7 @@ class TestMxTransactionRepository:
         mx_ledger = await mx_ledger_repository.insert_mx_ledger(ledger_request)
 
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
@@ -292,7 +292,7 @@ class TestMxTransactionRepository:
                 request_input, mx_ledger.id, connection
             )
         assert mx_transaction is not None
-        assert mx_transaction.currency == CurrencyType.USD
+        assert mx_transaction.currency == Currency.USD
         assert mx_transaction.amount == 2000
         assert mx_transaction.payment_account_id == payment_account_id
         assert mx_transaction.routing_key == datetime(2019, 8, 1)
@@ -332,7 +332,7 @@ class TestMxTransactionRepository:
         await mx_transaction_repository.insert_mx_transaction(insert_txn_request)
 
         request_input = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
@@ -616,7 +616,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         # prepare mx_transaction with routing_key as datetime(2019, 8, 1) and insert
         insert_txn_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
@@ -632,7 +632,7 @@ class TestMxTransactionRepository:
 
         # prepare another mx_transaction with routing_key as datetime(2019, 8, 2) and insert
         second_insert_txn_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
@@ -658,7 +658,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         # prepare mx_transaction with routing_key as datetime(2019, 8, 1) and insert
         insert_txn_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
@@ -674,7 +674,7 @@ class TestMxTransactionRepository:
 
         # prepare another mx_transaction with routing_key as datetime(2019, 8, 10) and insert
         second_insert_txn_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
@@ -700,7 +700,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         # prepare mx_transaction with routing_key as datetime(2019, 8, 10) and insert
         insert_txn_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
@@ -716,7 +716,7 @@ class TestMxTransactionRepository:
 
         # prepare another mx_transaction with routing_key as datetime(2019, 8, 1) and insert
         second_insert_txn_request = InsertMxTransactionWithLedgerInput(
-            currency=CurrencyType.USD,
+            currency=Currency.USD,
             amount=2000,
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,

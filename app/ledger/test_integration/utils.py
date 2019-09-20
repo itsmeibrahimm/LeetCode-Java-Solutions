@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.data_types import (
     InsertMxLedgerInput,
     InsertMxTransactionInput,
@@ -23,7 +23,7 @@ async def prepare_mx_ledger(
     ledger_id,
     payment_account_id,
     ledger_type=MxLedgerType.SCHEDULED,
-    currency=CurrencyType.USD,
+    currency=Currency.USD,
     balance=2000,
     state=MxLedgerStateType.OPEN,
 ):
@@ -44,7 +44,7 @@ async def prepare_mx_transaction(
     ledger_id,
     idempotency_key=str(uuid.uuid4()),
     amount=2000,
-    currency=CurrencyType.USD,
+    currency=Currency.USD,
     target_type=MxTransactionType.MERCHANT_DELIVERY,
     routing_key=datetime.utcnow(),
 ):
@@ -97,7 +97,7 @@ def prepare_transaction_post_request(
         "payment_account_id": payment_account_id,
         "target_type": MxTransactionType.MERCHANT_DELIVERY.value,
         "amount": 3000,
-        "currency": CurrencyType.USD.value,
+        "currency": Currency.USD.value,
         "idempotency_key": str(uuid.uuid4()),
         "routing_key": routing_key.isoformat(),
         "interval_type": MxScheduledLedgerIntervalType.WEEKLY.value,

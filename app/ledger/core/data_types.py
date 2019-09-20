@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from app.commons.database.model import DBEntity, DBRequestModel
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.types import (
     MxLedgerType,
     MxScheduledLedgerIntervalType,
@@ -49,7 +49,7 @@ class InsertMxTransactionWithLedgerInput(DBRequestModel):
     The variable name must be consistent with DB table column name
     """
 
-    currency: CurrencyType
+    currency: Currency
     amount: int
     type: MxLedgerType
     payment_account_id: str

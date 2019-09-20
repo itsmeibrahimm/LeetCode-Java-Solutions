@@ -2,7 +2,7 @@ import uuid
 
 from starlette.testclient import TestClient
 
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.exceptions import LedgerErrorCode
 from app.ledger.core.types import MxLedgerType, MxLedgerStateType
 from app.ledger.test_integration.utils import prepare_transaction_post_request
@@ -146,7 +146,7 @@ class TestMxLedgerAPI:
         payment_account_id = str(uuid.uuid4())
         create_mx_ledger_request = {
             "balance": 3000,
-            "currency": CurrencyType.USD.value,
+            "currency": Currency.USD.value,
             "payment_account_id": payment_account_id,
             "type": MxLedgerType.MICRO_DEPOSIT.value,
         }

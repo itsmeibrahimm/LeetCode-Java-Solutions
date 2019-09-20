@@ -14,7 +14,7 @@ from app.commons.providers.stripe.stripe_models import (
     DateOfBirth,
     StripeClientSettings,
 )
-from app.commons.types import CountryCode, CurrencyType
+from app.commons.types import CountryCode, Currency
 from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.core.account.processors.verify_account import (
     VerifyPayoutAccountRequest,
@@ -83,7 +83,7 @@ class TestVerifyPayoutAccount:
             business_type="individual",
             charges_enabled=True,
             country=CountryCode.US,
-            default_currency=CurrencyType.USD,
+            default_currency=Currency.USD,
             company=None,
             individual=Individual(
                 address=Address(

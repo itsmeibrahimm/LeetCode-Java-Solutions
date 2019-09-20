@@ -5,7 +5,7 @@ from uuid import UUID
 from typing_extensions import final
 from pydantic import BaseModel
 
-from app.commons.types import CurrencyType
+from app.commons.types import Currency
 from app.ledger.core.types import MxLedgerType, MxLedgerStateType
 
 
@@ -19,7 +19,7 @@ class MxLedgerModel(BaseModel):
 class MxLedger(MxLedgerModel):
     id: UUID
     type: MxLedgerType
-    currency: CurrencyType
+    currency: Currency
     state: MxLedgerStateType
     balance: int
     payment_account_id: str

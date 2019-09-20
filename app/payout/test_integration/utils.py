@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List
 
-from app.commons.types import CountryCode, CurrencyType
+from app.commons.types import CountryCode, Currency
 from stripe.error import StripeError
 
 from app.payout.repository.bankdb.model.payout import PayoutCreate
@@ -337,7 +337,7 @@ async def prepare_and_insert_payout_method(
 ):
     data = PayoutMethodCreate(
         type=PayoutExternalAccountType.CARD.value,
-        currency=CurrencyType.USD.value,
+        currency=Currency.USD.value,
         country=CountryCode.US.value,
         payment_account_id=payout_account_id,
         is_default=is_default,
@@ -396,7 +396,7 @@ async def prepare_payout_method_list(
         # create a payout_method
         data = PayoutMethodCreate(
             type=PayoutExternalAccountType.CARD.value,
-            currency=CurrencyType.USD.value,
+            currency=Currency.USD.value,
             country=CountryCode.US.value,
             payment_account_id=payout_account_id,
             is_default=True,
