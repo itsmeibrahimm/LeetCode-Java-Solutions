@@ -15,6 +15,9 @@ class PayerStatementDescription(ConstrainedStr):
 
 
 class SplitPayment(BaseModel):
+    # For V0/V1, we expect clients to provide the connect account ID inside the payout_account_id field.
+    # For future API versions, clients will provide the payment-service's payout account ID here, in which
+    # case we can look up the corresponding provider resource ID inside our service.
     payout_account_id: str
     application_fee_amount: int
 

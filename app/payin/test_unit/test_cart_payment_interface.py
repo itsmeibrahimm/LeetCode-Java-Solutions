@@ -13,12 +13,14 @@ from app.commons.types import LegacyCountryId, CountryCode, Currency
 from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
 from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
 from app.payin.core.cart_payment.model import (
+    CartPayment,
     PaymentIntent,
     PgpPaymentIntent,
     PaymentCharge,
     PgpPaymentCharge,
     LegacyConsumerCharge,
     LegacyStripeCharge,
+    SplitPayment,
 )
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import (
@@ -1155,6 +1157,52 @@ class TestCartPaymentInterface:
         )
         assert result_intent.amount == 200
 
+    def verify_populate_cart_payment_for_response(
+        self,
+        response_cart_payment: CartPayment,
+        original_cart_payment: CartPayment,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+    ):
+        # Fields populated based on related objects
+        assert (
+            response_cart_payment.payment_method_id == payment_intent.payment_method_id
+        )
+        assert (
+            response_cart_payment.payer_statement_description
+            == payment_intent.statement_descriptor
+        )
+
+        if (
+            payment_intent.application_fee_amount
+            and pgp_payment_intent.payout_account_id
+        ):
+            assert response_cart_payment.split_payment == SplitPayment(
+                payout_account_id=pgp_payment_intent.payout_account_id,
+                application_fee_amount=payment_intent.application_fee_amount,
+            )
+        else:
+            assert response_cart_payment.split_payment is None
+
+        # Unchanged attributes
+        assert response_cart_payment.id == original_cart_payment.id
+        assert response_cart_payment.amount == original_cart_payment.amount
+        assert response_cart_payment.payer_id == original_cart_payment.payer_id
+        assert (
+            response_cart_payment.correlation_ids
+            == original_cart_payment.correlation_ids
+        )
+        assert response_cart_payment.created_at == original_cart_payment.created_at
+        assert (
+            response_cart_payment.delay_capture == original_cart_payment.delay_capture
+        )
+        assert response_cart_payment.updated_at == original_cart_payment.updated_at
+        assert response_cart_payment.deleted_at == original_cart_payment.deleted_at
+        assert (
+            response_cart_payment.client_description
+            == original_cart_payment.client_description
+        )
+
     def test_populate_cart_payment_for_response(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
         cart_payment.delay_capture = True
@@ -1162,27 +1210,34 @@ class TestCartPaymentInterface:
         intent = generate_payment_intent(
             status="requires_capture", capture_method="auto"
         )
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
 
         original_cart_payment = deepcopy(cart_payment)
-        cart_payment_interface.populate_cart_payment_for_response(cart_payment, intent)
-
-        # Fields populated based on related objects
-        assert cart_payment.payment_method_id == intent.payment_method_id
-        assert cart_payment.payer_statement_description == intent.statement_descriptor
-        assert cart_payment.delay_capture is True
-
-        # Unchanged attributes
-        assert cart_payment.id == original_cart_payment.id
-        assert cart_payment.amount == original_cart_payment.amount
-        assert cart_payment.payer_id == original_cart_payment.payer_id
-        assert cart_payment.correlation_ids == original_cart_payment.correlation_ids
-        assert cart_payment.created_at == original_cart_payment.created_at
-        assert cart_payment.updated_at == original_cart_payment.updated_at
-        assert cart_payment.deleted_at == original_cart_payment.deleted_at
-        assert (
-            cart_payment.client_description == original_cart_payment.client_description
+        cart_payment_interface.populate_cart_payment_for_response(
+            cart_payment, intent, pgp_intent
         )
-        assert cart_payment.split_payment == original_cart_payment.split_payment
+        self.verify_populate_cart_payment_for_response(
+            cart_payment, original_cart_payment, intent, pgp_intent
+        )
+
+    def test_populate_cart_payment_for_response_with_split_payment(
+        self, cart_payment_interface
+    ):
+        cart_payment = generate_cart_payment()
+        cart_payment.delay_capture = True
+        cart_payment.payer_statement_description = "Fill in here"
+        intent = generate_payment_intent(
+            status="requires_capture", capture_method="auto", application_fee_amount=30
+        )
+        pgp_intent = generate_pgp_payment_intent(payout_account_id="test_account_id")
+
+        original_cart_payment = deepcopy(cart_payment)
+        cart_payment_interface.populate_cart_payment_for_response(
+            cart_payment, intent, pgp_intent
+        )
+        self.verify_populate_cart_payment_for_response(
+            cart_payment, original_cart_payment, intent, pgp_intent
+        )
 
     @pytest.mark.asyncio
     async def test_update_cart_payment_attributes(self, cart_payment_interface):

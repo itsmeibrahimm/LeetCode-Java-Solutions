@@ -23,7 +23,9 @@ from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
     CreatePaymentIntent,
     CancelPaymentIntent,
+    ConnectedAccountId,
     RefundCharge,
+    TransferData,
     PaymentIntent as ProviderPaymentIntent,
     Refund as ProviderRefund,
 )
@@ -40,6 +42,7 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentIntent,
     PaymentCharge,
     PgpPaymentCharge,
+    SplitPayment,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -658,14 +661,12 @@ class CartPaymentInterface:
             intent_request = CreatePaymentIntent(
                 amount=pgp_payment_intent.amount,
                 currency=pgp_payment_intent.currency,
-                application_fee_amount=pgp_payment_intent.application_fee_amount,
                 capture_method=self._get_provider_capture_method(pgp_payment_intent),
                 confirm=True,
                 # Set confirmation method to "manual". Do not change this!
                 # See link below for more details on what confirmation_method is
                 # https://stripe.com/docs/api/payment_intents/create#create_payment_intent-confirmation_method
                 confirmation_method="manual",
-                on_behalf_of=pgp_payment_intent.payout_account_id,
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
                 payment_method=provider_payment_resource_id,
                 customer=provider_customer_resource_id,
@@ -673,6 +674,17 @@ class CartPaymentInterface:
                 statement_descriptor=payment_intent.statement_descriptor,
                 metadata=payment_intent.metadata,
             )
+
+            if (
+                payment_intent.application_fee_amount
+                and pgp_payment_intent.payout_account_id
+            ):
+                intent_request.application_fee_amount = (
+                    payment_intent.application_fee_amount
+                )
+                intent_request.transfer_data = TransferData(
+                    destination=ConnectedAccountId(pgp_payment_intent.payout_account_id)
+                )
 
             self.req_context.log.debug(
                 f"[submit_payment_to_provider] Calling provider to create payment intent"
@@ -1166,7 +1178,10 @@ class CartPaymentInterface:
         return payment_resource_ids, result_legacy_payment
 
     def populate_cart_payment_for_response(
-        self, cart_payment: CartPayment, payment_intent: PaymentIntent
+        self,
+        cart_payment: CartPayment,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
     ) -> CartPayment:
         """
         Populate fields within a CartPayment instance to be suitable for an API response body.
@@ -1180,6 +1195,16 @@ class CartPaymentInterface:
         """
         cart_payment.payer_statement_description = payment_intent.statement_descriptor
         cart_payment.payment_method_id = payment_intent.payment_method_id
+
+        if (
+            payment_intent.application_fee_amount
+            and pgp_payment_intent.payout_account_id
+        ):
+            cart_payment.split_payment = SplitPayment(
+                payout_account_id=pgp_payment_intent.payout_account_id,
+                application_fee_amount=payment_intent.application_fee_amount,
+            )
+
         return cart_payment
 
     async def update_cart_payment_attributes(
@@ -1196,7 +1221,9 @@ class CartPaymentInterface:
             amount=amount,
             client_description=client_description,
         )
-        self.populate_cart_payment_for_response(updated_cart_payment, payment_intent)
+        self.populate_cart_payment_for_response(
+            updated_cart_payment, payment_intent, pgp_payment_intent
+        )
         return updated_cart_payment
 
 
@@ -1380,8 +1407,11 @@ class CartPaymentProcessor:
                 self.log.info(
                     f"[_update_payment_with_higher_amount] Duplicate amount increase request for idempotency_key {idempotency_key}"
                 )
+                pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                    existing_payment_intent
+                )
                 self.cart_payment_interface.populate_cart_payment_for_response(
-                    cart_payment, existing_payment_intent
+                    cart_payment, existing_payment_intent, pgp_payment_intent
                 )
                 return cart_payment
 
@@ -1653,7 +1683,7 @@ class CartPaymentProcessor:
             client_description=client_description,
         )
         return self.cart_payment_interface.populate_cart_payment_for_response(
-            updated_cart_payment, payment_intent
+            updated_cart_payment, payment_intent, pgp_payment_intent
         )
 
     async def cancel_payment_for_legacy_charge(self, dd_charge_id: int) -> CartPayment:
@@ -1826,9 +1856,14 @@ class CartPaymentProcessor:
                 self.log.info(
                     f"[create_payment] Duplicate cart payment creation request for key {existing_payment_intent.idempotency_key}"
                 )
+                pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                    existing_payment_intent
+                )
                 return (
                     self.cart_payment_interface.populate_cart_payment_for_response(
-                        existing_cart_payment, existing_payment_intent
+                        existing_cart_payment,
+                        existing_payment_intent,
+                        pgp_payment_intent,
                     ),
                     existing_legacy_payment,
                 )
@@ -1911,6 +1946,6 @@ class CartPaymentProcessor:
             legacy_payment.dd_charge_id = legacy_consumer_charge.id
 
         self.cart_payment_interface.populate_cart_payment_for_response(
-            cart_payment, payment_intent
+            cart_payment, payment_intent, pgp_payment_intent
         )
         return cart_payment, legacy_payment
