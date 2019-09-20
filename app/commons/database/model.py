@@ -1,6 +1,7 @@
+import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping
-import json
+
 import sqlalchemy
 from pydantic import BaseModel, validate_model
 from pydantic.utils import GetterDict
@@ -116,6 +117,35 @@ class DBEntity(BaseModel):
         object.__setattr__(m, "__fields_set__", fields_set)
         return m
 
+    def __init__(__pydantic_self__, **data: Any) -> None:
+        super().__init__(**data)
+
+        # Does not allow specifying an instance of EB entity without any specified field value
+        # todo consider move this to a base model shared across payment repo
+        if __pydantic_self__.fields and (not __pydantic_self__.__fields_set__):
+            raise ValueError(
+                f"At least 1 field need to be specified in model={type(__pydantic_self__)}"
+            )
+
+        # validate if an optional field is set to None by user and throw error if it is not allowed to do so
+        # (add this validation here, it seems pydantic validator doesn't work well with inheritance)
+        for field in __pydantic_self__.__fields_set__:
+            if (
+                __pydantic_self__.__getattribute__(field) is None
+                and field in __pydantic_self__.__class__.not_allow_set_none_fields()
+            ):
+                raise ValueError(f"{field} is not allowed to set as None")
+
+    def __init_subclass__(cls, *args, **kwargs):
+        # enforce only None is allowed as default in DB entity
+        # since we currently heavily rely on .dict(skip_default=True) to avoid unexpected behavior
+        for field in cls.__fields__.values():
+            if field.default is not None:
+                raise ValueError(
+                    f"only default=None is allowed for field, "
+                    f"but found field={field.name} default={field.default} model={cls}"
+                )
+
     def _fields_need_json_to_string_conversion(self):
         """
         Pydantic model has Json type, which takes json string
@@ -136,6 +166,17 @@ class DBEntity(BaseModel):
             for (key, value) in data_dict.items()
         }
 
+    @classmethod
+    def not_allow_set_none_fields(cls) -> List[str]:
+        """
+        Override this to provide set of fields that are not allowed to specified as None.
+        When specifying a field as Optional, this means user can leave the field unset.
+        But this doesn't mean underlying consumer of this model accept None value on this field.
+        e.g. statement_descriptor can be left unset when update a payment account so that it will be ignored in update,
+        but you shouldn't set it to None as DB schema defined this field cannot be written to None
+        """
+        return []
+
 
 class DBRequestModel(BaseModel):
     """
@@ -144,3 +185,24 @@ class DBRequestModel(BaseModel):
 
     class Config:
         allow_mutation = False  # Immutable
+
+    def __init__(__pydantic_self__, **data: Any) -> None:
+        super().__init__(**data)
+
+        # Does not allow specifying an instance of EB entity without any specified field value
+        # todo consider move this to a base model shared across payment repo
+        if not __pydantic_self__.__fields_set__:
+            raise ValueError(
+                f"At least 1 field need to be specified in model={type(__pydantic_self__)}"
+            )
+
+    def __init_subclass__(cls, **kwargs):
+
+        # enforce only None is allowed as default in DB request
+        # since we currently heavily rely on .dict(skip_default=True) to avoid unexpected behavior
+        for field in cls.__fields__.values():
+            if field.default is not None:
+                raise ValueError(
+                    f"only default=None is allowed for field, "
+                    f"but found field={field.name} default={field.default} model={cls}"
+                )

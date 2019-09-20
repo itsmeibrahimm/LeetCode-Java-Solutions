@@ -105,4 +105,6 @@ class PaymentAccountCreate(_PaymentAccountPartial):
 
 
 class PaymentAccountUpdate(_PaymentAccountPartial):
-    pass
+    @classmethod
+    def not_allow_set_none_fields(cls) -> List[str]:
+        return super().not_allow_set_none_fields() + ["statement_descriptor"]

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, text
 from typing_extensions import final
@@ -94,4 +94,6 @@ class StripeTransferCreate(_StripeTransferPartial):
 
 
 class StripeTransferUpdate(_StripeTransferPartial):
-    pass
+    @classmethod
+    def not_allow_set_none_fields(cls) -> List[str]:
+        return super().not_allow_set_none_fields() + ["stripe_status", "transfer_id"]

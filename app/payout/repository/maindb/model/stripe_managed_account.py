@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import Column, DateTime, Integer, Text, text
 from typing_extensions import final
@@ -75,4 +75,6 @@ class StripeManagedAccountCreate(_StripeManagedAccountPartial):
 
 
 class StripeManagedAccountUpdate(_StripeManagedAccountPartial):
-    pass
+    @classmethod
+    def not_allow_set_none_fields(cls) -> List[str]:
+        return super().not_allow_set_none_fields() + ["stripe_id", "country_shortname"]

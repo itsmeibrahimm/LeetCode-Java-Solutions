@@ -63,3 +63,20 @@ def test_db_entity_and_table_definition(
     db_entity_cls: Type[DBEntity], table_definition_cls: Type[TableDefinition]
 ):
     validation_db_entity_and_table_schema(db_entity_cls, table_definition_cls)
+
+
+def test_update_entities_field_null_check():
+    with pytest.raises(ValueError):
+        PaymentAccountUpdate(statement_descriptor=None)
+
+    with pytest.raises(ValueError):
+        StripeManagedAccountUpdate(stripe_id=None)
+
+    with pytest.raises(ValueError):
+        StripeManagedAccountUpdate(country_shortname=None)
+
+    with pytest.raises(ValueError):
+        StripeTransferUpdate(stripe_status=None)
+
+    with pytest.raises(ValueError):
+        StripeTransferUpdate(transfer_id=None)

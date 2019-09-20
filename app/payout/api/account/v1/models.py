@@ -2,26 +2,25 @@ from typing import Optional
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, Currency
-from app.payout.core.account.types import DateOfBirth, Address
+from app.payout.core.account.types import Address, DateOfBirth, VerificationRequirements
 from app.payout.types import (
+    AccountType,
     PayoutAccountId,
+    PayoutAccountTargetId,
+    PayoutAccountTargetType,
     PayoutAccountToken,
+    PayoutAmountType,
     PayoutMethodId,
     PayoutMethodToken,
-    PayoutAccountTargetType,
-    PayoutAccountTargetId,
-    PgpAccountId,
-    StripeFileHandle,
-    PayoutAmountType,
-    PayoutType,
     PayoutMethodType,
     PayoutTargetType,
+    PayoutType,
+    PgpAccountId,
     PgpExternalAccountId,
     StripeAccountToken,
     StripeBusinessType,
-    AccountType,
+    StripeFileHandle,
 )
-from app.payout.core.account.types import VerificationRequirements
 
 __all__ = ["PayoutAccountId", "PayoutAccount", "PayoutAccountToken"]
 
@@ -45,16 +44,16 @@ class PayoutAccount(PaymentResponse):
 
 
 class VerificationDetails(PaymentRequest):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    date_of_birth: Optional[DateOfBirth] = None
-    business_name: Optional[str] = None
-    business_tax_id: Optional[str] = None
-    address: Optional[Address] = None
-    id_file: Optional[StripeFileHandle] = None
-    personal_identification_number: Optional[str] = None
-    ssn_last_four: Optional[str] = None
-    business_type: Optional[StripeBusinessType] = None
+    first_name: Optional[str]
+    last_name: Optional[str]
+    date_of_birth: Optional[DateOfBirth]
+    business_name: Optional[str]
+    business_tax_id: Optional[str]
+    address: Optional[Address]
+    id_file: Optional[StripeFileHandle]
+    personal_identification_number: Optional[str]
+    ssn_last_four: Optional[str]
+    business_type: Optional[StripeBusinessType]
     # we need pass in country and currency to create stripe account unless payment account table can store them
     country: CountryCode
     currency: Currency
@@ -82,15 +81,15 @@ class PayoutMethod(PaymentResponse):
 
 class PayoutRequest(PaymentRequest):
     amount: PayoutAmountType
-    payout_type: PayoutType = PayoutType.STANDARD
-    target_id: Optional[str] = None
-    target_type: Optional[PayoutTargetType] = None
-    statement_descriptor: Optional[str] = None
-    payout_idempotency_key: Optional[str] = None
-    transfer_id: Optional[str] = None
-    payout_id: Optional[str] = None
+    payout_type: PayoutType
+    target_id: Optional[str]
+    target_type: Optional[PayoutTargetType]
+    statement_descriptor: Optional[str]
+    payout_idempotency_key: Optional[str]
+    transfer_id: Optional[str]
+    payout_id: Optional[str]
     method: Optional[PayoutMethodType]
-    submitted_by: Optional[str] = None
+    submitted_by: Optional[str]
 
 
 class Payout(PaymentResponse):

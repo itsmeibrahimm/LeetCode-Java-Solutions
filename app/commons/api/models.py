@@ -1,6 +1,8 @@
 from abc import ABC
+from typing import Any
 
 from fastapi import HTTPException
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -10,7 +12,27 @@ class PaymentRequest(BaseModel, ABC):
     Base pydantic request model for all payment service APIs
     """
 
-    pass
+    def __init__(__pydantic_self__, **data: Any) -> None:
+        super().__init__(**data)
+
+        # Does not allow specifying an instance of request without any specified field value
+        # todo consider move this to a base model shared across payment repo
+        if __pydantic_self__.fields and (not __pydantic_self__.__fields_set__):
+            raise RequestValidationError(
+                f"At least 1 field need to be specified in model={type(__pydantic_self__)}"
+            )
+
+    def __init_subclass__(cls, *args, **kwargs):
+        # enforce only None is allowed as default
+        # 1. since we currently heavily rely on .dict(skip_default=True) to avoid unexpected behavior
+        # 2. also defaulting behavior should be driven by biz logic code other than plain object. it makes
+        # sense to ensure client always explicitly set what they want
+        for field in cls.__fields__.values():
+            if field.default is not None:
+                raise ValueError(
+                    f"only default=None is allowed for field, "
+                    f"but found field={field.name} default={field.default} model={cls}"
+                )
 
 
 class PaymentResponse(BaseModel, ABC):
@@ -18,7 +40,15 @@ class PaymentResponse(BaseModel, ABC):
     Base pydantic response model for all payment service APIs
     """
 
-    pass
+    def __init_subclass__(cls, **kwargs):
+        # enforce only None is allowed as default
+        # since we currently heavily rely on .dict(skip_default=True) to avoid unexpected behavior
+        for field in cls.__fields__.values():
+            if field.default is not None:
+                raise ValueError(
+                    f"only default=None is allowed for field, "
+                    f"but found field={field.name} default={field.default} model={cls}"
+                )
 
 
 class PaymentException(HTTPException):
