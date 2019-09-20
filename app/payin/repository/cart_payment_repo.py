@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, List, Optional, Tuple, Dict, AsyncIterator
 from uuid import UUID
 
 from IPython.utils.tz import utcnow
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func, not_
+from sqlalchemy.sql.functions import now
 from typing_extensions import final
 
 from app.commons import tracing
@@ -140,6 +141,39 @@ class CartPaymentRepository(PayinDBRepository):
             self.payment_database.replica(), query, payment_intents.id
         ):
             yield self.to_payment_intent(result)
+
+    async def count_payment_intents_that_require_capture(
+        self, problematic_threshold: timedelta
+    ) -> int:
+        """
+        Returns count of payment intents that are not succeeded or canceled but have a capture_after > problematic_threshold
+
+        Used by alerting system to detect any payment intents that haven't been captured and are potentially in danger
+        of not being captured (which would be bad b/c the auth would drop and we would lose revenue)
+
+        :param problematic_threshold: delta added to each payment intents `capture_after` to filter
+        :return:
+        """
+        query = (
+            select(columns=[func.count()])
+            .where(
+                and_(
+                    # not in succeeded or cancelled state
+                    not_(
+                        payment_intents.status.in_(
+                            (IntentStatus.SUCCEEDED, IntentStatus.CANCELLED)
+                        )
+                    ),
+                    # capture_after older than X date
+                    payment_intents.capture_after <= now() - problematic_threshold,
+                )
+            )
+            .select_from(payment_intents.table)
+        )
+
+        result = await self.payment_database.replica().fetch_one(query)
+
+        return result[0]  # type: ignore
 
     async def find_payment_intents_in_capturing(
         self, older_than: datetime

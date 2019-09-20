@@ -1,8 +1,9 @@
+from datetime import datetime, timedelta
 from typing import cast
 from uuid import uuid4, UUID
 
 import pytest
-from datetime import datetime
+from IPython.utils.tz import utcnow
 
 from app.commons.types import CountryCode, LegacyCountryId, Currency
 from app.commons.utils.types import PaymentProvider
@@ -91,9 +92,11 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
     )
 
 
-@pytest.fixture
-async def payment_intent(
-    cart_payment_repository: CartPaymentRepository, payer, payment_method
+async def create_payment_intent(
+    cart_payment_repository: CartPaymentRepository,
+    payer,
+    payment_method,
+    payment_intent__capture_after,
 ):
     cart_payment_id = uuid4()
     await cart_payment_repository.insert_cart_payment(
@@ -113,7 +116,7 @@ async def payment_intent(
         legacy_provider_card_id="stripe_card_id",
     )
 
-    payment_intent = await cart_payment_repository.insert_payment_intent(
+    return await cart_payment_repository.insert_payment_intent(
         id=uuid4(),
         cart_payment_id=cart_payment_id,
         idempotency_key=f"ik_{uuid4()}",
@@ -125,12 +128,32 @@ async def payment_intent(
         capture_method=CaptureMethod.MANUAL,
         status=IntentStatus.REQUIRES_CAPTURE,
         statement_descriptor=None,
-        capture_after=datetime(2019, 1, 1),
+        capture_after=payment_intent__capture_after,
         payment_method_id=payment_method.id,
         metadata={"is_first_order": True},
         legacy_consumer_charge_id=0,
     )
-    yield payment_intent
+
+
+@pytest.fixture
+def payment_intent__capture_after() -> datetime:
+    """
+    Use to override the capture_after of payment_intent
+    :return:
+    """
+    return datetime(2019, 1, 1)
+
+
+@pytest.fixture
+async def payment_intent(
+    cart_payment_repository: CartPaymentRepository,
+    payer,
+    payment_method,
+    payment_intent__capture_after: datetime,
+):
+    yield await create_payment_intent(
+        cart_payment_repository, payer, payment_method, payment_intent__capture_after
+    )
 
 
 @pytest.fixture
@@ -961,3 +984,32 @@ class TestFindPaymentIntentsThatRequireCapture:
         )
         ids = [i.id async for i in results]
         assert payment_intent.id in ids
+
+
+class TestCountPaymentIntentsThatRequireCapture:
+    @pytest.mark.asyncio
+    async def test_success(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_method,
+        payment_intent: PaymentIntent,
+        payer: Payer,
+        payment_intent__capture_after: datetime,
+    ):
+        # Our databases are not data-less for each test run, so we need to count the payment intents before and after
+        # to write this test. This is so dirty!
+        result_before = await cart_payment_repository.count_payment_intents_that_require_capture(
+            problematic_threshold=timedelta(days=2)
+        )
+        await create_payment_intent(
+            cart_payment_repository,
+            payment_method=payment_method,
+            payer=payer,
+            payment_intent__capture_after=utcnow() - timedelta(days=3),
+        )
+        result_after = await cart_payment_repository.count_payment_intents_that_require_capture(
+            problematic_threshold=timedelta(days=2)
+        )
+        assert (
+            result_after - result_before
+        ) == 1, "there should be one payment intent matched"

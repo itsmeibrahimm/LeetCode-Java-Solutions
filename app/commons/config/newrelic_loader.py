@@ -32,4 +32,5 @@ def init_newrelic_agent():
     del create_new_relic_config
 
     # and then initialize
+
     newrelic.agent.initialize("newrelic.ini", environment=environment)

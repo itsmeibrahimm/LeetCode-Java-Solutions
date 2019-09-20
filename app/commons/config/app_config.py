@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 from apscheduler.triggers.cron import CronTrigger
@@ -152,3 +153,8 @@ class AppConfig(SecretAware):
     CAPTURE_CRON_TRIGGER: CronTrigger = CronTrigger(minute="*/2")
 
     DEFAULT_CAPTURE_DELAY_IN_MINUTES: int = 1  # set the capture delay to ~1 minute
+
+    # The threshold after which to consider a payment_intent might have a problem being captured (or cancelled)
+    # In other words, if a payment intent is not completed by `payment_intent.capture_after + PROBLEMATIC_CAPTURE_THRESHOLD`,
+    # then there is likely an issue with that payment intent and should be investigated
+    PROBLEMATIC_CAPTURE_THRESHOLD: timedelta = timedelta(days=2)

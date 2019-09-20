@@ -5,6 +5,8 @@ import signal
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
 from app.commons.context.logger import get_logger
+from apscheduler.triggers.cron import CronTrigger
+
 from app.commons.config.newrelic_loader import init_newrelic_agent
 
 init_newrelic_agent()
@@ -23,6 +25,7 @@ from app.commons.runtime import runtime
 from app.payin.jobs import (
     capture_uncaptured_payment_intents,
     resolve_capturing_payment_intents,
+    emit_problematic_capture_count,
 )
 
 logger = get_logger("cron")
@@ -84,6 +87,16 @@ scheduler.add_job(
     resolve_capturing_payment_intents,
     app_config.CAPTURE_CRON_TRIGGER,
     kwargs={"app_context": app_context, "job_pool": stripe_pool},
+)
+
+scheduler.add_job(
+    emit_problematic_capture_count,
+    CronTrigger(hour="*"),
+    kwargs={
+        "app_context": app_context,
+        "statsd_client": doorstats_global,
+        "problematic_threshold": app_config.PROBLEMATIC_CAPTURE_THRESHOLD,
+    },
 )
 
 scheduler.add_job(

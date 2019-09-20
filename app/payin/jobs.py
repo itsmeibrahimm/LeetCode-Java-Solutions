@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
+
 from app.commons.context.app_context import AppContext
 from app.commons.context.logger import get_logger
 from app.commons.context.req_context import build_req_context
@@ -80,3 +82,18 @@ async def resolve_capturing_payment_intents(app_context: AppContext, job_pool: J
                 previous_status=payment_intent.status,
             )
         )
+
+
+async def emit_problematic_capture_count(
+    app_context: AppContext,
+    statsd_client: DoorStatsProxyMultiServer,
+    problematic_threshold: timedelta,
+):
+    """
+    Emits the number of problematic captures to statsd
+    """
+    cart_payment_repo = CartPaymentRepository(app_context)
+    count = await cart_payment_repo.count_payment_intents_that_require_capture(
+        problematic_threshold=problematic_threshold
+    )
+    statsd_client.gauge("capture.problematic_count", count)
