@@ -188,7 +188,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
     ids_session: aiohttp.ClientSession = TrackedIdentityClientSession()
 
     identity_client: IdentityClientInterface
-    if config.ENVIRONMENT in ["testing"]:
+    if config.ENVIRONMENT in ["testing", "local"]:
         # disable testing
         identity_client = StubbedIdentityClient()
     else:
