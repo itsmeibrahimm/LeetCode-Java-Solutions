@@ -2,7 +2,6 @@ from typing import Dict, Any
 from datetime import datetime
 import json
 from structlog.stdlib import BoundLogger
-from fastapi import Depends
 
 from app.payout.service import (
     PayoutRepositoryInterface,
@@ -20,7 +19,9 @@ from app.payout.repository.maindb.model.transfer import TransferStatus, Transfer
 from app.payout.service import PayoutService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core import feature_flags
-from app.commons.context.req_context import get_logger_from_req
+from app.commons.context.logger import get_logger
+
+root_logger = get_logger("payout_webhook_handler")
 
 STRIPE_RESOURCE_ALLOWED_ACTIONS_TRANSFER = [
     "created",
@@ -37,7 +38,7 @@ async def _handle_stripe_transfer_event(
     i_transfers: TransferRepositoryInterface,
     i_stripe_transfers: StripeTransferRepositoryInterface,
     dsj_client: DSJClient,
-    log: BoundLogger = Depends(get_logger_from_req),
+    log: BoundLogger = root_logger,
 ):
     if not feature_flags.handle_stripe_transfer_event_enabled():
         log.info("handle_stripe_transfer_event_enabled is off, skipping...")
