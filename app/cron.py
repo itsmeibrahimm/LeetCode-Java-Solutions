@@ -25,6 +25,8 @@ from app.payin.jobs import (
     resolve_capturing_payment_intents,
 )
 
+logger = get_logger("cron")
+
 
 async def run_health_server(port: int = 80):
     """
@@ -40,7 +42,8 @@ async def run_health_server(port: int = 80):
     server = web.Server(handler)
     runner = web.ServerRunner(server)
     await runner.setup()
-    site = web.TCPSite(runner, "localhost", port)
+    logger.info(f"Starting health server on {port}")
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
 
@@ -53,8 +56,6 @@ def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
     """
     statsd_client.incr("scheduler.heartbeat")
 
-
-logger = get_logger("cron")
 
 (app_config, app_context, stripe_pool) = init_worker_resources(pool_name="stripe")
 
