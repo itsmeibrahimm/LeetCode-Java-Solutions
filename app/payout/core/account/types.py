@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Json
 
 from app.commons.core.processor import OperationResponse
 from app.commons.types import CountryCode, Currency
@@ -67,3 +67,7 @@ class PayoutCardMethod(OperationResponse):
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime]
+
+
+class VerificationRequirementsOnboarding(OperationResponse):
+    required_fields_stages: Json

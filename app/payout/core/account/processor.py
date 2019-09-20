@@ -1,5 +1,6 @@
 from app.commons.context.logger import Log
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.commons.types import CountryCode
 from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
@@ -37,6 +38,11 @@ from app.payout.core.account.processors.verify_account import (
     VerifyPayoutAccountRequest,
     VerifyPayoutAccount,
 )
+from app.payout.core.account.processors.get_required_fields import (
+    GetPaymentsOnboardingRequirements,
+    GetRequiredFieldsRequest,
+)
+from app.payout.core.account.types import VerificationRequirementsOnboarding
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepositoryInterface,
 )
@@ -49,6 +55,7 @@ from app.payout.repository.maindb.payment_account import (
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
+from app.payout.types import PayoutTargetType
 
 
 class PayoutAccountProcessors:
@@ -158,3 +165,14 @@ class PayoutAccountProcessors:
             request=request,
         )
         return await create_instant_payout_op.execute()
+
+    async def get_onboarding_requirements_by_stages(
+        self, entity_type: PayoutTargetType, country_shortname: CountryCode
+    ) -> VerificationRequirementsOnboarding:
+        request: GetRequiredFieldsRequest = GetRequiredFieldsRequest(
+            entity_type=entity_type, country_shortname=country_shortname
+        )
+        required_fields_op = GetPaymentsOnboardingRequirements(
+            logger=self.logger, request=request
+        )
+        return await required_fields_op.execute()

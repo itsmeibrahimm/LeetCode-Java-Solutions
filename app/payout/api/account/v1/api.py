@@ -6,7 +6,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
-
+from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
 from app.payout.api.account.utils import to_external_payout_account
@@ -28,7 +28,11 @@ from app.payout.core.account.processors.verify_account import VerifyPayoutAccoun
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.service import create_payout_account_processors
-from app.payout.types import PayoutAccountStatementDescriptor, PayoutType
+from app.payout.types import (
+    PayoutAccountStatementDescriptor,
+    PayoutType,
+    PayoutTargetType,
+)
 from . import models
 
 api_tags = ["AccountsV1"]
@@ -235,3 +239,23 @@ async def create_payout(
             instant_payout_request
         )
         return models.Payout(**instant_payout_response.dict())
+
+
+@router.get(
+    "/onboarding_required_fields/{entity_type}/{country_shortname}",
+    status_code=HTTP_200_OK,
+    operation_id="GetOnboardingRequirementsByStages",
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def get_onboarding_requirements_by_stages(
+    entity_type: PayoutTargetType,
+    country_shortname: CountryCode,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    internal_onboarding_requirements = await payout_account_processors.get_onboarding_requirements_by_stages(
+        entity_type=entity_type, country_shortname=country_shortname
+    )
+    return internal_onboarding_requirements

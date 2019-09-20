@@ -5,7 +5,7 @@ from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.types import CountryCode
-from app.payout.types import StripeAccountToken
+from app.payout.types import StripeAccountToken, PayoutTargetType
 
 ACCOUNT_ENDPOINT = "/payout/api/v1/accounts"
 
@@ -24,6 +24,12 @@ def update_account_statement_descriptor(id: int):
 
 def verify_account_url(id: int):
     return f"{ACCOUNT_ENDPOINT}/{id}/verify/legacy"
+
+
+def get_onboarding_requirements_by_stages_url(
+    entity_type: PayoutTargetType, country_shortname: CountryCode
+):
+    return f"{ACCOUNT_ENDPOINT}/onboarding_required_fields/{entity_type}/{country_shortname}"
 
 
 class TestAccountV1:
@@ -114,4 +120,19 @@ class TestAccountV1:
         response = client.post(
             verify_account_url(account_created["id"]), json=verification_details
         )
+        assert response.status_code == 200
+
+    def test_get_onboarding_requirements_by_stages(self, client: TestClient):
+        response = client.get(
+            get_onboarding_requirements_by_stages_url(
+                PayoutTargetType.STORE, CountryCode.CA
+            )
+        )
+
+        required_fields = response.json()
+        stages = required_fields.get("required_fields_stages")
+        assert stages is not None
+        # TODO : Nikita use constants and not hard code the field names
+        assert "business_name" in stages.get("stage_0")
+        assert "tax_id_CA" in stages.get("stage_1")
         assert response.status_code == 200
