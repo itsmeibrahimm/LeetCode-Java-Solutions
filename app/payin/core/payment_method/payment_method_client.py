@@ -83,9 +83,7 @@ class PaymentMethodClient:
     ) -> RawPaymentMethod:
         now = datetime.utcnow()
         try:
-            dynamic_last4: Optional[
-                str
-            ] = ""  # stupid existing DSJ logic in add_payment_card_to_consumer()
+            dynamic_last4: Optional[str] = None
             tokenization_method: Optional[str] = None
             if stripe_payment_method.card.wallet:
                 dynamic_last4 = stripe_payment_method.card.wallet.dynamic_last4
@@ -110,13 +108,13 @@ class PaymentMethodClient:
                 sc_input=InsertStripeCardInput(
                     stripe_id=stripe_payment_method.id,
                     fingerprint=stripe_payment_method.card.fingerprint,
-                    last4=stripe_payment_method.card.last4,
+                    last4=stripe_payment_method.card.last4 or "",
                     external_stripe_customer_id=stripe_payment_method.customer,
                     country_of_origin=stripe_payment_method.card.country,
-                    dynamic_last4=dynamic_last4,
+                    dynamic_last4=dynamic_last4 or "",
                     tokenization_method=tokenization_method,
-                    exp_month=stripe_payment_method.card.exp_month,
-                    exp_year=stripe_payment_method.card.exp_year,
+                    exp_month=str(stripe_payment_method.card.exp_month).zfill(2),
+                    exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
                     type=stripe_payment_method.card.brand,
                     active=True,
                     # consumer_id=int(legacy_consumer_id),  # FIXME: hit foreign key constraint error in testing. we need to populate this field in PROD.
@@ -245,8 +243,8 @@ class PaymentMethodClient:
             if raw_payment_method.stripe_card_entity:
                 updated_sc_entity = await self.payment_method_repo.delete_stripe_card_by_id(
                     input_set=DeleteStripeCardByIdSetInput(
-                        removed_at=now
-                    ),  # FIXME: timezone
+                        removed_at=now, active=False
+                    ),
                     input_where=DeleteStripeCardByIdWhereInput(
                         id=raw_payment_method.stripe_card_entity.id
                     ),
@@ -264,11 +262,7 @@ class PaymentMethodClient:
         )
 
     async def pgp_create_and_attach_payment_method(
-        self,
-        token: str,
-        pgp_customer_id: str,
-        country: Optional[str] = CountryCode.US,
-        attached: Optional[bool] = True,
+        self, token: str, pgp_customer_id: str, country: Optional[str] = CountryCode.US
     ) -> StripePaymentMethod:
         try:
             # create PGP payment method
@@ -280,16 +274,15 @@ class PaymentMethodClient:
             )
 
             # attach PGP payment method
-            if attached:
-                attach_payment_method = await self.stripe_async_client.attach_payment_method(
-                    country=CountryCode(country),
-                    request=AttachPaymentMethod(
-                        sid=stripe_payment_method.id, customer=pgp_customer_id
-                    ),
-                )
-                self.log.info(
-                    f"[pgp_create_and_attach_payment_method][{pgp_customer_id}] attach payment_method completed. customer_id from response:{attach_payment_method.customer}"
-                )
+            attach_payment_method = await self.stripe_async_client.attach_payment_method(
+                country=CountryCode(country),
+                request=AttachPaymentMethod(
+                    sid=stripe_payment_method.id, customer=pgp_customer_id
+                ),
+            )
+            self.log.info(
+                f"[pgp_create_and_attach_payment_method][{pgp_customer_id}] attach payment_method completed. customer_id from response:{attach_payment_method.customer}"
+            )
         except Exception as e:
             self.log.error(
                 f"[create_payment_method_impl][{pgp_customer_id}] error while creating stripe payment method. {e}"

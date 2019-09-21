@@ -53,26 +53,26 @@ class PaymentMethodProcessor:
         country: Optional[CountryCode] = CountryCode.US,
     ) -> PaymentMethod:
         """
-        Implementation to create a payment method.
+        Create payment method and attach to payer.
 
-        :param pgp_code:
-        :param token:
-        :param payer_id:
-        :param dd_consumer_id:
-        :param stripe_customer_id:
-        :param country:
-        :return:
+        :param pgp_code: payment gateway provider code (eg. "stripe")
+        :param token: payment provider authorized one-time payment method token.
+        :param payer_id: DoorDash payer id.
+        :param dd_consumer_id: legacy DoorDash consumer id.
+        :param stripe_customer_id: legacy Stripe customer id.
+        :param country: country only used for v0 legacy path.
+        :return: PaymentMethod object
         """
 
         if not (payer_id or dd_consumer_id or stripe_customer_id):
-            self.log.info(f"[create_payment_method] invalid input. must provide id")
+            self.log.info("[create_payment_method] invalid input. must provide id")
             raise PaymentMethodCreateError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
                 retryable=False,
             )
 
         # step 1: lookup pgp_customer_resource_id and country information
-        pgp_customer_res_id: Optional[str]
+        pgp_customer_res_id: Optional[str] = None
         pgp_country: Optional[str] = country
         raw_payer: RawPayer
         if payer_id:
@@ -90,14 +90,23 @@ class PaymentMethodProcessor:
                 )
                 pgp_customer_res_id = raw_payer.pgp_customer_id()
 
+        if not pgp_customer_res_id:
+            self.log.info(
+                "[create_payment_method] can't find pgp_customer_resource_id",
+                payer_id=payer_id,
+                dd_consumer_id=dd_consumer_id,
+                stripe_customer_id=stripe_customer_id,
+            )
+            raise PaymentMethodCreateError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
+                retryable=False,
+            )
+
         # TODO: perform Payer's lazy creation
 
         # step 2: create and attach PGP payment_method
         stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_create_and_attach_payment_method(
-            token=token,
-            pgp_customer_id=pgp_customer_res_id,
-            country=pgp_country,
-            attached=True,
+            token=token, pgp_customer_id=pgp_customer_res_id, country=pgp_country
         )
 
         self.log.info(
@@ -130,15 +139,13 @@ class PaymentMethodProcessor:
         force_update: Optional[bool] = False,
     ) -> PaymentMethod:
         """
-        Implementation of get payment method
+        Get payment method by payment_method_id
 
-        :param payer_id:
-        :param payment_method_id:
-        :param payer_id_type:
-        :param payment_method_id_type:
-        :param country:
-        :param force_update:
-        :return: PaymentMethod object.
+        :param payment_method_id: DoorDash payment method id.
+        :param payment_method_id_type: type of payment method.
+        :param country: country only used for v0 legacy path.
+        :param force_update: force update from Payment provider.
+        :return: PaymentMethod object
         """
 
         # step 1: retrieve data from DB
@@ -169,11 +176,12 @@ class PaymentMethodProcessor:
         country: Optional[CountryCode] = CountryCode.US,
     ) -> PaymentMethod:
         """
-        Implementation of delete/detach a payment method.
+        Detach a payment method.
 
-        :param payment_method_id:
-        :param payment_method_id_type:
-        :param country:
+        :param payment_method_id: DoorDash payment method id.
+        :param payment_method_id_type: type of payment method.
+        :param country: country only used for v0 legacy path.
+        :param force_update: force update from Payment provider.
         :return: PaymentMethod object
         """
 

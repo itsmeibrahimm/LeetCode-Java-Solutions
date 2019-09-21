@@ -113,6 +113,7 @@ class GetStripeCardByIdInput(DBRequestModel):
 
 class DeleteStripeCardByIdSetInput(DBRequestModel):
     removed_at: datetime
+    active: bool
 
 
 class DeleteStripeCardByIdWhereInput(DBRequestModel):
