@@ -4,6 +4,8 @@ import os
 import platform
 import sys
 from typing import Callable, Dict, Optional
+
+from structlog import BoundLogger
 from typing_extensions import Protocol
 
 import structlog
@@ -186,8 +188,8 @@ class Log(Protocol):
 
 
 # used for application initialization
-init_logger: Log = structlog.get_logger("initialization")
+init_logger: BoundLogger = structlog.get_logger("initialization")
 # used for general application usage
-root_logger: Log = structlog.get_logger("application")
+root_logger: BoundLogger = structlog.get_logger("application")
 # get or create a named logger
-get_logger: Callable[..., Log] = structlog.get_logger
+get_logger: Callable[..., BoundLogger] = structlog.get_logger
