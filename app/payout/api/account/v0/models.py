@@ -108,13 +108,13 @@ class StripeManagedAccountCreate(PaymentRequest):
     verification_fields_needed: Optional[List[str]]
 
     def to_db_model(self) -> stripe_managed_account.StripeManagedAccountCreate:
-        verification_fields_needed = None
-        if self.verification_fields_needed:
-            verification_fields_needed = json.dumps(self.verification_fields_needed)
-        return stripe_managed_account.StripeManagedAccountCreate(
-            **self.dict(exclude={"verification_fields_needed"}, skip_defaults=True),
-            verification_fields_needed=verification_fields_needed
-        )
+        internal_data = self.dict(skip_defaults=True)
+        if "verification_fields_needed" in internal_data:
+            if internal_data["verification_fields_needed"] is not None:
+                internal_data["verification_fields_needed"] = json.dumps(
+                    self.verification_fields_needed
+                )
+        return stripe_managed_account.StripeManagedAccountCreate(**internal_data)
 
 
 class StripeManagedAccountUpdate(PaymentRequest):

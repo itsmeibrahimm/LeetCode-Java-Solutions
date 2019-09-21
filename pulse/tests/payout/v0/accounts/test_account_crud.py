@@ -3,7 +3,12 @@ from datetime import datetime, timezone
 
 import payout_v0_client
 import pytest
-from payout_v0_client import PaymentAccount, PaymentAccountCreate, PaymentAccountUpdate
+from payout_v0_client import (
+    PaymentAccount,
+    PaymentAccountCreate,
+    PaymentAccountUpdate,
+    ApiException,
+)
 
 from tests.payout.v0.client_operations import (
     create_payment_account,
@@ -64,6 +69,38 @@ class TestPaymentAccount:
         # after change back entity locally, updated payment account should be same as before update
         updated_payment_account.entity = retrieved_payment_account.entity
         assert updated_payment_account == retrieved_payment_account
+
+        # Update not null field (use entity here) should succeed
+        # Need to construct a dict in order to pass None value to client
+        payment_account_update = {"entity": None}
+        updated_payment_account, status, _ = accounts_api.update_payment_account_by_id_with_http_info(
+            retrieved_payment_account.id, payment_account_update
+        )
+
+        assert updated_payment_account.entity is None
+
+        retrieved_payment_account, status, _ = get_payment_account_by_id(
+            payment_account_id=created_account.id, accounts_api=accounts_api
+        )
+        assert retrieved_payment_account == updated_payment_account
+
+        # Update statement_descriptor to Null value should raise ApiException.
+        # Need to construct a dict in order to pass None value to client
+        payment_account_update = {"statement_descriptor": None}
+        with pytest.raises(ApiException):
+            accounts_api.update_payment_account_by_id_with_http_info(
+                retrieved_payment_account.id, payment_account_update
+            )
+
+        # Update statement_descriptor to Null value along with other field should also raise ApiException.
+        payment_account_update = {
+            "statement_descriptor": None,
+            "payout_disabled": False,
+        }
+        with pytest.raises(Exception):
+            accounts_api.update_payment_account_by_id_with_http_info(
+                retrieved_payment_account.id, payment_account_update
+            )
 
     def test_create_account_malformed(
         self, accounts_api: payout_v0_client.AccountsV0Api
