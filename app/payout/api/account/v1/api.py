@@ -217,7 +217,7 @@ async def create_payout(
             # todo: remove this after id of payout_card_method updated to required
             assert payout_card_method.id, "payout_card_method id is required"
         except Exception:
-            return PayoutError(
+            raise PayoutError(
                 http_status_code=HTTP_400_BAD_REQUEST,
                 error_code=PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND,
                 retryable=False,
