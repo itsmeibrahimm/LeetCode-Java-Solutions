@@ -14,7 +14,10 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
-from app.commons.providers.stripe.stripe_models import CreatePayout, CreateTransfer
+from app.commons.providers.stripe.stripe_models import (
+    StripeCreatePayoutRequest,
+    StripeCreateTransferRequest,
+)
 from app.payout.core.account.utils import (
     get_account_balance,
     get_currency_code,
@@ -535,7 +538,7 @@ class CreateStandardPayout(
                 error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
                 retryable=False,
             )
-        create_payout_request = CreatePayout(
+        create_payout_request = StripeCreatePayoutRequest(
             statement_descriptor=statement_descriptor,
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
@@ -594,7 +597,7 @@ class CreateStandardPayout(
             currency=models.Currency(managed_account_transfer.currency),
             destination=models.Destination(stripe_destination_id),
             country=models.CountryCode(country),
-            request=CreateTransfer(),
+            request=StripeCreateTransferRequest(),
         )
         update_request = ManagedAccountTransferUpdate(
             stripe_id=transfer.id,

@@ -48,7 +48,7 @@ class TestAccountV1:
 
     @pytest.fixture
     def account_token(self, stripe_test: StripeTestClient) -> StripeAccountToken:
-        data = models.CreateAccountTokenMetaData(
+        data = models.CreateAccountTokenMetaDataRequest(
             business_type="individual",
             individual=models.Individual(
                 first_name="Test",

@@ -22,11 +22,11 @@ from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
-    CapturePaymentIntent,
+    StripeCapturePaymentIntentRequest,
     StripeCreatePaymentIntentRequest,
-    CancelPaymentIntent,
+    StripeCancelPaymentIntentRequest,
     ConnectedAccountId,
-    RefundCharge,
+    StripeRefundChargeRequest,
     TransferData,
     PaymentIntent as ProviderPaymentIntent,
     Refund as ProviderRefund,
@@ -763,7 +763,9 @@ class CartPaymentInterface:
     ) -> ProviderPaymentIntent:
         # Call to stripe payment intent API
         try:
-            intent_request = CapturePaymentIntent(sid=pgp_payment_intent.resource_id)
+            intent_request = StripeCapturePaymentIntentRequest(
+                sid=pgp_payment_intent.resource_id
+            )
 
             self.req_context.log.info(
                 f"Capturing payment intent: {payment_intent.country}, key: {pgp_payment_intent.idempotency_key}"
@@ -867,7 +869,7 @@ class CartPaymentInterface:
         reason,
     ) -> str:
         try:
-            intent_request = CancelPaymentIntent(
+            intent_request = StripeCancelPaymentIntentRequest(
                 sid=pgp_payment_intent.resource_id, cancellation_reason=reason
             )
 
@@ -896,7 +898,7 @@ class CartPaymentInterface:
         refund_amount: int,
     ) -> ProviderRefund:
         try:
-            refund_request = RefundCharge(
+            refund_request = StripeRefundChargeRequest(
                 charge=pgp_payment_intent.charge_resource_id,
                 amount=refund_amount,
                 reason=reason,
@@ -1355,7 +1357,7 @@ class CartPaymentProcessor:
             await self.cart_payment_interface.cancel_provider_payment_charge(
                 payment_intent,
                 pgp_payment_intent,
-                CancelPaymentIntent.CancellationReason.ABANDONED,
+                StripeCancelPaymentIntentRequest.CancellationReason.ABANDONED,
             )
 
             # Update state in our system after operation with provider
@@ -1367,7 +1369,7 @@ class CartPaymentProcessor:
             provider_refund = await self.cart_payment_interface.refund_provider_payment(
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
-                reason=RefundCharge.RefundReason.REQUESTED_BY_CONSUMER,
+                reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
                 refund_amount=payment_intent.amount,
             )
 
@@ -1545,7 +1547,7 @@ class CartPaymentProcessor:
             provider_refund = await self.cart_payment_interface.refund_provider_payment(
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
-                reason=RefundCharge.RefundReason.REQUESTED_BY_CONSUMER,
+                reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
                 refund_amount=refund_amount,
             )
 

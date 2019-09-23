@@ -15,9 +15,9 @@ from app.commons.context.req_context import (
 from app.commons import tracing
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
-    CreatePaymentMethod,
-    AttachPaymentMethod,
-    DetachPaymentMethod,
+    StripeCreatePaymentMethodRequest,
+    StripeAttachPaymentMethodRequest,
+    StripeDetachPaymentMethodRequest,
 )
 from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
@@ -268,15 +268,15 @@ class PaymentMethodClient:
             # create PGP payment method
             stripe_payment_method = await self.stripe_async_client.create_payment_method(
                 country=CountryCode(country),
-                request=CreatePaymentMethod(
-                    type="card", card=CreatePaymentMethod.Card(token=token)
+                request=StripeCreatePaymentMethodRequest(
+                    type="card", card=StripeCreatePaymentMethodRequest.Card(token=token)
                 ),
             )
 
             # attach PGP payment method
             attach_payment_method = await self.stripe_async_client.attach_payment_method(
                 country=CountryCode(country),
-                request=AttachPaymentMethod(
+                request=StripeAttachPaymentMethodRequest(
                     sid=stripe_payment_method.id, customer=pgp_customer_id
                 ),
             )
@@ -299,7 +299,7 @@ class PaymentMethodClient:
         try:
             stripe_payment_method = await self.stripe_async_client.detach_payment_method(
                 country=CountryCode(country),  # TODO: get from payer
-                request=DetachPaymentMethod(sid=pgp_payment_method_id),
+                request=StripeDetachPaymentMethodRequest(sid=pgp_payment_method_id),
             )
             self.log.info(
                 f"[pgp_detach_payment_method][{pgp_payment_method_id}] detach payment method completed. customer in stripe response blob:"

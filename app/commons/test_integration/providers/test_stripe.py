@@ -55,7 +55,7 @@ class TestStripePoolStats:
 
         customer_id = await stripe_async_client.create_customer(
             country=models.CountryCode.US,
-            request=models.CreateCustomer(
+            request=models.StripeCreateCustomerRequest(
                 email="test@user.com", description="customer name", country="US"
             ),
         )

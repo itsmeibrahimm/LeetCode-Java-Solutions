@@ -13,7 +13,7 @@ from app.commons.context.req_context import (
     get_stripe_async_client_from_req,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
-from app.commons.providers.stripe.stripe_models import UpdateDispute
+from app.commons.providers.stripe.stripe_models import StripeUpdateDisputeRequest
 from app.commons.types import CountryCode
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata, Evidence
 from app.payin.core.dispute.types import DisputeIdType, ReasonType
@@ -91,7 +91,7 @@ class DisputeClient:
         self, dispute_id: str, evidence: Evidence, country: CountryCode
     ):
         try:
-            request = UpdateDispute(sid=dispute_id, evidence=evidence)
+            request = StripeUpdateDisputeRequest(sid=dispute_id, evidence=evidence)
             response = await self.stripe_async_client.update_dispute(
                 country=country, request=request
             )

@@ -371,7 +371,7 @@ class CreateInstantPayout(
                 ),
                 destination=models.Destination(sma_transfer.to_stripe_account_id),
                 country=models.CountryCode(stripe_managed_account.country_shortname),
-                request=models.CreateTransfer(),
+                request=models.StripeCreateTransferRequest(),
             )
             self.logger.info(
                 f"[Fast Pay Local Creation] succeed to create a stripe transfer. stripe_transfer.id: {response.id}",
@@ -442,7 +442,7 @@ class CreateInstantPayout(
         payout_amount: int,
         stripe_account: models.StripeAccountId,
     ) -> models.Payout:
-        request = models.CreatePayout(
+        request = models.StripeCreatePayoutRequest(
             method="instant", metadata={"service_origin": "payment-service"}
         )
         response = await self.stripe_async_client.create_payout(

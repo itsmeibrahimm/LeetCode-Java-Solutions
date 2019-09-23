@@ -64,17 +64,7 @@ class StripeClientSettings(StripeBaseModel):
 
 
 # --------------- REQUEST MODELS ---------------------------------------------------------------------------------------
-class CreateConnectedAccountToken(StripeBaseModel):
-    card: str
-    stripe_account: str
-    customer: str
-
-
-class CreateBankAccountToken(StripeBaseModel):
-    ...
-
-
-class CreateCreditCardToken(StripeBaseModel):
+class StripeCreateCreditCardTokenRequest(StripeBaseModel):
     number: str
     exp_month: int
     exp_year: int
@@ -85,16 +75,16 @@ class InvoiceSettings(StripeBaseModel):
     default_payment_method: str
 
 
-class CreateCustomer(StripeBaseModel):
+class StripeCreateCustomerRequest(StripeBaseModel):
     email: str
     description: str
 
 
-class RetrieveCustomer(StripeBaseModel):
+class StripeRetrieveCustomerRequest(StripeBaseModel):
     id: str
 
 
-class UpdateCustomer(StripeBaseModel):
+class StripeUpdateCustomerRequest(StripeBaseModel):
     sid: str
     invoice_settings: InvoiceSettings
 
@@ -143,7 +133,7 @@ class StripeCreatePaymentIntentRequest(StripeBaseModel):
     transfer_group: Optional[str]
 
 
-class CapturePaymentIntent(StripeBaseModel):
+class StripeCapturePaymentIntentRequest(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/payment_intents/capture
     """
@@ -155,7 +145,7 @@ class CapturePaymentIntent(StripeBaseModel):
     transfer_data: Optional[TransferData]
 
 
-class CancelPaymentIntent(StripeBaseModel):
+class StripeCancelPaymentIntentRequest(StripeBaseModel):
     class CancellationReason(str, Enum):
         ABANDONED = "abandoned"
         DUPLICATE = "duplicate"
@@ -166,7 +156,7 @@ class CancelPaymentIntent(StripeBaseModel):
     cancellation_reason: str
 
 
-class RefundCharge(StripeBaseModel):
+class StripeRefundChargeRequest(StripeBaseModel):
     class RefundReason(str, Enum):
         DUPLICATE = "duplicate"
         FRAUDULENT = "fraudulent"
@@ -180,7 +170,7 @@ class RefundCharge(StripeBaseModel):
     reverse_transfer: Optional[bool]
 
 
-class CreatePaymentMethod(StripeBaseModel):
+class StripeCreatePaymentMethodRequest(StripeBaseModel):
     class Card(StripeBaseModel):
         token: str
 
@@ -188,30 +178,30 @@ class CreatePaymentMethod(StripeBaseModel):
     card: Card
 
 
-class AttachPaymentMethod(StripeBaseModel):
+class StripeAttachPaymentMethodRequest(StripeBaseModel):
     sid: str
     customer: str
 
 
-class DetachPaymentMethod(StripeBaseModel):
+class StripeDetachPaymentMethodRequest(StripeBaseModel):
     sid: str
 
 
-class RetrievePaymentMethod(StripeBaseModel):
+class StripeRetrievePaymentMethodRequest(StripeBaseModel):
     id: str
 
 
-class RetrievePayout(StripeBaseModel):
+class StripeRetrievePayoutRequest(StripeBaseModel):
     id: str
     stripe_account: str
 
 
-class CancelPayout(StripeBaseModel):
+class StripeCancelPayoutRequest(StripeBaseModel):
     sid: str
     stripe_account: str
 
 
-class UpdateDispute(StripeBaseModel):
+class StripeUpdateDisputeRequest(StripeBaseModel):
     class Evidence(StripeBaseModel):
         access_activity_log: Optional[str] = None
         billing_address: Optional[str] = None
@@ -245,7 +235,7 @@ class UpdateDispute(StripeBaseModel):
     evidence: Evidence
 
 
-class CreateTransfer(StripeBaseModel):
+class StripeCreateTransferRequest(StripeBaseModel):
     description: Optional[str]
     metadata: Optional[Dict]
     source_transaction: Optional[str]
@@ -253,7 +243,7 @@ class CreateTransfer(StripeBaseModel):
     transfer_group: Optional[str]
 
 
-class CreatePayout(StripeBaseModel):
+class StripeCreatePayoutRequest(StripeBaseModel):
     description: Optional[str]
     destination: Optional[str]
     metadata: Optional[Dict]
@@ -306,7 +296,7 @@ class Individual(StripeBaseModel):
     verification: Optional[Verification]
 
 
-class CreateAccountTokenMetaData(StripeBaseModel):
+class CreateAccountTokenMetaDataRequest(StripeBaseModel):
     business_type: Optional[str]
     company: Optional[Company]
     individual: Optional[Individual]
@@ -315,7 +305,7 @@ class CreateAccountTokenMetaData(StripeBaseModel):
 
 class CreateAccountTokenRequest(StripeBaseModel):
     country: CountryCode
-    account: CreateAccountTokenMetaData
+    account: CreateAccountTokenMetaDataRequest
 
 
 class CreateAccountRequest(StripeBaseModel):
@@ -666,7 +656,6 @@ class Payout(StripeBaseModel):
 
 
 class SourceTypes(StripeBaseModel):
-    bank_account: int
     card: int
 
 

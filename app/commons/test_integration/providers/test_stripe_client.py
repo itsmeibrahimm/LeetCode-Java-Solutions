@@ -16,7 +16,7 @@ from app.commons.providers.stripe.stripe_models import (
     Address,
     CreateAccountTokenRequest,
     Individual,
-    CreateAccountTokenMetaData,
+    CreateAccountTokenMetaDataRequest,
 )
 from app.commons.types import Currency, CountryCode
 
@@ -72,23 +72,10 @@ class TestStripeClient:
             ]
         )
 
-    @pytest.mark.skip("requires connected account key")
-    def test_token(self, mode: str, stripe: StripeClient):
-        token_id = stripe.create_connected_account_token(
-            country=models.CountryCode.US,
-            token=models.CreateConnectedAccountToken(
-                card="card_1F0HgE2eZvKYlo2CpI7aVFkd",
-                stripe_account="acct_1032D82eZvKYlo2C",
-                country="US",
-                customer="cus_FVIHDAyh5HbO5L",
-            ),
-        )
-        assert token_id
-
     def test_customer(self, mode: str, stripe: StripeClient):
         customer_id = stripe.create_customer(
             country=models.CountryCode.US,
-            request=models.CreateCustomer(
+            request=models.StripeCreateCustomerRequest(
                 email="test@user.com", description="customer name", country="US"
             ),
         )
@@ -96,7 +83,7 @@ class TestStripeClient:
 
         customer = stripe.retrieve_customer(
             country=models.CountryCode.US,
-            request=models.RetrieveCustomer(id=customer_id),
+            request=models.StripeRetrieveCustomerRequest(id=customer_id),
         )
         assert customer
 
@@ -109,7 +96,7 @@ class TestStripeClient:
             currency=models.Currency(Currency.USD.value),
             destination=models.Destination("acct_1A29cNCyrpkWaAxi"),
             amount=models.Amount(200),
-            request=models.CreateTransfer(description="test description"),
+            request=models.StripeCreateTransferRequest(description="test description"),
         )
         assert transfer.id
 
@@ -122,7 +109,7 @@ class TestStripeClient:
             currency=models.Currency(Currency.USD.value),
             amount=models.Amount(2),
             stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
-            request=models.CreatePayout(method="standard"),
+            request=models.StripeCreatePayoutRequest(method="standard"),
         )
         assert payout.id
 
@@ -135,13 +122,13 @@ class TestStripeClient:
             currency=models.Currency(Currency.USD.value),
             amount=models.Amount(2),
             stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
-            request=models.CreatePayout(method="standard"),
+            request=models.StripeCreatePayoutRequest(method="standard"),
         )
         assert payout.id
 
         retrieved_payout = stripe.retrieve_payout(
             country=models.CountryCode.US,
-            request=models.RetrievePayout(
+            request=models.StripeRetrievePayoutRequest(
                 stripe_account="acct_1FGdyOBOQHMRR5FG", id=payout.id
             ),
         )
@@ -156,14 +143,14 @@ class TestStripeClient:
             currency=models.Currency(Currency.USD.value),
             amount=models.Amount(2),
             stripe_account=models.StripeAccountId("acct_1FGdyOBOQHMRR5FG"),
-            request=models.CreatePayout(method="standard"),
+            request=models.StripeCreatePayoutRequest(method="standard"),
         )
         assert payout.id
 
         try:
             payout_cancelled = stripe.cancel_payout(
                 country=models.CountryCode.US,
-                request=models.CancelPayout(
+                request=models.StripeCancelPayoutRequest(
                     stripe_account="acct_1FGdyOBOQHMRR5FG", sid=payout.id
                 ),
             )
@@ -196,7 +183,7 @@ class TestStripeClient:
             pytest.skip()
 
         # generate account token
-        data = CreateAccountTokenMetaData(
+        data = CreateAccountTokenMetaDataRequest(
             business_type="individual",
             individual=Individual(
                 first_name="Test",
@@ -226,7 +213,7 @@ class TestStripeClient:
 
         if mode == "mock":
             pytest.skip()
-        data = CreateAccountTokenMetaData(
+        data = CreateAccountTokenMetaDataRequest(
             business_type="individual",
             individual=Individual(
                 first_name="Test",
@@ -297,23 +284,10 @@ class TestStripePool:
         yield stripe_async_client
         stripe_thread_pool.shutdown()
 
-    @pytest.mark.skip("requires connected account key")
-    async def test_token(self, mode: str, stripe_async_client: StripeAsyncClient):
-        token_id = await stripe_async_client.create_connected_account_token(
-            country=models.CountryCode.US,
-            token=models.CreateConnectedAccountToken(
-                card="card_1F0HgE2eZvKYlo2CpI7aVFkd",
-                stripe_account="acct_1032D82eZvKYlo2C",
-                country="US",
-                customer="cus_FVIHDAyh5HbO5L",
-            ),
-        )
-        assert token_id
-
     async def test_customer(self, mode: str, stripe_async_client: StripeAsyncClient):
         customer_id = await stripe_async_client.create_customer(
             country=models.CountryCode.US,
-            request=models.CreateCustomer(
+            request=models.StripeCreateCustomerRequest(
                 email="test@user.com", description="customer name", country="US"
             ),
         )

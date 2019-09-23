@@ -16,27 +16,12 @@ from app.commons.utils.pool import ThreadPoolHelper
 
 
 class StripeClientInterface(metaclass=abc.ABCMeta):
-    # TODO: Require idempotency key
-    @abc.abstractmethod
-    def create_connected_account_token(
-        self,
-        *,
-        country: models.CountryCode,
-        token: models.CreateConnectedAccountToken,
-        idempotency_key: models.IdempotencyKey = None,
-    ) -> models.TokenId:
-        """
-        Create a token for another connected account (used for cross-country charges on stripe)
-        See: https://stripe.com/docs/connect/shared-customers
-        """
-        ...
-
     @abc.abstractmethod
     def create_customer(
         self,
         *,
         country: models.CountryCode,
-        request: models.CreateCustomer,
+        request: models.StripeCreateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.CustomerId:
         """
@@ -50,7 +35,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.RetrieveCustomer,
+        request: models.StripeRetrieveCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.Customer:
         """
@@ -64,7 +49,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.UpdateCustomer,
+        request: models.StripeUpdateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> Any:
         """
@@ -78,7 +63,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.CreatePaymentMethod,
+        request: models.StripeCreatePaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         """
@@ -92,7 +77,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.AttachPaymentMethod,
+        request: models.StripeAttachPaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         """
@@ -106,7 +91,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.DetachPaymentMethod,
+        request: models.StripeDetachPaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         """
@@ -120,7 +105,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.RetrievePaymentMethod,
+        request: models.StripeRetrievePaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         """
@@ -148,7 +133,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.CapturePaymentIntent,
+        request: models.StripeCapturePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         """
@@ -162,7 +147,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.CancelPaymentIntent,
+        request: models.StripeCancelPaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         """
@@ -176,7 +161,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.RefundCharge,
+        request: models.StripeRefundChargeRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.Refund:
         """
@@ -187,7 +172,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def update_stripe_dispute(
-        self, request: models.UpdateDispute
+        self, request: models.StripeUpdateDisputeRequest
     ) -> models.StripeDisputeId:
         """
         Update a Dispute
@@ -203,7 +188,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         currency: models.Currency,
         destination: models.Destination,
         amount: models.Amount,
-        request: models.CreateTransfer,
+        request: models.StripeCreateTransferRequest,
     ) -> models.Transfer:
         """
         Create a Transfer
@@ -218,7 +203,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         country: models.CountryCode,
         currency: models.Currency,
         amount: models.Amount,
-        request: models.CreatePayout,
+        request: models.StripeCreatePayoutRequest,
     ) -> models.Payout:
         """
         Create a Payout
@@ -236,7 +221,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         stripe_account_id: models.StripeAccountId,
         country: models.CountryCode,
         metadata: models.Metadata,
-        request: models.CreatePayout,
+        request: models.StripeCreatePayoutRequest,
     ) -> models.Payout:
         """
         Create a Transfer Stripe api version 2016-02-29
@@ -246,7 +231,10 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def retrieve_payout(
-        self, *, country: models.CountryCode, request: models.RetrievePayout
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.StripeRetrievePayoutRequest,
     ) -> models.Payout:
         """
         Retrieve a Payout
@@ -256,7 +244,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def cancel_payout(
-        self, *, request: models.CancelPayout, country: models.CountryCode
+        self, *, request: models.StripeCancelPayoutRequest, country: models.CountryCode
     ) -> models.Payout:
         """
         Cancel a Payout
@@ -326,30 +314,12 @@ class StripeClient(StripeClientInterface):
                 f"service provider is not configured for country {country}"
             ) from err
 
-    @tracing.track_breadcrumb(resource="token", action="create")
-    def create_connected_account_token(
-        self,
-        *,
-        country: models.CountryCode,
-        token: models.CreateConnectedAccountToken,
-        idempotency_key: models.IdempotencyKey = None,
-    ) -> models.TokenId:
-        try:
-            stripe_token = stripe.Token.create(
-                idempotency_key=idempotency_key,
-                **self.settings_for(country),
-                **token.dict(skip_defaults=True),
-            )
-            return stripe_token.id
-        except stripe.error.InvalidRequestError as e:
-            raise errors.InvalidRequestError() from e
-
     @tracing.track_breadcrumb(resource="customer", action="create")
     def create_customer(
         self,
         *,
         country: models.CountryCode,
-        request: models.CreateCustomer,
+        request: models.StripeCreateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.CustomerId:
         customer = stripe.Customer.create(
@@ -364,7 +334,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.RetrieveCustomer,
+        request: models.StripeRetrieveCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.Customer:
         customer = stripe.Customer.retrieve(
@@ -377,7 +347,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.UpdateCustomer,
+        request: models.StripeUpdateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> Any:
         customer = stripe.Customer.modify(
@@ -392,7 +362,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.CreatePaymentMethod,
+        request: models.StripeCreatePaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.create(
@@ -407,7 +377,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.AttachPaymentMethod,
+        request: models.StripeAttachPaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.attach(
@@ -422,7 +392,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.DetachPaymentMethod,
+        request: models.StripeDetachPaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.detach(
@@ -437,7 +407,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.RetrievePaymentMethod,
+        request: models.StripeRetrievePaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.retrieve(
@@ -467,7 +437,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.CapturePaymentIntent,
+        request: models.StripeCapturePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         payment_intent = stripe.PaymentIntent.capture(
@@ -482,7 +452,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.CancelPaymentIntent,
+        request: models.StripeCancelPaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         payment_intent = stripe.PaymentIntent.cancel(
@@ -497,7 +467,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.RefundCharge,
+        request: models.StripeRefundChargeRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.Refund:
         refund = stripe.Refund.create(
@@ -509,7 +479,7 @@ class StripeClient(StripeClientInterface):
 
     @tracing.track_breadcrumb(resource="stripedispute", action="modify")
     def update_stripe_dispute(
-        self, request: models.UpdateDispute
+        self, request: models.StripeUpdateDisputeRequest
     ) -> models.StripeDisputeId:
         dispute = stripe.Dispute.modify(**request.dict(skip_defaults=True))
         return dispute.id
@@ -522,7 +492,7 @@ class StripeClient(StripeClientInterface):
         currency: models.Currency,
         destination: models.Destination,
         amount: models.Amount,
-        request: models.CreateTransfer,
+        request: models.StripeCreateTransferRequest,
     ) -> models.Transfer:
         transfer = stripe.Transfer.create(
             currency=currency,
@@ -541,7 +511,7 @@ class StripeClient(StripeClientInterface):
         currency: models.Currency,
         amount: models.Amount,
         stripe_account: models.StripeAccountId,
-        request: models.CreatePayout,
+        request: models.StripeCreatePayoutRequest,
     ) -> models.Payout:
         payout = stripe.Payout.create(
             currency=currency,
@@ -562,7 +532,7 @@ class StripeClient(StripeClientInterface):
         stripe_account_id: models.StripeAccountId,
         country: models.CountryCode,
         metadata: models.Metadata,
-        request: models.CreatePayout,
+        request: models.StripeCreatePayoutRequest,
     ) -> models.Payout:
         # we use 2016 stripe api create_transfer to payout to bank account, since in current version it requires
         # external_account stripe_id which we did not save in our db
@@ -581,7 +551,10 @@ class StripeClient(StripeClientInterface):
 
     @tracing.track_breadcrumb(resource="payout", action="retrieve")
     def retrieve_payout(
-        self, *, country: models.CountryCode, request: models.RetrievePayout
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.StripeRetrievePayoutRequest,
     ) -> models.Payout:
         payout = stripe.Payout.retrieve(
             **self.settings_for(country), **request.dict(skip_defaults=True)
@@ -590,7 +563,7 @@ class StripeClient(StripeClientInterface):
 
     @tracing.track_breadcrumb(resource="payout", action="cancel")
     def cancel_payout(
-        self, *, request: models.CancelPayout, country: models.CountryCode
+        self, *, request: models.StripeCancelPayoutRequest, country: models.CountryCode
     ) -> models.Payout:
         payout = stripe.Payout.cancel(
             **self.settings_for(country), **request.dict(skip_defaults=True)
@@ -635,24 +608,11 @@ class StripeTestClient(StripeClient):
     (eg. credit card creation)
     """
 
-    def create_bank_account_token(
-        self,
-        *,
-        country: models.CountryCode,
-        token: models.CreateBankAccountToken,
-        idempotency_key: models.IdempotencyKey = None,
-    ):
-        return stripe.Token.create(
-            idempotency_key=idempotency_key,
-            bank_account=token.dict(),
-            **self.settings_for(country),
-        )
-
     def create_credit_card_token(
         self,
         *,
         country: models.CountryCode,
-        token: models.CreateCreditCardToken,
+        token: models.StripeCreateCreditCardTokenRequest,
         idempotency_key: models.IdempotencyKey = None,
     ):
         return stripe.Charge.create(
@@ -678,25 +638,11 @@ class StripeAsyncClient:
         self.stripe_client = stripe_client
         self.commando = commando
 
-    async def create_connected_account_token(
-        self,
-        *,
-        country: models.CountryCode,
-        token: models.CreateConnectedAccountToken,
-        idempotency_key: models.IdempotencyKey = None,
-    ) -> models.TokenId:
-        return await self.executor_pool.submit(
-            self.stripe_client.create_connected_account_token,
-            country=country,
-            token=token,
-            idempotency_key=idempotency_key,
-        )
-
     async def create_customer(
         self,
         *,
         country: models.CountryCode,
-        request: models.CreateCustomer,
+        request: models.StripeCreateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.CustomerId:
         return await self.executor_pool.submit(
@@ -710,7 +656,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.RetrieveCustomer,
+        request: models.StripeRetrieveCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.Customer:
         return await self.executor_pool.submit(
@@ -723,7 +669,7 @@ class StripeAsyncClient:
     async def update_customer(
         self,
         country: models.CountryCode,
-        request: models.UpdateCustomer,
+        request: models.StripeUpdateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> Any:
         return await self.executor_pool.submit(
@@ -737,7 +683,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.CreatePaymentMethod,
+        request: models.StripeCreatePaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.executor_pool.submit(
@@ -751,7 +697,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.AttachPaymentMethod,
+        request: models.StripeAttachPaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.executor_pool.submit(
@@ -765,7 +711,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.DetachPaymentMethod,
+        request: models.StripeDetachPaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.executor_pool.submit(
@@ -779,7 +725,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.RetrievePaymentMethod,
+        request: models.StripeRetrievePaymentMethodRequest,
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         return await self.executor_pool.submit(
@@ -809,7 +755,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.CapturePaymentIntent,
+        request: models.StripeCapturePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         return await self.executor_pool.submit(
@@ -823,7 +769,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.CancelPaymentIntent,
+        request: models.StripeCancelPaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntentId:
         return await self.executor_pool.submit(
@@ -837,7 +783,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.RefundCharge,
+        request: models.StripeRefundChargeRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.Refund:
         return await self.executor_pool.submit(
@@ -848,7 +794,7 @@ class StripeAsyncClient:
         )
 
     async def update_dispute(
-        self, country: models.CountryCode, request: models.UpdateDispute
+        self, country: models.CountryCode, request: models.StripeUpdateDisputeRequest
     ) -> models.StripeDisputeId:
         return await self.executor_pool.submit(
             self.stripe_client.update_stripe_dispute, request
@@ -861,7 +807,7 @@ class StripeAsyncClient:
         currency: models.Currency,
         destination: models.Destination,
         amount: models.Amount,
-        request: models.CreateTransfer,
+        request: models.StripeCreateTransferRequest,
     ) -> models.Transfer:
         return await self.executor_pool.submit(
             self.stripe_client.create_transfer,
@@ -879,7 +825,7 @@ class StripeAsyncClient:
         currency: models.Currency,
         amount: models.Amount,
         stripe_account: models.StripeAccountId,
-        request: models.CreatePayout,
+        request: models.StripeCreatePayoutRequest,
     ) -> models.Payout:
         return await self.executor_pool.submit(
             self.stripe_client.create_payout,
@@ -899,7 +845,7 @@ class StripeAsyncClient:
         stripe_account_id: models.StripeAccountId,
         country: models.CountryCode,
         metadata: models.Metadata,
-        request: models.CreatePayout,
+        request: models.StripeCreatePayoutRequest,
     ) -> models.Payout:
         # we use 2016 stripe api create_transfer to payout to bank account, since in current venison it requires
         # external_account stripe_id which we did not save in our db
@@ -916,14 +862,17 @@ class StripeAsyncClient:
         )
 
     async def retrieve_payout(
-        self, *, request: models.RetrievePayout, country: models.CountryCode
+        self,
+        *,
+        request: models.StripeRetrievePayoutRequest,
+        country: models.CountryCode,
     ) -> models.Payout:
         return await self.executor_pool.submit(
             self.stripe_client.retrieve_payout, request=request, country=country
         )
 
     async def cancel_payout(
-        self, *, request: models.CancelPayout, country: models.CountryCode
+        self, *, request: models.StripeCancelPayoutRequest, country: models.CountryCode
     ) -> models.Payout:
         return await self.executor_pool.submit(
             self.stripe_client.cancel_payout, request=request, country=country

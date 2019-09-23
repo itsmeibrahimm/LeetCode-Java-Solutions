@@ -15,12 +15,12 @@ from app.commons.context.req_context import (
 from app.commons import tracing
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
-    CreateCustomer,
+    StripeCreateCustomerRequest,
     CustomerId,
-    UpdateCustomer,
+    StripeUpdateCustomerRequest,
     InvoiceSettings,
     Customer as StripeCustomer,
-    RetrieveCustomer,
+    StripeRetrieveCustomerRequest,
 )
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
@@ -321,7 +321,7 @@ class PayerClient:
     async def pgp_create_customer(
         self, country: str, email: str, description: str
     ) -> CustomerId:
-        creat_cus_req: CreateCustomer = CreateCustomer(
+        creat_cus_req: StripeCreateCustomerRequest = StripeCreateCustomerRequest(
             email=email, description=description
         )
         try:
@@ -340,7 +340,9 @@ class PayerClient:
     async def pgp_get_customer(
         self, pgp_customer_id: str, country: CountryCode
     ) -> StripeCustomer:
-        get_cus_req: RetrieveCustomer = RetrieveCustomer(id=pgp_customer_id)
+        get_cus_req: StripeRetrieveCustomerRequest = StripeRetrieveCustomerRequest(
+            id=pgp_customer_id
+        )
         try:
             stripe_customer: StripeCustomer = await self.stripe_async_client.retrieve_customer(
                 country=country, request=get_cus_req
@@ -365,7 +367,7 @@ class PayerClient:
         default_payment_method_id: str,
         country: Optional[str],
     ):
-        update_cus_req: UpdateCustomer = UpdateCustomer(
+        update_cus_req: StripeUpdateCustomerRequest = StripeUpdateCustomerRequest(
             sid=pgp_customer_id,
             invoice_settings=InvoiceSettings(
                 default_payment_method=default_payment_method_id
