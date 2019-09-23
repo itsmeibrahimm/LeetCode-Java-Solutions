@@ -133,7 +133,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         self,
         *,
         country: models.CountryCode,
-        request: models.CreatePaymentIntent,
+        request: models.StripeCreatePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         """
@@ -451,7 +451,7 @@ class StripeClient(StripeClientInterface):
         self,
         *,
         country: models.CountryCode,
-        request: models.CreatePaymentIntent,
+        request: models.StripeCreatePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         payment_intent = stripe.PaymentIntent.create(
@@ -792,7 +792,7 @@ class StripeAsyncClient:
         self,
         *,
         country: models.CountryCode,
-        request: models.CreatePaymentIntent,
+        request: models.StripeCreatePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         return await self.executor_pool.submit(

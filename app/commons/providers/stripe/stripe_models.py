@@ -104,7 +104,7 @@ class TransferData(StripeBaseModel):
     amount: Optional[int]
 
 
-class CreatePaymentIntent(StripeBaseModel):
+class StripeCreatePaymentIntentRequest(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/payment_intents/create
     """

@@ -1,26 +1,31 @@
 import pytest
 from pydantic import ValidationError
-from app.commons.providers.stripe.stripe_models import CreatePaymentIntent, Event
+from app.commons.providers.stripe.stripe_models import (
+    StripeCreatePaymentIntentRequest,
+    Event,
+)
 
 
 class TestPaymentIntent:
     def test_create(self):
-        create = CreatePaymentIntent(amount=200, currency="USD")
+        create = StripeCreatePaymentIntentRequest(amount=200, currency="USD")
         assert create.dict(skip_defaults=True) == {"amount": 200, "currency": "USD"}
 
         # type aliases are supported
-        create = CreatePaymentIntent(amount=200, currency="USD", customer="cust_399")
+        create = StripeCreatePaymentIntentRequest(
+            amount=200, currency="USD", customer="cust_399"
+        )
         # but type is erased
         create.customer = "not a customer"
 
         # enum
-        create = CreatePaymentIntent(
+        create = StripeCreatePaymentIntentRequest(
             amount=222, currency="CAD", capture_method="automatic"
         )
         assert create.capture_method == "automatic", "validates enum"
 
         # dictionaries are translated to nested objects
-        create = CreatePaymentIntent(
+        create = StripeCreatePaymentIntentRequest(
             amount=222,
             currency="CAD",
             transfer_data={"destination": "acct_1234", "amount": 123},
@@ -35,7 +40,9 @@ class TestPaymentIntent:
     def test_enum_validation(self):
         # data validation is done
         with pytest.raises(ValidationError, match=r"\bcapture_method\b"):
-            CreatePaymentIntent(amount=222, currency="CAD", capture_method="invalid")
+            StripeCreatePaymentIntentRequest(
+                amount=222, currency="CAD", capture_method="invalid"
+            )
 
 
 class TestEvent:

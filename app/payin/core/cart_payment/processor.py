@@ -21,7 +21,7 @@ from app.commons.context.req_context import (
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
-    CreatePaymentIntent,
+    StripeCreatePaymentIntentRequest,
     CancelPaymentIntent,
     ConnectedAccountId,
     RefundCharge,
@@ -72,7 +72,7 @@ from app.payin.repository.cart_payment_repo import CartPaymentRepository
 @final
 @dataclass
 class PaymentResourceIds:
-    provider_payment_resource_id: str
+    provider_payment_method_id: str
     provider_customer_resource_id: str
 
 
@@ -405,17 +405,17 @@ class CartPaymentInterface:
 
     def _get_provider_capture_method(
         self, pgp_payment_intent: PgpPaymentIntent
-    ) -> CreatePaymentIntent.CaptureMethod:
+    ) -> StripeCreatePaymentIntentRequest.CaptureMethod:
         target_method = self._transform_method_for_stripe(
             pgp_payment_intent.capture_method
         )
-        return CreatePaymentIntent.CaptureMethod(target_method)
+        return StripeCreatePaymentIntentRequest.CaptureMethod(target_method)
 
     def _get_provider_future_usage(self, payment_intent: PaymentIntent) -> str:
         if payment_intent.capture_method == CaptureMethod.AUTO:
-            return CreatePaymentIntent.SetupFutureUsage.ON_SESSION
+            return StripeCreatePaymentIntentRequest.SetupFutureUsage.ON_SESSION
 
-        return CreatePaymentIntent.SetupFutureUsage.OFF_SESSION
+        return StripeCreatePaymentIntentRequest.SetupFutureUsage.OFF_SESSION
 
     async def find_existing_payment(
         self, payer_id: Optional[uuid.UUID], idempotency_key: str
@@ -464,7 +464,7 @@ class CartPaymentInterface:
         self,
         request_cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
-        provider_payment_resource_id: str,
+        provider_payment_method_id: str,
         provider_customer_resource_id: str,
         provider_metadata: Optional[Dict[str, Any]],
         idempotency_key: str,
@@ -524,7 +524,7 @@ class CartPaymentInterface:
                 legacy_payment=legacy_payment,
                 idempotency_key=idempotency_key,
                 payment_method_id=request_cart_payment.payment_method_id,
-                provider_payment_resource_id=provider_payment_resource_id,
+                provider_payment_method_id=provider_payment_method_id,
                 provider_customer_resource_id=provider_customer_resource_id,
                 provider_metadata=provider_metadata,
                 amount=request_cart_payment.amount,
@@ -594,7 +594,7 @@ class CartPaymentInterface:
         legacy_payment: LegacyPayment,
         idempotency_key: str,
         payment_method_id: Optional[uuid.UUID],
-        provider_payment_resource_id: str,
+        provider_payment_method_id: str,
         provider_customer_resource_id: str,
         provider_metadata: Optional[Dict[str, Any]],
         amount: int,
@@ -631,7 +631,7 @@ class CartPaymentInterface:
             payment_intent_id=payment_intent.id,
             idempotency_key=idempotency_key,
             provider=PaymentProvider.STRIPE.value,
-            payment_method_resource_id=provider_payment_resource_id,
+            payment_method_resource_id=provider_payment_method_id,
             customer_resource_id=provider_customer_resource_id,
             currency=currency,
             amount=amount,
@@ -652,13 +652,13 @@ class CartPaymentInterface:
         self,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
-        provider_payment_resource_id: str,
+        provider_payment_method_id: str,
         provider_customer_resource_id: str,
         provider_description: Optional[str],
     ) -> ProviderPaymentIntent:
         # Call to stripe payment intent API
         try:
-            intent_request = CreatePaymentIntent(
+            intent_request = StripeCreatePaymentIntentRequest(
                 amount=pgp_payment_intent.amount,
                 currency=pgp_payment_intent.currency,
                 capture_method=self._get_provider_capture_method(pgp_payment_intent),
@@ -668,7 +668,7 @@ class CartPaymentInterface:
                 # https://stripe.com/docs/api/payment_intents/create#create_payment_intent-confirmation_method
                 confirmation_method="manual",
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
-                payment_method=provider_payment_resource_id,
+                payment_method=provider_payment_method_id,
                 customer=provider_customer_resource_id,
                 description=provider_description,
                 statement_descriptor=payment_intent.statement_descriptor,
@@ -1036,7 +1036,7 @@ class CartPaymentInterface:
                 legacy_payment=legacy_payment,
                 idempotency_key=idempotency_key,
                 payment_method_id=most_recent_intent.payment_method_id,
-                provider_payment_resource_id=pgp_intent.payment_method_resource_id,
+                provider_payment_method_id=pgp_intent.payment_method_resource_id,
                 provider_customer_resource_id=pgp_intent.customer_resource_id,
                 provider_metadata=most_recent_intent.metadata,
                 amount=amount,
@@ -1106,12 +1106,16 @@ class CartPaymentInterface:
         legacy_payment: Optional[LegacyPayment],
     ) -> Tuple[PaymentResourceIds, LegacyPayment]:
         # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent
-        # submission and management.  A client is expected to either provide either (a) both payer_id and
-        # payment_method_id, which we can use to look up corresponding pgp resource IDs, or (b) stripe resource
-        # IDs directly via the legacy_payment request field.  Case (b) is for legacy clients who have not fully
-        # adopted payin service yet, and in this case we direclty use those IDs and no lookup is needed.  A
-        # LegacyPayment instance is also returned since it is required for persisting charge records in the old system.
+        # submission and management.  A client is expected to either provide either
+        #   a. both payer_id and payment_method_id, which we can use to look up corresponding pgp resource IDs
+        #   b. stripe resource IDs directly via the legacy_payment request field.
+        # Used by legacy clients who haven't fully adopted payin service yet, and in this case we directly use
+        # those IDs and no lookup is needed.  A LegacyPayment instance is also returned since it is required for
+        # persisting charge records in the old system.
         self.req_context.log.debug("Getting payment info.")
+
+        provider_payment_method_id = None
+        provider_payer_id = None
 
         if payer_id and payment_method_id:
             raw_payment_method = await self.payment_method_client.get_raw_payment_method(
@@ -1123,8 +1127,8 @@ class CartPaymentInterface:
             raw_payer = await self.payer_client.get_raw_payer(
                 payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
             )
-            payer_resource_id = raw_payer.pgp_customer_id()
-            payment_method_resource_id = raw_payment_method.pgp_payment_method_id()
+            provider_payer_id = raw_payer.pgp_customer_id()
+            provider_payment_method_id = raw_payment_method.pgp_payment_method_id()
 
             if not raw_payer.payer_entity:
                 self.req_context.log.error("No payer entity found.")
@@ -1143,28 +1147,27 @@ class CartPaymentInterface:
             )
         elif legacy_payment:
             # Legacy payment case: no payer_id/payment_method_id provided
-            payer_resource_id = legacy_payment.stripe_customer_id
-            payment_method_resource_id = ""
+            provider_payer_id = legacy_payment.stripe_customer_id
             if legacy_payment.stripe_payment_method_id:
-                payment_method_resource_id = legacy_payment.stripe_payment_method_id
+                provider_payment_method_id = legacy_payment.stripe_payment_method_id
             elif legacy_payment.stripe_card_id:
-                payment_method_resource_id = legacy_payment.stripe_card_id
+                provider_payment_method_id = legacy_payment.stripe_card_id
 
             result_legacy_payment = legacy_payment
             self.req_context.log.debug(
-                f"Legacy resource IDs: {payer_resource_id}, {payment_method_resource_id}"
+                f"Legacy resource IDs: {provider_payer_id}, {provider_payment_method_id}"
             )
 
         # Ensure we have the necessary fields.  Though payer_client/payment_method_client already throws exceptions
         # if not found, still check here since we have to support the legacy payment case.
-        if not payer_resource_id:
+        if not provider_payer_id:
             self.req_context.log.warn("No payer pgp resource ID found.")
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
             )
 
-        if not payment_method_resource_id:
+        if not provider_payment_method_id:
             self.req_context.log.warn("No payment method pgp resource ID found.")
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
@@ -1172,8 +1175,8 @@ class CartPaymentInterface:
             )
 
         payment_resource_ids = PaymentResourceIds(
-            provider_payment_resource_id=payment_method_resource_id,
-            provider_customer_resource_id=payer_resource_id,
+            provider_payment_method_id=provider_payment_method_id,
+            provider_customer_resource_id=provider_payer_id,
         )
         return payment_resource_ids, result_legacy_payment
 
@@ -1444,7 +1447,7 @@ class CartPaymentProcessor:
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
-            provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
+            provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
             provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
             provider_description=intent_description,
         )
@@ -1808,11 +1811,11 @@ class CartPaymentProcessor:
         """Submit a cart payment creation request.
 
         Arguments:
-            request_cart_payment {CartPayment} -- CartPayment model containing request paramters provided by client.
+            request_cart_payment {CartPayment} -- CartPayment model containing request parameters provided by client.
             request_legacy_payment {LegacyPayment} -- LegacyPayment model containing legacy fields.  For v0 use only.
             request_legacy_correlation_ids {LegacyCorrelationIds} -- Legacy identifiers.  For v0 use only.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
-            country {Currency} -- ISO country code.
+            country {CountryCode} -- ISO country code.
             currency {Currency} -- Currency for cart payment request.
 
         Returns:
@@ -1913,7 +1916,7 @@ class CartPaymentProcessor:
             cart_payment, payment_intent, pgp_payment_intent = await self.cart_payment_interface.create_new_payment(
                 request_cart_payment=request_cart_payment,
                 legacy_payment=legacy_payment,
-                provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
+                provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
                 provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
                 provider_metadata=provider_metadata,
                 idempotency_key=idempotency_key,
@@ -1926,7 +1929,7 @@ class CartPaymentProcessor:
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
-            provider_payment_resource_id=payment_resource_ids.provider_payment_resource_id,
+            provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
             provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
             provider_description=request_cart_payment.client_description,
         )

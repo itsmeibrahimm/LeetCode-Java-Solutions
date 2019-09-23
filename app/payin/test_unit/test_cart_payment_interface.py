@@ -10,7 +10,7 @@ from freezegun import freeze_time
 from stripe.error import StripeError, InvalidRequestError
 
 from app.commons.types import LegacyCountryId, CountryCode, Currency
-from app.commons.providers.stripe.stripe_models import CreatePaymentIntent
+from app.commons.providers.stripe.stripe_models import StripeCreatePaymentIntentRequest
 from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -560,20 +560,20 @@ class TestCartPaymentInterface:
     def test_get_provider_capture_method(self, cart_payment_interface):
         intent = generate_payment_intent(capture_method="manual")
         result = cart_payment_interface._get_provider_capture_method(intent)
-        assert result == CreatePaymentIntent.CaptureMethod.MANUAL
+        assert result == StripeCreatePaymentIntentRequest.CaptureMethod.MANUAL
 
         intent = generate_payment_intent(capture_method="auto")
         result = cart_payment_interface._get_provider_capture_method(intent)
-        assert result == CreatePaymentIntent.CaptureMethod.AUTOMATIC
+        assert result == StripeCreatePaymentIntentRequest.CaptureMethod.AUTOMATIC
 
     def test_get_provider_future_usage(self, cart_payment_interface):
         intent = generate_payment_intent(capture_method="manual")
         result = cart_payment_interface._get_provider_future_usage(intent)
-        assert result == CreatePaymentIntent.SetupFutureUsage.OFF_SESSION
+        assert result == StripeCreatePaymentIntentRequest.SetupFutureUsage.OFF_SESSION
 
         intent = generate_payment_intent(capture_method="auto")
         result = cart_payment_interface._get_provider_future_usage(intent)
-        assert result == CreatePaymentIntent.SetupFutureUsage.ON_SESSION
+        assert result == StripeCreatePaymentIntentRequest.SetupFutureUsage.ON_SESSION
 
     @pytest.mark.asyncio
     async def test_find_existing_payment_no_matches(self, cart_payment_interface):
@@ -667,7 +667,7 @@ class TestCartPaymentInterface:
         result_cart_payment, result_payment_intent, result_pgp_payment_intent = await cart_payment_interface.create_new_payment(
             request_cart_payment=request_cart_payment,
             legacy_payment=legacy_payment,
-            provider_payment_resource_id=payment_resource_id,
+            provider_payment_method_id=payment_resource_id,
             provider_customer_resource_id=customer_resource_id,
             provider_metadata=None,
             idempotency_key=idempotency_key,
@@ -802,7 +802,7 @@ class TestCartPaymentInterface:
             cart_payment=cart_payment,
             idempotency_key="idempotency_key",
             payment_method_id=cart_payment.payment_method_id,
-            provider_payment_resource_id="provider_payment_resource_id",
+            provider_payment_method_id="provider_payment_method_id",
             provider_customer_resource_id="provider_customer_resource_id",
             provider_metadata={"is_first_order": False},
             amount=cart_payment.amount,
@@ -854,7 +854,7 @@ class TestCartPaymentInterface:
             resource_id=None,
             charge_resource_id=None,
             invoice_resource_id=None,
-            payment_method_resource_id="provider_payment_resource_id",
+            payment_method_resource_id="provider_payment_method_id",
             customer_resource_id="provider_customer_resource_id",
             currency="USD",
             amount=cart_payment.amount,
