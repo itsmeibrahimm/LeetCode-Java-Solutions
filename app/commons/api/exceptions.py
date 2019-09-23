@@ -1,4 +1,5 @@
 import json
+import newrelic.agent
 
 from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
@@ -66,25 +67,26 @@ async def payment_http_exception_handler(
     :return: Handled Http exception response
     """
     logger: BoundLogger = get_logger_from_req(request)
-    logger.exception(
-        f"Translating source exception",
-        exec_msg=str(exception),
-        exec_type=type(exception),
-    )
 
     exception_response = None
     if isinstance(exception, PaymentException):
+        # we wrapped the error, provide some additional info
+        error = PaymentErrorResponseBody(
+            error_code=exception.error_code,
+            error_message=exception.error_message,
+            retryable=exception.retryable,
+        )
+        logger.info(
+            "payment error", status_code=exception.status_code, error=error.json()
+        )
         exception_response = JSONResponse(
-            status_code=exception.status_code,
-            content=jsonable_encoder(
-                PaymentErrorResponseBody(
-                    error_code=exception.error_code,
-                    error_message=exception.error_message,
-                    retryable=exception.retryable,
-                )
-            ),
+            status_code=exception.status_code, content=jsonable_encoder(error)
         )
     else:
+        # default HTTP exception handling from the framework (eg. 404)
+        logger.debug(
+            "http error", status_code=exception.status_code, exc_info=exception
+        )
         exception_response = await http_exception_handler(request, exception)
 
     return response_with_req_id(request, exception_response)
@@ -94,11 +96,9 @@ async def payment_internal_error_handler(
     request: Request, exception: Exception
 ) -> Response:
     logger: BoundLogger = get_logger_from_req(request)
-    logger.exception(
-        f"Translating source exception",
-        exec_msg=str(exception),
-        exec_type=type(exception),
-    )
+    # unhandled error, report this in sentry and newrelic
+    logger.error("unknown internal error", exc_info=exception)
+    newrelic.agent.record_exception(exception)
 
     return response_with_req_id(
         request,
@@ -119,11 +119,9 @@ async def payment_request_validation_exception_handler(
     request: Request, exception: RequestValidationError
 ) -> JSONResponse:
     logger: BoundLogger = get_logger_from_req(request)
-    logger.exception(
-        f"Translating source exception",
-        exec_msg=str(exception),
-        exec_type=type(exception),
-    )
+    # log the details of the validation error
+    logger.info("request validation error", validation_errors=exception.errors())
+
     return response_with_req_id(
         request,
         JSONResponse(
