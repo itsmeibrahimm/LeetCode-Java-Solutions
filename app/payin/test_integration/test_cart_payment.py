@@ -2,7 +2,10 @@ import pytest
 import uuid
 from starlette.testclient import TestClient
 from typing import Any, Optional, Dict
-from app.conftest import StripeAPISettings
+
+from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
+from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
+
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
@@ -554,14 +557,18 @@ class TestCartPayment:
             client=client, cart_payment=cart_payment, amount=390
         )
 
+    @pytest.mark.parametrize("commando_mode", [(True), (False)])
     def test_cart_payment_creation(
         self,
         stripe_api: StripeAPISettings,
         client: TestClient,
         payer: Dict[str, Any],
         payment_method: Dict[str, Any],
+        runtime_setter: RuntimeSetter,
+        commando_mode: bool,
     ):
         stripe_api.enable_outbound()
+        runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, commando_mode)
 
         # Success case: intent created, not captured yet
         self._test_cart_payment_creation(
@@ -596,7 +603,9 @@ class TestCartPayment:
         )
 
         # Other payer cannot use some else's payment method for cart payment creation
-        other_payer = payer = self._test_payer_creation(client)
+        with RuntimeContextManager(STRIPE_COMMANDO_MODE_BOOLEAN, False, runtime_setter):
+            other_payer = payer = self._test_payer_creation(client)
+
         request_body = self._get_cart_payment_create_request(
             other_payer, payment_method
         )

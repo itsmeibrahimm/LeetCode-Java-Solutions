@@ -15,6 +15,7 @@ class CaptureMethod(str, Enum):
 
 class IntentStatus(str, Enum):
     INIT = "init"
+    PENDING = "doordash_pending"  # keeping as this for backwards compatibility
     PROCESSING = "processing"
     REQUIRES_CAPTURE = "requires_capture"
     CAPTURE_FAILED = "capture_failed"

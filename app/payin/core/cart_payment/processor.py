@@ -18,6 +18,8 @@ from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
+from app.commons.providers.errors import StripeCommandoError
+from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     CapturePaymentIntent,
@@ -703,6 +705,11 @@ class CartPaymentInterface:
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
                 retryable=False,
             )
+        except StripeCommandoError:
+            self.req_context.log.info(
+                "Returning mocked payment_intent response for commando mode"
+            )
+            return COMMANDO_PAYMENT_INTENT
 
     async def update_payment_after_submission_to_provider(
         self,

@@ -4,6 +4,7 @@ from stripe.http_client import HTTPClient
 from typing import Optional, Any
 
 from app.commons import tracing
+from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.stripe_http_client import (
     TimedRequestsClient,
     set_default_http_client,
@@ -795,6 +796,8 @@ class StripeAsyncClient:
         request: models.StripeCreatePaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
+        if self.commando:
+            raise StripeCommandoError()
         return await self.executor_pool.submit(
             self.stripe_client.create_payment_intent,
             country=country,

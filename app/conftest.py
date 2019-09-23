@@ -329,9 +329,41 @@ class RuntimeSetter(object):
     def remove(self, filename: str):
         del self._overrides[filename]
 
+    def get(self, filename: str):
+        return self._overrides.get(filename, None)
+
     def _get_content(self, file_name: str):
         return self.overrides.get(file_name, None)
 
     @property
     def overrides(self):
         return self._overrides
+
+
+class RuntimeContextManager:
+    """
+    TODO: figure out how to make this more fool proof
+    Utility for managing the state of a runtime value within a context for tests
+
+    Usage:
+
+    with RuntimeContextManager("cold_sandwich", True, runtime_setter) as manager:
+        ...
+
+    NOTE: runtime_setter should be coming from the fixture provided from pytest conf files.
+    """
+
+    def __init__(self, key: str, val: Any, runtime_setter: RuntimeSetter):
+        self.key = key
+        self.val = val
+        self.runtime_setter = runtime_setter
+
+    def __enter__(self):
+        self.old_value = self.runtime_setter.get(self.key)
+        self.runtime_setter.set(self.key, self.val)
+
+    def __exit__(self, type, value, traceback):
+        if self.old_value:
+            self.runtime_setter.set(self.key, self.old_value)
+        else:
+            self.runtime_setter.remove(self.key)

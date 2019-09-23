@@ -9,8 +9,10 @@ from asynctest import create_autospec
 from freezegun import freeze_time
 from stripe.error import StripeError, InvalidRequestError
 
-from app.commons.types import LegacyCountryId, CountryCode, Currency
+from app.commons.types import Currency
 from app.commons.providers.stripe.stripe_models import StripeCreatePaymentIntentRequest
+from app.commons.providers.errors import StripeCommandoError
+from app.commons.types import LegacyCountryId, CountryCode
 from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -888,6 +890,25 @@ class TestCartPaymentInterface:
             "test_description",
         )
         assert response
+
+    @pytest.mark.asyncio
+    async def test_submit_commando_payment_to_provider(self, cart_payment_interface):
+        mocked_create_payment_intent = MagicMock()
+        mocked_create_payment_intent.side_effect = StripeCommandoError
+        cart_payment_interface.stripe_async_client.create_payment_intent = (
+            mocked_create_payment_intent
+        )
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        response = await cart_payment_interface.submit_payment_to_provider(
+            intent,
+            pgp_intent,
+            "payment_resource_id",
+            "customer_resource_id",
+            "test_description",
+        )
+        assert response
+        assert response.status == IntentStatus.PENDING.value
 
     @pytest.mark.asyncio
     async def test_submit_payment_to_provider_error(self, cart_payment_interface):

@@ -1,0 +1,87 @@
+from datetime import datetime
+from app.commons.providers.stripe.stripe_models import PaymentIntent, Charge
+from app.payin.core.cart_payment.types import IntentStatus
+
+COMMAND_CHARGE = Charge(
+    id="",
+    object="charge",
+    amount=0,
+    amount_refunded=0,
+    application="",
+    application_fee="",
+    application_fee_amount=0,
+    balance_transaction="",
+    billing_details=None,
+    captured=False,
+    created=datetime.utcnow(),
+    currency="",
+    customer="",
+    description=None,
+    dispute=None,
+    failure_code=None,
+    failure_message=None,
+    invoice=None,
+    livemode=False,
+    metadata=None,
+    on_behalf_of=None,
+    order=None,
+    outcome=None,
+    paid=False,
+    payment_intent=None,
+    payment_method=None,
+    receipt_email=None,
+    receipt_number=None,
+    receipt_url=None,
+    refunded=False,
+    review=None,
+    shipping=None,
+    source_transfer=None,
+    statement_descriptor=None,
+    statement_descriptor_suffix=None,
+    status=IntentStatus.PENDING.value,
+    transfer=None,
+    transfer_data=None,
+    transfer_group=None,
+)
+
+COMMANDO_CHARGES = PaymentIntent.Charges(
+    data=[COMMAND_CHARGE], has_more=False, object="list", url=""
+)
+
+COMMANDO_PAYMENT_INTENT = PaymentIntent(
+    id="",
+    object="payment_intent",
+    amount=0,
+    amount_capturable=None,
+    amount_received=None,
+    application=None,
+    application_fee_amount=None,
+    canceled_at=None,
+    cancellation_reason=None,
+    capture_method="",
+    charges=COMMANDO_CHARGES,
+    created=datetime.utcnow(),
+    currency="",
+    customer="",
+    description=None,
+    invoice=None,
+    last_payment_error=None,
+    livemode=False,
+    metadata=None,
+    next_action=None,
+    on_behalf_of="",
+    payment_method="",
+    payment_method_options=None,
+    payment_method_types=[],
+    receipt_email="",
+    review="",
+    setup_future_usage="",
+    shipping=None,
+    statement_descriptor=None,
+    status=IntentStatus.PENDING.value,
+    transfer_data=None,
+    transfer_group=None,
+)
+
+
+# Recoup commando TODO: add script jobs here.

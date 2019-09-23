@@ -166,6 +166,29 @@ class TestCartPaymentProcessor:
         )
 
     @pytest.mark.asyncio
+    async def test_create_commando_payment(
+        self, cart_payment_processor, request_cart_payment
+    ):
+        cart_payment_processor.cart_payment_interface.stripe_async_client.commando = (
+            True
+        )
+        result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
+            request_cart_payment=request_cart_payment,
+            request_legacy_payment=None,
+            request_legacy_correlation_ids=None,
+            idempotency_key=str(uuid.uuid4()),
+            country="US",
+            currency="USD",
+        )
+        assert result_cart_payment
+        assert result_cart_payment.id
+        assert result_cart_payment.amount == request_cart_payment.amount
+        assert (
+            result_cart_payment.client_description
+            == request_cart_payment.client_description
+        )
+
+    @pytest.mark.asyncio
     async def test_resubmit(self, cart_payment_processor, request_cart_payment):
 
         intent = generate_payment_intent()
