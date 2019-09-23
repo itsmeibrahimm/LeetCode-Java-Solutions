@@ -76,3 +76,38 @@ class TestPaymentMethodsV1:
 
         # delete payment_method
         delete_payment_methods_v1(client=client, payment_method_id=payment_method["id"])
+
+    def test_create_duplicate_card(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        random_dd_payer_id: str = str(int(time.time() * 1e6))
+
+        # create payer
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                dd_payer_id=random_dd_payer_id,
+                country="US",
+                description="Integration Test test_create_payer()",
+                payer_type="marketplace",
+                email=(random_dd_payer_id + "@dd.com"),
+            ),
+        )
+
+        # create payment_method
+        payment_method = create_payment_method_v1(
+            client=client,
+            request=CreatePaymentMethodV1Request(
+                payer_id=payer["id"], payment_gateway="stripe", token="tok_visa"
+            ),
+        )
+
+        # create same payment_method again
+        duplicate_payment_method = create_payment_method_v1(
+            client=client,
+            request=CreatePaymentMethodV1Request(
+                payer_id=payer["id"], payment_gateway="stripe", token="tok_visa"
+            ),
+            # http_status=200,  # FIXME: PS should return 200 in duplication case
+        )
+        assert payment_method == duplicate_payment_method

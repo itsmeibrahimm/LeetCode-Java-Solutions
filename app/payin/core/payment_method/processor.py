@@ -11,7 +11,11 @@ from app.commons.providers.stripe.stripe_models import (
 )
 from app.commons.types import CountryCode
 from app.commons.utils.uuid import generate_object_uuid
-from app.payin.core.exceptions import PaymentMethodCreateError, PayinErrorCode
+from app.payin.core.exceptions import (
+    PaymentMethodCreateError,
+    PayinErrorCode,
+    PaymentMethodReadError,
+)
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payment_method.model import (
     PaymentMethod,
@@ -104,28 +108,56 @@ class PaymentMethodProcessor:
 
         # TODO: perform Payer's lazy creation
 
-        # step 2: create and attach PGP payment_method
-        stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_create_and_attach_payment_method(
-            token=token, pgp_customer_id=pgp_customer_res_id, country=pgp_country
+        # step 2: create PGP payment_method
+        stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_create_payment_method(
+            token=token, country=pgp_country
         )
-
         self.log.info(
-            "[create_payment_method] create stripe payment_method completed and attached to customer",
+            "[create_payment_method] create stripe payment_method completed",
             payer_id=payer_id,
-            pgp_customer_res_id=pgp_customer_res_id,
             pgp_payment_method_res_id=stripe_payment_method.id,
         )
 
-        # step 3: crete pgp_payment_method and stripe_card objects
+        # step 3: de-dup same payment_method by card fingerprint
         dd_payer_id: Optional[str] = None
         if dd_consumer_id:
             dd_payer_id = dd_consumer_id
         elif raw_payer and raw_payer.payer_entity:
             dd_payer_id = raw_payer.payer_entity.dd_payer_id
+        try:
+            exist_pm: RawPaymentMethod = await self.payment_method_client.get_duplicate_payment_method(
+                stripe_payment_method=stripe_payment_method,
+                dd_consumer_id=dd_payer_id,
+                pgp_customer_resource_id=pgp_customer_res_id,
+            )
+        except PaymentMethodReadError:
+            pass
+        else:
+            self.log.info(
+                "[create_payment_method]duplicate card is found. detach the new one",
+                dd_consumer_id=dd_consumer_id,
+                pgp_payment_method_res_id=stripe_payment_method.id,
+            )
+            return exist_pm.to_payment_method()
+
+        # step 4: attach PGP payment_method
+        attach_stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_attach_payment_method(
+            pgp_payment_method_res_id=stripe_payment_method.id,
+            pgp_customer_id=pgp_customer_res_id,
+            country=pgp_country,
+        )
+        self.log.info(
+            "[create_payment_method] attach stripe payment_method completed",
+            payer_id=payer_id,
+            pgp_customer_res_id=pgp_customer_res_id,
+            pgp_payment_method_res_id=attach_stripe_payment_method.id,
+        )
+
+        # step 5: crete pgp_payment_method and stripe_card objects
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
             id=generate_object_uuid(),
             pgp_code=pgp_code,
-            stripe_payment_method=stripe_payment_method,
+            stripe_payment_method=attach_stripe_payment_method,
             payer_id=payer_id,
             legacy_consumer_id=dd_payer_id,
         )

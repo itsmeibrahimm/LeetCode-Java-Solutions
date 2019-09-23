@@ -48,6 +48,7 @@ from app.payin.repository.payment_method_repo import (
     DeleteStripeCardByIdWhereInput,
     GetStripeCardsByStripeCustomerIdInput,
     GetStripeCardsByConsumerIdInput,
+    GetDuplicateStripeCardInput,
 )
 
 
@@ -223,6 +224,53 @@ class PaymentMethodClient:
             payment_method_id_type=payment_method_id_type,
         )
 
+    async def get_duplicate_payment_method(
+        self,
+        stripe_payment_method: StripePaymentMethod,
+        dd_consumer_id: str,
+        pgp_customer_resource_id: str,
+    ) -> RawPaymentMethod:
+        try:
+            dynamic_last4: Optional[str] = None
+            if stripe_payment_method.card.wallet:
+                dynamic_last4 = stripe_payment_method.card.wallet.dynamic_last4
+
+            # get stripe_card object
+            sc_entity = await self.payment_method_repo.get_duplicate_stripe_card(
+                input=GetDuplicateStripeCardInput(
+                    fingerprint=stripe_payment_method.card.fingerprint,
+                    dynamic_last4=dynamic_last4 or "",
+                    exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
+                    exp_month=str(stripe_payment_method.card.exp_month).zfill(2),
+                    external_stripe_customer_id=pgp_customer_resource_id,
+                    # consumer_id=str(dd_consumer_id),
+                    active=True,
+                )
+            )
+            if not sc_entity:
+                raise PaymentMethodReadError(
+                    error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
+                    retryable=False,
+                )
+
+            # get pgp_payment_method object
+            pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_pgp_resource_id(
+                input=GetPgpPaymentMethodByPgpResourceIdInput(
+                    pgp_resource_id=sc_entity.stripe_id
+                )
+            )
+
+            return RawPaymentMethod(
+                pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
+            )
+        except DataError as e:
+            self.log.exception(
+                f"[get_duplicate_payment_method][{stripe_payment_method.id}] DataError when read db: {e}"
+            )
+            raise PaymentMethodReadError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
+            )
+
     async def detach_raw_payment_method(
         self, pgp_payment_method_id: str, raw_payment_method: RawPaymentMethod
     ) -> RawPaymentMethod:
@@ -261,11 +309,10 @@ class PaymentMethodClient:
             stripe_card_entity=updated_sc_entity,
         )
 
-    async def pgp_create_and_attach_payment_method(
-        self, token: str, pgp_customer_id: str, country: Optional[str] = CountryCode.US
+    async def pgp_create_payment_method(
+        self, token: str, country: Optional[str] = CountryCode.US
     ) -> StripePaymentMethod:
         try:
-            # create PGP payment method
             stripe_payment_method = await self.stripe_async_client.create_payment_method(
                 country=CountryCode(country),
                 request=StripeCreatePaymentMethodRequest(
@@ -273,11 +320,28 @@ class PaymentMethodClient:
                 ),
             )
 
-            # attach PGP payment method
+            self.log.info(
+                "[pgp_create_and_attach_payment_method] create payment_method completed.",
+                pgp_payment_method_res_id=stripe_payment_method.id,
+            )
+        except Exception as e:
+            self.log.error(
+                f"[create_payment_method_impl]error while creating stripe payment method. {e}"
+            )
+            raise PaymentMethodCreateError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
+                retryable=False,
+            )
+        return stripe_payment_method
+
+    async def pgp_attach_payment_method(
+        self, pgp_payment_method_res_id: str, pgp_customer_id: str, country: str
+    ) -> StripePaymentMethod:
+        try:
             attach_payment_method = await self.stripe_async_client.attach_payment_method(
                 country=CountryCode(country),
                 request=StripeAttachPaymentMethodRequest(
-                    sid=stripe_payment_method.id, customer=pgp_customer_id
+                    sid=pgp_payment_method_res_id, customer=pgp_customer_id
                 ),
             )
             self.log.info(
@@ -294,7 +358,7 @@ class PaymentMethodClient:
         return attach_payment_method
 
     async def pgp_detach_payment_method(
-        self, pgp_payment_method_id: str, country: Optional[str] = CountryCode.US
+        self, pgp_payment_method_id: str, country: str
     ) -> StripePaymentMethod:
         try:
             stripe_payment_method = await self.stripe_async_client.detach_payment_method(

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
 
+from sqlalchemy import and_
 from typing_extensions import final
 
 from app.commons import tracing
@@ -128,6 +129,16 @@ class GetStripeCardsByConsumerIdInput(DBRequestModel):
     consumer_id: int
 
 
+class GetDuplicateStripeCardInput(DBRequestModel):
+    fingerprint: str
+    dynamic_last4: str
+    exp_year: str
+    exp_month: str
+    # consumer_id: str
+    external_stripe_customer_id: str  # FIXME: need to fix foreign key contraint issue in Integration Test then change to consumer_id, or add new index and consolidate the deduplication code in DSJ cx/drive
+    active: bool
+
+
 class PaymentMethodRepositoryInterface:
     """
     PaymentMethod repository interface class that exposes complicated CRUD operations APIs for business layer.
@@ -166,6 +177,12 @@ class PaymentMethodRepositoryInterface:
     @abstractmethod
     async def get_stripe_card_by_id(
         self, input: GetStripeCardByIdInput
+    ) -> Optional[StripeCardDbEntity]:
+        ...
+
+    @abstractmethod
+    async def get_duplicate_stripe_card(
+        self, input=GetDuplicateStripeCardInput
     ) -> Optional[StripeCardDbEntity]:
         ...
 
@@ -303,3 +320,21 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         )
         rows = await self.main_database.replica().fetch_all(stmt)
         return [StripeCardDbEntity.from_row(row) for row in rows]
+
+    async def get_duplicate_stripe_card(
+        self, input=GetDuplicateStripeCardInput
+    ) -> Optional[StripeCardDbEntity]:
+        stmt = stripe_cards.table.select().where(
+            and_(
+                stripe_cards.fingerprint == input.fingerprint,
+                stripe_cards.dynamic_last4 == input.dynamic_last4,
+                stripe_cards.exp_year == input.exp_year,
+                stripe_cards.exp_month == input.exp_month,
+                # stripe_cards.consumer_id == input.consumer_id,
+                stripe_cards.external_stripe_customer_id
+                == input.external_stripe_customer_id,
+                stripe_cards.active == input.active,
+            )
+        )
+        row = await self.main_database.replica().fetch_one(stmt)
+        return StripeCardDbEntity.from_row(row) if row else None

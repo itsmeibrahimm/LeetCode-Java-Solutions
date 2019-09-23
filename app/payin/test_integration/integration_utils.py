@@ -96,7 +96,9 @@ def create_payer_failure_v1(
 
 
 def create_payment_method_v1(
-    client: TestClient, request: CreatePaymentMethodV1Request
+    client: TestClient,
+    request: CreatePaymentMethodV1Request,
+    http_status: Optional[int] = 201,
 ) -> Dict[str, Any]:
     create_payment_method_request = {
         "payer_id": request.payer_id,
@@ -106,7 +108,7 @@ def create_payment_method_v1(
     response = client.post(
         _create_payment_method_v1_url(), json=create_payment_method_request
     )
-    assert response.status_code == 201
+    assert response.status_code == http_status
     payment_method: dict = response.json()
     assert UUID(payment_method["id"], version=4)
     assert UUID(payment_method["payer_id"], version=4)
