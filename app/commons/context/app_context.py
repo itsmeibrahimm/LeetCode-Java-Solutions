@@ -12,7 +12,10 @@ from app.commons.applications import FastAPI
 from app.commons.config.app_config import AppConfig
 from app.commons.context.logger import root_logger, get_logger
 from app.commons.database.infra import DB
-from app.commons.providers.TimedAioClient import TrackedIdentityClientSession
+from app.commons.providers.timed_aio_client import (
+    TrackedIdentityClientSession,
+    TrackedDsjClientSession,
+)
 from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.identity_client import (
     IdentityClientInterface,
@@ -56,6 +59,8 @@ class AppContext:
 
     ids_session: aiohttp.ClientSession
 
+    dsj_session: aiohttp.ClientSession
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -72,6 +77,7 @@ class AppContext:
                 self.ledger_maindb.disconnect(),
                 self.ledger_paymentdb.disconnect(),
                 self.ids_session.close(),
+                self.dsj_session.close(),
             )
         finally:
             # shutdown the threadpool
@@ -176,16 +182,20 @@ async def create_app_context(config: AppConfig) -> AppContext:
         interval_secs=config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
     )
 
+    ids_session: aiohttp.ClientSession = TrackedIdentityClientSession()
+    dsj_session: aiohttp.ClientSession = TrackedDsjClientSession()
+
+    # This can probably be provided/constructed at the Request/Job/Func level eventually. The true resource here is
+    # the dsj_session. Similarly identity_client could also be removed, although the stubbing makes it more complex
     dsj_client = DSJClient(
-        {
+        session=dsj_session,
+        client_config={
             "base_url": config.DSJ_API_BASE_URL,
             "email": config.DSJ_API_USER_EMAIL.value,
             "password": config.DSJ_API_USER_PASSWORD.value,
             "jwt_token_ttl": config.DSJ_API_JWT_TOKEN_TTL,
-        }
+        },
     )
-
-    ids_session: aiohttp.ClientSession = TrackedIdentityClientSession()
 
     identity_client: IdentityClientInterface
     if config.ENVIRONMENT in ["testing", "local"]:
@@ -217,6 +227,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         stripe_thread_pool=stripe_thread_pool,
         capture_service=capture_service,
         ids_session=ids_session,
+        dsj_session=dsj_session,
     )
 
     # start monitoring

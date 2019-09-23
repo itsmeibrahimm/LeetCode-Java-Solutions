@@ -37,7 +37,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         payin_paymentdb=payin_paymentdb,
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
-        dsj_client=DSJClient({}),
+        dsj_client=DSJClient(session=MagicMock(), client_config={}),
         identity_client=StubbedIdentityClient(),  # Does not matter
         stripe_thread_pool=ThreadPoolHelper(),
         stripe_client=StripeClient(
@@ -50,6 +50,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         ),
         capture_service=MagicMock(),
         ids_session=MagicMock(),
+        dsj_session=MagicMock(),
     )
     app.extra["context"] = cast(Any, context)
 

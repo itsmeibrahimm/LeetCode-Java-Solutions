@@ -7,6 +7,7 @@ from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
 
 
+
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
 # is marked as external.  The stripe simulator does not return the correct result since it does

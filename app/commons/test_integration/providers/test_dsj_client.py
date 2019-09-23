@@ -1,3 +1,4 @@
+import aiohttp
 import pytest
 from app.commons.providers.dsj_client import DSJClient
 
@@ -28,15 +29,16 @@ TEST_DSJ_CLIENT_CONFIG = {
 
 class TestDSJClient:
     @pytest.fixture
-    def dsj(self, request):
+    async def dsj(self, request, event_loop):
         # allow external tests to directly call external service
         if "external" in request.keywords:
             ...
         # allow integration tests to call the service mock
         elif "integration" in request.keywords:
             ...
-
-        return DSJClient(TEST_DSJ_CLIENT_CONFIG)
+        session = aiohttp.ClientSession(loop=event_loop)
+        yield DSJClient(session=session, client_config=TEST_DSJ_CLIENT_CONFIG)
+        await session.close()
 
     async def test__fetch_request_token(self, mode: str, dsj: DSJClient):
         token = await dsj._fetch_request_token()

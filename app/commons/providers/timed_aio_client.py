@@ -12,3 +12,10 @@ class TrackedIdentityClientSession(ClientSession):
     async def _request(self, *args, **kwargs):
         client_response: ClientResponse = await super()._request(*args, **kwargs)
         return client_response
+
+
+class TrackedDsjClientSession(ClientSession):
+    @track_identity_http_client_timing(stat_name="io.dsj-client.latency")
+    async def _request(self, *args, **kwargs):
+        client_response: ClientResponse = await super()._request(*args, **kwargs)
+        return client_response
