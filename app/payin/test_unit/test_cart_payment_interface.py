@@ -58,23 +58,6 @@ class TestLegacyPaymentInterface:
     Test LegacyPaymentInterface class functions.
     """
 
-    def test_default_country_id(self, legacy_payment_interface):
-        assert legacy_payment_interface.DEFAULT_COUNTRY_ID == LegacyCountryId.US
-
-    def test_get_country_id_by_code(self, legacy_payment_interface):
-        result = legacy_payment_interface.get_country_id_by_code(CountryCode.US)
-        assert result == LegacyCountryId.US
-
-        result = legacy_payment_interface.get_country_id_by_code(CountryCode.CA)
-        assert result == LegacyCountryId.CA
-
-        result = legacy_payment_interface.get_country_id_by_code(CountryCode.AU)
-        assert result == LegacyCountryId.AU
-
-        # Defaults to US
-        result = legacy_payment_interface.get_country_id_by_code("Hawaii")
-        assert result == LegacyCountryId.US
-
     def test_get_legacy_stripe_charge_status_from_provider_status(
         self, legacy_payment_interface
     ):

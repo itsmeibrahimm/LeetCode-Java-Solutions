@@ -65,6 +65,7 @@ from app.payin.core.exceptions import (
     InvalidProviderRequestError,
     ProviderError,
 )
+from app.payin.core.legacy.utils import get_country_id_by_code
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
@@ -98,17 +99,6 @@ class LegacyPaymentInterface:
         self.req_context = req_context
         self.payment_repo = payment_repo
         self.stripe_async_client = stripe_async_client
-
-    def get_country_id_by_code(self, country: str) -> int:
-        if country == CountryCode.US.value:
-            return LegacyCountryId.US
-        elif country == CountryCode.CA.value:
-            return LegacyCountryId.CA
-        elif country == CountryCode.AU.value:
-            return LegacyCountryId.AU
-        else:
-            self.req_context.log.warn(f"Invalid country {country} provided")
-            return self.DEFAULT_COUNTRY_ID
 
     def _get_legacy_stripe_charge_status_from_provider_status(
         self, provider_status: str
@@ -172,7 +162,7 @@ class LegacyPaymentInterface:
 
         country_id = legacy_payment.dd_country_id
         if not country_id:
-            country_id = self.get_country_id_by_code(country)
+            country_id = get_country_id_by_code(country)
 
         self.req_context.log.debug(
             f"[create_charge_after_payment_submitted] Creating new charge"
@@ -1402,9 +1392,7 @@ class CartPaymentProcessor:
             payer_id=cart_payment.payer_id,
             payment_method_id=payment_intents[0].payment_method_id,
             legacy_payment=legacy_payment,
-            legacy_country_id=self.legacy_payment_interface.get_country_id_by_code(
-                payment_intents[0].country
-            ),
+            legacy_country_id=get_country_id_by_code(payment_intents[0].country),
         )
 
         intent_description = (
@@ -1846,9 +1834,7 @@ class CartPaymentProcessor:
             payer_id=request_cart_payment.payer_id,
             payment_method_id=request_cart_payment.payment_method_id,
             legacy_payment=request_legacy_payment,
-            legacy_country_id=self.legacy_payment_interface.get_country_id_by_code(
-                country
-            ),
+            legacy_country_id=get_country_id_by_code(country),
         )
 
         # Check for resubmission by client
