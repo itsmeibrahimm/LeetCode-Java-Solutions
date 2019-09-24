@@ -3,6 +3,7 @@ import org.doordash.Doorctl
 import org.doordash.Github
 import org.doordash.Pulse
 import java.util.Arrays
+import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
 
 gitUrl = params["GITHUB_REPOSITORY"]
 sha = params["SHA"]
@@ -367,7 +368,10 @@ def runHooks() {
             |docker exec ${serviceName}-ci make test-hooks PRE_COMMIT_HOME=/home SKIP=flake8,mypy HOOKS_ADDOPTS="--show-diff-on-failure"
             |""".stripMargin()
     } catch (e) {
-      commentHooksFailed()
+      // ignore if step was aborted
+      if (!(e instanceof FlowInterruptedException)) {
+        commentHooksFailed()
+      }
       throw e
     } finally {
       sh """|#!/bin/bash
