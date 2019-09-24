@@ -140,6 +140,21 @@ class TestStripeClient:
     @pytest.mark.skip(
         "requires to create the needed resource first in case it becomes flaky"
     )
+    def test_retrieve_payout_not_found(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+
+        with pytest.raises(InvalidRequestError):
+            stripe.retrieve_payout(
+                country=models.CountryCode.US,
+                request=models.RetrievePayout(
+                    stripe_account="acct_1FGdyOBOQHMRR5FG", id="invalid_payout_id"
+                ),
+            )
+
+    @pytest.mark.skip(
+        "requires to create the needed resource first in case it becomes flaky"
+    )
     def test_create_and_cancel_payout(self, mode: str, stripe: StripeClient):
         payout = stripe.create_payout(
             country=models.CountryCode.US,

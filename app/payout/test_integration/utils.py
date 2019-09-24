@@ -201,7 +201,7 @@ async def prepare_and_insert_stripe_transfer(
         stripe_failure_code="stripe_failure_code",
         stripe_account_id="stripe_account_id",
         stripe_account_type="stripe_managed_account",
-        country_shortname="country_shortname",
+        country_shortname="US",
         bank_last_four="bank_last_four",
         bank_name="bank_name",
         submission_error_code="submission_error_code",
@@ -438,7 +438,7 @@ def mock_transfer() -> models.Transfer:
     return mocked_transfer
 
 
-def mock_payout() -> models.Payout:
+def mock_payout(status="pending",) -> models.Payout:
     mocked_payout = models.Payout(
         id=str(uuid.uuid4()),
         object="obj",
@@ -458,7 +458,7 @@ def mock_payout() -> models.Payout:
         method="method",
         source_type="source_type",
         statement_descriptor="statement_descriptor",
-        status="status",
+        status=status,
         type="type",
     )
     return mocked_payout

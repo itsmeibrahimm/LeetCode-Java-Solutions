@@ -76,7 +76,6 @@ class StripeTransferRepository(
     async def create_stripe_transfer(
         self, data: StripeTransferCreate
     ) -> StripeTransfer:
-        # django will insert an empty string if some fields is required but not given as params
         stmt = (
             stripe_transfers.table.insert()
             .values(

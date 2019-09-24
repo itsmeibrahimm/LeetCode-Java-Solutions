@@ -6,11 +6,14 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
+
+from app.commons.providers.stripe.stripe_models import TransferId
 from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
 from app.payout.api.account.utils import to_external_payout_account
 from app.payout.core.account.processor import PayoutAccountProcessors
+from app.payout.core.account.processors.cancel_payout import CancelPayoutRequest
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
 from app.payout.core.account.processors.create_instant_payout import (
     CreateInstantPayoutRequest,
@@ -256,6 +259,32 @@ async def create_payout(
             instant_payout_request
         )
         return models.Payout(**instant_payout_response.dict())
+
+
+@router.post(
+    "/{payout_account_id}/transfer/{transfer_id}/cancel",
+    operation_id="CancelPayout",
+    status_code=HTTP_200_OK,
+    responses={
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def cancel_payout(
+    transfer_id: TransferId,
+    payout_account_id: models.PayoutAccountId,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    cancel_payout_request = CancelPayoutRequest(
+        transfer_id=transfer_id, payout_account_id=payout_account_id
+    )
+    cancel_payout_response = await payout_account_processors.cancel_payout(
+        cancel_payout_request
+    )
+    return models.Payout(**cancel_payout_response.dict())
 
 
 @router.get(

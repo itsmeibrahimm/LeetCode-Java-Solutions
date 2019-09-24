@@ -1,6 +1,11 @@
 from app.commons.context.logger import Log
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.types import CountryCode
+from app.payout.core.account.processors.cancel_payout import (
+    CancelPayoutRequest,
+    CancelPayoutResponse,
+    CancelPayout,
+)
 from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
@@ -181,7 +186,6 @@ class PayoutAccountProcessors:
     async def create_instant_payout(
         self, request: CreateInstantPayoutRequest
     ) -> CreateInstantPayoutResponse:
-        # TODO: A repo for bankdb.transfers is needed
         create_instant_payout_op = CreateInstantPayout(
             logger=self.logger,
             stripe_payout_request_repo=self.stripe_payout_request_repo,
@@ -191,6 +195,16 @@ class PayoutAccountProcessors:
             request=request,
         )
         return await create_instant_payout_op.execute()
+
+    async def cancel_payout(self, request: CancelPayoutRequest) -> CancelPayoutResponse:
+        cancel_payout_op = CancelPayout(
+            logger=self.logger,
+            stripe_transfer_repo=self.stripe_transfer_repo,
+            payment_account_repo=self.payment_account_repo,
+            stripe=self.stripe,
+            request=request,
+        )
+        return await cancel_payout_op.execute()
 
     async def get_onboarding_requirements_by_stages(
         self, entity_type: PayoutTargetType, country_shortname: CountryCode

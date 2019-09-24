@@ -14,7 +14,7 @@ from app.commons.api.models import PaymentException
 ###########################################################
 payout_error_message_maps = {
     # payout errors
-    # payout_1, payout_4, payout_5, payout_6, payout_8 requires customized error message
+    # payout_1, payout_4, payout_5, payout_6, payout_8, payout_15 requires customized error message
     "payout_0": "Cannot make stripe transfer without stripe account id.",
     "payout_1": "",
     "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
@@ -30,6 +30,7 @@ payout_error_message_maps = {
     "payout_12": "All existing Stripe transfers must be failed or canceled.",
     "payout_13": "Cannot find payment_account with given id.",
     "payout_14": "Failed to submit stripe payout due to RateLimitError",
+    "payout_15": "Can only cancel if status is pending",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     "account_1": "You payout account is not fully set up, please verify your payout account.",
@@ -58,6 +59,7 @@ class PayoutErrorCode(str, Enum):
     TRANSFER_PROCESSING = "payout_12"
     INVALID_PAYMENT_ACCOUNT_ID = "payout_13"
     RATE_LIMIT_ERROR = "payout_14"
+    INVALID_STRIPE_PAYOUT = "payout_15"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"
