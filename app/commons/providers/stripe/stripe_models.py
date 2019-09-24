@@ -682,7 +682,7 @@ class Balance(StripeBaseModel):
     pending: List[Pending]
 
 
-class AccountToken(StripeBaseModel):
+class Token(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/tokens/object
     """

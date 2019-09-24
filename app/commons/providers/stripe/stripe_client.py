@@ -264,7 +264,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def create_account_token(
         self, request: models.CreateAccountTokenRequest
-    ) -> models.AccountToken:
+    ) -> models.Token:
         """
         Create an Account Token
         https://stripe.com/docs/api/tokens/create_account
@@ -582,7 +582,7 @@ class StripeClient(StripeClientInterface):
     @tracing.track_breadcrumb(resource="token", action="create")
     def create_account_token(
         self, *, request: CreateAccountTokenRequest
-    ) -> models.AccountToken:
+    ) -> models.Token:
         account_token = stripe.Token.create(
             account=request.account.dict(), **self.settings_for(request.country)
         )
@@ -889,7 +889,7 @@ class StripeAsyncClient:
 
     async def create_account_token(
         self, *, request: models.CreateAccountTokenRequest
-    ) -> models.AccountToken:
+    ) -> models.Token:
         return await self.executor_pool.submit(
             self.stripe_client.create_account_token, request=request
         )
