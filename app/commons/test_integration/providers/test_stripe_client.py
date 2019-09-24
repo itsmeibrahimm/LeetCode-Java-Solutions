@@ -9,16 +9,19 @@ from app.commons.providers.stripe.stripe_client import (
 )
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.test_integration.constants import DEBIT_CARD_TOKEN, DEBIT_CARD_NUMBER
+from app.commons.test_integration.utils import (
+    prepare_and_validate_stripe_account,
+    prepare_and_validate_stripe_account_token,
+)
 from app.commons.utils.pool import ThreadPoolHelper
 from app.commons.providers.stripe.stripe_models import (
-    DateOfBirth,
-    CreateAccountRequest,
-    Address,
-    CreateAccountTokenRequest,
-    Individual,
-    CreateAccountTokenMetaDataRequest,
+    CreateCardToken,
+    CreateExternalAccountRequest,
+    CreateCardTokenRequest,
 )
 from app.commons.types import Currency, CountryCode
+from app.payout.types import PayoutExternalAccountType
 
 pytestmark = [
     # mark all these tests as stripe tests
@@ -182,29 +185,7 @@ class TestStripeClient:
         if mode == "mock":
             pytest.skip()
 
-        # generate account token
-        data = CreateAccountTokenMetaDataRequest(
-            business_type="individual",
-            individual=Individual(
-                first_name="Test",
-                last_name="Payment",
-                dob=DateOfBirth(day=1, month=1, year=1990),
-                address=Address(
-                    city="Mountain View",
-                    country=CountryCode.US.value,
-                    line1="123 Castro St",
-                    line2="",
-                    postal_code="94041",
-                    state="CA",
-                ),
-                ssn_last_4="1234",
-            ),
-            tos_shown_and_accepted=True,
-        )
-        account_token = stripe.create_account_token(
-            request=CreateAccountTokenRequest(account=data, country=CountryCode.US)
-        )
-        assert account_token
+        prepare_and_validate_stripe_account_token(stripe)
 
     def test_create_account(self, mode: str, stripe: StripeClient):
         # should use create_account_token to generate an account token
@@ -213,39 +194,46 @@ class TestStripeClient:
 
         if mode == "mock":
             pytest.skip()
-        data = CreateAccountTokenMetaDataRequest(
-            business_type="individual",
-            individual=Individual(
-                first_name="Test",
-                last_name="Payment",
-                dob=DateOfBirth(day=1, month=1, year=1990),
-                address=Address(
-                    city="Mountain View",
-                    country=CountryCode.US.value,
-                    line1="123 Castro St",
-                    line2="",
-                    postal_code="94041",
-                    state="CA",
-                ),
-                ssn_last_4="1234",
-            ),
-            tos_shown_and_accepted=True,
-        )
-        account_token = stripe.create_account_token(
-            request=CreateAccountTokenRequest(account=data, country=CountryCode.US)
-        )
-        assert account_token
+        prepare_and_validate_stripe_account(stripe)
 
-        account = stripe.create_stripe_account(
-            request=CreateAccountRequest(
+    def test_create_card_token(self, mode: str, stripe_test: StripeTestClient):
+        # stripe mock always create a token for bank account which is not right for this use
+        if mode == "mock":
+            pytest.skip()
+        card_token = stripe_test.create_card_token(
+            request=CreateCardTokenRequest(
                 country=CountryCode.US,
-                type="custom",
-                account_token=account_token.id,
-                requested_capabilities=["legacy_payments"],
+                card=CreateCardToken(
+                    number=DEBIT_CARD_NUMBER,
+                    exp_month=10,
+                    exp_year=2022,
+                    cvc="123",
+                    currency="usd",
+                ),
+            ),
+            idempotency_key=None,
+        )
+        assert card_token
+        assert card_token.id.startswith("tok_")
+        assert card_token.type == "card"
+
+    def test_create_external_account_card(
+        self, mode: str, stripe_test: StripeTestClient
+    ):
+        if mode == "mock":
+            pytest.skip()
+        account = prepare_and_validate_stripe_account(stripe_test)
+        card = stripe_test.create_external_account_card(
+            request=CreateExternalAccountRequest(
+                country=CountryCode.US,
+                type=PayoutExternalAccountType.CARD.value,
+                stripe_account_id=account.id,
+                external_account_token=DEBIT_CARD_TOKEN,
             )
         )
-        assert account
-        assert account.id.startswith("acct_")
+        assert card
+        assert card.object == "card"
+        assert card.id.startswith("card_")
 
 
 class TestStripePool:

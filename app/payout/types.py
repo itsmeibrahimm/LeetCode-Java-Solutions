@@ -14,7 +14,8 @@ StripeAccountToken = str
 
 # Payout Methods
 PayoutMethodId = str
-PayoutMethodToken = str
+PayoutMethodExternalAccountToken = str
+PayoutMethodExternalAccountId = str
 
 # Payouts
 PayoutId = str

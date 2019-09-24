@@ -3,6 +3,7 @@ from typing import Optional
 from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.commons.types import CountryCode
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.repository.maindb.model.stripe_managed_account import (
@@ -12,7 +13,7 @@ from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
 from app.commons.providers.stripe import stripe_models as models
-
+from app.payout.types import PayoutAccountId
 
 COUNTRY_TO_CURRENCY_CODE = {
     "US": "USD",
@@ -38,6 +39,37 @@ async def get_country_shortname(
         )
         if stripe_managed_account:
             return stripe_managed_account.country_shortname
+    return None
+
+
+async def get_country_by_payout_account_id(
+    payout_account_id: PayoutAccountId,
+    payment_account_repository: PaymentAccountRepositoryInterface,
+) -> Optional[CountryCode]:
+    payment_account = await payment_account_repository.get_payment_account_by_id(
+        payout_account_id
+    )
+    if payment_account and payment_account.account_id:
+        stripe_managed_account = await payment_account_repository.get_stripe_managed_account_by_id(
+            payment_account.account_id
+        )
+        if stripe_managed_account:
+            return CountryCode(stripe_managed_account.country_shortname)
+    return None
+
+
+async def get_stripe_managed_account_by_payout_account_id(
+    payout_account_id: PayoutAccountId,
+    payment_account_repository: PaymentAccountRepositoryInterface,
+) -> Optional[StripeManagedAccount]:
+    payment_account = await payment_account_repository.get_payment_account_by_id(
+        payout_account_id
+    )
+    if payment_account and payment_account.account_id:
+        stripe_managed_account = await payment_account_repository.get_stripe_managed_account_by_id(
+            payment_account.account_id
+        )
+        return stripe_managed_account
     return None
 
 

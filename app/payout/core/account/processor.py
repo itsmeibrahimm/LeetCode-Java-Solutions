@@ -10,6 +10,10 @@ from app.payout.core.account.processors.create_instant_payout import (
     CreateInstantPayoutResponse,
     CreateInstantPayout,
 )
+from app.payout.core.account.processors.create_payout_method import (
+    CreatePayoutMethod,
+    CreatePayoutMethodRequest,
+)
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
     CreateStandardPayoutResponse,
@@ -24,9 +28,12 @@ from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
     GetDefaultPayoutCard,
 )
-from app.payout.core.account.types import PayoutCardMethod
+from app.payout.core.account.types import PayoutCardInternal
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
+from app.payout.repository.bankdb.payout_method_miscellaneous import (
+    PayoutMethodMiscellaneousRepository,
+)
 from app.payout.repository.bankdb.stripe_managed_account_transfer import (
     StripeManagedAccountTransferRepositoryInterface,
 )
@@ -61,6 +68,9 @@ from app.payout.types import PayoutTargetType
 class PayoutAccountProcessors:
     logger: Log
     payment_account_repo: PaymentAccountRepositoryInterface
+    payout_card_repo: PayoutCardRepositoryInterface
+    payout_method_repo: PayoutMethodRepositoryInterface
+    payout_method_miscellaneous_repo: PayoutMethodMiscellaneousRepository
     stripe_transfer_repo: StripeTransferRepositoryInterface
     stripe_payout_request_repo: StripePayoutRequestRepositoryInterface
     stripe: StripeAsyncClient
@@ -69,16 +79,20 @@ class PayoutAccountProcessors:
         self,
         logger: Log,
         payment_account_repo: PaymentAccountRepositoryInterface,
+        payout_card_repo: PayoutCardRepositoryInterface,
+        payout_method_repo: PayoutMethodRepositoryInterface,
+        payout_method_miscellaneous_repo: PayoutMethodMiscellaneousRepository,
         stripe_transfer_repo: StripeTransferRepositoryInterface,
         stripe_payout_request_repo: StripePayoutRequestRepositoryInterface,
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepositoryInterface,
         stripe: StripeAsyncClient,
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
-        payout_card_repo: PayoutCardRepositoryInterface,
-        payout_method_repo: PayoutMethodRepositoryInterface,
     ):
         self.logger = logger
         self.payment_account_repo = payment_account_repo
+        self.payout_card_repo = payout_card_repo
+        self.payout_method_repo = payout_method_repo
+        self.payout_method_miscellaneous_repo = payout_method_miscellaneous_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.stripe_payout_request_repo = stripe_payout_request_repo
         self.stripe_managed_account_transfer_repo = stripe_managed_account_transfer_repo
@@ -130,7 +144,7 @@ class PayoutAccountProcessors:
 
     async def get_default_payout_card(
         self, request: GetDefaultPayoutCardRequest
-    ) -> PayoutCardMethod:
+    ) -> PayoutCardInternal:
         get_payout_card_op = GetDefaultPayoutCard(
             request=request,
             payout_card_repo=self.payout_card_repo,
@@ -138,6 +152,18 @@ class PayoutAccountProcessors:
             logger=self.logger,
         )
         return await get_payout_card_op.execute()
+
+    async def create_payout_method(
+        self, request: CreatePayoutMethodRequest
+    ) -> PayoutCardInternal:
+        create_payout_method_op = CreatePayoutMethod(
+            logger=self.logger,
+            payment_account_repo=self.payment_account_repo,
+            payout_method_miscellaneous_repo=self.payout_method_miscellaneous_repo,
+            request=request,
+            stripe=self.stripe,
+        )
+        return await create_payout_method_op.execute()
 
     async def create_standard_payout(
         self, request: CreateStandardPayoutRequest

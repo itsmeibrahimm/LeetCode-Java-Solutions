@@ -1,7 +1,11 @@
 from enum import Enum
 from typing import Optional
 
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 
 from app.commons.api.models import PaymentException
 
@@ -28,10 +32,12 @@ payout_error_message_maps = {
     "payout_14": "Failed to submit stripe payout due to RateLimitError",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
+    "account_1": "You payout account is not fully set up, please verify your payout account.",
     # payout method errors
     "payout_method_0": "Cannot find a payout method for the given payout account id.",
     "payout_method_1": "Cannot find a payout card for the given payout account id.",
     "payout_method_2": "Cannot find a default payout card for the given payout account id.",
+    "payout_method_3": "Some issue happened for creating a payout method, please try again later.",
 }
 
 
@@ -55,11 +61,13 @@ class PayoutErrorCode(str, Enum):
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"
+    PGP_ACCOUNT_NOT_FOUND = "account_1"
 
     # payout method error code
     PAYOUT_METHOD_NOT_FOUND = "payout_method_0"
     PAYOUT_CARD_NOT_FOUND = "payout_method_1"
     DEFAULT_PAYOUT_CARD_NOT_FOUND = "payout_method_2"
+    PAYOUT_METHOD_CREATE_ERROR = "payout_method_3"
 
 
 class PayoutError(PaymentException):
@@ -109,6 +117,17 @@ def payout_account_not_found_error() -> PayoutError:
     )
 
 
+def pgp_account_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND,
+        retryable=False,
+    )
+
+
 ###########################################################
 # payout_method Errors                                    #
 ###########################################################
@@ -141,5 +160,16 @@ def default_payout_card_not_found_error() -> PayoutError:
             PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND.value
         ],
         error_code=PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def payout_method_create_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_METHOD_CREATE_ERROR.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_METHOD_CREATE_ERROR,
         retryable=False,
     )

@@ -33,7 +33,10 @@ from app.payout.repository.maindb.managed_account_transfer import (
 from app.payout.repository.maindb.model.managed_account_transfer import (
     ManagedAccountTransferCreate,
 )
-from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
+from app.payout.repository.maindb.model.payment_account import (
+    PaymentAccountCreate,
+    PaymentAccount,
+)
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountCreate,
     StripeManagedAccount,
@@ -220,7 +223,7 @@ async def prepare_and_insert_payment_account(
     account_id=None,
     entity="dasher",
     account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
-):
+) -> PaymentAccount:
     data = PaymentAccountCreate(
         account_id=account_id,
         account_type=account_type,
@@ -480,6 +483,38 @@ def mock_balance() -> models.Balance:
         pending=[pendings],
     )
     return mocked_balance
+
+
+def mock_stripe_card() -> models.StripeCard:
+    return models.StripeCard(
+        id=str(uuid.uuid4()),
+        account="ct_test_account_payment",
+        object="card",
+        address_city=None,
+        address_country=None,
+        address_line1=None,
+        address_line1_check=None,
+        address_line2=None,
+        address_state=None,
+        address_zip=None,
+        address_zip_check=None,
+        available_payout_methods=[],
+        brand="Visa",
+        country=CountryCode.US,
+        currency=Currency.USD,
+        customer=None,
+        cvc_check=None,
+        description="Visa Classic",
+        dynamic_last4=None,
+        exp_month=8,
+        exp_year=2020,
+        fingerprint="test_fingerprint",
+        funding="credit",
+        last4="4242",
+        metadata={},
+        name=None,
+        tokenization_method=None,
+    )
 
 
 def construct_stripe_error(code="error_code", error_type="error_type") -> StripeError:

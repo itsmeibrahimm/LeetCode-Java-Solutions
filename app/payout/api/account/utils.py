@@ -1,8 +1,10 @@
-from app.payout.api.account.v1.models import PayoutAccount
+from app.payout.api.account.v1.models import PayoutAccount, PayoutMethodCard
 from app.payout.core.account.types import (
     PayoutAccountInternal,
     VerificationRequirements,
+    PayoutCardInternal,
 )
+from app.payout.types import PayoutExternalAccountType
 
 
 def to_external_payout_account(internal_response: PayoutAccountInternal):
@@ -17,4 +19,10 @@ def to_external_payout_account(internal_response: PayoutAccountInternal):
         )
         if internal_response.verification_requirements
         else None,
+    )
+
+
+def to_external_payout_method(internal_response: PayoutCardInternal):
+    return PayoutMethodCard(
+        **internal_response.dict(), type=PayoutExternalAccountType.CARD
     )

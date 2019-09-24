@@ -65,6 +65,7 @@ class VerifyPayoutAccount(
             requested_capabilities=["legacy_payments"],
         )
         stripe_account = await self.stripe.create_stripe_account(request=create_account)
+        # add more error handling
 
         if stripe_account:
             # create sma

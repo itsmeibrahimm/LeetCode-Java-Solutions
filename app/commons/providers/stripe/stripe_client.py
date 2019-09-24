@@ -279,6 +279,15 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         https://stripe.com/docs/api/accounts/create
         """
 
+    @abc.abstractmethod
+    def create_external_account_card(
+        self, request: models.CreateExternalAccountRequest
+    ) -> models.StripeCard:
+        """
+        Create an external account card
+        https://stripe.com/docs/api/external_account_cards/create
+        """
+
 
 @tracing.track_breadcrumb(provider_name="stripe", from_kwargs={"country": "country"})
 class StripeClient(StripeClientInterface):
@@ -600,6 +609,17 @@ class StripeClient(StripeClientInterface):
         )
         return account
 
+    @tracing.track_breadcrumb(resource="payout_method", action="create")
+    def create_external_account_card(
+        self, request: models.CreateExternalAccountRequest
+    ) -> models.StripeCard:
+        card = stripe.Account.create_external_account(
+            request.stripe_account_id,
+            external_account=request.external_account_token,
+            **self.settings_for(request.country),
+        )
+        return card
+
 
 class StripeTestClient(StripeClient):
     """
@@ -608,19 +628,19 @@ class StripeTestClient(StripeClient):
     (eg. credit card creation)
     """
 
-    def create_credit_card_token(
+    # create debit card or credit card
+    def create_card_token(
         self,
         *,
-        country: models.CountryCode,
-        token: models.StripeCreateCreditCardTokenRequest,
+        request: models.CreateCardTokenRequest,
         idempotency_key: models.IdempotencyKey = None,
-    ):
-        return stripe.Charge.create(
+    ) -> models.CardToken:
+        card_token = stripe.Token.create(
             idempotency_key=idempotency_key,
-            country=country,
-            card=token.dict(),
-            **self.settings_for(country),
+            card=request.card.dict(),
+            **self.settings_for(request.country),
         )
+        return card_token
 
 
 class StripeAsyncClient:
@@ -899,4 +919,11 @@ class StripeAsyncClient:
     ) -> models.Account:
         return await self.executor_pool.submit(
             self.stripe_client.create_stripe_account, request=request
+        )
+
+    async def create_external_account_card(
+        self, *, request: models.CreateExternalAccountRequest
+    ) -> models.StripeCard:
+        return await self.executor_pool.submit(
+            self.stripe_client.create_external_account_card, request=request
         )

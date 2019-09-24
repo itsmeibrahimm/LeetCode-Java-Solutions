@@ -6,7 +6,7 @@ from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
     GetDefaultPayoutCard,
 )
-from app.payout.core.account.types import PayoutCardMethod
+from app.payout.core.account.types import PayoutCardInternal
 from app.payout.core.exceptions import (
     PayoutErrorCode,
     payout_error_message_maps,
@@ -23,7 +23,7 @@ from app.payout.test_integration.utils import (
 )
 
 
-class TestGetPayoutAccount:
+class TestGetDefaultPayoutCard:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture
@@ -62,7 +62,7 @@ class TestGetPayoutAccount:
             default_payout_card.id
         )
         assert default_payout_method
-        expected_default_payout_card = PayoutCardMethod(
+        expected_default_payout_card = PayoutCardInternal(
             stripe_card_id=default_payout_card.stripe_card_id,
             last4=default_payout_card.last4,
             brand=default_payout_card.brand,
@@ -87,7 +87,7 @@ class TestGetPayoutAccount:
             request=request,
         )
 
-        actual_default_payout_card: PayoutCardMethod = await get_default_payout_card_op._execute()
+        actual_default_payout_card: PayoutCardInternal = await get_default_payout_card_op._execute()
         assert actual_default_payout_card.payout_account_id == payout_account.id
         assert actual_default_payout_card == expected_default_payout_card
 

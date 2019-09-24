@@ -8,7 +8,14 @@ from app.commons.types import CountryCode
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
-from app.payout.types import StripeAccountToken, StripeBusinessType, StripeFileHandle
+from app.payout.types import (
+    StripeAccountToken,
+    StripeBusinessType,
+    StripeFileHandle,
+    PayoutMethodExternalAccountToken,
+    PgpExternalAccountId,
+    PayoutType,
+)
 
 STRIPE_API_VERSION = "2019-09-09"
 
@@ -64,11 +71,24 @@ class StripeClientSettings(StripeBaseModel):
 
 
 # --------------- REQUEST MODELS ---------------------------------------------------------------------------------------
-class StripeCreateCreditCardTokenRequest(StripeBaseModel):
+class CreateCardToken(StripeBaseModel):
     number: str
     exp_month: int
     exp_year: int
     cvc: str
+    currency: str = "usd"
+    name: Optional[str]
+    address_line1: Optional[str]
+    address_line2: Optional[str]
+    address_city: Optional[str]
+    address_state: Optional[str]
+    address_zip: Optional[str]
+    address_country: Optional[str]
+
+
+class CreateCardTokenRequest(StripeBaseModel):
+    country: CountryCode
+    card: CreateCardToken
 
 
 class InvoiceSettings(StripeBaseModel):
@@ -313,6 +333,13 @@ class CreateAccountRequest(StripeBaseModel):
     type: str = "custom"
     account_token: Optional[StripeAccountToken]
     requested_capabilities: list = ["legacy_payments"]
+
+
+class CreateExternalAccountRequest(StripeBaseModel):
+    country: CountryCode
+    type: str
+    stripe_account_id: PgpExternalAccountId
+    external_account_token: PayoutMethodExternalAccountToken
 
 
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
@@ -713,3 +740,74 @@ class Account(StripeBaseModel):
     individual: Optional[Individual] = None
     details_submitted: bool
     email: Optional[str]
+
+
+class StripeCard(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/external_accounts
+    """
+
+    _STRIPE_OBJECT_NAME: str = "card"
+
+    class AddressCheck(str, Enum):
+        PASS = ("pass",)
+        FAIL = ("fail",)
+        UNAVAILABLE = "unavailable"
+        UNCHECKED = "unchecked"
+
+    class FundingType(str, Enum):
+        CREDIT = "credit"
+        DEBIT = "debit"
+        PREPAID = "prepaid"
+        UNKNOWN = "unknown"
+
+    id: str
+    object: str
+    account: PgpExternalAccountId
+    address_city: Optional[str]
+    address_country: Optional[str]
+    address_line1: Optional[str]
+    address_line1_check: Optional[AddressCheck]
+    address_line2: Optional[str]
+    address_state: Optional[str]
+    address_zip: Optional[str]
+    address_zip_check: Optional[AddressCheck]
+    available_payout_methods: List[PayoutType] = []
+    brand: str
+    country: CountryCode
+    currency: Currency
+    customer: Optional[str]
+    cvc_check: Optional[AddressCheck]
+    default_for_currency: Optional[bool]
+    dynamic_last4: Optional[str]
+    exp_month: int
+    exp_year: int
+    fingerprint: str
+    funding: Optional[FundingType]
+    last4: str
+    metadata: Optional[dict]
+    name: Optional[str]
+    recipient: Optional[str]
+    tokenization_method: Optional[str]
+
+
+class Token(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/tokens/object
+    """
+
+    _STRIPE_OBJECT_NAME: str = "token"
+
+    id: str
+    object: str
+    type: str
+    used: bool
+    created: datetime
+
+
+class CardToken(Token):
+    """
+    See: https://stripe.com/docs/api/tokens/object
+    """
+
+    card: StripeCard

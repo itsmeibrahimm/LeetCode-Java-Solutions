@@ -51,7 +51,17 @@ class PayoutAccountInternal(OperationResponse):
     verification_requirements: Optional[VerificationRequirements]
 
 
-class PayoutCardMethod(OperationResponse):
+class PayoutMethodInternal(OperationResponse):
+    id: Optional[int]
+    token: Optional[UUID]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    deleted_at: Optional[datetime]
+
+
+class PayoutCardInternal(PayoutMethodInternal):
+    id: int
+    token: UUID
     stripe_card_id: str
     payout_account_id: int
     currency: Currency
@@ -61,12 +71,9 @@ class PayoutCardMethod(OperationResponse):
     exp_month: int
     exp_year: int
     is_default: bool
-    fingerprint: Optional[str]
-    id: Optional[int]
-    token: Optional[UUID]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
+    fingerprint: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class VerificationRequirementsOnboarding(OperationResponse):

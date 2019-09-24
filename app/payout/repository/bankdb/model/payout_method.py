@@ -7,6 +7,7 @@ from sqlalchemy import Column, Integer, text, Text, DateTime, Boolean
 from typing_extensions import final
 
 from app.commons.database.model import TableDefinition, DBEntity
+from app.commons.providers.stripe.stripe_models import StripeCard
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -83,3 +84,9 @@ class PayoutMethodCreate(_PayoutMethodPartial):
 
 class PayoutMethodUpdate(_PayoutMethodPartial):
     deleted_at: datetime
+
+
+class PayoutMethodMiscellaneousCreate(DBEntity):
+    payout_account_id: int
+    payout_method_type: str
+    card: StripeCard

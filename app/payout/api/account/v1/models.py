@@ -1,17 +1,17 @@
+from datetime import datetime
 from typing import Optional
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, Currency
 from app.payout.core.account.types import Address, DateOfBirth, VerificationRequirements
 from app.payout.types import (
-    AccountType,
     PayoutAccountId,
-    PayoutAccountTargetId,
-    PayoutAccountTargetType,
     PayoutAccountToken,
-    PayoutAmountType,
     PayoutMethodId,
-    PayoutMethodToken,
+    PayoutMethodExternalAccountToken,
+    PayoutAccountTargetType,
+    PayoutAccountTargetId,
+    PayoutAmountType,
     PayoutMethodType,
     PayoutTargetType,
     PayoutType,
@@ -20,9 +20,19 @@ from app.payout.types import (
     StripeAccountToken,
     StripeBusinessType,
     StripeFileHandle,
+    AccountType,
+    PayoutExternalAccountType,
+    PayoutMethodExternalAccountId,
 )
 
-__all__ = ["PayoutAccountId", "PayoutAccount", "PayoutAccountToken"]
+__all__ = [
+    "CreatePayoutAccount",
+    "CreatePayoutMethod",
+    "PayoutAccountId",
+    "PayoutAccount",
+    "PayoutAccountToken",
+    "VerificationDetailsWithToken",
+]
 
 
 class CreatePayoutAccount(PaymentRequest):
@@ -67,7 +77,8 @@ class VerificationDetailsWithToken(PaymentRequest):
 
 
 class CreatePayoutMethod(PaymentRequest):
-    token: PayoutMethodToken
+    token: PayoutMethodExternalAccountToken
+    type: PayoutExternalAccountType
 
 
 class PayoutMethod(PaymentResponse):
@@ -76,7 +87,29 @@ class PayoutMethod(PaymentResponse):
     """
 
     id: PayoutMethodId
-    ...
+    type: PayoutExternalAccountType
+    payout_account_id: PayoutAccountId
+    country: CountryCode
+    currency: Currency
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: Optional[datetime]
+
+
+class PayoutMethodCard(PayoutMethod):
+    stripe_card_id: PayoutMethodExternalAccountId
+    last4: str
+    brand: str
+    is_default: bool
+    exp_month: int
+    exp_year: int
+    fingerprint: str
+
+
+class PayoutMethodBankAccount(PayoutMethod):
+    bank_name: str
+    bank_last_4: str
+    fingerprint: str
 
 
 class PayoutRequest(PaymentRequest):

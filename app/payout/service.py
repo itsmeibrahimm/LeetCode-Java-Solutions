@@ -8,10 +8,13 @@ from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.repository.bankdb import (
     payout,
+    payout_card,
+    payout_method,
     stripe_payout_request,
     stripe_managed_account_transfer,
     payout_card,
     payout_method,
+    payout_method_miscellaneous,
 )
 from app.payout.repository.maindb import (
     payment_account,
@@ -26,6 +29,9 @@ __all__ = [
     "PayoutService",
     "PaymentAccountRepository",
     "PaymentAccountRepositoryInterface",
+    "PayoutCardRepositoryInterface",
+    "PayoutMethodMiscellaneousRepositoryInterface",
+    "PayoutMethodRepositoryInterface",
     "TransferRepository",
     "TransferRepositoryInterface",
     "PayoutRepository",
@@ -39,6 +45,11 @@ __all__ = [
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
+PayoutCardRepositoryInterface = payout_card.PayoutCardRepositoryInterface
+PayoutMethodRepositoryInterface = payout_method.PayoutMethodRepositoryInterface
+PayoutMethodMiscellaneousRepositoryInterface = (
+    payout_method_miscellaneous.PayoutMethodMiscellaneousRepositoryInterface
+)
 TransferRepositoryInterface = transfer.TransferRepositoryInterface
 PayoutRepositoryInterface = payout.PayoutRepositoryInterface
 StripePayoutRequestRepositoryInterface = (
@@ -51,21 +62,20 @@ StripeTransferRepositoryInterface = stripe_transfer.StripeTransferRepositoryInte
 ManagedAccountTransferRepositoryInterface = (
     managed_account_transfer.ManagedAccountTransferRepositoryInterface
 )
-PayoutCardRepositoryInterface = payout_card.PayoutCardRepositoryInterface
-PayoutMethodRepositoryInterface = payout_method.PayoutMethodRepositoryInterface
 
 
 class PayoutService(BaseService):
     service_name = "payout-service"
     payment_accounts: payment_account.PaymentAccountRepository
+    payout_cards: payout_card.PayoutCardRepository
+    payout_methods: payout_method.PayoutMethodRepository
+    payout_method_miscellaneous: payout_method_miscellaneous.PayoutMethodMiscellaneousRepository
     transfers: transfer.TransferRepository
     payouts: payout.PayoutRepository
     stripe_payout_requests: stripe_payout_request.StripePayoutRequestRepository
     striped_managed_account_transfers: stripe_managed_account_transfer.StripeManagedAccountTransferRepository
     stripe_transfers: stripe_transfer.StripeTransferRepository
     managed_account_transfers: managed_account_transfer.ManagedAccountTransferRepository
-    payout_cards: payout_card.PayoutCardRepository
-    payout_methods: payout_method.PayoutMethodRepository
     dsj_client: DSJClient
     stripe: StripeAsyncClient
 
@@ -92,6 +102,9 @@ class PayoutService(BaseService):
         )
         self.payout_cards = payout_card.PayoutCardRepository(bankdb)
         self.payout_methods = payout_method.PayoutMethodRepository(bankdb)
+        self.payout_method_miscellaneous = payout_method_miscellaneous.PayoutMethodMiscellaneousRepository(
+            bankdb
+        )
 
         # dsj_client
         self.dsj_client = self.app_context.dsj_client
@@ -104,6 +117,24 @@ def PaymentAccountRepository(
     payout_service: PayoutService = Depends()
 ) -> payment_account.PaymentAccountRepositoryInterface:
     return payout_service.payment_accounts
+
+
+def PayoutCardRepository(
+    payout_service: PayoutService = Depends()
+) -> payout_card.PayoutCardRepositoryInterface:
+    return payout_service.payout_cards
+
+
+def PayoutMethodRepository(
+    payout_service: PayoutService = Depends()
+) -> payout_method.PayoutMethodRepositoryInterface:
+    return payout_service.payout_methods
+
+
+def PayoutMethodMiscellaneousRepository(
+    payout_service: PayoutService = Depends()
+) -> payout_method_miscellaneous.PayoutMethodMiscellaneousRepositoryInterface:
+    return payout_service.payout_method_miscellaneous
 
 
 def TransferRepository(
@@ -142,18 +173,6 @@ def ManagedAccountTransferRepository(
     return payout_service.managed_account_transfers
 
 
-def PayoutCardRepository(
-    payout_service: PayoutService = Depends()
-) -> payout_card.PayoutCardRepositoryInterface:
-    return payout_service.payout_cards
-
-
-def PayoutMethodRepository(
-    payout_service: PayoutService = Depends()
-) -> payout_method.PayoutMethodRepositoryInterface:
-    return payout_service.payout_methods
-
-
 def DSJClientHandle(payout_service: PayoutService = Depends()):
     return payout_service.dsj_client
 
@@ -162,13 +181,14 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
     return PayoutAccountProcessors(
         logger=payout_service.log,
         payment_account_repo=payout_service.payment_accounts,
+        payout_card_repo=payout_service.payout_cards,
+        payout_method_repo=payout_service.payout_methods,
+        payout_method_miscellaneous_repo=payout_service.payout_method_miscellaneous,
         stripe_transfer_repo=payout_service.stripe_transfers,
         stripe_payout_request_repo=payout_service.stripe_payout_requests,
         stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
         stripe=payout_service.stripe,
         managed_account_transfer_repo=payout_service.managed_account_transfers,
-        payout_card_repo=payout_service.payout_cards,
-        payout_method_repo=payout_service.payout_methods,
     )
 
 

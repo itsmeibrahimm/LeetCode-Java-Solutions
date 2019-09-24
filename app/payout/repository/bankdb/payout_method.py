@@ -16,6 +16,7 @@ from app.payout.repository.bankdb.model.payout_method import (
     PayoutMethod,
     PayoutMethodUpdate,
 )
+from app.payout.types import PayoutExternalAccountType
 
 
 class PayoutMethodRepositoryInterface(ABC):
@@ -39,6 +40,12 @@ class PayoutMethodRepositoryInterface(ABC):
     async def update_payout_method_deleted_at(
         self, token: UUID, data: PayoutMethodUpdate
     ) -> Optional[PayoutMethod]:
+        pass
+
+    @abstractmethod
+    async def unset_default_payout_method_for_payout_account(
+        self, payout_account_id: int, payout_method_type: str
+    ) -> List[PayoutMethod]:
         pass
 
 
@@ -105,3 +112,27 @@ class PayoutMethodRepository(PayoutBankDBRepository, PayoutMethodRepositoryInter
         )
         row = await self._database.master().fetch_one(stmt)
         return PayoutMethod.from_row(row) if row else None
+
+    async def unset_default_payout_method_for_payout_account(
+        self,
+        payout_account_id: int,
+        payout_method_type: str = PayoutExternalAccountType.CARD.value,
+    ) -> List[PayoutMethod]:
+        stmt = (
+            payout_method.table.update()
+            .where(
+                and_(
+                    payout_method.payment_account_id == payout_account_id,
+                    payout_method.deleted_at.is_(None),
+                    payout_method.type == payout_method_type,
+                )
+            )
+            .values(is_default=False)
+            .returning(*payout_method.table.columns.values())
+        )
+
+        rows = await self._database.master().fetch_all(stmt)
+        if rows:
+            return [PayoutMethod.from_row(row) for row in rows]
+        else:
+            return []
