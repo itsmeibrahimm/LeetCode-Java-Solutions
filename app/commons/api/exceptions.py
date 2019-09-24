@@ -1,5 +1,4 @@
 import json
-import newrelic.agent
 
 from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
@@ -98,7 +97,6 @@ async def payment_internal_error_handler(
     logger: BoundLogger = get_logger_from_req(request)
     # unhandled error, report this in sentry and newrelic
     logger.error("unknown internal error", exc_info=exception)
-    newrelic.agent.record_exception(exception)
 
     return response_with_req_id(
         request,

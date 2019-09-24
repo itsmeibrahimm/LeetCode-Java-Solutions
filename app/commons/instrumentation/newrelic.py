@@ -1,6 +1,8 @@
 import newrelic.agent
 import fastapi
+import starlette.exceptions
 
+from contextlib import contextmanager
 from typing import Optional
 from starlette.requests import Request
 from newrelic.api.web_transaction import WebTransaction
@@ -92,3 +94,16 @@ def web_transaction(
         transaction.add_framework_info(name=framework[0], version=framework[1])
 
     return transaction
+
+
+@contextmanager
+def record_exception():
+    try:
+        # exceptions need to be handled in the context of a WebTransaction
+        yield
+    except Exception as exc:
+        # ignore handled exceptions
+        if not isinstance(exc, starlette.exceptions.HTTPException):
+            newrelic.agent.record_exception(exc)
+        # do not suppress the exception
+        raise

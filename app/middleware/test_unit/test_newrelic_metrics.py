@@ -1,4 +1,7 @@
+import pytest
 import uuid
+import starlette.exceptions
+
 from pytest_mock import MockFixture
 from unittest.mock import Mock
 from typing import Optional
@@ -35,6 +38,14 @@ def test_newrelic_middleware(mocker: MockFixture):
     async def health():
         return {"status": "ok"}
 
+    @app.get("/error")
+    async def error():
+        raise RuntimeError("unhandled error")
+
+    @app.get("/http-error")
+    async def http_error():
+        raise starlette.exceptions.HTTPException(status_code=403)
+
     router = APIRouter()
     nested_router = APIRouter()
 
@@ -70,6 +81,7 @@ def test_newrelic_middleware(mocker: MockFixture):
         "newrelic.agent.set_transaction_name", side_effect=check_transaction
     )
     mock_add_custom_parameter = mocker.patch("newrelic.agent.add_custom_parameter")
+    mock_record_exception = mocker.patch("newrelic.agent.record_exception")
 
     with TestClient(app) as client:
         response = client.get("/health")
@@ -90,6 +102,7 @@ def test_newrelic_middleware(mocker: MockFixture):
         mock_web_transaction.reset_mock()
         mock_set_transaction.reset_mock()
         mock_add_custom_parameter.reset_mock()
+        mock_record_exception.reset_mock()
 
         # nested router
         correlation_id = None
@@ -106,3 +119,29 @@ def test_newrelic_middleware(mocker: MockFixture):
 
         assert mock_add_custom_parameter.call_count == 1
         assert mock_add_custom_parameter.called_with("req_id", str(req_id))
+
+        mock_web_transaction.reset_mock()
+        mock_set_transaction.reset_mock()
+        mock_add_custom_parameter.reset_mock()
+        mock_record_exception.reset_mock()
+
+        # exception handling
+        with pytest.raises(RuntimeError):
+            # NOTE: unhandled exceptions are not caught using test client
+            response = client.get("/error")
+
+        assert mock_record_exception.called
+        assert mock_record_exception.called_with(
+            RuntimeError("unhandled_error")
+        ), "unhandled exceptions are passed to newrelic"
+
+        mock_web_transaction.reset_mock()
+        mock_set_transaction.reset_mock()
+        mock_add_custom_parameter.reset_mock()
+        mock_record_exception.reset_mock()
+
+        response = client.get("/http-error")
+        assert response.status_code == 403
+        assert (
+            not mock_record_exception.called
+        ), "exception is not recorded for handled errors"

@@ -9,6 +9,7 @@ from app.commons.instrumentation.newrelic import (
     web_transaction_from_request,
     set_transaction_name_from_request,
     set_request_id_from_request,
+    record_exception,
 )
 
 
@@ -32,6 +33,7 @@ class NewRelicMetricsMiddleware(BaseHTTPMiddleware):
             # start the newrelic web transaction
             if web_transaction:
                 stack.enter_context(web_transaction)
+                stack.enter_context(record_exception())
 
                 # callback: set the request and correlation id
                 stack.callback(set_request_id_from_request, request)
