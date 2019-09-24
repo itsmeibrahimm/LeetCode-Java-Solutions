@@ -11,7 +11,11 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
-from app.commons.providers.stripe.stripe_models import RetrievePayout, TransferId
+from app.commons.providers.stripe.stripe_models import (
+    TransferId,
+    StripeCancelPayoutRequest,
+    StripeRetrievePayoutRequest,
+)
 from app.commons.types import CountryCode
 from app.payout.core.account.utils import get_country_shortname
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
@@ -120,7 +124,7 @@ class CancelPayout(AsyncOperation[CancelPayoutRequest, CancelPayoutResponse]):
         if stripe_transfer.stripe_status == "pending":
             if not transfer_of_stripe:
                 return
-            cancel_request = models.CancelPayout(
+            cancel_request = StripeCancelPayoutRequest(
                 sid=stripe_transfer.stripe_id,
                 stripe_account=stripe_transfer.stripe_account_id,
             )
@@ -184,7 +188,7 @@ class CancelPayout(AsyncOperation[CancelPayoutRequest, CancelPayoutResponse]):
         if not stripe_transfer.stripe_id:
             return None
         try:
-            request = RetrievePayout(
+            request = StripeRetrievePayoutRequest(
                 id=stripe_transfer.stripe_id,
                 stripe_account=stripe_transfer.stripe_account_id,
             )

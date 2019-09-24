@@ -792,20 +792,6 @@ class StripeCard(StripeBaseModel):
     tokenization_method: Optional[str]
 
 
-class Token(StripeBaseModel):
-    """
-    See: https://stripe.com/docs/api/tokens/object
-    """
-
-    _STRIPE_OBJECT_NAME: str = "token"
-
-    id: str
-    object: str
-    type: str
-    used: bool
-    created: datetime
-
-
 class CardToken(Token):
     """
     See: https://stripe.com/docs/api/tokens/object
