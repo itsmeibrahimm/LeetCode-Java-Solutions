@@ -49,7 +49,8 @@ def create_payer_v1(
     client: TestClient, request: CreatePayerV1Request
 ) -> Dict[str, Any]:
     create_payer_request = {
-        "dd_payer_id": request.dd_payer_id,
+        # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
+        # "dd_payer_id": request.dd_payer_id,
         "payer_type": request.payer_type,
         "email": request.email,
         "country": request.country,
@@ -59,7 +60,8 @@ def create_payer_v1(
     assert response.status_code == 201
     payer: dict = response.json()
     assert UUID(payer["id"], version=4)
-    assert payer["dd_payer_id"] == request.dd_payer_id
+    # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
+    # assert payer["dd_payer_id"] == request.dd_payer_id
     assert payer["country"] == request.country
     assert payer["description"] == request.description
     assert payer["payer_type"] == request.payer_type
@@ -131,7 +133,8 @@ def create_payment_method_v1(
     assert payment_method["card"]["exp_year"] is not None
     assert payment_method["card"]["exp_month"] is not None
     assert payment_method["card"]["fingerprint"] is not None
-    assert payment_method["dd_payer_id"] is not None
+    # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
+    # assert payment_method["dd_payer_id"] is not None
     return payment_method
 
 

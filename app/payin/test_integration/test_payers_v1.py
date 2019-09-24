@@ -1,4 +1,4 @@
-import time
+import random
 import uuid
 from typing import Optional, Any, Dict
 
@@ -99,7 +99,7 @@ class TestPayersV1:
     def test_create_and_get_payer(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(int(time.time() * 1e6))
+        random_dd_payer_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
@@ -137,7 +137,7 @@ class TestPayersV1:
         )
 
     def test_invalid_input(self, client: TestClient, stripe_client: StripeTestClient):
-        random_dd_payer_id: str = str(int(time.time() * 1e6))
+        random_dd_payer_id: str = str(random.randint(1, 100000))
 
         # test non-numeric dd_payer_id
         create_payer_failure_v1(
@@ -189,7 +189,7 @@ class TestPayersV1:
         )
 
     def test_missing_input(self, client: TestClient, stripe_client: StripeTestClient):
-        random_dd_payer_id: str = str(int(time.time() * 1e6))
+        random_dd_payer_id: str = str(random.randint(1, 100000))
 
         # test missing dd_payer_id
         create_payer_failure_v1(
@@ -336,7 +336,7 @@ class TestPayersV1:
     def test_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(int(time.time() * 1e6))
+        random_dd_payer_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(

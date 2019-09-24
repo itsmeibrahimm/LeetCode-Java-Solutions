@@ -8,7 +8,8 @@ from app.payin.core.payer.types import PayerType
 
 
 class CreatePayerRequest(BaseModel):
-    dd_payer_id: str
+    # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
+    dd_payer_id: Optional[str]
     payer_type: PayerType
     email: str
     country: CountryCode = CountryCode.US

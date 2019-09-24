@@ -100,12 +100,12 @@ class PayerClient:
 
     async def create_raw_payer(
         self,
-        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
+        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
@@ -396,12 +396,12 @@ class PayerOpsInterface:
     @abstractmethod
     async def create_payer_raw_objects(
         self,
-        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
+        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         ...
@@ -430,12 +430,12 @@ class PayerOpsInterface:
 class PayerOps(PayerOpsInterface):
     async def create_payer_raw_objects(
         self,
-        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
+        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         try:
@@ -555,12 +555,12 @@ class PayerOps(PayerOpsInterface):
 class LegacyPayerOps(PayerOpsInterface):
     async def create_payer_raw_objects(
         self,
-        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
+        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         try:
@@ -587,6 +587,11 @@ class LegacyPayerOps(PayerOpsInterface):
                 GetStripeCustomerByStripeIdInput(stripe_id=pgp_customer_id)
             )
             if not stripe_customer_entity:
+                if not dd_payer_id:
+                    raise PayerCreationError(
+                        error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
+                        retryable=False,
+                    )
                 try:
                     owner_id = int(dd_payer_id)
                 except ValueError as e:

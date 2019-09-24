@@ -1,4 +1,4 @@
-import time
+import random
 from typing import Any, Dict
 
 import pytest
@@ -46,7 +46,7 @@ class TestPaymentMethodsV1:
     def test_create_get_delete_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(int(time.time() * 1e6))
+        random_dd_payer_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
@@ -80,7 +80,7 @@ class TestPaymentMethodsV1:
     def test_create_duplicate_card(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(int(time.time() * 1e6))
+        random_dd_payer_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(

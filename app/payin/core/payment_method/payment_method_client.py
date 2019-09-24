@@ -118,7 +118,9 @@ class PaymentMethodClient:
                     exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
                     type=stripe_payment_method.card.brand,
                     active=True,
-                    # consumer_id=int(legacy_consumer_id),  # FIXME: hit foreign key constraint error in testing. we need to populate this field in PROD.
+                    consumer_id=(
+                        int(legacy_consumer_id) if legacy_consumer_id else None
+                    ),
                     zip_code=stripe_payment_method.billing_details.address.postal_code,
                     address_line1_check=stripe_payment_method.card.checks.address_line1_check,
                     address_zip_check=stripe_payment_method.card.checks.address_postal_code_check,

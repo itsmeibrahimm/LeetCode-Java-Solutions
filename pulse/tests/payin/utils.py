@@ -30,7 +30,8 @@ class PaymentUtil:
         dd_payer_id=int(time.time() * 1e6), country="US", payer_type="marketplace"
     ):
         return {
-            "dd_payer_id": dd_payer_id,
+            # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
+            # "dd_payer_id": dd_payer_id,
             "payer_type": payer_type,
             "email": str(dd_payer_id) + "-" + payer_type + "@email.com",
             "country": country,
