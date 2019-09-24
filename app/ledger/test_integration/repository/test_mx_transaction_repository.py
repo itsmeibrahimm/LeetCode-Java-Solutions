@@ -346,13 +346,13 @@ class TestMxTransactionRepository:
                 await mx_transaction_repository.insert_mx_transaction_and_update_ledger(
                     request_input, mx_ledger_id, connection
                 )
-            # the mx_ledger that needs to be updated should not be updated
-            get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger_id)
-            mx_ledger_retrieved = await mx_ledger_repository.get_ledger_by_id(
-                get_ledger_request
-            )
-            assert mx_ledger_retrieved is not None
-            assert mx_ledger_retrieved.balance == 2000
+        # the mx_ledger that needs to be updated should not be updated
+        get_ledger_request = GetMxLedgerByIdInput(id=mx_ledger_id)
+        mx_ledger_retrieved = await mx_ledger_repository.get_ledger_by_id(
+            get_ledger_request
+        )
+        assert mx_ledger_retrieved is not None
+        assert mx_ledger_retrieved.balance == 2000
 
     async def test_get_open_mx_scheduled_ledger_with_period_success(
         self,
