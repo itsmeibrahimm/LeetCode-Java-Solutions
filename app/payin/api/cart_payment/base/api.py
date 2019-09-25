@@ -1,30 +1,17 @@
-from app.payin.api.cart_payment.base.request import CreateCartPaymentBaseRequest
-from app.commons.core.errors import PaymentError
-from app.payin.core.exceptions import PayinErrorCode
-from app.payin.core.cart_payment.model import CartPayment, CorrelationIds, SplitPayment
+from uuid import uuid4
 
 from pydantic import ValidationError
 
-from uuid import uuid4
+from app.commons.core.errors import PaymentError
+from app.payin.api.cart_payment.base.request import CreateCartPaymentBaseRequest
+from app.payin.core.cart_payment.model import CartPayment, CorrelationIds, SplitPayment
+from app.payin.core.exceptions import PayinErrorCode
 
 
 def create_request_to_model(
-    cart_payment_request: CreateCartPaymentBaseRequest
+    cart_payment_request: CreateCartPaymentBaseRequest, correlation_ids: CorrelationIds
 ) -> CartPayment:
     try:
-        if (
-            hasattr(cart_payment_request, "correlation_ids")
-            and cart_payment_request.correlation_ids
-        ):
-            correlation_ids = CorrelationIds(
-                reference_id=cart_payment_request.correlation_ids.reference_id,
-                reference_type=cart_payment_request.correlation_ids.reference_type,
-            )
-        else:
-            # Placeholders for legacy case.  See v0 handling within CartPaymentProcessor.create_payment.
-            # This will be removed once the legacy path is deprecated.
-            correlation_ids = CorrelationIds(reference_id="", reference_type="")
-
         return CartPayment(
             id=uuid4(),
             payer_id=getattr(cart_payment_request, "payer_id", None),

@@ -39,7 +39,6 @@ from app.payin.core.cart_payment.model import (
     LegacyPayment,
     LegacyConsumerCharge,
     LegacyStripeCharge,
-    LegacyCorrelationIds,
     PaymentIntent,
     PgpPaymentIntent,
     PaymentCharge,
@@ -1800,7 +1799,6 @@ class CartPaymentProcessor:
         self,
         request_cart_payment: CartPayment,
         request_legacy_payment: Optional[LegacyPayment],
-        request_legacy_correlation_ids: Optional[LegacyCorrelationIds],
         idempotency_key: str,
         country: CountryCode,
         currency: Currency,
@@ -1810,7 +1808,6 @@ class CartPaymentProcessor:
         Arguments:
             request_cart_payment {CartPayment} -- CartPayment model containing request parameters provided by client.
             request_legacy_payment {LegacyPayment} -- LegacyPayment model containing legacy fields.  For v0 use only.
-            request_legacy_correlation_ids {LegacyCorrelationIds} -- Legacy identifiers.  For v0 use only.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             country {CountryCode} -- ISO country code.
             currency {Currency} -- Currency for cart payment request.
@@ -1818,16 +1815,6 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- A CartPayment model for the created payment.
         """
-        # Overload the correlation IDs for the legacy case, since they end up persisted in the same fields of the cart payment.
-        if (
-            not request_cart_payment.correlation_ids.reference_id
-            and request_legacy_correlation_ids
-        ):
-            request_cart_payment.correlation_ids = CorrelationIds(
-                reference_id=str(request_legacy_correlation_ids.reference_id),
-                reference_type=str(request_legacy_correlation_ids.reference_type),
-            )
-
         # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
         # our exception handling middleware.
         payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_required_payment_resource_ids(

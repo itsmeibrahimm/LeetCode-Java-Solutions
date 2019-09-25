@@ -22,12 +22,6 @@ class LegacyPayment(BaseModel):
 
 
 @final
-class LegacyCorrelationIds(BaseModel):
-    reference_type: int
-    reference_id: int
-
-
-@final
 class CorrelationIds(BaseModel):
     reference_id: str
     reference_type: str

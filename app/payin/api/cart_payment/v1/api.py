@@ -75,9 +75,11 @@ async def create_cart_payment(
     try:
         cart_payment, legacy_payment = await cart_payment_processor.create_payment(
             # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
-            request_cart_payment=create_request_to_model(cart_payment_request),
+            request_cart_payment=create_request_to_model(
+                cart_payment_request,
+                correlation_ids=cart_payment_request.correlation_ids,
+            ),
             request_legacy_payment=None,
-            request_legacy_correlation_ids=None,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,

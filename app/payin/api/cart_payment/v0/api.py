@@ -1,24 +1,6 @@
-from fastapi import APIRouter, Depends
-from structlog.stdlib import BoundLogger
-
-from app.payin.api.cart_payment.base.api import create_request_to_model
-from app.commons.context.req_context import get_logger_from_req
-from app.commons.core.errors import PaymentError
-from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
-from app.payin.api.cart_payment.v0.request import (
-    CreateCartPaymentLegacyRequest,
-    UpdateCartPaymentLegacyRequest,
-)
-from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyResponse
-from app.payin.core.exceptions import PayinErrorCode
-
-from app.payin.api.commando_mode import commando_route_dependency
-from app.payin.core.cart_payment.processor import CartPaymentProcessor
-from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
-from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
 from typing import Optional
 
+from fastapi import APIRouter, Depends
 from starlette.status import (
     HTTP_201_CREATED,
     HTTP_200_OK,
@@ -26,6 +8,23 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
+from structlog.stdlib import BoundLogger
+
+from app.commons.api.models import PaymentException, PaymentErrorResponseBody
+from app.commons.context.req_context import get_logger_from_req
+from app.commons.core.errors import PaymentError
+from app.payin.api.cart_payment.base.api import create_request_to_model
+from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
+from app.payin.api.cart_payment.v0.request import (
+    CreateCartPaymentLegacyRequest,
+    UpdateCartPaymentLegacyRequest,
+)
+from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyResponse
+from app.payin.api.commando_mode import commando_route_dependency
+from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
+from app.payin.core.cart_payment.processor import CartPaymentProcessor
+from app.payin.core.exceptions import PayinErrorCode
+from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
 
 api_tags = ["CartPaymentV0"]
 router = APIRouter()
@@ -52,11 +51,12 @@ async def create_cart_payment_for_legacy_client(
 
     try:
         cart_payment, legacy_payment = await cart_payment_processor.create_payment(
-            request_cart_payment=create_request_to_model(cart_payment_request),
+            request_cart_payment=create_request_to_model(
+                cart_payment_request, cart_payment_request.legacy_correlation_ids
+            ),
             request_legacy_payment=get_legacy_payment_model(
                 cart_payment_request.legacy_payment
             ),
-            request_legacy_correlation_ids=cart_payment_request.legacy_correlation_ids,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
