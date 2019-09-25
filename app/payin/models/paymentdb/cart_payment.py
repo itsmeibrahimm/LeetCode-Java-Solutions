@@ -16,7 +16,6 @@ class CartPaymentTable(TableDefinition):
     payer_id: Column = no_init_field(Column("payer_id", UUID(as_uuid=True)))
     reference_id: Column = no_init_field(Column("reference_id", String))
     reference_type: Column = no_init_field(Column("reference_type", String))
-    legacy_charge_id: Column = no_init_field(Column("legacy_charge_id", BigInteger))
     legacy_consumer_id: Column = no_init_field(Column("legacy_consumer_id", BigInteger))
     amount_original: Column = no_init_field(Column("amount_original", Integer))
     amount_total: Column = no_init_field(Column("amount_total", Integer))
