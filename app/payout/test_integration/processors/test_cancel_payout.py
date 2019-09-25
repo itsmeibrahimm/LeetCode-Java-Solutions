@@ -135,14 +135,7 @@ class TestCancelPayout:
             stripe=stripe,
             logger=mocker.Mock(),
         )
-        with pytest.raises(PayoutError) as e:
-            await cancel_payout_op._execute()
-        assert e.value.status_code == HTTP_400_BAD_REQUEST
-        assert e.value.error_code == PayoutErrorCode.INVALID_STRIPE_ACCOUNT
-        assert (
-            e.value.error_message
-            == payout_error_message_maps[PayoutErrorCode.INVALID_STRIPE_ACCOUNT.value]
-        )
+        await cancel_payout_op._execute()
 
     async def test_cancel_payout_processor_success(
         self,

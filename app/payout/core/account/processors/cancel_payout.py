@@ -63,7 +63,7 @@ class CancelPayout(AsyncOperation[CancelPayoutRequest, CancelPayoutResponse]):
 
     async def _execute(self) -> CancelPayoutResponse:
         self.logger.info(
-            f"Cancelling payout.",
+            "Cancelling payout.",
             transfer_id=self.request.transfer_id,
             payment_account_id=self.request.payout_account_id,
         )
@@ -86,17 +86,17 @@ class CancelPayout(AsyncOperation[CancelPayoutRequest, CancelPayoutResponse]):
             not stripe_transfer
             or not stripe_transfer.stripe_account_type == "stripe_managed_account"
         ):
-            raise PayoutError(
-                http_status_code=HTTP_400_BAD_REQUEST,
-                error_code=PayoutErrorCode.INVALID_STRIPE_ACCOUNT,
-                retryable=False,
+            self.logger.info(
+                "Failed to get valid stripe managed account.",
+                payment_account_id=self.request.payout_account_id,
             )
+            return CancelPayoutResponse()
         await self.cancel_stripe_transfer(
             stripe_transfer=stripe_transfer, payment_account=payment_account
         )
 
         self.logger.info(
-            f"Cancelled payout.",
+            "Cancelled payout.",
             transfer_id=self.request.transfer_id,
             payment_account_id=self.request.payout_account_id,
         )
