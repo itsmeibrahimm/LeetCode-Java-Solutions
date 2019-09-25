@@ -3,11 +3,11 @@ from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from datetime import datetime, timezone
+from structlog.stdlib import BoundLogger
 from typing import Union, Optional, Dict
 
 from stripe.error import StripeError
 
-from app.commons.context.logger import Log
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -96,7 +96,7 @@ class CreateStandardPayout(
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
         payment_account_repo: PaymentAccountRepositoryInterface,
         stripe: StripeAsyncClient,
-        logger: Log = None,
+        logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
         self.request = request

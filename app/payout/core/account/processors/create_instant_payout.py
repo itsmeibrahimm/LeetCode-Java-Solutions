@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
+from structlog.stdlib import BoundLogger
 from typing import Optional, Union
 
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 from stripe.error import APIConnectionError, StripeError, RateLimitError
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -110,7 +110,7 @@ class CreateInstantPayout(
         payment_account_repo: PaymentAccountRepositoryInterface,
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepositoryInterface,
         stripe_async_client: StripeAsyncClient,
-        logger: Log = None,
+        logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
         self.request = request

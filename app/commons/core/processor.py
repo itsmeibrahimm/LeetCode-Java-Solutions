@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
+from structlog.stdlib import BoundLogger
 from typing import Generic, Optional, TypeVar, Union
 
 from pydantic import BaseModel
 
 from app.commons.api.models import PaymentException
-from app.commons.context.logger import Log, get_logger
+from app.commons.context.logger import get_logger
 
 
 class OperationResponse(BaseModel):
@@ -24,10 +25,10 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
     Abstraction of an async operation running a specific set of business logic
     """
 
-    logger: Log
+    logger: BoundLogger
     request: ReqT
 
-    def __init__(self, request: ReqT, logger: Optional[Log] = None):
+    def __init__(self, request: ReqT, logger: Optional[BoundLogger] = None):
         self.logger = logger or get_logger(__name__)
         self.request = request
 

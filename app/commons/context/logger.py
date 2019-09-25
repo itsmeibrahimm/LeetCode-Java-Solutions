@@ -5,9 +5,6 @@ import platform
 import sys
 from typing import Callable, Dict, Optional
 
-from structlog import BoundLogger
-from typing_extensions import Protocol
-
 import structlog
 from contextvars import ContextVar
 import uuid
@@ -99,7 +96,9 @@ def logger_add_request_id(
             log_record["req_id"] = str(req_id)
 
 
-def add_log_level(logger: structlog.BoundLogger, log_level: str, event_dict: dict):
+def add_log_level(
+    logger: structlog.stdlib.BoundLogger, log_level: str, event_dict: dict
+):
     """
     add the log level (as text) to the log output
     """
@@ -107,7 +106,9 @@ def add_log_level(logger: structlog.BoundLogger, log_level: str, event_dict: dic
     return event_dict
 
 
-def add_app_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict):
+def add_app_info(
+    logger: structlog.stdlib.BoundLogger, log_level: str, event_dict: dict
+):
     """
     application info (pid, hostname, environment, etc)
     """
@@ -117,7 +118,9 @@ def add_app_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict
     return event_dict
 
 
-def add_err_info(logger: structlog.BoundLogger, log_level: str, event_dict: dict):
+def add_err_info(
+    logger: structlog.stdlib.BoundLogger, log_level: str, event_dict: dict
+):
     """
     format exception stack traces (based on structlog.processors.format_exc_info)
     """
@@ -161,35 +164,9 @@ structlog.configure_once(
 )
 
 
-class Log(Protocol):
-    """
-    Helper protocol to allow BoundLoggerLazyProxy has statical type hinting
-    """
-
-    def debug(self, event=None, *args, **kw):
-        pass
-
-    def info(self, event=None, *args, **kw):
-        pass
-
-    def warning(self, event=None, *args, **kw):
-        pass
-
-    warn: Callable = warning
-
-    def error(self, event=None, *args, **kw):
-        pass
-
-    def critical(self, event=None, *args, **kw):
-        pass
-
-    def exception(self, event=None, *args, **kw):
-        pass
-
-
 # used for application initialization
-init_logger: BoundLogger = structlog.get_logger("initialization")
+init_logger: structlog.stdlib.BoundLogger = structlog.get_logger("initialization")
 # used for general application usage
-root_logger: BoundLogger = structlog.get_logger("application")
+root_logger: structlog.stdlib.BoundLogger = structlog.get_logger("application")
 # get or create a named logger
-get_logger: Callable[..., BoundLogger] = structlog.get_logger
+get_logger: Callable[..., structlog.stdlib.BoundLogger] = structlog.get_logger

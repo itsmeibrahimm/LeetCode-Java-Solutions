@@ -1,9 +1,9 @@
+from structlog.stdlib import BoundLogger
 from typing import Union
 
 from stripe.error import StripeError
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import CreateExternalAccountRequest
@@ -53,7 +53,7 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
         *,
         payment_account_repo: PaymentAccountRepositoryInterface,
         payout_method_miscellaneous_repo: PayoutMethodMiscellaneousRepositoryInterface,
-        logger: Log = None,
+        logger: BoundLogger = None,
         stripe: StripeAsyncClient,
     ):
         super().__init__(request, logger)

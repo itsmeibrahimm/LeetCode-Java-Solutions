@@ -1,9 +1,9 @@
+from structlog.stdlib import BoundLogger
 from typing import Union
 
 from IPython.utils.tz import utcnow
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import CreateAccountRequest
@@ -41,7 +41,7 @@ class VerifyPayoutAccount(
         request: VerifyPayoutAccountRequest,
         *,
         payment_account_repo: PaymentAccountRepositoryInterface,
-        logger: Log = None,
+        logger: BoundLogger = None,
         stripe: StripeAsyncClient
     ):
         super().__init__(request, logger)

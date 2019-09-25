@@ -1,7 +1,7 @@
+from structlog.stdlib import BoundLogger
 from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account.types import PayoutAccountInternal
 from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
@@ -30,7 +30,7 @@ class CreatePayoutAccount(
         request: CreatePayoutAccountRequest,
         *,
         payment_account_repo: PaymentAccountRepositoryInterface,
-        logger: Log = None
+        logger: BoundLogger = None
     ):
         super().__init__(request, logger)
         self.request = request

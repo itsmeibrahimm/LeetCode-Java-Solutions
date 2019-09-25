@@ -1,4 +1,5 @@
-from app.commons.context.logger import Log
+from structlog.stdlib import BoundLogger
+
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.types import CountryCode
 from app.payout.core.account.processors.cancel_payout import (
@@ -71,7 +72,7 @@ from app.payout.types import PayoutTargetType
 
 
 class PayoutAccountProcessors:
-    logger: Log
+    logger: BoundLogger
     payment_account_repo: PaymentAccountRepositoryInterface
     payout_card_repo: PayoutCardRepositoryInterface
     payout_method_repo: PayoutMethodRepositoryInterface
@@ -82,7 +83,7 @@ class PayoutAccountProcessors:
 
     def __init__(
         self,
-        logger: Log,
+        logger: BoundLogger,
         payment_account_repo: PaymentAccountRepositoryInterface,
         payout_card_repo: PayoutCardRepositoryInterface,
         payout_method_repo: PayoutMethodRepositoryInterface,

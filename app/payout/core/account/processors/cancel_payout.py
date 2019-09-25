@@ -1,10 +1,10 @@
+from structlog.stdlib import BoundLogger
 from typing import Optional, Union, Tuple
 
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 from stripe.error import StripeError
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -53,7 +53,7 @@ class CancelPayout(AsyncOperation[CancelPayoutRequest, CancelPayoutResponse]):
         stripe_transfer_repo: StripeTransferRepositoryInterface,
         payment_account_repo: PaymentAccountRepositoryInterface,
         stripe: StripeAsyncClient,
-        logger: Log = None,
+        logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
         self.request = request

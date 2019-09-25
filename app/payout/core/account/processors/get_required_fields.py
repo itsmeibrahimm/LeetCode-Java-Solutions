@@ -1,7 +1,8 @@
 import json
+from structlog.stdlib import BoundLogger
 from typing import Union
+
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.commons.runtime import runtime
 from app.commons.types import CountryCode
@@ -21,7 +22,9 @@ class GetPaymentsOnboardingRequirements(
     Processor to get required fields during onboarding
     """
 
-    def __init__(self, request: GetRequiredFieldsRequest, *, logger: Log = None):
+    def __init__(
+        self, request: GetRequiredFieldsRequest, *, logger: BoundLogger = None
+    ):
         super().__init__(request, logger)
         self.request = request
 

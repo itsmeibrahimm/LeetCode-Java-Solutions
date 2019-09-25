@@ -1,7 +1,7 @@
+from structlog.stdlib import BoundLogger
 from typing import Optional, Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
-from app.commons.context.logger import Log
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account.types import PayoutCardInternal
 from app.payout.core.exceptions import (
@@ -34,7 +34,7 @@ class GetDefaultPayoutCard(
         *,
         payout_card_repo: PayoutCardRepositoryInterface,
         payout_method_repo: PayoutMethodRepositoryInterface,
-        logger: Log = None,
+        logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
         self.request = request

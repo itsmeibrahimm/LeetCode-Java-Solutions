@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import Depends
 from psycopg2._psycopg import DataError, OperationalError, IntegrityError
 from psycopg2.errorcodes import LOCK_NOT_AVAILABLE, UNIQUE_VIOLATION
-from structlog import BoundLogger
+from structlog.stdlib import BoundLogger
 from tenacity import (
     retry,
     retry_if_exception_type,
