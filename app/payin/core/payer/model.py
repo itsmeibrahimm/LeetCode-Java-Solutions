@@ -83,15 +83,16 @@ class RawPayer:
             country = self.stripe_customer_entity.country_shortname
         return country
 
-    def pgp_customer_id(self) -> Optional[str]:
-        pgp_customer_id: Optional[str] = None
+    def pgp_customer_id(self) -> str:
         if self.payer_entity:
-            pgp_customer_id = self.payer_entity.legacy_stripe_customer_id
+            assert self.payer_entity.legacy_stripe_customer_id
+            return self.payer_entity.legacy_stripe_customer_id
         elif self.pgp_customer_entity:
-            pgp_customer_id = self.pgp_customer_entity.pgp_resource_id
+            return self.pgp_customer_entity.pgp_resource_id
         elif self.stripe_customer_entity:
-            pgp_customer_id = self.stripe_customer_entity.stripe_id
-        return pgp_customer_id
+            return self.stripe_customer_entity.stripe_id
+
+        raise Exception("RawPayer doesn't have pgp_customer_id")
 
     def pgp_default_payment_method_id(self) -> Optional[str]:
         default_payment_method_id: Optional[str] = None

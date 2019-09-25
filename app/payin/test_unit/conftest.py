@@ -617,7 +617,16 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     )
 
     # Lookup functions
-    cart_payment_interface.get_required_payment_resource_ids = FunctionMock(
+    cart_payment_interface.get_legacy_payment_resource_ids = FunctionMock(
+        return_value=(
+            PaymentResourceIds(
+                provider_payment_method_id="payment_method_id",
+                provider_customer_resource_id="customer_id",
+            ),
+            utils.generate_legacy_payment(),
+        )
+    )
+    cart_payment_interface.get_payment_resource_ids = FunctionMock(
         return_value=(
             PaymentResourceIds(
                 provider_payment_method_id="payment_method_id",

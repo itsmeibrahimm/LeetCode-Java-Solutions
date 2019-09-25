@@ -1096,12 +1096,44 @@ class CartPaymentInterface:
 
         return updated_intent, updated_pgp_intent
 
-    async def get_required_payment_resource_ids(
-        self,
-        payer_id: Optional[uuid.UUID],
-        payment_method_id: Optional[uuid.UUID],
-        legacy_country_id: int,
-        legacy_payment: Optional[LegacyPayment],
+    async def get_payment_resource_ids(
+        self, payer_id: uuid.UUID, payment_method_id: uuid.UUID, legacy_country_id: int
+    ) -> Tuple[PaymentResourceIds, LegacyPayment]:
+        raw_payment_method = await self.payment_method_client.get_raw_payment_method(
+            payer_id=payer_id,
+            payer_id_type=PayerIdType.PAYER_ID,
+            payment_method_id=payment_method_id,
+            payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
+        )
+        raw_payer = await self.payer_client.get_raw_payer(
+            payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+        )
+        provider_payer_id = raw_payer.pgp_customer_id()
+        provider_payment_method_id = raw_payment_method.pgp_payment_method_id()
+
+        if not raw_payer.payer_entity:
+            self.req_context.log.error("No payer entity found.")
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+                retryable=False,
+            )
+
+        result_legacy_payment = LegacyPayment(
+            dd_consumer_id=raw_payer.payer_entity.dd_payer_id,
+            dd_stripe_card_id=raw_payment_method.legacy_dd_stripe_card_id(),
+            dd_country_id=legacy_country_id,
+        )
+        self.req_context.log.debug(
+            f"Legacy payment generated for resource lookup: {result_legacy_payment}"
+        )
+        payment_resource_ids = PaymentResourceIds(
+            provider_payment_method_id=provider_payment_method_id,
+            provider_customer_resource_id=provider_payer_id,
+        )
+        return payment_resource_ids, result_legacy_payment
+
+    async def get_legacy_payment_resource_ids(
+        self, legacy_payment: LegacyPayment
     ) -> Tuple[PaymentResourceIds, LegacyPayment]:
         # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent
         # submission and management.  A client is expected to either provide either
@@ -1113,48 +1145,18 @@ class CartPaymentInterface:
         self.req_context.log.debug("Getting payment info.")
 
         provider_payment_method_id = None
-        provider_payer_id = None
 
-        if payer_id and payment_method_id:
-            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
-                payer_id=payer_id,
-                payer_id_type=PayerIdType.PAYER_ID,
-                payment_method_id=payment_method_id,
-                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
-            )
-            raw_payer = await self.payer_client.get_raw_payer(
-                payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
-            )
-            provider_payer_id = raw_payer.pgp_customer_id()
-            provider_payment_method_id = raw_payment_method.pgp_payment_method_id()
+        # Legacy payment case: no payer_id/payment_method_id provided
+        provider_payer_id = legacy_payment.stripe_customer_id
+        if legacy_payment.stripe_payment_method_id:
+            provider_payment_method_id = legacy_payment.stripe_payment_method_id
+        elif legacy_payment.stripe_card_id:
+            provider_payment_method_id = legacy_payment.stripe_card_id
 
-            if not raw_payer.payer_entity:
-                self.req_context.log.error("No payer entity found.")
-                raise CartPaymentCreateError(
-                    error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                    retryable=False,
-                )
-
-            result_legacy_payment = LegacyPayment(
-                dd_consumer_id=raw_payer.payer_entity.dd_payer_id,
-                dd_stripe_card_id=raw_payment_method.legacy_dd_stripe_card_id(),
-                dd_country_id=legacy_country_id,
-            )
-            self.req_context.log.debug(
-                f"Legacy payment generated for resource lookup: {result_legacy_payment}"
-            )
-        elif legacy_payment:
-            # Legacy payment case: no payer_id/payment_method_id provided
-            provider_payer_id = legacy_payment.stripe_customer_id
-            if legacy_payment.stripe_payment_method_id:
-                provider_payment_method_id = legacy_payment.stripe_payment_method_id
-            elif legacy_payment.stripe_card_id:
-                provider_payment_method_id = legacy_payment.stripe_card_id
-
-            result_legacy_payment = legacy_payment
-            self.req_context.log.debug(
-                f"Legacy resource IDs: {provider_payer_id}, {provider_payment_method_id}"
-            )
+        result_legacy_payment = legacy_payment
+        self.req_context.log.debug(
+            f"Legacy resource IDs: {provider_payer_id}, {provider_payment_method_id}"
+        )
 
         # Ensure we have the necessary fields.  Though payer_client/payment_method_client already throws exceptions
         # if not found, still check here since we have to support the legacy payment case.
@@ -1387,12 +1389,17 @@ class CartPaymentProcessor:
             payment_intents, idempotency_key
         )
 
-        payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_required_payment_resource_ids(
-            payer_id=cart_payment.payer_id,
-            payment_method_id=payment_intents[0].payment_method_id,
-            legacy_payment=legacy_payment,
-            legacy_country_id=get_country_id_by_code(payment_intents[0].country),
-        )
+        if cart_payment.payer_id:
+            assert payment_intents[0].payment_method_id
+            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+                payer_id=cart_payment.payer_id,
+                payment_method_id=payment_intents[0].payment_method_id,
+                legacy_country_id=get_country_id_by_code(payment_intents[0].country),
+            )
+        else:  # legacy case
+            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+                legacy_payment=legacy_payment
+            )
 
         intent_description = (
             description if description else cart_payment.client_description
@@ -1817,12 +1824,18 @@ class CartPaymentProcessor:
         """
         # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
         # our exception handling middleware.
-        payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_required_payment_resource_ids(
-            payer_id=request_cart_payment.payer_id,
-            payment_method_id=request_cart_payment.payment_method_id,
-            legacy_payment=request_legacy_payment,
-            legacy_country_id=get_country_id_by_code(country),
-        )
+        if request_cart_payment.payer_id:
+            assert request_cart_payment.payment_method_id
+            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+                payer_id=request_cart_payment.payer_id,
+                payment_method_id=request_cart_payment.payment_method_id,
+                legacy_country_id=get_country_id_by_code(country),
+            )
+        else:  # legacy case
+            assert request_legacy_payment
+            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+                legacy_payment=request_legacy_payment
+            )
 
         # Check for resubmission by client
         existing_cart_payment, existing_legacy_payment, existing_payment_intent = await self.cart_payment_interface.find_existing_payment(

@@ -156,13 +156,12 @@ class RawPaymentMethod:
         )
 
     def pgp_payment_method_id(self) -> str:
-        pgp_payment_method_id: str
         if self.pgp_payment_method_entity:
-            pgp_payment_method_id = self.pgp_payment_method_entity.pgp_resource_id
+            return self.pgp_payment_method_entity.pgp_resource_id
         elif self.stripe_card_entity:
-            pgp_payment_method_id = self.stripe_card_entity.stripe_id
+            return self.stripe_card_entity.stripe_id
 
-        return pgp_payment_method_id
+        raise Exception("RawPaymentMethod doesn't have pgp_payment_method_id")
 
     def legacy_dd_stripe_card_id(self) -> Optional[str]:
         return str(self.stripe_card_entity.id) if self.stripe_card_entity else None
