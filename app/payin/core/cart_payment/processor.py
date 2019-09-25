@@ -1802,10 +1802,54 @@ class CartPaymentProcessor:
             provider_payment_intent
         )
 
+    async def legacy_create_payment(
+        self,
+        request_cart_payment: CartPayment,
+        request_legacy_payment: LegacyPayment,
+        idempotency_key: str,
+        country: CountryCode,
+        currency: Currency,
+    ) -> Tuple[CartPayment, LegacyPayment]:
+        payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+            legacy_payment=request_legacy_payment
+        )
+        return await self._create_payment(
+            request_cart_payment=request_cart_payment,
+            payment_resource_ids=payment_resource_ids,
+            legacy_payment=legacy_payment,
+            idempotency_key=idempotency_key,
+            country=country,
+            currency=currency,
+        )
+
     async def create_payment(
         self,
         request_cart_payment: CartPayment,
-        request_legacy_payment: Optional[LegacyPayment],
+        idempotency_key: str,
+        country: CountryCode,
+        currency: Currency,
+    ):
+        assert request_cart_payment.payer_id
+        assert request_cart_payment.payment_method_id
+        payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+            payer_id=request_cart_payment.payer_id,
+            payment_method_id=request_cart_payment.payment_method_id,
+            legacy_country_id=get_country_id_by_code(country),
+        )
+        return await self._create_payment(
+            request_cart_payment=request_cart_payment,
+            payment_resource_ids=payment_resource_ids,
+            legacy_payment=legacy_payment,
+            idempotency_key=idempotency_key,
+            country=country,
+            currency=currency,
+        )
+
+    async def _create_payment(
+        self,
+        request_cart_payment: CartPayment,
+        payment_resource_ids: PaymentResourceIds,
+        legacy_payment: LegacyPayment,
         idempotency_key: str,
         country: CountryCode,
         currency: Currency,
@@ -1822,21 +1866,6 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- A CartPayment model for the created payment.
         """
-        # If payment method is not found or not owned by the specified payer, an exception is raised and handled by
-        # our exception handling middleware.
-        if request_cart_payment.payer_id:
-            assert request_cart_payment.payment_method_id
-            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
-                payer_id=request_cart_payment.payer_id,
-                payment_method_id=request_cart_payment.payment_method_id,
-                legacy_country_id=get_country_id_by_code(country),
-            )
-        else:  # legacy case
-            assert request_legacy_payment
-            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
-                legacy_payment=request_legacy_payment
-            )
-
         # Check for resubmission by client
         existing_cart_payment, existing_legacy_payment, existing_payment_intent = await self.cart_payment_interface.find_existing_payment(
             request_cart_payment.payer_id, idempotency_key

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import APIRouter, Depends
 from starlette.status import (
     HTTP_201_CREATED,
@@ -50,7 +48,7 @@ async def create_cart_payment_for_legacy_client(
     log.info(f"Creating cart_payment for legacy client.")
 
     try:
-        cart_payment, legacy_payment = await cart_payment_processor.create_payment(
+        cart_payment, legacy_payment = await cart_payment_processor.legacy_create_payment(
             request_cart_payment=create_request_to_model(
                 cart_payment_request, cart_payment_request.legacy_correlation_ids
             ),
@@ -171,11 +169,8 @@ def form_create_response(
 
 
 def get_legacy_payment_model(
-    request_legacy_payment_info: Optional[RequestLegacyPaymentInfo]
-) -> Optional[LegacyPayment]:
-    if not request_legacy_payment_info:
-        return None
-
+    request_legacy_payment_info: RequestLegacyPaymentInfo
+) -> LegacyPayment:
     return LegacyPayment(
         dd_consumer_id=request_legacy_payment_info.dd_consumer_id,
         dd_stripe_card_id=request_legacy_payment_info.dd_stripe_card_id,

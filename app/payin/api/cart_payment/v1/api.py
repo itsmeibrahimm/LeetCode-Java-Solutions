@@ -79,7 +79,6 @@ async def create_cart_payment(
                 cart_payment_request,
                 correlation_ids=cart_payment_request.correlation_ids,
             ),
-            request_legacy_payment=None,
             idempotency_key=cart_payment_request.idempotency_key,
             country=cart_payment_request.payment_country,
             currency=cart_payment_request.currency,
