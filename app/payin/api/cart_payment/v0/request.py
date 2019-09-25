@@ -1,9 +1,9 @@
+from app.commons.types import CountryCode
 from app.payin.api.cart_payment.base.request import (
     CreateCartPaymentBaseRequest,
     UpdateCartPaymentBaseRequest,
 )
 from app.payin.core.cart_payment.model import CorrelationIds
-from app.payin.core.types import CountryCode
 from app.payin.core.types import LegacyPaymentInfo
 
 

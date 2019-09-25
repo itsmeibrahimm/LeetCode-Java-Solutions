@@ -384,3 +384,42 @@ class TestPayersV1:
             ]
             is None
         )
+
+    def test_add_default_payment_method(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        random_dd_payer_id: str = str(random.randint(1, 100000))
+
+        # create payer
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                dd_payer_id=random_dd_payer_id,
+                country="US",
+                description="Integration Test test_create_payer()",
+                payer_type="marketplace",
+                email=(random_dd_payer_id + "@dd.com"),
+            ),
+        )
+
+        # create payment_method
+        payment_method = create_payment_method_v1(
+            client=client,
+            request=CreatePaymentMethodV1Request(
+                payer_id=payer["id"],
+                payment_gateway="stripe",
+                token="tok_visa",
+                set_default=True,
+            ),
+        )
+
+        # get payer, and ensure default is set.
+        response = client.get(_get_payer_url(payer_id=payer["id"]))
+        assert response.status_code == 200
+        get_payer: dict = response.json()
+        assert (
+            get_payer["payment_gateway_provider_customers"][0][
+                "default_payment_method_id"
+            ]
+            == payment_method["payment_gateway_provider_details"]["payment_method_id"]
+        )

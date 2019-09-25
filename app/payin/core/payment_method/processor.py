@@ -15,15 +15,17 @@ from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PayinErrorCode,
     PaymentMethodReadError,
+    PayerReadError,
 )
 from app.payin.core.payer.model import RawPayer
+from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import (
     PaymentMethod,
     RawPaymentMethod,
     PaymentMethodList,
 )
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
-from app.payin.core.payment_method.types import SortKey
+from app.payin.core.payment_method.types import SortKey, LegacyPaymentMethodInfo
 from app.payin.core.types import PaymentMethodIdType, PayerIdType
 
 
@@ -51,55 +53,74 @@ class PaymentMethodProcessor:
         self,
         pgp_code: str,
         token: str,
+        set_default: Optional[bool] = False,
+        is_scanned: Optional[bool] = False,
         payer_id: UUID = None,
-        dd_consumer_id: Optional[str] = None,
-        stripe_customer_id: Optional[str] = None,
-        country: Optional[CountryCode] = CountryCode.US,
+        legacy_payment_method_info: Optional[LegacyPaymentMethodInfo] = None,
     ) -> PaymentMethod:
         """
         Create payment method and attach to payer.
 
         :param pgp_code: payment gateway provider code (eg. "stripe")
         :param token: payment provider authorized one-time payment method token.
+        :param set_default: set the new payment method as default.
+        :param is_scanned: for fraud usage.
         :param payer_id: DoorDash payer id.
-        :param dd_consumer_id: legacy DoorDash consumer id.
-        :param stripe_customer_id: legacy Stripe customer id.
-        :param country: country only used for v0 legacy path.
+        :param legacy_payment_method_info: legacy payment method info.
         :return: PaymentMethod object
         """
 
-        if not (payer_id or dd_consumer_id or stripe_customer_id):
-            self.log.info("[create_payment_method] invalid input. must provide id")
+        pgp_customer_res_id: Optional[str] = None
+        pgp_country: Optional[str] = None
+        dd_consumer_id: Optional[str] = None
+        dd_stripe_customer_id: Optional[str] = None
+        payer_type: Optional[str] = None
+        raw_payer: Optional[RawPayer] = None
+
+        # step 1: lookup pgp_customer_resource_id and country information
+        if payer_id:
+            raw_payer = await self.payer_client.get_raw_payer(
+                payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+            )
+            if raw_payer and raw_payer.payer_entity:
+                pgp_country = raw_payer.country()
+                pgp_customer_res_id = raw_payer.pgp_customer_id()
+                payer_type = raw_payer.payer_entity.payer_type
+                if payer_type == PayerType.MARKETPLACE:
+                    dd_consumer_id = raw_payer.payer_entity.dd_payer_id
+                else:
+                    dd_stripe_customer_id = (
+                        str(raw_payer.stripe_customer_entity.id)
+                        if raw_payer.stripe_customer_entity
+                        else None
+                    )
+        elif legacy_payment_method_info:  # v0 path with legacy information
+            try:
+                raw_payer = await self.payer_client.get_raw_payer(
+                    payer_id=legacy_payment_method_info.stripe_customer_id,
+                    payer_id_type=PayerIdType.STRIPE_CUSTOMER_ID,
+                    payer_type=payer_type,
+                )
+            except PayerReadError:
+                self.log.warn(
+                    "[create_payment_method] can't find raw_payer. wont update default_source in DB"
+                )
+            pgp_country = legacy_payment_method_info.country
+            pgp_customer_res_id = legacy_payment_method_info.stripe_customer_id
+            payer_type = legacy_payment_method_info.payer_type
+            dd_consumer_id = legacy_payment_method_info.dd_consumer_id
+            dd_stripe_customer_id = legacy_payment_method_info.dd_stripe_customer_id
+        else:
+            self.log.error("[create_payment_method] invalid input. must provide id")
             raise PaymentMethodCreateError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
                 retryable=False,
             )
 
-        # step 1: lookup pgp_customer_resource_id and country information
-        pgp_customer_res_id: Optional[str] = None
-        pgp_country: Optional[str] = country
-        raw_payer: RawPayer
-        if payer_id:
-            raw_payer = await self.payer_client.get_raw_payer(
-                payer_id, PayerIdType.PAYER_ID
-            )
-            pgp_customer_res_id = raw_payer.pgp_customer_id()
-            pgp_country = raw_payer.country()
-        else:  # v0 path with legacy information
-            if stripe_customer_id:
-                pgp_customer_res_id = stripe_customer_id
-            else:
-                raw_payer = await self.payer_client.get_raw_payer(
-                    dd_consumer_id, PayerIdType.DD_CONSUMER_ID
-                )
-                pgp_customer_res_id = raw_payer.pgp_customer_id()
-
         if not pgp_customer_res_id:
             self.log.info(
                 "[create_payment_method] can't find pgp_customer_resource_id",
                 payer_id=payer_id,
-                dd_consumer_id=dd_consumer_id,
-                stripe_customer_id=stripe_customer_id,
             )
             raise PaymentMethodCreateError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
@@ -119,22 +140,19 @@ class PaymentMethodProcessor:
         )
 
         # step 3: de-dup same payment_method by card fingerprint
-        dd_payer_id: Optional[str] = None
-        if dd_consumer_id:
-            dd_payer_id = dd_consumer_id
-        elif raw_payer and raw_payer.payer_entity:
-            dd_payer_id = raw_payer.payer_entity.dd_payer_id
         try:
             exist_pm: RawPaymentMethod = await self.payment_method_client.get_duplicate_payment_method(
                 stripe_payment_method=stripe_payment_method,
-                dd_consumer_id=dd_payer_id,
+                payer_type=payer_type,
                 pgp_customer_resource_id=pgp_customer_res_id,
+                dd_consumer_id=dd_consumer_id,
+                dd_stripe_customer_id=dd_stripe_customer_id,
             )
         except PaymentMethodReadError:
             pass
         else:
             self.log.info(
-                "[create_payment_method]duplicate card is found. detach the new one",
+                "[create_payment_method] duplicate card is found. return the existing one",
                 dd_consumer_id=dd_consumer_id,
                 pgp_payment_method_res_id=stripe_payment_method.id,
             )
@@ -155,12 +173,39 @@ class PaymentMethodProcessor:
 
         # step 5: crete pgp_payment_method and stripe_card objects
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
-            id=generate_object_uuid(),
+            payment_method_id=generate_object_uuid(),
             pgp_code=pgp_code,
             stripe_payment_method=attach_stripe_payment_method,
             payer_id=payer_id,
-            legacy_consumer_id=dd_payer_id,
+            dd_consumer_id=dd_consumer_id,
+            dd_stripe_customer_id=dd_stripe_customer_id,
+            is_scanned=is_scanned,
         )
+
+        # step 6: set as default payment_method
+        if set_default:
+            stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
+                country=pgp_country,
+                pgp_customer_id=pgp_customer_res_id,
+                default_payment_method_id=attach_stripe_payment_method.id,
+            )
+
+            self.log.info(
+                f"[create_payment_method] PGP update default_payment_method completed",
+                payer_id=payer_id,
+                default_payment_method=stripe_customer.invoice_settings.default_payment_method,
+            )
+
+            if raw_payer:
+                await self.payer_client.update_payer_default_payment_method(
+                    raw_payer=raw_payer,
+                    pgp_default_payment_method_id=attach_stripe_payment_method.id,
+                    payer_id=(payer_id or dd_consumer_id),
+                    payer_id_type=(
+                        PayerIdType.PAYER_ID if payer_id else PayerIdType.DD_CONSUMER_ID
+                    ),
+                )
+
         return raw_payment_method.to_payment_method()
 
     async def get_payment_method(

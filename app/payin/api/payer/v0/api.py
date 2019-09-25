@@ -19,7 +19,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 
-from app.payin.core.payer.types import PayerType
+from app.payin.core.payer.types import PayerType, LegacyPayerInfo
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 
 api_tags = ["PayerV0"]
@@ -61,10 +61,12 @@ async def get_payer(
     log.info("[get_payer] payer_id=%s", payer_id)
     try:
         payer: Payer = await payer_processor.get_payer(
-            payer_id=payer_id,
-            country=country,
-            payer_id_type=payer_id_type,
-            payer_type=payer_type,
+            legacy_payer_info=LegacyPayerInfo(
+                payer_id=payer_id,
+                country=country,
+                payer_id_type=payer_id_type,
+                payer_type=payer_type,
+            ),
             force_update=force_update,
         )
         log.info("[get_payer] retrieve_payer completed")

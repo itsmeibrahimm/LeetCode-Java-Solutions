@@ -1,4 +1,10 @@
 from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel
+
+from app.commons.types import CountryCode
+from app.payin.core.payer.types import PayerType
 
 
 class WalletType(str, Enum):
@@ -17,3 +23,15 @@ class SortKey(str, Enum):
     """
 
     CREATED_AT = "created_at"
+
+
+class LegacyPaymentMethodInfo(BaseModel):
+    country: CountryCode
+    stripe_customer_id: str
+    payer_type: PayerType
+    dd_consumer_id: Optional[
+        str
+    ]  # required if PayerType is "marketplace" in order to populate MainDB.stripe_card.consumer_id
+    dd_stripe_customer_id: Optional[
+        str
+    ]  # required if PayerType is not "marketplace" in order to populate MainDB.stripe_card.stripe_customer_id

@@ -50,6 +50,8 @@ async def create_payment_method(
     - **payment_gateway**: [string] external payment gateway provider name.
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
+    - **set_default**: [bool] set as default payment method or not.
+    - **is_scanned**: [bool] Internal use by DD Fraud team.
     """
     log.info("[create_payment_method] receive request", payer_id=req_body.payer_id)
 
@@ -58,6 +60,8 @@ async def create_payment_method(
             payer_id=req_body.payer_id,
             pgp_code=req_body.payment_gateway,
             token=req_body.token,
+            set_default=req_body.set_default,
+            is_scanned=req_body.is_scanned,
         )
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError as e:

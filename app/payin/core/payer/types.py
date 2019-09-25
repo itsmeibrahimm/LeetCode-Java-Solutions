@@ -1,5 +1,10 @@
 from enum import Enum
 
+from pydantic import BaseModel
+
+from app.commons.types import CountryCode
+from app.payin.core.types import PayerIdType
+
 
 class PayerType(str, Enum):
     """
@@ -11,3 +16,10 @@ class PayerType(str, Enum):
     MERCHANT = "merchant"
     STORE = "store"
     BUSINESS = "business"
+
+
+class LegacyPayerInfo(BaseModel):
+    country: CountryCode
+    payer_id: str
+    payer_id_type: PayerIdType
+    payer_type: PayerType

@@ -4,8 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.commons.types import CountryCode
-
 
 MixedUuidStrType = Union[UUID, str]
 
@@ -22,20 +20,6 @@ class LegacyPaymentInfo(BaseModel):
     stripe_customer_id: Optional[str] = None
     stripe_payment_method_id: Optional[str] = None
     stripe_card_id: Optional[str] = None
-
-
-# https://pydantic-docs.helpmanual.io/#self-referencing-models
-LegacyPaymentInfo.update_forward_refs()
-
-
-class LegacyPaymentMethodInfo(BaseModel):
-    """
-    Legacy payment method information for DSJ backward compatibility.
-    """
-
-    country: CountryCode = CountryCode.US
-    dd_consumer_id: Optional[str]
-    stripe_customer_id: Optional[str]
 
 
 class PayerIdType(str, Enum):

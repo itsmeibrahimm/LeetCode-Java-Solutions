@@ -50,6 +50,7 @@ from app.payin.repository.payer_repo import (
     GetPayerByDDPayerIdAndTypeInput,
     GetStripeCustomerByStripeIdInput,
     GetStripeCustomerByIdInput,
+    GetPgpCustomerInput,
 )
 
 
@@ -153,7 +154,7 @@ class PayerClient:
         )
 
     async def force_update_payer(
-        self, raw_payer: RawPayer, country: Optional[CountryCode] = CountryCode.US
+        self, raw_payer: RawPayer, country: CountryCode
     ) -> RawPayer:
         pgp_customer_id: Optional[
             str
@@ -240,7 +241,6 @@ class PayerClient:
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
         payer_id: MixedUuidStrType,
-        payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
         description: Optional[str] = None,
     ) -> RawPayer:
@@ -268,7 +268,6 @@ class PayerClient:
             raw_payer=raw_payer,
             pgp_default_payment_method_id=pgp_default_payment_method_id,
             payer_id=payer_id,
-            payer_type=payer_type,
             payer_id_type=payer_id_type,
         )
 
@@ -421,7 +420,6 @@ class PayerOpsInterface:
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
         payer_id: MixedUuidStrType,
-        payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:
         ...
@@ -488,14 +486,24 @@ class PayerOps(PayerOpsInterface):
         stripe_cus_entity: Optional[StripeCustomerDbEntity] = None
         is_found: bool = False
         try:
-            # FIXME: need to query payer object and use payer_type to decide either retrieve from
-            # pgp_customers or stripe_customer
-            payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_id(
-                input=GetPayerByIdInput(dd_payer_id=payer_id)
+            payer_entity = await self.payer_repo.get_payer_by_id(
+                request=GetPayerByIdInput(dd_payer_id=payer_id)
                 if payer_id_type == PayerIdType.DD_CONSUMER_ID
                 else GetPayerByIdInput(id=payer_id)
             )
-            is_found = True if (payer_entity and pgp_cus_entity) else False
+            if payer_entity:
+                if payer_entity.payer_type == PayerType.MARKETPLACE:
+                    pgp_cus_entity = await self.payer_repo.get_pgp_customer(
+                        request=GetPgpCustomerInput(payer_id=payer_entity.id)
+                    )
+                    is_found = True if (payer_entity and pgp_cus_entity) else False
+                else:
+                    stripe_cus_entity = await self.payer_repo.get_stripe_customer_by_stripe_id(
+                        request=GetStripeCustomerByStripeIdInput(
+                            stripe_id=payer_entity.legacy_stripe_customer_id
+                        )
+                    )
+                    is_found = True if (payer_entity and stripe_cus_entity) else False
         except DataError as e:
             self.log.error(
                 f"[get_payer_raw_objects] DataError when reading data from db: {e}"
@@ -521,7 +529,6 @@ class PayerOps(PayerOpsInterface):
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
         payer_id: MixedUuidStrType,
-        payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:
         if raw_payer.pgp_customer_entity:
@@ -543,11 +550,16 @@ class PayerOps(PayerOpsInterface):
             )
         else:
             self.log.info(
-                f"[update_payer_default_payment_method][{payer_id}][{payer_id_type}] payer object doesn't exist"
+                "[update_payer_default_payment_method] payer object doesn't exist",
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
             )
 
         self.log.info(
-            f"[update_payer_default_payment_method][{payer_id}][{payer_id_type}] pgp_customers update default_payment_method completed:[{pgp_default_payment_method_id}]"
+            "[update_payer_default_payment_method] pgp_customers update default_payment_method completed",
+            payer_id=payer_id,
+            payer_id_type=payer_id_type,
+            pgp_default_payment_method_id=pgp_default_payment_method_id,
         )
         return raw_payer
 
@@ -690,7 +702,6 @@ class LegacyPayerOps(PayerOpsInterface):
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
         payer_id: MixedUuidStrType,
-        payer_type: Optional[str] = None,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:
         # update stripe_customer with new default_payment_method

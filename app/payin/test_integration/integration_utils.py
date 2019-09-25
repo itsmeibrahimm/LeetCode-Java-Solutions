@@ -21,6 +21,8 @@ class CreatePaymentMethodV1Request(BaseModel):
     payer_id: str
     payment_gateway: str
     token: str
+    set_default: Optional[bool]
+    is_scanned: Optional[bool]
 
 
 class PayinError(BaseModel):
@@ -107,6 +109,10 @@ def create_payment_method_v1(
         "payment_gateway": request.payment_gateway,
         "token": request.token,
     }
+    if request.set_default:
+        create_payment_method_request.update({"set_default": str(request.set_default)})
+    if request.is_scanned:
+        create_payment_method_request.update({"is_scanned": str(request.is_scanned)})
     response = client.post(
         _create_payment_method_v1_url(), json=create_payment_method_request
     )
@@ -114,6 +120,7 @@ def create_payment_method_v1(
     payment_method: dict = response.json()
     assert UUID(payment_method["id"], version=4)
     assert UUID(payment_method["payer_id"], version=4)
+    assert payment_method["payer_id"] == request.payer_id
     assert payment_method["dd_stripe_card_id"]
     assert payment_method["created_at"]
     assert payment_method["updated_at"]

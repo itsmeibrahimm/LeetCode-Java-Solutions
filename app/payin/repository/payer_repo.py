@@ -10,7 +10,6 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.model import DBRequestModel, DBEntity
-from app.payin.core.types import MixedUuidStrType
 from app.payin.models.maindb import stripe_customers
 from app.payin.models.paymentdb import payers, pgp_customers
 from app.payin.repository.base import PayinDBRepository
@@ -46,7 +45,7 @@ class GetPayerByIdInput(DBRequestModel):
     The variable name must be consistent with DB table column name
     """
 
-    id: Optional[MixedUuidStrType]
+    id: UUID
     legacy_stripe_customer_id: Optional[str]
     dd_payer_id: Optional[str]
 
@@ -92,7 +91,7 @@ class GetPgpCustomerInput(DBRequestModel):
     The variable name must be consistent with DB table column name
     """
 
-    payer_id: str
+    payer_id: UUID
     pgp_code: Optional[str]
 
 

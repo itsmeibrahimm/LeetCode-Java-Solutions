@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 
 from fastapi import Depends
 from structlog.stdlib import BoundLogger
@@ -14,6 +15,7 @@ from app.commons.utils.types import PaymentProvider
 from app.payin.core.exceptions import PayerReadError, PayinErrorCode
 from app.payin.core.payer.model import Payer, RawPayer, PaymentGatewayProviderCustomer
 from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payer.types import LegacyPayerInfo, PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.types import PayerIdType, MixedUuidStrType, PaymentMethodIdType
 
@@ -93,36 +95,48 @@ class PayerProcessor:
 
     async def get_payer(
         self,
-        payer_id: MixedUuidStrType,
-        payer_type: Optional[str],
-        payer_id_type: Optional[str] = None,
-        country: Optional[CountryCode] = CountryCode.US,
+        payer_id: Optional[UUID] = None,
+        legacy_payer_info: Optional[LegacyPayerInfo] = None,
         force_update: Optional[bool] = False,
     ):
         """
         Retrieve DoorDash payer
 
         :param payer_id: payer unique id.
-        :param payer_type: Identify the owner type. This is for backward compatibility.
-               Caller can ignore it for new consumer who is onboard from
-               new payer APIs.
-        :param payer_id_type: [string] identify the type of payer_id. Valid values include "dd_payer_id",
-               "stripe_customer_id", "stripe_customer_serial_id" (default is "dd_payer_id")
+        :param legacyPayerInfo: legacy payer information.
+        :param force_update: force update from payment provider.
         :return: Payer object
         """
         self.log.info(
-            "[get_payer] started.",
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
-            force_update=force_update,
+            "[get_payer] started.", payer_id=payer_id, force_update=force_update
         )
 
         force_retrieving = runtime.get_bool(
             "feature-flags/payin/force_retrieve_stripe_customer.bool", True
         )
+
+        mix_payer_id: MixedUuidStrType
+        payer_id_type: PayerIdType
+        payer_type: Optional[PayerType] = None
+        if payer_id:
+            mix_payer_id = payer_id
+            payer_id_type = PayerIdType.PAYER_ID
+        elif legacy_payer_info:
+            mix_payer_id = legacy_payer_info.payer_id
+            payer_id_type = legacy_payer_info.payer_id_type
+            payer_type = legacy_payer_info.payer_type
+        else:
+            self.log.error("[create_payment_method] invalid input. must provide id")
+            raise PayerReadError(
+                error_code=PayinErrorCode.PAYER_READ_INVALID_DATA, retryable=False
+            )
+
+        raw_payer: Optional[RawPayer] = None
         try:
-            raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-                payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
+            raw_payer = await self.payer_client.get_raw_payer(
+                payer_id=mix_payer_id,
+                payer_id_type=payer_id_type,
+                payer_type=payer_type,
             )
         except PayerReadError as e:
             if (
@@ -130,9 +144,11 @@ class PayerProcessor:
                 and force_update
                 and force_retrieving
                 and payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID
+                and legacy_payer_info
             ):
                 pgp_customer: StripeCustomer = await self.payer_client.pgp_get_customer(
-                    pgp_customer_id=str(payer_id), country=CountryCode(country)
+                    pgp_customer_id=str(mix_payer_id),
+                    country=CountryCode(legacy_payer_info.country),
                 )
 
                 default_pm_id: Optional[str] = None
@@ -151,7 +167,7 @@ class PayerProcessor:
                 )
 
                 return Payer(
-                    country=country,
+                    country=legacy_payer_info.country,
                     created_at=pgp_customer.created,
                     description=pgp_customer.description,
                     payment_gateway_provider_customers=[provider_customer],
@@ -159,11 +175,15 @@ class PayerProcessor:
             else:
                 raise e
 
-        if force_update:
+        if force_update and raw_payer:
             # ensure DB record is update-to-date
-            raw_payer = await self.payer_client.force_update_payer(
-                raw_payer=raw_payer, country=country
+            country: Optional[CountryCode] = CountryCode(raw_payer.country()) or (
+                legacy_payer_info.country if legacy_payer_info else None
             )
+            if country:
+                raw_payer = await self.payer_client.force_update_payer(
+                    raw_payer=raw_payer, country=country
+                )
 
         return raw_payer.to_payer()
 
@@ -225,7 +245,6 @@ class PayerProcessor:
             raw_payer=raw_payer,
             pgp_default_payment_method_id=raw_pm.pgp_payment_method_id(),
             payer_id=payer_id,
-            payer_type=payer_type,
             payer_id_type=payer_id_type,
         )
 

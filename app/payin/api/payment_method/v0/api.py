@@ -22,7 +22,7 @@ from app.payin.api.payment_method.v0.request import CreatePaymentMethodRequestV0
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
-from app.payin.core.payment_method.types import SortKey
+from app.payin.core.payment_method.types import SortKey, LegacyPaymentMethodInfo
 from app.payin.core.types import PaymentMethodIdType
 
 api_tags = ["PaymentMethodV0"]
@@ -53,33 +53,48 @@ async def create_payment_method(
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
     - **country**: [string] country code of DoorDash consumer
-    - **dd_consumer_id**: [string][in legacy_payment_info] DoorDash consumer id.
-    - **stripe_customer_id**: [string][in legacy_payment_info] Stripe customer id.
+    - **dd_consumer_id**: [string] DoorDash consumer id.
+    - **stripe_customer_id**: [string] Stripe customer id.
+    - **payer_type: [string] type that specifies the role of payer.
+    - **set_default**: [bool] set as default payment method or not.
+    - **is_scanned**: [bool] Internal use by DD Fraud team.
     """
     log.info(
-        "[create_payment_method] receive request. ",
-        dd_consumer_id=req_body.dd_consumer_id,
+        "[create_payment_method] received request.",
         stripe_customer_id=req_body.stripe_customer_id,
+        payer_type=req_body.payer_type,
+        dd_consumer_id=req_body.dd_consumer_id,
+        dd_stripe_customer_id=req_body.dd_stripe_customer_id,
     )
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
             pgp_code=PaymentProvider.STRIPE,
             token=req_body.token,
-            dd_consumer_id=req_body.dd_consumer_id,
-            stripe_customer_id=req_body.stripe_customer_id,
-            country=req_body.country,
+            set_default=req_body.set_default,
+            is_scanned=req_body.is_scanned,
+            legacy_payment_method_info=LegacyPaymentMethodInfo(
+                dd_consumer_id=req_body.dd_consumer_id,
+                dd_stripe_customer_id=req_body.dd_stripe_customer_id,
+                stripe_customer_id=req_body.stripe_customer_id,
+                country=req_body.country,
+                payer_type=req_body.payer_type,
+            ),
         )
         log.info(
-            f"[create_payment_method] completed.",
-            dd_consumer_id=req_body.dd_consumer_id,
+            "[create_payment_method] completed.",
             stripe_customer_id=req_body.stripe_customer_id,
+            payer_type=req_body.payer_type,
+            dd_consumer_id=req_body.dd_consumer_id,
+            dd_stripe_customer_id=req_body.dd_stripe_customer_id,
         )
     except PaymentError as e:
         log.error(
-            f"[create_payment_method] PaymentError.",
-            dd_consumer_id=req_body.dd_consumer_id,
+            "[create_payment_method] PaymentError.",
             stripe_customer_id=req_body.stripe_customer_id,
+            payer_type=req_body.payer_type,
+            dd_consumer_id=req_body.dd_consumer_id,
+            dd_stripe_customer_id=req_body.dd_stripe_customer_id,
         )
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
             http_status = HTTP_400_BAD_REQUEST

@@ -29,6 +29,7 @@ from app.payin.core.exceptions import (
     PaymentMethodReadError,
     PaymentMethodDeleteError,
 )
+from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.types import PaymentMethodIdType, PayerIdType, MixedUuidStrType
 
@@ -76,11 +77,13 @@ class PaymentMethodClient:
 
     async def create_raw_payment_method(
         self,
-        id: UUID,
+        payment_method_id: UUID,
         pgp_code: str,
         stripe_payment_method: StripePaymentMethod,
-        payer_id: Optional[str],
-        legacy_consumer_id: Optional[str] = None,
+        payer_id: Optional[UUID] = None,
+        dd_consumer_id: Optional[str] = None,
+        dd_stripe_customer_id: Optional[str] = None,
+        is_scanned: Optional[bool] = False,
     ) -> RawPaymentMethod:
         now = datetime.utcnow()
         try:
@@ -92,11 +95,11 @@ class PaymentMethodClient:
 
             pm_entity = await self.payment_method_repo.insert_pgp_payment_method(
                 pm_input=InsertPgpPaymentMethodInput(
-                    id=id,
+                    id=payment_method_id,
                     payer_id=(payer_id if payer_id else None),
                     pgp_code=pgp_code,
                     pgp_resource_id=stripe_payment_method.id,
-                    legacy_consumer_id=legacy_consumer_id,
+                    legacy_consumer_id=dd_consumer_id,
                     type=stripe_payment_method.type,
                     object=stripe_payment_method.object,
                     created_at=now,
@@ -118,13 +121,15 @@ class PaymentMethodClient:
                     exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
                     type=stripe_payment_method.card.brand,
                     active=True,
-                    consumer_id=(
-                        int(legacy_consumer_id) if legacy_consumer_id else None
+                    consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
+                    stripe_customer_id=(
+                        int(dd_stripe_customer_id) if dd_stripe_customer_id else None
                     ),
                     zip_code=stripe_payment_method.billing_details.address.postal_code,
                     address_line1_check=stripe_payment_method.card.checks.address_line1_check,
                     address_zip_check=stripe_payment_method.card.checks.address_postal_code_check,
                     created_at=now,  # FIXME: need to fix timezone
+                    is_scanned=is_scanned,
                 )
             )
 
@@ -229,8 +234,10 @@ class PaymentMethodClient:
     async def get_duplicate_payment_method(
         self,
         stripe_payment_method: StripePaymentMethod,
-        dd_consumer_id: str,
+        payer_type: PayerType,
         pgp_customer_resource_id: str,
+        dd_consumer_id: Optional[str] = None,
+        dd_stripe_customer_id: Optional[str] = None,
     ) -> RawPaymentMethod:
         try:
             dynamic_last4: Optional[str] = None
@@ -239,15 +246,19 @@ class PaymentMethodClient:
 
             # get stripe_card object
             sc_entity = await self.payment_method_repo.get_duplicate_stripe_card(
+                payer_type=payer_type,
                 input=GetDuplicateStripeCardInput(
                     fingerprint=stripe_payment_method.card.fingerprint,
                     dynamic_last4=dynamic_last4 or "",
                     exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
                     exp_month=str(stripe_payment_method.card.exp_month).zfill(2),
                     external_stripe_customer_id=pgp_customer_resource_id,
-                    # consumer_id=str(dd_consumer_id),
+                    # consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
+                    stripe_customer_id=(
+                        int(dd_stripe_customer_id) if dd_stripe_customer_id else None
+                    ),
                     active=True,
-                )
+                ),
             )
             if not sc_entity:
                 raise PaymentMethodReadError(
