@@ -6,7 +6,7 @@ import structlog
 from enum import Enum
 from types import FrameType, TracebackType
 from typing import Tuple, Any, Callable, List, Dict, Optional, Type
-from typing_extensions import AsyncContextManager, Literal, Protocol, runtime_checkable
+from typing_extensions import Literal, Protocol, runtime_checkable
 from doordash_python_stats import ddstats
 
 from app.commons import tracing
@@ -29,13 +29,34 @@ class Database(Protocol):
     instance_name: str
 
 
-class RequestStatus(str, Enum):
+@runtime_checkable
+class TrackedTransaction(Protocol):
+    tracker: Optional["QueryTimer"]
+    stack: Optional[contextlib.ExitStack]
+
+
+class QueryStatus(str, Enum):
     """
     Request Status categories for Database Queries
     """
 
     success = "success"
     timeout = "timeout"
+    error = "error"
+
+
+class QueryType(str, Enum):
+    unknown = ""
+    select = "select"
+    insert = "insert"
+    update = "update"
+    delete = "delete"
+    transaction = "transaction"
+
+
+class TransactionStatus(str, Enum):
+    commit = "commit"
+    rollback = "rollback"
     error = "error"
 
 
@@ -70,27 +91,28 @@ def _discover_caller(additional_ignores=None) -> Tuple[FrameType, str]:
     return f, name
 
 
-class DatabaseTimer(tracing.BaseTimer):
+class QueryTimer(tracing.BaseTimer):
     database: Database
-    calling_module_name: str = ""
-    calling_function_name: str = ""
+    calling_module_name: str
+    calling_function_name: str
     stack_frame: Any = None
 
-    request_status: str = RequestStatus.success
+    request_status: str = QueryStatus.success
     exception_name: str = ""
 
-    def __init__(self, database: Database, additional_ignores=None):
+    def __init__(
+        self,
+        database: Database,
+        *,
+        calling_function_name: str = "",
+        calling_module_name: str = "",
+        additional_ignores=None,
+    ):
         super().__init__()
         self.database = database
         self.additional_ignores = additional_ignores
-
-    def __enter__(self):
-        super().__enter__()
-        self.stack_frame, self.calling_module_name = _discover_caller(
-            additional_ignores=self.additional_ignores
-        )
-        self.calling_function_name = self.stack_frame.f_code.co_name
-        return self
+        self.calling_function_name = calling_function_name
+        self.calling_module_name = calling_module_name
 
     def __exit__(
         self,
@@ -108,6 +130,10 @@ class DatabaseTimer(tracing.BaseTimer):
         # record exception info
         self.exception_name = format_exc_name(exc_type)
 
+        # don't override the request status if it's already set
+        if self.request_status and self.request_status != QueryStatus.success:
+            return False
+
         if isinstance(
             # known timeout errors
             exc_value,
@@ -118,23 +144,61 @@ class DatabaseTimer(tracing.BaseTimer):
                 QueryCanceledError,
             ),
         ):
-            self.request_status = RequestStatus.timeout
+            self.request_status = QueryStatus.timeout
         else:
             # something else
-            self.request_status = RequestStatus.error
+            self.request_status = QueryStatus.error
 
         return False
 
 
-def track_query(func):
-    return DatabaseTimingManager(message="query complete")(func)
+class ExecuteTimer(QueryTimer):
+    """
+    query timer with auto-discovery of calling function
+    """
+
+    def __enter__(self):
+        super().__enter__()
+        self.stack_frame, self.calling_module_name = _discover_caller(
+            additional_ignores=self.additional_ignores
+        )
+        self.calling_function_name = self.stack_frame.f_code.co_name
+        return self
 
 
-def track_transaction(func):
-    return TransactionTimingManager(message="transaction complete")(func)
+class TransactionTimer(ExecuteTimer):
+    """
+    query timer with process_result that lists the operation type
+    """
+
+    request_status: str = TransactionStatus.commit
+
+    def process_result(self, result: TransactionStatus):
+        self.request_status = result
+        return super().process_result(result)
 
 
-def log_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
+def track_execute(func):
+    """
+    track the execution of a query, looking up the name from the calling function
+    """
+    return ExecuteTimingManager(message="query complete")(func)
+
+
+def track_query(func: Callable):
+    """
+    track the execution of a query, looking up the name from the wrapped function
+    """
+    calling_function_name = func.__name__
+    calling_module_name = func.__module__
+    return QueryTimingManager(
+        message="query complete",
+        calling_module_name=calling_module_name,
+        calling_function_name=calling_function_name,
+    )(func)
+
+
+def log_query_timing(tracker: "QueryTimingManager", timer: QueryTimer):
     if not isinstance(timer.database, Database):
         return
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
@@ -166,7 +230,7 @@ def log_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
     )
 
 
-def log_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
+def log_transaction_timing(tracker: "QueryTimingManager", timer: QueryTimer):
     if not isinstance(timer.database, Database):
         return
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
@@ -198,7 +262,7 @@ def log_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTime
 
 
 def _stat_query_timing(
-    tracker: "DatabaseTimingManager", timer: DatabaseTimer, *, query_type=""
+    tracker: "QueryTimingManager", timer: QueryTimer, *, query_type=""
 ):
     if not isinstance(timer.database, Database):
         return
@@ -237,15 +301,15 @@ def _stat_query_timing(
     log.debug("statsd: %s", stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
-def stat_query_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
+def stat_query_timing(tracker: "QueryTimingManager", timer: QueryTimer):
     _stat_query_timing(tracker, timer)
 
 
-def stat_transaction_timing(tracker: "DatabaseTimingManager", timer: DatabaseTimer):
+def stat_transaction_timing(tracker: "QueryTimingManager", timer: QueryTimer):
     _stat_query_timing(tracker, timer, query_type="transaction")
 
 
-class DatabaseTimingManager(tracing.TimingManager[DatabaseTimer]):
+class QueryTimingManager(tracing.TimingManager[QueryTimer]):
     """
     Tracker for database queries and transactions
     """
@@ -257,10 +321,22 @@ class DatabaseTimingManager(tracing.TimingManager[DatabaseTimer]):
 
     # database query processors
     processors = [log_query_timing, stat_query_timing]
+    additional_ignores: List[str]
+    calling_module_name: str
+    calling_function_name: str
 
-    def __init__(self, *, message: str):
+    def __init__(
+        self,
+        *,
+        message: str,
+        calling_function_name: str = "",
+        calling_module_name: str = "",
+    ):
         super().__init__()
         self.message = message
+        self.additional_ignores = ["app.commons.database"]
+        self.calling_module_name = calling_module_name
+        self.calling_function_name = calling_function_name
 
     def create_tracker(
         self,
@@ -269,50 +345,166 @@ class DatabaseTimingManager(tracing.TimingManager[DatabaseTimer]):
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> DatabaseTimer:
-        additional_ignores = ["app.commons.database"]
-        return DatabaseTimer(database=obj, additional_ignores=additional_ignores)
+    ) -> QueryTimer:
+        return QueryTimer(
+            database=obj,
+            additional_ignores=self.additional_ignores,
+            calling_module_name=self.calling_module_name,
+            calling_function_name=self.calling_function_name,
+        )
 
     def __call__(self, func_or_class):
         # NOTE: we assume that this is only called to decorate a class
         return self._decorate_class_method(func_or_class)
 
 
-class TransactionTimingManager(DatabaseTimingManager):
+class ExecuteTimingManager(QueryTimingManager):
+    def create_tracker(
+        self,
+        obj=tracing.Unspecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
+    ) -> QueryTimer:
+        return ExecuteTimer(database=obj, additional_ignores=self.additional_ignores)
+
+
+class TransactionTimingManager(ExecuteTimingManager):
     # database transaction processors
-    processors = [log_query_timing, stat_transaction_timing]
+    processors = [log_transaction_timing, stat_transaction_timing]
+    """
+    decorators for transactions
+    - track_start
+    - track_commit
+    - track_rollback
+    """
+
+    def __init__(self, *, message: str):
+        super().__init__(message=message)
+
+    def create_tracker(
+        self,
+        obj=tracing.Unspecified,
+        *,
+        func: Callable,
+        args: List[Any],
+        kwargs: Dict[str, Any],
+    ) -> QueryTimer:
+        return TransactionTimer(
+            database=obj,
+            additional_ignores=self.additional_ignores,
+            calling_module_name=self.calling_module_name,
+            calling_function_name=self.calling_function_name,
+        )
+
+    def start(self, *, obj: TrackedTransaction, func, args, kwargs) -> QueryTimer:
+        obj.stack = contextlib.ExitStack()
+        obj.stack.__enter__()
+        obj.tracker = self._start_tracker(
+            obj.stack, obj=obj, func=func, args=args, kwargs=kwargs
+        )
+        # tracing: set transaction name
+        obj.stack.enter_context(
+            tracing.breadcrumb_as(
+                tracing.Breadcrumb(transaction_name=obj.tracker.calling_function_name),
+                # the contextmanager will not be awaited in the same task
+                restore=False,
+            )
+        )
+        return obj.tracker
+
+    def commit(self, *, obj: TrackedTransaction):
+        # process result
+        if obj.tracker is not None:
+            self._exit_tracker(obj.tracker, "commit")
+        # exit stack
+        if obj.stack is not None:
+            obj.stack.__exit__(None, None, None)
+
+    def rollback(
+        self,
+        exc_type: Optional[Type[BaseException]] = None,
+        exc_value: Optional[BaseException] = None,
+        traceback: Optional[TracebackType] = None,
+        *,
+        obj: TrackedTransaction,
+    ):
+        # process result
+        if obj.tracker is not None:
+            self._exit_tracker(obj.tracker, "rollback")
+        # exit stack
+        if obj.stack is not None:
+            obj.stack.__exit__(exc_type, exc_value, traceback)
+
+    def error(
+        self,
+        exc_type: Optional[Type[BaseException]] = None,
+        exc_value: Optional[BaseException] = None,
+        traceback: Optional[TracebackType] = None,
+        *,
+        obj: TrackedTransaction,
+    ):
+        # no result to process
+        if obj.tracker is not None:
+            self._exit_tracker(obj.tracker, "error")
+        # exit stack
+        if obj.stack is not None:
+            obj.stack.__exit__(exc_type, exc_value, traceback)
+
+    def track_start(self, func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            obj = args[0]
+            if isinstance(obj, TrackedTransaction):
+                self.start(obj=obj, func=func, args=args, kwargs=kwargs)
+            try:
+                return await func(*args, **kwargs)
+            except:
+                # error starting the transaction
+                exc_type, exc_val, exc_tb = sys.exc_info()
+                self.error(exc_type, exc_val, exc_tb, obj=obj)
+                raise
+
+        return async_wrapper
+
+    def track_commit(self, func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            try:
+                result = await func(*args, **kwargs)
+                # successful commit
+                obj = args[0]
+                if isinstance(obj, TrackedTransaction):
+                    self.commit(obj=obj)
+                return result
+            except:
+                # error executing the commit itself
+                obj = args[0]
+                exc_type, exc_val, exc_tb = sys.exc_info()
+                self.error(exc_type, exc_val, exc_tb, obj=obj)
+                raise
+
+        return async_wrapper
+
+    def track_rollback(self, func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            try:
+                result = await func(*args, **kwargs)
+                # successful rollback
+                obj, *exc_args = args
+                if isinstance(obj, TrackedTransaction):
+                    self.rollback(*exc_args, obj=obj)
+                return result
+            except:
+                # error executing the rollback itself
+                obj = args[0]
+                exc_type, exc_val, exc_tb = sys.exc_info()
+                self.error(exc_type, exc_val, exc_tb, obj=obj)
+                raise
+
+        return async_wrapper
 
     def __call__(self, func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            obj: Database = args[0]
-            transaction_manager: AsyncContextManager = func(*args, **kwargs)
-
-            # chain together a context managers
-            @contextlib.asynccontextmanager
-            async def wrapped_transaction():
-                async with contextlib.AsyncExitStack() as stack:
-                    # NOTE: context manager exits are called in reverse order
-                    tracker: DatabaseTimer = self.create_tracker(
-                        obj=obj, func=func, args=args, kwargs=kwargs
-                    )
-                    # process_tracker callback is the last thing called,
-                    # will be called even if the exception is not suppressed
-                    stack.callback(self.process_tracker, tracker)
-                    # timing: start timing transaction
-                    stack.enter_context(tracker)
-                    # tracing: set transaction name
-                    stack.enter_context(
-                        tracing.breadcrumb_as(
-                            tracing.Breadcrumb(
-                                transaction_name=tracker.calling_function_name
-                            )
-                        )
-                    )
-                    # start transaction
-                    transaction = await stack.enter_async_context(transaction_manager)
-                    yield transaction
-
-            return wrapped_transaction()
-
-        return wrapper
+        raise NotImplementedError()

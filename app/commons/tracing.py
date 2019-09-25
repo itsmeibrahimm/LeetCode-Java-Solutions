@@ -91,14 +91,14 @@ def get_current_breadcrumb() -> Breadcrumb:
 
 
 @contextmanager
-def breadcrumb_as(breadcrumb: Breadcrumb):
+def breadcrumb_as(breadcrumb: Breadcrumb, restore=True):
     try:
         crumbs = get_breadcrumbs()
         crumb = _add_breadcrumb(crumbs, breadcrumb)
         token = BREADCRUMBS.set(crumbs)
         yield crumb
     finally:
-        if token:
+        if token and restore:
             BREADCRUMBS.reset(token)
         _remove_breadcrumb(crumbs)
 
@@ -213,7 +213,9 @@ class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
         # class or instance
         return func_or_class
 
-    def _start_tracker(self, stack: ExitStack, *, obj=Unspecified, func, args, kwargs):
+    def _start_tracker(
+        self, stack: ExitStack, *, obj=Unspecified, func, args, kwargs
+    ) -> TR:
         # NOTE: context manager exits are called in reverse order
         tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
         # process_tracker callback is the last thing called,
@@ -224,6 +226,9 @@ class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
         return tracker
 
     def _exit_tracker(self, tracker, result):
+        """
+        should be called with the result of the function, if any
+        """
         try:
             if isinstance(tracker, BaseTracker):
                 tracker.process_result(result)

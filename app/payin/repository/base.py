@@ -2,7 +2,7 @@ from dataclasses import InitVar, dataclass
 from starlette.requests import Request
 
 from app.commons.context.app_context import AppContext, get_global_app_context
-from app.commons.database.client.interface import EngineTransactionContext
+from app.commons.database.client.interface import DBTransaction
 from app.commons.database.infra import DB
 from app.commons.utils.dataclass_extensions import no_init_field
 
@@ -21,10 +21,10 @@ class PayinDBRepository:
         self.main_database = context.payin_maindb
         self.payment_database = context.payin_paymentdb
 
-    def main_database_transaction(self) -> EngineTransactionContext:
+    def main_database_transaction(self) -> DBTransaction:
         return self.main_database.master().transaction()
 
-    def payment_database_transaction(self) -> EngineTransactionContext:
+    def payment_database_transaction(self) -> DBTransaction:
         return self.payment_database.master().transaction()
 
     @classmethod

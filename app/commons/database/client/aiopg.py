@@ -1,19 +1,18 @@
 import asyncio
-from typing import Any, List, Optional, Sequence, Union, overload
+import contextlib
+from types import TracebackType
+from typing import Any, List, Optional, Sequence, Union, Type, overload, Generator
 
 from aiopg.sa import connection, create_engine, engine, transaction
 from aiopg.sa.result import ResultProxy, RowProxy
 
 from app.commons.timing import database as database_timing
 from app.commons.database.client.interface import (
-    AwaitableConnectionContext,
-    AwaitableTransactionContext,
     DBConnection,
     DBEngine,
     DBMultiResult,
     DBResult,
     DBTransaction,
-    EngineTransactionContext,
 )
 
 
@@ -74,38 +73,27 @@ class AioMultiResult(DBMultiResult[AioResult]):
         return self._results[i]
 
 
-class AioTransaction(DBTransaction):
+class AioTransaction(
+    DBTransaction, database_timing.Database, database_timing.TrackedTransaction
+):
     _raw_transaction: Optional[transaction.Transaction]
     _connection: "AioConnection"
+    database_name: str
+    instance_name: str
+
+    timing_manager = database_timing.TransactionTimingManager(
+        message="transaction complete"
+    )
+    tracker: Optional[database_timing.QueryTimer]
+    stack: Optional[contextlib.ExitStack]
 
     def __init__(self, connection: "AioConnection"):
-        if connection.closed():
-            raise ValueError("connection is closed!")
         self._connection = connection
         self._raw_transaction = None
-
-    async def start(self) -> "AioTransaction":
-        if not self._raw_transaction:
-            _raw_connection: connection.SAConnection = self._connection._raw_connection
-            self._raw_transaction = await _raw_connection.begin()
-        return self
-
-    async def commit(self):
-        if not self.active():
-            raise Exception("cannot commit an inactive transaction!")
-        await self.raw_transaction.commit()
-
-    async def rollback(self):
-        if self.active():
-            await self.raw_transaction.rollback()
-
-    def active(self):
-        return (
-            self._raw_transaction
-            and self._raw_transaction.is_active
-            and self._raw_transaction._parent.is_active  # aiopg doesn't check it's parent in "is_active" sad...
-            and (not self._connection.closed())
-        )
+        self.database_name = connection.database_name
+        self.instance_name = connection.instance_name
+        self.tracker = None
+        self.stack = None
 
     def connection(self) -> "AioConnection":
         return self._connection
@@ -115,15 +103,71 @@ class AioTransaction(DBTransaction):
         assert self._raw_transaction, "_raw_transaction not initialized"
         return self._raw_transaction
 
-    async def __aenter__(self):
-        if not self.active():
-            await self.start()
+    @timing_manager.track_start
+    async def start(self) -> "AioTransaction":
+        async with self._connection._transaction_lock:
+            is_root = not self._connection._transaction_stack
+            await self._connection.__aenter__()
+            async with self._connection._query_lock:
+                if is_root:
+                    self._raw_transaction = (
+                        await self._connection.raw_connection.begin()
+                    )
+                else:
+                    self._raw_transaction = (
+                        await self._connection.raw_connection.begin_nested()
+                    )
+            self._connection._transaction_stack.append(self)
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    @timing_manager.track_commit
+    @database_timing.track_query
+    async def commit(self) -> None:
+        async with self._connection._transaction_lock:
+            assert self._raw_transaction, "transaction has started"
+            assert self._connection._transaction_stack[-1] is self
+            self._connection._transaction_stack.pop()
+            async with self._connection._query_lock:
+                await self._raw_transaction.commit()
+            self._raw_transaction = None
+            await self._connection.__aexit__()
+
+    @timing_manager.track_rollback
+    @database_timing.track_query
+    async def rollback(
+        self,
+        exc_type: Optional[Type[BaseException]] = None,
+        exc_value: Optional[BaseException] = None,
+        traceback: Optional[TracebackType] = None,
+    ) -> None:
+        async with self._connection._transaction_lock:
+            assert self._raw_transaction, "transaction has started"
+            assert self._connection._transaction_stack[-1] is self
+            self._connection._transaction_stack.pop()
+            async with self._connection._query_lock:
+                await self._raw_transaction.rollback()
+            self._raw_transaction = None
+            await self._connection.__aexit__(exc_type, exc_value, traceback)
+
+    def __await__(self) -> Generator:
+        """
+        Called if using the low-level `transaction = await database.transaction()`
+        """
+        return self.start().__await__()
+
+    async def __aenter__(self):
+        await self.start()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ):
         if exc_type:
-            await self.rollback()
-        if self.active():
+            await self.rollback(exc_type, exc_value, traceback)
+        else:
             await self.commit()
 
 
@@ -132,6 +176,8 @@ class AioConnection(DBConnection, database_timing.Database):
     engine: "AioEngine"
     database_name: str
     instance_name: str
+
+    _transaction_stack: List[AioTransaction]
 
     def __init__(self, engine: "AioEngine"):
         if engine.closed():
@@ -142,71 +188,82 @@ class AioConnection(DBConnection, database_timing.Database):
         self.instance_name = engine.instance_name
         self._raw_connection = None
 
-    async def open(self) -> "AioConnection":
-        if not self._raw_connection:
-            assert self.engine._raw_engine
-            self._raw_connection = await self.engine._raw_engine.acquire()
+        self._connection_lock = asyncio.Lock()
+        self._connection_counter = 0
+
+        self._transaction_lock = asyncio.Lock()
+        self._transaction_stack = []
+
+        self._query_lock = asyncio.Lock()
+
+    async def __aenter__(self) -> "AioConnection":
+        async with self._connection_lock:
+            self._connection_counter += 1
+            if self._connection_counter == 1:
+                assert self._raw_connection is None
+                self._raw_connection = await self.engine.raw_engine.acquire()
         return self
 
-    def closed(self):
-        return (not self._raw_connection) or self._raw_connection.closed
+    async def __aexit__(
+        self,
+        exc_type: Type[BaseException] = None,
+        exc_value: BaseException = None,
+        traceback: TracebackType = None,
+    ) -> None:
+        async with self._connection_lock:
+            assert self._raw_connection is not None
+            self._connection_counter -= 1
+            if self._connection_counter == 0:
+                await self._raw_connection.close()
+                self._raw_connection = None
 
-    async def close(self):
-        if not self.closed():
-            await self._raw_connection.close()
+    def transaction(self) -> AioTransaction:
+        return AioTransaction(connection=self)
 
-    def transaction(self) -> AwaitableTransactionContext:
-        new_transaction = AioTransaction(connection=self)
-        return AwaitableTransactionContext(generator=new_transaction.start)
-
-    @database_timing.track_query
+    @database_timing.track_execute
     async def execute(self, stmt) -> AioMultiResult:
-        result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
-        row_proxies: List[RowProxy] = []
-        if result_proxy.returns_rows:
-            row_proxies = await result_proxy.fetchall()
-        else:
-            result_proxy.close()
-        return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
+        async with self._query_lock:
+            result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
+            row_proxies: List[RowProxy] = []
+            if result_proxy.returns_rows:
+                row_proxies = await result_proxy.fetchall()
+            else:
+                result_proxy.close()
+            return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
-    @database_timing.track_query
+    @database_timing.track_execute
     async def fetch_one(self, stmt) -> Optional[AioResult]:
-        result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
-        result: Optional[RowProxy] = None
-        if result_proxy.returns_rows:
-            result = await result_proxy.fetchone()
-        else:
-            result_proxy.close()
-        return AioResult(result, result_proxy.rowcount) if result else None
+        async with self._query_lock:
+            result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
+            result: Optional[RowProxy] = None
+            if result_proxy.returns_rows:
+                result = await result_proxy.fetchone()
+            else:
+                result_proxy.close()
+            return AioResult(result, result_proxy.rowcount) if result else None
 
-    @database_timing.track_query
+    @database_timing.track_execute
     async def fetch_all(self, stmt) -> AioMultiResult:
-        result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
-        row_proxies: List[RowProxy] = []
-        if result_proxy.returns_rows:
-            row_proxies = await result_proxy.fetchall()
-        else:
-            result_proxy.close()
-        return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
+        async with self._query_lock:
+            result_proxy: ResultProxy = await self.raw_connection.execute(stmt)
+            row_proxies: List[RowProxy] = []
+            if result_proxy.returns_rows:
+                row_proxies = await result_proxy.fetchall()
+            else:
+                result_proxy.close()
+            return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
-    @database_timing.track_query
+    @database_timing.track_execute
     async def fetch_value(self, stmt):
-        return await self.raw_connection.scalar(
-            stmt
-        )  # result proxy is already closed at this time
+        async with self._query_lock:
+            return await self.raw_connection.scalar(
+                stmt
+            )  # result proxy is already closed at this time
 
     @property
     def raw_connection(self) -> connection.SAConnection:
         assert self._raw_connection, "_raw_connection not initialized"
         return self._raw_connection
-
-    async def __aenter__(self):
-        if self.closed():
-            await self.open()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()
 
 
 class AioEngine(DBEngine, database_timing.Database):
@@ -306,17 +363,11 @@ class AioEngine(DBEngine, database_timing.Database):
                 self._raw_engine.terminate()
                 await self._raw_engine.wait_closed()
 
-    def acquire(self) -> AwaitableConnectionContext:
-        new_connection = AioConnection(engine=self)
-        return AwaitableConnectionContext(generator=new_connection.open)
+    def acquire(self) -> AioConnection:
+        return AioConnection(engine=self)
 
-    @database_timing.track_transaction
-    def transaction(self):
-        async def tx_generator() -> AioTransaction:
-            opened_conn = await self.acquire()
-            return await opened_conn.transaction()
-
-        return EngineTransactionContext(generator=tx_generator)
+    def transaction(self) -> AioTransaction:
+        return self.acquire().transaction()
 
     async def execute(self, stmt) -> AioMultiResult:
         async with self.acquire() as conn:

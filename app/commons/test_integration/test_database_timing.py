@@ -21,6 +21,16 @@ class MyRepository:
             connection = transaction.connection()
             return await self.insert_conn(connection)
 
+    async def nested_transaction(self):
+        async with self.db.master().acquire() as connection:
+            async with connection.transaction():
+                await self.inner_transaction(connection)
+                raise RuntimeError()
+
+    async def inner_transaction(self, connection):
+        async with connection.transaction():
+            return await connection.execute("SELECT 44")
+
     async def insert_conn(self, connection):
         return await connection.fetch_value("SELECT 2")
 
@@ -29,7 +39,7 @@ class MyRepository:
             connection = transaction.connection()
             # set the timeout for this transaction only
             await connection.execute("SET LOCAL statement_timeout=250;")
-            return await self.db.master().execute("SELECT pg_sleep(5)")
+            return await connection.execute("SELECT pg_sleep(5)")
 
     async def invalid_query(self):
         return await self.db.master().execute("SELECT column FROM not_a_table;")
@@ -85,7 +95,7 @@ class TestTiming:
         assert await repository.with_transaction() == 2
 
         events: List[Stat] = get_mock_statsd_events()
-        assert len(events) == 2, "transaction and query"
+        assert len(events) == 3
         stat_names = {
             (event.stat_name, event.tags["query_name"]): event for event in events
         }
@@ -102,6 +112,18 @@ class TestTiming:
             "request_status": "success",
         }
 
+        # commit
+        commit_name = ("dd.pay.payment-service.io.db.latency", "commit")
+        assert commit_name in stat_names, "transaction exists"
+        commit = stat_names[commit_name]
+        assert commit.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "transaction_name": "with_transaction",
+            "query_name": "commit",
+            "request_status": "success",
+        }
+
         # transaction
         transaction_name = ("dd.pay.payment-service.io.db.latency", "with_transaction")
         assert transaction_name in stat_names, "transaction exists"
@@ -112,7 +134,7 @@ class TestTiming:
             # "transaction_name": "with_transaction",
             "query_type": "transaction",
             "query_name": "with_transaction",
-            "request_status": "success",
+            "request_status": "commit",
         }
 
     async def test_timeout(self, payin_maindb: DB, get_mock_statsd_events):
@@ -121,8 +143,8 @@ class TestTiming:
             await repository.pg_sleep()
 
         events: List[Stat] = get_mock_statsd_events()
-        assert len(events) == 3, "one transaction and two queries"
-        statement, query, transaction = events
+        assert len(events) == 4
+        statement, query, rollback, transaction = events
 
         assert statement.stat_name == "dd.pay.payment-service.io.db.latency"
 
@@ -136,6 +158,15 @@ class TestTiming:
             "request_status": "timeout",
         }
 
+        assert rollback.stat_name == "dd.pay.payment-service.io.db.latency"
+        assert rollback.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "transaction_name": "pg_sleep",
+            "query_name": "rollback",
+            "request_status": "success",
+        }
+
         assert transaction.stat_name == "dd.pay.payment-service.io.db.latency"
         assert transaction.stat_value >= 250  # ms
         assert transaction.tags == {
@@ -143,7 +174,7 @@ class TestTiming:
             "instance_name": "master",
             "query_type": "transaction",
             "query_name": "pg_sleep",
-            "request_status": "timeout",
+            "request_status": "rollback",
         }
 
     async def test_error(self, payin_maindb: DB, get_mock_statsd_events):
@@ -163,6 +194,58 @@ class TestTiming:
             "request_status": "error",
         }
 
-    async def test_transaction_statuses(self, payin_maindb: DB, get_mock_statsd_events):
-        # rollback etc
-        ...
+    async def test_nested_transaction_statuses(
+        self, payin_maindb: DB, get_mock_statsd_events
+    ):
+        repository = MyRepository(payin_maindb)
+        with pytest.raises(RuntimeError):
+            await repository.nested_transaction()
+
+        events: List[Stat] = get_mock_statsd_events()
+        assert len(events) == 5, "result, commit, transaction, rollback, transaction"
+        result, commit, inner, rollback, outer = events
+
+        assert result.stat_name == "dd.pay.payment-service.io.db.latency"
+        assert result.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "query_name": "inner_transaction",
+            "transaction_name": "inner_transaction",
+            "request_status": "success",
+        }
+        assert commit.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "query_name": "commit",
+            "transaction_name": "inner_transaction",
+            "request_status": "success",
+        }
+        assert (
+            inner.tags["transaction_name"] == "nested_transaction"
+        ), "inner is nested inside outer transaction"
+        assert inner.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "query_type": "transaction",
+            "query_name": "inner_transaction",
+            "transaction_name": "nested_transaction",
+            "request_status": "commit",
+        }
+
+        assert rollback.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "query_name": "rollback",
+            "transaction_name": "nested_transaction",
+            "request_status": "success",
+            # "exception_name": "RuntimeError",
+        }
+        assert outer.tags == {
+            "database_name": "payin_maindb",
+            "instance_name": "master",
+            "query_type": "transaction",
+            "query_name": "nested_transaction",
+            # "transaction_name": "",
+            "request_status": "rollback",
+            # "exception_name": "RuntimeError",
+        }
