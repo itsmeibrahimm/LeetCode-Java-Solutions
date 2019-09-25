@@ -417,17 +417,22 @@ class TestCartPaymentProcessor:
     async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
         legacy_charge = generate_legacy_consumer_charge()
         legacy_payment = generate_legacy_payment(dd_charge_id=legacy_charge.id)
+        cart_payment = generate_cart_payment(amount=700)
+        cart_payment_processor.cart_payment_interface.get_cart_payment = FunctionMock(
+            return_value=(cart_payment, legacy_payment)
+        )
+
         client_description = f"updated description for {legacy_charge.id}"
         result = await cart_payment_processor.update_payment_for_legacy_charge(
             idempotency_key=str(uuid.uuid4()),
             dd_charge_id=legacy_charge.id,
             payer_id=None,
-            amount=1500,
+            amount=150,
             client_description=client_description,
             request_legacy_payment=legacy_payment,
         )
         assert result
-        assert result.amount == 1500
+        assert result.amount == cart_payment.amount + 150
         assert result.client_description == client_description
 
     @pytest.mark.asyncio

@@ -336,6 +336,7 @@ class TestCartPayment:
         cart_payment: Dict[str, Any],
         charge_id: int,
         amount: int,
+        original_amount: int,
     ) -> None:
         request_body = self._get_cart_payment_update_request(
             cart_payment=cart_payment,
@@ -348,7 +349,7 @@ class TestCartPayment:
         body = response.json()
         assert response.status_code == 200
         assert body["id"] == cart_payment["id"]
-        assert body["amount"] == request_body["amount"]
+        assert body["amount"] == original_amount + int(request_body["amount"])
         assert body["payer_id"] == cart_payment["payer_id"]
         assert body["payment_method_id"] == cart_payment["payment_method_id"]
         assert body["delay_capture"] == cart_payment["delay_capture"]
@@ -714,7 +715,17 @@ class TestCartPayment:
             client=client,
             cart_payment=cart_payment,
             charge_id=cart_payment["dd_charge_id"],
-            amount=1000,
+            amount=100,
+            original_amount=900,
+        )
+
+        # Adjustment, but down
+        self._test_legacy_cart_payment_adjustment(
+            client=client,
+            cart_payment=cart_payment,
+            charge_id=cart_payment["dd_charge_id"],
+            amount=-250,
+            original_amount=1000,
         )
 
         # Cancel

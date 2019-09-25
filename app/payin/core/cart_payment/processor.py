@@ -1571,7 +1571,7 @@ class CartPaymentProcessor:
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             dd_charge_id {int} -- ID of the legacy consumer charge associated with the cart payment to adjust.
             payer_id {str} -- ID of the payer who owns the specified cart payment.
-            amount {int} -- New amount to use for cart payment.
+            amount {int} -- Delta amount to add to the cart payment amount.  May be negative to reduce amount.
             client_description {Optional[str]} -- New client description to use for cart payment.
             request_legacy_payment: {Optional[LegacyPayment]} -- Optional legacy payment info containing additional_payment_info to use for legacy charge writes.
 
@@ -1588,7 +1588,6 @@ class CartPaymentProcessor:
             dd_charge_id
         )
         if not cart_payment_id:
-            # TODO handle case for old payments where there is no corresponding new model
             self.log.error(
                 f"Did not find cart payment for consumer charge {dd_charge_id}"
             )
@@ -1596,13 +1595,31 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
             )
 
-        return await self.update_payment(
+        cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
+            cart_payment_id
+        )
+
+        if not cart_payment or not legacy_payment:
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
+
+        # Clients may update additional_payment_info.
+        if request_legacy_payment and request_legacy_payment.dd_additional_payment_info:
+            legacy_payment.dd_additional_payment_info = (
+                request_legacy_payment.dd_additional_payment_info
+            )
+
+        # Amount is a delta.
+        new_amount = cart_payment.amount + amount
+
+        return await self._update_payment(
             idempotency_key=idempotency_key,
-            cart_payment_id=cart_payment_id,
-            payer_id=None,  # Not currently used in udpate_payment
-            amount=amount,
+            cart_payment=cart_payment,
+            legacy_payment=legacy_payment,
+            payer_id=None,  # Not currently used in update_payment
+            amount=new_amount,
             client_description=client_description,
-            request_legacy_payment=request_legacy_payment,
         )
 
     async def update_payment(
@@ -1612,14 +1629,42 @@ class CartPaymentProcessor:
         payer_id: Optional[uuid.UUID],
         amount: int,
         client_description: Optional[str],
-        request_legacy_payment: Optional[LegacyPayment] = None,
+        is_amount_delta: bool = False,
+    ) -> CartPayment:
+        cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
+            cart_payment_id
+        )
+
+        if not cart_payment or not legacy_payment:
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
+
+        return await self._update_payment(
+            idempotency_key=idempotency_key,
+            cart_payment=cart_payment,
+            legacy_payment=legacy_payment,
+            payer_id=payer_id,
+            amount=amount,
+            client_description=client_description,
+        )
+
+    async def _update_payment(
+        self,
+        idempotency_key: str,
+        cart_payment: CartPayment,
+        legacy_payment: LegacyPayment,
+        payer_id: Optional[uuid.UUID],
+        amount: int,
+        client_description: Optional[str],
     ) -> CartPayment:
         """Update an existing payment.
 
         Arguments:
             payment_method_repo {PaymentMethodRepository} -- Repo for accessing PaymentMethod and associated models.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
-            cart_payment_id {uuid.UUID} -- ID of the cart payment to adjust.
+            cart_payment {CartPayment} -- Existing cart payment.
+            legacy_payment {LegacyPayment} -- Legacy payment associated with cart payment.
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             amount {int} -- New amount to use for cart payment.
             client_description {Optional[str]} -- New client description to use for cart payment.
@@ -1631,21 +1676,6 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- An updated CartPayment instance, reflecting changes requested by the client.
         """
-
-        cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
-            cart_payment_id
-        )
-        if not cart_payment or not legacy_payment:
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
-            )
-
-        # V0 support: Clients may update additional_payment_info.
-        if request_legacy_payment and request_legacy_payment.dd_additional_payment_info:
-            legacy_payment.dd_additional_payment_info = (
-                request_legacy_payment.dd_additional_payment_info
-            )
-
         # Ensure the caller can access the cart payment being modified
         if not self.cart_payment_interface.is_accessible(
             cart_payment=cart_payment, request_payer_id=payer_id, credential_owner=""
