@@ -14,12 +14,11 @@ class LegacyPaymentInfo(BaseModel):
     """
 
     dd_consumer_id: int
-    dd_stripe_card_id: Optional[str] = None
+    dd_stripe_card_id: str
     dd_country_id: int
     dd_additional_payment_info: Optional[Dict[str, Any]] = None
-    stripe_customer_id: Optional[str] = None
-    stripe_payment_method_id: Optional[str] = None
-    stripe_card_id: Optional[str] = None
+    stripe_customer_id: str
+    stripe_card_id: str
 
 
 class PayerIdType(str, Enum):

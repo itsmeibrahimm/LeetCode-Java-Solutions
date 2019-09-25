@@ -129,8 +129,8 @@ class TestCartPayment:
 
     def _get_cart_payment_create_legacy_payment_request(
         self,
-        legacy_stripe_customer_id: str,
-        legacy_stripe_payment_method_id: str,
+        stripe_customer_id: str,
+        stripe_card_id: str,
         amount: int = 500,
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -139,14 +139,14 @@ class TestCartPayment:
             "amount": amount,
             "currency": "usd",
             "delay_capture": True,
-            "client_description": f"{legacy_stripe_customer_id} description",
-            "payer_statement_description": f"{legacy_stripe_customer_id} bill"[-22:],
+            "client_description": f"{stripe_customer_id} description",
+            "payer_statement_description": f"{stripe_customer_id} bill"[-22:],
             "payer_country": "US",
             "payment_country": "US",
             "legacy_correlation_ids": {"reference_id": 123, "reference_type": 5},
             "legacy_payment": {
-                "stripe_customer_id": legacy_stripe_customer_id,
-                "stripe_payment_method_id": legacy_stripe_payment_method_id,
+                "stripe_customer_id": stripe_customer_id,
+                "stripe_card_id": stripe_card_id,
                 "dd_country_id": 1,
                 "dd_consumer_id": 1,
                 "dd_additional_payment_info": {
@@ -155,6 +155,7 @@ class TestCartPayment:
                     "application_fee": 500,
                     "metadata": {"is_first_order": True},
                 },
+                "dd_stripe_card_id": "1",
             },
         }
 
@@ -175,12 +176,15 @@ class TestCartPayment:
             "payer_id": cart_payment["payer_id"],
             "client_description": client_description,
             "legacy_payment": {
+                "stripe_customer_id": "cus_9a8ds9",
+                "stripe_card_id": "card_a819d",
                 "dd_country_id": 1,
                 "dd_consumer_id": 1,
                 "dd_additional_payment_info": {
                     "place_tag2": "place tag two",
                     "extra items": "churro",
                 },
+                "dd_stripe_card_id": "987",
             },
         }
 
@@ -191,12 +195,12 @@ class TestCartPayment:
     def _test_cart_payment_legacy_payment_creation(
         self,
         client: TestClient,
-        legacy_stripe_customer_id: str,
-        legacy_stripe_payment_method_id: str,
+        stripe_customer_id: str,
+        stripe_card_id: str,
         amount: int,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
-            legacy_stripe_customer_id, legacy_stripe_payment_method_id, amount
+            stripe_customer_id, stripe_card_id, amount
         )
 
         response = client.post("/payin/api/v0/cart_payments", json=request_body)
@@ -700,8 +704,8 @@ class TestCartPayment:
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
         cart_payment = self._test_cart_payment_legacy_payment_creation(
             client=client,
-            legacy_stripe_customer_id=provider_account_id,
-            legacy_stripe_payment_method_id=provider_card_id,
+            stripe_customer_id=provider_account_id,
+            stripe_card_id=provider_card_id,
             amount=900,
         )
 
