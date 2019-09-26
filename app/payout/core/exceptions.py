@@ -33,7 +33,10 @@ payout_error_message_maps = {
     "payout_15": "Can only cancel if status is pending",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
-    "account_1": "You payout account is not fully set up, please verify your payout account.",
+    "account_1": "PGP account has not set up, please verify your payout account.",
+    "account_2": "Create external payment gateway account failed due to invalid request error.",
+    "account_3": "Create external payment gateway account failed due to some error.",
+    "account_4": "Update external payment gateway account failed due to some error.",
     # payout method errors
     "payout_method_0": "Cannot find a payout method for the given payout account id.",
     "payout_method_1": "Cannot find a payout card for the given payout account id.",
@@ -64,6 +67,9 @@ class PayoutErrorCode(str, Enum):
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"
     PGP_ACCOUNT_NOT_FOUND = "account_1"
+    PGP_ACCOUNT_CREATE_INVALID_REQUEST = "account_2"
+    PGP_ACCOUNT_CREATE_ERROR = "account_3"
+    PGP_ACCOUNT_UPDATE_ERROR = "account_4"
 
     # payout method error code
     PAYOUT_METHOD_NOT_FOUND = "payout_method_0"
@@ -126,6 +132,39 @@ def pgp_account_not_found_error() -> PayoutError:
             PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND.value
         ],
         error_code=PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def pgp_account_create_invalid_request(error_message: str = None) -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_message=error_message
+        if error_message
+        else payout_error_message_maps[PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND.value],
+        error_code=PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def pgp_account_create_error(error_message: str = None) -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        error_message=error_message
+        if error_message
+        else payout_error_message_maps[PayoutErrorCode.PGP_ACCOUNT_CREATE_ERROR.value],
+        error_code=PayoutErrorCode.PGP_ACCOUNT_CREATE_ERROR,
+        retryable=False,
+    )
+
+
+def pgp_account_update_error(error_message: str = None) -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        error_message=error_message
+        if error_message
+        else payout_error_message_maps[PayoutErrorCode.PGP_ACCOUNT_UPDATE_ERROR.value],
+        error_code=PayoutErrorCode.PGP_ACCOUNT_UPDATE_ERROR,
         retryable=False,
     )
 

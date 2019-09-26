@@ -78,3 +78,9 @@ class StripeManagedAccountUpdate(_StripeManagedAccountPartial):
     @classmethod
     def not_allow_set_none_fields(cls) -> List[str]:
         return super().not_allow_set_none_fields() + ["stripe_id", "country_shortname"]
+
+
+class StripeManagedAccountCreateAndPaymentAccountUpdate(_StripeManagedAccountPartial):
+    country_shortname: str
+    stripe_id: str
+    payment_account_id: int

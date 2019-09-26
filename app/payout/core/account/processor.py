@@ -144,7 +144,7 @@ class PayoutAccountProcessors:
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
             request=request,
-            stripe=self.stripe,
+            stripe_client=self.stripe,
         )
         return await verify_account_op.execute()
 

@@ -13,6 +13,7 @@ from app.payout.repository.maindb.model.payment_account import (
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountUpdate,
     StripeManagedAccountCreate,
+    StripeManagedAccountCreateAndPaymentAccountUpdate,
 )
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.test_integration.utils import (
@@ -186,3 +187,45 @@ class TestPaymentAccountRepository:
         assert retrieved_sma.country_shortname == data_2.country_shortname
         assert retrieved_sma == sma_2
         assert count == 2
+
+    async def test_create_stripe_managed_account_and_update_payment_account(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
+        country_shortname = "US"
+        stripe_id = str(uuid.uuid4())
+        data = StripeManagedAccountCreateAndPaymentAccountUpdate(
+            country_shortname=country_shortname,
+            stripe_id=stripe_id,
+            payment_account_id=payment_account.id,
+        )
+        stripe_managed_account, updated_payment_account = await payment_account_repo.create_stripe_managed_account_and_update_payment_account(
+            data=data
+        )
+        assert stripe_managed_account
+        assert stripe_managed_account.stripe_id == stripe_id
+        assert stripe_managed_account.country_shortname == country_shortname
+        assert updated_payment_account
+        assert updated_payment_account.id == payment_account.id
+        assert updated_payment_account.account_id == stripe_managed_account.id
+
+    async def test_create_stripe_managed_account_and_update_payment_account_failed(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
+        country_shortname = "US"
+        stripe_id = str(uuid.uuid4())
+        data = StripeManagedAccountCreateAndPaymentAccountUpdate(
+            country_shortname=country_shortname,
+            stripe_id=stripe_id,
+            payment_account_id=payment_account.id + 1,
+        )
+        with pytest.raises(AssertionError):
+            await payment_account_repo.create_stripe_managed_account_and_update_payment_account(
+                data=data
+            )
+        retrieved_sma, count = await payment_account_repo.get_last_stripe_managed_account_and_count_by_stripe_id(
+            stripe_id=stripe_id
+        )
+        assert retrieved_sma is None
+        assert count == 0

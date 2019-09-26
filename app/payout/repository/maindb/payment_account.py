@@ -6,6 +6,7 @@ from sqlalchemy import and_, desc, asc
 from typing_extensions import final
 
 from app.commons import tracing
+from app.commons.database.client.interface import DBConnection
 from app.commons.database.infra import DB
 from app.payout.repository.maindb.base import PayoutMainDBRepository
 from app.payout.repository.maindb.model import payment_accounts, stripe_managed_accounts
@@ -18,7 +19,9 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccount,
     StripeManagedAccountCreate,
     StripeManagedAccountUpdate,
+    StripeManagedAccountCreateAndPaymentAccountUpdate,
 )
+from app.payout.types import AccountType
 
 
 class PaymentAccountRepositoryInterface(ABC):
@@ -68,6 +71,12 @@ class PaymentAccountRepositoryInterface(ABC):
     async def update_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int, data: StripeManagedAccountUpdate
     ) -> Optional[StripeManagedAccount]:
+        pass
+
+    @abstractmethod
+    async def create_stripe_managed_account_and_update_payment_account(
+        self, data: StripeManagedAccountCreateAndPaymentAccountUpdate
+    ) -> Tuple[StripeManagedAccount, PaymentAccount]:
         pass
 
 
@@ -186,3 +195,48 @@ class PaymentAccountRepository(
         )
         row = await self._database.master().fetch_one(stmt)
         return StripeManagedAccount.from_row(row) if row else None
+
+    async def create_stripe_managed_account_and_update_payment_account(
+        self, data: StripeManagedAccountCreateAndPaymentAccountUpdate
+    ) -> Tuple[StripeManagedAccount, PaymentAccount]:
+        async with self._database.master().acquire() as connection:  # type: DBConnection
+            try:
+                return await self.execute_create_stripe_managed_account_and_update_payment_account(
+                    data=data, db_connection=connection
+                )
+            except Exception as e:
+                raise e
+
+    async def execute_create_stripe_managed_account_and_update_payment_account(
+        self,
+        data: StripeManagedAccountCreateAndPaymentAccountUpdate,
+        db_connection: DBConnection,
+    ) -> Tuple[StripeManagedAccount, PaymentAccount]:
+        async with db_connection.transaction():
+            stripe_managed_account_create = StripeManagedAccountCreate(
+                country_shortname=data.country_shortname, stripe_id=data.stripe_id
+            )
+            stmt = (
+                stripe_managed_accounts.table.insert()
+                .values(stripe_managed_account_create.dict(skip_defaults=True))
+                .returning(*stripe_managed_accounts.table.columns.values())
+            )
+            row = await db_connection.fetch_one(stmt)
+            assert row is not None
+            stripe_managed_account = StripeManagedAccount.from_row(row)
+
+            payment_account_update = PaymentAccountUpdate(
+                account_id=stripe_managed_account.id,
+                account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
+            )
+            stmt = (
+                payment_accounts.table.update()
+                .where(payment_accounts.id == data.payment_account_id)
+                .values(payment_account_update.dict(skip_defaults=True))
+                .returning(*payment_accounts.table.columns.values())
+            )
+
+            row = await db_connection.fetch_one(stmt)
+            assert row is not None
+            payment_account = PaymentAccount.from_row(row)
+            return stripe_managed_account, payment_account

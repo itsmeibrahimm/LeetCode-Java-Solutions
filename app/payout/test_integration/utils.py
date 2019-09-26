@@ -4,6 +4,7 @@ from typing import List
 from app.commons.types import CountryCode, Currency
 from stripe.error import StripeError
 
+from app.payout.core.account.constants import CREATE_STRIPE_ACCOUNT_TYPE
 from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.payout_card import PayoutCardCreate, PayoutCard
 from app.payout.repository.bankdb.model.payout_method import (
@@ -514,6 +515,88 @@ def mock_stripe_card() -> models.StripeCard:
         metadata={},
         name=None,
         tokenization_method=None,
+    )
+
+
+def mock_stripe_account(stripe_account_id: str = None) -> models.Account:
+    return models.Account(
+        id=stripe_account_id if stripe_account_id else "test_stripe_account_id",
+        object="Account",
+        business_type="individual",
+        charges_enabled=True,
+        country=CountryCode.US,
+        default_currency=Currency.USD,
+        company=None,
+        individual=models.Person(
+            id="person_test_verify_account",
+            object="person",
+            account=stripe_account_id,
+            created=datetime.utcnow(),
+            id_number_provided=False,
+            ssn_last_4_provided=False,
+            address=models.Address(
+                city="Mountain View",
+                country="US",
+                line1="123 Castro St",
+                line2="",
+                postal_code="94041",
+                state="CA",
+            ),
+            dob=models.DateOfBirth(day=1, month=4, year=1990),
+            email=None,
+            first_name="test",
+            last_name="payout",
+            id_number=None,
+            phone=None,
+            ssn_last_4=None,
+            verification=None,
+        ),
+        details_submitted=False,
+        email=None,
+        created=datetime.utcnow(),
+        payouts_enabled=False,
+        type=CREATE_STRIPE_ACCOUNT_TYPE,
+    )
+
+
+def mock_updated_stripe_account(stripe_account_id: str = None) -> models.Account:
+    return models.Account(
+        id=stripe_account_id if stripe_account_id else "test_stripe_account_id",
+        object="Account",
+        business_type="individual",
+        charges_enabled=True,
+        country=CountryCode.US,
+        default_currency=Currency.USD,
+        company=None,
+        individual=models.Person(
+            id="person_test_verify_account",
+            object="person",
+            account=stripe_account_id,
+            created=datetime.utcnow(),
+            id_number_provided=False,
+            ssn_last_4_provided=False,
+            address=models.Address(
+                city="Mountain View",
+                country="US",
+                line1="123 Castro St",
+                line2="",
+                postal_code="94041",
+                state="CA",
+            ),
+            dob=models.DateOfBirth(day=5, month=5, year=1991),
+            email=None,
+            first_name="Frosty",
+            last_name="Fish",
+            id_number=None,
+            phone=None,
+            ssn_last_4=None,
+            verification=None,
+        ),
+        details_submitted=False,
+        email=None,
+        created=datetime.utcnow(),
+        payouts_enabled=False,
+        type=CREATE_STRIPE_ACCOUNT_TYPE,
     )
 
 

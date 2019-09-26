@@ -8,6 +8,10 @@ from app.commons.types import CountryCode
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
+from app.payout.core.account.constants import (
+    CREATE_STRIPE_ACCOUNT_TYPE,
+    CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES,
+)
 from app.payout.types import (
     StripeAccountToken,
     StripeBusinessType,
@@ -291,10 +295,16 @@ class DateOfBirth(StripeBaseModel):
 class Document(StripeBaseModel):
     back: Optional[StripeFileHandle]
     front: Optional[StripeFileHandle]
+    details: Optional[str]
+    details_code: Optional[str]
 
 
 class Verification(StripeBaseModel):
+    additional_document: Document
+    details: Optional[str]
+    details_code: Optional[str]
     document: Document
+    status: str
 
 
 class Company(StripeBaseModel):
@@ -331,9 +341,15 @@ class CreateAccountTokenRequest(StripeBaseModel):
 
 class CreateAccountRequest(StripeBaseModel):
     country: CountryCode
-    type: str = "custom"
-    account_token: Optional[StripeAccountToken]
-    requested_capabilities: list = ["legacy_payments"]
+    type: str = CREATE_STRIPE_ACCOUNT_TYPE
+    account_token: StripeAccountToken
+    requested_capabilities: list = CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES
+
+
+class UpdateAccountRequest(StripeBaseModel):
+    id: StripeAccountId
+    country: CountryCode
+    account_token: StripeAccountToken
 
 
 class CreateExternalAccountRequest(StripeBaseModel):
@@ -724,6 +740,42 @@ class Token(StripeBaseModel):
     created: datetime
 
 
+class ExternalAccountsList(StripeBaseModel):
+    _STRIPE_OBJECT_NAME: str = "list"
+
+    object: str
+    data: List[dict]
+    has_more: bool
+    url: str
+
+
+class Person(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/persons/object
+    """
+
+    _STRIPE_OBJECT_NAME: str = "person"
+
+    id: str
+    object: str
+    account: str
+    address: Optional[Address]
+    created: datetime
+    dob: Optional[DateOfBirth]
+    email: Optional[str]
+    first_name: Optional[str]
+    gender: Optional[str]
+    id_number_provided: bool
+    last_name: Optional[str]
+    maiden_name: Optional[str]
+    metadata: Optional[dict]
+    phone: Optional[str]
+    relationship: Optional[dict]
+    requirements: Optional[dict]
+    ssn_last_4_provided: bool
+    verification: Optional[Verification]
+
+
 class Account(StripeBaseModel):
     """
     See: https://stripe.com/docs/api/accounts/object
@@ -733,14 +785,24 @@ class Account(StripeBaseModel):
 
     id: str
     object: str
+    business_profile: Optional[dict]
     business_type: StripeBusinessType
+    capabilities: Optional[dict]
     charges_enabled: bool
+    company: Optional[dict]
     country: CountryCode
+    created: datetime
     default_currency: Currency
-    company: Optional[Company] = None
-    individual: Optional[Individual] = None
     details_submitted: bool
     email: Optional[str]
+    external_accounts: Optional[ExternalAccountsList]
+    individual: Optional[Person]
+    metadata: Optional[dict]
+    payouts_enabled: bool
+    requirements: Optional[dict]
+    settings: Optional[dict]
+    tos_acceptance: Optional[dict]
+    type: str
 
 
 class StripeCard(StripeBaseModel):

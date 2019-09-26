@@ -9,17 +9,13 @@ from app.commons.providers.stripe.stripe_client import (
 )
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.providers.stripe.stripe_models import CreateAccountTokenMetaDataRequest
 from app.commons.test_integration.constants import DEBIT_CARD_TOKEN, DEBIT_CARD_NUMBER
 from app.commons.test_integration.utils import (
     prepare_and_validate_stripe_account,
     prepare_and_validate_stripe_account_token,
 )
 from app.commons.utils.pool import ThreadPoolHelper
-from app.commons.providers.stripe.stripe_models import (
-    CreateCardToken,
-    CreateExternalAccountRequest,
-    CreateCardTokenRequest,
-)
 from app.commons.types import Currency, CountryCode
 from app.payout.types import PayoutExternalAccountType
 
@@ -211,14 +207,87 @@ class TestStripeClient:
             pytest.skip()
         prepare_and_validate_stripe_account(stripe)
 
+    def test_update_account(self, mode: str, stripe: StripeClient):
+        # should use create_account_token to generate an account token
+        # stripe mock doesn't work as expected by returning a card token instead of account token
+        # test_account_token = "ct_Fny00gsFtsBBaU"
+
+        if mode == "mock":
+            pytest.skip()
+        create_account_token_data = CreateAccountTokenMetaDataRequest(
+            business_type="individual",
+            individual=models.Individual(
+                first_name="Test",
+                last_name="Payment",
+                dob=models.DateOfBirth(day=1, month=1, year=1990),
+                address=models.Address(
+                    city="Mountain View",
+                    country=CountryCode.US.value,
+                    line1="123 Castro St",
+                    line2="",
+                    postal_code="94041",
+                    state="CA",
+                ),
+                ssn_last_4="1234",
+            ),
+            tos_shown_and_accepted=True,
+        )
+        account_token = prepare_and_validate_stripe_account_token(
+            stripe_client=stripe, data=create_account_token_data
+        )
+        account = prepare_and_validate_stripe_account(stripe, account_token)
+        assert account.individual.first_name == "Test"
+        assert account.individual.last_name == "Payment"
+        assert account.business_type == create_account_token_data.business_type
+
+        first_name = "Frosty"
+        last_name = "Fish"
+        updated_create_account_token_data = CreateAccountTokenMetaDataRequest(
+            business_type="individual",
+            individual=models.Individual(
+                first_name=first_name,
+                last_name=last_name,
+                dob=models.DateOfBirth(day=5, month=5, year=1991),
+                address=models.Address(
+                    city="Mountain View",
+                    country=CountryCode.US.value,
+                    line1="123 Castro St",
+                    line2="",
+                    postal_code="94041",
+                    state="CA",
+                ),
+                ssn_last_4="1234",
+            ),
+            tos_shown_and_accepted=True,
+        )
+        new_token = prepare_and_validate_stripe_account_token(
+            stripe_client=stripe, data=updated_create_account_token_data
+        )
+        updated_account = stripe.update_account(
+            request=models.UpdateAccountRequest(
+                id=account.id, country=CountryCode.US, account_token=new_token.id
+            )
+        )
+        assert updated_account
+        assert updated_account.individual.first_name == first_name
+        assert updated_account.individual.last_name == last_name
+        assert updated_account.individual.dob.day == 5
+        assert updated_account.individual.dob.month == 5
+        assert updated_account.individual.dob.year == 1991
+        assert updated_account.individual.first_name != account.individual.first_name
+        assert updated_account.individual.last_name != account.individual.last_name
+        assert updated_account.individual.dob.day != account.individual.dob.day
+        assert updated_account.individual.dob.month != account.individual.dob.month
+        assert updated_account.individual.dob.year != account.individual.dob.year
+
     def test_create_card_token(self, mode: str, stripe_test: StripeTestClient):
         # stripe mock always create a token for bank account which is not right for this use
         if mode == "mock":
             pytest.skip()
         card_token = stripe_test.create_card_token(
-            request=CreateCardTokenRequest(
+            request=models.CreateCardTokenRequest(
                 country=CountryCode.US,
-                card=CreateCardToken(
+                card=models.CreateCardToken(
                     number=DEBIT_CARD_NUMBER,
                     exp_month=10,
                     exp_year=2022,
@@ -239,7 +308,7 @@ class TestStripeClient:
             pytest.skip()
         account = prepare_and_validate_stripe_account(stripe_test)
         card = stripe_test.create_external_account_card(
-            request=CreateExternalAccountRequest(
+            request=models.CreateExternalAccountRequest(
                 country=CountryCode.US,
                 type=PayoutExternalAccountType.CARD.value,
                 stripe_account_id=account.id,

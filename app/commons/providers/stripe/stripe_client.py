@@ -271,12 +271,17 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def create_stripe_account(
-        self, request: models.CreateAccountRequest
-    ) -> models.Account:
+    def create_account(self, request: models.CreateAccountRequest) -> models.Account:
         """
         Create an Account
         https://stripe.com/docs/api/accounts/create
+        """
+
+    @abc.abstractmethod
+    def update_account(self, request: models.UpdateAccountRequest) -> models.Account:
+        """
+        Update an Account
+        https://stripe.com/docs/api/accounts/update
         """
 
     @abc.abstractmethod
@@ -598,13 +603,20 @@ class StripeClient(StripeClientInterface):
         return account_token
 
     @tracing.track_breadcrumb(resource="account", action="create")
-    def create_stripe_account(
-        self, *, request: models.CreateAccountRequest
-    ) -> models.Account:
+    def create_account(self, *, request: models.CreateAccountRequest) -> models.Account:
         account = stripe.Account.create(
             type=request.type,
             account_token=request.account_token,
             requested_capabilities=request.requested_capabilities,
+            **self.settings_for(request.country),
+        )
+        return account
+
+    @tracing.track_breadcrumb(resource="account", action="update")
+    def update_account(self, request: models.UpdateAccountRequest) -> models.Account:
+        account = stripe.Account.modify(
+            request.id,
+            account_token=request.account_token,
             **self.settings_for(request.country),
         )
         return account
@@ -914,11 +926,18 @@ class StripeAsyncClient:
             self.stripe_client.create_account_token, request=request
         )
 
-    async def create_stripe_account(
+    async def create_account(
         self, *, request: models.CreateAccountRequest
     ) -> models.Account:
         return await self.executor_pool.submit(
-            self.stripe_client.create_stripe_account, request=request
+            self.stripe_client.create_account, request=request
+        )
+
+    async def update_account(
+        self, *, request: models.UpdateAccountRequest
+    ) -> models.Account:
+        return await self.executor_pool.submit(
+            self.stripe_client.update_account, request=request
         )
 
     async def create_external_account_card(

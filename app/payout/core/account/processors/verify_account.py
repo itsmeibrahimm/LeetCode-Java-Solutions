@@ -1,23 +1,29 @@
 from structlog.stdlib import BoundLogger
 from typing import Union
 
-from IPython.utils.tz import utcnow
-
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
-from app.commons.providers.stripe.stripe_models import CreateAccountRequest
+from app.commons.providers.stripe.stripe_models import (
+    CreateAccountRequest,
+    UpdateAccountRequest,
+)
 from app.commons.types import CountryCode
 from app.payout.core.account.types import PayoutAccountInternal
-from app.payout.core.exceptions import payout_account_not_found_error
-from app.payout.repository.maindb.model.payment_account import PaymentAccountUpdate
+from app.payout.core.exceptions import (
+    payout_account_not_found_error,
+    pgp_account_create_invalid_request,
+    pgp_account_create_error,
+    pgp_account_update_error,
+)
 from app.payout.repository.maindb.model.stripe_managed_account import (
-    StripeManagedAccountCreate,
+    StripeManagedAccountCreateAndPaymentAccountUpdate,
 )
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
-from app.payout.types import PayoutAccountId, StripeAccountToken, AccountType
+from app.payout.types import PayoutAccountId, StripeAccountToken
+import stripe.error as stripe_error
 
 
 class VerifyPayoutAccountRequest(OperationRequest):
@@ -34,7 +40,7 @@ class VerifyPayoutAccount(
     """
 
     payment_account_repo: PaymentAccountRepositoryInterface
-    stripe: StripeAsyncClient
+    stripe_client: StripeAsyncClient
 
     def __init__(
         self,
@@ -42,12 +48,12 @@ class VerifyPayoutAccount(
         *,
         payment_account_repo: PaymentAccountRepositoryInterface,
         logger: BoundLogger = None,
-        stripe: StripeAsyncClient
+        stripe_client: StripeAsyncClient,
     ):
         super().__init__(request, logger)
         self.request = request
         self.payment_account_repo = payment_account_repo
-        self.stripe = stripe
+        self.stripe_client = stripe_client
 
     async def _execute(self) -> PayoutAccountInternal:
         # get payout account
@@ -57,37 +63,72 @@ class VerifyPayoutAccount(
         if not payment_account:
             raise payout_account_not_found_error()
 
-        # create stripe account
-        create_account = CreateAccountRequest(
-            country=self.request.country,
-            type="custom",
-            account_token=self.request.account_token,
-            requested_capabilities=["legacy_payments"],
-        )
-        stripe_account = await self.stripe.create_stripe_account(request=create_account)
-        # add more error handling
+        # get sma if payment_account.account_id is not null
+        stripe_managed_account = None
+        if payment_account.account_id:
+            stripe_managed_account = await self.payment_account_repo.get_stripe_managed_account_by_id(
+                payment_account.account_id
+            )
+            self.logger.info(
+                f"account_id {payment_account.account_id} exists for payout account "
+                f"{payment_account.id} but no sma or stripe account exists"
+            )
 
-        if stripe_account:
-            # create sma
-            stripe_managed_account = await self.payment_account_repo.create_stripe_managed_account(
-                data=StripeManagedAccountCreate(
+        # create new stripe account if no sma
+        if not stripe_managed_account:
+            # create stripe account
+            create_account = CreateAccountRequest(
+                country=self.request.country, account_token=self.request.account_token
+            )
+            # add more error handling
+            try:
+                stripe_account = await self.stripe_client.create_account(
+                    request=create_account
+                )
+            # TODO: more comprehensive error handling in PAY-3793
+            except stripe_error.InvalidRequestError as e:
+                # raise BAD_REQUEST_ERROR
+                error_info = e.json_body.get("error", {})
+                stripe_error_message = error_info.get("message")
+                raise pgp_account_create_invalid_request(
+                    error_message=stripe_error_message
+                )
+            except stripe_error.StripeError as e:
+                error_info = e.json_body.get("error", {})
+                stripe_error_message = error_info.get("message")
+                raise pgp_account_create_error(stripe_error_message)
+            except Exception:
+                raise pgp_account_create_error()
+
+            # create stripe_managed_account and update the linked payment_account
+            stripe_managed_account, payment_account = await self.payment_account_repo.create_stripe_managed_account_and_update_payment_account(
+                data=StripeManagedAccountCreateAndPaymentAccountUpdate(
                     stripe_id=stripe_account.id,
                     country_shortname=self.request.country.value,
-                    stripe_last_updated_at=utcnow(),
+                    payment_account_id=payment_account.id,
                 )
             )
-            # update the linked payout_account
-            if stripe_managed_account:
-                payment_account = await self.payment_account_repo.update_payment_account_by_id(
-                    payment_account_id=self.request.payout_account_id,
-                    data=PaymentAccountUpdate(
-                        account_id=stripe_managed_account.id,
-                        account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
-                    ),
+        else:
+            # update stripe account
+            update_account = UpdateAccountRequest(
+                id=stripe_managed_account.stripe_id,
+                country=self.request.country,
+                account_token=self.request.account_token,
+            )
+            try:
+                stripe_account = await self.stripe_client.update_account(
+                    request=update_account
                 )
+            except stripe_error.StripeError as e:
+                error_info = e.json_body.get("error", {})
+                stripe_error_message = error_info.get("message")
+                raise pgp_account_update_error(stripe_error_message)
+            assert (
+                stripe_account.id == stripe_managed_account.stripe_id
+            ), "Updated stripe account id should be the same as the old one"
+
         return PayoutAccountInternal(
-            payment_account=payment_account,
-            pgp_external_account_id=stripe_account.id if stripe_account else None,
+            payment_account=payment_account, pgp_external_account_id=stripe_account.id
         )
 
     def _handle_exception(
