@@ -147,7 +147,7 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.asyncio
     async def test_create_payment(self, cart_payment_processor, request_cart_payment):
-        result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             country=CountryCode.US,
@@ -168,7 +168,7 @@ class TestCartPaymentProcessor:
         cart_payment_processor.cart_payment_interface.stripe_async_client.commando = (
             True
         )
-        result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             country=CountryCode.US,
@@ -199,7 +199,7 @@ class TestCartPaymentProcessor:
         )
 
         # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
-        result_cart_payment, result_legacy_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             country=CountryCode.US,
@@ -212,7 +212,7 @@ class TestCartPaymentProcessor:
         )
 
         # Second submission attempt
-        second_result_cart_payment, second_result_legacy_payment = await cart_payment_processor.create_payment(
+        second_result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             country=CountryCode.US,
@@ -416,12 +416,11 @@ class TestCartPaymentProcessor:
     @pytest.mark.asyncio
     async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
         legacy_charge = generate_legacy_consumer_charge()
-        legacy_payment = generate_legacy_payment(dd_charge_id=legacy_charge.id)
+        legacy_payment = generate_legacy_payment()
         cart_payment = generate_cart_payment(amount=700)
         cart_payment_processor.cart_payment_interface.get_cart_payment = FunctionMock(
             return_value=(cart_payment, legacy_payment)
         )
-
         client_description = f"updated description for {legacy_charge.id}"
         result = await cart_payment_processor.update_payment_for_legacy_charge(
             idempotency_key=str(uuid.uuid4()),

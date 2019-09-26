@@ -73,7 +73,7 @@ async def create_cart_payment(
     log.info(f"Creating cart_payment for payer {cart_payment_request.payer_id}")
 
     try:
-        cart_payment, legacy_payment = await cart_payment_processor.create_payment(
+        cart_payment = await cart_payment_processor.create_payment(
             # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
             request_cart_payment=create_request_to_model(
                 cart_payment_request,

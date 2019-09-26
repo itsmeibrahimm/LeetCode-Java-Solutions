@@ -4,7 +4,11 @@ from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
 from typing_extensions import final
-from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    ChargeStatus,
+    LegacyConsumerChargeId,
+)
 from uuid import UUID
 
 
@@ -13,7 +17,6 @@ class LegacyPayment(BaseModel):
     dd_consumer_id: int
     dd_country_id: Optional[int] = None
     dd_stripe_card_id: Optional[int] = None
-    dd_charge_id: Optional[int] = None
     dd_additional_payment_info: Optional[Dict[str, Any]] = None
     stripe_charge_id: Optional[str] = None
     stripe_customer_id: Optional[str] = None
@@ -67,7 +70,7 @@ class PaymentIntent(BaseModel):
     statement_descriptor: Optional[str]
     payment_method_id: Optional[UUID]
     metadata: Optional[Dict[str, Any]]
-    legacy_consumer_charge_id: Optional[int]
+    legacy_consumer_charge_id: LegacyConsumerChargeId
     created_at: datetime
     updated_at: datetime
     captured_at: Optional[datetime]
@@ -157,9 +160,9 @@ class PgpPaymentCharge:
 
 
 @final
-@dataclass()
+@dataclass
 class LegacyConsumerCharge:
-    id: int
+    id: LegacyConsumerChargeId
     target_id: int
     target_ct_id: int
     idempotency_key: str

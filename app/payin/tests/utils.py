@@ -19,6 +19,7 @@ from app.payin.core.cart_payment.types import (
     ChargeStatus,
     CaptureMethod,
     LegacyStripeChargeStatus,
+    LegacyConsumerChargeId,
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
 from app.payin.repository.dispute_repo import (
@@ -48,7 +49,7 @@ def generate_payment_intent(
     capture_method: str = "manual",
     amount_received: Optional[int] = None,
     captured_at: Optional[datetime] = None,
-    legacy_consumer_charge_id: Optional[int] = 1,
+    legacy_consumer_charge_id: LegacyConsumerChargeId = LegacyConsumerChargeId(1),
     application_fee_amount: int = 0,
 ):
     return PaymentIntent(
@@ -128,13 +129,12 @@ def generate_cart_payment(
     )
 
 
-def generate_legacy_payment(dd_charge_id: int = None) -> LegacyPayment:
+def generate_legacy_payment() -> LegacyPayment:
     return LegacyPayment(
         dd_consumer_id=1,
         dd_country_id=1,
         dd_stripe_card_id=1,
         dd_additional_payment_info={"test_key": f"{uuid.uuid4()}"},
-        dd_charge_id=dd_charge_id,
         stripe_charge_id=None,
         stripe_customer_id=str(uuid.uuid4()),
         stripe_payment_method_id=str(uuid.uuid4()),
@@ -144,7 +144,7 @@ def generate_legacy_payment(dd_charge_id: int = None) -> LegacyPayment:
 
 def generate_legacy_consumer_charge() -> LegacyConsumerCharge:
     return LegacyConsumerCharge(
-        id=1,
+        id=LegacyConsumerChargeId(1),
         target_id=1,
         target_ct_id=2,
         idempotency_key=str(uuid.uuid4()),

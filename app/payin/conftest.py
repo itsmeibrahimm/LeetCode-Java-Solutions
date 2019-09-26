@@ -12,7 +12,11 @@ from app.payin.core.cart_payment.model import (
     CorrelationIds,
     PgpPaymentIntent,
 )
-from app.payin.core.cart_payment.types import IntentStatus, CaptureMethod
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    CaptureMethod,
+    LegacyConsumerChargeId,
+)
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
@@ -76,7 +80,7 @@ async def payment_intent(
         capture_after=datetime(2016, 1, 1),
         payment_method_id=payment_intent.payment_method_id,
         metadata=None,
-        legacy_consumer_charge_id=0,
+        legacy_consumer_charge_id=LegacyConsumerChargeId(127683),
     )
 
 

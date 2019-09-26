@@ -2,7 +2,7 @@ import uuid
 from asyncio import gather
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Tuple, List, Optional, Callable, Dict, Any
+from typing import Tuple, List, Optional, Callable, Dict, Any, Union
 
 from fastapi import Depends
 from stripe.error import StripeError, InvalidRequestError
@@ -50,6 +50,7 @@ from app.payin.core.cart_payment.types import (
     ChargeStatus,
     IntentStatus,
     LegacyStripeChargeStatus,
+    LegacyConsumerChargeId,
 )
 from app.payin.core.exceptions import (
     PayinErrorCode,
@@ -410,7 +411,9 @@ class CartPaymentInterface:
 
     async def find_existing_payment(
         self, payer_id: Optional[uuid.UUID], idempotency_key: str
-    ) -> Tuple[Optional[CartPayment], Optional[LegacyPayment], Optional[PaymentIntent]]:
+    ) -> Union[
+        Tuple[CartPayment, LegacyPayment, PaymentIntent], Tuple[None, None, None]
+    ]:
         # TODO support legacy payment case, where there is no payer_id
         payment_intent = await self.payment_repo.get_payment_intent_for_idempotency_key(
             idempotency_key
@@ -423,6 +426,8 @@ class CartPaymentInterface:
             payment_intent.cart_payment_id
         )
 
+        assert cart_payment
+        assert legacy_payment
         return cart_payment, legacy_payment, payment_intent
 
     async def get_cart_payment(
@@ -455,6 +460,7 @@ class CartPaymentInterface:
         self,
         request_cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
+        legacy_consumer_charge_id: LegacyConsumerChargeId,
         provider_payment_method_id: str,
         provider_customer_resource_id: str,
         provider_metadata: Optional[Dict[str, Any]],
@@ -512,7 +518,7 @@ class CartPaymentInterface:
 
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
                 cart_payment=request_cart_payment,
-                legacy_payment=legacy_payment,
+                legacy_consumer_charge_id=legacy_consumer_charge_id,
                 idempotency_key=idempotency_key,
                 payment_method_id=request_cart_payment.payment_method_id,
                 provider_payment_method_id=provider_payment_method_id,
@@ -582,7 +588,7 @@ class CartPaymentInterface:
     async def _create_new_intent_pair(
         self,
         cart_payment: CartPayment,
-        legacy_payment: LegacyPayment,
+        legacy_consumer_charge_id: LegacyConsumerChargeId,
         idempotency_key: str,
         payment_method_id: Optional[uuid.UUID],
         provider_payment_method_id: str,
@@ -613,7 +619,7 @@ class CartPaymentInterface:
             capture_after=capture_after,
             payment_method_id=payment_method_id,
             metadata=provider_metadata,
-            legacy_consumer_charge_id=legacy_payment.dd_charge_id,
+            legacy_consumer_charge_id=legacy_consumer_charge_id,
         )
 
         # Create PgpPaymentIntent
@@ -1010,7 +1016,6 @@ class CartPaymentInterface:
         self,
         amount: int,
         cart_payment: CartPayment,
-        legacy_payment: LegacyPayment,
         existing_payment_intents: List[PaymentIntent],
         idempotency_key: str,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
@@ -1021,7 +1026,7 @@ class CartPaymentInterface:
         # Immutable properties, such as currency, are derived from the previous/most recent intent in order to
         # have these fields for new intent submission and keep API simple for clients.
         most_recent_intent = self.get_most_recent_intent(existing_payment_intents)
-        legacy_payment.dd_charge_id = most_recent_intent.legacy_consumer_charge_id
+        legacy_consumer_charge_id = most_recent_intent.legacy_consumer_charge_id
 
         # Get payment resource IDs, required for submitting intent to providers
         pgp_intent = await self._get_most_recent_pgp_payment_intent(most_recent_intent)
@@ -1031,7 +1036,7 @@ class CartPaymentInterface:
         async with self.payment_repo.payment_database_transaction():
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
                 cart_payment=cart_payment,
-                legacy_payment=legacy_payment,
+                legacy_consumer_charge_id=legacy_consumer_charge_id,
                 idempotency_key=idempotency_key,
                 payment_method_id=most_recent_intent.payment_method_id,
                 provider_payment_method_id=pgp_intent.payment_method_resource_id,
@@ -1434,7 +1439,6 @@ class CartPaymentProcessor:
             # First attempt at cart payment adjustment for this idempotency key.
             payment_intent, pgp_payment_intent = await self.cart_payment_interface.increase_payment_amount(
                 cart_payment=cart_payment,
-                legacy_payment=legacy_payment,
                 existing_payment_intents=payment_intents,
                 amount=amount,
                 idempotency_key=idempotency_key,
@@ -1839,7 +1843,7 @@ class CartPaymentProcessor:
         idempotency_key: str,
         country: CountryCode,
         currency: Currency,
-    ) -> Tuple[CartPayment, LegacyPayment]:
+    ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
         payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
             legacy_payment=request_legacy_payment
         )
@@ -1858,7 +1862,7 @@ class CartPaymentProcessor:
         idempotency_key: str,
         country: CountryCode,
         currency: Currency,
-    ):
+    ) -> CartPayment:
         assert request_cart_payment.payer_id
         assert request_cart_payment.payment_method_id
         payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
@@ -1866,7 +1870,7 @@ class CartPaymentProcessor:
             payment_method_id=request_cart_payment.payment_method_id,
             legacy_country_id=get_country_id_by_code(country),
         )
-        return await self._create_payment(
+        cart_payment, _ = await self._create_payment(
             request_cart_payment=request_cart_payment,
             payment_resource_ids=payment_resource_ids,
             legacy_payment=legacy_payment,
@@ -1874,6 +1878,7 @@ class CartPaymentProcessor:
             country=country,
             currency=currency,
         )
+        return cart_payment
 
     async def _create_payment(
         self,
@@ -1883,7 +1888,7 @@ class CartPaymentProcessor:
         idempotency_key: str,
         country: CountryCode,
         currency: Currency,
-    ) -> Tuple[CartPayment, LegacyPayment]:
+    ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
         """Submit a cart payment creation request.
 
         Arguments:
@@ -1922,7 +1927,7 @@ class CartPaymentProcessor:
                         existing_payment_intent,
                         pgp_payment_intent,
                     ),
-                    existing_legacy_payment,
+                    existing_payment_intent.legacy_consumer_charge_id,
                 )
 
             # We have record of the payment but it did not make it to provider.  Pick up where we left off by trying to submit to
@@ -1955,7 +1960,7 @@ class CartPaymentProcessor:
                 country=country,
                 currency=currency,
             )
-            legacy_payment.dd_charge_id = legacy_consumer_charge.id
+            legacy_consumer_charge_id = legacy_consumer_charge.id
             provider_metadata = None
             if (
                 legacy_payment
@@ -1970,6 +1975,7 @@ class CartPaymentProcessor:
             cart_payment, payment_intent, pgp_payment_intent = await self.cart_payment_interface.create_new_payment(
                 request_cart_payment=request_cart_payment,
                 legacy_payment=legacy_payment,
+                legacy_consumer_charge_id=legacy_consumer_charge_id,
                 provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
                 provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
                 provider_metadata=provider_metadata,
@@ -1999,10 +2005,8 @@ class CartPaymentProcessor:
             legacy_payment=legacy_payment,
             legacy_stripe_charge=legacy_stripe_charge,
         )
-        if legacy_consumer_charge:
-            legacy_payment.dd_charge_id = legacy_consumer_charge.id
 
         self.cart_payment_interface.populate_cart_payment_for_response(
             cart_payment, payment_intent, pgp_payment_intent
         )
-        return cart_payment, legacy_payment
+        return cart_payment, legacy_consumer_charge.id

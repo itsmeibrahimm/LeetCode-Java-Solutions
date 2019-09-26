@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Tuple, Dict, AsyncIterator
+from typing import Any, List, Optional, Tuple, Dict, AsyncIterator, Union
 from uuid import UUID
 
 from IPython.utils.tz import utcnow
@@ -22,7 +22,11 @@ from app.payin.core.cart_payment.model import (
     LegacyPayment,
     CorrelationIds,
 )
-from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    ChargeStatus,
+    LegacyConsumerChargeId,
+)
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.models.maindb import consumer_charges, stripe_charges
 from app.payin.models.paymentdb import (
@@ -194,7 +198,7 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def get_cart_payment_by_id(
         self, cart_payment_id: UUID
-    ) -> Tuple[Optional[CartPayment], Optional[LegacyPayment]]:
+    ) -> Union[Tuple[CartPayment, LegacyPayment], Tuple[None, None]]:
         statement = cart_payments.table.select().where(
             cart_payments.id == cart_payment_id
         )
@@ -233,7 +237,7 @@ class CartPaymentRepository(PayinDBRepository):
         capture_after: Optional[datetime],
         payment_method_id: Optional[UUID],
         metadata: Optional[Dict[str, Any]],
-        legacy_consumer_charge_id: Optional[int],
+        legacy_consumer_charge_id: LegacyConsumerChargeId,
     ) -> PaymentIntent:
         data = {
             payment_intents.id: id,
@@ -279,7 +283,9 @@ class CartPaymentRepository(PayinDBRepository):
             statement_descriptor=row[payment_intents.statement_descriptor],
             payment_method_id=row[payment_intents.payment_method_id],
             metadata=row[payment_intents.metadata],
-            legacy_consumer_charge_id=row[payment_intents.legacy_consumer_charge_id],
+            legacy_consumer_charge_id=LegacyConsumerChargeId(
+                row[payment_intents.legacy_consumer_charge_id]
+            ),
             created_at=row[payment_intents.created_at],
             updated_at=row[payment_intents.updated_at],
             captured_at=row[payment_intents.captured_at],
@@ -824,7 +830,7 @@ class CartPaymentRepository(PayinDBRepository):
 
     def to_legacy_consumer_charge(self, row: Any) -> LegacyConsumerCharge:
         return LegacyConsumerCharge(
-            id=row[consumer_charges.id],
+            id=LegacyConsumerChargeId(row[consumer_charges.id]),
             target_id=row[consumer_charges.target_id],
             target_ct_id=row[consumer_charges.target_ct_id],
             idempotency_key=row[consumer_charges.idempotency_key],

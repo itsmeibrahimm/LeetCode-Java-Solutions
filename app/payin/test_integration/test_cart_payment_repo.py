@@ -24,6 +24,7 @@ from app.payin.core.cart_payment.types import (
     CaptureMethod,
     ChargeStatus,
     LegacyStripeChargeStatus,
+    LegacyConsumerChargeId,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.core.payer.model import Payer
@@ -131,7 +132,7 @@ async def create_payment_intent(
         capture_after=payment_intent__capture_after,
         payment_method_id=payment_method.id,
         metadata={"is_first_order": True},
-        legacy_consumer_charge_id=0,
+        legacy_consumer_charge_id=LegacyConsumerChargeId(11),
     )
 
 
@@ -298,7 +299,7 @@ class TestPaymentIntentAdjustmentHistory:
             capture_after=None,
             payment_method_id=payment_method.id,
             metadata=None,
-            legacy_consumer_charge_id=0,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(98722),
         )
 
         id = uuid4()
@@ -838,7 +839,7 @@ class TestLegacyCharges:
         )
 
         expected_consumer_charge = LegacyConsumerCharge(
-            id=result.id,  # Generated
+            id=LegacyConsumerChargeId(result.id),  # Generated
             target_ct_id=1,
             target_id=2,
             idempotency_key=idempotency_key,

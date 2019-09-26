@@ -26,7 +26,11 @@ from app.payin.core.cart_payment.model import (
     LegacyStripeCharge,
     LegacyPayment,
 )
-from app.payin.core.cart_payment.types import IntentStatus, ChargeStatus
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    ChargeStatus,
+    LegacyConsumerChargeId,
+)
 from app.payin.tests import utils
 
 
@@ -97,7 +101,7 @@ class MockedPaymentRepo:
         capture_after: Optional[datetime],
         payment_method_id: Optional[str],
         metadata: Optional[Dict[str, Any]],
-        legacy_consumer_charge_id: Optional[int],
+        legacy_consumer_charge_id: Optional[LegacyConsumerChargeId],
     ) -> PaymentIntent:
         return PaymentIntent(
             id=id,
@@ -373,7 +377,7 @@ class MockedPaymentRepo:
         original_total: int,
     ) -> LegacyConsumerCharge:
         return LegacyConsumerCharge(
-            id=1,
+            id=LegacyConsumerChargeId(1),
             target_id=target_id,
             target_ct_id=target_ct_id,
             idempotency_key=idempotency_key,

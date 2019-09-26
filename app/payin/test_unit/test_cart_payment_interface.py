@@ -30,6 +30,7 @@ from app.payin.core.cart_payment.types import (
     ChargeStatus,
     CaptureMethod,
     LegacyStripeChargeStatus,
+    LegacyConsumerChargeId,
 )
 from app.payin.core.exceptions import (
     CartPaymentCreateError,
@@ -652,6 +653,7 @@ class TestCartPaymentInterface:
         result_cart_payment, result_payment_intent, result_pgp_payment_intent = await cart_payment_interface.create_new_payment(
             request_cart_payment=request_cart_payment,
             legacy_payment=legacy_payment,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(9999),
             provider_payment_method_id=payment_resource_id,
             provider_customer_resource_id=customer_resource_id,
             provider_metadata=None,
@@ -693,6 +695,7 @@ class TestCartPaymentInterface:
             captured_at=None,
             cancelled_at=None,
             capture_after=result_payment_intent.capture_after,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(9999),
         )
         assert result_payment_intent
         assert result_payment_intent == expected_payment_intent
@@ -781,7 +784,6 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_create_new_intent_pair(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
-        legacy_payment = generate_legacy_payment(dd_charge_id=560)
         capture_after = datetime.utcnow()
         result_intent, result_pgp_intent = await cart_payment_interface._create_new_intent_pair(
             cart_payment=cart_payment,
@@ -796,7 +798,7 @@ class TestCartPaymentInterface:
             capture_method=CaptureMethod.MANUAL,
             capture_after=capture_after,
             payer_statement_description=None,
-            legacy_payment=legacy_payment,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(560),
         )
 
         expected_payment_intent = PaymentIntent(
@@ -815,7 +817,7 @@ class TestCartPaymentInterface:
             statement_descriptor=None,
             payment_method_id=cart_payment.payment_method_id,
             metadata={"is_first_order": False},
-            legacy_consumer_charge_id=legacy_payment.dd_charge_id,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(560),
             created_at=result_intent.created_at,  # Generated field
             updated_at=result_intent.updated_at,  # Generated field
             capture_after=capture_after,
@@ -1135,18 +1137,21 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_increase_payment_amount(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
-        legacy_payment = generate_legacy_payment(dd_charge_id=440)
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(7888),
+        )
         result_intent, result_pgp_intent = await cart_payment_interface.increase_payment_amount(
             cart_payment=cart_payment,
-            existing_payment_intents=[
-                generate_payment_intent(cart_payment_id=cart_payment.id)
-            ],
+            existing_payment_intents=[payment_intent],
             idempotency_key=str(uuid.uuid4()),
             amount=875,
-            legacy_payment=legacy_payment,
         )
         assert result_intent.amount == 875
-        assert result_intent.legacy_consumer_charge_id == legacy_payment.dd_charge_id
+        assert (
+            result_intent.legacy_consumer_charge_id
+            == payment_intent.legacy_consumer_charge_id
+        )
 
     @pytest.mark.asyncio
     async def test_lower_amount_for_uncaptured_payment(self, cart_payment_interface):

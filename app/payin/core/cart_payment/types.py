@@ -1,4 +1,7 @@
 from enum import Enum
+from typing import NewType
+
+LegacyConsumerChargeId = NewType("LegacyConsumerChargeId", int)
 
 
 class CartType(str, Enum):

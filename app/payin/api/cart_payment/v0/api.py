@@ -21,6 +21,7 @@ from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyRespon
 from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
+from app.payin.core.cart_payment.types import LegacyConsumerChargeId
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
 
@@ -48,7 +49,7 @@ async def create_cart_payment_for_legacy_client(
     log.info(f"Creating cart_payment for legacy client.")
 
     try:
-        cart_payment, legacy_payment = await cart_payment_processor.legacy_create_payment(
+        cart_payment, legacy_consumer_charge_id = await cart_payment_processor.legacy_create_payment(
             request_cart_payment=create_request_to_model(
                 cart_payment_request, cart_payment_request.legacy_correlation_ids
             ),
@@ -61,7 +62,10 @@ async def create_cart_payment_for_legacy_client(
         )
 
         log.info(f"Created cart_payment {cart_payment.id} for legacy client.")
-        return form_create_response(cart_payment, legacy_payment)
+        return form_create_response(
+            cart_payment=cart_payment,
+            legacy_consumer_charge_id=legacy_consumer_charge_id,
+        )
     except PaymentError as payment_error:
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
         if payment_error.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
@@ -148,10 +152,10 @@ async def cancel_cart_payment(
 
 
 def form_create_response(
-    cart_payment: CartPayment, legacy_payment: LegacyPayment
+    cart_payment: CartPayment, legacy_consumer_charge_id: LegacyConsumerChargeId
 ) -> CreateCartPaymentLegacyResponse:
     return CreateCartPaymentLegacyResponse(
-        dd_charge_id=legacy_payment.dd_charge_id,
+        dd_charge_id=legacy_consumer_charge_id,
         id=cart_payment.id,
         amount=cart_payment.amount,
         payer_id=cart_payment.payer_id,
