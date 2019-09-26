@@ -199,7 +199,7 @@ class PaymentAccountRepository(
     async def create_stripe_managed_account_and_update_payment_account(
         self, data: StripeManagedAccountCreateAndPaymentAccountUpdate
     ) -> Tuple[StripeManagedAccount, PaymentAccount]:
-        async with self._database.master().acquire() as connection:  # type: DBConnection
+        async with self._database.master().connection() as connection:
             try:
                 return await self.execute_create_stripe_managed_account_and_update_payment_account(
                     data=data, db_connection=connection
