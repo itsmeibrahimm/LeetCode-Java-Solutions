@@ -131,44 +131,35 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     ) -> ProcessMxLedgerOutput:
         async with self.payment_database.master().transaction() as tx:
             connection = tx.connection()
-            try:
-                # Lock mx_ledger row for updating state
-                stmt = (
-                    mx_ledgers.table.select()
-                    .where(mx_ledgers.id == request.id)
-                    .with_for_update(nowait=True)
-                )
-                await connection.fetch_one(stmt)
-            except Exception as e:
-                raise e
-            try:
-                # update ledger state to PROCESSING
-                ledger_stmt = (
-                    mx_ledgers.table.update()
-                    .where(mx_ledgers.id == request.id)
-                    .values(state=MxLedgerStateType.PROCESSING)
-                    .returning(*mx_ledgers.table.columns.values())
-                )
-                ledger_row = await connection.fetch_one(ledger_stmt)
-                assert ledger_row
-            except Exception as e:
-                raise e
-            try:
-                # update scheduled_ledger closed_at only when it is 0
-                scheduled_ledger_stmt = (
-                    mx_scheduled_ledgers.table.update()
-                    .where(
-                        and_(
-                            mx_scheduled_ledgers.ledger_id == request.id,
-                            mx_scheduled_ledgers.closed_at == 0,
-                        )
+            # Lock mx_ledger row for updating state
+            stmt = (
+                mx_ledgers.table.select()
+                .where(mx_ledgers.id == request.id)
+                .with_for_update(nowait=True)
+            )
+            await connection.fetch_one(stmt)
+            # update ledger state to PROCESSING
+            ledger_stmt = (
+                mx_ledgers.table.update()
+                .where(mx_ledgers.id == request.id)
+                .values(state=MxLedgerStateType.PROCESSING)
+                .returning(*mx_ledgers.table.columns.values())
+            )
+            ledger_row = await connection.fetch_one(ledger_stmt)
+            assert ledger_row
+            # update scheduled_ledger closed_at only when it is 0
+            scheduled_ledger_stmt = (
+                mx_scheduled_ledgers.table.update()
+                .where(
+                    and_(
+                        mx_scheduled_ledgers.ledger_id == request.id,
+                        mx_scheduled_ledgers.closed_at == 0,
                     )
-                    .values(closed_at=int(datetime.utcnow().timestamp() * 1000000))
-                    .returning(*mx_scheduled_ledgers.table.columns.values())
                 )
-                await connection.fetch_one(scheduled_ledger_stmt)
-            except Exception as e:
-                raise e
+                .values(closed_at=int(datetime.utcnow().timestamp() * 1000000))
+                .returning(*mx_scheduled_ledgers.table.columns.values())
+            )
+            await connection.fetch_one(scheduled_ledger_stmt)
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
     async def get_ledger_by_id(
@@ -182,87 +173,71 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
         now = datetime.utcnow()
-        try:
-            # update ledger state to FAILED and finalized_at, updated_at
-            ledger_stmt = (
-                mx_ledgers.table.update()
-                .where(mx_ledgers.id == request.id)
-                .values(
-                    state=MxLedgerStateType.FAILED, finalized_at=now, updated_at=now
-                )
-                .returning(*mx_ledgers.table.columns.values())
-            )
-            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
-            assert ledger_row
-        except Exception as e:
-            raise e
+        # update ledger state to FAILED and finalized_at, updated_at
+        ledger_stmt = (
+            mx_ledgers.table.update()
+            .where(mx_ledgers.id == request.id)
+            .values(state=MxLedgerStateType.FAILED, finalized_at=now, updated_at=now)
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
     async def move_ledger_state_to_paid(
         self, request: UpdatePaidMxLedgerInput
     ) -> ProcessMxLedgerOutput:
         now = datetime.utcnow()
-        try:
-            # update ledger state to PAID and update amount_paid and finalized_at, updated_at
-            ledger_stmt = (
-                mx_ledgers.table.update()
-                .where(mx_ledgers.id == request.id)
-                .values(
-                    state=MxLedgerStateType.PAID,
-                    amount_paid=request.amount_paid,
-                    finalized_at=now,
-                    updated_at=now,
-                )
-                .returning(*mx_ledgers.table.columns.values())
+        # update ledger state to PAID and update amount_paid and finalized_at, updated_at
+        ledger_stmt = (
+            mx_ledgers.table.update()
+            .where(mx_ledgers.id == request.id)
+            .values(
+                state=MxLedgerStateType.PAID,
+                amount_paid=request.amount_paid,
+                finalized_at=now,
+                updated_at=now,
             )
-            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
-            assert ledger_row
-        except Exception as e:
-            raise e
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
     async def move_ledger_state_to_rolled(
         self, request: UpdatedRolledMxLedgerInput, db_connection: DBConnection
     ) -> ProcessMxLedgerOutput:
         now = datetime.utcnow()
-        try:
-            # update ledger state to ROLLED, amount_paid, finalized_at, rolled_to_ledger_id, updated_at
-            ledger_stmt = (
-                mx_ledgers.table.update()
-                .where(mx_ledgers.id == request.id)
-                .values(
-                    state=MxLedgerStateType.ROLLED,
-                    amount_paid=0,
-                    finalized_at=now,
-                    rolled_to_ledger_id=request.rolled_to_ledger_id,
-                    updated_at=now,
-                )
-                .returning(*mx_ledgers.table.columns.values())
+        # update ledger state to ROLLED, amount_paid, finalized_at, rolled_to_ledger_id, updated_at
+        ledger_stmt = (
+            mx_ledgers.table.update()
+            .where(mx_ledgers.id == request.id)
+            .values(
+                state=MxLedgerStateType.ROLLED,
+                amount_paid=0,
+                finalized_at=now,
+                rolled_to_ledger_id=request.rolled_to_ledger_id,
+                updated_at=now,
             )
-            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
-            assert ledger_row
-        except Exception as e:
-            raise e
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
     async def move_ledger_state_to_submitted(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
         now = datetime.utcnow()
-        try:
-            # update ledger state to SUBMITTED, submitted_at, updated_at
-            ledger_stmt = (
-                mx_ledgers.table.update()
-                .where(mx_ledgers.id == request.id)
-                .values(
-                    state=MxLedgerStateType.SUBMITTED, submitted_at=now, updated_at=now
-                )
-                .returning(*mx_ledgers.table.columns.values())
-            )
-            ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
-            assert ledger_row
-        except Exception as e:
-            raise e
+        # update ledger state to SUBMITTED, submitted_at, updated_at
+        ledger_stmt = (
+            mx_ledgers.table.update()
+            .where(mx_ledgers.id == request.id)
+            .values(state=MxLedgerStateType.SUBMITTED, submitted_at=now, updated_at=now)
+            .returning(*mx_ledgers.table.columns.values())
+        )
+        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
     # todo: PAY-3482: refactor type of the output
@@ -288,17 +263,14 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
 
         async with self.payment_database.master().transaction() as tx:
             connection = tx.connection()
-            try:
-                mx_transaction = await mx_transaction_repo.create_mx_transaction_and_upsert_mx_ledgers(
-                    request_input, connection
-                )
-                # move the ledger state to rolled
-                closed_mx_ledger = await self.move_ledger_state_to_rolled(
-                    UpdatedRolledMxLedgerInput(
-                        id=request.id, rolled_to_ledger_id=mx_transaction.ledger_id
-                    ),
-                    connection,
-                )
-                return closed_mx_ledger
-            except Exception as e:
-                raise e
+            mx_transaction = await mx_transaction_repo.create_mx_transaction_and_upsert_mx_ledgers(
+                request_input, connection
+            )
+            # move the ledger state to rolled
+            closed_mx_ledger = await self.move_ledger_state_to_rolled(
+                UpdatedRolledMxLedgerInput(
+                    id=request.id, rolled_to_ledger_id=mx_transaction.ledger_id
+                ),
+                connection,
+            )
+            return closed_mx_ledger
