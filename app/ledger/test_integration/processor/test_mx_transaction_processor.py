@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 import pytest_mock
@@ -62,7 +62,7 @@ class TestMxTransactionProcessor:
     ):
         ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        routing_key = datetime(2019, 8, 1)
+        routing_key = datetime(2019, 8, 1, tzinfo=timezone.utc)
         interval_type = MxScheduledLedgerIntervalType.WEEKLY
         scheduled_ledger_id = uuid.uuid4()
 
@@ -123,7 +123,7 @@ class TestMxTransactionProcessor:
         ledger_id = uuid.uuid4()
         scheduled_ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        routing_key = datetime(2019, 8, 1)
+        routing_key = datetime(2019, 8, 1, tzinfo=timezone.utc)
         closed_at = int(datetime.utcnow().timestamp() * 1000000)
 
         # construct and insert paid/closed ledger/scheduled_ledger so that it cannot find an open scheduled ledger with given period
@@ -157,7 +157,7 @@ class TestMxTransactionProcessor:
             scheduled_ledger_id=scheduled_ledger_id,
             ledger_id=ledger_id,
             payment_account_id=payment_account_id,
-            routing_key=datetime(2019, 8, 13),
+            routing_key=datetime(2019, 8, 13, tzinfo=timezone.utc),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -175,7 +175,7 @@ class TestMxTransactionProcessor:
             scheduled_ledger_id=scheduled_ledger_id,
             ledger_id=ledger_id,
             payment_account_id=payment_account_id,
-            routing_key=datetime(2019, 8, 7),
+            routing_key=datetime(2019, 8, 7, tzinfo=timezone.utc),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -209,7 +209,7 @@ class TestMxTransactionProcessor:
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         payment_account_id = str(uuid.uuid4())
-        routing_key = datetime(2019, 8, 1)
+        routing_key = datetime(2019, 8, 1, tzinfo=timezone.utc)
 
         mx_transaction = await self.mx_transaction_processor.create(
             payment_account_id=payment_account_id,

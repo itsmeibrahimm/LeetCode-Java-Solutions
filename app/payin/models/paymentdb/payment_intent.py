@@ -34,8 +34,8 @@ class PaymentIntentTable(TableDefinition):
     legacy_consumer_charge_id: Column = no_init_field(
         Column("legacy_consumer_charge_id", Integer)
     )
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
-    updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
-    captured_at: Column = no_init_field(Column("captured_at", DateTime(False)))
-    cancelled_at: Column = no_init_field(Column("cancelled_at", DateTime(False)))
-    capture_after: Column = no_init_field(Column("capture_after", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))
+    captured_at: Column = no_init_field(Column("captured_at", DateTime(True)))
+    cancelled_at: Column = no_init_field(Column("cancelled_at", DateTime(True)))
+    capture_after: Column = no_init_field(Column("capture_after", DateTime(True)))

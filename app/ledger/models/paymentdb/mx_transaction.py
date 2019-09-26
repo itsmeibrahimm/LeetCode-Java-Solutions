@@ -20,7 +20,7 @@ class MxTransactionTable(TableDefinition):
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
 
     # created_at for transaction from DSJ or POS confirmation time
-    routing_key: Column = no_init_field(Column("routing_key", DateTime(False)))
+    routing_key: Column = no_init_field(Column("routing_key", DateTime(True)))
     target_id: Column = no_init_field(Column("target_id", Text))
     legacy_transaction_id: Column = no_init_field(
         Column("legacy_transaction_id", Text)
@@ -28,6 +28,6 @@ class MxTransactionTable(TableDefinition):
     context: Column = no_init_field(Column("context", JSON))
     metadata: Column = no_init_field(Column("metadata", JSON))
     created_at: Column = no_init_field(
-        Column("created_at", DateTime(False))
+        Column("created_at", DateTime(True))
     )  # timestamp for db record insertion
-    updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))

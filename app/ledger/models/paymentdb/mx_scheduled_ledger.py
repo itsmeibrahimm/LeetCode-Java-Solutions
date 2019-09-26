@@ -20,11 +20,11 @@ class MxScheduledLedgerTable(TableDefinition):
     id: Column = no_init_field(Column("id", Text, primary_key=True))
     payment_account_id: Column = no_init_field(Column("payment_account_id", Text))
     interval_type: Column = no_init_field(Column("interval_type", Text))
-    start_time: Column = no_init_field(Column("start_time", DateTime(False)))
-    end_time: Column = no_init_field(Column("end_time", DateTime(False)))
+    start_time: Column = no_init_field(Column("start_time", DateTime(True)))
+    end_time: Column = no_init_field(Column("end_time", DateTime(True)))
     ledger_id: Column = no_init_field(Column("ledger_id", Text))
     closed_at: Column = no_init_field(
         Column("closed_at", BigInteger)
     )  # timestamp of when the ledger is updated to PROCESSING
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
-    updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))

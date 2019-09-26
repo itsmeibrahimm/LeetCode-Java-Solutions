@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 import pytest
@@ -25,7 +25,7 @@ class TestMxLedgerRepository:
         mx_scheduled_ledger_id = uuid.uuid4()
         ledger_id = uuid.uuid4()
         payment_account_id = str(uuid.uuid4())
-        routing_key = datetime(2019, 8, 7)
+        routing_key = datetime(2019, 8, 7, tzinfo=timezone.utc)
 
         ledger_to_insert = await prepare_mx_ledger(
             ledger_id=ledger_id, payment_account_id=payment_account_id
@@ -46,5 +46,9 @@ class TestMxLedgerRepository:
         assert mx_scheduled_ledger.payment_account_id == payment_account_id
         assert mx_scheduled_ledger.ledger_id == ledger_id
         assert mx_scheduled_ledger.interval_type == MxScheduledLedgerIntervalType.WEEKLY
-        assert mx_scheduled_ledger.start_time == datetime(2019, 8, 5, 7)
-        assert mx_scheduled_ledger.end_time == datetime(2019, 8, 12, 7)
+        assert mx_scheduled_ledger.start_time == datetime(
+            2019, 8, 5, 7, tzinfo=timezone.utc
+        )
+        assert mx_scheduled_ledger.end_time == datetime(
+            2019, 8, 12, 7, tzinfo=timezone.utc
+        )

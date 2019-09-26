@@ -19,4 +19,4 @@ class PaymentIntentAdjustmentTable(TableDefinition):
     amount_original: Column = no_init_field(Column("amount_original", Integer))
     amount_delta: Column = no_init_field(Column("amount_delta", Integer))
     currency: Column = no_init_field(Column("currency", String))
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))

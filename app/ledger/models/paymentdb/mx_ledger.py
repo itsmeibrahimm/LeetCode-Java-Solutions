@@ -21,10 +21,10 @@ class MxLedgerTable(TableDefinition):
     )  # amount paid through payout service
     payment_account_id: Column = no_init_field(Column("payment_account_id", Text))
     legacy_transfer_id: Column = no_init_field(Column("legacy_transfer_id", Text))
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
-    updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
-    submitted_at: Column = no_init_field(Column("submitted_at", DateTime(False)))
-    finalized_at: Column = no_init_field(Column("finalized_at", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))
+    submitted_at: Column = no_init_field(Column("submitted_at", DateTime(True)))
+    finalized_at: Column = no_init_field(Column("finalized_at", DateTime(True)))
     created_by_employee_id: Column = no_init_field(
         Column("created_by_employee_id", Text)
     )

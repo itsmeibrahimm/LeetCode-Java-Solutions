@@ -30,5 +30,5 @@ class PgpCustomerTable(TableDefinition):
     legacy_default_source_id: Column = no_init_field(
         Column("legacy_default_source_id", Text)
     )
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
-    updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))

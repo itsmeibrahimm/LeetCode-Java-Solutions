@@ -34,6 +34,6 @@ class CartPaymentTable(TableDefinition):
     legacy_provider_card_id: Column = no_init_field(
         Column("legacy_provider_card_id", String)
     )
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
-    updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
-    deleted_at: Column = no_init_field(Column("deleted_at", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))
+    deleted_at: Column = no_init_field(Column("deleted_at", DateTime(True)))

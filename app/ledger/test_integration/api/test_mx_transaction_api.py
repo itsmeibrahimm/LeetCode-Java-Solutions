@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from starlette.testclient import TestClient
 
 from app.ledger.core.types import MxLedgerStateType
@@ -83,7 +83,8 @@ class TestMxTransactionAPI:
         second_response = client.post(
             "/ledger/api/v1/mx_transactions",
             json=prepare_transaction_post_request(
-                payment_account_id=payment_account_id, routing_key=datetime(2019, 8, 10)
+                payment_account_id=payment_account_id,
+                routing_key=datetime(2019, 8, 10, tzinfo=timezone.utc),
             ),
         )
         assert second_response.status_code == 201
@@ -120,7 +121,8 @@ class TestMxTransactionAPI:
         fourth_response = client.post(
             "/ledger/api/v1/mx_transactions",
             json=prepare_transaction_post_request(
-                payment_account_id=payment_account_id, routing_key=datetime(2019, 8, 10)
+                payment_account_id=payment_account_id,
+                routing_key=datetime(2019, 8, 10, tzinfo=timezone.utc),
             ),
         )
         assert fourth_response.status_code == 201

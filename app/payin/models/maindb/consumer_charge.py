@@ -14,9 +14,9 @@ class ConsumerChargeTable(TableDefinition):
     id: Column = no_init_field(Column("id", Integer, primary_key=True))
 
     # TODO: Determine correct parameter for DateTime
-    created_at: Column = no_init_field(Column("created_at", DateTime(False)))
+    created_at: Column = no_init_field(Column("created_at", DateTime(True)))
     # TODO: this is not referenced in DSJ model and does not appeared to be filled in
-    # updated_at: Column = no_init_field(Column("updated_at", DateTime(False)))
+    # updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))
     # TODO: remove and/or replace after investigating DSJ usage, this is used in GenericForeignKey (puke)
     target_ct_id: Column = no_init_field(Column("target_ct_id", Integer))
     target_id: Column = no_init_field(Column("target_id", Integer))

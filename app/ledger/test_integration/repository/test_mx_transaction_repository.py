@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import psycopg2
 import pytest
@@ -99,7 +99,7 @@ class TestMxTransactionRepository:
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         payment_account_id = str(uuid.uuid4())
-        routing_key = datetime(2019, 8, 1)
+        routing_key = datetime(2019, 8, 1, tzinfo=timezone.utc)
         request_input = InsertMxTransactionWithLedgerInput(
             currency=Currency.USD,
             amount=2000,
@@ -119,7 +119,7 @@ class TestMxTransactionRepository:
         assert created_txn.currency == Currency.USD
         assert created_txn.amount == 2000
         assert created_txn.payment_account_id == payment_account_id
-        assert created_txn.routing_key == datetime(2019, 8, 1)
+        assert created_txn.routing_key == datetime(2019, 8, 1, tzinfo=timezone.utc)
         assert created_txn.target_type == MxTransactionType.MERCHANT_DELIVERY
 
         get_scheduled_ledger_request = GetMxScheduledLedgerInput(
@@ -148,7 +148,7 @@ class TestMxTransactionRepository:
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
         payment_account_id = str(uuid.uuid4())
-        routing_key = datetime(2019, 8, 1)
+        routing_key = datetime(2019, 8, 1, tzinfo=timezone.utc)
         request_input = InsertMxTransactionWithLedgerInput(
             currency=Currency.USD,
             amount=2000,
@@ -168,7 +168,7 @@ class TestMxTransactionRepository:
         assert created_txn.currency == Currency.USD
         assert created_txn.amount == 2000
         assert created_txn.payment_account_id == payment_account_id
-        assert created_txn.routing_key == datetime(2019, 8, 1)
+        assert created_txn.routing_key == datetime(2019, 8, 1, tzinfo=timezone.utc)
         assert created_txn.target_type == MxTransactionType.MERCHANT_DELIVERY
 
         get_scheduled_ledger_request = GetMxScheduledLedgerInput(
@@ -281,7 +281,7 @@ class TestMxTransactionRepository:
             type=MxLedgerType.SCHEDULED,
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=datetime(2019, 8, 1, tzinfo=timezone.utc),
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
@@ -294,7 +294,7 @@ class TestMxTransactionRepository:
         assert mx_transaction.currency == Currency.USD
         assert mx_transaction.amount == 2000
         assert mx_transaction.payment_account_id == payment_account_id
-        assert mx_transaction.routing_key == datetime(2019, 8, 1)
+        assert mx_transaction.routing_key == datetime(2019, 8, 1, tzinfo=timezone.utc)
         assert mx_transaction.target_type == MxTransactionType.MERCHANT_DELIVERY
 
         get_mx_ledger_request = GetMxLedgerByIdInput(id=mx_transaction.ledger_id)
@@ -362,7 +362,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
         mx_scheduled_ledger_id = uuid.uuid4()
-        routing_key = datetime(2019, 8, 1)
+        routing_key = datetime(2019, 8, 1, tzinfo=timezone.utc)
 
         ledger_to_insert = await prepare_mx_ledger(
             ledger_id=ledger_id, payment_account_id=payment_account_id
@@ -396,8 +396,12 @@ class TestMxTransactionRepository:
                 mx_scheduled_ledger.interval_type
                 == MxScheduledLedgerIntervalType.WEEKLY
             )
-            assert mx_scheduled_ledger.start_time == datetime(2019, 7, 29, 7)
-            assert mx_scheduled_ledger.end_time == datetime(2019, 8, 5, 7)
+            assert mx_scheduled_ledger.start_time == datetime(
+                2019, 7, 29, 7, tzinfo=timezone.utc
+            )
+            assert mx_scheduled_ledger.end_time == datetime(
+                2019, 8, 5, 7, tzinfo=timezone.utc
+            )
 
     async def test_get_open_mx_scheduled_ledger_with_period_not_exist_success(
         self,
@@ -447,7 +451,7 @@ class TestMxTransactionRepository:
         payment_account_id = str(uuid.uuid4())
         ledger_id = uuid.uuid4()
         scheduled_ledger_id = uuid.uuid4()
-        start_time = datetime(2019, 7, 29, 7)
+        start_time = datetime(2019, 7, 29, 7, tzinfo=timezone.utc)
 
         ledger_to_insert = await prepare_mx_ledger(
             ledger_id=ledger_id, payment_account_id=payment_account_id
@@ -459,7 +463,7 @@ class TestMxTransactionRepository:
             ledger_id=ledger_id,
             payment_account_id=payment_account_id,
             start_time=start_time,
-            end_time=datetime(2019, 8, 5, 7),
+            end_time=datetime(2019, 8, 5, 7, tzinfo=timezone.utc),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -478,7 +482,7 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             interval_type=MxScheduledLedgerIntervalType.DAILY,
             start_time=start_time,
-            end_time=datetime(2019, 7, 30, 7),
+            end_time=datetime(2019, 7, 30, 7, tzinfo=timezone.utc),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -487,7 +491,7 @@ class TestMxTransactionRepository:
         # construct request and retrieve scheduled_ledger
         request = GetMxScheduledLedgerInput(
             payment_account_id=payment_account_id,
-            routing_key=datetime(2019, 7, 30),
+            routing_key=datetime(2019, 7, 30, tzinfo=timezone.utc),
             interval_type=MxScheduledLedgerIntervalType.DAILY.value,
         )
         async with mx_transaction_repository.payment_database.master().connection() as connection:
@@ -498,7 +502,9 @@ class TestMxTransactionRepository:
 
             assert mx_scheduled_ledger_retrieved.id == scheduled_ledger_id
             assert mx_scheduled_ledger_retrieved.start_time == start_time
-            assert mx_scheduled_ledger_retrieved.end_time == datetime(2019, 7, 30, 7)
+            assert mx_scheduled_ledger_retrieved.end_time == datetime(
+                2019, 7, 30, 7, tzinfo=timezone.utc
+            )
             assert (
                 mx_scheduled_ledger_retrieved.payment_account_id == payment_account_id
             )
@@ -532,7 +538,7 @@ class TestMxTransactionRepository:
             scheduled_ledger_id=scheduled_ledger_id_1,
             ledger_id=ledger_id_1,
             payment_account_id=payment_account_id,
-            routing_key=datetime(2019, 8, 7),
+            routing_key=datetime(2019, 8, 7, tzinfo=timezone.utc),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -546,7 +552,7 @@ class TestMxTransactionRepository:
             scheduled_ledger_id=scheduled_ledger_id_2,
             ledger_id=ledger_id_2,
             payment_account_id=payment_account_id,
-            routing_key=datetime(2019, 8, 14),
+            routing_key=datetime(2019, 8, 14, tzinfo=timezone.utc),
         )
         await mx_scheduled_ledger_repository.insert_mx_scheduled_ledger(
             mx_scheduled_ledger_to_insert
@@ -568,8 +574,12 @@ class TestMxTransactionRepository:
                 mx_scheduled_ledger.interval_type
                 == MxScheduledLedgerIntervalType.WEEKLY
             )
-            assert mx_scheduled_ledger.start_time == datetime(2019, 8, 5, 7)
-            assert mx_scheduled_ledger.end_time == datetime(2019, 8, 12, 7)
+            assert mx_scheduled_ledger.start_time == datetime(
+                2019, 8, 5, 7, tzinfo=timezone.utc
+            )
+            assert mx_scheduled_ledger.end_time == datetime(
+                2019, 8, 12, 7, tzinfo=timezone.utc
+            )
 
     async def test_get_open_mx_scheduled_ledger_for_payment_account_not_exist_success(
         self,
@@ -662,7 +672,7 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=datetime(2019, 8, 1, tzinfo=timezone.utc),
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
@@ -678,7 +688,7 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 10),
+            routing_key=datetime(2019, 8, 10, tzinfo=timezone.utc),
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
@@ -704,7 +714,7 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 10),
+            routing_key=datetime(2019, 8, 10, tzinfo=timezone.utc),
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
@@ -720,7 +730,7 @@ class TestMxTransactionRepository:
             payment_account_id=payment_account_id,
             type=MxLedgerType.SCHEDULED,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
-            routing_key=datetime(2019, 8, 1),
+            routing_key=datetime(2019, 8, 1, tzinfo=timezone.utc),
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
