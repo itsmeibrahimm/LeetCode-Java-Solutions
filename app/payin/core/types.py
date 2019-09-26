@@ -1,11 +1,13 @@
 from enum import Enum
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union, Dict, Any, NewType
 from uuid import UUID
 
 from pydantic import BaseModel
 
-
 MixedUuidStrType = Union[UUID, str]
+
+PgpPaymentMethodResourceId = NewType("PgpPaymentMethodResourceId", str)
+PgpPayerResourceId = NewType("PgpPayerResourceId", str)
 
 
 class LegacyPaymentInfo(BaseModel):
@@ -17,8 +19,8 @@ class LegacyPaymentInfo(BaseModel):
     dd_stripe_card_id: str
     dd_country_id: int
     dd_additional_payment_info: Optional[Dict[str, Any]] = None
-    stripe_customer_id: str
-    stripe_card_id: str
+    stripe_customer_id: PgpPayerResourceId
+    stripe_card_id: PgpPaymentMethodResourceId
 
 
 class PayerIdType(str, Enum):

@@ -272,7 +272,7 @@ class DisputeClient:
             dd_order_cart_id=str(consumer_charge_entity.target_id),
             dd_charge_id=str(consumer_charge_entity.id),
             dd_consumer_id=str(consumer_charge_entity.consumer_id),
-            stripe_card_id=raw_pm.pgp_payment_method_id(),
+            stripe_card_id=raw_pm.pgp_payment_method_resource_id,
             stripe_dispute_status=stripe_dispute_entity.status,
             stripe_dispute_reason=stripe_dispute_entity.reason,
         )

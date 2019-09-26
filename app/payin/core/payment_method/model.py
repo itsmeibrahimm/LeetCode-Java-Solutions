@@ -8,6 +8,7 @@ from typing_extensions import final
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
 from app.payin.core.payment_method.types import WalletType
+from app.payin.core.types import PgpPaymentMethodResourceId
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -155,11 +156,14 @@ class RawPaymentMethod:
             )
         )
 
-    def pgp_payment_method_id(self) -> str:
+    @property
+    def pgp_payment_method_resource_id(self) -> PgpPaymentMethodResourceId:
         if self.pgp_payment_method_entity:
-            return self.pgp_payment_method_entity.pgp_resource_id
+            return PgpPaymentMethodResourceId(
+                self.pgp_payment_method_entity.pgp_resource_id
+            )
         elif self.stripe_card_entity:
-            return self.stripe_card_entity.stripe_id
+            return PgpPaymentMethodResourceId(self.stripe_card_entity.stripe_id)
 
         raise Exception("RawPaymentMethod doesn't have pgp_payment_method_id")
 

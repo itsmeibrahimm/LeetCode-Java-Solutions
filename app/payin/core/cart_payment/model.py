@@ -11,6 +11,8 @@ from app.payin.core.cart_payment.types import (
 )
 from uuid import UUID
 
+from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
+
 
 @final
 class LegacyPayment(BaseModel):
@@ -19,9 +21,9 @@ class LegacyPayment(BaseModel):
     dd_stripe_card_id: Optional[int] = None
     dd_additional_payment_info: Optional[Dict[str, Any]] = None
     stripe_charge_id: Optional[str] = None
-    stripe_customer_id: Optional[str] = None
+    stripe_customer_id: Optional[PgpPayerResourceId] = None
     stripe_payment_method_id: Optional[str] = None
-    stripe_card_id: Optional[str] = None
+    stripe_card_id: Optional[PgpPaymentMethodResourceId] = None
 
 
 @final

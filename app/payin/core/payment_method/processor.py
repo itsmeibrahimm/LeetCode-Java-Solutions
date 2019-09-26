@@ -84,7 +84,7 @@ class PaymentMethodProcessor:
             )
             if raw_payer and raw_payer.payer_entity:
                 pgp_country = raw_payer.country()
-                pgp_customer_res_id = raw_payer.pgp_customer_id()
+                pgp_customer_res_id = raw_payer.pgp_payer_resource_id
                 payer_type = raw_payer.payer_entity.payer_type
                 if payer_type == PayerType.MARKETPLACE:
                     dd_consumer_id = raw_payer.payer_entity.dd_payer_id
@@ -267,7 +267,7 @@ class PaymentMethodProcessor:
             payment_method_id=payment_method_id,
             payment_method_id_type=payment_method_id_type,
         )
-        pgp_payment_method_id: str = raw_payment_method.pgp_payment_method_id()
+        pgp_payment_method_id: str = raw_payment_method.pgp_payment_method_resource_id
 
         # step 2: find payer for country information
         raw_payer: Optional[RawPayer] = None

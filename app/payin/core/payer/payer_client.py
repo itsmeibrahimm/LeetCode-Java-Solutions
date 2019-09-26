@@ -158,7 +158,7 @@ class PayerClient:
     ) -> RawPayer:
         pgp_customer_id: Optional[
             str
-        ] = raw_payer.pgp_customer_id() if raw_payer.pgp_customer_id() else None
+        ] = raw_payer.pgp_payer_resource_id if raw_payer.pgp_payer_resource_id else None
         if not pgp_customer_id:
             self.log.info(
                 "[force_update_payer] pgp_customer_id is none, skip force update"

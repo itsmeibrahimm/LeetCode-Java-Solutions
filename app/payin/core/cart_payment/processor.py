@@ -1,14 +1,12 @@
 import uuid
 from asyncio import gather
-from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Tuple, List, Optional, Callable, Dict, Any, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from fastapi import Depends
-from stripe.error import StripeError, InvalidRequestError
+from stripe.error import InvalidRequestError, StripeError
 from stripe.util import convert_to_stripe_object
 from structlog.stdlib import BoundLogger
-from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
@@ -22,61 +20,60 @@ from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
-    StripeCapturePaymentIntentRequest,
-    StripeCreatePaymentIntentRequest,
-    StripeCancelPaymentIntentRequest,
     ConnectedAccountId,
-    StripeRefundChargeRequest,
-    TransferData,
     PaymentIntent as ProviderPaymentIntent,
     Refund as ProviderRefund,
+    StripeCancelPaymentIntentRequest,
+    StripeCapturePaymentIntentRequest,
+    StripeCreatePaymentIntentRequest,
+    StripeRefundChargeRequest,
+    TransferData,
 )
-from app.commons.types import CountryCode, LegacyCountryId, Currency
+from app.commons.types import CountryCode, Currency, LegacyCountryId
 from app.commons.utils.types import PaymentProvider
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
-    LegacyPayment,
     LegacyConsumerCharge,
+    LegacyPayment,
     LegacyStripeCharge,
-    PaymentIntent,
-    PgpPaymentIntent,
     PaymentCharge,
+    PaymentIntent,
     PgpPaymentCharge,
+    PgpPaymentIntent,
     SplitPayment,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
     ChargeStatus,
     IntentStatus,
-    LegacyStripeChargeStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
 )
 from app.payin.core.exceptions import (
-    PayinErrorCode,
     CartPaymentCreateError,
     CartPaymentReadError,
-    PaymentIntentCancelError,
-    PaymentIntentRefundError,
-    PaymentChargeRefundError,
-    PaymentIntentCouldNotBeUpdatedError,
-    PaymentIntentConcurrentAccessError,
-    PaymentIntentNotInRequiresCaptureState,
     InvalidProviderRequestError,
+    PayinErrorCode,
+    PaymentChargeRefundError,
+    PaymentIntentCancelError,
+    PaymentIntentConcurrentAccessError,
+    PaymentIntentCouldNotBeUpdatedError,
+    PaymentIntentNotInRequiresCaptureState,
+    PaymentIntentRefundError,
     ProviderError,
 )
 from app.payin.core.legacy.utils import get_country_id_by_code
 from app.payin.core.payer.processor import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
-from app.payin.core.types import PayerIdType, PaymentMethodIdType
+from app.payin.core.payment_method.types import PgpPaymentMethod
+from app.payin.core.types import (
+    PayerIdType,
+    PaymentMethodIdType,
+    PgpPaymentMethodResourceId,
+    PgpPayerResourceId,
+)
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
-
-
-@final
-@dataclass
-class PaymentResourceIds:
-    provider_payment_method_id: str
-    provider_customer_resource_id: str
 
 
 class LegacyPaymentInterface:
@@ -1103,7 +1100,7 @@ class CartPaymentInterface:
 
     async def get_payment_resource_ids(
         self, payer_id: uuid.UUID, payment_method_id: uuid.UUID, legacy_country_id: int
-    ) -> Tuple[PaymentResourceIds, LegacyPayment]:
+    ) -> Tuple[PgpPaymentMethod, LegacyPayment]:
         raw_payment_method = await self.payment_method_client.get_raw_payment_method(
             payer_id=payer_id,
             payer_id_type=PayerIdType.PAYER_ID,
@@ -1113,8 +1110,8 @@ class CartPaymentInterface:
         raw_payer = await self.payer_client.get_raw_payer(
             payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
         )
-        provider_payer_id = raw_payer.pgp_customer_id()
-        provider_payment_method_id = raw_payment_method.pgp_payment_method_id()
+        pgp_payer_ref_id = raw_payer.pgp_payer_resource_id
+        pgp_payment_method_ref_id = raw_payment_method.pgp_payment_method_resource_id
 
         if not raw_payer.payer_entity:
             self.req_context.log.error("No payer entity found.")
@@ -1131,15 +1128,15 @@ class CartPaymentInterface:
         self.req_context.log.debug(
             f"Legacy payment generated for resource lookup: {result_legacy_payment}"
         )
-        payment_resource_ids = PaymentResourceIds(
-            provider_payment_method_id=provider_payment_method_id,
-            provider_customer_resource_id=provider_payer_id,
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payment_method_resource_id=pgp_payment_method_ref_id,
+            pgp_payer_resource_id=pgp_payer_ref_id,
         )
-        return payment_resource_ids, result_legacy_payment
+        return pgp_payment_method, result_legacy_payment
 
     async def get_legacy_payment_resource_ids(
         self, legacy_payment: LegacyPayment
-    ) -> Tuple[PaymentResourceIds, LegacyPayment]:
+    ) -> Tuple[PgpPaymentMethod, LegacyPayment]:
         # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent
         # submission and management.  A client is expected to either provide either
         #   a. both payer_id and payment_method_id, which we can use to look up corresponding pgp resource IDs
@@ -1179,11 +1176,14 @@ class CartPaymentInterface:
                 retryable=False,
             )
 
-        payment_resource_ids = PaymentResourceIds(
-            provider_payment_method_id=provider_payment_method_id,
-            provider_customer_resource_id=provider_payer_id,
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                provider_payment_method_id
+            ),
+            pgp_payer_resource_id=PgpPayerResourceId(provider_payer_id),
         )
-        return payment_resource_ids, result_legacy_payment
+
+        return pgp_payment_method, result_legacy_payment
 
     def populate_cart_payment_for_response(
         self,
@@ -1396,13 +1396,13 @@ class CartPaymentProcessor:
 
         if cart_payment.payer_id:
             assert payment_intents[0].payment_method_id
-            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
                 payer_id=cart_payment.payer_id,
                 payment_method_id=payment_intents[0].payment_method_id,
                 legacy_country_id=get_country_id_by_code(payment_intents[0].country),
             )
         else:  # legacy case
-            payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
                 legacy_payment=legacy_payment
             )
 
@@ -1454,8 +1454,8 @@ class CartPaymentProcessor:
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
-            provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
-            provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
+            provider_payment_method_id=pgp_payment_method.pgp_payment_method_resource_id,
+            provider_customer_resource_id=pgp_payment_method.pgp_payer_resource_id,
             provider_description=intent_description,
         )
 
@@ -1844,12 +1844,12 @@ class CartPaymentProcessor:
         country: CountryCode,
         currency: Currency,
     ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
-        payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
             legacy_payment=request_legacy_payment
         )
         return await self._create_payment(
             request_cart_payment=request_cart_payment,
-            payment_resource_ids=payment_resource_ids,
+            pgp_payment_method=pgp_payment_method,
             legacy_payment=legacy_payment,
             idempotency_key=idempotency_key,
             country=country,
@@ -1865,14 +1865,14 @@ class CartPaymentProcessor:
     ) -> CartPayment:
         assert request_cart_payment.payer_id
         assert request_cart_payment.payment_method_id
-        payment_resource_ids, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
             payer_id=request_cart_payment.payer_id,
             payment_method_id=request_cart_payment.payment_method_id,
             legacy_country_id=get_country_id_by_code(country),
         )
         cart_payment, _ = await self._create_payment(
             request_cart_payment=request_cart_payment,
-            payment_resource_ids=payment_resource_ids,
+            pgp_payment_method=pgp_payment_method,
             legacy_payment=legacy_payment,
             idempotency_key=idempotency_key,
             country=country,
@@ -1883,7 +1883,7 @@ class CartPaymentProcessor:
     async def _create_payment(
         self,
         request_cart_payment: CartPayment,
-        payment_resource_ids: PaymentResourceIds,
+        pgp_payment_method: PgpPaymentMethod,
         legacy_payment: LegacyPayment,
         idempotency_key: str,
         country: CountryCode,
@@ -1976,8 +1976,8 @@ class CartPaymentProcessor:
                 request_cart_payment=request_cart_payment,
                 legacy_payment=legacy_payment,
                 legacy_consumer_charge_id=legacy_consumer_charge_id,
-                provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
-                provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
+                provider_payment_method_id=pgp_payment_method.pgp_payment_method_resource_id,
+                provider_customer_resource_id=pgp_payment_method.pgp_payer_resource_id,
                 provider_metadata=provider_metadata,
                 idempotency_key=idempotency_key,
                 country=country,
@@ -1989,8 +1989,8 @@ class CartPaymentProcessor:
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
-            provider_payment_method_id=payment_resource_ids.provider_payment_method_id,
-            provider_customer_resource_id=payment_resource_ids.provider_customer_resource_id,
+            provider_payment_method_id=pgp_payment_method.pgp_payment_method_resource_id,
+            provider_customer_resource_id=pgp_payment_method.pgp_payer_resource_id,
             provider_description=request_cart_payment.client_description,
         )
 

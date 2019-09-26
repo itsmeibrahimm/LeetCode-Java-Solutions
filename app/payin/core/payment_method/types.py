@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.commons.types import CountryCode
 from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
 
 
 class WalletType(str, Enum):
@@ -35,3 +36,11 @@ class LegacyPaymentMethodInfo(BaseModel):
     dd_stripe_customer_id: Optional[
         str
     ]  # required if PayerType is not "marketplace" in order to populate MainDB.stripe_card.stripe_customer_id
+
+
+class PgpPaymentMethod(BaseModel):
+    class Config:
+        allow_mutation = False
+
+    pgp_payment_method_resource_id: PgpPaymentMethodResourceId
+    pgp_payer_resource_id: PgpPayerResourceId

@@ -1,5 +1,5 @@
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing_extensions import final
 
 from app.commons.utils.types import PaymentProvider
+from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
     PgpCustomerDbEntity,
@@ -83,14 +84,15 @@ class RawPayer:
             country = self.stripe_customer_entity.country_shortname
         return country
 
-    def pgp_customer_id(self) -> str:
+    @property
+    def pgp_payer_resource_id(self) -> PgpPayerResourceId:
         if self.payer_entity:
             assert self.payer_entity.legacy_stripe_customer_id
-            return self.payer_entity.legacy_stripe_customer_id
+            return PgpPayerResourceId(self.payer_entity.legacy_stripe_customer_id)
         elif self.pgp_customer_entity:
-            return self.pgp_customer_entity.pgp_resource_id
+            return PgpPayerResourceId(self.pgp_customer_entity.pgp_resource_id)
         elif self.stripe_customer_entity:
-            return self.stripe_customer_entity.stripe_id
+            return PgpPayerResourceId(self.stripe_customer_entity.stripe_id)
 
         raise Exception("RawPayer doesn't have pgp_customer_id")
 

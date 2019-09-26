@@ -10,9 +10,10 @@ from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
     LegacyPaymentInterface,
     CartPaymentProcessor,
-    PaymentResourceIds,
 )
 from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
+from app.payin.core.payment_method.types import PgpPaymentMethod
+from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
 from app.payin.tests.utils import FunctionMock, ContextMock
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -623,18 +624,22 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     # Lookup functions
     cart_payment_interface.get_legacy_payment_resource_ids = FunctionMock(
         return_value=(
-            PaymentResourceIds(
-                provider_payment_method_id="payment_method_id",
-                provider_customer_resource_id="customer_id",
+            PgpPaymentMethod(
+                pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                    "payment_method_ref_id"
+                ),
+                pgp_payer_resource_id=PgpPayerResourceId("customer_id"),
             ),
             utils.generate_legacy_payment(),
         )
     )
     cart_payment_interface.get_payment_resource_ids = FunctionMock(
         return_value=(
-            PaymentResourceIds(
-                provider_payment_method_id="payment_method_id",
-                provider_customer_resource_id="customer_id",
+            PgpPaymentMethod(
+                pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                    "payment_method_ref_id"
+                ),
+                pgp_payer_resource_id=PgpPayerResourceId("customer_id"),
             ),
             utils.generate_legacy_payment(),
         )
