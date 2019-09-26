@@ -88,7 +88,7 @@ def _get_stripe_platform_account_id(country):
         return stripe_platform_account_dict[country]
     raise PayoutError(
         http_status_code=HTTP_400_BAD_REQUEST,
-        error_code=PayoutErrorCode.UNHANDLED_COUNTRY,
+        error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
         retryable=False,
     )
 
