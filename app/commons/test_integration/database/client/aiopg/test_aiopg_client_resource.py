@@ -56,7 +56,7 @@ async def test_engine_creation(app_config: AppConfig):
     )
     async with engine:
         assert not engine.closed()
-        async with engine.acquire() as connection:
+        async with engine.connection() as connection:
             start = time.time()
             # open a transaction but don't close it
             await connection.transaction()
@@ -72,25 +72,25 @@ async def test_engine_creation(app_config: AppConfig):
 
 async def test_engine_acquire_connection(payout_maindb_aio_engine: AioEngine):
     # Test await acquire then use as cxt manager!
-    conn2: AioConnection = payout_maindb_aio_engine.acquire()
+    conn2: AioConnection = payout_maindb_aio_engine.connection()
 
     async with conn2:
         assert not conn2.raw_connection.closed
     assert not conn2._raw_connection
 
     # Test await connection and use as context manager
-    async with payout_maindb_aio_engine.acquire() as conn3:
+    async with payout_maindb_aio_engine.connection() as conn3:
         assert not conn3.raw_connection.closed
     assert not conn3._raw_connection
 
     # Test use acquire connection as context manager
-    async with payout_maindb_aio_engine.acquire() as conn4:
+    async with payout_maindb_aio_engine.connection() as conn4:
         assert not conn4.raw_connection.closed
     assert not conn4._raw_connection
 
 
 async def test_connection_acquire_contextmanager(payout_maindb_aio_engine: AioEngine):
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         # commit
         async with connection.transaction() as alpha:
             validate_aio_transaction_active(alpha)
@@ -116,7 +116,7 @@ async def test_connection_acquire_contextmanager(payout_maindb_aio_engine: AioEn
 async def test_connection_acquire_transactions_rollback(
     payout_maindb_aio_engine: AioEngine
 ):
-    async with payout_maindb_aio_engine.acquire() as conn2:
+    async with payout_maindb_aio_engine.connection() as conn2:
         # commit
         alpha = await conn2.transaction()
         validate_aio_transaction_active(alpha)
@@ -134,7 +134,7 @@ async def test_connection_acquire_transactions_rollback(
 
 
 async def test_connection_multiple_styles(payout_maindb_aio_engine: AioEngine):
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         # await
         alpha = connection.transaction()
         validate_aio_transaction_inactive(alpha)

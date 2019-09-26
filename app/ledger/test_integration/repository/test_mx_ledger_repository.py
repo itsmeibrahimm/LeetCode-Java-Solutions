@@ -5,7 +5,6 @@ import psycopg2
 import pytest
 from psycopg2 import errorcodes
 
-from app.commons.database.client.interface import DBConnection
 from app.commons.types import Currency
 from app.ledger.core.data_types import (
     UpdatePaidMxLedgerInput,
@@ -119,7 +118,7 @@ class TestMxLedgerRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
+        async with mx_transaction_repository.payment_database.master().connection() as connection:
             scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, connection
             )
@@ -132,7 +131,7 @@ class TestMxLedgerRepository:
         assert mx_ledger.id == updated_mx_ledger.id
         assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
 
-        async with mx_transaction_repository.payment_database.master().acquire() as db_connection:  # type: DBConnection
+        async with mx_transaction_repository.payment_database.master().connection() as db_connection:
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, db_connection
             )
@@ -182,7 +181,7 @@ class TestMxLedgerRepository:
             routing_key=datetime(2019, 8, 1),
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
+        async with mx_transaction_repository.payment_database.master().connection() as connection:
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, connection
             )
@@ -297,7 +296,7 @@ class TestMxLedgerRepository:
         move_ledger_request = UpdatedRolledMxLedgerInput(
             id=mx_ledger_id, rolled_to_ledger_id=rolled_to_ledger_id
         )
-        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
+        async with mx_transaction_repository.payment_database.master().connection() as connection:
             rolled_mx_ledger = await mx_ledger_repository.move_ledger_state_to_rolled(
                 move_ledger_request, connection
             )

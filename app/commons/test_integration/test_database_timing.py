@@ -22,7 +22,7 @@ class MyRepository:
             return await self.insert_conn(connection)
 
     async def nested_transaction(self):
-        async with self.db.master().acquire() as connection:
+        async with self.db.master().connection() as connection:
             async with connection.transaction():
                 await self.inner_transaction(connection)
                 raise RuntimeError()

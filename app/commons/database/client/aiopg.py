@@ -1,9 +1,15 @@
 import asyncio
 import contextlib
+from contextvars import ContextVar
 from types import TracebackType
 from typing import Any, List, Optional, Sequence, Union, Type, overload, Generator
 
-from aiopg.sa import connection, create_engine, engine, transaction
+from aiopg.sa import (
+    connection as sa_connection,
+    create_engine,
+    engine,
+    transaction as sa_transaction,
+)
 from aiopg.sa.result import ResultProxy, RowProxy
 
 from app.commons.timing import database as database_timing
@@ -76,7 +82,7 @@ class AioMultiResult(DBMultiResult[AioResult]):
 class AioTransaction(
     DBTransaction, database_timing.Database, database_timing.TrackedTransaction
 ):
-    _raw_transaction: Optional[transaction.Transaction]
+    _raw_transaction: Optional[sa_transaction.Transaction]
     _connection: "AioConnection"
     database_name: str
     instance_name: str
@@ -99,7 +105,7 @@ class AioTransaction(
         return self._connection
 
     @property
-    def raw_transaction(self) -> transaction.Transaction:
+    def raw_transaction(self) -> sa_transaction.Transaction:
         assert self._raw_transaction, "_raw_transaction not initialized"
         return self._raw_transaction
 
@@ -172,7 +178,7 @@ class AioTransaction(
 
 
 class AioConnection(DBConnection, database_timing.Database):
-    _raw_connection: Optional[connection.SAConnection]
+    _raw_connection: Optional[sa_connection.SAConnection]
     engine: "AioEngine"
     database_name: str
     instance_name: str
@@ -261,7 +267,7 @@ class AioConnection(DBConnection, database_timing.Database):
             )  # result proxy is already closed at this time
 
     @property
-    def raw_connection(self) -> connection.SAConnection:
+    def raw_connection(self) -> sa_connection.SAConnection:
         assert self._raw_connection, "_raw_connection not initialized"
         return self._raw_connection
 
@@ -328,6 +334,11 @@ class AioEngine(DBEngine, database_timing.Database):
         self.debug = debug
         self.force_rollback = force_rollback  # TODO actually implement force rollback
 
+        # Connections are stored as task-local state.
+        self._connection_context: ContextVar[AioConnection] = ContextVar(
+            "connection_context"
+        )
+
     def closed(self):
         return (not self._raw_engine) or self._raw_engine.closed
 
@@ -363,29 +374,34 @@ class AioEngine(DBEngine, database_timing.Database):
                 self._raw_engine.terminate()
                 await self._raw_engine.wait_closed()
 
-    def acquire(self) -> AioConnection:
-        return AioConnection(engine=self)
+    def connection(self) -> AioConnection:
+        try:
+            return self._connection_context.get()
+        except LookupError:
+            connection = AioConnection(engine=self)
+            self._connection_context.set(connection)
+            return connection
 
     def transaction(self) -> AioTransaction:
-        return self.acquire().transaction()
+        return self.connection().transaction()
 
     async def execute(self, stmt) -> AioMultiResult:
-        async with self.acquire() as conn:
+        async with self.connection() as conn:
             result = await conn.execute(stmt)
         return result
 
     async def fetch_one(self, stmt) -> Optional[AioResult]:
-        async with self.acquire() as conn:
+        async with self.connection() as conn:
             result = await conn.fetch_one(stmt)
         return result
 
     async def fetch_all(self, stmt) -> AioMultiResult:
-        async with self.acquire() as conn:
+        async with self.connection() as conn:
             result = await conn.fetch_all(stmt)
         return result
 
     async def fetch_value(self, stmt) -> Optional[Any]:
-        async with self.acquire() as conn:
+        async with self.connection() as conn:
             result = await conn.fetch_value(stmt)
         return result
 

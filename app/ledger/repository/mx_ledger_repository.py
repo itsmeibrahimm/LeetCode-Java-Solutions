@@ -9,7 +9,7 @@ from typing import Optional
 from sqlalchemy import and_
 
 from app.commons import tracing
-from app.commons.database.client.interface import DBConnection, DBTransaction
+from app.commons.database.client.interface import DBConnection
 from app.ledger.core.data_types import (
     InsertMxLedgerInput,
     InsertMxLedgerOutput,
@@ -286,7 +286,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             target_type=MxTransactionType.NEGATIVE_BALANCE_ROLLOVER,
         )
 
-        async with self.payment_database.master().transaction() as tx:  # type: DBTransaction
+        async with self.payment_database.master().transaction() as tx:
             connection = tx.connection()
             try:
                 mx_transaction = await mx_transaction_repo.create_mx_transaction_and_upsert_mx_ledgers(

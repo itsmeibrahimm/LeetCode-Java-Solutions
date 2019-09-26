@@ -7,7 +7,6 @@ from asynctest import patch
 from psycopg2._psycopg import DataError, OperationalError
 from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 
-from app.commons.database.client.interface import DBConnection
 from app.ledger.core.data_types import GetMxScheduledLedgerByAccountInput
 from app.commons.types import Currency
 from app.ledger.core.data_types import GetMxLedgerByIdInput
@@ -385,7 +384,7 @@ class TestMxLedgerProcessor:
         request = GetMxScheduledLedgerByAccountInput(
             payment_account_id=payment_account_id
         )
-        async with mx_transaction_repository.payment_database.master().acquire() as connection:  # type: DBConnection
+        async with mx_transaction_repository.payment_database.master().connection() as connection:
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_for_payment_account_id(
                 request, connection
             )
@@ -399,7 +398,7 @@ class TestMxLedgerProcessor:
         assert rolled_ledger.amount_paid == 0
         assert rolled_ledger.balance == -1500
 
-        async with mx_transaction_repository.payment_database.master().acquire() as db_connection:  # type: DBConnection
+        async with mx_transaction_repository.payment_database.master().connection() as db_connection:
             # retrieve and check the updated open ledger
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_for_payment_account_id(
                 request, db_connection

@@ -3,6 +3,7 @@ from collections import Sequence
 from datetime import datetime
 
 import pytest
+import asyncio
 
 from app.commons.config.app_config import AppConfig
 from app.commons.database.client.aiopg import AioEngine, AioTransaction
@@ -41,7 +42,7 @@ async def test_client_side_execution_timeout_via_connection_timeout(
     assert isinstance(e.value, ConcurrentTimeoutError)
 
     with pytest.raises(BaseException) as e:
-        async with payout_maindb_aio_engine.acquire() as conn:
+        async with payout_maindb_aio_engine.connection() as conn:
             raw_connection = conn.raw_connection
             await conn.execute(f"select pg_sleep({_CONNECTION_TIMEOUT_SEC+1})")
 
@@ -122,7 +123,7 @@ async def test_fetch_one_fetch_many_fetch_value_but_nothing(
 
 
 async def test_transaction_intentionally_rollback(payout_maindb_aio_engine: AioEngine):
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         tx = await connection.transaction()
         account_stmt = (
             payment_accounts.table.insert()
@@ -168,7 +169,7 @@ async def test_multiple_level_intentionally_transaction_rollback(
 ):
 
     # [should be rollback]  execute with outer tx and rollback outer tx at outer level
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         tx11 = await connection.transaction()
         async with payout_maindb_aio_engine.transaction():
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
@@ -179,7 +180,7 @@ async def test_multiple_level_intentionally_transaction_rollback(
     assert not account_gone
 
     # [should be rollback]  execute with outer tx and rollback outer tx at inner level
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         tx21 = await connection.transaction()
         async with connection.transaction():
             retrival_stmt, id = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
@@ -248,7 +249,7 @@ async def test_multiple_level_error_transaction_rollback(
     account_gone = await payout_maindb_aio_engine.fetch_one(retrival_stmt)
     assert not account_gone
 
-    # [should fail at rollback] execute with inner tx and rollback inner tx at inner level
+    # should rollback, connection is shared
     with pytest.raises(Exception):
         async with payout_maindb_aio_engine.transaction():
             async with payout_maindb_aio_engine.transaction() as tx42:
@@ -256,9 +257,8 @@ async def test_multiple_level_error_transaction_rollback(
                     tx42
                 )
             raise Exception("should rollback!")
-    account_should_not_gone = await payout_maindb_aio_engine.fetch_one(retrival_stmt)
-    assert account_should_not_gone
-    assert account_should_not_gone["id"] == id
+    account_gone = await payout_maindb_aio_engine.fetch_one(retrival_stmt)
+    assert not account_gone
 
 
 async def test_transaction_commit(payout_maindb_aio_engine: AioEngine):
@@ -274,7 +274,7 @@ async def test_transaction_commit(payout_maindb_aio_engine: AioEngine):
 async def test_transaction_commit_with_partial_rollback(
     payout_maindb_aio_engine: AioEngine
 ):
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         transaction = connection.transaction()
         await transaction.start()
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
@@ -300,7 +300,7 @@ async def test_only_outer_most_commit_is_effective_within_same_connection(
 ):
 
     #  Inner committed but outer rollback, so all should be rolled back
-    async with payout_maindb_aio_engine.acquire() as outer_connection:
+    async with payout_maindb_aio_engine.connection() as outer_connection:
         tx11 = await outer_connection.transaction()
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
             tx11
@@ -317,7 +317,7 @@ async def test_only_outer_most_commit_is_effective_within_same_connection(
     assert not account_gone_2
 
     #  Inner rollback, so all should be rolled back
-    async with payout_maindb_aio_engine.acquire() as connection:
+    async with payout_maindb_aio_engine.connection() as connection:
         tx21 = connection.transaction()
         await tx21.start()
         retrival_stmt_1, id_1 = await _create_account_validate_within_transaction_then_return_retrieval_stmt_and_id(
@@ -379,3 +379,48 @@ async def _create_account_validate_within_transaction_then_return_retrieval_stmt
     assert retrieved
     assert retrieved["id"] == id
     return (retrival_stmt, id)
+
+
+async def test_nested_connection_acquisition(payout_maindb_aio_engine: AioEngine):
+    engine = payout_maindb_aio_engine
+
+    async def raphael():
+        return id(engine.connection())
+
+    async def michaelangelo():
+        return await raphael()
+
+    async with engine.connection() as turtle:
+        async with engine.connection() as donatello:
+            async with engine.transaction() as transaction, transaction.connection() as leonardo:
+                assert id(donatello) == id(turtle)
+                assert id(leonardo) == id(turtle)
+                assert await raphael() == id(turtle)
+                assert await michaelangelo() == id(turtle)
+
+
+async def test_root_connection_acquisition(payout_maindb_aio_engine: AioEngine):
+    engine = payout_maindb_aio_engine
+
+    async def get_connection():
+        return id(engine.connection())
+
+    root_connection_id = await get_connection()
+    same_connection_ids = await asyncio.gather(
+        get_connection(), get_connection(), get_connection()
+    )
+    assert set(same_connection_ids) == set(
+        [root_connection_id]
+    ), "tasks inherit connection from the root task"
+
+
+async def test_parallel_connection_acquisition(payout_maindb_aio_engine: AioEngine):
+    engine = payout_maindb_aio_engine
+
+    async def get_connection():
+        return id(engine.connection())
+
+    connection_ids = await asyncio.gather(
+        get_connection(), get_connection(), get_connection()
+    )
+    assert len(set(connection_ids)) == 3, "separate tasks have separate connections"

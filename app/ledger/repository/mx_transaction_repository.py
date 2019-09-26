@@ -105,7 +105,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
     async def create_ledger_and_insert_mx_transaction_caller(
         self, request: InsertMxTransactionWithLedgerInput
     ):
-        async with self.payment_database.master().acquire() as connection:  # type: DBConnection
+        async with self.payment_database.master().connection() as connection:
             try:
                 mx_ledger, mx_transaction = await self.create_ledger_and_insert_mx_transaction(
                     request, connection
@@ -321,7 +321,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
     async def create_mx_transaction_and_upsert_mx_ledgers_caller(
         self, request_input: InsertMxTransactionWithLedgerInput
     ):
-        async with self.payment_database.master().acquire() as connection:  # type: DBConnection
+        async with self.payment_database.master().connection() as connection:
             try:
                 mx_transaction = await self.create_mx_transaction_and_upsert_mx_ledgers(
                     request_input, connection

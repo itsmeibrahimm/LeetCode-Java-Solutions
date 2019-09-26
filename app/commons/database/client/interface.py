@@ -135,11 +135,11 @@ class DBEngine(ABC):
 
     2. Acquire connection and execute as you will:
         2.2. async cxt manager style:
-            async with engine.acquire() as conn:
+            async with engine.connection() as conn:
                 result = await conn.fetch_one(stmt)
             assert conn.closed()
         2.3. mix-and-match!
-            conn = engine.acquire()
+            conn = engine.connection()
             async with conn:
                 result = await conn.fetch_one(stmt)
             assert conn.closed()
@@ -184,7 +184,7 @@ class DBEngine(ABC):
         pass
 
     @abstractmethod
-    def acquire(self) -> DBConnection:
+    def connection(self) -> DBConnection:
         pass
 
     @abstractmethod

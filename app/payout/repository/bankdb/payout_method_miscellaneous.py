@@ -38,7 +38,7 @@ class PayoutMethodMiscellaneousRepository(
     async def unset_default_and_create_payout_method_and_payout_card(
         self, data: PayoutMethodMiscellaneousCreate
     ) -> Tuple[PayoutMethod, PayoutCard]:
-        async with self._database.master().acquire() as connection:  # type: DBConnection
+        async with self._database.master().connection() as connection:
             try:
                 created_payout_method, created_payout_card = await self.execute_unset_default_and_create_payout_method_and_payout_card(
                     data=data, db_connection=connection
