@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -16,10 +16,10 @@ class PaymentChargeTable(TableDefinition):
     payment_intent_id: Column = no_init_field(
         Column("payment_intent_id", UUID(as_uuid=True))
     )
-    provider: Column = no_init_field(Column("provider", String))
+    provider: Column = no_init_field(Column("provider", Text))
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
-    status: Column = no_init_field(Column("status", String))
-    currency: Column = no_init_field(Column("currency", String))
+    status: Column = no_init_field(Column("status", Text))
+    currency: Column = no_init_field(Column("currency", Text))
     amount: Column = no_init_field(Column("amount", Integer))
     amount_refunded: Column = no_init_field(Column("amount_refunded", Integer))
     application_fee_amount: Column = no_init_field(

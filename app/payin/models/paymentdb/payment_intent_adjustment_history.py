@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -18,5 +18,5 @@ class PaymentIntentAdjustmentTable(TableDefinition):
     amount: Column = no_init_field(Column("amount", Integer))
     amount_original: Column = no_init_field(Column("amount_original", Integer))
     amount_delta: Column = no_init_field(Column("amount_delta", Integer))
-    currency: Column = no_init_field(Column("currency", String))
+    currency: Column = no_init_field(Column("currency", Text))
     created_at: Column = no_init_field(Column("created_at", DateTime(True)))

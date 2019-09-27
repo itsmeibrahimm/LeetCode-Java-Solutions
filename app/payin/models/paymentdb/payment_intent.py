@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, JSON
+from sqlalchemy import Column, DateTime, Integer, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -22,11 +22,11 @@ class PaymentIntentTable(TableDefinition):
     application_fee_amount: Column = no_init_field(
         Column("application_fee_amount", Integer)
     )
-    capture_method: Column = no_init_field(Column("capture_method", String))
-    country: Column = no_init_field(Column("country", String))
-    currency: Column = no_init_field(Column("currency", String))
-    status: Column = no_init_field(Column("status", String))
-    statement_descriptor: Column = no_init_field(Column("statement_descriptor", String))
+    capture_method: Column = no_init_field(Column("capture_method", Text))
+    country: Column = no_init_field(Column("country", Text))
+    currency: Column = no_init_field(Column("currency", Text))
+    status: Column = no_init_field(Column("status", Text))
+    statement_descriptor: Column = no_init_field(Column("statement_descriptor", Text))
     payment_method_id: Column = no_init_field(
         Column("payment_method_id", UUID(as_uuid=True))
     )
