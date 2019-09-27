@@ -22,7 +22,6 @@ class LegacyPayment(BaseModel):
     dd_additional_payment_info: Optional[Dict[str, Any]] = None
     stripe_charge_id: Optional[str] = None
     stripe_customer_id: Optional[PgpPayerResourceId] = None
-    stripe_payment_method_id: Optional[str] = None
     stripe_card_id: Optional[PgpPaymentMethodResourceId] = None
 
 

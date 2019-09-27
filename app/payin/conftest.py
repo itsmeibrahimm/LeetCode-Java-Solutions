@@ -52,7 +52,6 @@ async def payment_intent(
         metadata=None,
         legacy_stripe_card_id=1,
         legacy_provider_customer_id="stripe_customer_id",
-        legacy_provider_payment_method_id="stripe_payment_method_id",
         legacy_provider_card_id="stripe_card_id",
     )
 

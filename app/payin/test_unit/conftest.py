@@ -51,7 +51,6 @@ class MockedPaymentRepo:
         metadata: Dict[str, Any],
         legacy_stripe_card_id: int,
         legacy_provider_customer_id: str,
-        legacy_provider_payment_method_id: str,
         legacy_provider_card_id: str,
     ) -> CartPayment:
         return CartPayment(

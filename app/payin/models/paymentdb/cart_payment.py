@@ -28,9 +28,6 @@ class CartPaymentTable(TableDefinition):
     legacy_provider_customer_id: Column = no_init_field(
         Column("legacy_provider_customer_id", Text)
     )
-    legacy_provider_payment_method_id: Column = no_init_field(
-        Column("legacy_provider_payment_method_id", Text)
-    )
     legacy_provider_card_id: Column = no_init_field(
         Column("legacy_provider_card_id", Text)
     )

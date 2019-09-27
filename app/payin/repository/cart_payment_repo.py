@@ -59,7 +59,6 @@ class CartPaymentRepository(PayinDBRepository):
         metadata: Optional[Dict[str, Any]],
         legacy_stripe_card_id: Optional[int],
         legacy_provider_customer_id: Optional[str],
-        legacy_provider_payment_method_id: Optional[str],
         legacy_provider_card_id: Optional[str],
     ) -> CartPayment:
         data = {
@@ -75,7 +74,6 @@ class CartPaymentRepository(PayinDBRepository):
             cart_payments.metadata: metadata,
             cart_payments.legacy_stripe_card_id: legacy_stripe_card_id,
             cart_payments.legacy_provider_customer_id: legacy_provider_customer_id,
-            cart_payments.legacy_provider_payment_method_id: legacy_provider_payment_method_id,
             cart_payments.legacy_provider_card_id: legacy_provider_card_id,
         }
 
@@ -111,9 +109,6 @@ class CartPaymentRepository(PayinDBRepository):
             dd_consumer_id=row[cart_payments.legacy_consumer_id],
             dd_stripe_card_id=row[cart_payments.legacy_stripe_card_id],
             stripe_customer_id=row[cart_payments.legacy_provider_customer_id],
-            stripe_payment_method_id=row[
-                cart_payments.legacy_provider_payment_method_id
-            ],
             stripe_card_id=row[cart_payments.legacy_provider_card_id],
         )
 

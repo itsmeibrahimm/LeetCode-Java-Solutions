@@ -29,6 +29,7 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
 from app.payin.repository.payment_method_repo import (
@@ -88,7 +89,6 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
         legacy_consumer_id=1,
         legacy_stripe_card_id=1,
         legacy_provider_customer_id="stripe_customer_id",
-        legacy_provider_payment_method_id="stripe_payment_method_id",
         legacy_provider_card_id="stripe_card_id",
     )
 
@@ -113,7 +113,6 @@ async def create_payment_intent(
         metadata=None,
         legacy_stripe_card_id=1,
         legacy_provider_customer_id="stripe_customer_id",
-        legacy_provider_payment_method_id="stripe_payment_method_id",
         legacy_provider_card_id="stripe_card_id",
     )
 
@@ -735,11 +734,9 @@ class TestCartPayment:
             dd_consumer_id=1,
             dd_country_id=None,
             dd_stripe_card_id=1,
-            charge_id=None,
             stripe_charge_id=None,
-            stripe_customer_id="stripe_customer_id",
-            stripe_payment_method_id="stripe_payment_method_id",
-            stripe_card_id="stripe_card_id",
+            stripe_customer_id=PgpPayerResourceId("stripe_customer_id"),
+            stripe_card_id=PgpPaymentMethodResourceId("stripe_card_id"),
         )
         assert result == (cart_payment, expected_legacy_payment)
 
@@ -761,7 +758,6 @@ class TestCartPayment:
             legacy_consumer_id=1,
             legacy_stripe_card_id=1,
             legacy_provider_customer_id="stripe_customer_id",
-            legacy_provider_payment_method_id="stripe_payment_method_id",
             legacy_provider_card_id="stripe_card_id",
         )
 

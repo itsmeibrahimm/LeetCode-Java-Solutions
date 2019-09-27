@@ -181,6 +181,5 @@ def get_legacy_payment_model(
         dd_country_id=request_legacy_payment_info.dd_country_id,
         dd_additional_payment_info=request_legacy_payment_info.dd_additional_payment_info,
         stripe_customer_id=request_legacy_payment_info.stripe_customer_id,
-        stripe_payment_method_id=None,
         stripe_card_id=request_legacy_payment_info.stripe_card_id,
     )

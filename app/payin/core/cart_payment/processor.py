@@ -503,7 +503,6 @@ class CartPaymentInterface:
                 legacy_consumer_id=legacy_payment.dd_consumer_id,
                 legacy_stripe_card_id=legacy_payment.dd_stripe_card_id,
                 legacy_provider_customer_id=legacy_payment.stripe_customer_id,
-                legacy_provider_payment_method_id=legacy_payment.stripe_payment_method_id,
                 legacy_provider_card_id=legacy_payment.stripe_card_id,
             )
 
@@ -1144,10 +1143,7 @@ class CartPaymentInterface:
 
         # Legacy payment case: no payer_id/payment_method_id provided
         provider_payer_id = legacy_payment.stripe_customer_id
-        if legacy_payment.stripe_payment_method_id:
-            provider_payment_method_id = legacy_payment.stripe_payment_method_id
-        elif legacy_payment.stripe_card_id:
-            provider_payment_method_id = legacy_payment.stripe_card_id
+        provider_payment_method_id = legacy_payment.stripe_card_id
 
         self.req_context.log.debug(
             f"Legacy resource IDs: {provider_payer_id}, {provider_payment_method_id}"

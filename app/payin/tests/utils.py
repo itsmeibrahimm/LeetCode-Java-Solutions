@@ -22,6 +22,7 @@ from app.payin.core.cart_payment.types import (
     LegacyConsumerChargeId,
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
+from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.dispute_repo import (
     StripeDisputeDbEntity,
     ConsumerChargeDbEntity,
@@ -136,8 +137,7 @@ def generate_legacy_payment() -> LegacyPayment:
         dd_stripe_card_id=1,
         dd_additional_payment_info={"test_key": f"{uuid.uuid4()}"},
         stripe_charge_id=None,
-        stripe_customer_id=str(uuid.uuid4()),
-        stripe_payment_method_id=str(uuid.uuid4()),
+        stripe_customer_id=PgpPayerResourceId("cus_ja7lka"),
         stripe_card_id=None,
     )
 
