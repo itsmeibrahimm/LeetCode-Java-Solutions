@@ -16,7 +16,7 @@ class LegacyPaymentInfo(BaseModel):
     """
 
     dd_consumer_id: int
-    dd_stripe_card_id: str
+    dd_stripe_card_id: int
     dd_country_id: int
     dd_additional_payment_info: Optional[Dict[str, Any]] = None
     stripe_customer_id: PgpPayerResourceId

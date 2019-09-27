@@ -57,10 +57,10 @@ class CartPaymentRepository(PayinDBRepository):
         amount_total: int,
         delay_capture: bool,
         metadata: Optional[Dict[str, Any]],
-        legacy_stripe_card_id: int,
-        legacy_provider_customer_id: str,
-        legacy_provider_payment_method_id: str,
-        legacy_provider_card_id: str,
+        legacy_stripe_card_id: Optional[int],
+        legacy_provider_customer_id: Optional[str],
+        legacy_provider_payment_method_id: Optional[str],
+        legacy_provider_card_id: Optional[str],
     ) -> CartPayment:
         data = {
             cart_payments.id: id,

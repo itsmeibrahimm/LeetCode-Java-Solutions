@@ -500,17 +500,11 @@ class CartPaymentInterface:
                 # Legacy fields are associated with the cart_payment instance to support idempotency and
                 # adjusting amount without the client having to provide full payment info again.  But these
                 # fields are considered deprecated and will be removed once clients upgrade to new payin API.
-                legacy_consumer_id=getattr(legacy_payment, "dd_consumer_id", None),
-                legacy_stripe_card_id=getattr(
-                    legacy_payment, "dd_stripe_card_id", None
-                ),
-                legacy_provider_customer_id=getattr(
-                    legacy_payment, "stripe_customer_id", None
-                ),
-                legacy_provider_payment_method_id=getattr(
-                    legacy_payment, "stripe_payment_method_id", None
-                ),
-                legacy_provider_card_id=getattr(legacy_payment, "stripe_card_id", None),
+                legacy_consumer_id=legacy_payment.dd_consumer_id,
+                legacy_stripe_card_id=legacy_payment.dd_stripe_card_id,
+                legacy_provider_customer_id=legacy_payment.stripe_customer_id,
+                legacy_provider_payment_method_id=legacy_payment.stripe_payment_method_id,
+                legacy_provider_card_id=legacy_payment.stripe_card_id,
             )
 
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
