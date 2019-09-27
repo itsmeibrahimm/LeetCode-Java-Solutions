@@ -1129,7 +1129,7 @@ class CartPaymentInterface:
 
     async def get_pgp_payment_method_by_legacy_payment(
         self, legacy_payment: LegacyPayment
-    ) -> Tuple[PgpPaymentMethod, LegacyPayment]:
+    ) -> PgpPaymentMethod:
         # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent
         # submission and management.  A client is expected to either provide either
         #   a. both payer_id and payment_method_id, which we can use to look up corresponding pgp resource IDs
@@ -1172,7 +1172,7 @@ class CartPaymentInterface:
             pgp_payer_resource_id=PgpPayerResourceId(provider_payer_id),
         )
 
-        return pgp_payment_method, legacy_payment
+        return pgp_payment_method
 
     def populate_cart_payment_for_response(
         self,
@@ -1391,7 +1391,7 @@ class CartPaymentProcessor:
                 legacy_country_id=get_country_id_by_code(payment_intents[0].country),
             )
         else:  # legacy case
-            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
+            pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
                 legacy_payment=legacy_payment
             )
 
@@ -1828,13 +1828,13 @@ class CartPaymentProcessor:
     async def legacy_create_payment(
         self,
         request_cart_payment: CartPayment,
-        request_legacy_payment: LegacyPayment,
+        legacy_payment: LegacyPayment,
         idempotency_key: str,
         country: CountryCode,
         currency: Currency,
     ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
-        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
-            legacy_payment=request_legacy_payment
+        pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
+            legacy_payment=legacy_payment
         )
         return await self._create_payment(
             request_cart_payment=request_cart_payment,

@@ -53,7 +53,7 @@ async def create_cart_payment_for_legacy_client(
             request_cart_payment=create_request_to_model(
                 cart_payment_request, cart_payment_request.legacy_correlation_ids
             ),
-            request_legacy_payment=get_legacy_payment_model(
+            legacy_payment=get_legacy_payment_model(
                 cart_payment_request.legacy_payment
             ),
             idempotency_key=cart_payment_request.idempotency_key,
