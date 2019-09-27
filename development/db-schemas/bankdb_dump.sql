@@ -1490,6 +1490,8 @@ CREATE INDEX transactions_idempotency_key_47231c55_like ON transactions USING bt
 CREATE INDEX transfer_transactions_transfer_id_e14f919f ON transfer_transactions USING btree (transfer_id);
 
 
+CREATE UNIQUE INDEX payout_method_default_type_unique ON payout_methods (payment_account_id, TYPE) WHERE (is_default is TRUE);
+
 --
 -- Name: aggregate_report_entity aggregate_report_ent_aggregate_report_id_3a9b08a2_fk_aggregate; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -1545,6 +1547,9 @@ ALTER TABLE ONLY transfer_transactions
 ALTER TABLE ONLY transfer_transactions
     ADD CONSTRAINT transfer_transactions_transfer_id_e14f919f_fk_transfers_id FOREIGN KEY (transfer_id) REFERENCES transfers(id) DEFERRABLE INITIALLY DEFERRED;
 
+
+ALTER TABLE ONLY payout_cards
+    ADD CONSTRAINT payout_cards_stripe_card_id_key UNIQUE (stripe_card_id);
 
 --
 -- PostgreSQL database dump complete

@@ -316,7 +316,7 @@ async def prepare_and_insert_payout_card(
 
     data = PayoutCardCreate(
         id=payout_method.id,
-        stripe_card_id="card_test_payout_card",
+        stripe_card_id=f"{payout_method.id}_card_test_payout_card",
         last4="1234",
         brand="Bear Bank",
         exp_month=12,
@@ -373,7 +373,7 @@ async def prepare_payout_card_list(
 
         data = PayoutCardCreate(
             id=payout_method.id,
-            stripe_card_id="card_test_payout_card{}".format(i),
+            stripe_card_id=f"{payout_method.id}_card_test_payout_card{i}",
             last4="1234",
             brand="Bear Bank",
             exp_month=12,
@@ -403,7 +403,7 @@ async def prepare_payout_method_list(
             currency=Currency.USD.value,
             country=CountryCode.US.value,
             payment_account_id=payout_account_id,
-            is_default=True,
+            is_default=False,
             token=uuid.uuid4(),
         )
 
