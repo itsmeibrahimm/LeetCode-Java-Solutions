@@ -622,7 +622,7 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     )
 
     # Lookup functions
-    cart_payment_interface.get_legacy_payment_resource_ids = FunctionMock(
+    cart_payment_interface.get_pgp_payment_method_by_legacy_payment = FunctionMock(
         return_value=(
             PgpPaymentMethod(
                 pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
@@ -633,7 +633,7 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
             utils.generate_legacy_payment(),
         )
     )
-    cart_payment_interface.get_payment_resource_ids = FunctionMock(
+    cart_payment_interface.get_pgp_payment_method = FunctionMock(
         return_value=(
             PgpPaymentMethod(
                 pgp_payment_method_resource_id=PgpPaymentMethodResourceId(

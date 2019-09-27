@@ -1098,7 +1098,7 @@ class CartPaymentInterface:
 
         return updated_intent, updated_pgp_intent
 
-    async def get_payment_resource_ids(
+    async def get_pgp_payment_method(
         self, payer_id: uuid.UUID, payment_method_id: uuid.UUID, legacy_country_id: int
     ) -> Tuple[PgpPaymentMethod, LegacyPayment]:
         raw_payment_method = await self.payment_method_client.get_raw_payment_method(
@@ -1134,7 +1134,7 @@ class CartPaymentInterface:
         )
         return pgp_payment_method, result_legacy_payment
 
-    async def get_legacy_payment_resource_ids(
+    async def get_pgp_payment_method_by_legacy_payment(
         self, legacy_payment: LegacyPayment
     ) -> Tuple[PgpPaymentMethod, LegacyPayment]:
         # We need to look up the pgp's account ID and payment method ID, so that we can use then for intent
@@ -1155,7 +1155,6 @@ class CartPaymentInterface:
         elif legacy_payment.stripe_card_id:
             provider_payment_method_id = legacy_payment.stripe_card_id
 
-        result_legacy_payment = legacy_payment
         self.req_context.log.debug(
             f"Legacy resource IDs: {provider_payer_id}, {provider_payment_method_id}"
         )
@@ -1183,7 +1182,7 @@ class CartPaymentInterface:
             pgp_payer_resource_id=PgpPayerResourceId(provider_payer_id),
         )
 
-        return pgp_payment_method, result_legacy_payment
+        return pgp_payment_method, legacy_payment
 
     def populate_cart_payment_for_response(
         self,
@@ -1396,13 +1395,13 @@ class CartPaymentProcessor:
 
         if cart_payment.payer_id:
             assert payment_intents[0].payment_method_id
-            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
                 payer_id=cart_payment.payer_id,
                 payment_method_id=payment_intents[0].payment_method_id,
                 legacy_country_id=get_country_id_by_code(payment_intents[0].country),
             )
         else:  # legacy case
-            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
                 legacy_payment=legacy_payment
             )
 
@@ -1844,7 +1843,7 @@ class CartPaymentProcessor:
         country: CountryCode,
         currency: Currency,
     ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
-        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_legacy_payment_resource_ids(
+        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=request_legacy_payment
         )
         return await self._create_payment(
@@ -1865,7 +1864,7 @@ class CartPaymentProcessor:
     ) -> CartPayment:
         assert request_cart_payment.payer_id
         assert request_cart_payment.payment_method_id
-        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_payment_resource_ids(
+        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
             payer_id=request_cart_payment.payer_id,
             payment_method_id=request_cart_payment.payment_method_id,
             legacy_country_id=get_country_id_by_code(country),
