@@ -335,9 +335,8 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                     stripe_cards.dynamic_last4 == input.dynamic_last4,
                     stripe_cards.exp_year == input.exp_year,
                     stripe_cards.exp_month == input.exp_month,
-                    stripe_cards.external_stripe_customer_id
-                    == input.external_stripe_customer_id,
-                    # stripe_cards.consumer_id == input.consumer_id,
+                    # stripe_cards.external_stripe_customer_id == input.external_stripe_customer_id,
+                    stripe_cards.consumer_id == input.consumer_id,
                     stripe_cards.active == input.active,
                 )
             )

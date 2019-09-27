@@ -22,6 +22,7 @@ from app.commons.providers.stripe.stripe_models import (
     Customer as StripeCustomer,
     StripeRetrieveCustomerRequest,
 )
+from app.commons.runtime import runtime
 from app.commons.types import CountryCode
 from app.commons.utils.types import PaymentProvider
 from app.commons.utils.uuid import generate_object_uuid
@@ -101,12 +102,12 @@ class PayerClient:
 
     async def create_raw_payer(
         self,
+        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
-        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
@@ -128,27 +129,14 @@ class PayerClient:
     async def get_raw_payer(
         self,
         payer_id: MixedUuidStrType,
-        payer_id_type: Optional[str] = None,
+        payer_id_type: Optional[PayerIdType] = None,
         payer_type: Optional[str] = None,
     ) -> RawPayer:
         payer_interface: PayerOpsInterface
-        if not payer_id_type or payer_id_type in (
-            PayerIdType.PAYER_ID,
-            PayerIdType.DD_CONSUMER_ID,
-        ):
+        if not self._is_legacy(payer_id_type=payer_id_type):
             payer_interface = PayerOps(self.log, self.payer_repo)
-        elif payer_id_type in (
-            PayerIdType.DD_STRIPE_CUSTOMER_SERIAL_ID,
-            PayerIdType.STRIPE_CUSTOMER_ID,
-        ):
-            payer_interface = LegacyPayerOps(self.log, self.payer_repo)
         else:
-            self.log.error(
-                f"[get_payer_raw_objects][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
-            )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_INVALID_DATA, retryable=False
-            )
+            payer_interface = LegacyPayerOps(self.log, self.payer_repo)
         return await payer_interface.get_payer_raw_objects(
             payer_id=payer_id, payer_id_type=payer_id_type, payer_type=payer_type
         )
@@ -241,29 +229,17 @@ class PayerClient:
         raw_payer: RawPayer,
         pgp_default_payment_method_id: str,
         payer_id: MixedUuidStrType,
-        payer_id_type: Optional[str] = None,
+        payer_id_type: Optional[PayerIdType] = None,
         description: Optional[str] = None,
     ) -> RawPayer:
         lazy_create: bool = False
         payer_interface: PayerOpsInterface
-        if not payer_id_type or payer_id_type in (
-            PayerIdType.PAYER_ID,
-            PayerIdType.DD_CONSUMER_ID,
-        ):
+        if not self._is_legacy(payer_id_type=payer_id_type):
             payer_interface = PayerOps(self.log, self.payer_repo)
-        elif payer_id_type in (
-            PayerIdType.DD_STRIPE_CUSTOMER_SERIAL_ID,
-            PayerIdType.STRIPE_CUSTOMER_ID,
-        ):
+        else:
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
             lazy_create = True
-        else:
-            self.log.error(
-                f"[update_payer_default_payment_method][{payer_id}] invalid payer_id_type:[{payer_id_type}]"
-            )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_INVALID_DATA, retryable=False
-            )
+
         updated_raw_payer = await payer_interface.update_payer_default_payment_method(
             raw_payer=raw_payer,
             pgp_default_payment_method_id=pgp_default_payment_method_id,
@@ -271,7 +247,13 @@ class PayerClient:
             payer_id_type=payer_id_type,
         )
 
-        if lazy_create is True and updated_raw_payer.stripe_customer_entity:
+        runtime_lazy_create: bool = runtime.get_bool(
+            "payin/feature-flags/enable_payer_lazy_creation.bool", True
+        )
+
+        if runtime_lazy_create and (
+            lazy_create and updated_raw_payer.stripe_customer_entity
+        ):
             return await self.lazy_create_raw_payer(
                 dd_payer_id=str(updated_raw_payer.stripe_customer_entity.owner_id),
                 country=updated_raw_payer.stripe_customer_entity.country_shortname,
@@ -386,6 +368,14 @@ class PayerClient:
             )
         return stripe_customer
 
+    def _is_legacy(self, payer_id_type: Optional[PayerIdType] = None):
+        if not payer_id_type or payer_id_type in (
+            PayerIdType.PAYER_ID,
+            PayerIdType.DD_CONSUMER_ID,
+        ):
+            return False
+        return True
+
 
 class PayerOpsInterface:
     def __init__(self, log: BoundLogger, payer_repo: PayerRepository):
@@ -395,12 +385,12 @@ class PayerOpsInterface:
     @abstractmethod
     async def create_payer_raw_objects(
         self,
+        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
-        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         ...
@@ -428,12 +418,12 @@ class PayerOpsInterface:
 class PayerOps(PayerOpsInterface):
     async def create_payer_raw_objects(
         self,
+        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
-        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         try:
@@ -544,7 +534,7 @@ class PayerOps(PayerOpsInterface):
             # update stripe_customer.default_card for non-marketplace payer
             raw_payer.stripe_customer_entity = await self.payer_repo.update_stripe_customer(
                 UpdateStripeCustomerSetInput(
-                    default_card=pgp_default_payment_method_id
+                    default_source=pgp_default_payment_method_id
                 ),
                 UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
             )
@@ -567,12 +557,12 @@ class PayerOps(PayerOpsInterface):
 class LegacyPayerOps(PayerOpsInterface):
     async def create_payer_raw_objects(
         self,
+        dd_payer_id: str,
         payer_type: str,
         country: str,
         pgp_customer_id: str,
         pgp_code: str,
         description: Optional[str],
-        dd_payer_id: Optional[str] = None,
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
         try:
@@ -599,11 +589,6 @@ class LegacyPayerOps(PayerOpsInterface):
                 GetStripeCustomerByStripeIdInput(stripe_id=pgp_customer_id)
             )
             if not stripe_customer_entity:
-                if not dd_payer_id:
-                    raise PayerCreationError(
-                        error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
-                        retryable=False,
-                    )
                 try:
                     owner_id = int(dd_payer_id)
                 except ValueError as e:

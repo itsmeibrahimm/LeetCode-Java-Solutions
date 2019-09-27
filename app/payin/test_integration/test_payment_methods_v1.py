@@ -54,8 +54,8 @@ class TestPaymentMethodsV1:
             request=CreatePayerV1Request(
                 dd_payer_id=random_dd_payer_id,
                 country="US",
-                description="Integration Test test_create_payer()",
-                payer_type="marketplace",
+                description="Integration Test test_create_get_delete_payment_method()",
+                payer_type="store",
                 email=(random_dd_payer_id + "@dd.com"),
             ),
         )
@@ -64,7 +64,12 @@ class TestPaymentMethodsV1:
         payment_method = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
-                payer_id=payer["id"], payment_gateway="stripe", token="tok_visa"
+                payer_id=payer["id"],
+                payment_gateway="stripe",
+                token="tok_visa",
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
             ),
         )
 
@@ -88,8 +93,8 @@ class TestPaymentMethodsV1:
             request=CreatePayerV1Request(
                 dd_payer_id=random_dd_payer_id,
                 country="US",
-                description="Integration Test test_create_payer()",
-                payer_type="marketplace",
+                description="Integration Test test_create_duplicate_card()",
+                payer_type="store",
                 email=(random_dd_payer_id + "@dd.com"),
             ),
         )
@@ -98,7 +103,12 @@ class TestPaymentMethodsV1:
         payment_method = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
-                payer_id=payer["id"], payment_gateway="stripe", token="tok_visa"
+                payer_id=payer["id"],
+                payment_gateway="stripe",
+                token="tok_visa",
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
             ),
         )
 
@@ -106,7 +116,12 @@ class TestPaymentMethodsV1:
         duplicate_payment_method = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
-                payer_id=payer["id"], payment_gateway="stripe", token="tok_visa"
+                payer_id=payer["id"],
+                payment_gateway="stripe",
+                token="tok_visa",
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
             ),
             # http_status=200,  # FIXME: PS should return 200 in duplication case
         )

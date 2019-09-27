@@ -1,4 +1,3 @@
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -11,5 +10,6 @@ class CreatePaymentMethodRequest(BaseModel):
     payer_id: UUID
     payment_gateway: PaymentProvider = PaymentProvider.STRIPE
     token: str
-    set_default: Optional[bool] = False
-    is_scanned: Optional[bool] = False
+    set_default: bool
+    is_scanned: bool
+    is_active: bool

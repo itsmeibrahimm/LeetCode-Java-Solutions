@@ -21,8 +21,9 @@ class CreatePaymentMethodV1Request(BaseModel):
     payer_id: str
     payment_gateway: str
     token: str
-    set_default: Optional[bool]
-    is_scanned: Optional[bool]
+    set_default: bool
+    is_scanned: bool
+    is_active: bool
 
 
 class PayinError(BaseModel):
@@ -51,8 +52,7 @@ def create_payer_v1(
     client: TestClient, request: CreatePayerV1Request
 ) -> Dict[str, Any]:
     create_payer_request = {
-        # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
-        # "dd_payer_id": request.dd_payer_id,
+        "dd_payer_id": request.dd_payer_id,
         "payer_type": request.payer_type,
         "email": request.email,
         "country": request.country,
@@ -62,8 +62,7 @@ def create_payer_v1(
     assert response.status_code == 201
     payer: dict = response.json()
     assert UUID(payer["id"], version=4)
-    # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
-    # assert payer["dd_payer_id"] == request.dd_payer_id
+    assert payer["dd_payer_id"] == request.dd_payer_id
     assert payer["country"] == request.country
     assert payer["description"] == request.description
     assert payer["payer_type"] == request.payer_type
@@ -108,6 +107,9 @@ def create_payment_method_v1(
         "payer_id": request.payer_id,
         "payment_gateway": request.payment_gateway,
         "token": request.token,
+        "set_default": request.set_default,
+        "is_active": request.is_active,
+        "is_scanned": request.is_scanned,
     }
     if request.set_default:
         create_payment_method_request.update({"set_default": str(request.set_default)})
@@ -140,7 +142,6 @@ def create_payment_method_v1(
     assert payment_method["card"]["exp_year"] is not None
     assert payment_method["card"]["exp_month"] is not None
     assert payment_method["card"]["fingerprint"] is not None
-    # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
     # assert payment_method["dd_payer_id"] is not None
     return payment_method
 

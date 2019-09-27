@@ -52,8 +52,9 @@ async def create_payment_method(
                  details, or personally identifiable information (PII), directly from your customers.
     - **set_default**: [bool] set as default payment method or not.
     - **is_scanned**: [bool] Internal use by DD Fraud team.
+    - **param is_active**: [bool] mark as active or not. For fraud usage.
     """
-    log.info("[create_payment_method] receive request", payer_id=req_body.payer_id)
+    log.info("[create_payment_method] receive request", req_body=req_body)
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
@@ -62,6 +63,7 @@ async def create_payment_method(
             token=req_body.token,
             set_default=req_body.set_default,
             is_scanned=req_body.is_scanned,
+            is_active=req_body.is_active,
         )
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError as e:

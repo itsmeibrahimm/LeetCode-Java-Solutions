@@ -344,8 +344,8 @@ class TestPayersV1:
             request=CreatePayerV1Request(
                 dd_payer_id=random_dd_payer_id,
                 country="US",
-                description="Integration Test test_create_payer()",
-                payer_type="marketplace",
+                description="Integration Test test_default_payment_method()",
+                payer_type="store",
                 email=(random_dd_payer_id + "@dd.com"),
             ),
         )
@@ -354,7 +354,12 @@ class TestPayersV1:
         payment_method = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
-                payer_id=payer["id"], payment_gateway="stripe", token="tok_visa"
+                payer_id=payer["id"],
+                payment_gateway="stripe",
+                token="tok_visa",
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
             ),
         )
 
@@ -396,8 +401,8 @@ class TestPayersV1:
             request=CreatePayerV1Request(
                 dd_payer_id=random_dd_payer_id,
                 country="US",
-                description="Integration Test test_create_payer()",
-                payer_type="marketplace",
+                description="Integration Test test_add_default_payment_method()",
+                payer_type="store",
                 email=(random_dd_payer_id + "@dd.com"),
             ),
         )
@@ -410,6 +415,8 @@ class TestPayersV1:
                 payment_gateway="stripe",
                 token="tok_visa",
                 set_default=True,
+                is_scanned=False,
+                is_active=True,
             ),
         )
 

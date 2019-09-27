@@ -40,11 +40,11 @@ class PayerProcessor:
 
     async def create_payer(
         self,
+        dd_payer_id: str,
         payer_type: str,
         email: str,
         country: str,
         description: str,
-        dd_payer_id: str = None,
     ) -> Payer:
         """
         create a new DoorDash payer. We will create 3 models under the hood:
@@ -67,11 +67,9 @@ class PayerProcessor:
         pgp_code = PaymentProvider.STRIPE
 
         # step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
-        # FIXME: PAY-3773 re-enforce dd_payer_id when the consumer_id constraint in maindb.stripe_card is removed.
-        if dd_payer_id:
-            await self.payer_client.has_existing_payer(
-                dd_payer_id=dd_payer_id, payer_type=payer_type
-            )
+        await self.payer_client.has_existing_payer(
+            dd_payer_id=dd_payer_id, payer_type=payer_type
+        )
 
         # step 2: create PGP customer
         pgp_customer_id: CustomerId = await self.payer_client.pgp_create_customer(
@@ -112,7 +110,7 @@ class PayerProcessor:
         )
 
         force_retrieving = runtime.get_bool(
-            "feature-flags/payin/force_retrieve_stripe_customer.bool", True
+            "payin/feature-flags/force_retrieve_stripe_customer.bool", True
         )
 
         mix_payer_id: MixedUuidStrType

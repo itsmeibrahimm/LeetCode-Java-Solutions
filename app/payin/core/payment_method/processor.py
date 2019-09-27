@@ -9,6 +9,7 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
 )
+from app.commons.runtime import runtime
 from app.commons.types import CountryCode
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
@@ -53,8 +54,9 @@ class PaymentMethodProcessor:
         self,
         pgp_code: str,
         token: str,
-        set_default: Optional[bool] = False,
-        is_scanned: Optional[bool] = False,
+        set_default: bool,
+        is_scanned: bool,
+        is_active: bool,
         payer_id: UUID = None,
         legacy_payment_method_info: Optional[LegacyPaymentMethodInfo] = None,
     ) -> PaymentMethod:
@@ -65,6 +67,7 @@ class PaymentMethodProcessor:
         :param token: payment provider authorized one-time payment method token.
         :param set_default: set the new payment method as default.
         :param is_scanned: for fraud usage.
+        :param is_active: mark as active or not. For fraud usage.
         :param payer_id: DoorDash payer id.
         :param legacy_payment_method_info: legacy payment method info.
         :return: PaymentMethod object
@@ -140,23 +143,27 @@ class PaymentMethodProcessor:
         )
 
         # step 3: de-dup same payment_method by card fingerprint
-        try:
-            exist_pm: RawPaymentMethod = await self.payment_method_client.get_duplicate_payment_method(
-                stripe_payment_method=stripe_payment_method,
-                payer_type=payer_type,
-                pgp_customer_resource_id=pgp_customer_res_id,
-                dd_consumer_id=dd_consumer_id,
-                dd_stripe_customer_id=dd_stripe_customer_id,
-            )
-        except PaymentMethodReadError:
-            pass
-        else:
-            self.log.info(
-                "[create_payment_method] duplicate card is found. return the existing one",
-                dd_consumer_id=dd_consumer_id,
-                pgp_payment_method_res_id=stripe_payment_method.id,
-            )
-            return exist_pm.to_payment_method()
+        is_dedup_card_logic_active: bool = runtime.get_bool(
+            "payin/feature-flags/enable_dedup_payment_method_card.bool", True
+        )
+        if is_dedup_card_logic_active:
+            try:
+                exist_pm: RawPaymentMethod = await self.payment_method_client.get_duplicate_payment_method(
+                    stripe_payment_method=stripe_payment_method,
+                    payer_type=payer_type,
+                    pgp_customer_resource_id=pgp_customer_res_id,
+                    dd_consumer_id=dd_consumer_id,
+                    dd_stripe_customer_id=dd_stripe_customer_id,
+                )
+            except PaymentMethodReadError:
+                pass
+            else:
+                self.log.info(
+                    "[create_payment_method] duplicate card is found. return the existing one",
+                    dd_consumer_id=dd_consumer_id,
+                    pgp_payment_method_res_id=stripe_payment_method.id,
+                )
+                return exist_pm.to_payment_method()
 
         # step 4: attach PGP payment_method
         attach_stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_attach_payment_method(
@@ -180,6 +187,7 @@ class PaymentMethodProcessor:
             dd_consumer_id=dd_consumer_id,
             dd_stripe_customer_id=dd_stripe_customer_id,
             is_scanned=is_scanned,
+            is_active=is_active,
         )
 
         # step 6: set as default payment_method
@@ -191,7 +199,7 @@ class PaymentMethodProcessor:
             )
 
             self.log.info(
-                f"[create_payment_method] PGP update default_payment_method completed",
+                "[create_payment_method] PGP update default_payment_method completed",
                 payer_id=payer_id,
                 default_payment_method=stripe_customer.invoice_settings.default_payment_method,
             )

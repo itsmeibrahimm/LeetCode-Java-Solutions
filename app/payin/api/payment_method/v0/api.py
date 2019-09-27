@@ -55,17 +55,12 @@ async def create_payment_method(
     - **country**: [string] country code of DoorDash consumer
     - **dd_consumer_id**: [string] DoorDash consumer id.
     - **stripe_customer_id**: [string] Stripe customer id.
-    - **payer_type: [string] type that specifies the role of payer.
+    - **payer_type**: [string] type that specifies the role of payer.
     - **set_default**: [bool] set as default payment method or not.
     - **is_scanned**: [bool] Internal use by DD Fraud team.
+    - **param is_active**: [bool] mark as active or not. For fraud usage.
     """
-    log.info(
-        "[create_payment_method] received request.",
-        stripe_customer_id=req_body.stripe_customer_id,
-        payer_type=req_body.payer_type,
-        dd_consumer_id=req_body.dd_consumer_id,
-        dd_stripe_customer_id=req_body.dd_stripe_customer_id,
-    )
+    log.info("[create_payment_method] received request.", req_body=req_body)
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
@@ -73,6 +68,7 @@ async def create_payment_method(
             token=req_body.token,
             set_default=req_body.set_default,
             is_scanned=req_body.is_scanned,
+            is_active=req_body.is_active,
             legacy_payment_method_info=LegacyPaymentMethodInfo(
                 dd_consumer_id=req_body.dd_consumer_id,
                 dd_stripe_customer_id=req_body.dd_stripe_customer_id,

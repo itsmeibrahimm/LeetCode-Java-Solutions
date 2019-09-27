@@ -80,10 +80,11 @@ class PaymentMethodClient:
         payment_method_id: UUID,
         pgp_code: str,
         stripe_payment_method: StripePaymentMethod,
+        is_scanned: bool,
+        is_active: bool,
         payer_id: Optional[UUID] = None,
         dd_consumer_id: Optional[str] = None,
         dd_stripe_customer_id: Optional[str] = None,
-        is_scanned: Optional[bool] = False,
     ) -> RawPaymentMethod:
         now = datetime.utcnow()
         try:
@@ -120,7 +121,7 @@ class PaymentMethodClient:
                     exp_month=str(stripe_payment_method.card.exp_month).zfill(2),
                     exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
                     type=stripe_payment_method.card.brand,
-                    active=True,
+                    active=is_active,
                     consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
                     stripe_customer_id=(
                         int(dd_stripe_customer_id) if dd_stripe_customer_id else None
@@ -128,7 +129,7 @@ class PaymentMethodClient:
                     zip_code=stripe_payment_method.billing_details.address.postal_code,
                     address_line1_check=stripe_payment_method.card.checks.address_line1_check,
                     address_zip_check=stripe_payment_method.card.checks.address_postal_code_check,
-                    created_at=now,  # FIXME: need to fix timezone
+                    created_at=now,
                     is_scanned=is_scanned,
                 )
             )
@@ -252,8 +253,8 @@ class PaymentMethodClient:
                     dynamic_last4=dynamic_last4 or "",
                     exp_year=str(stripe_payment_method.card.exp_year).zfill(4),
                     exp_month=str(stripe_payment_method.card.exp_month).zfill(2),
-                    external_stripe_customer_id=pgp_customer_resource_id,
-                    # consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
+                    # external_stripe_customer_id=pgp_customer_resource_id,
+                    consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
                     stripe_customer_id=(
                         int(dd_stripe_customer_id) if dd_stripe_customer_id else None
                     ),

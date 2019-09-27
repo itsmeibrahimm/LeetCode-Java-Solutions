@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing_extensions import final
 
 from app.commons.utils.types import PaymentProvider
+from app.payin.core.payer.types import PayerType
 from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
@@ -126,19 +127,26 @@ class RawPayer:
         provider_customer: PaymentGatewayProviderCustomer
         if self.payer_entity:
             updated_at: datetime = self.payer_entity.updated_at
-            if self.pgp_customer_entity:
-                updated_at = max(
-                    self.pgp_customer_entity.updated_at, self.payer_entity.updated_at
-                )
-                provider_customer = PaymentGatewayProviderCustomer(
-                    payment_provider=self.pgp_customer_entity.pgp_code,
-                    payment_provider_customer_id=self.pgp_customer_entity.pgp_resource_id,
-                    default_payment_method_id=self.pgp_default_payment_method_id(),
-                )
+            if self.payer_entity.payer_type == PayerType.MARKETPLACE:
+                if self.pgp_customer_entity:
+                    updated_at = max(
+                        self.pgp_customer_entity.updated_at,
+                        self.payer_entity.updated_at,
+                    )
+                    provider_customer = PaymentGatewayProviderCustomer(
+                        payment_provider=self.pgp_customer_entity.pgp_code,
+                        payment_provider_customer_id=self.pgp_customer_entity.pgp_resource_id,
+                        default_payment_method_id=self.pgp_default_payment_method_id(),
+                    )
             else:
                 provider_customer = PaymentGatewayProviderCustomer(
                     payment_provider=PaymentProvider.STRIPE.value,  # hard-coded "stripe"
                     payment_provider_customer_id=self.payer_entity.legacy_stripe_customer_id,
+                    default_payment_method_id=(
+                        self.stripe_customer_entity.default_source
+                        if self.stripe_customer_entity
+                        else None
+                    ),
                 )
             payer = Payer(
                 id=self.payer_entity.id,
