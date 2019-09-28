@@ -77,7 +77,9 @@ class PayerProcessor:
         )
 
         self.log.info(
-            f"[create_payer_impl][{dd_payer_id}] create PGP customer completed. id:[{pgp_customer_id}]"
+            "[create_payer] create PGP customer completed.",
+            dd_payer_id=dd_payer_id,
+            pgp_customer_id=pgp_customer_id,
         )
 
         # step 3: create Payer/PgpCustomer/StripeCustomer objects
@@ -85,7 +87,7 @@ class PayerProcessor:
             dd_payer_id=dd_payer_id,
             payer_type=payer_type,
             country=country,
-            pgp_customer_id=pgp_customer_id,
+            pgp_customer_res_id=pgp_customer_id,
             pgp_code=pgp_code,
             description=description,
         )
@@ -101,7 +103,7 @@ class PayerProcessor:
         Retrieve DoorDash payer
 
         :param payer_id: payer unique id.
-        :param legacyPayerInfo: legacy payer information.
+        :param legacy_payer_info: legacy payer information.
         :param force_update: force update from payment provider.
         :return: Payer object
         """
@@ -185,7 +187,7 @@ class PayerProcessor:
 
         return raw_payer.to_payer()
 
-    async def update_payer(
+    async def update_default_payment_method(
         self,
         payer_id: MixedUuidStrType,
         default_payment_method_id: MixedUuidStrType,
@@ -223,23 +225,22 @@ class PayerProcessor:
         )
 
         # step 3: call PGP/stripe api to update default payment method
-        pgp_customer_id: Optional[str] = raw_payer.pgp_payer_resource_id
-        if pgp_customer_id:
-            stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
-                country=pgp_country,
-                pgp_customer_id=pgp_customer_id,
-                default_payment_method_id=raw_pm.pgp_payment_method_resource_id,
-            )
+        pgp_customer_id: str = raw_payer.pgp_payer_resource_id
+        stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
+            country=pgp_country,
+            pgp_customer_id=pgp_customer_id,
+            default_payment_method_id=raw_pm.pgp_payment_method_resource_id,
+        )
 
-            self.log.info(
-                f"[update_payer_impl] PGP update default_payment_method completed",
-                payer_id=payer_id,
-                payer_id_type=payer_id_type,
-                default_payment_method=stripe_customer.invoice_settings.default_payment_method,
-            )
+        self.log.info(
+            "[update_payer] PGP update default_payment_method completed",
+            payer_id=payer_id,
+            payer_id_type=payer_id_type,
+            default_payment_method=stripe_customer.invoice_settings.default_payment_method,
+        )
 
         # step 4: update default_payment_method in pgp_customers/stripe_customer table
-        updated_raw_payer: RawPayer = await self.payer_client.update_payer_default_payment_method(
+        updated_raw_payer: RawPayer = await self.payer_client.update_default_payment_method(
             raw_payer=raw_payer,
             pgp_default_payment_method_id=raw_pm.pgp_payment_method_resource_id,
             payer_id=payer_id,

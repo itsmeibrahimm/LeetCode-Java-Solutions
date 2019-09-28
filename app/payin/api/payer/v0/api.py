@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
@@ -8,7 +6,7 @@ from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.core.errors import PaymentError
 from app.commons.types import CountryCode
 from app.payin.api.payer.v0.request import UpdatePayerRequestV0
-from app.payin.core.exceptions import PayinErrorCode, payin_error_message_maps
+from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.processor import PayerProcessor
 
@@ -40,8 +38,8 @@ router = APIRouter()
 async def get_payer(
     payer_id_type: PayerIdType,
     payer_id: str,
-    country: CountryCode = CountryCode.US,
     payer_type: PayerType = None,
+    country: CountryCode = CountryCode.US,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     payer_processor: PayerProcessor = Depends(PayerProcessor),
@@ -88,8 +86,8 @@ async def get_payer(
     return payer
 
 
-@router.patch(
-    "/payers/{payer_id_type}/{payer_id}",
+@router.post(
+    "/payers/{payer_id_type}/{payer_id}/default_payment_method",
     response_model=Payer,
     status_code=HTTP_200_OK,
     operation_id="UpdatePayer",
@@ -99,7 +97,7 @@ async def get_payer(
     },
     tags=api_tags,
 )
-async def update_payer(
+async def update_default_payment_method(
     payer_id_type: PayerIdType,
     payer_id: str,
     req_body: UpdatePayerRequestV0,
@@ -113,25 +111,21 @@ async def update_payer(
       "stripe_customer_id", "dd_stripe_customer_id"
     - **payer_id**: DSJ legacy id
     - **country**: country of DoorDash payer (consumer)
+    - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",
+                      "drive", "merchant", "store", "business" (default is "marketplace")
     - **default_payment_method**: [object] payer's payment method (source) on authorized Payment Provider
     - **default_payment_method.dd_stripe_card_id**: [string] primary key of MainDB.stripe_card table.
-    - **default_payment_method.stripe_payment_method_id**: [string] stripe's payment method id.
+
     """
 
     log.info("[update_payer] payer_id=%s", payer_id)
     try:
-
-        # verify default_payment_method to ensure only one id is provided
-        default_payment_method_id, payment_method_id_type = _verify_legacy_payment_method_id(
-            req_body
-        )
-
-        payer: Payer = await payer_processor.update_payer(
+        payer: Payer = await payer_processor.update_default_payment_method(
             payer_id=payer_id,
             payer_id_type=payer_id_type,
-            default_payment_method_id=default_payment_method_id,
+            default_payment_method_id=req_body.default_payment_method.dd_stripe_card_id,
             country=req_body.country,
-            payment_method_id_type=payment_method_id_type,
+            payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
         )
     except PaymentError as e:
         if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value:
@@ -145,28 +139,3 @@ async def update_payer(
             retryable=e.retryable,
         )
     return payer
-
-
-def _verify_legacy_payment_method_id(
-    request: UpdatePayerRequestV0
-) -> Tuple[str, PaymentMethodIdType]:
-    payment_method_id: str
-    payment_method_id_type: PaymentMethodIdType
-    count: int = 0
-    for key, value in request.default_payment_method:
-        if value:
-            payment_method_id = value
-            payment_method_id_type = key
-            count += 1
-
-    if count != 1:
-        raise PaymentException(
-            http_status_code=HTTP_400_BAD_REQUEST,
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE
-            ],
-            retryable=False,
-        )
-
-    return payment_method_id, payment_method_id_type

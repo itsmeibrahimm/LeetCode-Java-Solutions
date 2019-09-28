@@ -31,7 +31,7 @@ def _get_payer_url(payer_id: str):
 
 
 def _update_payer_default_payment_method_url(payer_id: str):
-    return f"{V1_PAYERS_ENDPOINT}/{payer_id}"
+    return f"{V1_PAYERS_ENDPOINT}/{payer_id}/default_payment_method"
 
 
 class UpdatePayerV1Request(BaseModel):
@@ -48,7 +48,7 @@ def _update_payer_v1(
             "dd_stripe_card_id": request.dd_stripe_card_id,
         }
     }
-    response = client.patch(
+    response = client.post(
         _update_payer_default_payment_method_url(payer_id=payer_id),
         json=update_payer_request,
     )
@@ -65,7 +65,7 @@ def _update_payer_failure_v1(
             "dd_stripe_card_id": request.dd_stripe_card_id,
         }
     }
-    response = client.patch(
+    response = client.post(
         _update_payer_default_payment_method_url(payer_id=payer_id),
         json=update_payer_request,
     )
@@ -76,7 +76,7 @@ def _update_payer_failure_v1(
 
 
 def _get_payer_failure_v1(client: TestClient, payer_id: Any, error: PayinError):
-    response = client.get(_update_payer_default_payment_method_url(payer_id=payer_id))
+    response = client.get(_get_payer_url(payer_id=payer_id))
     assert response.status_code == error.http_status_code
     error_response: dict = response.json()
     assert error_response["error_code"] == error.error_code

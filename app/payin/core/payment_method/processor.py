@@ -205,7 +205,7 @@ class PaymentMethodProcessor:
             )
 
             if raw_payer:
-                await self.payer_client.update_payer_default_payment_method(
+                await self.payer_client.update_default_payment_method(
                     raw_payer=raw_payer,
                     pgp_default_payment_method_id=attach_stripe_payment_method.id,
                     payer_id=(payer_id or dd_consumer_id),

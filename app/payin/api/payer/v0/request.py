@@ -3,13 +3,14 @@ from typing import Optional
 from pydantic import BaseModel
 
 from app.commons.types import CountryCode
+from app.payin.core.payer.types import PayerType
 
 
 class DefaultPaymentMethodV0(BaseModel):
-    payment_method_id: Optional[str]
-    dd_stripe_card_id: Optional[str]
+    dd_stripe_card_id: str
 
 
 class UpdatePayerRequestV0(BaseModel):
     default_payment_method: DefaultPaymentMethodV0
-    country: CountryCode = CountryCode.US
+    country: CountryCode
+    payer_type: Optional[PayerType]

@@ -4,7 +4,7 @@ from structlog.stdlib import BoundLogger
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequest
+from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
 
 from starlette.requests import Request
 
@@ -39,7 +39,7 @@ router = APIRouter()
 )
 async def create_payment_method(
     request: Request,
-    req_body: CreatePaymentMethodRequest,
+    req_body: CreatePaymentMethodRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):

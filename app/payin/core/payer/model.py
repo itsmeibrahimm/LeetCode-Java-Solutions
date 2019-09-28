@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
@@ -31,39 +30,11 @@ class Payer(BaseModel):
     payer_type: Optional[str] = None
     country: Optional[str] = None
     dd_payer_id: Optional[str] = None
+    dd_stripe_customer_id: Optional[str] = None
     description: Optional[str] = None
     payment_gateway_provider_customers: Optional[
         List[PaymentGatewayProviderCustomer]
     ] = None
-
-
-@final
-@dataclass(frozen=True)
-class PgpCustomer:
-    id: str
-    legacy_id: int
-    pgp_code: str
-    pgp_resource_id: str
-    payer_id: str
-    created_at: datetime
-    updated_at: datetime
-    account_balance: Optional[int] = None
-    currency: Optional[str] = None
-    default_payment_method_id: Optional[str] = None
-    legacy_default_card_id: Optional[str] = None
-    legacy_default_source_id: Optional[str] = None
-
-
-@final
-@dataclass(frozen=True)
-class StripeCustomer:
-    id: int
-    stripe_id: str
-    country_shortname: str
-    owner_type: str
-    owner_id: int
-    default_card: str
-    default_source: str
 
 
 class RawPayer:
@@ -127,6 +98,7 @@ class RawPayer:
         provider_customer: PaymentGatewayProviderCustomer
         if self.payer_entity:
             updated_at: datetime = self.payer_entity.updated_at
+            dd_stripe_customer_id: Optional[str] = None
             if self.payer_entity.payer_type == PayerType.MARKETPLACE:
                 if self.pgp_customer_entity:
                     updated_at = max(
@@ -139,13 +111,14 @@ class RawPayer:
                         default_payment_method_id=self.pgp_default_payment_method_id(),
                     )
             else:
+                if not self.stripe_customer_entity:
+                    raise Exception("RawPayer doesn't stripe_customer_entity")
+                dd_stripe_customer_id = str(self.stripe_customer_entity.id)
                 provider_customer = PaymentGatewayProviderCustomer(
                     payment_provider=PaymentProvider.STRIPE.value,  # hard-coded "stripe"
                     payment_provider_customer_id=self.payer_entity.legacy_stripe_customer_id,
                     default_payment_method_id=(
                         self.stripe_customer_entity.default_source
-                        if self.stripe_customer_entity
-                        else None
                     ),
                 )
             payer = Payer(
@@ -154,35 +127,20 @@ class RawPayer:
                 payment_gateway_provider_customers=[provider_customer],
                 country=self.payer_entity.country,
                 dd_payer_id=self.payer_entity.dd_payer_id,
+                dd_stripe_customer_id=dd_stripe_customer_id,
                 description=self.payer_entity.description,
                 created_at=self.payer_entity.created_at,
                 updated_at=updated_at,
             )
         elif self.stripe_customer_entity:
-            provider_customer = PaymentGatewayProviderCustomer(
-                payment_provider=PaymentProvider.STRIPE.value,  # hard-coded "stripe"
-                payment_provider_customer_id=self.stripe_customer_entity.stripe_id,
-                default_payment_method_id=self.stripe_customer_entity.default_source,
+            payer = Payer(
+                # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
+                # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
+                country=self.stripe_customer_entity.country_shortname,
+                dd_payer_id=str(self.stripe_customer_entity.owner_id),
+                dd_stripe_customer_id=str(self.stripe_customer_entity.id),
+                payer_type=self.stripe_customer_entity.owner_type,
+                payment_gateway_provider_customers=[provider_customer],
             )
-            if self.payer_entity:
-                payer = Payer(
-                    id=self.payer_entity.id,
-                    payer_type=self.payer_entity.payer_type,
-                    payment_gateway_provider_customers=[provider_customer],
-                    country=self.payer_entity.country,
-                    dd_payer_id=self.payer_entity.dd_payer_id,
-                    description=self.payer_entity.description,
-                    created_at=self.payer_entity.created_at,
-                    updated_at=self.payer_entity.updated_at,
-                )
-            else:
-                payer = Payer(
-                    # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
-                    # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
-                    country=self.stripe_customer_entity.country_shortname,
-                    dd_payer_id=str(self.stripe_customer_entity.owner_id),
-                    payer_type=self.stripe_customer_entity.owner_type,
-                    payment_gateway_provider_customers=[provider_customer],
-                )
 
         return payer

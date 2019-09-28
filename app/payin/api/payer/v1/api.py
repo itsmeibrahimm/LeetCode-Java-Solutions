@@ -7,7 +7,7 @@ from structlog.stdlib import BoundLogger
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequest
+from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequestV1
 from app.payin.core.exceptions import PayinErrorCode, payin_error_message_maps
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.processor import PayerProcessor
@@ -145,8 +145,8 @@ async def get_payer(
     return payer
 
 
-@router.patch(
-    "/payers/{payer_id}",
+@router.post(
+    "/payers/{payer_id}/default_payment_method",
     response_model=Payer,
     status_code=HTTP_200_OK,
     operation_id="UpdatePayer",
@@ -156,9 +156,9 @@ async def get_payer(
     },
     tags=api_tags,
 )
-async def update_payer(
+async def update_default_payment_method(
     payer_id: UUID,
-    req_body: UpdatePayerRequest,
+    req_body: UpdatePayerRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
     payer_processor: PayerProcessor = Depends(PayerProcessor),
 ):
@@ -177,7 +177,7 @@ async def update_payer(
             req_body
         )
 
-        payer: Payer = await payer_processor.update_payer(
+        payer: Payer = await payer_processor.update_default_payment_method(
             payer_id=payer_id,
             default_payment_method_id=default_payment_method_id,
             payment_method_id_type=payment_method_id_type,
@@ -197,7 +197,7 @@ async def update_payer(
 
 
 def _verify_payment_method_id(
-    request: UpdatePayerRequest
+    request: UpdatePayerRequestV1
 ) -> Tuple[MixedUuidStrType, PaymentMethodIdType]:
     payment_method_id: str
     payment_method_id_type: PaymentMethodIdType
