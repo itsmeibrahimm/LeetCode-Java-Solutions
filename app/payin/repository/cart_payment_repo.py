@@ -10,7 +10,7 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.query import paged_query
-from app.commons.types import PgpCode
+from app.commons.types import PgpCode, CountryCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentIntent,
@@ -225,7 +225,7 @@ class CartPaymentRepository(PayinDBRepository):
         amount_initiated: int,
         amount: int,
         application_fee_amount: Optional[int],
-        country: str,
+        country: CountryCode,
         currency: str,
         capture_method: str,
         status: str,

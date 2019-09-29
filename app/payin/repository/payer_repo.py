@@ -5,12 +5,12 @@ from typing import Optional, Tuple
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from typing_extensions import final
 
 from app.commons import tracing
-from app.commons.database.model import DBRequestModel, DBEntity
-from app.commons.types import PgpCode
+from app.commons.database.model import DBEntity, DBRequestModel
+from app.commons.types import CountryCode, PgpCode
 from app.payin.models.maindb import stripe_customers
 from app.payin.models.paymentdb import payers, pgp_customers
 from app.payin.repository.base import PayinDBRepository
@@ -26,7 +26,7 @@ class PayerDbEntity(DBEntity):
 
     id: UUID
     payer_type: str
-    country: str
+    country: CountryCode
     legacy_stripe_customer_id: Optional[str] = None
     account_balance: Optional[int] = None
     description: Optional[str] = None

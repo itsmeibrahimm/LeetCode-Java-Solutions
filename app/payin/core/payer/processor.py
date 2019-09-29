@@ -42,7 +42,7 @@ class PayerProcessor:
         dd_payer_id: str,
         payer_type: str,
         email: str,
-        country: str,
+        country: CountryCode,
         description: str,
     ) -> Payer:
         """

@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from typing_extensions import final
 
-from app.commons.types import PgpCode
+from app.commons.types import PgpCode, CountryCode
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
@@ -67,7 +67,7 @@ class PaymentIntent(BaseModel):
     amount_received: Optional[int]
     application_fee_amount: Optional[int]
     capture_method: str
-    country: str
+    country: CountryCode
     currency: str
     status: IntentStatus
     statement_descriptor: Optional[str]

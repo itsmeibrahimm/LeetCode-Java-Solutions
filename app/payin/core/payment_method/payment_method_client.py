@@ -349,11 +349,11 @@ class PaymentMethodClient:
         return stripe_payment_method
 
     async def pgp_attach_payment_method(
-        self, pgp_payment_method_res_id: str, pgp_customer_id: str, country: str
+        self, pgp_payment_method_res_id: str, pgp_customer_id: str, country: CountryCode
     ) -> StripePaymentMethod:
         try:
             attach_payment_method = await self.stripe_async_client.attach_payment_method(
-                country=CountryCode(country),
+                country=country,
                 request=StripeAttachPaymentMethodRequest(
                     sid=pgp_payment_method_res_id, customer=pgp_customer_id
                 ),
@@ -372,11 +372,11 @@ class PaymentMethodClient:
         return attach_payment_method
 
     async def pgp_detach_payment_method(
-        self, pgp_payment_method_id: str, country: str
+        self, pgp_payment_method_id: str, country: CountryCode
     ) -> StripePaymentMethod:
         try:
             stripe_payment_method = await self.stripe_async_client.detach_payment_method(
-                country=CountryCode(country),  # TODO: get from payer
+                country=country,  # TODO: get from payer
                 request=StripeDetachPaymentMethodRequest(sid=pgp_payment_method_id),
             )
             self.log.info(

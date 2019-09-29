@@ -103,7 +103,7 @@ class PayerClient:
         self,
         dd_payer_id: str,
         payer_type: str,
-        country: str,
+        country: CountryCode,
         pgp_customer_res_id: str,
         pgp_code: PgpCode,
         description: Optional[str],
@@ -255,7 +255,9 @@ class PayerClient:
         ):
             return await self.lazy_create_raw_payer(
                 dd_payer_id=str(updated_raw_payer.stripe_customer_entity.owner_id),
-                country=updated_raw_payer.stripe_customer_entity.country_shortname,
+                country=CountryCode(
+                    updated_raw_payer.stripe_customer_entity.country_shortname
+                ),
                 pgp_customer_res_id=updated_raw_payer.stripe_customer_entity.stripe_id,
                 pgp_code=PgpCode.STRIPE,
                 payer_type=updated_raw_payer.stripe_customer_entity.owner_type,
@@ -267,7 +269,7 @@ class PayerClient:
     async def lazy_create_raw_payer(
         self,
         dd_payer_id: str,
-        country: str,
+        country: CountryCode,
         pgp_customer_res_id: str,
         pgp_code: PgpCode,
         payer_type: str,
@@ -299,14 +301,14 @@ class PayerClient:
         )
 
     async def pgp_create_customer(
-        self, country: str, email: str, description: str
+        self, country: CountryCode, email: str, description: str
     ) -> CustomerId:
         creat_cus_req: StripeCreateCustomerRequest = StripeCreateCustomerRequest(
             email=email, description=description
         )
         try:
             stripe_cus_id: CustomerId = await self.stripe_async_client.create_customer(
-                country=CountryCode(country), request=creat_cus_req
+                country=country, request=creat_cus_req
             )
         except Exception as e:
             self.log.error(
@@ -386,7 +388,7 @@ class PayerOpsInterface:
         self,
         dd_payer_id: str,
         payer_type: str,
-        country: str,
+        country: CountryCode,
         pgp_customer_res_id: str,
         pgp_code: PgpCode,
         description: Optional[str],
@@ -419,7 +421,7 @@ class PayerOps(PayerOpsInterface):
         self,
         dd_payer_id: str,
         payer_type: str,
-        country: str,
+        country: CountryCode,
         pgp_customer_res_id: str,
         pgp_code: PgpCode,
         description: Optional[str],
@@ -558,7 +560,7 @@ class LegacyPayerOps(PayerOpsInterface):
         self,
         dd_payer_id: str,
         payer_type: str,
-        country: str,
+        country: CountryCode,
         pgp_customer_res_id: str,
         pgp_code: str,
         description: Optional[str],

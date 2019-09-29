@@ -461,7 +461,7 @@ class CartPaymentInterface:
         provider_customer_resource_id: str,
         provider_metadata: Optional[Dict[str, Any]],
         idempotency_key: str,
-        country: str,
+        country: CountryCode,
         currency: str,
     ) -> Tuple[CartPayment, PaymentIntent, PgpPaymentIntent]:
         # Create a new cart payment, with associated models
@@ -584,7 +584,7 @@ class CartPaymentInterface:
         provider_customer_resource_id: str,
         provider_metadata: Optional[Dict[str, Any]],
         amount: int,
-        country: str,
+        country: CountryCode,
         currency: str,
         capture_method: str,
         capture_after: Optional[datetime],

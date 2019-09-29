@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
-from app.commons.types import PgpCode
+from app.commons.types import PgpCode, CountryCode
 from app.payin.capture.service import CaptureService
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
@@ -94,7 +94,7 @@ class MockedPaymentRepo:
         amount_initiated: int,
         amount: int,
         application_fee_amount: Optional[int],
-        country: str,
+        country: CountryCode,
         currency: str,
         capture_method: str,
         status: str,
