@@ -10,6 +10,7 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.model import DBRequestModel, DBEntity
+from app.commons.types import PgpCode
 from app.payin.models.maindb import stripe_customers
 from app.payin.models.paymentdb import payers, pgp_customers
 from app.payin.repository.base import PayinDBRepository
@@ -71,7 +72,7 @@ class PgpCustomerDbEntity(DBEntity):
     payer_id: UUID
     pgp_resource_id: str
     currency: Optional[str] = None
-    pgp_code: Optional[str] = None
+    pgp_code: Optional[PgpCode] = None
     legacy_id: Optional[int] = None
     account_balance: Optional[int] = None
     default_payment_method_id: Optional[str] = None

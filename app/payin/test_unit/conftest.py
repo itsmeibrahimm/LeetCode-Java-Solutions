@@ -5,6 +5,7 @@ from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+from app.commons.types import PgpCode
 from app.payin.capture.service import CaptureService
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
@@ -162,7 +163,7 @@ class MockedPaymentRepo:
         id: UUID,
         payment_intent_id: UUID,
         idempotency_key: str,
-        provider: str,
+        pgp_code: PgpCode,
         payment_method_resource_id: str,
         customer_resource_id: str,
         currency: str,
@@ -177,7 +178,7 @@ class MockedPaymentRepo:
             id=id,
             payment_intent_id=payment_intent_id,
             idempotency_key=idempotency_key,
-            provider=provider,
+            pgp_code=pgp_code,
             resource_id=None,
             status=IntentStatus.INIT,
             invoice_resource_id=None,
@@ -226,7 +227,7 @@ class MockedPaymentRepo:
         self,
         id: UUID,
         payment_intent_id: UUID,
-        provider: str,
+        pgp_code: PgpCode,
         idempotency_key: str,
         status: str,
         currency: str,
@@ -238,7 +239,7 @@ class MockedPaymentRepo:
         return PaymentCharge(
             id=id,
             payment_intent_id=payment_intent_id,
-            provider=provider,
+            pgp_code=pgp_code,
             idempotency_key=idempotency_key,
             status=ChargeStatus(status),
             currency=currency,
@@ -256,7 +257,7 @@ class MockedPaymentRepo:
         self,
         id: UUID,
         payment_charge_id: UUID,
-        provider: str,
+        pgp_code: PgpCode,
         idempotency_key: str,
         status: str,
         currency: str,
@@ -272,7 +273,7 @@ class MockedPaymentRepo:
         return PgpPaymentCharge(
             id=id,
             payment_charge_id=payment_charge_id,
-            provider=provider,
+            pgp_code=pgp_code,
             idempotency_key=idempotency_key,
             status=ChargeStatus(status),
             currency=currency,

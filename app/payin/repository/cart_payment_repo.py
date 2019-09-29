@@ -10,6 +10,7 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.query import paged_query
+from app.commons.types import PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentIntent,
@@ -388,7 +389,7 @@ class CartPaymentRepository(PayinDBRepository):
         id: UUID,
         payment_intent_id: UUID,
         idempotency_key: str,
-        provider: str,
+        pgp_code: PgpCode,
         payment_method_resource_id: str,
         customer_resource_id: Optional[str],
         currency: str,
@@ -403,7 +404,7 @@ class CartPaymentRepository(PayinDBRepository):
             pgp_payment_intents.id: id,
             pgp_payment_intents.payment_intent_id: payment_intent_id,
             pgp_payment_intents.idempotency_key: idempotency_key,
-            pgp_payment_intents.provider: provider,
+            pgp_payment_intents.provider: pgp_code.value,
             pgp_payment_intents.payment_method_resource_id: payment_method_resource_id,
             pgp_payment_intents.customer_resource_id: customer_resource_id,
             pgp_payment_intents.currency: currency,
@@ -487,7 +488,7 @@ class CartPaymentRepository(PayinDBRepository):
             id=row[pgp_payment_intents.id],
             payment_intent_id=row[pgp_payment_intents.payment_intent_id],
             idempotency_key=row[pgp_payment_intents.idempotency_key],
-            provider=row[pgp_payment_intents.provider],
+            pgp_code=PgpCode(row[pgp_payment_intents.provider]),
             resource_id=row[pgp_payment_intents.resource_id],
             status=IntentStatus(row[pgp_payment_intents.status]),
             invoice_resource_id=row[pgp_payment_intents.invoice_resource_id],
@@ -587,7 +588,7 @@ class CartPaymentRepository(PayinDBRepository):
         self,
         id: UUID,
         payment_intent_id: UUID,
-        provider: str,
+        pgp_code: PgpCode,
         idempotency_key: str,
         status: str,
         currency: str,
@@ -599,7 +600,7 @@ class CartPaymentRepository(PayinDBRepository):
         data = {
             payment_charges.id: str(id),
             payment_charges.payment_intent_id: str(payment_intent_id),
-            payment_charges.provider: provider,
+            payment_charges.provider: pgp_code.value,
             payment_charges.idempotency_key: idempotency_key,
             payment_charges.status: status,
             payment_charges.currency: currency,
@@ -622,7 +623,7 @@ class CartPaymentRepository(PayinDBRepository):
         return PaymentCharge(
             id=row[payment_charges.id],
             payment_intent_id=row[payment_charges.payment_intent_id],
-            provider=row[payment_charges.provider],
+            pgp_code=PgpCode(row[payment_charges.provider]),
             idempotency_key=row[payment_charges.idempotency_key],
             status=ChargeStatus(row[payment_charges.status]),
             currency=row[payment_charges.currency],
@@ -682,7 +683,7 @@ class CartPaymentRepository(PayinDBRepository):
         self,
         id: UUID,
         payment_charge_id: UUID,
-        provider: str,
+        pgp_code: PgpCode,
         idempotency_key: str,
         status: str,
         currency: str,
@@ -698,7 +699,7 @@ class CartPaymentRepository(PayinDBRepository):
         data = {
             pgp_payment_charges.id: id,
             pgp_payment_charges.payment_charge_id: payment_charge_id,
-            pgp_payment_charges.provider: provider,
+            pgp_payment_charges.provider: pgp_code.value,
             pgp_payment_charges.idempotency_key: idempotency_key,
             pgp_payment_charges.status: status,
             pgp_payment_charges.currency: currency,
@@ -725,7 +726,7 @@ class CartPaymentRepository(PayinDBRepository):
         return PgpPaymentCharge(
             id=row[pgp_payment_charges.id],
             payment_charge_id=row[pgp_payment_charges.payment_charge_id],
-            provider=row[pgp_payment_charges.provider],
+            pgp_code=PgpCode(row[pgp_payment_charges.provider]),
             idempotency_key=row[pgp_payment_charges.idempotency_key],
             status=ChargeStatus(row[pgp_payment_charges.status]),
             currency=row[pgp_payment_charges.currency],

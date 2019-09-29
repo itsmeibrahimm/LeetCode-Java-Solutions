@@ -14,6 +14,7 @@ from app.commons.database.model import DBEntity, DBRequestModel
 ###########################################################
 # PgpPaymentMethod DBEntity and CRUD operations           #
 ###########################################################
+from app.commons.types import PgpCode
 from app.payin.core.payer.types import PayerType
 from app.payin.models.maindb import stripe_cards
 from app.payin.models.paymentdb import pgp_payment_methods
@@ -28,7 +29,7 @@ class PgpPaymentMethodDbEntity(DBEntity):
     """
 
     id: UUID
-    pgp_code: str
+    pgp_code: PgpCode
     pgp_resource_id: str
     payer_id: Optional[UUID] = None
     pgp_card_id: Optional[str] = None

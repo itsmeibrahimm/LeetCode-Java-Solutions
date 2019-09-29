@@ -102,6 +102,9 @@ class DBEntity(BaseModel):
 
     class Config:
         allow_mutation = False  # Immutable
+        # makes it so that .dict() returns the value of Enum typed fields rather than the Enum itself
+        # eg. {'color': 'blue'} instead of {'color': <Color.BLUE: 'blue'>}
+        use_enum_values = True
 
     @classmethod
     def from_row(cls, row: Mapping):

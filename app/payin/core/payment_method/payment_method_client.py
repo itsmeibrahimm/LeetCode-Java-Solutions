@@ -22,7 +22,7 @@ from app.commons.providers.stripe.stripe_models import (
 from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
 )
-from app.commons.types import CountryCode
+from app.commons.types import CountryCode, PgpCode
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PayinErrorCode,
@@ -78,7 +78,7 @@ class PaymentMethodClient:
     async def create_raw_payment_method(
         self,
         payment_method_id: UUID,
-        pgp_code: str,
+        pgp_code: PgpCode,
         stripe_payment_method: StripePaymentMethod,
         is_scanned: bool,
         is_active: bool,

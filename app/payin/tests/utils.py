@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from unittest.mock import MagicMock
 import uuid
-from app.commons.types import LegacyCountryId, Currency
+from app.commons.types import LegacyCountryId, Currency, PgpCode
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentIntent,
@@ -90,7 +90,7 @@ def generate_pgp_payment_intent(
         id=id if id else uuid.uuid4(),
         payment_intent_id=payment_intent_id if payment_intent_id else uuid.uuid4(),
         idempotency_key=str(uuid.uuid4()),
-        provider="stripe",
+        pgp_code=PgpCode.STRIPE,
         resource_id=resource_id if resource_id else str(uuid.uuid4()),
         status=IntentStatus(status),
         invoice_resource_id=None,
@@ -197,7 +197,7 @@ def generate_payment_charge(
     return PaymentCharge(
         id=uuid.uuid4(),
         payment_intent_id=payment_intent_id,
-        provider="stripe",
+        pgp_code=PgpCode.STRIPE,
         idempotency_key=str(uuid.uuid4()),
         status=status,
         currency=Currency.USD.value,
@@ -221,7 +221,7 @@ def generate_pgp_payment_charge(
     return PgpPaymentCharge(
         id=uuid.uuid4(),
         payment_charge_id=payment_charge_id,
-        provider="stripe",
+        pgp_code=PgpCode.STRIPE,
         idempotency_key=str(uuid.uuid4()),
         status=status,
         currency=Currency.USD.value,

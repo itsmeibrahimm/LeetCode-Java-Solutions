@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from typing_extensions import final
 
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import PgpCode
 from app.payin.core.payer.types import PayerType
 from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.payer_repo import (
@@ -16,7 +16,7 @@ from app.payin.repository.payer_repo import (
 
 
 class PaymentGatewayProviderCustomer(BaseModel):
-    payment_provider: str
+    payment_provider: PgpCode
     payment_provider_customer_id: str
     default_payment_method_id: Optional[str] = None
 
@@ -115,7 +115,7 @@ class RawPayer:
                     raise Exception("RawPayer doesn't stripe_customer_entity")
                 dd_stripe_customer_id = str(self.stripe_customer_entity.id)
                 provider_customer = PaymentGatewayProviderCustomer(
-                    payment_provider=PaymentProvider.STRIPE.value,  # hard-coded "stripe"
+                    payment_provider=PgpCode.STRIPE,
                     payment_provider_customer_id=self.payer_entity.legacy_stripe_customer_id,
                     default_payment_method_id=(
                         self.stripe_customer_entity.default_source

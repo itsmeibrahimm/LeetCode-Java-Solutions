@@ -29,8 +29,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeRefundChargeRequest,
     TransferData,
 )
-from app.commons.types import CountryCode, Currency, LegacyCountryId
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
@@ -539,7 +538,7 @@ class CartPaymentInterface:
         payment_charge = await self.payment_repo.insert_payment_charge(
             id=uuid.uuid4(),
             payment_intent_id=payment_intent.id,
-            provider=PaymentProvider.STRIPE.value,
+            pgp_code=PgpCode.STRIPE,
             idempotency_key=str(uuid.uuid4()),  # TODO handle idempotency key
             status=status,
             currency=payment_intent.currency,
@@ -559,7 +558,7 @@ class CartPaymentInterface:
         pgp_payment_charge = await self.payment_repo.insert_pgp_payment_charge(
             id=uuid.uuid4(),
             payment_charge_id=payment_charge.id,
-            provider=PaymentProvider.STRIPE.value,
+            pgp_code=PgpCode.STRIPE,
             idempotency_key=payment_charge.idempotency_key,
             status=status,
             currency=provider_charge.currency,
@@ -617,7 +616,7 @@ class CartPaymentInterface:
             id=uuid.uuid4(),
             payment_intent_id=payment_intent.id,
             idempotency_key=idempotency_key,
-            provider=PaymentProvider.STRIPE.value,
+            pgp_code=PgpCode.STRIPE,
             payment_method_resource_id=provider_payment_method_id,
             customer_resource_id=provider_customer_resource_id,
             currency=currency,

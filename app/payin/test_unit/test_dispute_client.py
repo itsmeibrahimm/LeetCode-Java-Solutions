@@ -1,6 +1,7 @@
 import pytest
 from asynctest import MagicMock
 
+from app.commons.types import PgpCode
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.dispute.types import DisputeIdType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
@@ -63,7 +64,7 @@ class TestDisputeClient:
         pgp_payment_method_id = generate_object_uuid()
         pgp_entity_mock: PgpPaymentMethodDbEntity = PgpPaymentMethodDbEntity(
             id=pgp_payment_method_id,
-            pgp_code="STRIPE",
+            pgp_code=PgpCode.STRIPE,
             pgp_resource_id="VALID_STRIPE_PAYMENT_METHOD_ID",
         )
         stripe_entity_mock: StripeCardDbEntity = StripeCardDbEntity(

@@ -4,7 +4,7 @@ from structlog.stdlib import BoundLogger
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.commons.types import CountryCode
+from app.commons.types import CountryCode, PgpCode
 
 from starlette.requests import Request
 
@@ -17,7 +17,6 @@ from starlette.status import (
     HTTP_201_CREATED,
 )
 
-from app.commons.utils.types import PaymentProvider
 from app.payin.api.payment_method.v0.request import CreatePaymentMethodRequestV0
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
@@ -64,7 +63,7 @@ async def create_payment_method(
 
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
-            pgp_code=PaymentProvider.STRIPE,
+            pgp_code=PgpCode.STRIPE,
             token=req_body.token,
             set_default=req_body.set_default,
             is_scanned=req_body.is_scanned,

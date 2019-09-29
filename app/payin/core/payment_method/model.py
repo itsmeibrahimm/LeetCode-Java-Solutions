@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from typing_extensions import final
 
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import PgpCode
 from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
 from app.payin.core.payment_method.types import WalletType
 from app.payin.core.types import PgpPaymentMethodResourceId
@@ -45,7 +45,7 @@ class BillingDetails(BaseModel):
 
 @final
 class PaymentGatewayProviderDetails(BaseModel):
-    payment_provider: str
+    payment_provider: PgpCode
     payment_method_id: Optional[str] = None
     customer_id: Optional[str] = None
 
@@ -117,7 +117,7 @@ class RawPaymentMethod:
             payment_provider=(
                 self.pgp_payment_method_entity.pgp_code
                 if self.pgp_payment_method_entity
-                else PaymentProvider.STRIPE
+                else PgpCode.STRIPE
             ),
             payment_method_id=self.stripe_card_entity.stripe_id,
             customer_id=self.stripe_card_entity.external_stripe_customer_id,

@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
 from typing_extensions import final
+
+from app.commons.types import PgpCode
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
@@ -85,7 +87,7 @@ class PgpPaymentIntent:
     id: UUID
     payment_intent_id: UUID
     idempotency_key: str
-    provider: str
+    pgp_code: PgpCode
     resource_id: Optional[str]
     status: IntentStatus
     invoice_resource_id: Optional[str]
@@ -123,7 +125,7 @@ class PaymentIntentAdjustmentHistory:
 class PaymentCharge:
     id: UUID
     payment_intent_id: UUID
-    provider: str
+    pgp_code: PgpCode
     idempotency_key: str
     status: ChargeStatus
     currency: str
@@ -142,7 +144,7 @@ class PaymentCharge:
 class PgpPaymentCharge:
     id: UUID
     payment_charge_id: UUID
-    provider: str
+    pgp_code: PgpCode
     idempotency_key: str
     status: ChargeStatus
     currency: str

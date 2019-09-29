@@ -10,7 +10,7 @@ from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
 )
 from app.commons.runtime import runtime
-from app.commons.types import CountryCode
+from app.commons.types import CountryCode, PgpCode
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
@@ -52,7 +52,7 @@ class PaymentMethodProcessor:
 
     async def create_payment_method(
         self,
-        pgp_code: str,
+        pgp_code: PgpCode,
         token: str,
         set_default: bool,
         is_scanned: bool,

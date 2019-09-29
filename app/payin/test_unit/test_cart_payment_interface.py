@@ -9,7 +9,7 @@ from asynctest import create_autospec
 from freezegun import freeze_time
 from stripe.error import StripeError, InvalidRequestError
 
-from app.commons.types import Currency
+from app.commons.types import Currency, PgpCode
 from app.commons.providers.stripe.stripe_models import StripeCreatePaymentIntentRequest
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.types import LegacyCountryId, CountryCode
@@ -733,7 +733,7 @@ class TestCartPaymentInterface:
         expected_payment_charge = PaymentCharge(
             id=result_payment_charge.id,  # Generated
             payment_intent_id=payment_intent.id,
-            provider=pgp_payment_intent.provider,
+            pgp_code=pgp_payment_intent.pgp_code,
             idempotency_key=result_payment_charge.idempotency_key,
             status=ChargeStatus.SUCCEEDED,
             currency=payment_intent.currency,
@@ -757,7 +757,7 @@ class TestCartPaymentInterface:
         expected_pgp_charge = PgpPaymentCharge(
             id=result_pgp_charge.id,  # Generated
             payment_charge_id=result_payment_charge.id,
-            provider=pgp_payment_intent.provider,
+            pgp_code=pgp_payment_intent.pgp_code,
             idempotency_key=result_payment_charge.idempotency_key,
             status=ChargeStatus.SUCCEEDED,
             currency=payment_intent.currency,
@@ -836,7 +836,7 @@ class TestCartPaymentInterface:
             id=result_pgp_intent.id,  # Generated field
             payment_intent_id=result_intent.id,
             idempotency_key="idempotency_key",
-            provider="stripe",
+            pgp_code=PgpCode.STRIPE,
             status=IntentStatus.INIT,
             resource_id=None,
             charge_resource_id=None,

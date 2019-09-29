@@ -4,8 +4,7 @@ from uuid import uuid4
 import factory
 import pytest
 
-from app.commons.types import CountryCode, Currency
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import CountryCode, Currency, PgpCode
 from app.payin.core.cart_payment.model import (
     PaymentIntent,
     CartPayment,
@@ -57,7 +56,7 @@ async def payment_intent(
 
     payment_method_processor = PaymentMethodProcessor()
     payment_method = await payment_method_processor.create_payment_method(
-        pgp_code=PaymentProvider.STRIPE.value,
+        pgp_code=PgpCode.STRIPE,
         token="tok_visa",
         payer_id=payer.id,
         set_default=False,
@@ -151,7 +150,7 @@ class PgpPaymentIntentFactory(factory.Factory):
     id = factory.LazyAttribute(lambda o: str(uuid4()))
     payment_intent_id = factory.LazyAttribute(lambda o: str(uuid4()))
     idempotency_key = factory.LazyAttribute(lambda o: str(uuid4()))
-    provider = PaymentProvider.STRIPE
+    pgp_code = PgpCode.STRIPE
     resource_id = 1
     status = IntentStatus.REQUIRES_CAPTURE
     invoice_resource_id = "asdf"

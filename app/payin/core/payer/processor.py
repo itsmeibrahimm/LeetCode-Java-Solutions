@@ -10,8 +10,7 @@ from app.commons.providers.stripe.stripe_models import (
     Customer as StripeCustomer,
 )
 from app.commons.runtime import runtime
-from app.commons.types import CountryCode
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import CountryCode, PgpCode
 from app.payin.core.exceptions import PayerReadError, PayinErrorCode
 from app.payin.core.payer.model import Payer, RawPayer, PaymentGatewayProviderCustomer
 from app.payin.core.payer.payer_client import PayerClient
@@ -64,7 +63,7 @@ class PayerProcessor:
         )
 
         # TODO: we should get pgp_code in different way
-        pgp_code = PaymentProvider.STRIPE
+        pgp_code = PgpCode.STRIPE
 
         # step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
         await self.payer_client.has_existing_payer(
@@ -161,7 +160,7 @@ class PayerProcessor:
                     default_pm_id = pgp_customer.default_source
 
                 provider_customer = PaymentGatewayProviderCustomer(
-                    payment_provider=PaymentProvider.STRIPE,
+                    payment_provider=PgpCode.STRIPE,
                     payment_provider_customer_id=pgp_customer.id,
                     default_payment_method_id=default_pm_id,
                 )

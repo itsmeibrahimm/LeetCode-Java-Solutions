@@ -17,3 +17,11 @@ class Currency(str, Enum):
     USD = "usd"
     CAD = "cad"
     AUD = "aud"
+
+
+class PgpCode(str, Enum):
+    """
+    Enum definition of supported payment gateway providers.
+    """
+
+    STRIPE = "stripe"

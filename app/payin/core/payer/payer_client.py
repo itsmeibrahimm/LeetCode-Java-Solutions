@@ -23,8 +23,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeRetrieveCustomerRequest,
 )
 from app.commons.runtime import runtime
-from app.commons.types import CountryCode
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import CountryCode, PgpCode
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
     PayerReadError,
@@ -106,7 +105,7 @@ class PayerClient:
         payer_type: str,
         country: str,
         pgp_customer_res_id: str,
-        pgp_code: str,
+        pgp_code: PgpCode,
         description: Optional[str],
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
@@ -258,7 +257,7 @@ class PayerClient:
                 dd_payer_id=str(updated_raw_payer.stripe_customer_entity.owner_id),
                 country=updated_raw_payer.stripe_customer_entity.country_shortname,
                 pgp_customer_res_id=updated_raw_payer.stripe_customer_entity.stripe_id,
-                pgp_code=PaymentProvider.STRIPE,  # hard-code "stripe"
+                pgp_code=PgpCode.STRIPE,
                 payer_type=updated_raw_payer.stripe_customer_entity.owner_type,
                 default_payment_method_id=pgp_default_payment_method_id,
                 description=description,
@@ -270,7 +269,7 @@ class PayerClient:
         dd_payer_id: str,
         country: str,
         pgp_customer_res_id: str,
-        pgp_code: str,
+        pgp_code: PgpCode,
         payer_type: str,
         default_payment_method_id: Optional[str],
         description: Optional[str] = None,
@@ -389,7 +388,7 @@ class PayerOpsInterface:
         payer_type: str,
         country: str,
         pgp_customer_res_id: str,
-        pgp_code: str,
+        pgp_code: PgpCode,
         description: Optional[str],
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:
@@ -422,7 +421,7 @@ class PayerOps(PayerOpsInterface):
         payer_type: str,
         country: str,
         pgp_customer_res_id: str,
-        pgp_code: str,
+        pgp_code: PgpCode,
         description: Optional[str],
         default_payment_method_id: Optional[str] = None,
     ) -> RawPayer:

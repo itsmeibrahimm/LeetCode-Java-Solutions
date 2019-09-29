@@ -2,12 +2,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import PgpCode
 
 
 class CreatePaymentMethodRequestV1(BaseModel):
     payer_id: UUID
-    payment_gateway: PaymentProvider = PaymentProvider.STRIPE
+    payment_gateway: PgpCode = PgpCode.STRIPE
     token: str
     set_default: bool
     is_scanned: bool

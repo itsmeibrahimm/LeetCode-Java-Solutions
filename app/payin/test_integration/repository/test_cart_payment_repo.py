@@ -5,8 +5,7 @@ from uuid import uuid4, UUID
 import pytest
 from IPython.utils.tz import utcnow
 
-from app.commons.types import CountryCode, LegacyCountryId, Currency
-from app.commons.utils.types import PaymentProvider
+from app.commons.types import CountryCode, LegacyCountryId, Currency, PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
@@ -50,8 +49,8 @@ async def payer(payer_repository: PayerRepository):
 @pytest.fixture
 async def payment_method(payer, payment_method_repository: PaymentMethodRepository):
     insert_payment_method = InsertPgpPaymentMethodInput(
-        id=str(uuid4()),
-        pgp_code=PaymentProvider.STRIPE.value,
+        id=uuid4(),
+        pgp_code=PgpCode.STRIPE,
         pgp_resource_id=str(uuid4()),
         payer_id=payer.id,
     )
@@ -164,7 +163,7 @@ async def pgp_payment_intent(
         id=uuid4(),
         payment_intent_id=payment_intent.id,
         idempotency_key=str(uuid4()),
-        provider=PaymentProvider.STRIPE,
+        pgp_code=PgpCode.STRIPE,
         payment_method_resource_id="pm_test",
         customer_resource_id=None,
         currency="USD",
@@ -184,7 +183,7 @@ async def payment_charge(
     yield await cart_payment_repository.insert_payment_charge(
         id=uuid4(),
         payment_intent_id=payment_intent.id,
-        provider=PaymentProvider.STRIPE,
+        pgp_code=PgpCode.STRIPE,
         idempotency_key=str(uuid4()),
         status=ChargeStatus.REQUIRES_CAPTURE,
         currency="USD",
@@ -202,7 +201,7 @@ async def pgp_payment_charge(
     yield await cart_payment_repository.insert_pgp_payment_charge(
         id=uuid4(),
         payment_charge_id=payment_charge.id,
-        provider=PaymentProvider.STRIPE,
+        pgp_code=PgpCode.STRIPE,
         idempotency_key=str(uuid4()),
         status=ChargeStatus.REQUIRES_CAPTURE,
         currency="USD",
@@ -342,7 +341,7 @@ class TestPgpPaymentIntent:
             id=pgp_payment_intent.id,
             payment_intent_id=pgp_payment_intent.payment_intent_id,
             idempotency_key=pgp_payment_intent.idempotency_key,
-            provider=pgp_payment_intent.provider,
+            pgp_code=pgp_payment_intent.pgp_code,
             resource_id=pgp_payment_intent.resource_id,
             status=IntentStatus.SUCCEEDED,  # Updated
             invoice_resource_id=pgp_payment_intent.invoice_resource_id,
@@ -378,7 +377,7 @@ class TestPgpPaymentIntent:
             id=pgp_payment_intent.id,
             payment_intent_id=pgp_payment_intent.payment_intent_id,
             idempotency_key=pgp_payment_intent.idempotency_key,
-            provider=pgp_payment_intent.provider,
+            pgp_code=pgp_payment_intent.pgp_code,
             resource_id=pgp_payment_intent.resource_id,
             status=pgp_payment_intent.status,
             invoice_resource_id=pgp_payment_intent.invoice_resource_id,
@@ -412,7 +411,7 @@ class TestPaymentCharge:
         result = await cart_payment_repository.insert_payment_charge(
             id=id,
             payment_intent_id=payment_intent.id,
-            provider=PaymentProvider.STRIPE,
+            pgp_code=PgpCode.STRIPE,
             idempotency_key=idempotency_key,
             status=ChargeStatus.REQUIRES_CAPTURE,
             currency="USD",
@@ -425,7 +424,7 @@ class TestPaymentCharge:
         expected_charge = PaymentCharge(
             id=id,
             payment_intent_id=payment_intent.id,
-            provider=PaymentProvider.STRIPE,
+            pgp_code=PgpCode.STRIPE,
             idempotency_key=idempotency_key,
             status=ChargeStatus.REQUIRES_CAPTURE,
             currency="USD",
@@ -455,7 +454,7 @@ class TestPaymentCharge:
         expected_charge = PaymentCharge(
             id=payment_charge.id,
             payment_intent_id=payment_charge.payment_intent_id,
-            provider=payment_charge.provider,
+            pgp_code=payment_charge.pgp_code,
             idempotency_key=payment_charge.idempotency_key,
             status=ChargeStatus.FAILED,  # Updated
             currency=payment_charge.currency,
@@ -485,7 +484,7 @@ class TestPaymentCharge:
         expected_charge = PaymentCharge(
             id=payment_charge.id,
             payment_intent_id=payment_charge.payment_intent_id,
-            provider=payment_charge.provider,
+            pgp_code=payment_charge.pgp_code,
             idempotency_key=payment_charge.idempotency_key,
             status=payment_charge.status,
             currency=payment_charge.currency,
@@ -516,7 +515,7 @@ class TestPaymentCharge:
         expected_charge = PaymentCharge(
             id=payment_charge.id,
             payment_intent_id=payment_charge.payment_intent_id,
-            provider=payment_charge.provider,
+            pgp_code=payment_charge.pgp_code,
             idempotency_key=payment_charge.idempotency_key,
             status=ChargeStatus.FAILED,  # Updated
             currency=payment_charge.currency,
@@ -546,7 +545,7 @@ class TestPgpPaymentCharge:
         result = await cart_payment_repository.insert_pgp_payment_charge(
             id=id,
             payment_charge_id=payment_charge.id,
-            provider=PaymentProvider.STRIPE,
+            pgp_code=PgpCode.STRIPE,
             idempotency_key=idempotency_key,
             status=ChargeStatus.REQUIRES_CAPTURE,
             currency="USD",
@@ -563,7 +562,7 @@ class TestPgpPaymentCharge:
         expected_charge = PgpPaymentCharge(
             id=id,
             payment_charge_id=payment_charge.id,
-            provider=PaymentProvider.STRIPE,
+            pgp_code=PgpCode.STRIPE,
             idempotency_key=idempotency_key,
             status=ChargeStatus.REQUIRES_CAPTURE,
             currency="USD",
@@ -597,7 +596,7 @@ class TestPgpPaymentCharge:
         expected_charge = PgpPaymentCharge(
             id=pgp_payment_charge.id,
             payment_charge_id=pgp_payment_charge.payment_charge_id,
-            provider=pgp_payment_charge.provider,
+            pgp_code=pgp_payment_charge.pgp_code,
             idempotency_key=pgp_payment_charge.idempotency_key,
             status=ChargeStatus.FAILED,  # Updated
             currency=pgp_payment_charge.currency,
@@ -631,7 +630,7 @@ class TestPgpPaymentCharge:
         expected_charge = PgpPaymentCharge(
             id=pgp_payment_charge.id,
             payment_charge_id=pgp_payment_charge.payment_charge_id,
-            provider=pgp_payment_charge.provider,
+            pgp_code=pgp_payment_charge.pgp_code,
             idempotency_key=pgp_payment_charge.idempotency_key,
             status=pgp_payment_charge.status,
             currency=pgp_payment_charge.currency,
@@ -667,7 +666,7 @@ class TestPgpPaymentCharge:
         expected_charge = PgpPaymentCharge(
             id=pgp_payment_charge.id,
             payment_charge_id=pgp_payment_charge.payment_charge_id,
-            provider=pgp_payment_charge.provider,
+            pgp_code=pgp_payment_charge.pgp_code,
             idempotency_key=pgp_payment_charge.idempotency_key,
             status=ChargeStatus.SUCCEEDED,  # Updated
             currency=pgp_payment_charge.currency,
