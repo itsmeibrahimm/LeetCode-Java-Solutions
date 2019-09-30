@@ -122,6 +122,17 @@ class CartPaymentRepository(PayinDBRepository):
         results = await self.payment_database.replica().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
+    async def get_payment_intents_paginated(
+        self, status: IntentStatus, limit: Optional[int] = None
+    ) -> List[PaymentIntent]:
+        statement = (
+            payment_intents.table.select()
+            .where(payment_intents.status == status)
+            .limit(limit)
+        )
+        results = await self.payment_database.replica().fetch_all(statement)
+        return [self.to_payment_intent(row) for row in results]
+
     async def find_payment_intents_that_require_capture(
         self, cutoff: datetime
     ) -> AsyncIterator[PaymentIntent]:

@@ -263,6 +263,28 @@ class LegacyPaymentInterface:
             refunded_at=datetime.now(),
         )
 
+    async def update_state_after_provider_submission(
+        self,
+        payment_intent: PaymentIntent,
+        provider_payment_intent: ProviderPaymentIntent,
+        cart_payment: CartPayment,
+        legacy_payment: LegacyPayment,
+        legacy_stripe_charge: Optional[LegacyStripeCharge],
+    ) -> LegacyStripeCharge:
+        # update state in our legacy system: ConsumerCharge/StripeCharge still used there until migration to new service
+        # is entirely complete.  If the stripe_charge record exists it is updated with details of the payment provider's intent.
+        # If it does not exist it is created
+        updated_stripe_charge = await self.update_charge_after_payment_submitted(
+            charge_id=payment_intent.legacy_consumer_charge_id,
+            legacy_payment=legacy_payment,
+            legacy_stripe_charge=legacy_stripe_charge,
+            idempotency_key=payment_intent.idempotency_key,
+            client_description=cart_payment.client_description,
+            provider_payment_intent=provider_payment_intent,
+        )
+
+        return updated_stripe_charge
+
 
 @tracing.track_breadcrumb(processor_name="cart_payments", only_trackable=False)
 class CartPaymentInterface:
@@ -1222,6 +1244,21 @@ class CartPaymentInterface:
         )
         return updated_cart_payment
 
+    async def update_state_after_provider_submission(
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        provider_payment_intent: ProviderPaymentIntent,
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+        # Update state of payment in our system now that payment exists in provider
+        updated_payment_intent, updated_pgp_payment_intent = await self.update_payment_after_submission_to_provider(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_intent=provider_payment_intent,
+        )
+
+        return (updated_payment_intent, updated_pgp_payment_intent)
+
 
 class CartPaymentProcessor:
     # TODO: use payer_country passed to processor functions to get the right stripe platform key within CartPaymentInterface.
@@ -1465,14 +1502,21 @@ class CartPaymentProcessor:
 
         # Update state of payment in our system now that payment exists in provider.
         # Also takes care of triggering immediate capture if needed.
-        payment_intent, pgp_payment_intent, legacy_stripe_charge = await self._update_state_after_submit_to_provider(
+
+        # update legacy values in db
+        await self.legacy_payment_interface.update_state_after_provider_submission(
+            payment_intent=payment_intent,
+            provider_payment_intent=provider_payment_intent,
+            cart_payment=cart_payment,
+            legacy_payment=legacy_payment,
+            legacy_stripe_charge=None,
+        )
+
+        # update payment_intent and pgp_payment_intent pair in db
+        payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_state_after_provider_submission(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-            cart_payment=cart_payment,
-            correlation_ids=cart_payment.correlation_ids,
-            legacy_payment=legacy_payment,
-            legacy_stripe_charge=None,  # For adjustments, we create a new stripe_charge record
         )
 
         # Cancel old intents
@@ -1984,17 +2028,152 @@ class CartPaymentProcessor:
 
         # Update state of payment in our system now that payment exists in provider.
         # Also takes care of triggering immediate capture if needed.
-        payment_intent, pgp_payment_intent, legacy_stripe_charge = await self._update_state_after_submit_to_provider(
+
+        # update legacy values in db
+        legacy_stripe_charge = await self.legacy_payment_interface.update_state_after_provider_submission(
+            payment_intent=payment_intent,
+            provider_payment_intent=provider_payment_intent,
+            cart_payment=request_cart_payment,
+            legacy_payment=legacy_payment,
+            legacy_stripe_charge=legacy_stripe_charge,
+        )
+
+        # update payment_intent and pgp_payment_intent pair in db
+        payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_state_after_provider_submission(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-            cart_payment=request_cart_payment,
-            correlation_ids=request_cart_payment.correlation_ids,
-            legacy_payment=legacy_payment,
-            legacy_stripe_charge=legacy_stripe_charge,
         )
 
         self.cart_payment_interface.populate_cart_payment_for_response(
             cart_payment, payment_intent, pgp_payment_intent
         )
         return cart_payment, legacy_consumer_charge.id
+
+
+# TODO: Decouple CommandoProcessor from CartPaymentProcessor
+class CommandoProcessor(CartPaymentProcessor):
+    """
+    I'm sneaky
+    """
+
+    log: BoundLogger
+    cart_payment_interface: CartPaymentInterface
+    legacy_payment_interface: LegacyPaymentInterface
+    cart_payment_repo: CartPaymentRepository
+
+    def __init__(
+        self,
+        log: BoundLogger,
+        cart_payment_interface: CartPaymentInterface,
+        legacy_payment_interface: LegacyPaymentInterface,
+        cart_payment_repo: CartPaymentRepository,
+    ):
+        self.log = log
+        self.cart_payment_interface = cart_payment_interface
+        self.legacy_payment_interface = legacy_payment_interface
+        self.cart_payment_repo = cart_payment_repo
+        super().__init__(
+            log=log,
+            cart_payment_interface=cart_payment_interface,
+            legacy_payment_interface=legacy_payment_interface,
+        )
+
+    async def _associated_payment_intent_data(
+        self, payment_intent: PaymentIntent
+    ) -> Tuple[
+        CartPayment,
+        LegacyPayment,
+        PgpPaymentIntent,
+        LegacyConsumerCharge,
+        LegacyStripeCharge,
+    ]:
+        cart_payment, legacy_payment = await self.cart_payment_repo.get_cart_payment_by_id(
+            cart_payment_id=payment_intent.cart_payment_id
+        )
+
+        pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+            payment_intent
+        )
+
+        legacy_consumer_charge, legacy_stripe_charge = await self.legacy_payment_interface.find_existing_payment_charge(
+            charge_id=payment_intent.legacy_consumer_charge_id
+        )
+
+        if (
+            not cart_payment
+            or not legacy_payment
+            or not legacy_consumer_charge
+            or not legacy_stripe_charge
+        ):
+            raise Exception()  # TODO: update with sub-classed exception
+
+        return (
+            cart_payment,
+            legacy_payment,
+            pgp_payment_intent,
+            legacy_consumer_charge,
+            legacy_stripe_charge,
+        )
+
+    async def fullfill_intent(self, payment_intent: PaymentIntent):
+        (
+            cart_payment,
+            legacy_payment,
+            pgp_payment_intent,
+            legacy_consumer_charge,
+            legacy_stripe_charge,
+        ) = await self._associated_payment_intent_data(payment_intent)
+
+        if not pgp_payment_intent.customer_resource_id:
+            raise Exception()  # TODO: update with sub-classed exception
+
+        provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_method_id=pgp_payment_intent.payment_method_resource_id,
+            provider_customer_resource_id=pgp_payment_intent.customer_resource_id,
+            provider_description=cart_payment.client_description,
+        )
+
+        # Update state of payment in our system now that payment exists in provider.
+        # Also takes care of triggering immediate capture if needed.
+
+        # update legacy values in db
+        legacy_stripe_charge = await self.legacy_payment_interface.update_state_after_provider_submission(
+            payment_intent=payment_intent,
+            provider_payment_intent=provider_payment_intent,
+            cart_payment=cart_payment,
+            legacy_payment=legacy_payment,
+            legacy_stripe_charge=legacy_stripe_charge,
+        )
+
+        # update payment_intent and pgp_payment_intent pair in db
+        payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_state_after_provider_submission(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_intent=provider_payment_intent,
+        )
+
+        # When submitting a new intent, capture may happen if:
+        # (a) Caller specified capture_method = auto.  This happens above when updating state, and intents are already transitioned to success/failed states.
+        # (b) Caller specified capture_method = manual (delay capture) but based on config we are not going to wait - handled below.
+        if self.cart_payment_interface.is_capture_immediate(
+            payment_intent
+        ) and self.cart_payment_interface.does_intent_require_capture(payment_intent):
+            await self.capture_payment(payment_intent)
+
+        return (payment_intent, pgp_payment_intent, legacy_stripe_charge)
+
+    async def recoup(self, limit: Optional[int] = 10000, chunk_size: int = 100):
+        pending_ps_payment_intents = await self.cart_payment_repo.get_payment_intents_paginated(
+            status=IntentStatus.PENDING, limit=limit
+        )
+
+        for i in range(0, len(pending_ps_payment_intents), chunk_size):
+            chunk = pending_ps_payment_intents[i : i + chunk_size]
+            await gather(
+                *[self.fullfill_intent(payment_intent=pi) for pi in chunk],
+                return_exceptions=True,
+            )
+            # TODO: aggregate results

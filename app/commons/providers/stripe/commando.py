@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from app.commons.providers.stripe.stripe_models import PaymentIntent, Charge
 from app.payin.core.cart_payment.types import IntentStatus
 
@@ -82,6 +83,3 @@ COMMANDO_PAYMENT_INTENT = PaymentIntent(
     transfer_data=None,
     transfer_group=None,
 )
-
-
-# Recoup commando TODO: add script jobs here.

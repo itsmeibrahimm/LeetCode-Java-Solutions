@@ -380,14 +380,20 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.cart_payment_interface.app_context.stripe.create_payment_intent()
         )
 
-        result_payment_intent, result_pgp_payment_intent, result_stripe_charge = await cart_payment_processor._update_state_after_submit_to_provider(
+        # update legacy values in db
+        result_stripe_charge = await cart_payment_processor.legacy_payment_interface.update_state_after_provider_submission(
+            payment_intent=payment_intent,
+            provider_payment_intent=provider_payment_intent,
+            cart_payment=cart_payment,
+            legacy_payment=generate_legacy_payment(),
+            legacy_stripe_charge=generate_legacy_stripe_charge(),
+        )
+
+        # update payment_intent and pgp_payment_intent pair in db
+        result_payment_intent, result_pgp_payment_intent = await cart_payment_processor.cart_payment_interface.update_state_after_provider_submission(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-            cart_payment=cart_payment,
-            correlation_ids=cart_payment.correlation_ids,
-            legacy_payment=generate_legacy_payment(),
-            legacy_stripe_charge=generate_legacy_stripe_charge(),
         )
 
         assert result_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
