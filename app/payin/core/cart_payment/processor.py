@@ -1,7 +1,7 @@
 import uuid
 from asyncio import gather
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 from fastapi import Depends
 from stripe.error import InvalidRequestError, StripeError
@@ -28,6 +28,8 @@ from app.commons.providers.stripe.stripe_models import (
     StripeCreatePaymentIntentRequest,
     StripeRefundChargeRequest,
     TransferData,
+    PaymentMethodId,
+    CustomerId,
 )
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
@@ -673,10 +675,10 @@ class CartPaymentInterface:
 
     async def submit_payment_to_provider(
         self,
+        *,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
-        provider_payment_method_id: str,
-        provider_customer_resource_id: str,
+        pgp_payment_method: PgpPaymentMethod,
         provider_description: Optional[str],
     ) -> ProviderPaymentIntent:
         # Call to stripe payment intent API
@@ -691,8 +693,10 @@ class CartPaymentInterface:
                 # https://stripe.com/docs/api/payment_intents/create#create_payment_intent-confirmation_method
                 confirmation_method="manual",
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
-                payment_method=provider_payment_method_id,
-                customer=provider_customer_resource_id,
+                payment_method=cast(
+                    PaymentMethodId, pgp_payment_method.pgp_payment_method_resource_id
+                ),
+                customer=cast(CustomerId, pgp_payment_method.pgp_payer_resource_id),
                 description=provider_description,
                 statement_descriptor=payment_intent.statement_descriptor,
                 metadata=payment_intent.metadata,
@@ -1544,8 +1548,7 @@ class CartPaymentProcessor:
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
-            provider_payment_method_id=pgp_payment_method.pgp_payment_method_resource_id,
-            provider_customer_resource_id=pgp_payment_method.pgp_payer_resource_id,
+            pgp_payment_method=pgp_payment_method,
             provider_description=intent_description,
         )
 
@@ -2091,8 +2094,7 @@ class CartPaymentProcessor:
             provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
-                provider_payment_method_id=pgp_payment_method.pgp_payment_method_resource_id,
-                provider_customer_resource_id=pgp_payment_method.pgp_payer_resource_id,
+                pgp_payment_method=pgp_payment_method,
                 provider_description=request_cart_payment.client_description,
             )
         except Exception:
@@ -2206,11 +2208,19 @@ class CommandoProcessor(CartPaymentProcessor):
         if not pgp_payment_intent.customer_resource_id:
             raise Exception()  # TODO: update with sub-classed exception
 
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                pgp_payment_intent.payment_method_resource_id
+            ),
+            pgp_payer_resource_id=PgpPayerResourceId(
+                pgp_payment_intent.customer_resource_id
+            ),
+        )
+
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
-            provider_payment_method_id=pgp_payment_intent.payment_method_resource_id,
-            provider_customer_resource_id=pgp_payment_intent.customer_resource_id,
+            pgp_payment_method=pgp_payment_method,
             provider_description=cart_payment.client_description,
         )
 

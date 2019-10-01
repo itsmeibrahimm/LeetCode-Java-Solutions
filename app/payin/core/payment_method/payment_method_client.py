@@ -152,13 +152,11 @@ class PaymentMethodClient:
         payment_method_id: MixedUuidStrType,
         payer_id: Optional[MixedUuidStrType] = None,
         payer_id_type: Optional[str] = None,
-        payment_method_id_type: Optional[str] = None,
+        payment_method_id_type: Optional[PaymentMethodIdType] = None,
     ) -> RawPaymentMethod:
         """
         Utility function to get payment_method.
 
-        :param payment_method_repository: payment method repository.
-        :param req_ctxt: request context.
         :param payer_id: DoorDash payer id. For backward compatibility, payer_id can be payer_id,
                stripe_customer_id, or stripe_customer_serial_id
         :param payment_method_id: DoorDash payment method id. For backward compatibility, payment_method_id can
@@ -211,7 +209,7 @@ class PaymentMethodClient:
         payer_id: MixedUuidStrType,
         payment_method_id: MixedUuidStrType,
         payer_id_type: Optional[str] = None,
-        payment_method_id_type: Optional[str] = None,
+        payment_method_id_type: Optional[PaymentMethodIdType] = None,
     ) -> RawPaymentMethod:
 
         return await self._get_raw_payment_method(
@@ -224,7 +222,7 @@ class PaymentMethodClient:
     async def get_raw_payment_method_without_payer_auth(
         self,
         payment_method_id: MixedUuidStrType,
-        payment_method_id_type: Optional[str] = None,
+        payment_method_id_type: Optional[PaymentMethodIdType] = None,
     ) -> RawPaymentMethod:
 
         return await self._get_raw_payment_method(

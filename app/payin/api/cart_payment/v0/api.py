@@ -11,8 +11,8 @@ from structlog.stdlib import BoundLogger
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
-from app.payin.api.cart_payment.base.api import create_request_to_model
 from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
+from app.payin.api.cart_payment.v0.helper import legacy_create_request_to_model
 from app.payin.api.cart_payment.v0.request import (
     CreateCartPaymentLegacyRequest,
     UpdateCartPaymentLegacyRequest,
@@ -50,7 +50,7 @@ async def create_cart_payment_for_legacy_client(
 
     try:
         cart_payment, legacy_consumer_charge_id = await cart_payment_processor.legacy_create_payment(
-            request_cart_payment=create_request_to_model(
+            request_cart_payment=legacy_create_request_to_model(
                 cart_payment_request, cart_payment_request.legacy_correlation_ids
             ),
             legacy_payment=get_legacy_payment_model(

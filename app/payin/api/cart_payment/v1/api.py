@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends
 from structlog.stdlib import BoundLogger
 
-from app.payin.api.cart_payment.base.api import create_request_to_model
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
+from app.payin.api.cart_payment.v1.helper import create_request_to_model
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,

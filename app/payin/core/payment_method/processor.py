@@ -257,7 +257,7 @@ class PaymentMethodProcessor:
     async def delete_payment_method(
         self,
         payment_method_id: str,
-        payment_method_id_type: Optional[str] = None,
+        payment_method_id_type: Optional[PaymentMethodIdType] = None,
         country: Optional[CountryCode] = CountryCode.US,
     ) -> PaymentMethod:
         """

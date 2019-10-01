@@ -42,6 +42,8 @@ from app.payin.core.exceptions import (
     ProviderError,
     InvalidProviderRequestError,
 )
+from app.payin.core.payment_method.types import PgpPaymentMethod
+from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.tests.utils import (
     generate_payment_intent,
     generate_pgp_payment_intent,
@@ -885,12 +887,17 @@ class TestCartPaymentInterface:
     async def test_submit_payment_to_provider(self, cart_payment_interface):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                "payment_resource_id"
+            ),
+        )
         response = await cart_payment_interface.submit_payment_to_provider(
-            intent,
-            pgp_intent,
-            "payment_resource_id",
-            "customer_resource_id",
-            "test_description",
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            pgp_payment_method=pgp_payment_method,
+            provider_description="test_description",
         )
         assert response
 
@@ -903,12 +910,17 @@ class TestCartPaymentInterface:
         )
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                "payment_resource_id"
+            ),
+        )
         response = await cart_payment_interface.submit_payment_to_provider(
-            intent,
-            pgp_intent,
-            "payment_resource_id",
-            "customer_resource_id",
-            "test_description",
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            pgp_payment_method=pgp_payment_method,
+            provider_description="test_description",
         )
         assert response
         assert response.status == IntentStatus.PENDING.value
@@ -923,14 +935,19 @@ class TestCartPaymentInterface:
 
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                "payment_resource_id"
+            ),
+        )
 
         with pytest.raises(CartPaymentCreateError) as payment_error:
             await cart_payment_interface.submit_payment_to_provider(
-                intent,
-                pgp_intent,
-                "payment_resource_id",
-                "customer_resource_id",
-                "test_description",
+                payment_intent=intent,
+                pgp_payment_intent=pgp_intent,
+                pgp_payment_method=pgp_payment_method,
+                provider_description="test_description",
             )
 
         assert (
@@ -944,12 +961,17 @@ class TestCartPaymentInterface:
     ):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                "payment_resource_id"
+            ),
+        )
         provider_intent = await cart_payment_interface.submit_payment_to_provider(
-            intent,
-            pgp_intent,
-            "payment_resource_id",
-            "customer_resource_id",
-            "test_description",
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            pgp_payment_method=pgp_payment_method,
+            provider_description="test_description",
         )
 
         result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_submission_to_provider(
