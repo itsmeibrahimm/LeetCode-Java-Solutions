@@ -237,7 +237,7 @@ class PayerClient:
             payer_interface = PayerOps(self.log, self.payer_repo)
         else:
             payer_interface = LegacyPayerOps(self.log, self.payer_repo)
-            lazy_create = True
+            lazy_create = False if raw_payer.payer_entity else True
 
         updated_raw_payer = await payer_interface.update_payer_default_payment_method(
             raw_payer=raw_payer,
@@ -345,14 +345,14 @@ class PayerClient:
 
     async def pgp_update_customer_default_payment_method(
         self,
-        pgp_customer_id: str,
-        default_payment_method_id: str,
-        country: Optional[str],
+        pgp_customer_resource_id: str,
+        pgp_payment_method_resource_id: str,
+        country: str,
     ):
         update_cus_req: StripeUpdateCustomerRequest = StripeUpdateCustomerRequest(
-            sid=pgp_customer_id,
+            sid=pgp_customer_resource_id,
             invoice_settings=InvoiceSettings(
-                default_payment_method=default_payment_method_id
+                default_payment_method=pgp_payment_method_resource_id
             ),
         )
         try:
@@ -362,7 +362,7 @@ class PayerClient:
             )
         except Exception as e:
             self.log.error(
-                f"[pgp_update_customer_default_payment_method][{pgp_customer_id}][{default_payment_method_id}] error while updating stripe customer {e}"
+                f"[pgp_update_customer_default_payment_method][{pgp_customer_resource_id}][{pgp_payment_method_resource_id}] error while updating stripe customer {e}"
             )
             raise PayerUpdateError(
                 error_code=PayinErrorCode.PAYER_UPDATE_STRIPE_ERROR, retryable=False
@@ -504,7 +504,9 @@ class PayerOps(PayerOpsInterface):
             )
         if not is_found:
             self.log.error(
-                "[get_payer_entity][%s] payer not found:[%s]", payer_id, payer_id_type
+                "[get_payer_raw_objects] payer not found.",
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
@@ -581,9 +583,9 @@ class LegacyPayerOps(PayerOpsInterface):
             # create Payer and StripeCustomer objects
             payer_entity = await self.payer_repo.insert_payer(request=payer_input)
             self.log.info(
-                "[create_payer_impl][%s] create payer completed. stripe_customer_id_id:%s",
-                payer_entity.id,
-                pgp_customer_res_id,
+                "[create_payer_raw_objects] create payer completed.",
+                payer_id=payer_entity.id,
+                pgp_customer_res_id=pgp_customer_res_id,
             )
 
             stripe_customer_entity = await self.payer_repo.get_stripe_customer_by_stripe_id(
@@ -610,9 +612,8 @@ class LegacyPayerOps(PayerOpsInterface):
                     )
                 )
             self.log.info(
-                "[create_payer_impl][%s] create stripe_customer completed. stripe_customer.id:%s",
-                payer_entity.id,
-                stripe_customer_entity.id if stripe_customer_entity else None,
+                "[create_payer_raw_objects] create stripe_customer completed.",
+                payer_id=payer_entity.id,
             )
         except DataError as e:
             self.log.error(f"[create_payer_impl] DataError when writing into db. {e}")
@@ -634,7 +635,7 @@ class LegacyPayerOps(PayerOpsInterface):
         stripe_cus_entity: Optional[StripeCustomerDbEntity] = None
         is_found: bool = False
         try:
-            if payer_type and payer_type != PayerType.MARKETPLACE:
+            if not payer_type or payer_type != PayerType.MARKETPLACE:
                 if payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
                     stripe_cus_entity = await self.payer_repo.get_stripe_customer_by_stripe_id(
                         GetStripeCustomerByStripeIdInput(stripe_id=payer_id)
@@ -644,9 +645,12 @@ class LegacyPayerOps(PayerOpsInterface):
                         GetStripeCustomerByIdInput(id=payer_id)
                     )
                 # payer entity is optional
-                payer_entity = await self.payer_repo.get_payer_by_id(
-                    request=GetPayerByIdInput(legacy_stripe_customer_id=payer_id)
-                )
+                if stripe_cus_entity:
+                    payer_entity = await self.payer_repo.get_payer_by_id(
+                        request=GetPayerByIdInput(
+                            legacy_stripe_customer_id=stripe_cus_entity.stripe_id
+                        )
+                    )
                 is_found = bool(stripe_cus_entity)
             else:
                 # lookup payers and pgp_customers first. This happens when client creates payer
@@ -665,14 +669,16 @@ class LegacyPayerOps(PayerOpsInterface):
                     )
         except DataError as e:
             self.log.error(
-                f"[get_payer_entity] DataError when reading data from db: {e}"
+                f"[get_payer_raw_objects] DataError when reading data from db: {e}"
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False
             )
         if not is_found:
             self.log.error(
-                "[get_payer_entity][%s] payer not found:[%s]", payer_id, payer_id_type
+                "[get_payer_raw_objects] payer not found.",
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
@@ -699,6 +705,9 @@ class LegacyPayerOps(PayerOpsInterface):
                 UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
             )
             self.log.info(
-                f"[update_payer_impl][{payer_id}][{payer_id_type}] stripe_customer update default_payment_method completed:[{pgp_default_payment_method_id}]"
+                "[update_payer_default_payment_method] stripe_customer update default_payment_method completed.",
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
+                pgp_default_payment_method_id=pgp_default_payment_method_id,
             )
         return raw_payer

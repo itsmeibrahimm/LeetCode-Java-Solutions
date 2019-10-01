@@ -8,7 +8,6 @@ from app.commons.types import CountryCode
 from app.payin.api.payer.v0.request import UpdatePayerRequestV0
 from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payer.model import Payer
-from app.payin.core.payer.processor import PayerProcessor
 
 from starlette.status import (
     HTTP_404_NOT_FOUND,
@@ -18,7 +17,8 @@ from starlette.status import (
 )
 
 from app.payin.core.payer.types import PayerType, LegacyPayerInfo
-from app.payin.core.types import PayerIdType, PaymentMethodIdType
+from app.payin.core.payer.v0.processor import PayerProcessorV0
+from app.payin.core.types import PayerIdType
 
 api_tags = ["PayerV0"]
 router = APIRouter()
@@ -42,7 +42,7 @@ async def get_payer(
     country: CountryCode = CountryCode.US,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
-    payer_processor: PayerProcessor = Depends(PayerProcessor),
+    payer_processor: PayerProcessorV0 = Depends(PayerProcessorV0),
 ) -> Payer:
     """
     Get payer with DSJ legacy information.
@@ -102,7 +102,7 @@ async def update_default_payment_method(
     payer_id: str,
     req_body: UpdatePayerRequestV0,
     log: BoundLogger = Depends(get_logger_from_req),
-    payer_processor: PayerProcessor = Depends(PayerProcessor),
+    payer_processor: PayerProcessorV0 = Depends(PayerProcessorV0),
 ):
     """
     Update payer's default payment method
@@ -121,11 +121,13 @@ async def update_default_payment_method(
     log.info("[update_payer] payer_id=%s", payer_id)
     try:
         payer: Payer = await payer_processor.update_default_payment_method(
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
-            default_payment_method_id=req_body.default_payment_method.dd_stripe_card_id,
-            country=req_body.country,
-            payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
+            legacy_payer_info=LegacyPayerInfo(
+                country=req_body.country,
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
+                payer_type=req_body.payer_type,
+            ),
+            dd_stripe_card_id=req_body.default_payment_method.dd_stripe_card_id,
         )
     except PaymentError as e:
         if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value:

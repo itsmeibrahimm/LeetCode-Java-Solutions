@@ -10,7 +10,9 @@ class CreatePaymentMethodRequestV0(BaseModel):
     token: str
     country: CountryCode
     stripe_customer_id: str
-    payer_type: PayerType
+    # FIXME: can't enforce payer_type for Drive. This is for lazy creation use and will revisit to see if we can
+    # do lazy creation without client input before removing it.
+    payer_type: Optional[PayerType]
     set_default: bool
     is_scanned: bool
     is_active: bool

@@ -48,6 +48,7 @@ class RawPayer:
         self.pgp_customer_entity = pgp_customer_entity
         self.stripe_customer_entity = stripe_customer_entity
 
+    # FIXME: change to @property, and throw exception if not found
     def country(self) -> Optional[str]:
         country: Optional[str] = None
         if self.payer_entity:
@@ -89,9 +90,6 @@ class RawPayer:
         """
         Build Payer object.
 
-        :param payer_entity:
-        :param pgp_customer_entity:
-        :param stripe_customer_entity:
         :return: Payer object
         """
         payer: Payer
@@ -112,7 +110,7 @@ class RawPayer:
                     )
             else:
                 if not self.stripe_customer_entity:
-                    raise Exception("RawPayer doesn't stripe_customer_entity")
+                    raise Exception("RawPayer doesn't have stripe_customer_entity")
                 dd_stripe_customer_id = str(self.stripe_customer_entity.id)
                 provider_customer = PaymentGatewayProviderCustomer(
                     payment_provider=PgpCode.STRIPE,
@@ -133,6 +131,11 @@ class RawPayer:
                 updated_at=updated_at,
             )
         elif self.stripe_customer_entity:
+            provider_customer = PaymentGatewayProviderCustomer(
+                payment_provider=PgpCode.STRIPE,
+                payment_provider_customer_id=self.stripe_customer_entity.stripe_id,
+                default_payment_method_id=(self.stripe_customer_entity.default_source),
+            )
             payer = Payer(
                 # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation

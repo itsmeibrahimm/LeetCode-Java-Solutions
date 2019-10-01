@@ -1,4 +1,3 @@
-from typing import Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -10,7 +9,6 @@ from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequestV1
 from app.payin.core.exceptions import PayinErrorCode, payin_error_message_maps
 from app.payin.core.payer.model import Payer
-from app.payin.core.payer.processor import PayerProcessor
 
 from starlette.status import (
     HTTP_201_CREATED,
@@ -21,7 +19,7 @@ from starlette.status import (
     HTTP_422_UNPROCESSABLE_ENTITY,
 )
 
-from app.payin.core.types import PaymentMethodIdType, MixedUuidStrType
+from app.payin.core.payer.v1.processor import PayerProcessorV1
 
 api_tags = ["PayerV1"]
 router = APIRouter()
@@ -41,7 +39,7 @@ router = APIRouter()
 async def create_payer(
     req_body: CreatePayerRequest,
     log: BoundLogger = Depends(get_logger_from_req),
-    payer_processor: PayerProcessor = Depends(PayerProcessor),
+    payer_processor: PayerProcessorV1 = Depends(PayerProcessorV1),
 ) -> Payer:
     """
     Create a payer on DoorDash payments platform
@@ -113,7 +111,7 @@ async def get_payer(
     payer_id: UUID,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
-    payer_processor: PayerProcessor = Depends(PayerProcessor),
+    payer_processor: PayerProcessorV1 = Depends(PayerProcessorV1),
 ) -> Payer:
     """
     Get payer.
@@ -160,7 +158,7 @@ async def update_default_payment_method(
     payer_id: UUID,
     req_body: UpdatePayerRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
-    payer_processor: PayerProcessor = Depends(PayerProcessor),
+    payer_processor: PayerProcessorV1 = Depends(PayerProcessorV1),
 ):
     """
     Update payer's default payment method
@@ -173,14 +171,12 @@ async def update_default_payment_method(
     log.info("[update_payer] received request", payer_id=payer_id)
     try:
         # verify default_payment_method to ensure only one id is provided
-        default_payment_method_id, payment_method_id_type = _verify_payment_method_id(
-            req_body
-        )
+        _verify_payment_method_id(req_body)
 
         payer: Payer = await payer_processor.update_default_payment_method(
             payer_id=payer_id,
-            default_payment_method_id=default_payment_method_id,
-            payment_method_id_type=payment_method_id_type,
+            payment_method_id=req_body.default_payment_method.payment_method_id,
+            dd_stripe_card_id=req_body.default_payment_method.dd_stripe_card_id,
         )
     except PaymentError as e:
         if e.error_code == PayinErrorCode.PAYER_UPDATE_DB_ERROR_INVALID_DATA.value:
@@ -196,16 +192,10 @@ async def update_default_payment_method(
     return payer
 
 
-def _verify_payment_method_id(
-    request: UpdatePayerRequestV1
-) -> Tuple[MixedUuidStrType, PaymentMethodIdType]:
-    payment_method_id: str
-    payment_method_id_type: PaymentMethodIdType
+def _verify_payment_method_id(request: UpdatePayerRequestV1):
     count: int = 0
     for key, value in request.default_payment_method:
         if value:
-            payment_method_id = value
-            payment_method_id_type = key
             count += 1
 
     if count != 1:
@@ -217,5 +207,3 @@ def _verify_payment_method_id(
             ],
             retryable=False,
         )
-
-    return payment_method_id, payment_method_id_type

@@ -29,7 +29,7 @@ class SortKey(str, Enum):
 class LegacyPaymentMethodInfo(BaseModel):
     country: CountryCode
     stripe_customer_id: str
-    payer_type: PayerType
+    payer_type: Optional[PayerType]
     dd_consumer_id: Optional[
         str
     ]  # required if PayerType is "marketplace" in order to populate MainDB.stripe_card.consumer_id

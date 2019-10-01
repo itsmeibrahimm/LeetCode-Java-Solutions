@@ -19,7 +19,7 @@ from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata, Evidenc
 from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.exceptions import DisputeUpdateError
-from app.payin.core.payer.processor import PayerClient
+from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.types import PaymentMethodIdType

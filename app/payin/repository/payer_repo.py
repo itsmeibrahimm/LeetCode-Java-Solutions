@@ -46,7 +46,7 @@ class GetPayerByIdInput(DBRequestModel):
     The variable name must be consistent with DB table column name
     """
 
-    id: UUID
+    id: Optional[UUID]
     legacy_stripe_customer_id: Optional[str]
     dd_payer_id: Optional[str]
 

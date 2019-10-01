@@ -36,7 +36,7 @@ class PaymentMethodProcessor:
     """
 
     # prevent circular dependency
-    from app.payin.core.payer.processor import PayerClient
+    from app.payin.core.payer.payer_client import PayerClient
 
     def __init__(
         self,
@@ -194,8 +194,8 @@ class PaymentMethodProcessor:
         if set_default:
             stripe_customer = await self.payer_client.pgp_update_customer_default_payment_method(
                 country=pgp_country,
-                pgp_customer_id=pgp_customer_res_id,
-                default_payment_method_id=attach_stripe_payment_method.id,
+                pgp_customer_resource_id=pgp_customer_res_id,
+                pgp_payment_method_resource_id=attach_stripe_payment_method.id,
             )
 
             self.log.info(
@@ -266,7 +266,6 @@ class PaymentMethodProcessor:
         :param payment_method_id: DoorDash payment method id.
         :param payment_method_id_type: type of payment method.
         :param country: country only used for v0 legacy path.
-        :param force_update: force update from Payment provider.
         :return: PaymentMethod object
         """
 
@@ -283,6 +282,21 @@ class PaymentMethodProcessor:
             raw_payer = await self.payer_client.get_raw_payer(
                 payer_id=raw_payment_method.payer_id()
             )
+        elif raw_payment_method.stripe_card_entity:
+            try:
+                raw_payer = await self.payer_client.get_raw_payer(
+                    payer_id=raw_payment_method.stripe_card_entity.external_stripe_customer_id,
+                    payer_id_type=PayerIdType.STRIPE_CUSTOMER_ID,
+                )
+            except PayerReadError as e:
+                if e.error_code != PayinErrorCode.PAYER_READ_NOT_FOUND:
+                    raise e
+                else:
+                    # existing DSJ consumers, continue to detach the payment method.
+                    self.log.warn(
+                        "[delete_payment_method] can't find payer by stripe_customer_id. could be DSJ existing consumer.",
+                        stripe_customer_id=raw_payment_method.stripe_card_entity.external_stripe_customer_id,
+                    )
 
         # step 3: detach PGP payment method
         country_code: Optional[str] = raw_payer.country() if raw_payer else country

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -22,4 +23,6 @@ class LegacyPayerInfo(BaseModel):
     country: CountryCode
     payer_id: str
     payer_id_type: PayerIdType
-    payer_type: PayerType
+    # FIXME: can't enforce payer_type for Drive. This is for lazy creation use and will revisit to see if we can
+    # do lazy creation without client input before removing it.
+    payer_type: Optional[PayerType]

@@ -65,7 +65,7 @@ from app.payin.core.exceptions import (
     ProviderError,
 )
 from app.payin.core.legacy.utils import get_country_id_by_code
-from app.payin.core.payer.processor import PayerClient
+from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.payment_method.types import PgpPaymentMethod
 from app.payin.core.types import (

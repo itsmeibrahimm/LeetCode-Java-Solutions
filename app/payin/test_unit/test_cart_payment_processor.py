@@ -7,7 +7,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
 )
-from app.payin.core.payer.processor import PayerClient
+from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 import app.payin.core.cart_payment.processor as processor
 from app.payin.core.cart_payment.model import IntentStatus, CartPayment
