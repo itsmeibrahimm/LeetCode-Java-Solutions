@@ -120,7 +120,12 @@ class CreateInstantPayout(
         self.stripe_async_client = stripe_async_client
 
     async def _execute(self) -> CreateInstantPayoutResponse:
-        self.logger.info(f"CreatedInstantPayout")
+        self.logger.info(
+            "[Fast Payout Payout Service Creation] Creating a standard payout.",
+            payout_id=self.request.payout_id,
+            payment_account_id=self.request.payout_account_id,
+            payout_idempotency_key=self.request.payout_idempotency_key,
+        )
 
         payout_account_id = self.request.payout_account_id
         payment_account = await self.payment_account_repo.get_payment_account_by_id(
@@ -185,7 +190,8 @@ class CreateInstantPayout(
                 stripe_account=models.StripeAccountId(stripe_account_id),
             )
             self.logger.info(
-                f"[Fast Pay Local Creation] succeed to create a stripe payout. stripe_payout.id: {response.id}",
+                "[Fast Payout Payout Service Creation] succeed to create a stripe payout.",
+                stripe_payout_id=response.id,
                 payout_account_id=payout_account_id,
                 payout_id=payout_id,
             )
@@ -220,7 +226,7 @@ class CreateInstantPayout(
                 stripe_payout_status=payout_status,
             )
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe payout due to APIConnectionError.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe payout due to APIConnectionError.",
                 payout_account_id=payout_account_id,
                 payout_id=payout_id,
                 error=error.json_body,
@@ -240,7 +246,7 @@ class CreateInstantPayout(
                 stripe_payout_status=payout_status,
             )
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe payout due to RateLimitError.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe payout due to RateLimitError.",
                 payout_account_id=payout_account_id,
                 payout_id=payout_id,
                 error=error.json_body,
@@ -260,7 +266,7 @@ class CreateInstantPayout(
                 stripe_payout_status=payout_status,
             )
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe payout due to StripeError.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe payout due to StripeError.",
                 payout_account_id=payout_account_id,
                 payout_id=payout_id,
                 error=error.json_body,
@@ -282,7 +288,7 @@ class CreateInstantPayout(
                 stripe_payout_status=payout_status,
             )
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe payout due to other error.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe payout due to other error.",
                 payout_account_id=payout_account_id,
                 payout_id=payout_id,
             )
@@ -292,6 +298,12 @@ class CreateInstantPayout(
                 retryable=True,
             )
 
+        self.logger.info(
+            "[Fast Payout Payout Service Creation] Created a standard payout.",
+            payout_id=self.request.payout_id,
+            payment_account_id=self.request.payout_account_id,
+            payout_idempotency_key=self.request.payout_idempotency_key,
+        )
         return CreateInstantPayoutResponse()
 
     def _handle_exception(
@@ -344,7 +356,8 @@ class CreateInstantPayout(
             data
         )
         self.logger.info(
-            f"[Fast Payout Local Creation] succeed to create a sma transfer. sma_transfer.id: {sma_transfer.id}",
+            "[Fast Payout Payout Service Creation] succeed to create a sma transfer.",
+            sma_transfer_id=sma_transfer.id,
             stripe_managed_account_id=stripe_managed_account.id,
         )
         return sma_transfer
@@ -374,14 +387,15 @@ class CreateInstantPayout(
                 request=models.StripeCreateTransferRequest(),
             )
             self.logger.info(
-                f"[Fast Pay Local Creation] succeed to create a stripe transfer. stripe_transfer.id: {response.id}",
+                "[Fast Payout Payout Service Creation] succeed to create a stripe transfer.",
+                stripe_transfer_id=response.id,
                 stripe_managed_account_id=stripe_managed_account.id,
                 stripe_managed_account_transfer_id=sma_transfer.id,
             )
             return response
         except APIConnectionError as error:
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe transfer due to APIConnectionError.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe transfer due to APIConnectionError.",
                 stripe_managed_account_id=stripe_managed_account.id,
                 stripe_managed_account_transfer_id=sma_transfer.id,
                 error=error.json_body,
@@ -396,7 +410,7 @@ class CreateInstantPayout(
             )
         except StripeError as error:
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe transfer due to StripeError.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe transfer due to StripeError.",
                 stripe_managed_account_id=stripe_managed_account.id,
                 stripe_managed_account_transfer_id=sma_transfer.id,
                 error=error.json_body,
@@ -413,7 +427,7 @@ class CreateInstantPayout(
             # Note: we don't know if this transfer succeeded or not, so we assume it didn't and dont
             # persist the request. Re-attempts will reuse the same idempotency key.
             self.logger.info(
-                "[Fast Payout Local Creation] fail to create a stripe transfer due to other error.",
+                "[Fast Payout Payout Service Creation] fail to create a stripe transfer due to other error.",
                 stripe_managed_account_id=stripe_managed_account.id,
                 stripe_managed_account_transfer_id=sma_transfer.id,
             )
@@ -430,7 +444,8 @@ class CreateInstantPayout(
             data
         )
         self.logger.info(
-            f"[Fast Payout Local Creation] succeed to create a stripe payout request. stripe_payout_request.id: {stripe_payout_request.id}",
+            "[Fast Payout Payout Service Creation] succeed to create a stripe payout request.",
+            stripe_payout_request_id=stripe_payout_request.id,
             payout_id=data.payout_id,
             stripe_account_id=data.stripe_account_id,
         )

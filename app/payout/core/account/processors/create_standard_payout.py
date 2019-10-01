@@ -107,7 +107,9 @@ class CreateStandardPayout(
 
     async def _execute(self) -> CreateStandardPayoutResponse:
         self.logger.info(
-            f"Creating standard payout{self.request.transfer_id} for payment_account{self.request.payout_account_id}"
+            "Creating a standard payout.",
+            transfer_id=self.request.transfer_id,
+            payment_account_id=self.request.payout_account_id,
         )
         transfer_id = int(self.request.transfer_id)
         payment_account = await self.payment_account_repo.get_payment_account_by_id(
@@ -157,7 +159,9 @@ class CreateStandardPayout(
         )
 
         self.logger.info(
-            f"Created standard payout{self.request.transfer_id} for payment_account{self.request.payout_account_id}"
+            "Successfully created a standard payout.",
+            transfer_id=self.request.transfer_id,
+            payment_account_id=self.request.payout_account_id,
         )
         return CreateStandardPayoutResponse()
 
@@ -269,7 +273,11 @@ class CreateStandardPayout(
             if managed_account_transfer:
                 if managed_account_transfer.amount < amount_still_needed:
                     self.logger.info(
-                        f"updating managed account transfer {managed_account_transfer.id} for transfer {transfer_id}. Amount from {managed_account_transfer.amount} to {amount_still_needed}"
+                        "Updating amount of the managed account transfer.",
+                        managed_account_transfer_id=managed_account_transfer.id,
+                        transfer_id=transfer_id,
+                        original_amount=managed_account_transfer.amount,
+                        new_amount=amount_still_needed,
                     )
                     request = ManagedAccountTransferUpdate(amount=amount_still_needed)
                     await self.managed_account_transfer_repo.update_managed_account_transfer_by_id(
@@ -278,7 +286,9 @@ class CreateStandardPayout(
                     )
             else:
                 self.logger.info(
-                    f"creating managed account transfer of {amount_still_needed} cents for transfer {transfer_id}"
+                    "Creating a managed account transfer",
+                    transfer_id=transfer_id,
+                    amount=amount_still_needed,
                 )
                 country_shortname = await get_country_shortname(
                     payment_account=payment_account,
@@ -520,6 +530,13 @@ class CreateStandardPayout(
         managed_account_transfer = await self.managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
             transfer_id=transfer_id
         )
+        if not managed_account_transfer:
+            self.logger.info(
+                "Cannot find managed_account_transfer. Could be SMA balance is enough for payout.",
+                transfer_id=transfer_id,
+                payment_account_id=payment_account.id,
+            )
+
         if managed_account_transfer and managed_account_transfer.amount > 0:
             await self.submit_managed_account_transfer(
                 managed_account_transfer=managed_account_transfer,
@@ -527,7 +544,7 @@ class CreateStandardPayout(
                 stripe=stripe,
             )
 
-        self.logger.info(f"Submitting transfer {transfer_id} at {datetime.utcnow()}")
+        self.logger.info("Creating a Stripe Payout.", transfer_id=transfer_id)
         country_shortname = await get_country_shortname(
             payment_account=payment_account,
             payment_account_repository=self.payment_account_repo,
@@ -568,7 +585,6 @@ class CreateStandardPayout(
         :param payment_account: PaymentAccount
         :param stripe: StripeAsyncClient
         """
-        self.logger.warn("ManagedAccountTransfer submit function has been deprecated!")
         if managed_account_transfer.amount <= 0:
             return
 
