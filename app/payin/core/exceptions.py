@@ -234,8 +234,12 @@ class InvalidProviderRequestError(BaseProviderError):
     pass
 
 
-###########################################################
-# Provider Errors                                         #
-###########################################################
 class CommandoModeShortCircuit(PayinError):
+    pass
+
+
+###########################################################
+# Commando Errors                                         #
+###########################################################
+class CommandoProcessingError(Exception):
     pass

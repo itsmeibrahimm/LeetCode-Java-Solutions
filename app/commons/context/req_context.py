@@ -22,9 +22,7 @@ class ReqContext:
     req_id: UUID
     log: BoundLogger
     commando_mode: bool
-    stripe_async_client: Optional[
-        StripeAsyncClient
-    ] = None  # cron worker does not need this
+    stripe_async_client: StripeAsyncClient
     correlation_id: Optional[str] = None
 
 
@@ -68,10 +66,18 @@ def get_context_from_req(request: Request) -> ReqContext:
 def build_req_context(app_context: AppContext):
     req_id = uuid4()
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
+    # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
+    # per request level
+    stripe_async_client = StripeAsyncClient(
+        executor_pool=app_context.stripe_thread_pool,
+        stripe_client=app_context.stripe_client,
+        commando=commando_mode,
+    )
     return ReqContext(
         req_id=req_id,
         log=app_context.log.bind(req_id=req_id),
         commando_mode=commando_mode,
+        stripe_async_client=stripe_async_client,
     )
 
 

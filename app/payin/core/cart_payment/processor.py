@@ -63,6 +63,7 @@ from app.payin.core.exceptions import (
     PaymentIntentNotInRequiresCaptureState,
     PaymentIntentRefundError,
     ProviderError,
+    CommandoProcessingError,
 )
 from app.payin.core.legacy.utils import get_country_id_by_code
 from app.payin.core.payer.payer_client import PayerClient
@@ -2186,7 +2187,9 @@ class CommandoProcessor(CartPaymentProcessor):
             or not legacy_consumer_charge
             or not legacy_stripe_charge
         ):
-            raise Exception()  # TODO: update with sub-classed exception
+            msg = "Could not find complete set of payment information for given payment intent"
+            self.log.warning(msg, payment_intent_id=str(payment_intent.id))
+            raise CommandoProcessingError(msg)
 
         return (
             cart_payment,
@@ -2196,7 +2199,7 @@ class CommandoProcessor(CartPaymentProcessor):
             legacy_stripe_charge,
         )
 
-    async def fullfill_intent(self, payment_intent: PaymentIntent):
+    async def fullfill_intent(self, payment_intent: PaymentIntent) -> Tuple[str, int]:
         (
             cart_payment,
             legacy_payment,
@@ -2206,7 +2209,9 @@ class CommandoProcessor(CartPaymentProcessor):
         ) = await self._associated_payment_intent_data(payment_intent)
 
         if not pgp_payment_intent.customer_resource_id:
-            raise Exception()  # TODO: update with sub-classed exception
+            msg = "Could not find customer_resource_id for given pgp payment intent"
+            self.log.warning(msg, pgp_payment_intent_id=str(pgp_payment_intent.id))
+            raise CommandoProcessingError(msg)
 
         pgp_payment_method = PgpPaymentMethod(
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
@@ -2237,7 +2242,7 @@ class CommandoProcessor(CartPaymentProcessor):
         )
 
         # update payment_intent and pgp_payment_intent pair in db
-        payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_state_after_provider_submission(
+        payment_intent, _ = await self.cart_payment_interface.update_state_after_provider_submission(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
@@ -2251,17 +2256,33 @@ class CommandoProcessor(CartPaymentProcessor):
         ) and self.cart_payment_interface.does_intent_require_capture(payment_intent):
             await self.capture_payment(payment_intent)
 
-        return (payment_intent, pgp_payment_intent, legacy_stripe_charge)
+        self.log.info(
+            "Recoup attempted",
+            payment_intent_id=payment_intent.id,
+            status=payment_intent.status,
+            amount=legacy_stripe_charge.amount,
+        )
+        return payment_intent.status, legacy_stripe_charge.amount
 
     async def recoup(self, limit: Optional[int] = 10000, chunk_size: int = 100):
+        """
+        This may have to be called multiple times from ipython shell until we have re-couped everything.
+
+        :param limit:
+        :param chunk_size:
+        :return:
+        """
         pending_ps_payment_intents = await self.cart_payment_repo.get_payment_intents_paginated(
             status=IntentStatus.PENDING, limit=limit
         )
-
+        total = 0
         for i in range(0, len(pending_ps_payment_intents), chunk_size):
             chunk = pending_ps_payment_intents[i : i + chunk_size]
-            await gather(
+            results = await gather(
                 *[self.fullfill_intent(payment_intent=pi) for pi in chunk],
                 return_exceptions=True,
             )
-            # TODO: aggregate results
+            total += len(results)
+            self.log.info(f"Attempted to recoup {len(results)} payment_intents")
+
+        return total, results

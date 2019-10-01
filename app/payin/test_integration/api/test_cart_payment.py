@@ -1,8 +1,11 @@
+from asyncio import AbstractEventLoop
+
 import pytest
 import uuid
 from starlette.testclient import TestClient
 from typing import Any, Optional, Dict
 
+from app.commons.context.app_context import AppContext
 from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
 
@@ -11,6 +14,10 @@ from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
 # is marked as external.  The stripe simulator does not return the correct result since it does
 # persist state.
+from app.payin.core.cart_payment.processor import CommandoProcessor
+from app.payin.test_integration.integration_utils import build_commando_processor
+
+
 @pytest.mark.external
 class TestCartPayment:
     @pytest.fixture
@@ -574,9 +581,13 @@ class TestCartPayment:
         payment_method: Dict[str, Any],
         runtime_setter: RuntimeSetter,
         commando_mode: bool,
+        app_context: AppContext,
+        event_loop: AbstractEventLoop,
     ):
         stripe_api.enable_outbound()
         runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, commando_mode)
+
+        amounts = (500, 600, 560)
 
         # Success case: intent created, not captured yet
         self._test_cart_payment_creation(
@@ -620,6 +631,22 @@ class TestCartPayment:
         self._test_cart_payment_creation_error(
             client, request_body, 403, "payin_23", False
         )
+
+        if commando_mode:
+            with RuntimeContextManager(
+                STRIPE_COMMANDO_MODE_BOOLEAN, False, runtime_setter
+            ):
+                commando_processor: CommandoProcessor = build_commando_processor(
+                    app_context=app_context
+                )
+                total, result = event_loop.run_until_complete(
+                    commando_processor.recoup()
+                )
+
+                for r in result:
+                    assert r[1] in amounts
+
+                assert total == 3
 
     def test_payment_provider_error(
         self, stripe_api: StripeAPISettings, client: TestClient
