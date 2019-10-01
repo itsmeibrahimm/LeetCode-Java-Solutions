@@ -409,6 +409,7 @@ class MockedPaymentRepo:
         idempotency_key: str,
         additional_payment_info: Optional[str],
         description: Optional[str],
+        error_reason: Optional[str] = None,
     ) -> LegacyStripeCharge:
         return LegacyStripeCharge(
             id=1,
@@ -416,7 +417,7 @@ class MockedPaymentRepo:
             amount_refunded=amount_refunded,
             currency=currency,
             status=status,
-            error_reason=None,
+            error_reason=error_reason,
             additional_payment_info=additional_payment_info,
             description=description,
             idempotency_key=idempotency_key,
@@ -452,6 +453,13 @@ class MockedPaymentRepo:
             amount_refunded=amount_refunded,
             status=status,
             currency=currency,
+        )
+
+    async def update_legacy_stripe_charge_error_details(
+        self, id: int, stripe_id: str, status: str, error_reason: str
+    ):
+        return utils.generate_legacy_stripe_charge(
+            stripe_id=stripe_id, status=status, error_reason=error_reason
         )
 
     async def update_legacy_stripe_charge_status(
@@ -552,6 +560,9 @@ def cart_payment_repo():
     )
     payment_repo.update_legacy_stripe_charge_provider_details = (
         mocked_repo.update_legacy_stripe_charge_provider_details
+    )
+    payment_repo.update_legacy_stripe_charge_error_details = (
+        mocked_repo.update_legacy_stripe_charge_error_details
     )
     payment_repo.update_legacy_stripe_charge_status = (
         mocked_repo.update_legacy_stripe_charge_status

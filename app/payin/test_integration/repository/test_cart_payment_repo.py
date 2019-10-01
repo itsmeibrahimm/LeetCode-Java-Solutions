@@ -957,6 +957,25 @@ class TestLegacyCharges:
         assert result == expected_result
 
     @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_error_details(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge: LegacyStripeCharge,
+    ):
+        result = await cart_payment_repository.update_legacy_stripe_charge_error_details(
+            id=stripe_charge.id,
+            status=LegacyStripeChargeStatus.FAILED,
+            stripe_id="generated id",
+            error_reason="generic error",
+        )
+
+        expected_result = stripe_charge
+        expected_result.status = LegacyStripeChargeStatus.FAILED
+        expected_result.stripe_id = "generated id"
+        expected_result.error_reason = "generic error"
+        assert result == expected_result
+
+    @pytest.mark.asyncio
     async def test_get_legacy_stripe_charge_by_stripe_id(
         self,
         cart_payment_repository: CartPaymentRepository,

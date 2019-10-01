@@ -59,12 +59,12 @@ class TestCartPayment:
         return self._test_payment_method_creation(client, payer)
 
     def _get_payer_payment_method_request(
-        self, payer: Dict[str, Any]
+        self, payer: Dict[str, Any], token: str
     ) -> Dict[str, Any]:
         request_body = {
             "payer_id": payer["id"],
             "payment_gateway": "stripe",
-            "token": "tok_mastercard",
+            "token": token,
             "set_default": False,
             "is_scanned": False,
             "is_active": True,
@@ -72,9 +72,9 @@ class TestCartPayment:
         return request_body
 
     def _test_payment_method_creation(
-        self, client: TestClient, payer: Dict[str, Any]
+        self, client: TestClient, payer: Dict[str, Any], token: str = "tok_mastercard"
     ) -> Dict[str, Any]:
-        request_body = self._get_payer_payment_method_request(payer)
+        request_body = self._get_payer_payment_method_request(payer, token)
         response = client.post("/payin/api/v1/payment_methods", json=request_body)
         assert response.status_code == 201
         payment_method = response.json()
@@ -619,6 +619,26 @@ class TestCartPayment:
         )
         self._test_cart_payment_creation_error(
             client, request_body, 403, "payin_23", False
+        )
+
+    def test_payment_provider_error(
+        self, stripe_api: StripeAPISettings, client: TestClient
+    ):
+        stripe_api.enable_outbound()
+
+        payer = self._test_payer_creation(client)
+        payment_method = self._test_payment_method_creation(
+            client, payer, "tok_chargeCustomerFail"
+        )
+
+        request_body = self._get_cart_payment_create_request(payer, payment_method)
+        self._test_cart_payment_creation_error(
+            client, request_body, 500, "payin_40", False
+        )
+
+        # Resubmit same request
+        self._test_cart_payment_creation_error(
+            client, request_body, 500, "payin_40", False
         )
 
     def test_cart_payment_validation(

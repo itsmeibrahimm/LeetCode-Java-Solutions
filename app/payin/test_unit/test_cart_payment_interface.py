@@ -318,6 +318,18 @@ class TestLegacyPaymentInterface:
         assert result_stripe_charge.amount_refunded == provider_refund.amount
         assert result_stripe_charge.refunded_at
 
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        result = await legacy_payment_interface.mark_charge_as_failed(
+            legacy_stripe_charge
+        )
+        assert result.status == LegacyStripeChargeStatus.FAILED
+        assert result.stripe_id.startswith("stripeid_lost_")
+        assert result.error_reason == "generic_exception"
+
 
 class TestCartPaymentInterface:
     """
@@ -439,8 +451,14 @@ class TestCartPaymentInterface:
         intent = generate_payment_intent(status="init")
         assert cart_payment_interface.is_payment_intent_submitted(intent) is False
 
-        intent = generate_payment_intent(status="processing")
+        intent = generate_payment_intent(status="requires_capture")
         assert cart_payment_interface.is_payment_intent_submitted(intent) is True
+
+        intent = generate_payment_intent(status="succeeded")
+        assert cart_payment_interface.is_payment_intent_submitted(intent) is True
+
+        intent = generate_payment_intent(status="failed")
+        assert cart_payment_interface.is_payment_intent_submitted(intent) is False
 
     def test_can_payment_intent_be_cancelled(self, cart_payment_interface):
         intent = generate_payment_intent(status=IntentStatus.FAILED)
@@ -1165,6 +1183,17 @@ class TestCartPaymentInterface:
             amount=200,
         )
         assert result_intent.amount == 200
+
+    @pytest.mark.asyncio
+    async def test_mark_payment_as_failed(self, cart_payment_interface):
+        intent = generate_payment_intent(status=IntentStatus.REQUIRES_CAPTURE)
+        pgp_intent = generate_pgp_payment_intent(status=IntentStatus.REQUIRES_CAPTURE)
+
+        result_intent, result_pgp_intent = await cart_payment_interface.mark_payment_as_failed(
+            intent, pgp_intent
+        )
+        assert result_intent.status == IntentStatus.FAILED
+        assert result_pgp_intent.status == IntentStatus.FAILED
 
     def verify_populate_cart_payment_for_response(
         self,

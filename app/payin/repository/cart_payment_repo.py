@@ -823,7 +823,7 @@ class CartPaymentRepository(PayinDBRepository):
             consumer_charges.stripe_customer_id: stripe_customer_id,
             consumer_charges.total: total,
             consumer_charges.original_total: original_total,
-            consumer_charges.created_at: datetime.now(),
+            consumer_charges.created_at: datetime.utcnow(),
         }
 
         statement = (
@@ -872,7 +872,9 @@ class CartPaymentRepository(PayinDBRepository):
         idempotency_key: str,
         additional_payment_info: Optional[str],
         description: Optional[str],
+        error_reason: Optional[str] = None,
     ) -> LegacyStripeCharge:
+        now = datetime.utcnow()
         data = {
             stripe_charges.stripe_id: stripe_id,
             stripe_charges.card_id: card_id,
@@ -884,8 +886,9 @@ class CartPaymentRepository(PayinDBRepository):
             stripe_charges.idempotency_key: idempotency_key,
             stripe_charges.additional_payment_info: additional_payment_info,
             stripe_charges.description: description,
-            stripe_charges.created_at: datetime.now(),
-            stripe_charges.updated_at: datetime.now(),
+            stripe_charges.error_reason: error_reason,
+            stripe_charges.created_at: now,
+            stripe_charges.updated_at: now,
         }
 
         statement = (
@@ -948,6 +951,19 @@ class CartPaymentRepository(PayinDBRepository):
                 currency=currency,
                 status=status,
             )
+            .returning(*stripe_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row)
+
+    async def update_legacy_stripe_charge_error_details(
+        self, id: int, stripe_id: str, status: str, error_reason: str
+    ):
+        statement = (
+            stripe_charges.table.update()
+            .where(stripe_charges.id == id)
+            .values(stripe_id=stripe_id, status=status, error_reason=error_reason)
             .returning(*stripe_charges.table.columns.values())
         )
 

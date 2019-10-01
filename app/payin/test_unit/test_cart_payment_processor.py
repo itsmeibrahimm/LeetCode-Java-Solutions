@@ -162,6 +162,25 @@ class TestCartPaymentProcessor:
         )
 
     @pytest.mark.asyncio
+    async def test_create_payment_with_exception_calling_provider(
+        self, cart_payment_processor, request_cart_payment
+    ):
+        cart_payment_processor._update_state_after_provider_error = FunctionMock()
+        cart_payment_processor.cart_payment_interface.submit_payment_to_provider = FunctionMock(
+            side_effect=Exception()
+        )
+
+        with pytest.raises(Exception):
+            await cart_payment_processor.create_payment(
+                request_cart_payment=request_cart_payment,
+                idempotency_key=str(uuid.uuid4()),
+                country=CountryCode.US,
+                currency=Currency.USD,
+            )
+
+        assert cart_payment_processor._update_state_after_provider_error.called is True
+
+    @pytest.mark.asyncio
     async def test_create_commando_payment(
         self, cart_payment_processor, request_cart_payment
     ):
@@ -319,6 +338,22 @@ class TestCartPaymentProcessor:
         # TODO verify expected values
         assert result_intent.amount == 0
         assert result_pgp_intent.amount == 0
+
+    @pytest.mark.asyncio
+    async def test_update_state_after_provider_error(self, cart_payment_processor):
+        payment_intent = generate_payment_intent()
+        pgp_payment_intent = generate_pgp_payment_intent()
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+
+        result_intent, result_pgp_intent, result_stripe_charge = await cart_payment_processor._update_state_after_provider_error(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            legacy_stripe_charge=legacy_stripe_charge,
+        )
+
+        assert result_intent.status == IntentStatus.FAILED
+        assert result_pgp_intent.status == IntentStatus.FAILED
+        assert result_stripe_charge.status == LegacyStripeChargeStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_update_state_after_refund_with_provider(
