@@ -70,8 +70,9 @@ class VerifyPayoutAccount(
                 payment_account.account_id
             )
             self.logger.info(
-                f"account_id {payment_account.account_id} exists for payout account "
-                f"{payment_account.id} but no sma or stripe account exists"
+                "pgp_account_id exists for payout account but no external account exists",
+                pgp_account_id=payment_account.account_id,
+                payment_account_id=payment_account.id,
             )
 
         # create new stripe account if no sma
@@ -123,9 +124,6 @@ class VerifyPayoutAccount(
                 error_info = e.json_body.get("error", {})
                 stripe_error_message = error_info.get("message")
                 raise pgp_account_update_error(stripe_error_message)
-            assert (
-                stripe_account.id == stripe_managed_account.stripe_id
-            ), "Updated stripe account id should be the same as the old one"
 
         return PayoutAccountInternal(
             payment_account=payment_account, pgp_external_account_id=stripe_account.id

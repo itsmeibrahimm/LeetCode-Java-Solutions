@@ -13,7 +13,7 @@ StripeFileHandle = str
 StripeAccountToken = str
 
 # Payout Methods
-PayoutMethodId = str
+PayoutMethodId = int
 PayoutMethodExternalAccountToken = str
 PayoutMethodExternalAccountId = str
 

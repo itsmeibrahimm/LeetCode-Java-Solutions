@@ -27,20 +27,24 @@ def create_account_url():
     return ACCOUNT_ENDPOINT + "/"
 
 
-def get_account_by_id_url(id: int):
-    return f"{ACCOUNT_ENDPOINT}/{id}"
+def get_account_by_id_url(account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}"
 
 
-def update_account_statement_descriptor(id: int):
-    return f"{ACCOUNT_ENDPOINT}/{id}/statement_descriptor"
+def update_account_statement_descriptor(account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/statement_descriptor"
 
 
-def verify_account_url(id: int):
-    return f"{ACCOUNT_ENDPOINT}/{id}/verify/legacy"
+def verify_account_url(account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/verify/legacy"
 
 
-def create_payout_method_url(id: int):
-    return f"{ACCOUNT_ENDPOINT}/{id}/payout_methods"
+def create_payout_method_url(account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods"
+
+
+def get_payout_method_url(account_id: int, payout_method_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods/{payout_method_id}"
 
 
 def get_onboarding_requirements_by_stages_url(
@@ -213,6 +217,28 @@ class TestAccountV1:
         assert response.status_code == 201
         payout_card_internal: dict = response.json()
         assert payout_card_internal["stripe_card_id"]
+
+    def test_get_payout_method(self, client: TestClient, verified_payout_account: dict):
+        request = CreatePayoutMethod(
+            token=DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+        )
+        response = client.post(
+            create_payout_method_url(verified_payout_account["id"]), json=request.dict()
+        )
+        assert response.status_code == 201
+        created_payout_card: dict = response.json()
+        assert created_payout_card["stripe_card_id"]
+
+        get_response = client.get(
+            get_payout_method_url(
+                account_id=verified_payout_account["id"],
+                payout_method_id=created_payout_card["id"],
+            ),
+            json=request.dict(),
+        )
+        assert get_response.status_code == 200
+        get_payout_card: dict = get_response.json()
+        assert get_payout_card == created_payout_card
 
     def test_get_onboarding_requirements_by_stages(self, client: TestClient):
         response = client.get(

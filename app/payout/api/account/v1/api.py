@@ -27,6 +27,7 @@ from app.payout.core.account.processors.create_standard_payout import (
 from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
 )
+from app.payout.core.account.processors.get_payout_method import GetPayoutMethodRequest
 from app.payout.core.account.processors.update_account_statement_descriptor import (
     UpdatePayoutAccountStatementDescriptorRequest,
 )
@@ -185,6 +186,32 @@ async def create_payout_method(
         payout_account_id=payout_account_id, token=request.token, type=request.type
     )
     internal_response = await payout_account_processors.create_payout_method(
+        internal_request
+    )
+    return models.PayoutMethodCard(
+        **internal_response.dict(), type=PayoutExternalAccountType.CARD
+    )
+
+
+@router.get(
+    "/{payout_account_id}/payout_methods/{payout_method_id}",
+    status_code=HTTP_200_OK,
+    operation_id="GetPayoutMethod",
+    response_model=models.PayoutMethodCard,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def get_payout_method(
+    payout_account_id: models.PayoutAccountId,
+    payout_method_id: models.PayoutMethodId,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    internal_request = GetPayoutMethodRequest(
+        payout_account_id=payout_account_id, payout_method_id=payout_method_id
+    )
+    internal_response = await payout_account_processors.get_payout_method(
         internal_request
     )
     return models.PayoutMethodCard(

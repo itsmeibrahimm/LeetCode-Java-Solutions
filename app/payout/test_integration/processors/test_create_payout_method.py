@@ -177,6 +177,4 @@ class TestCreatePayoutMethod:
         )
         payout_card_internal: PayoutCardInternal = await create_payout_method_op._execute()
         assert payout_card_internal.payout_account_id == payout_account.id
-        print(f"here {payout_card_internal}")
-        print(f"here {expected_default_payout_card}")
         assert payout_card_internal == expected_default_payout_card

@@ -34,6 +34,10 @@ from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
     GetDefaultPayoutCard,
 )
+from app.payout.core.account.processors.get_payout_method import (
+    GetPayoutMethodRequest,
+    GetPayoutMethod,
+)
 from app.payout.core.account.types import PayoutCardInternal
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
@@ -170,6 +174,17 @@ class PayoutAccountProcessors:
             stripe=self.stripe,
         )
         return await create_payout_method_op.execute()
+
+    async def get_payout_method(
+        self, request: GetPayoutMethodRequest
+    ) -> PayoutCardInternal:
+        get_payout_method_op = GetPayoutMethod(
+            logger=self.logger,
+            payout_card_repo=self.payout_card_repo,
+            payout_method_repo=self.payout_method_repo,
+            request=request,
+        )
+        return await get_payout_method_op.execute()
 
     async def create_standard_payout(
         self, request: CreateStandardPayoutRequest

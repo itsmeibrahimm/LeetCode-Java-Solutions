@@ -84,13 +84,16 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
                 )
             )
             self.logger.info(
-                f"A debit card {card.id} has been added to stripe account {stripe_account_id} "
-                f"for account {self.request.payout_account_id}"
+                "A debit card has been added to stripe account for payout account.",
+                card_id=card.id,
+                stripe_account_id=stripe_account_id,
+                payout_account_id=self.request.payout_account_id,
             )
         except StripeError:
             self.logger.error(
-                f"Error creating payout method {self.request.token} for account "
-                f"{self.request.payout_account_id}"
+                "Error creating payout method for payout account.",
+                token=self.request.token,
+                payout_account_id=self.request.payout_account_id,
             )
             # add more error handling, raise internal error for now
             raise payout_method_create_error()
@@ -98,8 +101,9 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
         if not card:
             # Failed to create a stripe external account
             self.logger.error(
-                f"Error creating payout method {self.request.token} for account "
-                f"{self.request.payout_account_id}"
+                "Error creating payout method for payout account.",
+                token=self.request.token,
+                payout_account_id=self.request.payout_account_id,
             )
             raise payout_method_create_error()
 
@@ -114,7 +118,10 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
             )
         )
         self.logger.info(
-            f"Created default payout_method {payout_method} and payout_card {payout_card} for stripe card {card.id}"
+            f"Created default payout_method for payout account.",
+            token=self.request.token,
+            card_id=card.id,
+            payout_account_id=self.request.payout_account_id,
         )
 
         return PayoutCardInternal(

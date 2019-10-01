@@ -111,10 +111,12 @@ class TestGetDefaultPayoutCard:
         with pytest.raises(PayoutError) as e:
             await get_default_payout_card_op._execute()
 
-        assert e.value.error_code == PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND
+        assert e.value.error_code == PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND_FOR_ACCOUNT
         assert (
             e.value.error_message
-            == payout_error_message_maps[PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND.value]
+            == payout_error_message_maps[
+                PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND_FOR_ACCOUNT.value
+            ]
         )
 
     async def test_get_default_payout_card_no_payout_card_for_this_account(
@@ -140,10 +142,12 @@ class TestGetDefaultPayoutCard:
         with pytest.raises(PayoutError) as e:
             await get_default_payout_card_op._execute()
 
-        assert e.value.error_code == PayoutErrorCode.PAYOUT_CARD_NOT_FOUND
+        assert e.value.error_code == PayoutErrorCode.PAYOUT_CARD_NOT_FOUND_FOR_ACCOUNT
         assert (
             e.value.error_message
-            == payout_error_message_maps[PayoutErrorCode.PAYOUT_CARD_NOT_FOUND.value]
+            == payout_error_message_maps[
+                PayoutErrorCode.PAYOUT_CARD_NOT_FOUND_FOR_ACCOUNT.value
+            ]
         )
 
     async def test_get_default_payout_card_no_default_card(

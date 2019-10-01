@@ -38,10 +38,13 @@ payout_error_message_maps = {
     "account_3": "Create external payment gateway account failed due to some error.",
     "account_4": "Update external payment gateway account failed due to some error.",
     # payout method errors
-    "payout_method_0": "Cannot find a payout method for the given payout account id.",
+    "payout_method_0": "Cannot find a payout method with the given payout account id.",
     "payout_method_1": "Cannot find a payout card for the given payout account id.",
     "payout_method_2": "Cannot find a default payout card for the given payout account id.",
     "payout_method_3": "Some issue happened for creating a payout method, please try again later.",
+    "payout_method_4": "Cannot find a payout method with the given id.",
+    "payout_method_5": "Cannot find a payout card with the given id.",
+    "payout_method_6": "The payout_account id for the payout_method is not matching with the one is given.",
 }
 
 
@@ -72,10 +75,13 @@ class PayoutErrorCode(str, Enum):
     PGP_ACCOUNT_UPDATE_ERROR = "account_4"
 
     # payout method error code
-    PAYOUT_METHOD_NOT_FOUND = "payout_method_0"
-    PAYOUT_CARD_NOT_FOUND = "payout_method_1"
+    PAYOUT_METHOD_NOT_FOUND_FOR_ACCOUNT = "payout_method_0"
+    PAYOUT_CARD_NOT_FOUND_FOR_ACCOUNT = "payout_method_1"
     DEFAULT_PAYOUT_CARD_NOT_FOUND = "payout_method_2"
     PAYOUT_METHOD_CREATE_ERROR = "payout_method_3"
+    PAYOUT_METHOD_NOT_FOUND = "payout_method_4"
+    PAYOUT_CARD_NOT_FOUND = "payout_method_5"
+    PAYOUT_ACCOUNT_NOT_MATCH = "payout_method_6"
 
 
 class PayoutError(PaymentException):
@@ -172,24 +178,24 @@ def pgp_account_update_error(error_message: str = None) -> PayoutError:
 ###########################################################
 # payout_method Errors                                    #
 ###########################################################
-def payout_method_not_found_error() -> PayoutError:
+def payout_method_not_found_for_account_error() -> PayoutError:
     return PayoutError(
         http_status_code=HTTP_404_NOT_FOUND,
         error_message=payout_error_message_maps[
-            PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND.value
+            PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND_FOR_ACCOUNT.value
         ],
-        error_code=PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND,
+        error_code=PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND_FOR_ACCOUNT,
         retryable=False,
     )
 
 
-def payout_card_not_found_error() -> PayoutError:
+def payout_card_not_found_for_account_error() -> PayoutError:
     return PayoutError(
         http_status_code=HTTP_404_NOT_FOUND,
         error_message=payout_error_message_maps[
-            PayoutErrorCode.PAYOUT_CARD_NOT_FOUND.value
+            PayoutErrorCode.PAYOUT_CARD_NOT_FOUND_FOR_ACCOUNT.value
         ],
-        error_code=PayoutErrorCode.PAYOUT_CARD_NOT_FOUND,
+        error_code=PayoutErrorCode.PAYOUT_CARD_NOT_FOUND_FOR_ACCOUNT,
         retryable=False,
     )
 
@@ -212,5 +218,38 @@ def payout_method_create_error() -> PayoutError:
             PayoutErrorCode.PAYOUT_METHOD_CREATE_ERROR.value
         ],
         error_code=PayoutErrorCode.PAYOUT_METHOD_CREATE_ERROR,
+        retryable=False,
+    )
+
+
+def payout_method_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_404_NOT_FOUND,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_METHOD_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def payout_card_not_found_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_404_NOT_FOUND,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_CARD_NOT_FOUND.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_CARD_NOT_FOUND,
+        retryable=False,
+    )
+
+
+def payout_account_not_match_error() -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_message=payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_ACCOUNT_NOT_MATCH.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_ACCOUNT_NOT_MATCH,
         retryable=False,
     )

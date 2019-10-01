@@ -5,8 +5,8 @@ from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account.types import PayoutCardInternal
 from app.payout.core.exceptions import (
-    payout_method_not_found_error,
-    payout_card_not_found_error,
+    payout_method_not_found_for_account_error,
+    payout_card_not_found_for_account_error,
     default_payout_card_not_found_error,
 )
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
@@ -47,9 +47,10 @@ class GetDefaultPayoutCard(
         )
         if not payout_methods:
             self.logger.warning(
-                f"No payout method existing for payout account {self.request.payout_account_id}"
+                "No payout method existing for payout account.",
+                payout_account_id=self.request.payout_account_id,
             )
-            raise payout_method_not_found_error()
+            raise payout_method_not_found_for_account_error()
 
         payout_method_ids = [payout_method.id for payout_method in payout_methods]
         payout_cards = await self.payout_card_repo.list_payout_cards_by_ids(
@@ -57,10 +58,11 @@ class GetDefaultPayoutCard(
         )
         if not payout_cards:
             self.logger.warning(
-                f"No payout card existing for payout account {self.request.payout_account_id} "
-                f"matching payout_method list {payout_method_ids}"
+                "No payout card existing for payout account.",
+                payout_account_id=self.request.payout_account_id,
+                matching_payout_method_ids=payout_method_ids,
             )
-            raise payout_card_not_found_error()
+            raise payout_card_not_found_for_account_error()
 
         payout_cards_map = {payout_card.id: payout_card for payout_card in payout_cards}
         payout_card_method: Optional[PayoutCardInternal] = None
@@ -86,7 +88,8 @@ class GetDefaultPayoutCard(
                 )
         if not payout_card_method:
             self.logger.warning(
-                f"No default payout card for existing payout account {self.request.payout_account_id}"
+                "No default payout card for existing payout account.",
+                payout_account_id=self.request.payout_account_id,
             )
             raise default_payout_card_not_found_error()
         return payout_card_method
