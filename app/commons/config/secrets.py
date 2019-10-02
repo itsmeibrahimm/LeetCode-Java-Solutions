@@ -87,7 +87,7 @@ def load_up_secret_aware_recursively(
 
     for key in dir(secret_aware):
         item = secret_aware.__getattribute__(key)
-        if isinstance(item, Secret):
+        if isinstance(item, Secret) and item.value is None:
             if secret_loader:
                 loaded_secret = secret_loader.fetch_secret(secret_holder=item)
                 object.__setattr__(secret_aware, key, loaded_secret)
