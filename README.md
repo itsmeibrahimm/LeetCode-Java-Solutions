@@ -57,6 +57,7 @@ The following technologies/frameworks are used across the entire stack:
 # Monitoring
 - [Wavefront Dashboards](https://metrics.wavefront.com/u/NFqvPJ66SJ)
 - [Sentry Issues](https://sentry.io/organizations/doordash/issues/?project=1381528)
+- [New Relic](https://rpm.newrelic.com/accounts/833981/applications/416583243)
 
 # Infrastructure
 - [README-infra.md](README-infra.md)
