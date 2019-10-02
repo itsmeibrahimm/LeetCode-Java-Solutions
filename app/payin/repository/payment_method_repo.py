@@ -47,17 +47,12 @@ class InsertPgpPaymentMethodInput(PgpPaymentMethodDbEntity):
     pass
 
 
-class GetPgpPaymentMethodByPaymentMethodIdInput(DBRequestModel):
-    payment_method_id: UUID
-
-
 class GetPgpPaymentMethodByPgpResourceIdInput(DBRequestModel):
     pgp_resource_id: str
 
 
 class GetPgpPaymentMethodByIdInput(DBRequestModel):
-    id: Optional[str]
-    pgp_resource_id: Optional[str]
+    id: UUID
 
 
 class DeletePgpPaymentMethodByIdSetInput(DBRequestModel):
@@ -162,14 +157,14 @@ class PaymentMethodRepositoryInterface:
         ...
 
     @abstractmethod
-    async def get_pgp_payment_method_by_payment_method_id(
-        self, input: GetPgpPaymentMethodByPaymentMethodIdInput
+    async def get_pgp_payment_method_by_pgp_resource_id(
+        self, input: GetPgpPaymentMethodByPgpResourceIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
         ...
 
     @abstractmethod
-    async def get_pgp_payment_method_by_pgp_resource_id(
-        self, input: GetPgpPaymentMethodByPgpResourceIdInput
+    async def get_pgp_payment_method_by_id(
+        self, input: GetPgpPaymentMethodByIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
         ...
 
@@ -228,15 +223,6 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             row = await maindb_conn.fetch_one(stmt)
             return StripeCardDbEntity.from_row(row) if row else None
 
-    async def get_pgp_payment_method_by_payment_method_id(
-        self, input: GetPgpPaymentMethodByPaymentMethodIdInput
-    ) -> Optional[PgpPaymentMethodDbEntity]:
-        stmt = pgp_payment_methods.table.select().where(
-            pgp_payment_methods.id == input.payment_method_id
-        )
-        row = await self.payment_database.replica().fetch_one(stmt)
-        return PgpPaymentMethodDbEntity.from_row(row) if row else None
-
     async def get_pgp_payment_method_by_pgp_resource_id(
         self, input: GetPgpPaymentMethodByPgpResourceIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
@@ -249,16 +235,10 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
     async def get_pgp_payment_method_by_id(
         self, input: GetPgpPaymentMethodByIdInput
     ) -> Optional[PgpPaymentMethodDbEntity]:
-        if input.id:
-            stmt = pgp_payment_methods.table.select().where(
-                pgp_payment_methods.id == input.id
-            )
-            row = await self.payment_database.replica().fetch_one(stmt)
-        else:
-            stmt = pgp_payment_methods.table.select().where(
-                pgp_payment_methods.pgp_resource_id == input.pgp_resource_id
-            )
-            row = await self.payment_database.replica().fetch_one(stmt)
+        stmt = pgp_payment_methods.table.select().where(
+            pgp_payment_methods.id == input.id
+        )
+        row = await self.payment_database.replica().fetch_one(stmt)
         return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
     async def delete_pgp_payment_method_by_id(

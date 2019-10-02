@@ -174,7 +174,7 @@ class PayerProcessorV0:
         # step 4: update default_payment_method in pgp_customers/stripe_customer table
         updated_raw_payer: RawPayer = await self.payer_client.update_default_payment_method(
             raw_payer=raw_payer,
-            pgp_default_payment_method_id=raw_pm.pgp_payment_method_resource_id,
+            pgp_payment_method_resource_id=raw_pm.pgp_payment_method_resource_id,
             payer_id=legacy_payer_info.payer_id,
             payer_id_type=legacy_payer_info.payer_id_type,
         )

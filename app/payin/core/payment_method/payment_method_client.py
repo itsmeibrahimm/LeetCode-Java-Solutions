@@ -37,7 +37,6 @@ from app.payin.repository.payment_method_repo import (
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
     PgpPaymentMethodDbEntity,
-    GetPgpPaymentMethodByPaymentMethodIdInput,
     StripeCardDbEntity,
     GetStripeCardByStripeIdInput,
     GetPgpPaymentMethodByPgpResourceIdInput,
@@ -50,6 +49,7 @@ from app.payin.repository.payment_method_repo import (
     GetStripeCardsByStripeCustomerIdInput,
     GetStripeCardsByConsumerIdInput,
     GetDuplicateStripeCardInput,
+    GetPgpPaymentMethodByIdInput,
 )
 
 
@@ -444,10 +444,8 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
         pm_entity: Optional[PgpPaymentMethodDbEntity] = None
         try:
             # get pgp_payment_method object
-            pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_payment_method_id(
-                input=GetPgpPaymentMethodByPaymentMethodIdInput(
-                    payment_method_id=payment_method_id
-                )
+            pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_id(
+                input=GetPgpPaymentMethodByIdInput(id=payment_method_id)
             )
             # get stripe_card object
             if pm_entity:

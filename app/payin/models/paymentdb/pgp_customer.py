@@ -24,9 +24,6 @@ class PgpCustomerTable(TableDefinition):
     default_payment_method_id: Column = no_init_field(
         Column("default_payment_method_id", Text)
     )
-    legacy_default_card_id: Column = no_init_field(
-        Column("legacy_default_card_id", Text)
-    )
     legacy_default_source_id: Column = no_init_field(
         Column("legacy_default_source_id", Text)
     )

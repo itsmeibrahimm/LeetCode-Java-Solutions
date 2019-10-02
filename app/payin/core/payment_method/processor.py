@@ -207,7 +207,7 @@ class PaymentMethodProcessor:
             if raw_payer:
                 await self.payer_client.update_default_payment_method(
                     raw_payer=raw_payer,
-                    pgp_default_payment_method_id=attach_stripe_payment_method.id,
+                    pgp_payment_method_resource_id=attach_stripe_payment_method.id,
                     payer_id=(payer_id or dd_consumer_id),
                     payer_id_type=(
                         PayerIdType.PAYER_ID if payer_id else PayerIdType.DD_CONSUMER_ID
@@ -280,7 +280,8 @@ class PaymentMethodProcessor:
         raw_payer: Optional[RawPayer] = None
         if raw_payment_method.payer_id():
             raw_payer = await self.payer_client.get_raw_payer(
-                payer_id=raw_payment_method.payer_id()
+                payer_id=raw_payment_method.payer_id(),
+                payer_id_type=PayerIdType.PAYER_ID,
             )
         elif raw_payment_method.stripe_card_entity:
             try:

@@ -11,7 +11,7 @@ from app.payin.core.exceptions import PayerReadError, PayinErrorCode
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.model import RawPaymentMethod
-from app.payin.core.types import PaymentMethodIdType, MixedUuidStrType
+from app.payin.core.types import PaymentMethodIdType, MixedUuidStrType, PayerIdType
 
 
 class PayerProcessorV1:
@@ -81,7 +81,7 @@ class PayerProcessorV1:
             dd_payer_id=dd_payer_id,
             payer_type=payer_type,
             country=country,
-            pgp_customer_res_id=pgp_customer_id,
+            pgp_customer_resource_id=pgp_customer_id,
             pgp_code=pgp_code,
             description=description,
         )
@@ -99,7 +99,9 @@ class PayerProcessorV1:
             "[get_payer] started.", payer_id=payer_id, force_update=force_update
         )
 
-        raw_payer: RawPayer = await self.payer_client.get_raw_payer(payer_id=payer_id)
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
+            payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+        )
 
         if force_update:
             # ensure DB record is update-to-date
@@ -145,7 +147,9 @@ class PayerProcessorV1:
             )
 
         # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
-        raw_payer: RawPayer = await self.payer_client.get_raw_payer(payer_id=payer_id)
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
+            payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+        )
         pgp_country: Optional[str] = raw_payer.country()
         if not pgp_country:
             raise PayerReadError(
@@ -178,7 +182,7 @@ class PayerProcessorV1:
         # step 4: update default_payment_method in pgp_customers/stripe_customer table
         updated_raw_payer: RawPayer = await self.payer_client.update_default_payment_method(
             raw_payer=raw_payer,
-            pgp_default_payment_method_id=raw_pm.pgp_payment_method_resource_id,
+            pgp_payment_method_resource_id=raw_pm.pgp_payment_method_resource_id,
             payer_id=payer_id,
         )
 
