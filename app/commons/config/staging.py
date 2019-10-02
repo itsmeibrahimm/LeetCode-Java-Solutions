@@ -43,8 +43,26 @@ def create_app_config() -> AppConfig:
             replica_pool_max_size=5, master_pool_max_size=5, debug=False
         ),
         AVAILABLE_MAINDB_REPLICAS=[],
-        STRIPE_US_SECRET_KEY=Secret(name="stripe_us_secret_key"),
-        STRIPE_US_PUBLIC_KEY=Secret(name="stripe_us_public_key"),
+        STRIPE_US_SECRET_KEY=Secret(
+            name="stripe_us_secret_key", value="sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
+        ),
+        STRIPE_US_PUBLIC_KEY=Secret(
+            name="stripe_us_public_key", value="pk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
+        ),
+        STRIPE_CA_SECRET_KEY=Secret(
+            name="stripe_ca_secret_key", value="sk_test_DjN82k53PAi4mKVlkeOXUsGh"
+        ),
+        STRIPE_CA_PUBLIC_KEY=Secret(
+            name="stripe_ca_public_key", value="pk_test_6BIBosD7fUMQKx5ehGg5L6pz"
+        ),
+        STRIPE_AU_SECRET_KEY=Secret(
+            name="stripe_au_secret_key",
+            value="sk_test_kwb7Pky1rEyIYbWhIBnHbEG500GIVp7eeO",
+        ),
+        STRIPE_AU_PUBLIC_KEY=Secret(
+            name="stripe_au_public_key",
+            value="pk_test_dJ998ZEOQNHLDCAQG37EKbId00c9TVHvH7",
+        ),
         DSJ_API_BASE_URL="https://api.doorcrawl.com",
         DSJ_API_USER_EMAIL=Secret(name="dsj_api_user_email"),
         DSJ_API_USER_PASSWORD=Secret(name="dsj_api_user_password"),

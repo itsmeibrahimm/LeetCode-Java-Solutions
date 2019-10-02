@@ -112,6 +112,10 @@ class AppConfig(SecretAware):
     # Payment Service Provider
     STRIPE_US_SECRET_KEY: Secret
     STRIPE_US_PUBLIC_KEY: Secret
+    STRIPE_CA_SECRET_KEY: Secret
+    STRIPE_CA_PUBLIC_KEY: Secret
+    STRIPE_AU_SECRET_KEY: Secret
+    STRIPE_AU_PUBLIC_KEY: Secret
 
     # DSJ client
     DSJ_API_USER_EMAIL: Secret
