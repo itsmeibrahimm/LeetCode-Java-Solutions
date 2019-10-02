@@ -121,7 +121,7 @@ class CreateInstantPayout(
 
     async def _execute(self) -> CreateInstantPayoutResponse:
         self.logger.info(
-            "[Fast Payout Payout Service Creation] Creating a standard payout.",
+            "[Fast Payout Payout Service Creation] Creating an instant payout.",
             payout_id=self.request.payout_id,
             payment_account_id=self.request.payout_account_id,
             payout_idempotency_key=self.request.payout_idempotency_key,
@@ -299,7 +299,7 @@ class CreateInstantPayout(
             )
 
         self.logger.info(
-            "[Fast Payout Payout Service Creation] Created a standard payout.",
+            "[Fast Payout Payout Service Creation] Created an instant payout.",
             payout_id=self.request.payout_id,
             payment_account_id=self.request.payout_account_id,
             payout_idempotency_key=self.request.payout_idempotency_key,
