@@ -76,5 +76,9 @@ class PayoutCardInternal(PayoutMethodInternal):
     updated_at: datetime
 
 
+class PayoutCardListInternal(OperationResponse):
+    data: List[PayoutCardInternal]
+
+
 class VerificationRequirementsOnboarding(OperationResponse):
     required_fields_stages: Json

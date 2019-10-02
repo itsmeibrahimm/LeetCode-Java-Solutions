@@ -12,6 +12,7 @@ from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
 from app.payout.api.account.utils import to_external_payout_account
+from app.payout.api.account.v1.models import PayoutMethodList
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.cancel_payout import CancelPayoutRequest
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
@@ -28,6 +29,9 @@ from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
 )
 from app.payout.core.account.processors.get_payout_method import GetPayoutMethodRequest
+from app.payout.core.account.processors.list_payout_methods import (
+    ListPayoutMethodRequest,
+)
 from app.payout.core.account.processors.update_account_statement_descriptor import (
     UpdatePayoutAccountStatementDescriptorRequest,
 )
@@ -216,6 +220,42 @@ async def get_payout_method(
     )
     return models.PayoutMethodCard(
         **internal_response.dict(), type=PayoutExternalAccountType.CARD
+    )
+
+
+@router.get(
+    "/{payout_account_id}/payout_methods",
+    status_code=HTTP_200_OK,
+    operation_id="ListPayoutMethod",
+    response_model=models.PayoutMethodList,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def list_payout_method(
+    payout_account_id: models.PayoutAccountId,
+    payout_method_type: models.PayoutExternalAccountType = PayoutExternalAccountType.CARD,
+    limit: int = 50,
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    internal_request = ListPayoutMethodRequest(
+        payout_account_id=payout_account_id,
+        payout_method_type=payout_method_type,
+        limit=limit,
+    )
+    internal_response = await payout_account_processors.list_payout_method(
+        internal_request
+    )
+    payout_method_card_list = []
+    for card_internal in internal_response.data:
+        payout_method_card_list.append(
+            models.PayoutMethodCard(
+                **card_internal.dict(), type=PayoutExternalAccountType.CARD
+            )
+        )
+    return PayoutMethodList(
+        card_list=payout_method_card_list, count=len(payout_method_card_list)
     )
 
 

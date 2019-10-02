@@ -32,7 +32,10 @@ class PayoutMethodRepositoryInterface(ABC):
 
     @abstractmethod
     async def list_payout_methods_by_payout_account_id(
-        self, payout_account_id: int
+        self,
+        payout_account_id: int,
+        payout_method_type: Optional[str] = "card",
+        limit: Optional[int] = 50,
     ) -> List[PayoutMethod]:
         pass
 
@@ -74,7 +77,10 @@ class PayoutMethodRepository(PayoutBankDBRepository, PayoutMethodRepositoryInter
         return PayoutMethod.from_row(row) if row else None
 
     async def list_payout_methods_by_payout_account_id(
-        self, payout_account_id: int
+        self,
+        payout_account_id: int,
+        payout_method_type: Optional[str] = "card",
+        limit: Optional[int] = 50,
     ) -> List[PayoutMethod]:
         stmt = (
             payout_method.table.select()
@@ -82,9 +88,11 @@ class PayoutMethodRepository(PayoutBankDBRepository, PayoutMethodRepositoryInter
             .where(
                 and_(
                     payout_method.payment_account_id == payout_account_id,
+                    payout_method.type == payout_method_type,
                     payout_method.deleted_at.is_(None),
                 )
             )
+            .limit(limit)
         )
 
         rows = await self._database.replica().fetch_all(stmt)

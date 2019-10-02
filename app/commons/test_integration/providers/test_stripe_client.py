@@ -10,7 +10,10 @@ from app.commons.providers.stripe.stripe_client import (
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import CreateAccountTokenMetaDataRequest
-from app.commons.test_integration.constants import DEBIT_CARD_TOKEN, DEBIT_CARD_NUMBER
+from app.commons.test_integration.constants import (
+    VISA_DEBIT_CARD_TOKEN,
+    DEBIT_CARD_NUMBER,
+)
 from app.commons.test_integration.utils import (
     prepare_and_validate_stripe_account,
     prepare_and_validate_stripe_account_token,
@@ -312,7 +315,7 @@ class TestStripeClient:
                 country=CountryCode.US,
                 type=PayoutExternalAccountType.CARD.value,
                 stripe_account_id=account.id,
-                external_account_token=DEBIT_CARD_TOKEN,
+                external_account_token=VISA_DEBIT_CARD_TOKEN,
             )
         )
         assert card

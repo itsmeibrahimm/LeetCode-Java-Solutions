@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -5,7 +7,10 @@ from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.providers.stripe.stripe_models import CreateAccountTokenMetaDataRequest
-from app.commons.test_integration.constants import DEBIT_CARD_TOKEN
+from app.commons.test_integration.constants import (
+    VISA_DEBIT_CARD_TOKEN,
+    MASTER_CARD_DEBIT_CARD_TOKEN,
+)
 from app.commons.test_integration.utils import prepare_and_validate_stripe_account_token
 from app.commons.types import CountryCode, Currency
 from app.payout.api.account.v1.models import (
@@ -45,6 +50,10 @@ def create_payout_method_url(account_id: int):
 
 def get_payout_method_url(account_id: int, payout_method_id: int):
     return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods/{payout_method_id}"
+
+
+def list_payout_method_url(account_id: int, limit: int = 50):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods?limit={limit}"
 
 
 def get_onboarding_requirements_by_stages_url(
@@ -209,7 +218,7 @@ class TestAccountV1:
 
     def test_add_payout_method(self, client: TestClient, verified_payout_account: dict):
         request = CreatePayoutMethod(
-            token=DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+            token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
             create_payout_method_url(verified_payout_account["id"]), json=request.dict()
@@ -220,7 +229,7 @@ class TestAccountV1:
 
     def test_get_payout_method(self, client: TestClient, verified_payout_account: dict):
         request = CreatePayoutMethod(
-            token=DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+            token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
             create_payout_method_url(verified_payout_account["id"]), json=request.dict()
@@ -233,12 +242,63 @@ class TestAccountV1:
             get_payout_method_url(
                 account_id=verified_payout_account["id"],
                 payout_method_id=created_payout_card["id"],
-            ),
-            json=request.dict(),
+            )
         )
         assert get_response.status_code == 200
         get_payout_card: dict = get_response.json()
         assert get_payout_card == created_payout_card
+
+    def test_list_payout_method(
+        self, client: TestClient, verified_payout_account: dict
+    ):
+        expected_card_list: List[dict] = []
+        request_visa = CreatePayoutMethod(
+            token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+        )
+        response_visa = client.post(
+            create_payout_method_url(verified_payout_account["id"]),
+            json=request_visa.dict(),
+        )
+        assert response_visa.status_code == 201
+        created_payout_card_visa: dict = response_visa.json()
+        assert created_payout_card_visa["stripe_card_id"]
+        # after the next card inserted, the is_default of this card will be unset
+        created_payout_card_visa["is_default"] = False
+        expected_card_list.insert(0, created_payout_card_visa)
+
+        request_mastercard = CreatePayoutMethod(
+            token=MASTER_CARD_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+        )
+        response_mastercard = client.post(
+            create_payout_method_url(verified_payout_account["id"]),
+            json=request_mastercard.dict(),
+        )
+        assert response_mastercard.status_code == 201
+        created_payout_card_mastercard: dict = response_mastercard.json()
+        assert created_payout_card_mastercard["stripe_card_id"]
+        expected_card_list.insert(0, created_payout_card_mastercard)
+
+        # get all
+        get_response = client.get(
+            list_payout_method_url(account_id=verified_payout_account["id"])
+        )
+        assert get_response.status_code == 200
+        get_payout_card_list: dict = get_response.json()
+        actual_list = get_payout_card_list["card_list"]
+        assert len(actual_list) == len(expected_card_list)
+        assert get_payout_card_list["count"] == len(actual_list)
+        assert actual_list == expected_card_list
+
+        # get with limit
+        get_response_with_limit = client.get(
+            list_payout_method_url(account_id=verified_payout_account["id"], limit=1)
+        )
+        assert get_response_with_limit
+        get_response_with_limit_response: dict = get_response_with_limit.json()
+        assert len(get_response_with_limit_response["card_list"]) == 1
+        actual_card = get_response_with_limit_response["card_list"][0]
+        assert actual_card["brand"] == "MasterCard"
+        assert get_response_with_limit_response["count"] == 1
 
     def test_get_onboarding_requirements_by_stages(self, client: TestClient):
         response = client.get(

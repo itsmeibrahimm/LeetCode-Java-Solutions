@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, Currency
@@ -127,3 +127,13 @@ class PayoutRequest(PaymentRequest):
 
 class Payout(PaymentResponse):
     pass
+
+
+class ListPayoutMethod(PaymentRequest):
+    limit: Optional[int]
+    payout_method_type: Optional[PayoutExternalAccountType]
+
+
+class PayoutMethodList(PaymentResponse):
+    count: int
+    card_list: List[PayoutMethodCard]

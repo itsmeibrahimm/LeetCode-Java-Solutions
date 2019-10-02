@@ -38,7 +38,11 @@ from app.payout.core.account.processors.get_payout_method import (
     GetPayoutMethodRequest,
     GetPayoutMethod,
 )
-from app.payout.core.account.types import PayoutCardInternal
+from app.payout.core.account.processors.list_payout_methods import (
+    ListPayoutMethodRequest,
+    ListPayoutMethod,
+)
+from app.payout.core.account.types import PayoutCardInternal, PayoutCardListInternal
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
 from app.payout.repository.bankdb.payout_method_miscellaneous import (
@@ -185,6 +189,17 @@ class PayoutAccountProcessors:
             request=request,
         )
         return await get_payout_method_op.execute()
+
+    async def list_payout_method(
+        self, request: ListPayoutMethodRequest
+    ) -> PayoutCardListInternal:
+        list_payout_method_op = ListPayoutMethod(
+            logger=self.logger,
+            payout_card_repo=self.payout_card_repo,
+            payout_method_repo=self.payout_method_repo,
+            request=request,
+        )
+        return await list_payout_method_op.execute()
 
     async def create_standard_payout(
         self, request: CreateStandardPayoutRequest

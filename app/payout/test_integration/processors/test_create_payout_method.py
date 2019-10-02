@@ -11,7 +11,7 @@ from app.commons.database.infra import DB
 from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
-from app.commons.test_integration.constants import DEBIT_CARD_TOKEN
+from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
 from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethod,
@@ -90,7 +90,7 @@ class TestCreatePayoutMethod:
         payout_account = await prepare_and_insert_payment_account(payment_account_repo)
         request = CreatePayoutMethodRequest(
             payout_account_id=payout_account.id,
-            token=DEBIT_CARD_TOKEN,
+            token=VISA_DEBIT_CARD_TOKEN,
             type=PayoutExternalAccountType.CARD,
         )
 

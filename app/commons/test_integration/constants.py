@@ -1,2 +1,3 @@
-DEBIT_CARD_TOKEN = "tok_visa_debit"
+VISA_DEBIT_CARD_TOKEN = "tok_visa_debit"
+MASTER_CARD_DEBIT_CARD_TOKEN = "tok_mastercard_debit"
 DEBIT_CARD_NUMBER = "4000056655665556"
