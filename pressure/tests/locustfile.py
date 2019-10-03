@@ -1,7 +1,39 @@
 from locust import task
 from payout_v0_client import AccountsV0Api, DefaultApi, PaymentAccountCreate
+from payin_v1_client import PaymentMethodV1Api, CartPaymentV1Api
+from utils.payment_locust import PayoutV0Locust, PayinV1Locust
+from utils.payment_util import PaymentUtil
 
-from utils.payment_locust import PayoutV0Locust
+
+class PayinV1Tests(PayinV1Locust):
+    class Task(PayinV1Locust.PayinV1TaskSet):
+
+        CART_AMOUNT = 1000
+
+        @task(1)
+        def test_create_cart_payment(self):
+            new_payer = PaymentUtil.create_payer(self.client)[0]
+            new_payment_method = PaymentMethodV1Api(self.client).create_payment_method(
+                create_payment_method_request_v1=PaymentUtil.get_payment_method_info(
+                    new_payer
+                ),
+                _request_timeout=(5, 20),  # (connection, read) in seconds
+            )
+            new_cart_payment = CartPaymentV1Api(
+                self.client
+            ).create_cart_payment_with_http_info(
+                create_cart_payment_request=PaymentUtil.get_cart_payment_info(
+                    new_payer, new_payment_method, self.CART_AMOUNT
+                ),
+                _request_timeout=(5, 15),  # (connection, read) in seconds
+            )
+            assert new_cart_payment[1] == 201
+            assert new_cart_payment[0].amount == self.CART_AMOUNT
+
+    weight = 1
+    task_set = Task
+    min_wait = 5000
+    max_wait = 15000
 
 
 class PayoutV0Tests(PayoutV0Locust):
