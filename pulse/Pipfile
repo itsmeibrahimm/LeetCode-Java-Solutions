@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[[source]]
+name = "artifactory"
+url = "https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+payin-v0-client = "==0.0.6"
+payin-v1-client = "==0.0.4"
+payout-v0-client = "==0.0.12"
+stripe = "==2.32.1"
+
+[requires]
+python_version = "3.7"

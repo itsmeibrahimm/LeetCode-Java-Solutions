@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def test_create_payment_method_with_invalid_input():
     try:
         payment_method_v1_client.create_payment_method_with_http_info(
-            create_payment_method_request={
+            create_payment_method_request_v1={
                 "payer_id": [123],
                 "payment_gateway": "stripe",
                 "token": "tok_visa",
@@ -26,7 +26,7 @@ def test_create_payment_method_with_invalid_input():
 def test_create_payment_method_with_missing_payer_id():
     try:
         payment_method_v1_client.create_payment_method_with_http_info(
-            create_payment_method_request={
+            create_payment_method_request_v1={
                 "payment_gateway": "stripe",
                 "token": "tok_visa",
             }
@@ -39,7 +39,7 @@ def test_create_payment_method_with_missing_payer_id():
 def test_get_payment_method_with_invalid_input():
     test_payer = PaymentUtil.create_payer()[0]
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
+        create_payment_method_request_v1={
             "payer_id": test_payer.id,
             "payment_gateway": "stripe",
             "token": "tok_visa",
@@ -68,7 +68,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
+        create_payment_method_request_v1={
             "payer_id": test_payer.id,
             "payment_gateway": "stripe",
             "token": "tok_visa",
@@ -107,7 +107,7 @@ def test_create_get_delete_payment_method_with_payer_id_and_stripe_payment_metho
     # step 1: create a payment method using payer_id
     test_payer = PaymentUtil.create_payer()[0]
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
+        create_payment_method_request_v1={
             "payer_id": test_payer.id,
             "payment_gateway": "stripe",
             "token": "tok_visa",
