@@ -61,36 +61,36 @@ class LedgerError(PaymentError):
 ###########################################################
 # mx_ledger Errors                                        #
 ###########################################################
-class MxLedgerCreationError(PaymentError):
+class MxLedgerCreationError(LedgerError):
     pass
 
 
-class MxLedgerProcessError(PaymentError):
+class MxLedgerProcessError(LedgerError):
     pass
 
 
-class MxLedgerInvalidProcessStateError(PaymentError):
+class MxLedgerInvalidProcessStateError(LedgerError):
     pass
 
 
-class MxLedgerReadError(PaymentError):
+class MxLedgerReadError(LedgerError):
     pass
 
 
-class MxLedgerLockError(PaymentError):
+class MxLedgerLockError(LedgerError):
     pass
 
 
-class MxLedgerSubmissionError(PaymentError):
+class MxLedgerSubmissionError(LedgerError):
     pass
 
 
-class MxLedgerCreateUniqueViolationError(PaymentError):
+class MxLedgerCreateUniqueViolationError(LedgerError):
     pass
 
 
 ###########################################################
 # mx_transaction Errors                                   #
 ###########################################################
-class MxTransactionCreationError(PaymentError):
+class MxTransactionCreationError(LedgerError):
     pass

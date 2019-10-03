@@ -5,6 +5,7 @@ import psycopg2
 import pytest
 from psycopg2 import errorcodes
 
+from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.ledger.core.data_types import (
     GetMxLedgerByIdInput,
@@ -31,6 +32,22 @@ from app.ledger.test_integration.utils import (
 
 class TestMxTransactionRepository:
     pytestmark = [pytest.mark.asyncio]
+
+    @pytest.fixture
+    def mx_transaction_repository(
+        self, ledger_paymentdb: DB
+    ) -> MxTransactionRepository:
+        return MxTransactionRepository(database=ledger_paymentdb)
+
+    @pytest.fixture
+    def mx_ledger_repository(self, ledger_paymentdb: DB) -> MxLedgerRepository:
+        return MxLedgerRepository(database=ledger_paymentdb)
+
+    @pytest.fixture
+    def mx_scheduled_ledger_repository(
+        self, ledger_paymentdb: DB
+    ) -> MxScheduledLedgerRepository:
+        return MxScheduledLedgerRepository(database=ledger_paymentdb)
 
     async def test_insert_mx_transaction_success(
         self,
@@ -111,7 +128,7 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        async with mx_ledger_repository.payment_database.master().connection() as connection:
+        async with mx_ledger_repository._database.master().connection() as connection:
             created_ledger, created_txn = await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                 request_input, connection
             )
@@ -127,7 +144,7 @@ class TestMxTransactionRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_ledger_repository.payment_database.master().connection() as db_connection:
+        async with mx_ledger_repository._database.master().connection() as db_connection:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 get_scheduled_ledger_request, db_connection
             )
@@ -160,7 +177,7 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        async with mx_ledger_repository.payment_database.master().connection() as connection:
+        async with mx_ledger_repository._database.master().connection() as connection:
             created_ledger, created_txn = await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                 request_input, connection
             )
@@ -176,7 +193,7 @@ class TestMxTransactionRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_ledger_repository.payment_database.master().connection() as db_connection:
+        async with mx_ledger_repository._database.master().connection() as db_connection:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 get_scheduled_ledger_request, db_connection
             )
@@ -227,7 +244,7 @@ class TestMxTransactionRepository:
         )
 
         with pytest.raises(psycopg2.IntegrityError) as e:
-            async with mx_ledger_repository.payment_database.master().connection() as connection:
+            async with mx_ledger_repository._database.master().connection() as connection:
                 await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                     request_input, connection
                 )
@@ -252,7 +269,7 @@ class TestMxTransactionRepository:
         )
 
         with pytest.raises(Exception) as e:
-            async with mx_ledger_repository.payment_database.master().connection() as connection:
+            async with mx_ledger_repository._database.master().connection() as connection:
                 await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                     request_input, connection
                 )
@@ -286,7 +303,7 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        async with mx_ledger_repository.payment_database.master().connection() as connection:
+        async with mx_ledger_repository._database.master().connection() as connection:
             mx_transaction = await mx_transaction_repository.insert_mx_transaction_and_update_ledger(
                 request_input, mx_ledger.id, connection
             )
@@ -341,7 +358,7 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
         with pytest.raises(Exception):
-            async with mx_ledger_repository.payment_database.master().connection() as connection:
+            async with mx_ledger_repository._database.master().connection() as connection:
                 await mx_transaction_repository.insert_mx_transaction_and_update_ledger(
                     request_input, mx_ledger_id, connection
                 )
@@ -384,7 +401,7 @@ class TestMxTransactionRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 request, connection
             )
@@ -435,7 +452,7 @@ class TestMxTransactionRepository:
             interval_type=MxScheduledLedgerIntervalType.WEEKLY.value,
         )
 
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 request, connection
             )
@@ -494,7 +511,7 @@ class TestMxTransactionRepository:
             routing_key=datetime(2019, 7, 30, tzinfo=timezone.utc),
             interval_type=MxScheduledLedgerIntervalType.DAILY.value,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             mx_scheduled_ledger_retrieved = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 request, connection
             )
@@ -561,7 +578,7 @@ class TestMxTransactionRepository:
         request = GetMxScheduledLedgerByAccountInput(
             payment_account_id=payment_account_id
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_for_payment_account_id(
                 request, connection
             )
@@ -610,7 +627,7 @@ class TestMxTransactionRepository:
         request = GetMxScheduledLedgerByAccountInput(
             payment_account_id=str(uuid.uuid4())
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             mx_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_for_payment_account_id(
                 request, connection
             )
@@ -634,7 +651,7 @@ class TestMxTransactionRepository:
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             first_mx_transaction = await mx_transaction_repository.create_mx_transaction_and_upsert_mx_ledgers(
                 insert_txn_request, connection
             )
@@ -650,7 +667,7 @@ class TestMxTransactionRepository:
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as db_connection:
+        async with mx_transaction_repository._database.master().connection() as db_connection:
             second_mx_transaction = await mx_transaction_repository.create_mx_transaction_and_upsert_mx_ledgers(
                 second_insert_txn_request, db_connection
             )
@@ -676,7 +693,7 @@ class TestMxTransactionRepository:
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             first_mx_transaction = await mx_transaction_repository.create_mx_transaction_and_upsert_mx_ledgers(
                 insert_txn_request, connection
             )
@@ -692,7 +709,7 @@ class TestMxTransactionRepository:
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as db_connection:
+        async with mx_transaction_repository._database.master().connection() as db_connection:
             second_mx_transaction = await mx_transaction_repository.create_mx_transaction_and_upsert_mx_ledgers(
                 second_insert_txn_request, db_connection
             )
@@ -718,7 +735,7 @@ class TestMxTransactionRepository:
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             first_mx_transaction = await mx_transaction_repository.create_mx_transaction_and_upsert_mx_ledgers(
                 insert_txn_request, connection
             )
@@ -734,7 +751,7 @@ class TestMxTransactionRepository:
             idempotency_key=str(uuid.uuid4()),
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as db_connection:
+        async with mx_transaction_repository._database.master().connection() as db_connection:
             second_mx_transaction = await mx_transaction_repository.create_mx_transaction_and_upsert_mx_ledgers(
                 second_insert_txn_request, db_connection
             )

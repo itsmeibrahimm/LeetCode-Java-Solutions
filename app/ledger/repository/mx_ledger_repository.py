@@ -10,6 +10,7 @@ from sqlalchemy import and_
 
 from app.commons import tracing
 from app.commons.database.client.interface import DBConnection
+from app.commons.database.infra import DB
 from app.ledger.core.data_types import (
     InsertMxLedgerInput,
     InsertMxLedgerOutput,
@@ -32,8 +33,10 @@ from app.ledger.core.types import (
 )
 
 from app.ledger.models.paymentdb import mx_ledgers, mx_scheduled_ledgers
-from app.ledger.repository.base import LedgerDBRepository
-from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
+from app.ledger.repository.base import LedgerPaymentDBRepository
+from app.ledger.repository.mx_transaction_repository import (
+    MxTransactionRepositoryInterface,
+)
 
 
 class MxLedgerRepositoryInterface:
@@ -91,14 +94,17 @@ class MxLedgerRepositoryInterface:
     async def rollover_negative_balanced_ledger(
         self,
         request: RolloverNegativeLedgerInput,
-        mx_transaction_repo: MxTransactionRepository,
+        mx_transaction_repo: MxTransactionRepositoryInterface,
     ) -> ProcessMxLedgerOutput:
         ...
 
 
 @dataclass
 @tracing.track_breadcrumb(repository_name="mx_ledger")
-class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
+class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerPaymentDBRepository):
+    def __init__(self, database: DB):
+        super().__init__(_database=database)
+
     async def insert_mx_ledger(
         self, request: InsertMxLedgerInput
     ) -> InsertMxLedgerOutput:
@@ -107,7 +113,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             .values(request.dict(skip_defaults=True))
             .returning(*mx_ledgers.table.columns.values())
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self._database.master().fetch_one(stmt)
         assert row
         return InsertMxLedgerOutput.from_row(row)
 
@@ -122,14 +128,14 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             .values(request_set.dict(skip_defaults=True))
             .returning(*mx_ledgers.table.columns.values())
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self._database.master().fetch_one(stmt)
         assert row
         return UpdateMxLedgerOutput.from_row(row)
 
     async def move_ledger_state_to_processing_and_close_schedule_ledger(
         self, request: ProcessMxLedgerInput
     ) -> ProcessMxLedgerOutput:
-        async with self.payment_database.master().transaction() as tx:
+        async with self._database.master().transaction() as tx:
             connection = tx.connection()
             # Lock mx_ledger row for updating state
             stmt = (
@@ -166,7 +172,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
         self, request: GetMxLedgerByIdInput
     ) -> Optional[GetMxLedgerByIdOutput]:
         stmt = mx_ledgers.table.select().where(mx_ledgers.id == request.id)
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self._database.master().fetch_one(stmt)
         return GetMxLedgerByIdOutput.from_row(row) if row else None
 
     async def move_ledger_state_to_failed(
@@ -180,7 +186,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             .values(state=MxLedgerStateType.FAILED, finalized_at=now, updated_at=now)
             .returning(*mx_ledgers.table.columns.values())
         )
-        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        ledger_row = await self._database.master().fetch_one(ledger_stmt)
         assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
@@ -200,7 +206,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             )
             .returning(*mx_ledgers.table.columns.values())
         )
-        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        ledger_row = await self._database.master().fetch_one(ledger_stmt)
         assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
@@ -221,7 +227,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             )
             .returning(*mx_ledgers.table.columns.values())
         )
-        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        ledger_row = await self._database.master().fetch_one(ledger_stmt)
         assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
@@ -236,7 +242,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             .values(state=MxLedgerStateType.SUBMITTED, submitted_at=now, updated_at=now)
             .returning(*mx_ledgers.table.columns.values())
         )
-        ledger_row = await self.payment_database.master().fetch_one(ledger_stmt)
+        ledger_row = await self._database.master().fetch_one(ledger_stmt)
         assert ledger_row
         return ProcessMxLedgerOutput.from_row(ledger_row)
 
@@ -245,7 +251,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
     async def rollover_negative_balanced_ledger(
         self,
         request: RolloverNegativeLedgerInput,
-        mx_transaction_repo: MxTransactionRepository,
+        mx_transaction_repo: MxTransactionRepositoryInterface,
     ) -> ProcessMxLedgerOutput:
         # given ledger_id can always find a ledger, it is checked in ledger processor.py
         mx_ledger = await self.get_ledger_by_id(GetMxLedgerByIdInput(id=request.id))
@@ -261,7 +267,7 @@ class MxLedgerRepository(MxLedgerRepositoryInterface, LedgerDBRepository):
             target_type=MxTransactionType.NEGATIVE_BALANCE_ROLLOVER,
         )
 
-        async with self.payment_database.master().transaction() as tx:
+        async with self._database.master().transaction() as tx:
             connection = tx.connection()
             mx_transaction = await mx_transaction_repo.create_mx_transaction_and_upsert_mx_ledgers(
                 request_input, connection

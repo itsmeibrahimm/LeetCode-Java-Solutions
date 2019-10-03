@@ -8,8 +8,6 @@ from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.repository.bankdb import (
     payout,
-    payout_card,
-    payout_method,
     stripe_payout_request,
     stripe_managed_account_transfer,
     payout_card,

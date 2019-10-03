@@ -1,27 +1,14 @@
-from dataclasses import InitVar, dataclass
-from starlette.requests import Request
+from abc import ABC
 
-
-from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.database.infra import DB
-from app.commons.utils.dataclass_extensions import no_init_field
 
 
-@dataclass
-class LedgerDBRepository:
+class LedgerPaymentDBRepository(ABC):
     """
-    Base repository containing Ledger_PaymentDB connection resources
+    Base repository containing Ledger_paymentdb connection resources
     """
 
-    context: InitVar[AppContext]  # constructor use only, not persisted in repo instance
-    main_database: DB = no_init_field()
-    payment_database: DB = no_init_field()
+    _database: DB
 
-    def __post_init__(self, context: AppContext):
-        self.main_database = context.ledger_maindb
-        self.payment_database = context.ledger_paymentdb
-
-    @classmethod
-    def get_repository(cls, request: Request):
-        app_context: AppContext = get_global_app_context(request)
-        return cls(context=app_context)
+    def __init__(self, *, _database: DB):
+        self._database = _database

@@ -12,6 +12,7 @@ from sqlalchemy import and_
 
 from app.commons import tracing
 from app.commons.database.client.interface import DBConnection
+from app.commons.database.infra import DB
 from app.ledger.core.data_types import (
     InsertMxTransactionInput,
     InsertMxTransactionOutput,
@@ -25,7 +26,7 @@ from app.ledger.core.data_types import (
     GetMxScheduledLedgerOutput,
     GetMxScheduledLedgerByAccountInput,
 )
-from app.ledger.core.mx_transaction.model import MxTransaction
+from app.ledger.core.mx_transaction.types import MxTransactionInternal
 from app.ledger.core.utils import (
     to_mx_transaction,
     pacific_start_time_for_current_interval,
@@ -38,7 +39,7 @@ from app.ledger.models.paymentdb import (
     mx_ledgers,
     mx_scheduled_ledgers,
 )
-from app.ledger.repository.base import LedgerDBRepository
+from app.ledger.repository.base import LedgerPaymentDBRepository
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +83,30 @@ class MxTransactionRepositoryInterface:
         self,
         input_request: InsertMxTransactionWithLedgerInput,
         db_connection: DBConnection,
-    ) -> MxTransaction:
+    ) -> MxTransactionInternal:
+        ...
+
+    @abstractmethod
+    async def create_ledger_and_insert_mx_transaction_caller(
+        self, request: InsertMxTransactionWithLedgerInput
+    ):
+        ...
+
+    @abstractmethod
+    async def create_mx_transaction_and_upsert_mx_ledgers_caller(
+        self, request_input: InsertMxTransactionWithLedgerInput
+    ):
         ...
 
 
 @tracing.track_breadcrumb(repository_name="mx_transaction")
 @dataclass
-class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBRepository):
+class MxTransactionRepository(
+    MxTransactionRepositoryInterface, LedgerPaymentDBRepository
+):
+    def __init__(self, database: DB):
+        super().__init__(_database=database)
+
     async def insert_mx_transaction(
         self, request: InsertMxTransactionInput
     ) -> InsertMxTransactionOutput:
@@ -97,14 +115,14 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
             .values(request.dict(skip_defaults=True))
             .returning(*mx_transactions.table.columns.values())
         )
-        row = await self.payment_database.master().fetch_one(stmt)
+        row = await self._database.master().fetch_one(stmt)
         assert row
         return InsertMxTransactionOutput.from_row(row)
 
     async def create_ledger_and_insert_mx_transaction_caller(
         self, request: InsertMxTransactionWithLedgerInput
     ):
-        async with self.payment_database.master().connection() as connection:
+        async with self._database.master().connection() as connection:
             mx_ledger, mx_transaction = await self.create_ledger_and_insert_mx_transaction(
                 request, connection
             )
@@ -297,7 +315,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
     async def create_mx_transaction_and_upsert_mx_ledgers_caller(
         self, request_input: InsertMxTransactionWithLedgerInput
     ):
-        async with self.payment_database.master().connection() as connection:
+        async with self._database.master().connection() as connection:
             mx_transaction = await self.create_mx_transaction_and_upsert_mx_ledgers(
                 request_input, connection
             )
@@ -307,7 +325,7 @@ class MxTransactionRepository(MxTransactionRepositoryInterface, LedgerDBReposito
         self,
         request_input: InsertMxTransactionWithLedgerInput,
         db_connection: DBConnection,
-    ) -> MxTransaction:
+    ) -> MxTransactionInternal:
         """
         Create mx_transaction and insert/update mx_ledgers
         :param db_connection: DBConnection

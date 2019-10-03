@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 
+from app.commons.database.infra import DB
 from app.ledger.core.types import MxScheduledLedgerIntervalType
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
 from app.ledger.repository.mx_scheduled_ledger_repository import (
@@ -16,6 +17,16 @@ from app.ledger.test_integration.utils import (
 
 class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
+
+    @pytest.fixture
+    def mx_ledger_repository(self, ledger_paymentdb: DB) -> MxLedgerRepository:
+        return MxLedgerRepository(database=ledger_paymentdb)
+
+    @pytest.fixture
+    def mx_scheduled_ledger_repository(
+        self, ledger_paymentdb: DB
+    ) -> MxScheduledLedgerRepository:
+        return MxScheduledLedgerRepository(database=ledger_paymentdb)
 
     async def test_insert_mx_scheduled_ledger_success(
         self,

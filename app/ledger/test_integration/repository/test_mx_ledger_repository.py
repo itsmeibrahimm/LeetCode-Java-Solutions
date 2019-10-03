@@ -5,6 +5,7 @@ import psycopg2
 import pytest
 from psycopg2 import errorcodes
 
+from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.ledger.core.data_types import (
     UpdatePaidMxLedgerInput,
@@ -35,6 +36,22 @@ from app.ledger.test_integration.utils import (
 
 class TestMxLedgerRepository:
     pytestmark = [pytest.mark.asyncio]
+
+    @pytest.fixture
+    def mx_transaction_repository(
+        self, ledger_paymentdb: DB
+    ) -> MxTransactionRepository:
+        return MxTransactionRepository(database=ledger_paymentdb)
+
+    @pytest.fixture
+    def mx_ledger_repository(self, ledger_paymentdb: DB) -> MxLedgerRepository:
+        return MxLedgerRepository(database=ledger_paymentdb)
+
+    @pytest.fixture
+    def mx_scheduled_ledger_repository(
+        self, ledger_paymentdb: DB
+    ) -> MxScheduledLedgerRepository:
+        return MxScheduledLedgerRepository(database=ledger_paymentdb)
 
     async def test_insert_mx_ledger_success(
         self, mx_ledger_repository: MxLedgerRepository
@@ -118,7 +135,7 @@ class TestMxLedgerRepository:
             routing_key=routing_key,
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, connection
             )
@@ -131,7 +148,7 @@ class TestMxLedgerRepository:
         assert mx_ledger.id == updated_mx_ledger.id
         assert updated_mx_ledger.state == MxLedgerStateType.PROCESSING
 
-        async with mx_transaction_repository.payment_database.master().connection() as db_connection:
+        async with mx_transaction_repository._database.master().connection() as db_connection:
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, db_connection
             )
@@ -181,7 +198,7 @@ class TestMxLedgerRepository:
             routing_key=datetime(2019, 8, 1),
             interval_type=MxScheduledLedgerIntervalType.WEEKLY,
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             retrieved_scheduled_ledger = await mx_transaction_repository.get_open_mx_scheduled_ledger_with_period(
                 scheduled_ledger_request, connection
             )
@@ -296,7 +313,7 @@ class TestMxLedgerRepository:
         move_ledger_request = UpdatedRolledMxLedgerInput(
             id=mx_ledger_id, rolled_to_ledger_id=rolled_to_ledger_id
         )
-        async with mx_transaction_repository.payment_database.master().connection() as connection:
+        async with mx_transaction_repository._database.master().connection() as connection:
             rolled_mx_ledger = await mx_ledger_repository.move_ledger_state_to_rolled(
                 move_ledger_request, connection
             )

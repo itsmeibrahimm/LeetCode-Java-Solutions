@@ -17,11 +17,6 @@ from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.context.logger import get_logger
 from app.commons.database.infra import DB
 from app.commons.utils.testing import Stat, parse_raw_stat
-from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
-from app.ledger.repository.mx_scheduled_ledger_repository import (
-    MxScheduledLedgerRepository,
-)
-from app.ledger.repository.mx_transaction_repository import MxTransactionRepository
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
@@ -261,21 +256,6 @@ async def payer_repository(app_context: AppContext):
 @pytest.fixture
 async def payment_method_repository(app_context: AppContext):
     yield PaymentMethodRepository(app_context)
-
-
-@pytest.fixture
-async def mx_transaction_repository(app_context: AppContext):
-    return MxTransactionRepository(app_context)
-
-
-@pytest.fixture
-async def mx_ledger_repository(app_context: AppContext):
-    return MxLedgerRepository(app_context)
-
-
-@pytest.fixture
-async def mx_scheduled_ledger_repository(app_context: AppContext):
-    return MxScheduledLedgerRepository(app_context)
 
 
 @pytest.fixture(scope="session")
