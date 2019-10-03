@@ -2,24 +2,28 @@ import pytest
 from stripe.error import InvalidRequestError
 
 from app.commons.config.app_config import AppConfig
+from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe.constants import STRIPE_PLATFORM_ACCOUNT_IDS
 from app.commons.providers.stripe.stripe_client import (
+    StripeAsyncClient,
     StripeClient,
     StripeTestClient,
-    StripeAsyncClient,
 )
-from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import CreateAccountTokenMetaDataRequest
-from app.commons.test_integration.constants import (
-    VISA_DEBIT_CARD_TOKEN,
-    DEBIT_CARD_NUMBER,
+from app.commons.providers.stripe.stripe_models import (
+    CreateAccountTokenMetaDataRequest,
+    StripeAttachPaymentMethodRequest,
+    StripeCreateCustomerRequest,
+    ClonePaymentMethodRequest,
+    PaymentMethodId,
 )
+from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
 from app.commons.test_integration.utils import (
     prepare_and_validate_stripe_account,
     prepare_and_validate_stripe_account_token,
 )
+from app.commons.types import CountryCode, Currency
 from app.commons.utils.pool import ThreadPoolHelper
-from app.commons.types import Currency, CountryCode
 from app.payout.types import PayoutExternalAccountType
 
 pytestmark = [
@@ -52,8 +56,17 @@ class TestStripeClient:
         return StripeClient(
             [
                 models.StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value,
+                    country=CountryCode.US,
+                ),
+                models.StripeClientSettings(
+                    api_key=app_config.STRIPE_CA_SECRET_KEY.value,
+                    country=CountryCode.CA,
+                ),
+                models.StripeClientSettings(
+                    api_key=app_config.STRIPE_AU_SECRET_KEY.value,
+                    country=CountryCode.AU,
+                ),
             ]
         )
 
@@ -69,23 +82,27 @@ class TestStripeClient:
         return StripeTestClient(
             [
                 models.StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value,
+                    country=CountryCode.US,
                 )
             ]
         )
 
+    @pytest.mark.vcr()
     def test_customer(self, mode: str, stripe: StripeClient):
-        customer_id = stripe.create_customer(
+        if mode == "mock":
+            pytest.skip()
+        customer = stripe.create_customer(
             country=models.CountryCode.US,
             request=models.StripeCreateCustomerRequest(
-                email="test@user.com", description="customer name", country="US"
+                email="test@user.com", description="customer name"
             ),
         )
-        assert customer_id
+        assert customer
 
         customer = stripe.retrieve_customer(
             country=models.CountryCode.US,
-            request=models.StripeRetrieveCustomerRequest(id=customer_id),
+            request=models.StripeRetrieveCustomerRequest(id=customer.id),
         )
         assert customer
 
@@ -283,26 +300,64 @@ class TestStripeClient:
         assert updated_account.individual.dob.month != account.individual.dob.month
         assert updated_account.individual.dob.year != account.individual.dob.year
 
-    def test_create_card_token(self, mode: str, stripe_test: StripeTestClient):
-        # stripe mock always create a token for bank account which is not right for this use
+    @pytest.mark.vcr()
+    def test_create_payment_method(self, mode: str, stripe: StripeClient):
         if mode == "mock":
             pytest.skip()
-        card_token = stripe_test.create_card_token(
-            request=models.CreateCardTokenRequest(
-                country=CountryCode.US,
-                card=models.CreateCardToken(
-                    number=DEBIT_CARD_NUMBER,
-                    exp_month=10,
-                    exp_year=2022,
-                    cvc="123",
-                    currency="usd",
-                ),
+
+        stripe_customer = stripe.create_customer(
+            request=StripeCreateCustomerRequest(
+                email="hahn@doordash.com", description="Hello!"
             ),
-            idempotency_key=None,
+            country=CountryCode.US,
         )
-        assert card_token
-        assert card_token.id.startswith("tok_")
-        assert card_token.type == "card"
+        stripe_payment_method = stripe.attach_payment_method(
+            request=StripeAttachPaymentMethodRequest(
+                payment_method="pm_card_visa", customer=stripe_customer.id
+            ),
+            country=CountryCode.US,
+        )
+        assert stripe_payment_method.customer == stripe_customer.id
+
+    @pytest.mark.vcr()
+    def test_clone_payment_method(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+
+        stripe_customer = stripe.create_customer(
+            request=StripeCreateCustomerRequest(
+                email="hahn@doordash.com", description="Hello!"
+            ),
+            country=CountryCode.US,
+        )
+        stripe_payment_method = stripe.attach_payment_method(
+            request=StripeAttachPaymentMethodRequest(
+                payment_method="pm_card_visa", customer=stripe_customer.id
+            ),
+            country=CountryCode.US,
+        )
+        au_stripe_payment_method = stripe.clone_payment_method(
+            request=ClonePaymentMethodRequest(
+                payment_method=PaymentMethodId(stripe_payment_method.id),
+                customer=stripe_customer.id,
+                stripe_account=STRIPE_PLATFORM_ACCOUNT_IDS[CountryCode.AU],
+            ),
+            country=CountryCode.US,
+        )
+        au_stripe_customer = stripe.create_customer(
+            request=StripeCreateCustomerRequest(
+                email="hahn+aus@doordash.com", description="Hello!"
+            ),
+            country=CountryCode.AU,
+        )
+        au_stripe_payment_method = stripe.attach_payment_method(
+            request=StripeAttachPaymentMethodRequest(
+                payment_method=au_stripe_payment_method.id,
+                customer=au_stripe_customer.id,
+            ),
+            country=CountryCode.AU,
+        )
+        assert au_stripe_payment_method.customer == au_stripe_customer.id
 
     def test_create_external_account_card(
         self, mode: str, stripe_test: StripeTestClient
@@ -360,10 +415,10 @@ class TestStripePool:
         stripe_thread_pool.shutdown()
 
     async def test_customer(self, mode: str, stripe_async_client: StripeAsyncClient):
-        customer_id = await stripe_async_client.create_customer(
+        customer = await stripe_async_client.create_customer(
             country=models.CountryCode.US,
             request=models.StripeCreateCustomerRequest(
-                email="test@user.com", description="customer name", country="US"
+                email="test@user.com", description="customer name"
             ),
         )
-        assert customer_id
+        assert customer

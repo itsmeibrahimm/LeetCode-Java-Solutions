@@ -7,49 +7,46 @@ from fastapi import Depends
 from psycopg2._psycopg import DataError
 from structlog.stdlib import BoundLogger
 
+from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
-from app.commons import tracing
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
-    StripeCreatePaymentMethodRequest,
-    StripeAttachPaymentMethodRequest,
-    StripeDetachPaymentMethodRequest,
-)
-from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
+    StripeAttachPaymentMethodRequest,
+    StripeCreatePaymentMethodRequest,
+    StripeDetachPaymentMethodRequest,
 )
 from app.commons.types import CountryCode, PgpCode
 from app.payin.core.exceptions import (
-    PaymentMethodCreateError,
     PayinErrorCode,
-    PaymentMethodReadError,
+    PaymentMethodCreateError,
     PaymentMethodDeleteError,
+    PaymentMethodReadError,
 )
 from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod
-from app.payin.core.types import PaymentMethodIdType, PayerIdType, MixedUuidStrType
-
+from app.payin.core.types import MixedUuidStrType, PayerIdType, PaymentMethodIdType
 from app.payin.repository.payment_method_repo import (
-    InsertPgpPaymentMethodInput,
-    InsertStripeCardInput,
-    PgpPaymentMethodDbEntity,
-    StripeCardDbEntity,
-    GetStripeCardByStripeIdInput,
-    GetPgpPaymentMethodByPgpResourceIdInput,
-    GetStripeCardByIdInput,
-    PaymentMethodRepository,
     DeletePgpPaymentMethodByIdSetInput,
     DeletePgpPaymentMethodByIdWhereInput,
     DeleteStripeCardByIdSetInput,
     DeleteStripeCardByIdWhereInput,
-    GetStripeCardsByStripeCustomerIdInput,
-    GetStripeCardsByConsumerIdInput,
     GetDuplicateStripeCardInput,
     GetPgpPaymentMethodByIdInput,
+    GetPgpPaymentMethodByPgpResourceIdInput,
+    GetStripeCardByIdInput,
+    GetStripeCardByStripeIdInput,
+    GetStripeCardsByConsumerIdInput,
+    GetStripeCardsByStripeCustomerIdInput,
+    InsertPgpPaymentMethodInput,
+    InsertStripeCardInput,
+    PaymentMethodRepository,
+    PgpPaymentMethodDbEntity,
+    StripeCardDbEntity,
 )
 
 
@@ -328,7 +325,8 @@ class PaymentMethodClient:
             stripe_payment_method = await self.stripe_async_client.create_payment_method(
                 country=CountryCode(country),
                 request=StripeCreatePaymentMethodRequest(
-                    type="card", card=StripeCreatePaymentMethodRequest.Card(token=token)
+                    type="card",
+                    card=StripeCreatePaymentMethodRequest.TokenizedCard(token=token),
                 ),
             )
 
@@ -353,7 +351,7 @@ class PaymentMethodClient:
             attach_payment_method = await self.stripe_async_client.attach_payment_method(
                 country=country,
                 request=StripeAttachPaymentMethodRequest(
-                    sid=pgp_payment_method_res_id, customer=pgp_customer_id
+                    payment_method=pgp_payment_method_res_id, customer=pgp_customer_id
                 ),
             )
             self.log.info(
@@ -375,7 +373,9 @@ class PaymentMethodClient:
         try:
             stripe_payment_method = await self.stripe_async_client.detach_payment_method(
                 country=country,  # TODO: get from payer
-                request=StripeDetachPaymentMethodRequest(sid=pgp_payment_method_id),
+                request=StripeDetachPaymentMethodRequest(
+                    payment_method=pgp_payment_method_id
+                ),
             )
             self.log.info(
                 f"[pgp_detach_payment_method][{pgp_payment_method_id}] detach payment method completed. customer in stripe response blob:"

@@ -1,17 +1,19 @@
-import stripe
 import abc
+from typing import Any, Optional
+
+import stripe
 from stripe.http_client import HTTPClient
-from typing import Optional, Any
 
 from app.commons import tracing
+from app.commons.providers import errors
 from app.commons.providers.errors import StripeCommandoError
+from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_http_client import (
     TimedRequestsClient,
     set_default_http_client,
 )
-from app.commons.providers import errors
-from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_models import CreateAccountTokenRequest
+from app.commons.types import CountryCode
 from app.commons.utils.pool import ThreadPoolHelper
 
 
@@ -335,13 +337,12 @@ class StripeClient(StripeClientInterface):
         country: models.CountryCode,
         request: models.StripeCreateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
-    ) -> models.CustomerId:
-        customer = stripe.Customer.create(
+    ) -> models.Customer:
+        return stripe.Customer.create(
             idempotency_key=idempotency_key,
             **self.settings_for(country),
             **request.dict(skip_defaults=True),
         )
-        return customer.id
 
     @tracing.track_breadcrumb(resource="customer", action="retrieve")
     def retrieve_customer(
@@ -395,9 +396,10 @@ class StripeClient(StripeClientInterface):
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.attach(
+            request.payment_method,
+            customer=request.customer,
             idempotency_key=idempotency_key,
             **self.settings_for(country),
-            **request.dict(skip_defaults=True),
         )
         return payment_method
 
@@ -410,9 +412,9 @@ class StripeClient(StripeClientInterface):
         idempotency_key: models.IdempotencyKey = None,
     ) -> models.PaymentMethod:
         payment_method = stripe.PaymentMethod.detach(
+            request.payment_method,
             idempotency_key=idempotency_key,
             **self.settings_for(country),
-            **request.dict(skip_defaults=True),
         )
         return payment_method
 
@@ -632,6 +634,18 @@ class StripeClient(StripeClientInterface):
         )
         return card
 
+    @tracing.track_breadcrumb(resource="payout_method", action="create")
+    def clone_payment_method(
+        self, request: models.ClonePaymentMethodRequest, country: CountryCode
+    ) -> models.PaymentMethod:
+        payment_method = stripe.PaymentMethod.create(
+            customer=request.customer,
+            payment_method=request.payment_method,
+            stripe_account=request.stripe_account,
+            **self.settings_for(country),
+        )
+        return payment_method
+
 
 class StripeTestClient(StripeClient):
     """
@@ -639,20 +653,6 @@ class StripeTestClient(StripeClient):
     includes methods that should not be called outside of tests
     (eg. credit card creation)
     """
-
-    # create debit card or credit card
-    def create_card_token(
-        self,
-        *,
-        request: models.CreateCardTokenRequest,
-        idempotency_key: models.IdempotencyKey = None,
-    ) -> models.CardToken:
-        card_token = stripe.Token.create(
-            idempotency_key=idempotency_key,
-            card=request.card.dict(),
-            **self.settings_for(request.country),
-        )
-        return card_token
 
 
 class StripeAsyncClient:
@@ -676,7 +676,7 @@ class StripeAsyncClient:
         country: models.CountryCode,
         request: models.StripeCreateCustomerRequest,
         idempotency_key: models.IdempotencyKey = None,
-    ) -> models.CustomerId:
+    ) -> models.Customer:
         return await self.executor_pool.submit(
             self.stripe_client.create_customer,
             country=country,
@@ -945,4 +945,11 @@ class StripeAsyncClient:
     ) -> models.StripeCard:
         return await self.executor_pool.submit(
             self.stripe_client.create_external_account_card, request=request
+        )
+
+    async def clone_payment_method(
+        self, request: models.ClonePaymentMethodRequest, country: CountryCode
+    ):
+        return await self.executor_pool.submit(
+            self.stripe_client.clone_payment_method, request=request, country=country
         )

@@ -8,7 +8,7 @@ from starlette.testclient import TestClient
 from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
-from app.commons.providers.stripe.stripe_models import CustomerId
+from app.commons.providers.stripe.stripe_models import CustomerId, Customer
 from app.commons.types import CountryCode
 from app.payin.test_integration.integration_utils import (
     create_payer_v1,
@@ -108,7 +108,7 @@ class TestPayersV0:
         )
 
     @pytest.fixture
-    def stripe_customer(self, stripe_client: StripeTestClient) -> CustomerId:
+    def stripe_customer(self, stripe_client: StripeTestClient) -> Customer:
         request = models.StripeCreateCustomerRequest(
             email="test@dd.com", description="test account"
         )
@@ -207,11 +207,13 @@ class TestPayersV0:
         self,
         client: TestClient,
         stripe_client: StripeTestClient,
-        stripe_customer: CustomerId,
+        stripe_customer: Customer,
     ):
         # get payer by stripe_customer_id with force_update
         response = client.get(
-            _get_payer_url(payer_id_type="stripe_customer_id", payer_id=stripe_customer)
+            _get_payer_url(
+                payer_id_type="stripe_customer_id", payer_id=stripe_customer.id
+            )
             + "?force_update=True"
         )
         assert response.status_code == 200
@@ -220,7 +222,7 @@ class TestPayersV0:
             force_get_payer["payment_gateway_provider_customers"][0][
                 "payment_provider_customer_id"
             ]
-            == stripe_customer
+            == stripe_customer.id
         )
 
     def test_not_found_without_force_update(
@@ -239,13 +241,13 @@ class TestPayersV0:
         self,
         client: TestClient,
         stripe_client: StripeTestClient,
-        stripe_customer: CustomerId,
+        stripe_customer: Customer,
     ):
         # create payment_method
         payment_method = create_payment_method_v0(
             client=client,
             request=CreatePaymentMethodV0Request(
-                stripe_customer_id=stripe_customer,
+                stripe_customer_id=stripe_customer.id,
                 country="US",
                 token="tok_visa",
                 set_default=False,
@@ -259,7 +261,7 @@ class TestPayersV0:
         # set default_payment_method
         update_payer = _update_payer_v0(
             client=client,
-            payer_id=stripe_customer,
+            payer_id=stripe_customer.id,
             payer_id_type="stripe_customer_id",
             request=UpdatePayerV0Request(
                 dd_stripe_card_id=payment_method["dd_stripe_card_id"],

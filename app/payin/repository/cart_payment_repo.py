@@ -93,7 +93,6 @@ class CartPaymentRepository(PayinDBRepository):
             id=row[cart_payments.id],
             payer_id=row[cart_payments.payer_id],
             amount=row[cart_payments.amount_total],
-            capture_method=None,
             payment_method_id=None,
             client_description=row[cart_payments.client_description],
             correlation_ids=CorrelationIds(

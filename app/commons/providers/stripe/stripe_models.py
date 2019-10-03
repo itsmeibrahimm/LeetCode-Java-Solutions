@@ -1,24 +1,25 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, NewType, Optional, Any
+from typing import Any, Dict, List, NewType, Optional
 
 import pydantic
 
+from app.commons.providers.stripe.types import StripePlatformAccountId
 from app.commons.types import CountryCode
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
 from app.payout.core.account.constants import (
-    CREATE_STRIPE_ACCOUNT_TYPE,
     CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES,
+    CREATE_STRIPE_ACCOUNT_TYPE,
 )
 from app.payout.types import (
+    PayoutMethodExternalAccountToken,
+    PayoutType,
+    PgpExternalAccountId,
     StripeAccountToken,
     StripeBusinessType,
     StripeFileHandle,
-    PayoutMethodExternalAccountToken,
-    PgpExternalAccountId,
-    PayoutType,
 )
 
 STRIPE_API_VERSION = "2019-09-09"
@@ -44,6 +45,9 @@ TransferId = NewType("TransferId", str)
 
 
 class StripeBaseModel(pydantic.BaseModel):
+    class Config:
+        use_enum_values = True
+
     # object String that comes from a typical stripe response. Denotes the object 'type'
     # Reference: https://stripe.com/docs/api/events/object#event_object-object
     _STRIPE_OBJECT_NAME: Optional[str] = None
@@ -76,26 +80,6 @@ class StripeClientSettings(StripeBaseModel):
 
 
 # --------------- REQUEST MODELS ---------------------------------------------------------------------------------------
-class CreateCardToken(StripeBaseModel):
-    number: str
-    exp_month: int
-    exp_year: int
-    cvc: str
-    currency: str = "usd"
-    name: Optional[str]
-    address_line1: Optional[str]
-    address_line2: Optional[str]
-    address_city: Optional[str]
-    address_state: Optional[str]
-    address_zip: Optional[str]
-    address_country: Optional[str]
-
-
-class CreateCardTokenRequest(StripeBaseModel):
-    country: CountryCode
-    card: CreateCardToken
-
-
 class InvoiceSettings(StripeBaseModel):
     default_payment_method: str
 
@@ -196,20 +180,23 @@ class StripeRefundChargeRequest(StripeBaseModel):
 
 
 class StripeCreatePaymentMethodRequest(StripeBaseModel):
-    class Card(StripeBaseModel):
+    class Type(str, Enum):
+        CARD = "card"
+
+    class TokenizedCard(StripeBaseModel):
         token: str
 
-    type: str
-    card: Card
+    type: Type
+    card: TokenizedCard
 
 
 class StripeAttachPaymentMethodRequest(StripeBaseModel):
-    sid: str
+    payment_method: str
     customer: str
 
 
 class StripeDetachPaymentMethodRequest(StripeBaseModel):
-    sid: str
+    payment_method: str
 
 
 class StripeRetrievePaymentMethodRequest(StripeBaseModel):
@@ -359,6 +346,12 @@ class CreateExternalAccountRequest(StripeBaseModel):
     external_account_token: PayoutMethodExternalAccountToken
 
 
+class ClonePaymentMethodRequest(StripeBaseModel):
+    payment_method: PaymentMethodId
+    stripe_account: StripePlatformAccountId
+    customer: CustomerId
+
+
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
 class BillingDetails(StripeBaseModel):
     address: Address
@@ -401,7 +394,7 @@ class Customer(StripeBaseModel):
     See: https://stripe.com/docs/api/customers/object
     """
 
-    id: str
+    id: CustomerId
     object: str
     created: datetime
     currency: str

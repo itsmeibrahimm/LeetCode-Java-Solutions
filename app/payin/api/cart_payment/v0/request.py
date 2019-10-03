@@ -14,5 +14,5 @@ class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):
 
 
 class UpdateCartPaymentLegacyRequest(UpdateCartPaymentBaseRequest):
-    amount: int  # Amount is overriden here to allow negative values as for v0 it is a delta
+    amount: int  # Amount is overridden here to allow negative values as for v0 it is a delta
     legacy_payment: LegacyPaymentInfo

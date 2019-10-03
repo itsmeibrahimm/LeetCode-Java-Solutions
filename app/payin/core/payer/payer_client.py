@@ -21,6 +21,7 @@ from app.commons.providers.stripe.stripe_models import (
     InvoiceSettings,
     Customer as StripeCustomer,
     StripeRetrieveCustomerRequest,
+    Customer,
 )
 from app.commons.runtime import runtime
 from app.commons.types import CountryCode, PgpCode
@@ -311,7 +312,7 @@ class PayerClient:
             email=email, description=description
         )
         try:
-            stripe_cus_id: CustomerId = await self.stripe_async_client.create_customer(
+            stripe_cus: Customer = await self.stripe_async_client.create_customer(
                 country=country, request=creat_cus_req
             )
         except Exception as e:
@@ -321,7 +322,7 @@ class PayerClient:
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_CREATE_STRIPE_ERROR, retryable=False
             )
-        return stripe_cus_id
+        return stripe_cus.id
 
     async def pgp_get_customer(
         self, pgp_customer_id: str, country: CountryCode

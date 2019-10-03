@@ -25,6 +25,7 @@ from app.commons.providers.identity_client import (
 from app.commons.providers.stripe.stripe_client import StripeClient
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
+from app.commons.types import CountryCode
 from app.commons.utils.pool import ThreadPoolHelper
 
 from doordash_python_stats.ddstats import doorstats_global
@@ -165,8 +166,14 @@ async def create_app_context(config: AppConfig) -> AppContext:
         settings_list=[
             # TODO: add CA/AU
             StripeClientSettings(
-                api_key=config.STRIPE_US_SECRET_KEY.value, country="US"
-            )
+                api_key=config.STRIPE_US_SECRET_KEY.value, country=CountryCode.US
+            ),
+            StripeClientSettings(
+                api_key=config.STRIPE_AU_SECRET_KEY.value, country=CountryCode.AU
+            ),
+            StripeClientSettings(
+                api_key=config.STRIPE_CA_SECRET_KEY.value, country=CountryCode.CA
+            ),
         ],
         http_client=TimedRequestsClient(),
     )

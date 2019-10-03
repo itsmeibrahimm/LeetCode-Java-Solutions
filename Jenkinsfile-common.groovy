@@ -193,7 +193,7 @@ def runUnitTests() {
     try {
       sh """|#!/bin/bash
             |set -eox
-            |docker exec ${serviceName}-ci make test-unit PYTEST_ADDOPTS="--junitxml ${outputFile}"
+            |docker exec ${serviceName}-ci make test-unit PYTEST_ADDOPTS="--junitxml ${outputFile} --vcr-record=none"
             |""".stripMargin()
     } finally {
       sh """|#!/bin/bash
@@ -217,7 +217,8 @@ def runIntegrationTests() {
     try {
       sh """|#!/bin/bash
             |set -eox
-            |docker exec ${serviceName}-ci make test-integration PYTEST_ADDOPTS="--junitxml ${outputFile}"
+            |docker exec ${serviceName}-ci make test-integration PYTEST_ADDOPTS="--junitxml ${outputFile} \
+             --vcr-record=none"
             |""".stripMargin()
     } finally {
       sh """|#!/bin/bash

@@ -71,8 +71,17 @@ class TestAccountV1:
         return StripeTestClient(
             [
                 models.StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value,
+                    country=CountryCode.US,
+                ),
+                models.StripeClientSettings(
+                    api_key=app_config.STRIPE_CA_SECRET_KEY.value,
+                    country=CountryCode.CA,
+                ),
+                models.StripeClientSettings(
+                    api_key=app_config.STRIPE_AU_SECRET_KEY.value,
+                    country=CountryCode.AU,
+                ),
             ]
         )
 
