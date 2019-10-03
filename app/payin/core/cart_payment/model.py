@@ -5,11 +5,12 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from typing_extensions import final
 
-from app.commons.types import PgpCode, CountryCode
+from app.commons.types import PgpCode, CountryCode, Currency
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
 )
 from uuid import UUID
 
@@ -163,8 +164,7 @@ class PgpPaymentCharge:
 
 
 @final
-@dataclass
-class LegacyConsumerCharge:
+class LegacyConsumerCharge(BaseModel):
     id: LegacyConsumerChargeId
     target_id: int
     target_ct_id: int
@@ -172,7 +172,7 @@ class LegacyConsumerCharge:
     is_stripe_connect_based: bool
     total: int
     original_total: int
-    currency: str
+    currency: Currency
     country_id: int
     issue_id: Optional[int]
     stripe_customer_id: Optional[int]
@@ -180,13 +180,12 @@ class LegacyConsumerCharge:
 
 
 @final
-@dataclass()
-class LegacyStripeCharge:
+class LegacyStripeCharge(BaseModel):
     id: int
     amount: int
     amount_refunded: int
-    currency: str
-    status: str
+    currency: Currency
+    status: LegacyStripeChargeStatus
     error_reason: Optional[str]
     additional_payment_info: Optional[str]
     description: Optional[str]

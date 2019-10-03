@@ -10,7 +10,7 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.query import paged_query
-from app.commons.types import PgpCode, CountryCode
+from app.commons.types import PgpCode, CountryCode, Currency
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentIntent,
@@ -27,6 +27,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.models.maindb import consumer_charges, stripe_charges
@@ -807,7 +808,7 @@ class CartPaymentRepository(PayinDBRepository):
         idempotency_key: str,
         is_stripe_connect_based: bool,
         country_id: int,
-        currency: str,
+        currency: Currency,
         stripe_customer_id: Optional[int],
         total: int,
         original_total: int,
@@ -819,7 +820,7 @@ class CartPaymentRepository(PayinDBRepository):
             consumer_charges.idempotency_key: idempotency_key,
             consumer_charges.is_stripe_connect_based: is_stripe_connect_based,
             consumer_charges.country_id: country_id,
-            consumer_charges.currency: currency,
+            consumer_charges.currency: currency.value.upper(),  # In legacy tables, upper case currency convention used
             consumer_charges.stripe_customer_id: stripe_customer_id,
             consumer_charges.total: total,
             consumer_charges.original_total: original_total,
@@ -844,7 +845,7 @@ class CartPaymentRepository(PayinDBRepository):
             is_stripe_connect_based=row[consumer_charges.is_stripe_connect_based],
             total=row[consumer_charges.total],
             original_total=row[consumer_charges.original_total],
-            currency=row[consumer_charges.currency],
+            currency=Currency(row[consumer_charges.currency].lower()),
             country_id=row[consumer_charges.country_id],
             issue_id=row[consumer_charges.issue_id],
             stripe_customer_id=row[consumer_charges.stripe_customer_id],
@@ -867,12 +868,12 @@ class CartPaymentRepository(PayinDBRepository):
         charge_id: int,
         amount: int,
         amount_refunded: int,
-        currency: str,
-        status: str,
+        currency: Currency,
+        status: LegacyStripeChargeStatus,
         idempotency_key: str,
         additional_payment_info: Optional[str],
         description: Optional[str],
-        error_reason: Optional[str] = None,
+        error_reason: Optional[str],
     ) -> LegacyStripeCharge:
         now = datetime.utcnow()
         data = {
@@ -881,8 +882,8 @@ class CartPaymentRepository(PayinDBRepository):
             stripe_charges.charge_id: charge_id,
             stripe_charges.amount: amount,
             stripe_charges.amount_refunded: amount_refunded,
-            stripe_charges.currency: currency,
-            stripe_charges.status: status,
+            stripe_charges.currency: currency.value.upper(),  # In legacy tables, upper case currency convention used
+            stripe_charges.status: status.value,
             stripe_charges.idempotency_key: idempotency_key,
             stripe_charges.additional_payment_info: additional_payment_info,
             stripe_charges.description: description,
@@ -905,8 +906,8 @@ class CartPaymentRepository(PayinDBRepository):
             id=row[stripe_charges.id],
             amount=row[stripe_charges.amount],
             amount_refunded=row[stripe_charges.amount_refunded],
-            currency=row[stripe_charges.currency],
-            status=row[stripe_charges.status],
+            currency=Currency(row[stripe_charges.currency].lower()),
+            status=LegacyStripeChargeStatus(row[stripe_charges.status]),
             error_reason=row[stripe_charges.error_reason],
             additional_payment_info=row[stripe_charges.additional_payment_info],
             description=row[stripe_charges.description],
@@ -938,8 +939,7 @@ class CartPaymentRepository(PayinDBRepository):
         stripe_id: str,
         amount: int,
         amount_refunded: int,
-        currency: str,
-        status: str,
+        status: LegacyStripeChargeStatus,
     ):
         statement = (
             stripe_charges.table.update()
@@ -948,8 +948,7 @@ class CartPaymentRepository(PayinDBRepository):
                 stripe_id=stripe_id,
                 amount=amount,
                 amount_refunded=amount_refunded,
-                currency=currency,
-                status=status,
+                status=status.value,
             )
             .returning(*stripe_charges.table.columns.values())
         )
@@ -958,12 +957,16 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_legacy_stripe_charge(row)
 
     async def update_legacy_stripe_charge_error_details(
-        self, id: int, stripe_id: str, status: str, error_reason: str
+        self,
+        id: int,
+        stripe_id: str,
+        status: LegacyStripeChargeStatus,
+        error_reason: str,
     ):
         statement = (
             stripe_charges.table.update()
             .where(stripe_charges.id == id)
-            .values(stripe_id=stripe_id, status=status, error_reason=error_reason)
+            .values(stripe_id=stripe_id, status=status.value, error_reason=error_reason)
             .returning(*stripe_charges.table.columns.values())
         )
 
@@ -971,12 +974,12 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_legacy_stripe_charge(row)
 
     async def update_legacy_stripe_charge_status(
-        self, stripe_charge_id: str, status: str
+        self, stripe_charge_id: str, status: LegacyStripeChargeStatus
     ):
         statement = (
             stripe_charges.table.update()
             .where(stripe_charges.stripe_id == stripe_charge_id)
-            .values(status=status)
+            .values(status=status.value)
             .returning(*stripe_charges.table.columns.values())
         )
 

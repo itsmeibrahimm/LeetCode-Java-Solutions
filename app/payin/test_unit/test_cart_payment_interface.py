@@ -149,9 +149,9 @@ class TestLegacyPaymentInterface:
             target_ct_id=int(cart_payment.correlation_ids.reference_type),
             idempotency_key=payment_intent.idempotency_key,
             is_stripe_connect_based=False,
-            total=cart_payment.amount,
+            total=0,
             original_total=cart_payment.amount,
-            currency=payment_intent.currency,
+            currency=Currency(payment_intent.currency),
             country_id=LegacyCountryId.US,
             issue_id=None,
             stripe_customer_id=None,
@@ -163,9 +163,9 @@ class TestLegacyPaymentInterface:
             id=result_stripe_charge.id,  # Generated
             amount=cart_payment.amount,
             amount_refunded=0,
-            currency=payment_intent.currency,
+            currency=Currency(payment_intent.currency),
             status=LegacyStripeChargeStatus.PENDING,
-            error_reason=None,
+            error_reason="",
             additional_payment_info=str(legacy_payment.dd_additional_payment_info),
             description=cart_payment.client_description,
             idempotency_key=payment_intent.idempotency_key,
@@ -271,7 +271,7 @@ class TestLegacyPaymentInterface:
             amount_refunded=0,
             currency=payment_intent.currency,
             status="succeeded",
-            error_reason=None,
+            error_reason="",
             additional_payment_info=str(legacy_payment.dd_additional_payment_info),
             description="Test client description",
             idempotency_key=payment_intent.idempotency_key,
@@ -1352,6 +1352,9 @@ class TestCapturePayment:
         cart_payment_processor.cart_payment_interface._get_intent_status_from_provider_status = create_autospec(  # type: ignore
             cart_payment_processor.cart_payment_interface._get_intent_status_from_provider_status,
             return_value=IntentStatus.SUCCEEDED,
+        )
+        cart_payment_processor.legacy_payment_interface.update_charge_after_payment_captured = (  # type: ignore
+            asynctest.CoroutineMock()
         )
         pgp_payment_intent = PgpPaymentIntentFactory()  # type: PgpPaymentIntent
         cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = (  # type: ignore

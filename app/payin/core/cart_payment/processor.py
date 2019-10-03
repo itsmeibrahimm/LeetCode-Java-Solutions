@@ -143,10 +143,7 @@ class LegacyPaymentInterface:
         self.req_context.log.info(
             "[create_new_payment_charges] Creating charge records in legacy system"
         )
-
-        # TODO check if charge exists already, in which case stripe_charge will be created under existing charge instead of a new one
-
-        # Brand new payment, create new consumer charge
+        # New payment: create new consumer charge
         is_stripe_connect_based = (
             True
             if legacy_payment.dd_additional_payment_info
@@ -174,7 +171,7 @@ class LegacyPaymentInterface:
             currency=currency,
             # stripe_customer_id=pgp_payment_intent.customer_resource_id,
             stripe_customer_id=None,
-            total=request_cart_payment.amount,
+            total=0,
             original_total=request_cart_payment.amount,
         )
         consumer_charge_id = legacy_consumer_charge.id
@@ -193,6 +190,7 @@ class LegacyPaymentInterface:
             idempotency_key=idempotency_key,
             additional_payment_info=additional_payment_info,
             description=request_cart_payment.client_description,
+            error_reason="",
         )
 
         return legacy_consumer_charge, legacy_stripe_charge
@@ -221,6 +219,7 @@ class LegacyPaymentInterface:
         provider_charges = provider_payment_intent.charges
         provider_charge = provider_charges.data[0]
 
+        # TODO: Remove conditional insert.  We should only need to upate existing details.
         if legacy_stripe_charge:
             # If the stripe_charge exists, update it with details from provider (order creation case)
             return await self.payment_repo.update_legacy_stripe_charge_provider_details(
@@ -228,26 +227,26 @@ class LegacyPaymentInterface:
                 stripe_id=provider_charge.id,
                 amount=provider_charge.amount,
                 amount_refunded=provider_charge.amount_refunded,
-                currency=provider_charge.currency,
                 status=self._get_legacy_stripe_charge_status_from_provider_status(
                     provider_charge.status
                 ),
             )
         else:
-            # No legacy_stripe_charge exists yet, a new one is made (order card adjustment case)
+            # No legacy_stripe_charge exists yet, a new one is made (order cart adjustment case)
             return await self.payment_repo.insert_legacy_stripe_charge(
                 stripe_id=provider_charge.id,
                 card_id=legacy_payment.dd_stripe_card_id,
                 charge_id=charge_id,
                 amount=provider_charge.amount,
                 amount_refunded=provider_charge.amount_refunded,
-                currency=provider_charge.currency,
+                currency=Currency(provider_charge.currency),
                 status=self._get_legacy_stripe_charge_status_from_provider_status(
                     provider_charge.status
                 ),
                 idempotency_key=idempotency_key,
                 additional_payment_info=str(legacy_payment.dd_additional_payment_info),
                 description=client_description,
+                error_reason="",
             )
 
     async def update_charge_after_payment_captured(
@@ -255,7 +254,7 @@ class LegacyPaymentInterface:
     ) -> LegacyStripeCharge:
         charge = provider_intent.charges.data[0]
         return await self.payment_repo.update_legacy_stripe_charge_status(
-            stripe_charge_id=charge.id, status=charge.status
+            stripe_charge_id=charge.id, status=LegacyStripeChargeStatus(charge.status)
         )
 
     async def update_charge_after_payment_refunded(

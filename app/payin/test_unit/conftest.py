@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
-from app.commons.types import PgpCode, CountryCode
+from app.commons.types import PgpCode, CountryCode, Currency
 from app.payin.capture.service import CaptureService
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
@@ -32,6 +32,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
 )
 from app.payin.tests import utils
 
@@ -372,7 +373,7 @@ class MockedPaymentRepo:
         idempotency_key: str,
         is_stripe_connect_based: bool,
         country_id: int,
-        currency: str,
+        currency: Currency,
         stripe_customer_id: Optional[int],
         total: int,
         original_total: int,
@@ -404,12 +405,12 @@ class MockedPaymentRepo:
         charge_id: int,
         amount: int,
         amount_refunded: int,
-        currency: str,
-        status: str,
+        currency: Currency,
+        status: LegacyStripeChargeStatus,
         idempotency_key: str,
         additional_payment_info: Optional[str],
         description: Optional[str],
-        error_reason: Optional[str] = None,
+        error_reason: Optional[str],
     ) -> LegacyStripeCharge:
         return LegacyStripeCharge(
             id=1,
@@ -444,26 +445,28 @@ class MockedPaymentRepo:
         stripe_id: str,
         amount: int,
         amount_refunded: int,
-        currency: str,
-        status: str,
+        status: LegacyStripeChargeStatus,
     ):
         return utils.generate_legacy_stripe_charge(
             stripe_id=stripe_id,
             amount=amount,
             amount_refunded=amount_refunded,
             status=status,
-            currency=currency,
         )
 
     async def update_legacy_stripe_charge_error_details(
-        self, id: int, stripe_id: str, status: str, error_reason: str
+        self,
+        id: int,
+        stripe_id: str,
+        status: LegacyStripeChargeStatus,
+        error_reason: str,
     ):
         return utils.generate_legacy_stripe_charge(
             stripe_id=stripe_id, status=status, error_reason=error_reason
         )
 
     async def update_legacy_stripe_charge_status(
-        self, stripe_charge_id: str, status: str
+        self, stripe_charge_id: str, status: LegacyStripeChargeStatus
     ):
         return utils.generate_legacy_stripe_charge(
             stripe_id=stripe_charge_id, status=status
@@ -598,6 +601,7 @@ def stripe_interface():
     mocked_intent.charges = MagicMock()
     mocked_intent.charges.data = [MagicMock()]
     mocked_intent.charges.data[0].status = "succeeded"
+    mocked_intent.charges.data[0].currency = "usd"
     mocked_intent.charges.data[0].id = str(uuid4())
 
     stripe.create_payment_intent = FunctionMock(return_value=mocked_intent)
@@ -609,6 +613,7 @@ def stripe_interface():
     mocked_refund.id = "test_refund"
     mocked_refund.status = "succeeded"
     mocked_refund.amount = 200
+    mocked_refund.charge = "ch_AUgV0YDud8EOlo"
 
     stripe.refund_charge = FunctionMock(return_value=mocked_refund)
 

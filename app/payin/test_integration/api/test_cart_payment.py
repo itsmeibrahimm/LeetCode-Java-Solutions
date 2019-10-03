@@ -143,6 +143,7 @@ class TestCartPayment:
         stripe_card_id: str,
         amount: int = 500,
         idempotency_key: Optional[str] = None,
+        split_payment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         # No payer_id or payment_method_id.  Instead we use legacy_payment.
         request_body = {
@@ -153,6 +154,7 @@ class TestCartPayment:
             "payer_statement_description": f"{stripe_customer_id} bill"[-22:],
             "payer_country": "US",
             "payment_country": "US",
+            "split_payment": split_payment,
             "legacy_correlation_ids": {"reference_id": 123, "reference_type": 5},
             "legacy_payment": {
                 "stripe_customer_id": stripe_customer_id,
@@ -208,9 +210,13 @@ class TestCartPayment:
         stripe_customer_id: str,
         stripe_card_id: str,
         amount: int,
+        split_payment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
-            stripe_customer_id, stripe_card_id, amount
+            stripe_customer_id=stripe_customer_id,
+            stripe_card_id=stripe_card_id,
+            amount=amount,
+            split_payment=split_payment,
         )
 
         response = client.post("/payin/api/v0/cart_payments", json=request_body)
@@ -235,7 +241,10 @@ class TestCartPayment:
         assert cart_payment["client_description"] == request_body["client_description"]
         statement_description = cart_payment["payer_statement_description"]
         assert statement_description == request_body["payer_statement_description"]
-        assert cart_payment["split_payment"] is None
+        expected_split_payment = (
+            request_body["split_payment"] if "split_payment" in request_body else None
+        )
+        assert cart_payment["split_payment"] == expected_split_payment
         assert cart_payment["created_at"]
         assert cart_payment["updated_at"]
         assert cart_payment["deleted_at"] is None
@@ -781,4 +790,17 @@ class TestCartPayment:
         # Cancel
         self._test_cart_payment_legacy_cancel(
             client=client, charge_id=cart_payment["dd_charge_id"]
+        )
+
+        # Split payment use in v0 api
+        split_payment = {
+            "payout_account_id": "acct_1FKYqjDpmxeDAkcx",  # Pre-seeded stripe sandbox testing account
+            "application_fee_amount": 100,
+        }
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
+            client=client,
+            stripe_customer_id=provider_account_id,
+            stripe_card_id=provider_card_id,
+            split_payment=split_payment,
+            amount=860,
         )

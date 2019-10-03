@@ -809,10 +809,11 @@ class TestLegacyCharges:
             amount=consumer_charge.total,
             amount_refunded=0,
             currency=Currency.USD,
-            status=LegacyStripeChargeStatus.SUCCEEDED.value,
+            status=LegacyStripeChargeStatus.SUCCEEDED,
             idempotency_key=str(uuid4()),
             additional_payment_info="{'test_key': 'test_value'}",
             description="test description",
+            error_reason="",
         )
 
     @pytest.mark.asyncio
@@ -875,10 +876,11 @@ class TestLegacyCharges:
             amount=consumer_charge.total,
             amount_refunded=0,
             currency=Currency.USD,
-            status=LegacyStripeChargeStatus.SUCCEEDED.value,
+            status=LegacyStripeChargeStatus.SUCCEEDED,
             idempotency_key=idempotency_key,
             additional_payment_info="{'test_key': 'test_value'}",
             description="Test description",
+            error_reason="",
         )
 
         expected_stripe_charge = LegacyStripeCharge(
@@ -887,7 +889,7 @@ class TestLegacyCharges:
             amount_refunded=0,
             currency=Currency.USD,
             status=LegacyStripeChargeStatus.SUCCEEDED.value,
-            error_reason=None,
+            error_reason="",
             additional_payment_info="{'test_key': 'test_value'}",
             description="Test description",
             idempotency_key=idempotency_key,
@@ -929,7 +931,6 @@ class TestLegacyCharges:
             stripe_id=f"stripe-{stripe_charge.id}",
             amount=450,
             amount_refunded=300,
-            currency="cad",
             status=LegacyStripeChargeStatus.SUCCEEDED,
         )
 
@@ -937,7 +938,6 @@ class TestLegacyCharges:
         expected_result.stripe_id = f"stripe-{stripe_charge.id}"
         expected_result.amount = 450
         expected_result.amount_refunded = 300
-        expected_result.currency = "cad"
         expected_result.status = LegacyStripeChargeStatus.SUCCEEDED
         assert result == expected_result
 

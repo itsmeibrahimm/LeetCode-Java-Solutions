@@ -167,7 +167,7 @@ def generate_legacy_stripe_charge(
     amount_refunded: int = 0,
     refunded_at: datetime = None,
     status: str = LegacyStripeChargeStatus.SUCCEEDED,
-    currency: str = Currency.USD.value,
+    currency: Currency = Currency.USD,
     error_reason: str = None,
 ) -> LegacyStripeCharge:
     return LegacyStripeCharge(
