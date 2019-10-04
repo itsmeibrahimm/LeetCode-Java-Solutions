@@ -634,7 +634,7 @@ class StripeClient(StripeClientInterface):
         )
         return card
 
-    @tracing.track_breadcrumb(resource="payout_method", action="create")
+    @tracing.track_breadcrumb(resource="payout_method", action="clone")
     def clone_payment_method(
         self, request: models.ClonePaymentMethodRequest, country: CountryCode
     ) -> models.PaymentMethod:
@@ -645,6 +645,14 @@ class StripeClient(StripeClientInterface):
             **self.settings_for(country),
         )
         return payment_method
+
+    @tracing.track_breadcrumb(resource="card", action="create")
+    def create_card(
+        self, request: models.StripeCreateCardRequest, country: CountryCode
+    ) -> models.StripeCard:
+        return stripe.Customer.create_source(
+            request.customer, source=request.source, **self.settings_for(country)
+        )
 
 
 class StripeTestClient(StripeClient):
@@ -952,4 +960,11 @@ class StripeAsyncClient:
     ):
         return await self.executor_pool.submit(
             self.stripe_client.clone_payment_method, request=request, country=country
+        )
+
+    async def create_card(
+        self, request: models.StripeCreateCardRequest, country: CountryCode
+    ):
+        return await self.executor_pool.submit(
+            self.stripe_client.create_card, request=request, country=country
         )

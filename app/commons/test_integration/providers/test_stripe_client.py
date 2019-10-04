@@ -11,11 +11,13 @@ from app.commons.providers.stripe.stripe_client import (
 )
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import (
-    CreateAccountTokenMetaDataRequest,
-    StripeAttachPaymentMethodRequest,
-    StripeCreateCustomerRequest,
     ClonePaymentMethodRequest,
+    CreateAccountTokenMetaDataRequest,
     PaymentMethodId,
+    StripeAttachPaymentMethodRequest,
+    StripeCreateCardRequest,
+    StripeCreateCustomerRequest,
+    TokenId,
 )
 from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
 from app.commons.test_integration.utils import (
@@ -358,6 +360,52 @@ class TestStripeClient:
             country=CountryCode.AU,
         )
         assert au_stripe_payment_method.customer == au_stripe_customer.id
+
+    @pytest.mark.vcr()
+    def test_create_card(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+
+        stripe_customer = stripe.create_customer(
+            request=StripeCreateCustomerRequest(
+                email="hahn@doordash.com", description="Hello!"
+            ),
+            country=CountryCode.US,
+        )
+        stripe_card = stripe.create_card(
+            request=StripeCreateCardRequest(
+                customer=stripe_customer.id, source=TokenId("tok_visa")
+            ),
+            country=CountryCode.US,
+        )
+        assert stripe_card.id.startswith("card_")
+
+    @pytest.mark.vcr()
+    def test_clone_card(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+
+        stripe_customer = stripe.create_customer(
+            request=StripeCreateCustomerRequest(
+                email="hahn@doordash.com", description="Hello!"
+            ),
+            country=CountryCode.US,
+        )
+        stripe_card = stripe.create_card(
+            request=StripeCreateCardRequest(
+                customer=stripe_customer.id, source=TokenId("tok_visa")
+            ),
+            country=CountryCode.US,
+        )
+        stripe_payment_method = stripe.clone_payment_method(
+            request=ClonePaymentMethodRequest(
+                payment_method=PaymentMethodId(stripe_card.id),
+                customer=stripe_customer.id,
+                stripe_account=STRIPE_PLATFORM_ACCOUNT_IDS[CountryCode.AU],
+            ),
+            country=CountryCode.US,
+        )
+        assert stripe_payment_method.id.startswith("pm_")
 
     def test_create_external_account_card(
         self, mode: str, stripe_test: StripeTestClient

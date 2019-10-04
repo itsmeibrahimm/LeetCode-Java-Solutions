@@ -264,6 +264,11 @@ class StripeCreatePayoutRequest(StripeBaseModel):
     statement_descriptor: Optional[str]
 
 
+class StripeCreateCardRequest(StripeBaseModel):
+    customer: CustomerId
+    source: TokenId
+
+
 class Address(StripeBaseModel):
     city: Optional[str]
     country: Optional[str]
