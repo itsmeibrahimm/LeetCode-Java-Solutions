@@ -47,7 +47,7 @@ def create_app_config() -> AppConfig:
             name="stripe_us_secret_key", value="sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
         ),
         STRIPE_US_PUBLIC_KEY=Secret(
-            name="stripe_us_public_key", value="pk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
+            name="stripe_us_public_key", value="pk_test_VCKL0VKIMMPzuUB8ZbuXdKkA"
         ),
         STRIPE_CA_SECRET_KEY=Secret(
             name="stripe_ca_secret_key", value="sk_test_DjN82k53PAi4mKVlkeOXUsGh"
