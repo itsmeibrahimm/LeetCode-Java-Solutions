@@ -41,7 +41,7 @@ from app.payin.repository.payment_method_repo import (
 @pytest.fixture
 async def payer(payer_repository: PayerRepository):
     insert_payer_input = InsertPayerInput(
-        id=str(uuid4()), payer_type=PayerType.STORE, country=CountryCode.US
+        id=uuid4(), payer_type=PayerType.STORE, country=CountryCode.US
     )
     yield await payer_repository.insert_payer(insert_payer_input)
 

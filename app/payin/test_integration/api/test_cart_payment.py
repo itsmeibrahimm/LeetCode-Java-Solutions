@@ -7,6 +7,7 @@ from typing import Any, Optional, Dict
 
 from app.commons.context.app_context import AppContext
 from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
+from app.commons.types import CountryCode
 from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
 
 
@@ -141,6 +142,7 @@ class TestCartPayment:
         self,
         stripe_customer_id: str,
         stripe_card_id: str,
+        merchant_country: CountryCode,
         amount: int = 500,
         idempotency_key: Optional[str] = None,
         split_payment: Optional[Dict[str, Any]] = None,
@@ -153,7 +155,7 @@ class TestCartPayment:
             "client_description": f"{stripe_customer_id} description",
             "payer_statement_description": f"{stripe_customer_id} bill"[-22:],
             "payer_country": "US",
-            "payment_country": "US",
+            "payment_country": merchant_country.value,
             "split_payment": split_payment,
             "legacy_correlation_ids": {"reference_id": 123, "reference_type": 5},
             "legacy_payment": {
@@ -210,6 +212,7 @@ class TestCartPayment:
         stripe_customer_id: str,
         stripe_card_id: str,
         amount: int,
+        merchant_country: CountryCode,
         split_payment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -217,6 +220,7 @@ class TestCartPayment:
             stripe_card_id=stripe_card_id,
             amount=amount,
             split_payment=split_payment,
+            merchant_country=merchant_country,
         )
 
         response = client.post("/payin/api/v0/cart_payments", json=request_body)
@@ -581,7 +585,7 @@ class TestCartPayment:
             client=client, cart_payment=cart_payment, amount=390
         )
 
-    @pytest.mark.parametrize("commando_mode", [(True), (False)])
+    @pytest.mark.parametrize("commando_mode", [True, False])
     def test_cart_payment_creation(
         self,
         stripe_api: StripeAPISettings,
@@ -656,6 +660,46 @@ class TestCartPayment:
                     assert r[1] in amounts
 
                 assert total == 3
+
+    def test_cart_payment_creation_cross_country(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        app_context: AppContext,
+    ):
+        stripe_api.enable_outbound()
+
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, amount=500, delay_capture=False, split_payment=None
+        )
+        request_body["payment_country"] = "AU"
+        response = client.post("/payin/api/v1/cart_payments", json=request_body)
+        assert response.status_code == 201
+
+    def test_cart_payment_creation_cross_country_legacy(
+        self,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        app_context: AppContext,
+    ):
+        provider_account_id = payer["payment_gateway_provider_customers"][0][
+            "payment_provider_customer_id"
+        ]
+
+        provider_card_id = payment_method["payment_gateway_provider_details"][
+            "payment_method_id"
+        ]
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
+            client=client,
+            stripe_customer_id=provider_account_id,
+            stripe_card_id=provider_card_id,
+            amount=900,
+            merchant_country=CountryCode.AU,
+        )
+        assert cart_payment
 
     def test_payment_provider_error(
         self, stripe_api: StripeAPISettings, client: TestClient
@@ -767,6 +811,7 @@ class TestCartPayment:
             stripe_customer_id=provider_account_id,
             stripe_card_id=provider_card_id,
             amount=900,
+            merchant_country=CountryCode.US,
         )
 
         # Adjustment for case where legacy payment was initially used
@@ -803,4 +848,5 @@ class TestCartPayment:
             stripe_card_id=provider_card_id,
             split_payment=split_payment,
             amount=860,
+            merchant_country=CountryCode.US,
         )

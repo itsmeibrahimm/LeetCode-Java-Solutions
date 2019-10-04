@@ -1,7 +1,12 @@
-import pytest
+import uuid
 from unittest.mock import MagicMock
 
+import pytest
+
+import app.payin.core.cart_payment.processor as processor
 from app.commons.types import CountryCode, Currency
+from app.payin.core.cart_payment.model import CartPayment, IntentStatus
+from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.core.exceptions import (
     CartPaymentReadError,
     PayinErrorCode,
@@ -9,19 +14,15 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
-import app.payin.core.cart_payment.processor as processor
-from app.payin.core.cart_payment.model import IntentStatus, CartPayment
-from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.tests.utils import (
+    FunctionMock,
+    generate_cart_payment,
+    generate_legacy_consumer_charge,
+    generate_legacy_payment,
+    generate_legacy_stripe_charge,
     generate_payment_intent,
     generate_pgp_payment_intent,
-    generate_cart_payment,
-    generate_legacy_payment,
-    generate_legacy_consumer_charge,
-    generate_legacy_stripe_charge,
-    FunctionMock,
 )
-import uuid
 
 
 class TestCartPaymentProcessor:
@@ -166,6 +167,7 @@ class TestCartPaymentProcessor:
         self, cart_payment_processor, request_cart_payment
     ):
         cart_payment_processor._update_state_after_provider_error = FunctionMock()
+        cart_payment_processor._get_payer_from_cart_payment = FunctionMock()
         cart_payment_processor.cart_payment_interface.submit_payment_to_provider = FunctionMock(
             side_effect=Exception()
         )

@@ -5,6 +5,8 @@ from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+from asynctest import create_autospec
+
 from app.commons.types import PgpCode, CountryCode, Currency
 from app.payin.capture.service import CaptureService
 from app.payin.core.cart_payment.processor import (
@@ -13,9 +15,11 @@ from app.payin.core.cart_payment.processor import (
     CartPaymentProcessor,
 )
 from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
+from app.payin.core.payer.model import RawPayer
+from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.types import PgpPaymentMethod
 from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
-from app.payin.tests.utils import FunctionMock, ContextMock
+from app.payin.tests.utils import FunctionMock, ContextMock, generate_payer
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
@@ -632,7 +636,7 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
         app_context=app_context,
         req_context=MagicMock(),
         payment_repo=cart_payment_repo,
-        payer_client=MagicMock(),
+        payer_client=create_autospec(PayerClient),
         payment_method_client=MagicMock(),
         stripe_async_client=stripe_interface,
     )
@@ -682,11 +686,17 @@ def cart_payment_processor(
     cart_payment_interface: CartPaymentInterface,
     legacy_payment_interface: LegacyPaymentInterface,
 ):
-    return CartPaymentProcessor(
+    cart_payment_processor = CartPaymentProcessor(
         log=MagicMock(),
         cart_payment_interface=cart_payment_interface,
         legacy_payment_interface=legacy_payment_interface,
     )
+    raw_payer_mock = create_autospec(RawPayer)
+    raw_payer_mock.to_payer.return_value = generate_payer()
+    cart_payment_processor.cart_payment_interface.payer_client.get_raw_payer.return_value = (  # type: ignore
+        raw_payer_mock
+    )
+    return cart_payment_processor
 
 
 @pytest.fixture

@@ -53,6 +53,7 @@ from app.payin.tests.utils import (
     generate_legacy_consumer_charge,
     generate_legacy_stripe_charge,
     FunctionMock,
+    generate_payer,
 )
 
 
@@ -893,7 +894,9 @@ class TestCartPaymentInterface:
                 "payment_resource_id"
             ),
         )
+        payer = generate_payer()
         response = await cart_payment_interface.submit_payment_to_provider(
+            payer=payer,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
             pgp_payment_method=pgp_payment_method,
@@ -916,7 +919,9 @@ class TestCartPaymentInterface:
                 "payment_resource_id"
             ),
         )
+        payer = generate_payer()
         response = await cart_payment_interface.submit_payment_to_provider(
+            payer=payer,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
             pgp_payment_method=pgp_payment_method,
@@ -941,9 +946,11 @@ class TestCartPaymentInterface:
                 "payment_resource_id"
             ),
         )
+        payer = generate_payer()
 
         with pytest.raises(CartPaymentCreateError) as payment_error:
             await cart_payment_interface.submit_payment_to_provider(
+                payer=payer,
                 payment_intent=intent,
                 pgp_payment_intent=pgp_intent,
                 pgp_payment_method=pgp_payment_method,
@@ -967,7 +974,9 @@ class TestCartPaymentInterface:
                 "payment_resource_id"
             ),
         )
+        payer = generate_payer()
         provider_intent = await cart_payment_interface.submit_payment_to_provider(
+            payer=payer,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
             pgp_payment_method=pgp_payment_method,

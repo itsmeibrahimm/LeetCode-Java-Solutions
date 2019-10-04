@@ -1,7 +1,7 @@
 import uuid
 from asyncio import gather
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from fastapi import Depends
 from stripe.error import InvalidRequestError, StripeError
@@ -18,18 +18,20 @@ from app.commons.context.req_context import (
 )
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
+from app.commons.providers.stripe.constants import STRIPE_PLATFORM_ACCOUNT_IDS
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
+    ClonePaymentMethodRequest,
     ConnectedAccountId,
+    CustomerId,
     PaymentIntent as ProviderPaymentIntent,
+    PaymentMethodId,
     Refund as ProviderRefund,
     StripeCancelPaymentIntentRequest,
     StripeCapturePaymentIntentRequest,
     StripeCreatePaymentIntentRequest,
     StripeRefundChargeRequest,
     TransferData,
-    PaymentMethodId,
-    CustomerId,
 )
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
@@ -54,6 +56,7 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.exceptions import (
     CartPaymentCreateError,
     CartPaymentReadError,
+    CommandoProcessingError,
     InvalidProviderRequestError,
     PayinErrorCode,
     PaymentChargeRefundError,
@@ -63,17 +66,17 @@ from app.payin.core.exceptions import (
     PaymentIntentNotInRequiresCaptureState,
     PaymentIntentRefundError,
     ProviderError,
-    CommandoProcessingError,
 )
 from app.payin.core.legacy.utils import get_country_id_by_code
+from app.payin.core.payer.model import Payer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.payment_method.types import PgpPaymentMethod
 from app.payin.core.types import (
     PayerIdType,
     PaymentMethodIdType,
-    PgpPaymentMethodResourceId,
     PgpPayerResourceId,
+    PgpPaymentMethodResourceId,
 )
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
@@ -676,12 +679,41 @@ class CartPaymentInterface:
     async def submit_payment_to_provider(
         self,
         *,
+        payer: Payer,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         pgp_payment_method: PgpPaymentMethod,
         provider_description: Optional[str],
     ) -> ProviderPaymentIntent:
-        # Call to stripe payment intent API
+        #
+        # If the country for the payment intent does not match the country in which the payer is, then the payment
+        # method needs to be converted into a payment method that can be used in the pgp account for that country as
+        # payment methods are pgp account-specific
+        #
+        pgp_payment_method_resource_id: PaymentMethodId = PaymentMethodId(
+            pgp_payment_method.pgp_payment_method_resource_id
+        )
+        pgp_customer_resource_id: Optional[
+            PgpPayerResourceId
+        ] = pgp_payment_method.pgp_payer_resource_id
+        # TODO(update to use pgp_customer.country when that model exists)
+        if payment_intent.country != CountryCode(payer.country):
+            assert payer.payment_gateway_provider_customers
+            pgp_payment_method_resource_id = (
+                await self.stripe_async_client.clone_payment_method(
+                    request=ClonePaymentMethodRequest(
+                        payment_method=pgp_payment_method_resource_id,
+                        customer=CustomerId(pgp_payment_method.pgp_payer_resource_id),
+                        stripe_account=STRIPE_PLATFORM_ACCOUNT_IDS[
+                            payment_intent.country
+                        ],
+                    ),
+                    country=CountryCode(payer.country),
+                )
+            ).id
+            pgp_customer_resource_id = None
+
+        # Actually create the payment intent
         try:
             intent_request = StripeCreatePaymentIntentRequest(
                 amount=pgp_payment_intent.amount,
@@ -693,10 +725,8 @@ class CartPaymentInterface:
                 # https://stripe.com/docs/api/payment_intents/create#create_payment_intent-confirmation_method
                 confirmation_method="manual",
                 setup_future_usage=self._get_provider_future_usage(payment_intent),
-                payment_method=cast(
-                    PaymentMethodId, pgp_payment_method.pgp_payment_method_resource_id
-                ),
-                customer=cast(CustomerId, pgp_payment_method.pgp_payer_resource_id),
+                payment_method=pgp_payment_method_resource_id,
+                customer=pgp_customer_resource_id,
                 description=provider_description,
                 statement_descriptor=payment_intent.statement_descriptor,
                 metadata=payment_intent.metadata,
@@ -1488,6 +1518,8 @@ class CartPaymentProcessor:
             payment_intents, idempotency_key
         )
 
+        payer = await self._get_payer_from_cart_payment(cart_payment, legacy_payment)
+
         if cart_payment.payer_id:
             assert payment_intents[0].payment_method_id
             pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
@@ -1546,6 +1578,7 @@ class CartPaymentProcessor:
         # Call to provider to create payment on their side, and update state in our system based on the result
         # TODO catch error and update state accordingly: both payment_intent/pgp_payment_intent, and legacy charges
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
+            payer=payer,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             pgp_payment_method=pgp_payment_method,
@@ -2089,9 +2122,12 @@ class CartPaymentProcessor:
                 currency=currency,
             )
 
+        payer = await self._get_payer_from_cart_payment(cart_payment, legacy_payment)
+
         # Call to provider to create payment on their side, and update state in our system based on the result
         try:
             provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
+                payer=payer,
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
                 pgp_payment_method=pgp_payment_method,
@@ -2129,6 +2165,23 @@ class CartPaymentProcessor:
             cart_payment, payment_intent, pgp_payment_intent
         )
         return cart_payment, legacy_consumer_charge.id
+
+    async def _get_payer_from_cart_payment(
+        self, cart_payment: CartPayment, legacy_payment: LegacyPayment
+    ) -> Payer:
+        if cart_payment.payer_id:
+            return (
+                await self.cart_payment_interface.payer_client.get_raw_payer(
+                    payer_id_type=PayerIdType.PAYER_ID, payer_id=cart_payment.payer_id
+                )
+            ).to_payer()
+
+        return (
+            await self.cart_payment_interface.payer_client.get_raw_payer(
+                payer_id_type=PayerIdType.DD_CONSUMER_ID,
+                payer_id=str(legacy_payment.dd_consumer_id),
+            )
+        ).to_payer()
 
 
 # TODO: Decouple CommandoProcessor from CartPaymentProcessor
@@ -2221,7 +2274,10 @@ class CommandoProcessor(CartPaymentProcessor):
             ),
         )
 
+        payer = await self._get_payer_from_cart_payment(cart_payment, legacy_payment)
+
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
+            payer=payer,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             pgp_payment_method=pgp_payment_method,

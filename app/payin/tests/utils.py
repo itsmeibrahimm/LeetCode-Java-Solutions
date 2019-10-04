@@ -1,31 +1,33 @@
+import uuid
 from datetime import datetime
 from typing import Optional
 from unittest.mock import MagicMock
-import uuid
-from app.commons.types import LegacyCountryId, Currency, PgpCode
+
+from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
-    PaymentIntent,
-    PgpPaymentIntent,
     CartPayment,
     CorrelationIds,
-    PaymentCharge,
-    PgpPaymentCharge,
-    LegacyPayment,
     LegacyConsumerCharge,
+    LegacyPayment,
     LegacyStripeCharge,
+    PaymentCharge,
+    PaymentIntent,
+    PgpPaymentCharge,
+    PgpPaymentIntent,
 )
 from app.payin.core.cart_payment.types import (
-    IntentStatus,
-    ChargeStatus,
     CaptureMethod,
-    LegacyStripeChargeStatus,
+    ChargeStatus,
+    IntentStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
+from app.payin.core.payer.model import Payer
 from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.dispute_repo import (
-    StripeDisputeDbEntity,
     ConsumerChargeDbEntity,
+    StripeDisputeDbEntity,
 )
 
 
@@ -63,11 +65,11 @@ def generate_payment_intent(
         amount_received=amount_received,
         application_fee_amount=application_fee_amount,
         capture_method=capture_method,
-        country="US",
+        country=CountryCode.US,
         currency=Currency.USD.value,
         status=IntentStatus(status),
         statement_descriptor="descriptor",
-        payment_method_id=str(uuid.uuid4()),
+        payment_method_id=uuid.uuid4(),
         legacy_consumer_charge_id=legacy_consumer_charge_id,
         created_at=datetime.now(),
         updated_at=datetime.now(),
@@ -109,6 +111,10 @@ def generate_pgp_payment_intent(
         captured_at=None,
         cancelled_at=None,
     )
+
+
+def generate_payer() -> Payer:
+    return Payer(country=CountryCode.US)
 
 
 def generate_cart_payment(
