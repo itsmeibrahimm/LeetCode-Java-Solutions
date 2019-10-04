@@ -221,7 +221,7 @@ def log_query_timing(tracker: "QueryTimingManager", timer: QueryTimer):
     if timer.exception_name:
         database["exception_name"] = timer.exception_name
 
-    log.debug(
+    log.info(
         tracker.message,
         query=timer.calling_function_name,
         latency_ms=round(timer.delta_ms, 3),
@@ -252,7 +252,7 @@ def log_transaction_timing(tracker: "QueryTimingManager", timer: QueryTimer):
     if timer.exception_name:
         database["exception_name"] = timer.exception_name
 
-    log.debug(
+    log.info(
         tracker.message,
         transaction=timer.calling_function_name,
         latency_ms=round(timer.delta_ms, 3),
