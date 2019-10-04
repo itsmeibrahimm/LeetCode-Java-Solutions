@@ -8,7 +8,7 @@ service_env:
 secret_sources:
   - payment-service-pulse
 
-users: "10"
+users: "100"
 hatch_rate: "10"
-run_time: "10m"
+run_time: "2m"
 target_host: "http://payment-service-web.payment-service.svc.cluster.local"
