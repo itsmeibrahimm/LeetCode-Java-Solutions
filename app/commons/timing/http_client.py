@@ -74,7 +74,7 @@ def log_http_client_timing(
     if timer.exception_name:
         context["exception_name"] = timer.exception_name
 
-    log.info(
+    log.debug(
         "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
     )
 
@@ -179,7 +179,7 @@ class StripeClientTracker(HttpClientTracker):
         if isinstance(
             # known timeout errors
             exc_value,
-            (requests.Timeout),
+            requests.Timeout,
         ):
             self.request_status = RequestStatus.timeout
         else:
