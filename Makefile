@@ -65,6 +65,11 @@ local-server: local-dependency
 local-dependency:
 	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock
 
+.PHONY: migrate
+migrate:
+	ENVIRONMENT=local python -m development.update_db_schemas && \
+	ENVIRONMENT=testing python -m development.update_db_schemas
+
 .PHONY: test
 test: test-lint test-typing local-dependency test-unit test-external test-integration
 
