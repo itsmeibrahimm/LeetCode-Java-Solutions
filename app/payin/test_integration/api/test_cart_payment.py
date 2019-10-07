@@ -206,6 +206,28 @@ class TestCartPayment:
         request_body["idempotency_key"] = idempotency
         return request_body
 
+    def _get_legacy_cart_payment_update_request(
+        self,
+        cart_payment: Dict[str, Any],
+        amount: int,
+        client_description: str,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        request_body = {
+            "amount": amount,
+            "client_description": client_description,
+            "dd_additional_payment_info": {
+                "place_tag2": "place tag two",
+                "application_fee": "90",
+                "destination": "test_acct",
+                "extra items": "churro",
+            },
+        }
+
+        idempotency = idempotency_key if idempotency_key else str(uuid.uuid4())
+        request_body["idempotency_key"] = idempotency
+        return request_body
+
     def _test_cart_payment_legacy_payment_creation(
         self,
         client: TestClient,
@@ -361,7 +383,7 @@ class TestCartPayment:
         amount: int,
         original_amount: int,
     ) -> None:
-        request_body = self._get_cart_payment_update_request(
+        request_body = self._get_legacy_cart_payment_update_request(
             cart_payment=cart_payment,
             amount=amount,
             client_description=f"{cart_payment['client_description']}-updated",

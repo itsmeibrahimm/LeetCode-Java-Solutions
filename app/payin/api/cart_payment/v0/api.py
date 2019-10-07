@@ -112,9 +112,7 @@ async def update_cart_payment(
         payer_id=None,
         amount=cart_payment_request.amount,
         client_description=cart_payment_request.client_description,
-        request_legacy_payment=get_legacy_payment_model(
-            cart_payment_request.legacy_payment
-        ),
+        dd_additional_payment_info=cart_payment_request.dd_additional_payment_info,
     )
     log.info(f"Updated cart_payment {cart_payment.id} for legacy charge {dd_charge_id}")
     return cart_payment

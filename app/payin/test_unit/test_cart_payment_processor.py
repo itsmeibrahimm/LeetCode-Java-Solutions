@@ -471,7 +471,7 @@ class TestCartPaymentProcessor:
             payer_id=None,
             amount=150,
             client_description=client_description,
-            request_legacy_payment=legacy_payment,
+            dd_additional_payment_info=legacy_payment.dd_additional_payment_info,
         )
         assert result
         assert result.amount == cart_payment.amount + 150
@@ -492,7 +492,7 @@ class TestCartPaymentProcessor:
                 payer_id=None,
                 amount=1500,
                 client_description="description",
-                request_legacy_payment=None,
+                dd_additional_payment_info=None,
             )
         assert (
             payment_error.value.error_code

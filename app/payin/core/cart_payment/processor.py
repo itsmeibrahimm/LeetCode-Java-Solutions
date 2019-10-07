@@ -1699,27 +1699,24 @@ class CartPaymentProcessor:
         payer_id: Optional[str],
         amount: int,
         client_description: Optional[str],
-        request_legacy_payment: Optional[LegacyPayment],
+        dd_additional_payment_info: Optional[Dict[str, Any]],
     ) -> CartPayment:
         """Update an existing payment associated with a legacy consumer charge.
 
         Arguments:
-            payment_method_repo {PaymentMethodRepository} -- Repo for accessing PaymentMethod and associated models.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             dd_charge_id {int} -- ID of the legacy consumer charge associated with the cart payment to adjust.
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             amount {int} -- Delta amount to add to the cart payment amount.  May be negative to reduce amount.
             client_description {Optional[str]} -- New client description to use for cart payment.
-            request_legacy_payment: {Optional[LegacyPayment]} -- Optional legacy payment info containing additional_payment_info to use for legacy charge writes.
+            dd_additional_payment_info: {Optional[Dict[str, Any]]} -- Optional legacy payment additional_payment_info to use for legacy charge writes.
 
         Raises:
-            CartPaymentReadError: [description]
-            CartPaymentReadError: [description]
-            PaymentIntentNotInRequiresCaptureState: [description]
-            PaymentIntentConcurrentAccessError: [description]
+            CartPaymentReadError: If there is no cart paymetn associated with the provided dd_charge_id.
+            PaymentIntentConcurrentAccessError: If another request or process has modified the associated intent state.
 
         Returns:
-            CartPayment -- [description]
+            CartPayment -- The updated cart payment representation.
         """
         cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(
             dd_charge_id
@@ -1746,10 +1743,8 @@ class CartPaymentProcessor:
             )
 
         # Clients may update additional_payment_info.
-        if request_legacy_payment and request_legacy_payment.dd_additional_payment_info:
-            legacy_payment.dd_additional_payment_info = (
-                request_legacy_payment.dd_additional_payment_info
-            )
+        if dd_additional_payment_info:
+            legacy_payment.dd_additional_payment_info = dd_additional_payment_info
 
         # Amount is a delta.
         new_amount = cart_payment.amount + amount

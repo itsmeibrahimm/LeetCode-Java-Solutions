@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional
+
 from app.commons.types import CountryCode
 from app.payin.api.cart_payment.base.request import (
     CreateCartPaymentBaseRequest,
@@ -15,4 +17,4 @@ class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):
 
 class UpdateCartPaymentLegacyRequest(UpdateCartPaymentBaseRequest):
     amount: int  # Amount is overridden here to allow negative values as for v0 it is a delta
-    legacy_payment: LegacyPaymentInfo
+    dd_additional_payment_info: Optional[Dict[str, Any]] = None
