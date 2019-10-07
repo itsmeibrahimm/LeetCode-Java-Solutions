@@ -5,6 +5,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_404_NOT_FOUND,
 )
 from structlog.stdlib import BoundLogger
 
@@ -92,6 +93,7 @@ async def create_cart_payment_for_legacy_client(
     responses={
         HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
         HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
     },
     tags=api_tags,
@@ -106,14 +108,28 @@ async def update_cart_payment(
     log.info(
         f"Updating cart_payment associated with legacy consumer charge {dd_charge_id}"
     )
-    cart_payment: CartPayment = await cart_payment_processor.update_payment_for_legacy_charge(
-        idempotency_key=cart_payment_request.idempotency_key,
-        dd_charge_id=dd_charge_id,
-        payer_id=None,
-        amount=cart_payment_request.amount,
-        client_description=cart_payment_request.client_description,
-        dd_additional_payment_info=cart_payment_request.dd_additional_payment_info,
-    )
+    try:
+        cart_payment: CartPayment = await cart_payment_processor.update_payment_for_legacy_charge(
+            idempotency_key=cart_payment_request.idempotency_key,
+            dd_charge_id=dd_charge_id,
+            payer_id=None,
+            amount=cart_payment_request.amount,
+            client_description=cart_payment_request.client_description,
+            dd_additional_payment_info=cart_payment_request.dd_additional_payment_info,
+        )
+    except PaymentError as payment_error:
+        http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
+        if payment_error.error_code == PayinErrorCode.CART_PAYMENT_NOT_FOUND:
+            http_status_code = HTTP_404_NOT_FOUND
+        elif payment_error.error_code == PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH:
+            http_status_code = HTTP_403_FORBIDDEN
+
+        raise PaymentException(
+            http_status_code=http_status_code,
+            error_code=payment_error.error_code,
+            error_message=payment_error.error_message,
+            retryable=payment_error.retryable,
+        )
     log.info(f"Updated cart_payment {cart_payment.id} for legacy charge {dd_charge_id}")
     return cart_payment
 
