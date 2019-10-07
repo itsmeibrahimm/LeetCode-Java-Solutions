@@ -131,7 +131,7 @@ class TestServiceMetricsMiddleware:
         tags = event.tags.copy()
         container = tags.pop("container", None)
         assert container is not None, "container hostname is set"
-        assert tags == dict(), "no additional tags are present"
+        assert tags == {}, "no additional tags are present"
 
     def test_additional_tags(self, get_mock_statsd_events, mocker: MockFixture):
         app = mocker.Mock()  # typing: disable

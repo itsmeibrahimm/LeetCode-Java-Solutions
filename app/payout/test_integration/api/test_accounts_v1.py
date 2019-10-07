@@ -156,10 +156,6 @@ class TestAccountV1:
         assert verified_account["pgp_external_account_id"]
         return verified_account
 
-    def test_invalid(self, client: TestClient):
-        response = client.get(ACCOUNT_ENDPOINT + "/")
-        assert response.status_code == 405, "accessing accounts requires an id"
-
     def test_get_payout_account(self, client: TestClient, payout_account: dict):
         response = client.get(get_account_by_id_url(payout_account["id"]))
         assert response.status_code == 200

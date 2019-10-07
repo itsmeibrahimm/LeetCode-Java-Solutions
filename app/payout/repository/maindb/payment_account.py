@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, asc
 from typing_extensions import final
@@ -25,6 +25,12 @@ from app.payout.types import AccountType
 
 
 class PaymentAccountRepositoryInterface(ABC):
+    @abstractmethod
+    async def get_all_payment_accounts(
+        self, offset: int, limit: int
+    ) -> List[PaymentAccount]:
+        pass
+
     @abstractmethod
     async def create_payment_account(
         self, data: PaymentAccountCreate
@@ -53,6 +59,12 @@ class PaymentAccountRepositoryInterface(ABC):
     async def get_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int
     ) -> Optional[StripeManagedAccount]:
+        pass
+
+    @abstractmethod
+    async def get_stripe_managed_account_by_ids(
+        self, stripe_managed_account_ids: List[int]
+    ) -> Dict[int, StripeManagedAccount]:
         pass
 
     @abstractmethod
@@ -87,6 +99,23 @@ class PaymentAccountRepository(
 ):
     def __init__(self, database: DB):
         super().__init__(_database=database)
+
+    async def delete_all_payment_accounts(self) -> None:
+        stmt = payment_accounts.table.delete()
+        await self._database.master().execute(stmt)
+
+    async def get_all_payment_accounts(
+        self, offset: int, limit: int
+    ) -> List[PaymentAccount]:
+        stmt = (
+            payment_accounts.table.select()
+            .order_by(asc(payment_accounts.id))
+            .offset(offset)
+            .limit(limit)
+        )
+
+        rows = await self._database.replica().fetch_all(stmt)
+        return [PaymentAccount.from_row(row) for row in rows]
 
     async def create_payment_account(
         self, data: PaymentAccountCreate
@@ -149,12 +178,28 @@ class PaymentAccountRepository(
     async def get_stripe_managed_account_by_id(
         self, stripe_managed_account_id: int
     ) -> Optional[StripeManagedAccount]:
-        stmt = stripe_managed_accounts.table.select().where(
-            stripe_managed_accounts.id == stripe_managed_account_id
+        accounts = await self.get_stripe_managed_account_by_ids(
+            [stripe_managed_account_id]
         )
+        return accounts.get(stripe_managed_account_id, None)
 
-        row = await self._database.replica().fetch_one(stmt)
-        return StripeManagedAccount.from_row(row) if row else None
+    async def get_stripe_managed_account_by_ids(
+        self, stripe_managed_account_ids: List[int]
+    ) -> Dict[int, StripeManagedAccount]:
+        if len(stripe_managed_account_ids) <= 0:
+            return {}
+
+        stmt = stripe_managed_accounts.table.select().where(
+            stripe_managed_accounts.id.in_(stripe_managed_account_ids)
+        )
+        rows = await self._database.replica().fetch_all(stmt)
+
+        result: Dict[int, StripeManagedAccount] = {}
+        for row in rows:
+            account = StripeManagedAccount.from_row(row)
+            result[account.id] = account
+
+        return result
 
     async def get_last_stripe_managed_account_and_count_by_stripe_id(
         self, stripe_id: str

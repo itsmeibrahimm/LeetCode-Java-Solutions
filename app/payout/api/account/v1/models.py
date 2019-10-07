@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, Currency
@@ -51,6 +51,11 @@ class PayoutAccount(PaymentResponse):
     pgp_external_account_id: Optional[PgpExternalAccountId]
     verification_requirements: Optional[VerificationRequirements]
     # todo: add payout_methods, payout_schedule
+
+
+class PayoutAccountStream(PaymentResponse):
+    cursor: Optional[str]
+    items: List[PayoutAccount]
 
 
 class VerificationDetails(PaymentRequest):

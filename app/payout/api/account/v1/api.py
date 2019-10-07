@@ -6,13 +6,15 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
+from typing import Optional
 
 from app.commons.providers.stripe.stripe_models import TransferId
 from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
+from app.commons.api.streams import decode_stream_cursor, encode_stream_cursor
 from app.commons.context.req_context import get_logger_from_req
 from app.payout.api.account.utils import to_external_payout_account
-from app.payout.api.account.v1.models import PayoutMethodList
+from app.payout.api.account.v1 import models
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.account.processors.cancel_payout import CancelPayoutRequest
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
@@ -24,6 +26,9 @@ from app.payout.core.account.processors.create_payout_method import (
 )
 from app.payout.core.account.processors.create_standard_payout import (
     CreateStandardPayoutRequest,
+)
+from app.payout.core.account.processors.get_account_stream import (
+    GetPayoutAccountStreamRequest,
 )
 from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
@@ -45,10 +50,46 @@ from app.payout.types import (
     PayoutTargetType,
     PayoutExternalAccountType,
 )
-from . import models
 
 api_tags = ["AccountsV1"]
 router = APIRouter()
+
+
+@router.get(
+    "/",
+    operation_id="GetPayoutAccountStream",
+    status_code=HTTP_200_OK,
+    response_model=models.PayoutAccountStream,
+    responses={
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def get_payout_account_stream(
+    log: BoundLogger = Depends(get_logger_from_req),
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+    cursor: dict = Depends(decode_stream_cursor),
+    limit: int = 10,
+):
+    log.info("getting payout account stream", extra={"cursor": cursor, "limit": limit})
+
+    offset = cursor.get("offset", 0)
+    request = GetPayoutAccountStreamRequest(offset=offset, limit=limit)
+
+    stream = await payout_account_processors.get_payout_account_stream(request=request)
+
+    items = [to_external_payout_account(account) for account in stream.items]
+
+    next_cursor: Optional[dict] = None
+    if stream.new_offset:
+        next_cursor = {"offset": stream.new_offset}
+
+    return models.PayoutAccountStream(
+        cursor=encode_stream_cursor(next_cursor), items=items
+    )
 
 
 @router.post(
@@ -66,8 +107,7 @@ async def create_payout_account(
     ),
     log: BoundLogger = Depends(get_logger_from_req),
 ):
-
-    log.debug(f"Creating payment_account for {body}.")
+    log.debug("creating payment_account", extra=dict(body=body))
     internal_request = CreatePayoutAccountRequest(
         entity=body.target_type, statement_descriptor=body.statement_descriptor
     )
@@ -254,7 +294,7 @@ async def list_payout_method(
                 **card_internal.dict(), type=PayoutExternalAccountType.CARD
             )
         )
-    return PayoutMethodList(
+    return models.PayoutMethodList(
         card_list=payout_method_card_list, count=len(payout_method_card_list)
     )
 

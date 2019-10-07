@@ -30,6 +30,11 @@ from app.payout.core.account.processors.get_account import (
     PayoutAccountInternal,
     GetPayoutAccount,
 )
+from app.payout.core.account.processors.get_account_stream import (
+    GetPayoutAccountStreamRequest,
+    GetPayoutAccountStreamResponse,
+    GetPayoutAccountStream,
+)
 from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
     GetDefaultPayoutCard,
@@ -114,6 +119,16 @@ class PayoutAccountProcessors:
         self.managed_account_transfer_repo = managed_account_transfer_repo
         self.payout_card_repo = payout_card_repo
         self.payout_method_repo = payout_method_repo
+
+    async def get_payout_account_stream(
+        self, request: GetPayoutAccountStreamRequest
+    ) -> GetPayoutAccountStreamResponse:
+        get_account_stream_op = GetPayoutAccountStream(
+            logger=self.logger,
+            payment_account_repo=self.payment_account_repo,
+            request=request,
+        )
+        return await get_account_stream_op.execute()
 
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
