@@ -106,7 +106,7 @@ Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddo
 
 ### Python environment
 
-1. Install python specified in `Pipefile.lock` (v3.7) through [pyenv](https://github.com/pyenv/pyenv) and [pipenv](https://github.com/pypa/pipenv) into a newly created python virtual environment.
+1. Install python specified in `Pipfile.lock` (v3.7) through [pyenv](https://github.com/pyenv/pyenv) and [pipenv](https://github.com/pypa/pipenv) into a newly created python virtual environment.
 
    ```bash
    brew install pyenv pipenv
