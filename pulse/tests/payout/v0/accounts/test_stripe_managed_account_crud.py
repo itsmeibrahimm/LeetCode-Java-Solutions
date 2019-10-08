@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Dict, Any
 
 import payout_v0_client
 import pytest
@@ -8,7 +9,6 @@ from payout_v0_client import (
     StripeManagedAccountUpdate,
     ApiException,
 )
-
 from tests.payout.v0.client_operations import (
     create_stripe_managed_account,
     get_stripe_managed_account_by_id,
@@ -71,7 +71,7 @@ class TestStripeManagedAccount:
         # Update not null field (use fingerprint here) should succeed
         # Need to construct a dict in order to pass None value to client
         assert updated_stripe_managed_account.fingerprint is not None
-        sma_update = {"fingerprint": None}
+        sma_update: Dict[str, Any] = {"fingerprint": None}
         updated_stripe_managed_account, status, _ = accounts_api.update_stripe_managed_account_by_id_with_http_info(
             retrieved_stripe_managed_account.id, sma_update
         )
@@ -125,7 +125,7 @@ class TestStripeManagedAccount:
         assert created_account.verification_fields_needed is None
 
         # Update verification_fields_needed to []
-        sma_update = {"verification_fields_needed": []}
+        sma_update: Dict[str, Any] = {"verification_fields_needed": []}
         updated_stripe_managed_account, status, _ = accounts_api.update_stripe_managed_account_by_id_with_http_info(
             created_account.id, sma_update
         )

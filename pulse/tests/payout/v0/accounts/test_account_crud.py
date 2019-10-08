@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+from typing import Dict, Any
 
 import payout_v0_client
 import pytest
@@ -72,7 +73,7 @@ class TestPaymentAccount:
 
         # Update not null field (use entity here) should succeed
         # Need to construct a dict in order to pass None value to client
-        payment_account_update = {"entity": None}
+        payment_account_update: Dict[str, Any] = {"entity": None}
         updated_payment_account, status, _ = accounts_api.update_payment_account_by_id_with_http_info(
             retrieved_payment_account.id, payment_account_update
         )
