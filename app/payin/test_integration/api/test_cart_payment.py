@@ -7,6 +7,7 @@ from typing import Any, Optional, Dict
 
 from app.commons.context.app_context import AppContext
 from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
+from app.commons.providers.stripe.stripe_models import Customer as StripeCustomer
 from app.commons.types import CountryCode
 from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
 
@@ -810,28 +811,16 @@ class TestCartPayment:
     def test_legacy_payment(
         self,
         stripe_api: StripeAPISettings,
+        stripe_customer: StripeCustomer,
         client: TestClient,
-        payer: Dict[str, Any],
-        payment_method: Dict[str, Any],
     ):
         stripe_api.enable_outbound()
-
-        # Use payer, payment method api calls to seed data into legacy table.  It would be better to
-        # create directly in legacy system without creating corresponding records in the new tables since
-        # that is a more realistic case, but there is not yet an easy way to set this up.
-        provider_account_id = payer["payment_gateway_provider_customers"][0][
-            "payment_provider_customer_id"
-        ]
-
-        provider_card_id = payment_method["payment_gateway_provider_details"][
-            "payment_method_id"
-        ]
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
         cart_payment = self._test_cart_payment_legacy_payment_creation(
             client=client,
-            stripe_customer_id=provider_account_id,
-            stripe_card_id=provider_card_id,
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_mastercard",
             amount=900,
             merchant_country=CountryCode.US,
         )
@@ -866,8 +855,8 @@ class TestCartPayment:
         }
         cart_payment = self._test_cart_payment_legacy_payment_creation(
             client=client,
-            stripe_customer_id=provider_account_id,
-            stripe_card_id=provider_card_id,
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_mastercard",
             split_payment=split_payment,
             amount=860,
             merchant_country=CountryCode.US,

@@ -1,11 +1,8 @@
 import random
 from typing import Any, Dict
 
-import pytest
 from starlette.testclient import TestClient
 
-from app.commons.config.app_config import AppConfig
-from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.payin.test_integration.integration_utils import (
     create_payer_v1,
@@ -31,18 +28,6 @@ def _get_payment_methods_v1(
 
 
 class TestPaymentMethodsV1:
-    @pytest.fixture
-    def stripe_client(self, stripe_api, app_config: AppConfig):
-        stripe_api.enable_outbound()
-
-        return StripeTestClient(
-            [
-                models.StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ]
-        )
-
     def test_create_get_delete_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):

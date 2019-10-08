@@ -58,7 +58,8 @@ async def create_cart_payment_for_legacy_client(
                 cart_payment_request.legacy_payment
             ),
             idempotency_key=cart_payment_request.idempotency_key,
-            country=cart_payment_request.payment_country,
+            payment_country=cart_payment_request.payment_country,
+            payer_country=cart_payment_request.payer_country,
             currency=cart_payment_request.currency,
         )
 

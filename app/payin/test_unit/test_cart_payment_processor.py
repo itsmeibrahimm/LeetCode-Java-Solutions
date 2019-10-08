@@ -81,7 +81,7 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
-                country=CountryCode.US,
+                payment_country=CountryCode.US,
                 currency=Currency.USD,
             )
         assert (
@@ -126,7 +126,7 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
-                country=CountryCode.US,
+                payment_country=CountryCode.US,
                 currency=Currency.USD,
             )
         assert (
@@ -151,7 +151,7 @@ class TestCartPaymentProcessor:
         result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
-            country=CountryCode.US,
+            payment_country=CountryCode.US,
             currency=Currency.USD,
         )
         assert result_cart_payment
@@ -176,7 +176,7 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
-                country=CountryCode.US,
+                payment_country=CountryCode.US,
                 currency=Currency.USD,
             )
 
@@ -192,7 +192,7 @@ class TestCartPaymentProcessor:
         result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
-            country=CountryCode.US,
+            payment_country=CountryCode.US,
             currency=Currency.USD,
         )
         assert result_cart_payment
@@ -223,7 +223,7 @@ class TestCartPaymentProcessor:
         result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
-            country=CountryCode.US,
+            payment_country=CountryCode.US,
             currency=Currency.USD,
         )
         assert result_cart_payment
@@ -236,7 +236,7 @@ class TestCartPaymentProcessor:
         second_result_cart_payment = await cart_payment_processor.create_payment(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
-            country=CountryCode.US,
+            payment_country=CountryCode.US,
             currency=Currency.USD,
         )
         assert second_result_cart_payment

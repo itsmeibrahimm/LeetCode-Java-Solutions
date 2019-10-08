@@ -1,15 +1,11 @@
 import random
 from typing import Optional, Any, Dict
 
-import pytest
 from pydantic import BaseModel
 from starlette.testclient import TestClient
 
-from app.commons.config.app_config import AppConfig
-from app.commons.providers.stripe import stripe_models as models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.providers.stripe.stripe_models import CustomerId, Customer
-from app.commons.types import CountryCode
 from app.payin.test_integration.integration_utils import (
     create_payer_v1,
     CreatePayerV1Request,
@@ -95,26 +91,6 @@ def _get_payer_failure_v1(
 
 
 class TestPayersV0:
-    @pytest.fixture
-    def stripe_client(self, stripe_api, app_config: AppConfig):
-        stripe_api.enable_outbound()
-
-        return StripeTestClient(
-            [
-                models.StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ]
-        )
-
-    @pytest.fixture
-    def stripe_customer(self, stripe_client: StripeTestClient) -> Customer:
-        request = models.StripeCreateCustomerRequest(
-            email="test@dd.com", description="test account"
-        )
-
-        return stripe_client.create_customer(request=request, country=CountryCode.US)
-
     def test_create_and_get_payer_by_stripe_customer_id(
         self, client: TestClient, stripe_client: StripeTestClient
     ):

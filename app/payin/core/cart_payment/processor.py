@@ -67,7 +67,7 @@ from app.payin.core.exceptions import (
     PaymentIntentRefundError,
     ProviderError,
 )
-from app.payin.core.legacy.utils import get_country_id_by_code
+from app.payin.core.legacy.utils import get_country_id_by_code, get_country_code_by_id
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
@@ -679,7 +679,7 @@ class CartPaymentInterface:
     async def submit_payment_to_provider(
         self,
         *,
-        payer: Payer,
+        payer_country: CountryCode,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         pgp_payment_method: PgpPaymentMethod,
@@ -697,8 +697,7 @@ class CartPaymentInterface:
             PgpPayerResourceId
         ] = pgp_payment_method.pgp_payer_resource_id
         # TODO(update to use pgp_customer.country when that model exists)
-        if payment_intent.country != CountryCode(payer.country):
-            assert payer.payment_gateway_provider_customers
+        if payment_intent.country != payer_country:
             pgp_payment_method_resource_id = (
                 await self.stripe_async_client.clone_payment_method(
                     request=ClonePaymentMethodRequest(
@@ -708,7 +707,7 @@ class CartPaymentInterface:
                             payment_intent.country
                         ],
                     ),
-                    country=CountryCode(payer.country),
+                    country=payer_country,
                 )
             ).id
             pgp_customer_resource_id = None
@@ -1508,6 +1507,7 @@ class CartPaymentProcessor:
         cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
         idempotency_key: str,
+        payer_country: CountryCode,
         amount: int,
         description: Optional[str],
     ):
@@ -1517,8 +1517,6 @@ class CartPaymentProcessor:
         existing_payment_intent = self.cart_payment_interface.filter_payment_intents_by_idempotency_key(
             payment_intents, idempotency_key
         )
-
-        payer = await self._get_payer_from_cart_payment(cart_payment, legacy_payment)
 
         if cart_payment.payer_id:
             assert payment_intents[0].payment_method_id
@@ -1578,7 +1576,7 @@ class CartPaymentProcessor:
         # Call to provider to create payment on their side, and update state in our system based on the result
         # TODO catch error and update state accordingly: both payment_intent/pgp_payment_intent, and legacy charges
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
-            payer=payer,
+            payer_country=payer_country,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             pgp_payment_method=pgp_payment_method,
@@ -1742,6 +1740,20 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
             )
 
+        legacy_consumer_charge, legacy_stripe_charge = await self.legacy_payment_interface.find_existing_payment_charge(
+            charge_id=dd_charge_id
+        )
+        if not legacy_consumer_charge:
+            self.log.error(
+                "Failed to find legacy consumer charge for charge id",
+                dd_charge_id=dd_charge_id,
+            )
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+            )
+
+        payer_country_code = get_country_code_by_id(legacy_consumer_charge.country_id)
+
         # Clients may update additional_payment_info.
         if dd_additional_payment_info:
             legacy_payment.dd_additional_payment_info = dd_additional_payment_info
@@ -1753,7 +1765,8 @@ class CartPaymentProcessor:
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
-            payer_id=None,  # Not currently used in update_payment
+            payer_id=None,
+            payer_country=payer_country_code,
             amount=new_amount,
             client_description=client_description,
         )
@@ -1776,11 +1789,21 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
             )
 
+        if not cart_payment.payer_id:
+            self.log.error(
+                "Cart payment missing payer id", cart_payment_id=cart_payment.id
+            )
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
+            )
+        payer = await self.get_payer_by_id(cart_payment.payer_id)
+
         return await self._update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
             payer_id=payer_id,
+            payer_country=CountryCode(payer.country),
             amount=amount,
             client_description=client_description,
         )
@@ -1791,6 +1814,7 @@ class CartPaymentProcessor:
         cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
         payer_id: Optional[uuid.UUID],
+        payer_country: CountryCode,
         amount: int,
         client_description: Optional[str],
     ) -> CartPayment:
@@ -1802,6 +1826,7 @@ class CartPaymentProcessor:
             cart_payment {CartPayment} -- Existing cart payment.
             legacy_payment {LegacyPayment} -- Legacy payment associated with cart payment.
             payer_id {str} -- ID of the payer who owns the specified cart payment.
+            payer_country {CountryCode} -- The CountryCode of the payer whose payment is being modified.
             amount {int} -- New amount to use for cart payment.
             client_description {Optional[str]} -- New client description to use for cart payment.
             request_legacy_payment: {Optional[LegacyPayment]} -- Optional legacy payment info containing additional_payment_info to use for legacy charge writes.
@@ -1827,6 +1852,7 @@ class CartPaymentProcessor:
                 cart_payment=cart_payment,
                 legacy_payment=legacy_payment,
                 idempotency_key=idempotency_key,
+                payer_country=payer_country,
                 amount=amount,
                 description=client_description,
             )
@@ -1974,7 +2000,8 @@ class CartPaymentProcessor:
         request_cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
         idempotency_key: str,
-        country: CountryCode,
+        payment_country: CountryCode,
+        payer_country: CountryCode,
         currency: Currency,
     ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
@@ -1985,7 +2012,8 @@ class CartPaymentProcessor:
             pgp_payment_method=pgp_payment_method,
             legacy_payment=legacy_payment,
             idempotency_key=idempotency_key,
-            country=country,
+            payment_country=payment_country,
+            payer_country=payer_country,
             currency=currency,
         )
 
@@ -1993,7 +2021,7 @@ class CartPaymentProcessor:
         self,
         request_cart_payment: CartPayment,
         idempotency_key: str,
-        country: CountryCode,
+        payment_country: CountryCode,
         currency: Currency,
     ) -> CartPayment:
         assert request_cart_payment.payer_id
@@ -2001,14 +2029,16 @@ class CartPaymentProcessor:
         pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
             payer_id=request_cart_payment.payer_id,
             payment_method_id=request_cart_payment.payment_method_id,
-            legacy_country_id=get_country_id_by_code(country),
+            legacy_country_id=get_country_id_by_code(payment_country),
         )
+        payer = await self.get_payer_by_id(payer_id=request_cart_payment.payer_id)
         cart_payment, _ = await self._create_payment(
             request_cart_payment=request_cart_payment,
             pgp_payment_method=pgp_payment_method,
             legacy_payment=legacy_payment,
             idempotency_key=idempotency_key,
-            country=country,
+            payment_country=payment_country,
+            payer_country=CountryCode(payer.country),
             currency=currency,
         )
         return cart_payment
@@ -2019,7 +2049,8 @@ class CartPaymentProcessor:
         pgp_payment_method: PgpPaymentMethod,
         legacy_payment: LegacyPayment,
         idempotency_key: str,
-        country: CountryCode,
+        payment_country: CountryCode,
+        payer_country: CountryCode,
         currency: Currency,
     ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
         """Submit a cart payment creation request.
@@ -2028,7 +2059,8 @@ class CartPaymentProcessor:
             request_cart_payment {CartPayment} -- CartPayment model containing request parameters provided by client.
             request_legacy_payment {LegacyPayment} -- LegacyPayment model containing legacy fields.  For v0 use only.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
-            country {CountryCode} -- ISO country code.
+            payment_country {CountryCode} -- ISO country code for payment
+            payer_country {CountryCode} -- ISO country code for the payer who the payment is being created for.
             currency {Currency} -- Currency for cart payment request.
 
         Returns:
@@ -2090,7 +2122,7 @@ class CartPaymentProcessor:
                 legacy_payment=legacy_payment,
                 correlation_ids=request_cart_payment.correlation_ids,
                 idempotency_key=idempotency_key,
-                country=country,
+                country=payment_country,
                 currency=currency,
             )
             legacy_consumer_charge_id = legacy_consumer_charge.id
@@ -2113,16 +2145,14 @@ class CartPaymentProcessor:
                 provider_customer_resource_id=pgp_payment_method.pgp_payer_resource_id,
                 provider_metadata=provider_metadata,
                 idempotency_key=idempotency_key,
-                country=country,
+                country=payment_country,
                 currency=currency,
             )
-
-        payer = await self._get_payer_from_cart_payment(cart_payment, legacy_payment)
 
         # Call to provider to create payment on their side, and update state in our system based on the result
         try:
             provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
-                payer=payer,
+                payer_country=payer_country,
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
                 pgp_payment_method=pgp_payment_method,
@@ -2161,20 +2191,10 @@ class CartPaymentProcessor:
         )
         return cart_payment, legacy_consumer_charge.id
 
-    async def _get_payer_from_cart_payment(
-        self, cart_payment: CartPayment, legacy_payment: LegacyPayment
-    ) -> Payer:
-        if cart_payment.payer_id:
-            return (
-                await self.cart_payment_interface.payer_client.get_raw_payer(
-                    payer_id_type=PayerIdType.PAYER_ID, payer_id=cart_payment.payer_id
-                )
-            ).to_payer()
-
+    async def get_payer_by_id(self, payer_id: uuid.UUID) -> Payer:
         return (
             await self.cart_payment_interface.payer_client.get_raw_payer(
-                payer_id_type=PayerIdType.DD_CONSUMER_ID,
-                payer_id=str(legacy_payment.dd_consumer_id),
+                payer_id_type=PayerIdType.PAYER_ID, payer_id=payer_id
             )
         ).to_payer()
 
@@ -2269,10 +2289,14 @@ class CommandoProcessor(CartPaymentProcessor):
             ),
         )
 
-        payer = await self._get_payer_from_cart_payment(cart_payment, legacy_payment)
+        if cart_payment.payer_id:
+            payer = await self.get_payer_by_id(cart_payment.payer_id)
+            payer_country = CountryCode(payer.country)
+        else:
+            payer_country = get_country_code_by_id(legacy_consumer_charge.country_id)
 
         provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
-            payer=payer,
+            payer_country=payer_country,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             pgp_payment_method=pgp_payment_method,
