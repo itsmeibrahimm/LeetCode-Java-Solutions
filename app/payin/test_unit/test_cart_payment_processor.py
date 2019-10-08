@@ -5,7 +5,7 @@ import pytest
 
 import app.payin.core.cart_payment.processor as processor
 from app.commons.types import CountryCode, Currency
-from app.payin.core.cart_payment.model import CartPayment, IntentStatus
+from app.payin.core.cart_payment.model import CartPayment, IntentStatus, SplitPayment
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.core.exceptions import (
     CartPaymentReadError,
@@ -255,6 +255,7 @@ class TestCartPaymentProcessor:
                 payer_id="payer_id",
                 amount=500,
                 client_description=None,
+                split_payment=None,
             )
         assert (
             payment_error.value.error_code
@@ -271,6 +272,9 @@ class TestCartPaymentProcessor:
             payer_id=cart_payment.payer_id,
             amount=updated_amount,
             client_description=None,
+            split_payment=SplitPayment(
+                payout_account_id="test_merchant", application_fee_amount=20
+            ),
         )
         assert result
         assert result.id == cart_payment.id
@@ -306,6 +310,7 @@ class TestCartPaymentProcessor:
             payer_id=cart_payment.payer_id,
             amount=updated_amount,
             client_description=None,
+            split_payment=None,
         )
         assert result
         assert result.id == cart_payment.id
@@ -472,6 +477,7 @@ class TestCartPaymentProcessor:
             amount=150,
             client_description=client_description,
             dd_additional_payment_info=legacy_payment.dd_additional_payment_info,
+            split_payment=None,
         )
         assert result
         assert result.amount == cart_payment.amount + 150
@@ -493,6 +499,7 @@ class TestCartPaymentProcessor:
                 amount=1500,
                 client_description="description",
                 dd_additional_payment_info=None,
+                split_payment=None,
             )
         assert (
             payment_error.value.error_code

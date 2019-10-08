@@ -806,7 +806,7 @@ class TestCartPaymentInterface:
         cart_payment = generate_cart_payment()
         capture_after = datetime.utcnow()
         result_intent, result_pgp_intent = await cart_payment_interface._create_new_intent_pair(
-            cart_payment=cart_payment,
+            cart_payment_id=cart_payment.id,
             idempotency_key="idempotency_key",
             payment_method_id=cart_payment.payment_method_id,
             provider_payment_method_id="provider_payment_method_id",
@@ -815,6 +815,7 @@ class TestCartPaymentInterface:
             amount=cart_payment.amount,
             country="US",
             currency="USD",
+            split_payment=cart_payment.split_payment,
             capture_method=CaptureMethod.MANUAL,
             capture_after=capture_after,
             payer_statement_description=None,
@@ -1190,12 +1191,41 @@ class TestCartPaymentInterface:
             existing_payment_intents=[payment_intent],
             idempotency_key=str(uuid.uuid4()),
             amount=875,
+            split_payment=None,
         )
         assert result_intent.amount == 875
         assert (
             result_intent.legacy_consumer_charge_id
             == payment_intent.legacy_consumer_charge_id
         )
+        assert result_intent.application_fee_amount is None
+        assert result_pgp_intent.payout_account_id is None
+
+    @pytest.mark.asyncio
+    async def test_increase_payment_amount_with_split_payment(
+        self, cart_payment_interface
+    ):
+        cart_payment = generate_cart_payment()
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id,
+            legacy_consumer_charge_id=LegacyConsumerChargeId(7888),
+        )
+        result_intent, result_pgp_intent = await cart_payment_interface.increase_payment_amount(
+            cart_payment=cart_payment,
+            existing_payment_intents=[payment_intent],
+            idempotency_key=str(uuid.uuid4()),
+            amount=875,
+            split_payment=SplitPayment(
+                payout_account_id="test_merchant_account", application_fee_amount=75
+            ),
+        )
+        assert result_intent.amount == 875
+        assert (
+            result_intent.legacy_consumer_charge_id
+            == payment_intent.legacy_consumer_charge_id
+        )
+        assert result_intent.application_fee_amount == 75
+        assert result_pgp_intent.payout_account_id == "test_merchant_account"
 
     @pytest.mark.asyncio
     async def test_lower_amount_for_uncaptured_payment(self, cart_payment_interface):

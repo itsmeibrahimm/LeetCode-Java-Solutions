@@ -548,7 +548,7 @@ class CartPaymentInterface:
             )
 
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
-                cart_payment=request_cart_payment,
+                cart_payment_id=cart_payment.id,
                 legacy_consumer_charge_id=legacy_consumer_charge_id,
                 idempotency_key=idempotency_key,
                 payment_method_id=request_cart_payment.payment_method_id,
@@ -558,6 +558,7 @@ class CartPaymentInterface:
                 amount=request_cart_payment.amount,
                 country=country,
                 currency=currency,
+                split_payment=request_cart_payment.split_payment,
                 capture_method=capture_method,
                 payer_statement_description=request_cart_payment.payer_statement_description,
                 capture_after=capture_after,
@@ -618,7 +619,7 @@ class CartPaymentInterface:
 
     async def _create_new_intent_pair(
         self,
-        cart_payment: CartPayment,
+        cart_payment_id: uuid.UUID,
         legacy_consumer_charge_id: LegacyConsumerChargeId,
         idempotency_key: str,
         payment_method_id: Optional[uuid.UUID],
@@ -628,6 +629,7 @@ class CartPaymentInterface:
         amount: int,
         country: CountryCode,
         currency: str,
+        split_payment: Optional[SplitPayment],
         capture_method: str,
         capture_after: Optional[datetime],
         payer_statement_description: Optional[str] = None,
@@ -635,13 +637,13 @@ class CartPaymentInterface:
         # Create PaymentIntent
         payment_intent = await self.payment_repo.insert_payment_intent(
             id=uuid.uuid4(),
-            cart_payment_id=cart_payment.id,
+            cart_payment_id=cart_payment_id,
             idempotency_key=idempotency_key,
             amount_initiated=amount,
             amount=amount,
-            application_fee_amount=getattr(
-                cart_payment.split_payment, "application_fee_amount", None
-            ),
+            application_fee_amount=split_payment.application_fee_amount
+            if split_payment
+            else None,
             country=country,
             currency=currency,
             capture_method=capture_method,
@@ -663,12 +665,12 @@ class CartPaymentInterface:
             customer_resource_id=provider_customer_resource_id,
             currency=currency,
             amount=amount,
-            application_fee_amount=getattr(
-                cart_payment.split_payment, "application_fee_amount", None
-            ),
-            payout_account_id=getattr(
-                cart_payment.split_payment, "payout_account_id", None
-            ),
+            application_fee_amount=split_payment.application_fee_amount
+            if split_payment
+            else None,
+            payout_account_id=split_payment.payout_account_id
+            if split_payment
+            else None,
             capture_method=capture_method,
             status=IntentStatus.INIT,
             statement_descriptor=payer_statement_description,
@@ -962,6 +964,10 @@ class CartPaymentInterface:
                 reason=reason,
             )
 
+            if payment_intent.application_fee_amount:
+                refund_request.refund_application_fee = True
+                refund_request.reverse_transfer = True
+
             self.req_context.log.info(
                 f"[refund_provider_payment] Refunding charge {pgp_payment_intent.charge_resource_id}"
             )
@@ -1082,6 +1088,7 @@ class CartPaymentInterface:
     async def increase_payment_amount(
         self,
         amount: int,
+        split_payment: Optional[SplitPayment],
         cart_payment: CartPayment,
         existing_payment_intents: List[PaymentIntent],
         idempotency_key: str,
@@ -1104,7 +1111,7 @@ class CartPaymentInterface:
         # New intent pair for the higher amount
         async with self.payment_repo.payment_database_transaction():
             payment_intent, pgp_payment_intent = await self._create_new_intent_pair(
-                cart_payment=cart_payment,
+                cart_payment_id=cart_payment.id,
                 legacy_consumer_charge_id=legacy_consumer_charge_id,
                 idempotency_key=idempotency_key,
                 payment_method_id=most_recent_intent.payment_method_id,
@@ -1114,6 +1121,7 @@ class CartPaymentInterface:
                 amount=amount,
                 country=most_recent_intent.country,
                 currency=most_recent_intent.currency,
+                split_payment=split_payment,
                 capture_method=most_recent_intent.capture_method,
                 payer_statement_description=most_recent_intent.statement_descriptor,
                 capture_after=most_recent_intent.capture_after,
@@ -1510,6 +1518,7 @@ class CartPaymentProcessor:
         payer_country: CountryCode,
         amount: int,
         description: Optional[str],
+        split_payment: Optional[SplitPayment],
     ):
         payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
             cart_payment
@@ -1565,6 +1574,7 @@ class CartPaymentProcessor:
                 cart_payment=cart_payment,
                 existing_payment_intents=payment_intents,
                 amount=amount,
+                split_payment=split_payment,
                 idempotency_key=idempotency_key,
             )
 
@@ -1667,23 +1677,26 @@ class CartPaymentProcessor:
             # TODO: Check if we need to update existing stripe_charge, or if it will get upated later upon capture
         elif refundable_intents:
             refundable_intent = self.cart_payment_interface.get_most_recent_intent(
-                capturable_intents
+                refundable_intents
+            )
+            refundable_pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                refundable_intent
             )
             refund_amount = refundable_intent.amount - new_amount
             # TODO verify if pgp intent can be refunded: may have been refunded previously, protect against
             # exceeding limits (avoid call to provider if not necessary)
 
             provider_refund = await self.cart_payment_interface.refund_provider_payment(
-                payment_intent=payment_intent,
-                pgp_payment_intent=pgp_payment_intent,
+                payment_intent=refundable_intent,
+                pgp_payment_intent=refundable_pgp_payment_intent,
                 reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
                 refund_amount=refund_amount,
             )
 
             # Update state
             payment_intent, pgp_payment_intent = await self._update_state_after_refund_with_provider(
-                payment_intent=payment_intent,
-                pgp_payment_intent=pgp_payment_intent,
+                payment_intent=refundable_intent,
+                pgp_payment_intent=refundable_pgp_payment_intent,
                 provider_refund=provider_refund,
                 refund_amount=refund_amount,
             )
@@ -1698,6 +1711,7 @@ class CartPaymentProcessor:
         amount: int,
         client_description: Optional[str],
         dd_additional_payment_info: Optional[Dict[str, Any]],
+        split_payment: Optional[SplitPayment],
     ) -> CartPayment:
         """Update an existing payment associated with a legacy consumer charge.
 
@@ -1708,6 +1722,7 @@ class CartPaymentProcessor:
             amount {int} -- Delta amount to add to the cart payment amount.  May be negative to reduce amount.
             client_description {Optional[str]} -- New client description to use for cart payment.
             dd_additional_payment_info: {Optional[Dict[str, Any]]} -- Optional legacy payment additional_payment_info to use for legacy charge writes.
+            split_payment: {Optional[SplitPayment]} -- Optional new split payment to use for payment.
 
         Raises:
             CartPaymentReadError: If there is no cart paymetn associated with the provided dd_charge_id.
@@ -1769,6 +1784,7 @@ class CartPaymentProcessor:
             payer_country=payer_country_code,
             amount=new_amount,
             client_description=client_description,
+            split_payment=split_payment,
         )
 
     async def update_payment(
@@ -1778,7 +1794,7 @@ class CartPaymentProcessor:
         payer_id: Optional[uuid.UUID],
         amount: int,
         client_description: Optional[str],
-        is_amount_delta: bool = False,
+        split_payment: SplitPayment,
     ) -> CartPayment:
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
             cart_payment_id
@@ -1806,6 +1822,7 @@ class CartPaymentProcessor:
             payer_country=CountryCode(payer.country),
             amount=amount,
             client_description=client_description,
+            split_payment=split_payment,
         )
 
     async def _update_payment(
@@ -1817,6 +1834,7 @@ class CartPaymentProcessor:
         payer_country: CountryCode,
         amount: int,
         client_description: Optional[str],
+        split_payment: Optional[SplitPayment],
     ) -> CartPayment:
         """Update an existing payment.
 
@@ -1829,7 +1847,7 @@ class CartPaymentProcessor:
             payer_country {CountryCode} -- The CountryCode of the payer whose payment is being modified.
             amount {int} -- New amount to use for cart payment.
             client_description {Optional[str]} -- New client description to use for cart payment.
-            request_legacy_payment: {Optional[LegacyPayment]} -- Optional legacy payment info containing additional_payment_info to use for legacy charge writes.
+            split_payment {Optional[SplitPayment]} -- New split payment to use, if needed.
 
         Raises:
             CartPaymentReadError: Raised when there is an error retrieving the specified cart payment.
@@ -1855,6 +1873,7 @@ class CartPaymentProcessor:
                 payer_country=payer_country,
                 amount=amount,
                 description=client_description,
+                split_payment=split_payment,
             )
         elif self.cart_payment_interface.is_amount_adjusted_lower(cart_payment, amount):
             payment_intent, pgp_payment_intent = await self._update_payment_with_lower_amount(

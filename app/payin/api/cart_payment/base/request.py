@@ -37,6 +37,7 @@ class UpdateCartPaymentBaseRequest(BaseModel):
     idempotency_key: str
     amount: PositiveInt
     client_description: Optional[str] = None
+    split_payment: Optional[SplitPayment] = None
 
 
 class CancelCartPaymentRequest(BaseModel):

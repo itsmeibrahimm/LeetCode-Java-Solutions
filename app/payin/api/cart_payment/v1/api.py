@@ -139,6 +139,7 @@ async def update_cart_payment(
     - **payer_country**: [string] payer's country ISO code
     - **idempotency_key**: [string] idempotency key to sumibt the payment
     - **client_description** [string] client description
+    - **split_payment** [json object] Optional, new split payment to use for the payment
     """
     log.info(f"Updating cart_payment {cart_payment_id}")
     cart_payment = await cart_payment_processor.update_payment(
@@ -147,6 +148,7 @@ async def update_cart_payment(
         payer_id=cart_payment_request.payer_id,
         amount=cart_payment_request.amount,
         client_description=cart_payment_request.client_description,
+        split_payment=cart_payment_request.split_payment,
     )
     log.info(
         f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"

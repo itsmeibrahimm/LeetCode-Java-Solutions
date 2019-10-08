@@ -117,6 +117,7 @@ async def update_cart_payment(
             amount=cart_payment_request.amount,
             client_description=cart_payment_request.client_description,
             dd_additional_payment_info=cart_payment_request.dd_additional_payment_info,
+            split_payment=cart_payment_request.split_payment,
         )
     except PaymentError as payment_error:
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR

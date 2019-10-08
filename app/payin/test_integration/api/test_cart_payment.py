@@ -184,6 +184,7 @@ class TestCartPayment:
         cart_payment: Dict[str, Any],
         amount: int,
         client_description: str,
+        split_payment: Optional[Dict[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         request_body = {
@@ -202,6 +203,9 @@ class TestCartPayment:
                 "dd_stripe_card_id": "987",
             },
         }
+
+        if split_payment:
+            request_body["split_payment"] = split_payment
 
         idempotency = idempotency_key if idempotency_key else str(uuid.uuid4())
         request_body["idempotency_key"] = idempotency
@@ -440,12 +444,17 @@ class TestCartPayment:
         )
 
     def _test_cart_payment_adjustment(
-        self, client: TestClient, cart_payment: Dict[str, Any], amount: int
-    ) -> None:
+        self,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+        amount: int,
+        split_payment: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_update_request(
             cart_payment=cart_payment,
             amount=amount,
             client_description=f"{cart_payment['client_description']}-updated",
+            split_payment=split_payment,
         )
         response = client.post(
             f"/payin/api/v1/cart_payments/{str(cart_payment['id'])}/adjust",
@@ -462,6 +471,11 @@ class TestCartPayment:
         assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
+        expected_split_payment = (
+            split_payment if split_payment else cart_payment["split_payment"]
+        )
+        assert body["split_payment"] == expected_split_payment
+        return body
 
     def test_cancellation(
         self, client: TestClient, payer: Dict[str, Any], payment_method: Dict[str, Any]
@@ -489,11 +503,7 @@ class TestCartPayment:
         self._test_cancel_cart_payment(client=client, cart_payment=cart_payment)
 
     def test_cart_payment_multiple_adjustments_up_then_down(
-        self,
-        stripe_api: StripeAPISettings,
-        client: TestClient,
-        payer: Dict[str, Any],
-        payment_method: Dict[str, Any],
+        self, stripe_api: StripeAPISettings, client: TestClient
     ):
         stripe_api.enable_outbound()
         payer = self._test_payer_creation(client)
@@ -529,11 +539,7 @@ class TestCartPayment:
         )
 
     def test_cart_payment_multiple_adjustments_down_then_up(
-        self,
-        stripe_api: StripeAPISettings,
-        client: TestClient,
-        payer: Dict[str, Any],
-        payment_method: Dict[str, Any],
+        self, stripe_api: StripeAPISettings, client: TestClient
     ):
         stripe_api.enable_outbound()
         payer = self._test_payer_creation(client)
@@ -569,11 +575,7 @@ class TestCartPayment:
         )
 
     def test_cart_payment_multiple_adjustments_mixed_up_and_down(
-        self,
-        stripe_api: StripeAPISettings,
-        client: TestClient,
-        payer: Dict[str, Any],
-        payment_method: Dict[str, Any],
+        self, stripe_api: StripeAPISettings, client: TestClient
     ):
         stripe_api.enable_outbound()
         payer = self._test_payer_creation(client)
@@ -589,23 +591,72 @@ class TestCartPayment:
         )
 
         # Adjust up once
-        self._test_cart_payment_adjustment(
-            client=client, cart_payment=cart_payment, amount=690
+        updated_cart_payment = self._test_cart_payment_adjustment(
+            client=client,
+            cart_payment=cart_payment,
+            amount=690,
+            split_payment={
+                "application_fee_amount": 80,
+                "payout_account_id": "acct_1FKYqjDpmxeDAkcx",
+            },
         )
 
         # Bring down once
-        self._test_cart_payment_adjustment(
-            client=client, cart_payment=cart_payment, amount=510
+        updated_cart_payment = self._test_cart_payment_adjustment(
+            client=client, cart_payment=updated_cart_payment, amount=510
         )
 
         # Adjust up again
-        self._test_cart_payment_adjustment(
-            client=client, cart_payment=cart_payment, amount=610
+        updated_cart_payment = self._test_cart_payment_adjustment(
+            client=client,
+            cart_payment=updated_cart_payment,
+            amount=610,
+            split_payment={
+                "application_fee_amount": 70,
+                "payout_account_id": "acct_1FKYqjDpmxeDAkcx",
+            },
         )
 
         # Adjust down again
-        self._test_cart_payment_adjustment(
-            client=client, cart_payment=cart_payment, amount=390
+        updated_cart_payment = self._test_cart_payment_adjustment(
+            client=client, cart_payment=updated_cart_payment, amount=390
+        )
+
+    def test_cart_payment_adjustment_with_split_payment(
+        self, stripe_api: StripeAPISettings, client: TestClient
+    ):
+        stripe_api.enable_outbound()
+        payer = self._test_payer_creation(client)
+        payment_method = self._test_payment_method_creation(client, payer)
+
+        # Initial payment, delay capture set to False for immediate capture.  This option is used to
+        # verify refund handling where split_payment is involved
+        cart_payment = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=340,
+            delay_capture=False,
+            split_payment={
+                "application_fee_amount": 60,
+                "payout_account_id": "acct_1FKYqjDpmxeDAkcx",
+            },
+        )
+
+        # Adjust up once
+        updated_cart_payment = self._test_cart_payment_adjustment(
+            client=client,
+            cart_payment=cart_payment,
+            amount=790,
+            split_payment={
+                "application_fee_amount": 120,
+                "payout_account_id": "acct_1FKYqjDpmxeDAkcx",
+            },
+        )
+
+        # Bring down once
+        updated_cart_payment = self._test_cart_payment_adjustment(
+            client=client, cart_payment=updated_cart_payment, amount=410
         )
 
     @pytest.mark.parametrize("commando_mode", [True, False])
