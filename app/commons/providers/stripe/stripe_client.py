@@ -295,6 +295,15 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         https://stripe.com/docs/api/external_account_cards/create
         """
 
+    @abc.abstractmethod
+    def retrieve_stripe_account(
+        self, request: models.RetrieveAccountRequest
+    ) -> models.Account:
+        """
+        Retrieve an Account
+        https://stripe.com/docs/api/accounts/retrieve
+        """
+
 
 @tracing.track_breadcrumb(provider_name="stripe", from_kwargs={"country": "country"})
 class StripeClient(StripeClientInterface):
@@ -654,6 +663,15 @@ class StripeClient(StripeClientInterface):
             request.customer, source=request.source, **self.settings_for(country)
         )
 
+    @tracing.track_breadcrumb(resource="account", action="retrieve")
+    def retrieve_stripe_account(
+        self, *, request: models.RetrieveAccountRequest
+    ) -> models.Account:
+        account = stripe.Account.retrieve(
+            id=request.account_id, **self.settings_for(request.country)
+        )
+        return account
+
 
 class StripeTestClient(StripeClient):
     """
@@ -967,4 +985,11 @@ class StripeAsyncClient:
     ):
         return await self.executor_pool.submit(
             self.stripe_client.create_card, request=request, country=country
+        )
+
+    async def retrieve_stripe_account(
+        self, *, request: models.RetrieveAccountRequest
+    ) -> models.Account:
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_stripe_account, request=request
         )

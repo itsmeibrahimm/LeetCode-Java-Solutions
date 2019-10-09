@@ -357,6 +357,11 @@ class ClonePaymentMethodRequest(StripeBaseModel):
     customer: CustomerId
 
 
+class RetrieveAccountRequest(StripeBaseModel):
+    country: CountryCode
+    account_id: str
+
+
 # --------------- RESPONSE MODELS --------------------------------------------------------------------------------------
 class BillingDetails(StripeBaseModel):
     address: Address

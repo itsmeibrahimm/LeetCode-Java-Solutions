@@ -18,6 +18,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeCreateCardRequest,
     StripeCreateCustomerRequest,
     TokenId,
+    RetrieveAccountRequest,
 )
 from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
 from app.commons.test_integration.utils import (
@@ -424,6 +425,22 @@ class TestStripeClient:
         assert card
         assert card.object == "card"
         assert card.id.startswith("card_")
+
+    def test_retrieve_account_token(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+        # Creating test account first - to make sure they always exist
+        created_account = prepare_and_validate_stripe_account(stripe)
+        assert created_account
+        assert created_account.id
+        account = stripe.retrieve_stripe_account(
+            request=RetrieveAccountRequest(
+                account_id=created_account.id, country=CountryCode.US
+            )
+        )
+
+        assert account
+        assert account.id == created_account.id
 
 
 class TestStripePool:
