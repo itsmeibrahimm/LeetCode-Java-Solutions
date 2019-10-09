@@ -2,6 +2,7 @@ import stripe
 import time
 
 from . import payer_v1_client, payment_method_v1_client
+from payin_v1_client import CreatePayerRequest
 
 # TODO: Add stripe API key to bond service
 API_KEY = "####"
@@ -26,21 +27,21 @@ class PaymentUtil:
         return {"payer_id": payer.id, "payment_gateway": "stripe", "token": "tok_visa"}
 
     @staticmethod
-    def get_payer_info(
-        dd_payer_id=int(time.time() * 1e6), country="US", payer_type="marketplace"
+    def get_create_payer_request(
+        dd_payer_id=int(time.time()), country="US", payer_type="marketplace"
     ):
-        return {
-            "dd_payer_id": dd_payer_id,
-            "payer_type": payer_type,
-            "email": str(dd_payer_id) + "-" + payer_type + "@email.com",
-            "country": country,
-            "description": "payer creation for tests",
-        }
+        return CreatePayerRequest(
+            dd_payer_id=dd_payer_id,
+            payer_type=payer_type,
+            email=str(dd_payer_id) + "-" + payer_type + "@email.com",
+            country=country,
+            description="test payer creation",
+        )
 
     @staticmethod
     def create_payer():
         return payer_v1_client.create_payer_with_http_info(
-            create_payer_request=PaymentUtil.get_payer_info()
+            create_payer_request=PaymentUtil.get_create_payer_request()
         )
 
     @staticmethod

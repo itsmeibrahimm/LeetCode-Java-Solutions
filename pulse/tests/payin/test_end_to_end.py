@@ -1,6 +1,10 @@
 import logging
 
-import pytest
+from payin_v1_client import (
+    CreatePaymentMethodRequestV1,
+    UpdatePayerRequestV1,
+    DefaultPaymentMethodV1,
+)
 
 from . import payer_v1_client, payment_method_v1_client
 from .utils import PaymentUtil
@@ -8,39 +12,54 @@ from .utils import PaymentUtil
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.skip(reason="API contract change. need to bump client lib version")
 def test_end_to_end():
-    # step 1: create payer object
-    test_payer = PaymentUtil.create_payer()
+    # Step 1: create payer object
+    test_payer = payer_v1_client.create_payer_with_http_info(
+        create_payer_request=PaymentUtil.get_create_payer_request(
+            payer_type="store"
+        )  # Due to foreign-key constraint
+    )
     assert test_payer[1] == 201
 
-    # step 2: create payment_method
+    # Step 2: create payment_method
+    create_payment_method_request = CreatePaymentMethodRequestV1(
+        payer_id=test_payer[0].id,
+        token="tok_visa",
+        set_default=False,
+        is_scanned=False,
+        is_active=True,
+        payment_gateway="stripe",
+    )
     payment_method = payment_method_v1_client.create_payment_method_with_http_info(
-        create_payment_method_request={
-            "payer_id": test_payer[0].id,
-            "payment_gateway": "stripe",
-            "token": "tok_visa",
-        }
+        create_payment_method_request_v1=create_payment_method_request
     )
     assert payment_method[1] == 201
     assert payment_method[0].deleted_at is None
+    assert payment_method[0].payer_id == test_payer[0].id
 
-    # step 3: set default payment_method
+    # Step 3: set default payment_method
+    default_payment_method = DefaultPaymentMethodV1(
+        payment_method_id=payment_method[0].id
+    )
+    update_payer_request = UpdatePayerRequestV1(
+        default_payment_method=default_payment_method
+    )
     updated_payer = payer_v1_client.update_payer_with_http_info(
-        payer_id=test_payer[0].id,
-        update_payer_request={"default_payment_method": payment_method[0]},
+        payer_id=test_payer[0].id, update_payer_request_v1=update_payer_request
     )
     assert updated_payer[1] == 200
     # verify default payment_method
     pay_providers_list = updated_payer[0].payment_gateway_provider_customers
-    default_payment_method_id = None
-    # todo - test for default_payment_method using multiple payment methods
+    default_pm_id = None
     for pay_provider in pay_providers_list:
         if pay_provider.default_payment_method_id is not None:
-            default_payment_method_id = pay_provider.default_payment_method_id
-    assert default_payment_method_id == payment_method[0].card.payment_provider_card_id
+            default_pm_id = pay_provider.default_payment_method_id
+    assert (
+        default_pm_id
+        == payment_method[0].payment_gateway_provider_details.payment_method_id
+    )
 
-    # step 4: get payment_method
+    # Step 4: get payment_method
     get_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
         payment_method_id=payment_method[0].id
     )
@@ -48,7 +67,7 @@ def test_end_to_end():
     assert get_payment_method[0] == payment_method[0]
     assert get_payment_method[0].deleted_at is None
 
-    # step 5: delete payment_method
+    # Step 5: delete payment_method
     delete_payment_method = payment_method_v1_client.delete_payment_method_with_http_info(
         payment_method_id=payment_method[0].id
     )
@@ -56,7 +75,7 @@ def test_end_to_end():
     assert delete_payment_method[0] != get_payment_method[0]
     assert delete_payment_method[0].deleted_at is not None
 
-    # step 6: verify payment_method to be deleted
+    # Step 6: verify payment_method to be deleted
     get_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
         payment_method_id=payment_method[0].id
     )
@@ -64,7 +83,7 @@ def test_end_to_end():
     assert get_payment_method[0] == delete_payment_method[0]
     assert get_payment_method[0].deleted_at is not None
 
-    # step 7: verify default_payment_method of payer
+    # Step 7: verify default_payment_method of payer
     get_payer = payer_v1_client.get_payer_with_http_info(payer_id=test_payer[0].id)
     assert get_payer[1] == 200
 
