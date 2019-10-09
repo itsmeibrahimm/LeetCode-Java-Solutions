@@ -13,7 +13,9 @@ from app.commons.utils.dataclass_extensions import no_init_field
 class PaymentIntentTable(TableDefinition):
     name: str = no_init_field("payment_intents")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    cart_payment_id: Column = no_init_field(Column("cart_payment_id", Text))
+    cart_payment_id: Column = no_init_field(
+        Column("cart_payment_id", UUID(as_uuid=True))
+    )
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
     amount_initiated: Column = no_init_field(Column("amount_initiated", Integer))
     amount: Column = no_init_field(Column("amount", Integer))

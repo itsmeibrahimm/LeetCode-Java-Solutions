@@ -17,6 +17,8 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentIntent,
     PaymentCharge,
     PgpPaymentCharge,
+    Refund,
+    PgpRefund,
 )
 from app.payin.core.cart_payment.types import (
     IntentStatus,
@@ -24,6 +26,7 @@ from app.payin.core.cart_payment.types import (
     ChargeStatus,
     LegacyStripeChargeStatus,
     LegacyConsumerChargeId,
+    RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.core.payer.model import Payer
@@ -177,6 +180,33 @@ async def pgp_payment_intent(
 
 
 @pytest.fixture
+async def refund(
+    cart_payment_repository: CartPaymentRepository, payment_intent: PaymentIntent
+):
+    yield await cart_payment_repository.insert_refund(
+        id=uuid4(),
+        payment_intent_id=payment_intent.id,
+        idempotency_key=payment_intent.idempotency_key,
+        status=RefundStatus.PROCESSING,
+        amount=payment_intent.amount,
+        reason=None,
+    )
+
+
+@pytest.fixture
+async def pgp_refund(cart_payment_repository: CartPaymentRepository, refund: Refund):
+    yield await cart_payment_repository.insert_pgp_refund(
+        id=uuid4(),
+        refund_id=refund.id,
+        idempotency_key=refund.idempotency_key,
+        status=RefundStatus.PROCESSING,
+        amount=refund.amount,
+        reason=None,
+        pgp_code=PgpCode.STRIPE,
+    )
+
+
+@pytest.fixture
 async def payment_charge(
     cart_payment_repository: CartPaymentRepository, payment_intent: PaymentIntent
 ):
@@ -309,6 +339,7 @@ class TestPaymentIntentAdjustmentHistory:
             amount_original=payment_intent.amount,
             amount_delta=100,
             currency=payment_intent.currency,
+            idempotency_key=payment_intent.idempotency_key,
         )
 
         expected_adjustment = PaymentIntentAdjustmentHistory(
@@ -319,10 +350,46 @@ class TestPaymentIntentAdjustmentHistory:
             amount_original=payment_intent.amount,
             amount_delta=100,
             currency=payment_intent.currency,
+            idempotency_key=payment_intent.idempotency_key,
             created_at=result.created_at,  # Do not know exact created_at ahead of time
         )
 
         assert result == expected_adjustment
+
+    @pytest.mark.asyncio
+    async def test_get_payment_intent_adjustment_history(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        cart_payment: CartPayment,
+        payment_intent: PaymentIntent,
+    ):
+        history_record = await cart_payment_repository.insert_payment_intent_adjustment_history(
+            id=uuid4(),
+            payer_id=cart_payment.payer_id,
+            payment_intent_id=payment_intent.id,
+            amount=payment_intent.amount + 100,
+            amount_original=payment_intent.amount,
+            amount_delta=100,
+            currency=payment_intent.currency,
+            idempotency_key=str(uuid4()),
+        )
+
+        result = await cart_payment_repository.get_payment_intent_adjustment_history(
+            payment_intent_id=history_record.payment_intent_id,
+            idempotency_key=history_record.idempotency_key,
+        )
+        assert result == history_record
+
+        result = await cart_payment_repository.get_payment_intent_adjustment_history(
+            payment_intent_id=history_record.payment_intent_id,
+            idempotency_key=f"{history_record.idempotency_key}-does-not-exist",
+        )
+        assert result is None
+
+        result = await cart_payment_repository.get_payment_intent_adjustment_history(
+            payment_intent_id=uuid4(), idempotency_key=history_record.idempotency_key
+        )
+        assert result is None
 
 
 class TestPgpPaymentIntent:
@@ -778,6 +845,156 @@ class TestCartPayment:
         )
 
         assert result == expected_cart_payment
+
+
+class TestRefunds:
+    @pytest.mark.asyncio
+    async def test_insert_refund(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        id = uuid4()
+        result = await cart_payment_repository.insert_refund(
+            id=id,
+            payment_intent_id=payment_intent.id,
+            idempotency_key=payment_intent.idempotency_key,
+            status=RefundStatus.PROCESSING,
+            amount=payment_intent.amount,
+            reason=None,
+        )
+
+        expected_refund = Refund(
+            id=id,
+            payment_intent_id=payment_intent.id,
+            idempotency_key=payment_intent.idempotency_key,
+            status=RefundStatus.PROCESSING,
+            amount=payment_intent.amount,
+            reason=None,
+            created_at=result.created_at,  # Generated
+            updated_at=result.updated_at,  # Generated
+        )
+
+        assert result == expected_refund
+
+    @pytest.mark.asyncio
+    async def test_get_refund_by_idempotency_key(
+        self, cart_payment_repository: CartPaymentRepository, refund: Refund
+    ):
+        result = await cart_payment_repository.get_refund_by_idempotency_key(
+            refund.idempotency_key
+        )
+        assert result == refund
+
+        result = await cart_payment_repository.get_refund_by_idempotency_key(
+            f"{refund.idempotency_key}-does-not-exist"
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_update_refund_status(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        idempotency_key = str(uuid4())
+        refund = await cart_payment_repository.insert_refund(
+            id=uuid4(),
+            payment_intent_id=payment_intent.id,
+            idempotency_key=idempotency_key,
+            status=RefundStatus.PROCESSING,
+            amount=500,
+            reason=None,
+        )
+        result = await cart_payment_repository.update_refund_status(
+            refund.id, RefundStatus.FAILED
+        )
+
+        expected_refund = Refund(
+            id=refund.id,
+            payment_intent_id=payment_intent.id,
+            idempotency_key=idempotency_key,
+            status=RefundStatus.FAILED,
+            amount=refund.amount,
+            reason=refund.reason,
+            created_at=refund.created_at,
+            updated_at=result.updated_at,  # Generated
+        )
+
+        assert result == expected_refund
+
+    @pytest.mark.asyncio
+    async def test_insert_pgp_refund(
+        self, cart_payment_repository: CartPaymentRepository, refund: Refund
+    ):
+        id = uuid4()
+        result = await cart_payment_repository.insert_pgp_refund(
+            id=id,
+            refund_id=refund.id,
+            idempotency_key=refund.idempotency_key,
+            status=RefundStatus.PROCESSING,
+            pgp_code=PgpCode.STRIPE,
+            amount=refund.amount,
+            reason=refund.reason,
+        )
+
+        expected_pgp_refund = PgpRefund(
+            id=id,
+            refund_id=refund.id,
+            idempotency_key=refund.idempotency_key,
+            status=RefundStatus.PROCESSING,
+            reason=refund.reason,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=None,
+            amount=refund.amount,
+            created_at=result.created_at,  # Generated
+            updated_at=result.updated_at,  # Generated
+        )
+
+        assert result == expected_pgp_refund
+
+    @pytest.mark.asyncio
+    async def test_get_pgp_refund_by_refund_id(
+        self, cart_payment_repository: CartPaymentRepository, pgp_refund: PgpRefund
+    ):
+        result = await cart_payment_repository.get_pgp_refund_by_refund_id(
+            pgp_refund.refund_id
+        )
+        assert result == pgp_refund
+
+    @pytest.mark.asyncio
+    async def test_updated_pgp_refund(
+        self, cart_payment_repository: CartPaymentRepository, refund: Refund
+    ):
+        pgp_refund = await cart_payment_repository.insert_pgp_refund(
+            id=uuid4(),
+            refund_id=refund.id,
+            idempotency_key=refund.idempotency_key,
+            status=RefundStatus.PROCESSING,
+            pgp_code=PgpCode.STRIPE,
+            amount=refund.amount,
+            reason=refund.reason,
+        )
+
+        result = await cart_payment_repository.update_pgp_refund(
+            pgp_refund_id=pgp_refund.id,
+            status=RefundStatus.SUCCEEDED,
+            pgp_resource_id="test resource id",
+        )
+
+        expected_pgp_refund = PgpRefund(
+            id=pgp_refund.id,
+            refund_id=refund.id,
+            idempotency_key=refund.idempotency_key,
+            status=RefundStatus.SUCCEEDED,
+            reason=refund.reason,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id="test resource id",
+            amount=refund.amount,
+            created_at=pgp_refund.created_at,
+            updated_at=result.updated_at,  # Generated
+        )
+        assert result == expected_pgp_refund
 
 
 class TestLegacyCharges:

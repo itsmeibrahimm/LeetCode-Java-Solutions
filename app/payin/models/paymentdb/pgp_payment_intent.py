@@ -13,7 +13,9 @@ from app.commons.utils.dataclass_extensions import no_init_field
 class PgpPaymentIntentTable(TableDefinition):
     name: str = no_init_field("pgp_payment_intents")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    payment_intent_id: Column = no_init_field(Column("payment_intent_id", Text))
+    payment_intent_id: Column = no_init_field(
+        Column("payment_intent_id", UUID(as_uuid=True))
+    )
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
     provider: Column = no_init_field(Column("provider", Text))
     resource_id: Column = no_init_field(Column("resource_id", Text))

@@ -164,6 +164,10 @@ class CartPaymentReadError(PayinError):
     pass
 
 
+class CartPaymentUpdateError(PayinError):
+    pass
+
+
 ###########################################################
 # PaymentCharge Errors                                      #
 ###########################################################

@@ -18,6 +18,8 @@ from app.payin.core.cart_payment.model import (
     PaymentIntentAdjustmentHistory,
     PaymentCharge,
     PgpPaymentCharge,
+    Refund,
+    PgpRefund,
     LegacyConsumerCharge,
     LegacyStripeCharge,
     LegacyPayment,
@@ -28,6 +30,7 @@ from app.payin.core.cart_payment.types import (
     ChargeStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.models.maindb import consumer_charges, stripe_charges
@@ -38,6 +41,8 @@ from app.payin.models.paymentdb import (
     payment_intents_adjustment_history,
     payment_charges,
     pgp_payment_charges,
+    refunds,
+    pgp_refunds,
 )
 from app.payin.repository.base import PayinDBRepository
 
@@ -395,6 +400,23 @@ class CartPaymentRepository(PayinDBRepository):
 
         return [self.to_payment_intent(row) for row in results]
 
+    async def get_payment_intent_adjustment_history(
+        self, payment_intent_id: UUID, idempotency_key: str
+    ) -> Optional[PaymentIntentAdjustmentHistory]:
+        statement = payment_intents_adjustment_history.table.select().where(
+            and_(
+                payment_intents_adjustment_history.payment_intent_id
+                == payment_intent_id,
+                payment_intents_adjustment_history.idempotency_key == idempotency_key,
+            )
+        )
+        row = await self.payment_database.replica().fetch_one(statement)
+
+        if not row:
+            return None
+
+        return self.to_payment_intent_adjustment_history(row)
+
     async def insert_pgp_payment_intent(
         self,
         id: UUID,
@@ -561,6 +583,7 @@ class CartPaymentRepository(PayinDBRepository):
         amount_original: int,
         amount_delta: int,
         currency: str,
+        idempotency_key: str,
     ) -> PaymentIntentAdjustmentHistory:
         data = {
             payment_intents_adjustment_history.id: id,
@@ -570,6 +593,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents_adjustment_history.amount_original: amount_original,
             payment_intents_adjustment_history.amount_delta: amount_delta,
             payment_intents_adjustment_history.currency: currency,
+            payment_intents_adjustment_history.idempotency_key: idempotency_key,
         }
 
         statement = (
@@ -592,6 +616,7 @@ class CartPaymentRepository(PayinDBRepository):
             amount_original=row[payment_intents_adjustment_history.amount_original],
             amount_delta=row[payment_intents_adjustment_history.amount_delta],
             currency=row[payment_intents_adjustment_history.currency],
+            idempotency_key=row[payment_intents_adjustment_history.idempotency_key],
             created_at=row[payment_intents_adjustment_history.created_at],
         )
 
@@ -1002,3 +1027,133 @@ class CartPaymentRepository(PayinDBRepository):
         )
         results = await self.main_database.replica().fetch_all(statement)
         return [self.to_legacy_stripe_charge(row) for row in results]
+
+    async def insert_refund(
+        self,
+        id: UUID,
+        payment_intent_id: UUID,
+        idempotency_key: str,
+        status: RefundStatus,
+        amount: int,
+        reason: Optional[str],
+    ) -> Refund:
+        data = {
+            refunds.id: id,
+            refunds.payment_intent_id: payment_intent_id,
+            refunds.idempotency_key: idempotency_key,
+            refunds.status: status.value,
+            refunds.amount: amount,
+            refunds.reason: reason,
+        }
+
+        statement = (
+            refunds.table.insert()
+            .values(data)
+            .returning(*refunds.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_refund(row)
+
+    def to_refund(self, row: Any) -> Refund:
+        return Refund(
+            id=row[refunds.id],
+            payment_intent_id=row[refunds.payment_intent_id],
+            idempotency_key=row[refunds.idempotency_key],
+            status=RefundStatus(row[refunds.status]),
+            amount=row[refunds.amount],
+            reason=row[refunds.reason],
+            created_at=row[refunds.created_at],
+            updated_at=row[refunds.updated_at],
+        )
+
+    async def get_refund_by_idempotency_key(
+        self, idempotency_key: str
+    ) -> Optional[Refund]:
+        statement = refunds.table.select().where(
+            refunds.idempotency_key == idempotency_key
+        )
+        row = await self.payment_database.replica().fetch_one(statement)
+        if not row:
+            return None
+        return self.to_refund(row)
+
+    async def update_refund_status(
+        self, refund_id: UUID, status: RefundStatus
+    ) -> Refund:
+        statement = (
+            refunds.table.update()
+            .where(refunds.id == refund_id)
+            .values(status=status.value, updated_at=utcnow())
+            .returning(*refunds.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_refund(row)
+
+    async def insert_pgp_refund(
+        self,
+        id: UUID,
+        refund_id: UUID,
+        idempotency_key: str,
+        status: RefundStatus,
+        pgp_code: PgpCode,
+        amount: int,
+        reason: Optional[str],
+    ) -> PgpRefund:
+        data = {
+            pgp_refunds.id: id,
+            pgp_refunds.refund_id: refund_id,
+            pgp_refunds.idempotency_key: idempotency_key,
+            pgp_refunds.status: status.value,
+            pgp_refunds.amount: amount,
+            pgp_refunds.reason: reason,
+            pgp_refunds.pgp_code: pgp_code.value,
+        }
+
+        statement = (
+            pgp_refunds.table.insert()
+            .values(data)
+            .returning(*pgp_refunds.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_refund(row)
+
+    def to_pgp_refund(self, row: Any) -> PgpRefund:
+        return PgpRefund(
+            id=row[pgp_refunds.id],
+            refund_id=row[pgp_refunds.refund_id],
+            idempotency_key=row[pgp_refunds.idempotency_key],
+            status=RefundStatus(row[pgp_refunds.status]),
+            amount=row[pgp_refunds.amount],
+            reason=row[pgp_refunds.reason],
+            pgp_code=PgpCode(row[pgp_refunds.pgp_code]),
+            pgp_resource_id=row[pgp_refunds.pgp_resource_id],
+            created_at=row[pgp_refunds.created_at],
+            updated_at=row[pgp_refunds.updated_at],
+        )
+
+    async def get_pgp_refund_by_refund_id(self, refund_id: UUID) -> Optional[PgpRefund]:
+        statement = pgp_refunds.table.select().where(pgp_refunds.refund_id == refund_id)
+        row = await self.payment_database.replica().fetch_one(statement)
+        if not row:
+            return None
+        return self.to_pgp_refund(row)
+
+    async def update_pgp_refund(
+        self, pgp_refund_id: UUID, status: RefundStatus, pgp_resource_id: str
+    ) -> PgpRefund:
+        statement = (
+            pgp_refunds.table.update()
+            .where(pgp_refunds.id == pgp_refund_id)
+            .values(
+                status=status.value,
+                pgp_resource_id=pgp_resource_id,
+                updated_at=utcnow(),
+            )
+            .returning(*pgp_refunds.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_pgp_refund(row)

@@ -574,6 +574,32 @@ class TestCartPayment:
             client=client, cart_payment=cart_payment, amount=870
         )
 
+    def test_cart_payment_adjustment_after_capture(
+        self, stripe_api: StripeAPISettings, client: TestClient
+    ):
+        stripe_api.enable_outbound()
+        payer = self._test_payer_creation(client)
+        payment_method = self._test_payment_method_creation(client, payer)
+
+        # Initial payment, immediate capture
+        cart_payment = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=440,
+            delay_capture=False,
+        )
+
+        # Bring down once
+        self._test_cart_payment_adjustment(
+            client=client, cart_payment=cart_payment, amount=400
+        )
+
+        # Bring down again
+        self._test_cart_payment_adjustment(
+            client=client, cart_payment=cart_payment, amount=300
+        )
+
     def test_cart_payment_multiple_adjustments_mixed_up_and_down(
         self, stripe_api: StripeAPISettings, client: TestClient
     ):

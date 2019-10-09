@@ -10,14 +10,15 @@ from app.commons.utils.dataclass_extensions import no_init_field
 
 @final
 @dataclass(frozen=True)
-class PaymentIntentAdjustmentTable(TableDefinition):
-    name: str = no_init_field("payment_intents_adjustment_history")
+class RefundTable(TableDefinition):
+    name: str = no_init_field("refunds")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    payer_id: Column = no_init_field(Column("payer_id", UUID(as_uuid=True)))
-    payment_intent_id: Column = no_init_field(Column("payment_intent_id", Text))
-    amount: Column = no_init_field(Column("amount", Integer))
-    amount_original: Column = no_init_field(Column("amount_original", Integer))
-    amount_delta: Column = no_init_field(Column("amount_delta", Integer))
-    currency: Column = no_init_field(Column("currency", Text))
+    payment_intent_id: Column = no_init_field(
+        Column("payment_intent_id", UUID(as_uuid=True))
+    )
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
+    status: Column = no_init_field(Column("status", Text))
+    amount: Column = no_init_field(Column("amount", Integer))
+    reason: Column = no_init_field(Column("reason", Text))
     created_at: Column = no_init_field(Column("created_at", DateTime(True)))
+    updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))

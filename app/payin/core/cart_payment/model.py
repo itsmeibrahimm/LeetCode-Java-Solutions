@@ -11,6 +11,7 @@ from app.payin.core.cart_payment.types import (
     ChargeStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundStatus,
 )
 from uuid import UUID
 
@@ -118,6 +119,7 @@ class PaymentIntentAdjustmentHistory:
     amount_original: int
     amount_delta: int
     currency: str
+    idempotency_key: str
     created_at: datetime
 
 
@@ -161,6 +163,36 @@ class PgpPaymentCharge:
     updated_at: datetime
     captured_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+
+
+class Refund(BaseModel):
+    class Config:
+        allow_mutation = False
+
+    id: UUID
+    payment_intent_id: UUID
+    idempotency_key: str
+    status: RefundStatus
+    amount: int
+    reason: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class PgpRefund(BaseModel):
+    class Config:
+        allow_mutation = False
+
+    id: UUID
+    refund_id: UUID
+    idempotency_key: str
+    status: RefundStatus
+    pgp_code: PgpCode
+    pgp_resource_id: Optional[str]
+    amount: int
+    reason: Optional[str]
+    created_at: datetime
+    updated_at: datetime
 
 
 @final

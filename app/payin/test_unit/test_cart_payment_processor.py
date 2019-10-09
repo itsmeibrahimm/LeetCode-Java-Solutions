@@ -14,6 +14,9 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
+import app.payin.core.cart_payment.processor as processor
+from app.payin.core.cart_payment.model import IntentStatus, CartPayment
+from app.payin.core.cart_payment.types import LegacyStripeChargeStatus, RefundStatus
 from app.payin.tests.utils import (
     FunctionMock,
     generate_cart_payment,
@@ -22,6 +25,10 @@ from app.payin.tests.utils import (
     generate_legacy_stripe_charge,
     generate_payment_intent,
     generate_pgp_payment_intent,
+    generate_refund,
+    generate_pgp_refund,
+    generate_payment_intent_adjustment_history,
+    FunctionMock,
 )
 
 
@@ -180,12 +187,6 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.skip("Not yet implemented")
     @pytest.mark.asyncio
-    async def test_invalid_country(self):
-        # TODO Invalid currency/country
-        pass
-
-    @pytest.mark.skip("Not yet implemented")
-    @pytest.mark.asyncio
     async def test_legacy_payment(self):
         # TODO legacy payment, including other payer_id_type
         pass
@@ -262,6 +263,12 @@ class TestCartPaymentProcessor:
         cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
             return_value=(request_cart_payment, legacy_payment)
         )
+        cart_payment_processor.legacy_payment_interface.find_existing_payment_charge = FunctionMock(
+            return_value=(
+                generate_legacy_consumer_charge(),
+                generate_legacy_stripe_charge(),
+            )
+        )
 
         # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
         result_cart_payment = await cart_payment_processor.create_payment(
@@ -324,20 +331,97 @@ class TestCartPaymentProcessor:
         assert result.id == cart_payment.id
         assert result.amount == updated_amount
 
-    @pytest.mark.skip("Test not implemented yet")
     @pytest.mark.asyncio
-    async def test_update_payment_higher_after_capture(self, cart_payment_processor):
-        pass
+    async def test_update_payment_with_higher_amount(self, cart_payment_processor):
+        cart_payment = generate_cart_payment(amount=650)
+        idempotency_key = str(uuid.uuid4())
+        new_amount = 750
+        intents_for_cart_payment = [
+            generate_payment_intent(
+                cart_payment_id=cart_payment.id,
+                status=IntentStatus.REQUIRES_CAPTURE,
+                idempotency_key=idempotency_key,
+            )
+        ]
+        cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
+            return_value=intents_for_cart_payment
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status = FunctionMock(
+            return_value=generate_payment_intent(
+                id=intents_for_cart_payment[0].id,
+                amount=new_amount,
+                status=IntentStatus.REQUIRES_CAPTURE,
+            )
+        )
 
-    @pytest.mark.skip("Test not implemented yet")
-    @pytest.mark.asyncio
-    async def test_resubmit_updated_amount_higher(self, cart_payment_processor):
-        pass
+        result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_higher_amount(
+            cart_payment=cart_payment,
+            legacy_payment=None,
+            idempotency_key=str(uuid.uuid4()),
+            payer_country=CountryCode.US,
+            amount=new_amount,
+            description=None,
+            split_payment=None,
+        )
+        assert result_intent.amount == new_amount
+        assert result_intent.status == IntentStatus.REQUIRES_CAPTURE
+
+        # Resubmit where intent processing with provider did not finish
+        intents_for_cart_payment = [
+            generate_payment_intent(
+                cart_payment_id=cart_payment.id,
+                status=IntentStatus.INIT,
+                idempotency_key=idempotency_key,
+            )
+        ]
+        cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
+            return_value=intents_for_cart_payment
+        )
+        cart_payment_processor.legacy_payment_interface.find_existing_payment_charge = FunctionMock(
+            return_value=(
+                generate_legacy_consumer_charge(),
+                generate_legacy_stripe_charge(),
+            )
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_higher_amount(
+            cart_payment=cart_payment,
+            legacy_payment=None,
+            idempotency_key=idempotency_key,
+            payer_country=CountryCode.US,
+            amount=new_amount,
+            description=None,
+            split_payment=None,
+        )
+        assert result_intent.amount == new_amount
+        assert result_intent.status == IntentStatus.REQUIRES_CAPTURE
+
+        # Resubmit where intent processing with provider did already finish
+        intents_for_cart_payment = [
+            generate_payment_intent(
+                cart_payment_id=cart_payment.id,
+                status=IntentStatus.REQUIRES_CAPTURE,
+                idempotency_key=idempotency_key,
+            )
+        ]
+        cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
+            return_value=intents_for_cart_payment
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_higher_amount(
+            cart_payment=cart_payment,
+            legacy_payment=None,
+            idempotency_key=idempotency_key,
+            payer_country=CountryCode.US,
+            amount=new_amount,
+            description=None,
+            split_payment=None,
+        )
+        assert result_intent == intents_for_cart_payment[0]
 
     @pytest.mark.asyncio
     async def test_update_payment_amount_lower(self, cart_payment_processor):
         cart_payment = generate_cart_payment()
-
         cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
             return_value=[
                 generate_payment_intent(
@@ -360,10 +444,122 @@ class TestCartPaymentProcessor:
         assert result.id == cart_payment.id
         assert result.amount == updated_amount
 
-    @pytest.mark.skip("Test not implemented yet")
     @pytest.mark.asyncio
-    async def test_resubmit_update_payment_amount_lower(self, cart_payment_processor):
-        pass
+    async def test_update_payment_with_lower_amount_for_uncaptured(
+        self, cart_payment_processor
+    ):
+        cart_payment = generate_cart_payment(amount=880)
+        idempotency_key = str(uuid.uuid4())
+        new_amount = 800
+
+        intents_for_cart_payment = [
+            generate_payment_intent(
+                cart_payment_id=cart_payment.id, status=IntentStatus.REQUIRES_CAPTURE
+            )
+        ]
+        cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
+            return_value=intents_for_cart_payment
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=generate_payment_intent(
+                status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
+            )
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=generate_pgp_payment_intent(
+                status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
+            )
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(
+            cart_payment=cart_payment,
+            new_amount=new_amount,
+            idempotency_key=idempotency_key,
+        )
+
+        assert result_intent.status == IntentStatus.REQUIRES_CAPTURE
+        assert result_intent.amount == 800
+        assert result_pgp_intent.status == IntentStatus.REQUIRES_CAPTURE
+        assert result_pgp_intent.amount == 800
+
+        # Resubmit
+        cart_payment_processor.cart_payment_interface.get_payment_intent_adjustment = FunctionMock(
+            return_value=generate_payment_intent_adjustment_history()
+        )
+        result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(
+            cart_payment=cart_payment,
+            new_amount=new_amount,
+            idempotency_key=idempotency_key,
+        )
+        assert result_intent == intents_for_cart_payment[0]
+
+    @pytest.mark.asyncio
+    async def test_update_payment_with_lower_amount_for_refund(
+        self, cart_payment_processor
+    ):
+        cart_payment = generate_cart_payment(amount=780)
+        idempotency_key = str(uuid.uuid4())
+        new_amount = 700
+
+        intents_for_cart_payment = [
+            generate_payment_intent(
+                cart_payment_id=cart_payment.id, status=IntentStatus.SUCCEEDED
+            )
+        ]
+        cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
+            return_value=intents_for_cart_payment
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_amount = FunctionMock(
+            return_value=generate_payment_intent(
+                status=IntentStatus.SUCCEEDED, amount=new_amount
+            )
+        )
+        cart_payment_processor.cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
+            return_value=generate_pgp_payment_intent(
+                status=IntentStatus.SUCCEEDED, amount=new_amount
+            )
+        )
+
+        result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(
+            cart_payment=cart_payment,
+            new_amount=new_amount,
+            idempotency_key=idempotency_key,
+        )
+
+        assert result_intent.status == IntentStatus.SUCCEEDED
+        assert result_intent.amount == 700
+        assert result_pgp_intent.status == IntentStatus.SUCCEEDED
+        assert result_pgp_intent.amount == 700
+
+        # Simulate resubmit after previous request that did not complete successfully:
+        # Refund created, but not processed completely.
+        cart_payment_processor.cart_payment_interface.find_existing_refund = FunctionMock(
+            return_value=(
+                generate_refund(status=RefundStatus.PROCESSING),
+                generate_pgp_refund(status=RefundStatus.PROCESSING),
+            )
+        )
+        resubmit_intent, resubmit_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(
+            cart_payment=cart_payment,
+            new_amount=new_amount,
+            idempotency_key=idempotency_key,
+        )
+        assert resubmit_intent == result_intent
+        assert resubmit_pgp_intent == result_pgp_intent
+
+        # Simulate resubmit of previous request that completed in provider but not on our end
+        cart_payment_processor.cart_payment_interface.find_existing_refund = FunctionMock(
+            return_value=(
+                generate_refund(status=RefundStatus.SUCCEEDED),
+                generate_pgp_refund(status=RefundStatus.SUCCEEDED),
+            )
+        )
+        resubmit_intent, resubmit_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(
+            cart_payment=cart_payment,
+            new_amount=new_amount,
+            idempotency_key=idempotency_key,
+        )
+        assert resubmit_intent == intents_for_cart_payment[0]
 
     @pytest.mark.asyncio
     async def test_cancel_payment_intent_for_uncaptured(self, cart_payment_processor):
@@ -418,6 +614,9 @@ class TestCartPaymentProcessor:
             payment_intent_id=payment_intent.id, status=IntentStatus.SUCCEEDED
         )
 
+        refund = generate_refund()
+        pgp_refund = generate_pgp_refund()
+
         provider_refund = (
             await cart_payment_processor.cart_payment_interface.app_context.stripe.refund_charge()
         )
@@ -427,6 +626,8 @@ class TestCartPaymentProcessor:
             pgp_payment_intent=pgp_payment_intent,
             provider_refund=provider_refund,
             refund_amount=payment_intent.amount,
+            refund=refund,
+            pgp_refund=pgp_refund,
         )
 
         # TODO verify expected values
@@ -468,10 +669,8 @@ class TestCartPaymentProcessor:
 
         # update legacy values in db
         result_stripe_charge = await cart_payment_processor.legacy_payment_interface.update_state_after_provider_submission(
-            payment_intent=payment_intent,
+            idempotency_key=str(uuid.uuid4()),
             provider_payment_intent=provider_payment_intent,
-            cart_payment=cart_payment,
-            legacy_payment=generate_legacy_payment(),
             legacy_stripe_charge=generate_legacy_stripe_charge(),
         )
 

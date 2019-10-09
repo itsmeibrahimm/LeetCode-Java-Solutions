@@ -28,6 +28,12 @@ class IntentStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class RefundStatus(str, Enum):
+    PROCESSING = "processing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class ChargeStatus(str, Enum):
     REQUIRES_CAPTURE = "requires_capture"
     SUCCEEDED = "succeeded"

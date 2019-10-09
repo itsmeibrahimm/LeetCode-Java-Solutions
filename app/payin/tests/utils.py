@@ -14,6 +14,9 @@ from app.payin.core.cart_payment.model import (
     PaymentIntent,
     PgpPaymentCharge,
     PgpPaymentIntent,
+    Refund,
+    PgpRefund,
+    PaymentIntentAdjustmentHistory,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -21,6 +24,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundStatus,
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
 from app.payin.core.payer.model import Payer
@@ -49,6 +53,7 @@ def generate_payment_intent(
     cart_payment_id: uuid.UUID = None,
     status: str = "init",
     amount: int = 500,
+    idempotency_key: str = None,
     capture_method: str = "manual",
     amount_received: Optional[int] = None,
     captured_at: Optional[datetime] = None,
@@ -58,7 +63,7 @@ def generate_payment_intent(
     return PaymentIntent(
         id=id if id else uuid.uuid4(),
         cart_payment_id=cart_payment_id if cart_payment_id else uuid.uuid4(),
-        idempotency_key=str(uuid.uuid4()),
+        idempotency_key=idempotency_key if idempotency_key else str(uuid.uuid4()),
         amount_initiated=0,
         amount=amount,
         amount_capturable=0,
@@ -136,6 +141,54 @@ def generate_cart_payment(
     )
 
 
+def generate_refund(
+    payment_intent_id: uuid.UUID = None, status: RefundStatus = RefundStatus.PROCESSING
+):
+    return Refund(
+        id=uuid.uuid4(),
+        payment_intent_id=payment_intent_id if payment_intent_id else uuid.uuid4(),
+        idempotency_key=str(uuid.uuid4()),
+        status=status,
+        amount=500,
+        currency=Currency.USD,
+        reason=None,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+
+
+def generate_pgp_refund(
+    status: RefundStatus = RefundStatus.PROCESSING, pgp_resource_id: str = None
+):
+    return PgpRefund(
+        id=uuid.uuid4(),
+        refund_id=uuid.uuid4(),
+        idempotency_key=str(uuid.uuid4()),
+        status=status,
+        pgp_code=PgpCode.STRIPE,
+        pgp_resource_id=pgp_resource_id,
+        amount=500,
+        currency=Currency.USD,
+        reason=None,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+
+
+def generate_payment_intent_adjustment_history():
+    return PaymentIntentAdjustmentHistory(
+        id=uuid.uuid4(),
+        payer_id=uuid.uuid4(),
+        payment_intent_id=uuid.uuid4(),
+        amount=500,
+        amount_original=400,
+        amount_delta=100,
+        currency=Currency.USD,
+        idempotency_key=str(uuid.uuid4()),
+        created_at=datetime.now(),
+    )
+
+
 def generate_legacy_payment() -> LegacyPayment:
     return LegacyPayment(
         dd_consumer_id=1,
@@ -172,6 +225,7 @@ def generate_legacy_stripe_charge(
     amount: int = 100,
     amount_refunded: int = 0,
     refunded_at: datetime = None,
+    idempotency_key: Optional[str] = None,
     status: str = LegacyStripeChargeStatus.SUCCEEDED,
     currency: Currency = Currency.USD,
     error_reason: str = None,
@@ -185,7 +239,7 @@ def generate_legacy_stripe_charge(
         error_reason=error_reason,
         additional_payment_info=None,
         description=None,
-        idempotency_key=str(uuid.uuid4),
+        idempotency_key=idempotency_key if idempotency_key else str(uuid.uuid4()),
         card_id=None,
         charge_id=charge_id if charge_id else 1,
         stripe_id=stripe_id if stripe_id else str(uuid.uuid4()),

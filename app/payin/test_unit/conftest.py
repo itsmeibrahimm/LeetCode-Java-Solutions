@@ -31,12 +31,15 @@ from app.payin.core.cart_payment.model import (
     LegacyConsumerCharge,
     LegacyStripeCharge,
     LegacyPayment,
+    Refund,
+    PgpRefund,
 )
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundStatus,
 )
 from app.payin.tests import utils
 
@@ -357,6 +360,7 @@ class MockedPaymentRepo:
         amount_original: int,
         amount_delta: int,
         currency: str,
+        idempotency_key: str,
     ) -> PaymentIntentAdjustmentHistory:
         return PaymentIntentAdjustmentHistory(
             id=id,
@@ -366,6 +370,7 @@ class MockedPaymentRepo:
             amount_original=amount_original,
             amount_delta=amount_delta,
             currency=currency,
+            idempotency_key=idempotency_key,
             created_at=datetime.now(),
         )
 
@@ -486,6 +491,72 @@ class MockedPaymentRepo:
     ) -> List[LegacyStripeCharge]:
         return [utils.generate_legacy_stripe_charge()]
 
+    async def get_payment_intent_adjustment_history(
+        self, payment_intent_id: UUID, idempotency_key: str
+    ) -> Optional[PaymentIntentAdjustmentHistory]:
+        return None
+
+    async def get_refund_by_idempotency_key(
+        self, idempotency_key: str
+    ) -> Optional[Refund]:
+        return None
+
+    async def insert_refund(
+        self,
+        id: UUID,
+        payment_intent_id: UUID,
+        idempotency_key: str,
+        status: RefundStatus,
+        amount: int,
+        reason: Optional[str],
+    ) -> Refund:
+        return Refund(
+            id=id,
+            payment_intent_id=payment_intent_id,
+            idempotency_key=idempotency_key,
+            status=status,
+            amount=amount,
+            reason=reason,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+
+    async def insert_pgp_refund(
+        self,
+        id: UUID,
+        refund_id: UUID,
+        idempotency_key: str,
+        status: RefundStatus,
+        pgp_code: PgpCode,
+        amount: int,
+        reason: Optional[str],
+    ) -> PgpRefund:
+        return PgpRefund(
+            id=id,
+            refund_id=refund_id,
+            idempotency_key=idempotency_key,
+            status=status,
+            amount=amount,
+            reason=reason,
+            pgp_code=pgp_code,
+            pgp_resource_id=None,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+
+    async def get_pgp_refund_by_refund_id(self, refund_id: UUID) -> Optional[PgpRefund]:
+        return None
+
+    async def update_refund_status(
+        self, refund_id: UUID, status: RefundStatus
+    ) -> Refund:
+        return utils.generate_refund(status=status)
+
+    async def update_pgp_refund(
+        self, pgp_refund_id: UUID, status: RefundStatus, pgp_resource_id: str
+    ) -> PgpRefund:
+        return utils.generate_pgp_refund(status=status, pgp_resource_id=pgp_resource_id)
+
 
 @pytest.fixture
 def cart_payment_repo():
@@ -580,6 +651,20 @@ def cart_payment_repo():
     payment_repo.get_legacy_stripe_charges_by_charge_id = (
         mocked_repo.get_legacy_stripe_charges_by_charge_id
     )
+
+    # Refunds
+    payment_repo.insert_refund = mocked_repo.insert_refund
+    payment_repo.get_payment_intent_adjustment_history = (
+        mocked_repo.get_payment_intent_adjustment_history
+    )
+    payment_repo.get_refund_by_idempotency_key = (
+        mocked_repo.get_refund_by_idempotency_key
+    )
+    payment_repo.update_refund_status = mocked_repo.update_refund_status
+
+    payment_repo.insert_pgp_refund = mocked_repo.insert_pgp_refund
+    payment_repo.get_pgp_refund_by_refund_id = mocked_repo.get_pgp_refund_by_refund_id
+    payment_repo.update_pgp_refund = mocked_repo.update_pgp_refund
 
     # Transaction function
     payment_repo.payment_database_transaction = ContextMock()
