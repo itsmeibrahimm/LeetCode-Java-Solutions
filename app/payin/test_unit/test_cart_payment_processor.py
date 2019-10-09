@@ -46,6 +46,50 @@ class TestCartPaymentProcessor:
             payer_repo=MagicMock(), log=MagicMock(), app_ctxt=MagicMock()
         )
 
+    def test_get_legacy_client_description(self, cart_payment_processor):
+        # Value < 1000: not modified
+        input_value = "test"
+        result = cart_payment_processor.get_legacy_client_description(input_value)
+        assert result == input_value
+
+        # Value over 1000: modified
+        input_value = """
+            #order_cart_adjustment# Hi Test Name,
+
+            This email is to confirm that we have edited your DoorDash order.
+            The new total cost of your order is $15.00 which includes
+            all taxes and fees.
+
+            Please note, you might see a refund for the
+            original order amount and a new, separate charge reflecting the final
+            adjusted order total of $15.00 in your account.
+
+            You can verify the final order total charge in your account by
+            visiting www.DoorDash.com and following these steps:
+                1. Click the 3 stacked bars to access the site menu.
+                2. Click Orders from the menu list.
+                3. Click on the relevant order to review the details, including order total.
+
+            The refund of your original order total and the updated final order total
+            charge can take between 5-7 business days to complete, depending on your
+            bank’s processing times.
+
+            Thanks again for ordering with DoorDash.
+            Please feel free to contact us if there’s anything else we can help with.
+
+            Best,
+            Varun
+            DoorDash Customer Care
+            support.doordash.com"
+            """
+
+        result = cart_payment_processor.get_legacy_client_description(input_value)
+        assert result == input_value[:1000]
+
+        # Not provided case
+        result = cart_payment_processor.get_legacy_client_description(None)
+        assert result is None
+
     @pytest.mark.asyncio
     async def test_create_payment_with_no_payment_method(
         self,

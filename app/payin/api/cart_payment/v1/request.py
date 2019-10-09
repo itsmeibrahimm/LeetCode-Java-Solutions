@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.payin.api.cart_payment.base.request import (
     CreateCartPaymentBaseRequest,
     UpdateCartPaymentBaseRequest,
+    ClientDescription,
 )
 
 
@@ -17,6 +18,7 @@ class CorrelationIds(BaseModel):
 class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
     payer_id: UUID
     payment_method_id: UUID
+    client_description: Optional[ClientDescription] = None
     correlation_ids: CorrelationIds
     metadata: Optional[Dict[str, Any]]
 

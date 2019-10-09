@@ -11,6 +11,9 @@ from app.payin.core.types import LegacyPaymentInfo
 
 class CreateCartPaymentLegacyRequest(CreateCartPaymentBaseRequest):
     payer_country: CountryCode = CountryCode.US
+    client_description: Optional[
+        str
+    ] = None  # Overridden here to allow for any length to be input
     legacy_payment: LegacyPaymentInfo
     legacy_correlation_ids: CorrelationIds
 

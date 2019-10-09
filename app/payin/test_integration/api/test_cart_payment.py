@@ -838,6 +838,48 @@ class TestCartPayment:
             payer, payment_method, 0, True
         )
         request_body["payer_statement_description"] = "01234567891123456789212"
+        self._test_cart_payment_creation_error(
+            client, request_body, 422, "request_validation_error", False
+        )
+
+        # Client description over 1000 too long
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, 0, True
+        )
+        request_body[
+            "client_description"
+        ] = """
+            #order_cart_adjustment# Hi Test Name,
+
+            This email is to confirm that we have edited your DoorDash order.
+            The new total cost of your order is $15.00 which includes
+            all taxes and fees.
+
+            Please note, you might see a refund for the
+            original order amount and a new, separate charge reflecting the final
+            adjusted order total of $15.00 in your account.
+
+            You can verify the final order total charge in your account by
+            visiting www.DoorDash.com and following these steps:
+                1. Click the 3 stacked bars to access the site menu.
+                2. Click Orders from the menu list.
+                3. Click on the relevant order to review the details, including order total.
+
+            The refund of your original order total and the updated final order total
+            charge can take between 5-7 business days to complete, depending on your
+            bank’s processing times.
+
+            Thanks again for ordering with DoorDash.
+            Please feel free to contact us if there’s anything else we can help with.
+
+            Best,
+            Varun
+            DoorDash Customer Care
+            support.doordash.com"
+            """
+        self._test_cart_payment_creation_error(
+            client, request_body, 422, "request_validation_error", False
+        )
 
         # Cart payment update
         request_body = self._get_cart_payment_create_request(
@@ -857,6 +899,60 @@ class TestCartPayment:
         )
         self._test_cart_payment_update_error(
             client, cart_payment, request_body, 422, "request_validation_error", False
+        )
+
+    def test_legacy_payment_client_description(
+        self,
+        stripe_api: StripeAPISettings,
+        stripe_customer: StripeCustomer,
+        client: TestClient,
+    ):
+        stripe_api.enable_outbound()
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_mastercard",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        request_body[
+            "client_description"
+        ] = """
+            #order_cart_adjustment# Hi Test Name,
+
+            This email is to confirm that we have edited your DoorDash order.
+            The new total cost of your order is $15.00 which includes
+            all taxes and fees.
+
+            Please note, you might see a refund for the
+            original order amount and a new, separate charge reflecting the final
+            adjusted order total of $15.00 in your account.
+
+            You can verify the final order total charge in your account by
+            visiting www.DoorDash.com and following these steps:
+                1. Click the 3 stacked bars to access the site menu.
+                2. Click Orders from the menu list.
+                3. Click on the relevant order to review the details, including order total.
+
+            The refund of your original order total and the updated final order total
+            charge can take between 5-7 business days to complete, depending on your
+            bank’s processing times.
+
+            Thanks again for ordering with DoorDash.
+            Please feel free to contact us if there’s anything else we can help with.
+
+            Best,
+            Varun
+            DoorDash Customer Care
+            support.doordash.com"
+        """
+
+        response = client.post("/payin/api/v0/cart_payments", json=request_body)
+        assert response.status_code == 201
+        cart_payment = response.json()
+        assert (
+            cart_payment["client_description"]
+            == request_body["client_description"][:1000]
         )
 
     def test_legacy_payment(

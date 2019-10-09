@@ -1703,6 +1703,14 @@ class CartPaymentProcessor:
 
         return payment_intent, pgp_payment_intent
 
+    def get_legacy_client_description(
+        self, request_client_description: Optional[str]
+    ) -> Optional[str]:
+        if not request_client_description:
+            return None
+
+        return request_client_description[:1000]
+
     async def update_payment_for_legacy_charge(
         self,
         idempotency_key: str,
@@ -1776,6 +1784,11 @@ class CartPaymentProcessor:
         # Amount is a delta.
         new_amount = cart_payment.amount + amount
 
+        # Client description cannot exceed 1000: truncated if needed
+        payment_client_description = self.get_legacy_client_description(
+            client_description
+        )
+
         return await self._update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
@@ -1783,7 +1796,7 @@ class CartPaymentProcessor:
             payer_id=None,
             payer_country=payer_country_code,
             amount=new_amount,
-            client_description=client_description,
+            client_description=payment_client_description,
             split_payment=split_payment,
         )
 
@@ -2026,6 +2039,12 @@ class CartPaymentProcessor:
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=legacy_payment
         )
+
+        # Client description cannot exceed 1000: truncated if needed
+        request_cart_payment.client_description = self.get_legacy_client_description(
+            request_cart_payment.client_description
+        )
+
         return await self._create_payment(
             request_cart_payment=request_cart_payment,
             pgp_payment_method=pgp_payment_method,
