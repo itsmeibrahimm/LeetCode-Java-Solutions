@@ -11,7 +11,7 @@ from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsync
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
 from app.commons.utils.pool import ThreadPoolHelper
-from app.payout.core.account.processors.create_standard_payout import (
+from app.payout.core.transfer.create_standard_payout import (
     CreateStandardPayout,
     CreateStandardPayoutRequest,
 )
@@ -535,7 +535,7 @@ class TestCreateStandardPayoutUtils:
             return mocked_payout
 
         mocker.patch(
-            "app.payout.core.account.processors.create_standard_payout.CreateStandardPayout.create_for_managed_account",
+            "app.payout.core.transfer.create_standard_payout.CreateStandardPayout.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
@@ -639,7 +639,7 @@ class TestCreateStandardPayoutUtils:
             raise error
 
         mocker.patch(
-            "app.payout.core.account.processors.create_standard_payout.CreateStandardPayout.create_for_managed_account",
+            "app.payout.core.transfer.create_standard_payout.CreateStandardPayout.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
@@ -702,7 +702,7 @@ class TestCreateStandardPayoutUtils:
             raise error
 
         mocker.patch(
-            "app.payout.core.account.processors.create_standard_payout.CreateStandardPayout.create_for_managed_account",
+            "app.payout.core.transfer.create_standard_payout.CreateStandardPayout.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
@@ -765,7 +765,7 @@ class TestCreateStandardPayoutUtils:
             raise error
 
         mocker.patch(
-            "app.payout.core.account.processors.create_standard_payout.CreateStandardPayout.create_for_managed_account",
+            "app.payout.core.transfer.create_standard_payout.CreateStandardPayout.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
@@ -828,7 +828,7 @@ class TestCreateStandardPayoutUtils:
             raise error
 
         mocker.patch(
-            "app.payout.core.account.processors.create_standard_payout.CreateStandardPayout.create_for_managed_account",
+            "app.payout.core.transfer.create_standard_payout.CreateStandardPayout.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
@@ -1180,7 +1180,7 @@ class TestCreateStandardPayoutUtils:
             return "US"
 
         mocker.patch(
-            "app.payout.core.account.processors.create_standard_payout.get_country_shortname",
+            "app.payout.core.transfer.create_standard_payout.get_country_shortname",
             side_effect=mock_get_country_shortname,
         )
 

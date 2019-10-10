@@ -16,17 +16,13 @@ from app.commons.context.req_context import get_logger_from_req
 from app.payout.api.account.utils import to_external_payout_account
 from app.payout.api.account.v1 import models
 from app.payout.core.account.processor import PayoutAccountProcessors
-from app.payout.core.account.processors.cancel_payout import CancelPayoutRequest
-from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
-from app.payout.core.account.processors.create_instant_payout import (
-    CreateInstantPayoutRequest,
-)
+from app.payout.core.transfer.cancel_payout import CancelPayoutRequest
+from app.payout.core.transfer.create_account import CreatePayoutAccountRequest
+from app.payout.core.transfer.create_instant_payout import CreateInstantPayoutRequest
 from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethodRequest,
 )
-from app.payout.core.account.processors.create_standard_payout import (
-    CreateStandardPayoutRequest,
-)
+from app.payout.core.transfer.create_standard_payout import CreateStandardPayoutRequest
 from app.payout.core.account.processors.get_account_stream import (
     GetPayoutAccountStreamRequest,
 )

@@ -11,10 +11,7 @@ from app.commons.providers.stripe.stripe_client import StripeAsyncClient, Stripe
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
 from app.commons.utils.pool import ThreadPoolHelper
-from app.payout.core.account.processors.cancel_payout import (
-    CancelPayout,
-    CancelPayoutRequest,
-)
+from app.payout.core.transfer.cancel_payout import CancelPayout, CancelPayoutRequest
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,

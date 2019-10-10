@@ -16,7 +16,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeAccountId,
 )
 from app.commons.utils.pool import ThreadPoolHelper
-from app.payout.core.account.processors.create_instant_payout import (
+from app.payout.core.transfer.create_instant_payout import (
     CreateInstantPayout,
     CreateInstantPayoutRequest,
 )

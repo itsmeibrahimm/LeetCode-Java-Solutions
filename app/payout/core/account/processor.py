@@ -2,16 +2,16 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.types import CountryCode
-from app.payout.core.account.processors.cancel_payout import (
+from app.payout.core.transfer.cancel_payout import (
     CancelPayoutRequest,
     CancelPayoutResponse,
     CancelPayout,
 )
-from app.payout.core.account.processors.create_account import (
+from app.payout.core.transfer.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
 )
-from app.payout.core.account.processors.create_instant_payout import (
+from app.payout.core.transfer.create_instant_payout import (
     CreateInstantPayoutRequest,
     CreateInstantPayoutResponse,
     CreateInstantPayout,
@@ -20,7 +20,7 @@ from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethod,
     CreatePayoutMethodRequest,
 )
-from app.payout.core.account.processors.create_standard_payout import (
+from app.payout.core.transfer.create_standard_payout import (
     CreateStandardPayoutRequest,
     CreateStandardPayoutResponse,
     CreateStandardPayout,
