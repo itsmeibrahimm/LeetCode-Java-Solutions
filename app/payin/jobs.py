@@ -34,6 +34,10 @@ async def capture_uncaptured_payment_intents(
     :param job_pool:
     :return:
     """
+    app_context.log.info(
+        "[payment-service cron job] triggering",
+        job="capture_uncaptured_payment_intents",
+    )
     req_context = build_req_context(app_context)
 
     cart_payment_repo = CartPaymentRepository(app_context)
@@ -56,6 +60,9 @@ async def capture_uncaptured_payment_intents(
         await job_pool.spawn(
             cart_payment_processor.capture_payment(payment_intent), cb=job_callback
         )
+    app_context.log.info(
+        "[payment-service cron job] triggered", job="capture_uncaptured_payment_intents"
+    )
 
 
 async def resolve_capturing_payment_intents(app_context: AppContext, job_pool: JobPool):
@@ -67,6 +74,9 @@ async def resolve_capturing_payment_intents(app_context: AppContext, job_pool: J
 
     :return:
     """
+    app_context.log.info(
+        "[payment-service cron job] triggering", job="resolve_capturing_payment_intents"
+    )
     cart_payment_repo = CartPaymentRepository(app_context)
 
     # Look for payment intents that haven't been updated in an hour and still in capturing
@@ -82,6 +92,9 @@ async def resolve_capturing_payment_intents(app_context: AppContext, job_pool: J
                 previous_status=payment_intent.status,
             )
         )
+    app_context.log.info(
+        "[payment-service cron job] triggered", job="resolve_capturing_payment_intents"
+    )
 
 
 async def emit_problematic_capture_count(
@@ -92,8 +105,14 @@ async def emit_problematic_capture_count(
     """
     Emits the number of problematic captures to statsd
     """
+    app_context.log.info(
+        "[payment-service cron job] triggering", job="emit_problematic_capture_count"
+    )
     cart_payment_repo = CartPaymentRepository(app_context)
     count = await cart_payment_repo.count_payment_intents_that_require_capture(
         problematic_threshold=problematic_threshold
     )
     statsd_client.gauge("capture.problematic_count", count)
+    app_context.log.info(
+        "[payment-service cron job] triggered", job="emit_problematic_capture_count"
+    )
