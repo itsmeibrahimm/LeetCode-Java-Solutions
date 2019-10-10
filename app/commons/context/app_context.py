@@ -31,6 +31,7 @@ from app.commons.utils.pool import ThreadPoolHelper
 from doordash_python_stats.ddstats import doorstats_global
 from app.commons.instrumentation.monitor import MonitoringManager
 from app.commons.instrumentation.eventloop import EventLoopMonitor
+from app.commons.instrumentation.memtrace import MemTraceMonitor
 from app.commons.instrumentation.pool import stat_thread_pool_jobs
 from app.payin.capture.service import CaptureService
 
@@ -97,6 +98,12 @@ async def create_app_context(config: AppConfig) -> AppContext:
     monitor.add(
         EventLoopMonitor(interval_secs=config.MONITOR_INTERVAL_EVENT_LOOP_LATENCY),
         interval_secs=config.MONITOR_INTERVAL_EVENT_LOOP_LATENCY,
+    )
+
+    # monitor: mem trace for each pid
+    monitor.add(
+        MemTraceMonitor(interval_secs=config.MONITOR_INTERVAL_MEM_TRACE),
+        interval_secs=config.MONITOR_INTERVAL_MEM_TRACE,
     )
 
     # Pick up a maindb replica upfront and use it for all instances targeting maindb

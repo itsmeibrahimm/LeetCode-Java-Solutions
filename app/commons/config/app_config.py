@@ -145,6 +145,7 @@ class AppConfig(SecretAware):
 
     # Monitoring Intervals
     MONITOR_INTERVAL_EVENT_LOOP_LATENCY: float = 0.5
+    MONITOR_INTERVAL_MEM_TRACE: float = 0.5
     MONITOR_INTERVAL_RESOURCE_JOB_POOL: float = 1
 
     #
