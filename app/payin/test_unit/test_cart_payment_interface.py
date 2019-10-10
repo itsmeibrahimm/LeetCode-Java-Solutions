@@ -53,6 +53,7 @@ from app.payin.tests.utils import (
     generate_pgp_payment_intent,
     generate_cart_payment,
     generate_provider_charges,
+    generate_provider_intent,
     generate_legacy_payment,
     generate_legacy_consumer_charge,
     generate_legacy_stripe_charge,
@@ -274,9 +275,7 @@ class TestLegacyPaymentInterface:
         pgp_payment_intent = generate_pgp_payment_intent(
             status="requires_capture", payment_intent_id=payment_intent.id
         )
-        provider_intent = (
-            await cart_payment_interface.app_context.stripe.capture_payment_intent()
-        )
+        provider_intent = generate_provider_intent()
         provider_intent.charges = generate_provider_charges(
             payment_intent, pgp_payment_intent
         )
@@ -315,9 +314,7 @@ class TestLegacyPaymentInterface:
         pgp_payment_intent = generate_pgp_payment_intent(
             status="requires_capture", payment_intent_id=payment_intent.id
         )
-        provider_intent = (
-            await cart_payment_interface.app_context.stripe.capture_payment_intent()
-        )
+        provider_intent = generate_provider_intent()
         provider_intent.charges = generate_provider_charges(
             payment_intent, pgp_payment_intent
         )
@@ -834,9 +831,7 @@ class TestCartPaymentInterface:
         payment_intent = generate_payment_intent()
         pgp_payment_intent = generate_pgp_payment_intent()
 
-        provider_intent = (
-            await cart_payment_interface.app_context.stripe.capture_payment_intent()
-        )
+        provider_intent = generate_provider_intent()
         provider_intent.charges = generate_provider_charges(
             payment_intent, pgp_payment_intent
         )
@@ -1160,9 +1155,7 @@ class TestCartPaymentInterface:
 
     @pytest.mark.asyncio
     async def test_update_pgp_charge_from_provider(self, cart_payment_interface):
-        provider_intent = (
-            await cart_payment_interface.app_context.stripe.capture_payment_intent()
-        )
+        provider_intent = generate_provider_intent()
         provider_intent.charges = generate_provider_charges(
             generate_payment_intent(), generate_pgp_payment_intent()
         )
@@ -1234,9 +1227,7 @@ class TestCartPaymentInterface:
         pgp_payment_intent = generate_pgp_payment_intent(
             status="requires_capture", payment_intent_id=payment_intent.id
         )
-        provider_intent = (
-            await cart_payment_interface.app_context.stripe.capture_payment_intent()
-        )
+        provider_intent = generate_provider_intent()
         provider_intent.charges = generate_provider_charges(
             payment_intent, pgp_payment_intent
         )
@@ -1557,13 +1548,22 @@ class TestCapturePayment:
 
 class TestCapturePaymentWithProvider(object):
     @pytest.mark.asyncio
+    async def test_capture_payment_partial(self, cart_payment_interface):
+        intent = generate_payment_intent(status="requires_capture", amount=300)
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        response = await cart_payment_interface.submit_capture_to_provider(
+            intent, pgp_intent
+        )
+        assert response.amount_received == intent.amount
+
+    @pytest.mark.asyncio
     async def test_capture_payment_with_provider(self, cart_payment_interface):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
         response = await cart_payment_interface.submit_capture_to_provider(
             intent, pgp_intent
         )
-        assert response
+        assert response.amount_received == intent.amount
 
     @pytest.mark.asyncio
     async def test_capture_payment_with_generic_stripe_error(

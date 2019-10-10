@@ -3,6 +3,11 @@ from datetime import datetime
 from typing import Optional
 from unittest.mock import MagicMock
 
+from asynctest import create_autospec
+
+from app.commons.providers.stripe.stripe_models import (
+    PaymentIntent as StripePaymentIntent,
+)
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -12,11 +17,11 @@ from app.payin.core.cart_payment.model import (
     LegacyStripeCharge,
     PaymentCharge,
     PaymentIntent,
+    PaymentIntentAdjustmentHistory,
     PgpPaymentCharge,
     PgpPaymentIntent,
-    Refund,
     PgpRefund,
-    PaymentIntentAdjustmentHistory,
+    Refund,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -55,6 +60,7 @@ def generate_payment_intent(
     amount: int = 500,
     idempotency_key: str = None,
     capture_method: str = "manual",
+    amount_capturable: Optional[int] = None,
     amount_received: Optional[int] = None,
     captured_at: Optional[datetime] = None,
     legacy_consumer_charge_id: LegacyConsumerChargeId = LegacyConsumerChargeId(1),
@@ -66,7 +72,7 @@ def generate_payment_intent(
         idempotency_key=idempotency_key if idempotency_key else str(uuid.uuid4()),
         amount_initiated=0,
         amount=amount,
-        amount_capturable=0,
+        amount_capturable=amount_capturable if amount_capturable else amount,
         amount_received=amount_received,
         application_fee_amount=application_fee_amount,
         capture_method=capture_method,
@@ -332,6 +338,18 @@ def generate_provider_charges(
     ]
 
     return charges
+
+
+def generate_provider_intent():
+    mocked_intent = create_autospec(StripePaymentIntent)
+    mocked_intent.id = "test_intent_id"
+    mocked_intent.status = "requires_capture"  # Assume delayed capture is used
+    mocked_intent.charges = MagicMock()
+    mocked_intent.charges.data = [MagicMock()]
+    mocked_intent.charges.data[0].status = "succeeded"
+    mocked_intent.charges.data[0].currency = "usd"
+    mocked_intent.charges.data[0].id = str(uuid.uuid4())
+    return mocked_intent
 
 
 def generate_dispute() -> Dispute:

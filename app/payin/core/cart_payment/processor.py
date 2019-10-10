@@ -886,7 +886,8 @@ class CartPaymentInterface:
         # Call to stripe payment intent API
         try:
             intent_request = StripeCapturePaymentIntentRequest(
-                sid=pgp_payment_intent.resource_id
+                sid=pgp_payment_intent.resource_id,
+                amount_to_capture=payment_intent.amount,
             )
 
             self.req_context.log.info(

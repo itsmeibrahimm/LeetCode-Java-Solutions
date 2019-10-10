@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime
 from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from asynctest import create_autospec
 
@@ -684,18 +684,21 @@ def stripe_interface():
     stripe = MagicMock()
 
     # Intent functions
-    mocked_intent = MagicMock()
-    mocked_intent.id = "test_intent_id"
-    mocked_intent.status = "requires_capture"  # Assume delayed capture is used
-    mocked_intent.charges = MagicMock()
-    mocked_intent.charges.data = [MagicMock()]
-    mocked_intent.charges.data[0].status = "succeeded"
-    mocked_intent.charges.data[0].currency = "usd"
-    mocked_intent.charges.data[0].id = str(uuid4())
 
-    stripe.create_payment_intent = FunctionMock(return_value=mocked_intent)
-    stripe.cancel_payment_intent = FunctionMock(return_value=mocked_intent)
-    stripe.capture_payment_intent = FunctionMock(return_value=mocked_intent)
+    stripe.create_payment_intent = FunctionMock(
+        return_value=utils.generate_provider_intent()
+    )
+    stripe.cancel_payment_intent = FunctionMock(
+        return_value=utils.generate_provider_intent()
+    )
+
+    async def mocked_capture(*args, **kwargs):
+        capture_request = kwargs["request"]
+        captured_provider_intent = utils.generate_provider_intent()
+        captured_provider_intent.amount_received = capture_request.amount_to_capture
+        return captured_provider_intent
+
+    stripe.capture_payment_intent = mocked_capture
 
     # Refund functions
     mocked_refund = MagicMock()
