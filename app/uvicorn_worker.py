@@ -6,7 +6,7 @@ class UvicornWorker(DefaultUvicornWorker):
     Extended gunicorn worker class from uvicorn.workers.UvicornWorker to allow more flexible configurations
     """
 
-    CONFIG_KWARGS = {"loop": "uvloop", "http": "httptools", "lifespan": "on"}
+    CONFIG_KWARGS = {"loop": "asyncio", "http": "httptools", "lifespan": "on"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
