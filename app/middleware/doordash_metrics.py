@@ -35,6 +35,10 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
         self.statsd_client = create_statsd_client_from_config(
             host, config, additional_tags={"hostname": platform.node()}
         )
+        config2 = StatsDConfig(PREFIX="dd.pay.payment-service", TAGS=config.TAGS)
+        self.statsd_client2 = create_statsd_client_from_config(
+            host, config2, additional_tags={"hostname": platform.node()}
+        )
 
     async def dispatch_func(
         self: Any, request: Request, call_next: RequestResponseEndpoint
@@ -85,6 +89,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
 
         self.statsd_client.incr(status_type, 1, tags=tags)
         self.statsd_client.timing("latency", latency_ms, tags=tags)
+        self.statsd_client2.timing("response.latency", latency_ms, tags=tags)
 
         return response
 
