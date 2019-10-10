@@ -7,7 +7,7 @@ from app.payout.core.transfer.cancel_payout import (
     CancelPayoutResponse,
     CancelPayout,
 )
-from app.payout.core.transfer.create_account import (
+from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
 )

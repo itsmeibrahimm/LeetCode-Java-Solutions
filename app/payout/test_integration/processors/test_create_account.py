@@ -5,7 +5,7 @@ import pytest_mock
 from IPython.utils.tz import utcnow
 
 from app.commons.database.infra import DB
-from app.payout.core.transfer.create_account import (
+from app.payout.core.account.processors.create_account import (
     CreatePayoutAccount,
     CreatePayoutAccountRequest,
 )
