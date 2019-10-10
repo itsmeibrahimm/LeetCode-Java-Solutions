@@ -54,7 +54,7 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
 
     # Mount routers
     default_payment_router_builder().add_sub_routers(
-        {"/accounts": account.v1.router}
+        {"/accounts": account.v1.router, "/transfers": transfer.v1.router}
     ).add_common_dependencies(
         ApiSecretRouteAuthorizer(config.PAYOUT_SERVICE_ID)
     ).attach_to_app(

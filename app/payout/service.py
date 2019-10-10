@@ -6,6 +6,7 @@ from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
+from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.repository.bankdb import (
     payout,
     stripe_payout_request,
@@ -23,6 +24,7 @@ from app.payout.repository.maindb import (
 
 __all__ = [
     "create_payout_account_processors",
+    "create_transfer_processors",
     "get_stripe_client",
     "PayoutService",
     "PaymentAccountRepository",
@@ -187,6 +189,14 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
         stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
         stripe=payout_service.stripe,
         managed_account_transfer_repo=payout_service.managed_account_transfers,
+    )
+
+
+def create_transfer_processors(payout_service: PayoutService = Depends()):
+    return TransferProcessors(
+        logger=payout_service.log,
+        stripe=payout_service.stripe,
+        transfer_repo=payout_service.transfers,
     )
 
 
