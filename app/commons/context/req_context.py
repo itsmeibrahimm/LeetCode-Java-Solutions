@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, Optional, cast, List
 from uuid import UUID, uuid4
 
 from starlette.requests import Request
@@ -11,7 +11,10 @@ from app.commons.constants import (
     EXTERNAL_CORRELATION_ID_HEADER,
 )
 from app.commons.context.app_context import AppContext, get_context_from_app
-from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
+from app.commons.operational_flags import (
+    STRIPE_COMMANDO_MODE_BOOLEAN,
+    STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY,
+)
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.runtime import runtime
 from app.commons.context.logger import set_request_id
@@ -23,6 +26,7 @@ class ReqContext:
     log: BoundLogger
     commando_mode: bool
     stripe_async_client: StripeAsyncClient
+    commando_legacy_payment_white_list: List  # whitelist of consumer_ids
     correlation_id: Optional[str] = None
 
 
@@ -35,6 +39,9 @@ def set_context_for_req(request: Request) -> ReqContext:
     correlation_id = request.headers.get(EXTERNAL_CORRELATION_ID_HEADER, None)
     log = app_context.log.bind(req_id=req_id, correlation_id=correlation_id)
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
+    commando_legacy_payment_white_list = runtime.get_json(
+        STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, []
+    )
 
     # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
     # per request level
@@ -49,6 +56,7 @@ def set_context_for_req(request: Request) -> ReqContext:
         commando_mode=commando_mode,
         correlation_id=correlation_id,
         stripe_async_client=stripe_async_client,
+        commando_legacy_payment_white_list=commando_legacy_payment_white_list,
     )
 
     state = cast(Any, request.state)
@@ -66,6 +74,9 @@ def get_context_from_req(request: Request) -> ReqContext:
 def build_req_context(app_context: AppContext):
     req_id = uuid4()
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
+    commando_legacy_payment_white_list = runtime.get_json(
+        STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, []
+    )
     # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
     # per request level
     stripe_async_client = StripeAsyncClient(
@@ -78,6 +89,7 @@ def build_req_context(app_context: AppContext):
         log=app_context.log.bind(req_id=req_id),
         commando_mode=commando_mode,
         stripe_async_client=stripe_async_client,
+        commando_legacy_payment_white_list=commando_legacy_payment_white_list,
     )
 
 
@@ -85,14 +97,35 @@ def get_logger_from_req(request: Request) -> BoundLogger:
     return get_context_from_req(request).log
 
 
-def is_req_commando_mode(request: Request):
+def is_req_commando_mode(request: Request) -> bool:
     return get_context_from_req(request).commando_mode
+
+
+def get_legacy_payment_commando_whitelist(request: Request) -> List:
+    return get_context_from_req(request).commando_legacy_payment_white_list
 
 
 def response_with_req_id(request: Request, response: Response):
     req_id = str(get_context_from_req(request).req_id)
     response.headers[PAYMENT_REQUEST_ID_HEADER] = req_id
     return response
+
+
+def override_commando_mode_context(request: Request, commando_mode: bool):
+    old_ctxt = get_context_from_req(request)
+    old_ctxt.stripe_async_client.commando = commando_mode
+    req_context = ReqContext(
+        req_id=old_ctxt.req_id,
+        log=old_ctxt.log,
+        commando_mode=commando_mode,
+        correlation_id=old_ctxt.correlation_id,
+        stripe_async_client=old_ctxt.stripe_async_client,
+        commando_legacy_payment_white_list=old_ctxt.commando_legacy_payment_white_list,
+    )
+    state = cast(Any, request.state)
+    state.context = req_context
+
+    return req_context
 
 
 def get_stripe_async_client_from_req(request: Request) -> Optional[StripeAsyncClient]:

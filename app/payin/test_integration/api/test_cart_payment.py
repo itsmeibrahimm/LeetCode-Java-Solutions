@@ -6,9 +6,12 @@ from starlette.testclient import TestClient
 from typing import Any, Optional, Dict
 
 from app.commons.context.app_context import AppContext
-from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from app.commons.providers.stripe.stripe_models import Customer as StripeCustomer
 from app.commons.types import CountryCode
+from app.commons.operational_flags import (
+    STRIPE_COMMANDO_MODE_BOOLEAN,
+    STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY,
+)
 from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
 
 
@@ -800,6 +803,61 @@ class TestCartPayment:
             merchant_country=CountryCode.AU,
         )
         assert cart_payment
+
+    def test_cart_payment_creation_with_commando_white_list(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        runtime_setter: RuntimeSetter,
+        app_context: AppContext,
+        event_loop: AbstractEventLoop,
+    ):
+        stripe_api.enable_outbound()
+        runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, False)
+        # Use payer, payment method api calls to seed data into legacy table.  It would be better to
+        # create directly in legacy system without creating corresponding records in the new tables since
+        # that is a more realistic case, but there is not yet an easy way to set this up.
+        provider_account_id = payer["payment_gateway_provider_customers"][0][
+            "payment_provider_customer_id"
+        ]
+
+        provider_card_id = payment_method["payment_gateway_provider_details"][
+            "payment_method_id"
+        ]
+
+        # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
+        with RuntimeContextManager(
+            STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, [1], runtime_setter
+        ):
+            cart_payment = self._test_cart_payment_legacy_payment_creation(
+                client=client,
+                stripe_customer_id=provider_account_id,
+                stripe_card_id=provider_card_id,
+                amount=700,
+                merchant_country=CountryCode.US,
+            )
+            assert cart_payment
+
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
+            client=client,
+            stripe_customer_id=provider_account_id,
+            stripe_card_id=provider_card_id,
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+
+        assert cart_payment
+
+        commando_processor: CommandoProcessor = build_commando_processor(
+            app_context=app_context
+        )
+        total, result = event_loop.run_until_complete(commando_processor.recoup())
+
+        assert result[0][1] == 700
+
+        assert total == 1
 
     def test_payment_provider_error(
         self, stripe_api: StripeAPISettings, client: TestClient

@@ -19,7 +19,10 @@ from app.payin.api.cart_payment.v0.request import (
     UpdateCartPaymentLegacyRequest,
 )
 from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyResponse
-from app.payin.api.commando_mode import commando_route_dependency
+from app.payin.api.commando_mode import (
+    commando_route_dependency,
+    override_commando_mode_legacy_cart_payment,
+)
 from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import LegacyConsumerChargeId
@@ -43,7 +46,9 @@ router = APIRouter()
     tags=api_tags,
 )
 async def create_cart_payment_for_legacy_client(
-    cart_payment_request: CreateCartPaymentLegacyRequest,
+    cart_payment_request: CreateCartPaymentLegacyRequest = Depends(
+        override_commando_mode_legacy_cart_payment
+    ),
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):

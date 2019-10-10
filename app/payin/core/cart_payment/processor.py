@@ -2,7 +2,7 @@ import uuid
 from asyncio import gather
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, NewType
 
 from fastapi import Depends
 from stripe.error import InvalidRequestError, StripeError
@@ -85,6 +85,8 @@ from app.payin.core.types import (
     PgpPaymentMethodResourceId,
 )
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
+
+IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
 
 
 class LegacyPaymentInterface:
@@ -2515,7 +2517,9 @@ class CommandoProcessor(CartPaymentProcessor):
             legacy_stripe_charge,
         )
 
-    async def fullfill_intent(self, payment_intent: PaymentIntent) -> Tuple[str, int]:
+    async def fullfill_intent(
+        self, payment_intent: PaymentIntent
+    ) -> IntentFullfillmentResult:
         (
             cart_payment,
             legacy_payment,
@@ -2583,9 +2587,13 @@ class CommandoProcessor(CartPaymentProcessor):
             status=payment_intent.status,
             amount=legacy_stripe_charge.amount,
         )
-        return payment_intent.status, legacy_stripe_charge.amount
+        return IntentFullfillmentResult(
+            (payment_intent.status, legacy_stripe_charge.amount)
+        )
 
-    async def recoup(self, limit: Optional[int] = 10000, chunk_size: int = 100):
+    async def recoup(
+        self, limit: Optional[int] = 10000, chunk_size: int = 100
+    ) -> Tuple[int, List[IntentFullfillmentResult]]:
         """
         This may have to be called multiple times from ipython shell until we have re-couped everything.
 
@@ -2597,13 +2605,16 @@ class CommandoProcessor(CartPaymentProcessor):
             status=IntentStatus.PENDING, limit=limit
         )
         total = 0
+        results: List[IntentFullfillmentResult] = []
         for i in range(0, len(pending_ps_payment_intents), chunk_size):
             chunk = pending_ps_payment_intents[i : i + chunk_size]
-            results = await gather(
-                *[self.fullfill_intent(payment_intent=pi) for pi in chunk],
-                return_exceptions=True,
+            results.extend(
+                await gather(
+                    *[self.fullfill_intent(payment_intent=pi) for pi in chunk],
+                    return_exceptions=True,
+                )
             )
             total += len(results)
-            self.log.info(f"Attempted to recoup {len(results)} payment_intents")
+            self.log.info(f"Attempted to recoup payment_intents", amount=len(results))
 
         return total, results
