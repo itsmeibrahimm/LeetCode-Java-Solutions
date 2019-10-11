@@ -39,7 +39,7 @@ class TestCaptureUncapturedPaymentIntents:
         await capture_uncaptured_payment_intents(
             app_context=app_context, job_pool=stripe_pool
         )
-        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture.assert_called_once()  # type: ignore
+        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture_before_cutoff.assert_called_once()  # type: ignore
 
     @pytest.mark.asyncio
     @patch(
@@ -63,7 +63,7 @@ class TestCaptureUncapturedPaymentIntents:
         async def mock_find_payment_intents_that_require_capture(*args):
             yield payment_intent
 
-        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture = (  # type: ignore
+        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture_before_cutoff = (  # type: ignore
             mock_find_payment_intents_that_require_capture
         )
         await capture_uncaptured_payment_intents(

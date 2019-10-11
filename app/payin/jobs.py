@@ -82,7 +82,7 @@ async def capture_uncaptured_payment_intents(
         legacy_payment_interface=legacy_payment_interface,
     )
 
-    uncaptured_payment_intents = cart_payment_repo.find_payment_intents_that_require_capture(
+    uncaptured_payment_intents = cart_payment_repo.find_payment_intents_that_require_capture_before_cutoff(
         datetime.utcnow()
     )
 

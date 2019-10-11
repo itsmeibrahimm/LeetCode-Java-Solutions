@@ -1206,13 +1206,40 @@ class TestLegacyCharges:
 
 class TestFindPaymentIntentsThatRequireCapture:
     @pytest.mark.asyncio
-    async def test_returns_batches(
+    async def test_intent_need_capture_right_on_cutoff_is_included(
         self,
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
-        results = cart_payment_repository.find_payment_intents_that_require_capture(
-            cutoff=datetime(2016, 1, 1)
+        assert payment_intent.capture_after
+        results = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
+            cutoff=payment_intent.capture_after
+        )
+        ids = [i.id async for i in results]
+        assert payment_intent.id in ids
+
+    @pytest.mark.asyncio
+    async def test_intent_need_capture_after_cutoff_is_NOT_included(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        assert payment_intent.capture_after
+        results = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
+            cutoff=payment_intent.capture_after - timedelta(seconds=1)
+        )
+        ids = [i.id async for i in results]
+        assert payment_intent.id not in ids
+
+    @pytest.mark.asyncio
+    async def test_intent_need_capture_before_cutoff_is_included(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        assert payment_intent.capture_after
+        results = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
+            cutoff=payment_intent.capture_after + timedelta(seconds=1)
         )
         ids = [i.id async for i in results]
         assert payment_intent.id in ids

@@ -138,7 +138,7 @@ class CartPaymentRepository(PayinDBRepository):
         results = await self.payment_database.replica().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
-    async def find_payment_intents_that_require_capture(
+    async def find_payment_intents_that_require_capture_before_cutoff(
         self, cutoff: datetime
     ) -> AsyncIterator[PaymentIntent]:
         """
@@ -149,7 +149,7 @@ class CartPaymentRepository(PayinDBRepository):
         query = payment_intents.table.select().where(
             and_(
                 payment_intents.status == IntentStatus.REQUIRES_CAPTURE,
-                payment_intents.capture_after >= cutoff,
+                payment_intents.capture_after <= cutoff,
             )
         )
 
