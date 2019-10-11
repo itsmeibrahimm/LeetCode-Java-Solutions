@@ -1,3 +1,4 @@
+import random
 from asyncio import AbstractEventLoop
 
 import pytest
@@ -236,6 +237,12 @@ class TestCartPayment:
         request_body["idempotency_key"] = idempotency
         return request_body
 
+    def _get_random_charge_id(self, charge_id):
+        while True:
+            id = random.randint(1, 100000)
+            if id != charge_id:
+                return id
+
     def _test_cart_payment_legacy_payment_creation(
         self,
         client: TestClient,
@@ -383,6 +390,23 @@ class TestCartPayment:
         cart_payment = response.json()
         assert cart_payment["id"]
 
+    def _test_cancel_cart_payment_error(
+        self,
+        client: TestClient,
+        cart_payment_id: uuid.UUID,
+        expected_http_status_status_code: int,
+        expected_body_error_code: str,
+        expected_retryable: bool,
+    ) -> None:
+        self._test_cart_payment_error(
+            client,
+            f"/payin/api/v1/cart_payments/{str(cart_payment_id)}/cancel",
+            {},
+            expected_http_status_status_code,
+            expected_body_error_code,
+            expected_retryable,
+        )
+
     def _test_legacy_cart_payment_adjustment(
         self,
         client: TestClient,
@@ -410,6 +434,46 @@ class TestCartPayment:
         assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
+
+    def _test_legacy_update_cart_payment_not_found_error(
+        self,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+        charge_id: int,
+        amount: int,
+        original_amount: int,
+    ) -> None:
+        request_body = self._get_legacy_cart_payment_update_request(
+            cart_payment=cart_payment,
+            amount=amount,
+            client_description=f"{cart_payment['client_description']}-updated",
+        )
+        self._test_cart_payment_error(
+            client,
+            f"/payin/api/v0/cart_payments/{str(charge_id)}/adjust",
+            request_body,
+            404,
+            "payin_61",
+            False,
+        )
+
+    def _test_adjust_cart_payment_not_found_error(
+        self,
+        client: TestClient,
+        cart_payment: Dict[str, Any],
+        request_body: Dict[str, Any],
+        expected_http_status_status_code: int,
+        expected_body_error_code: str,
+        expected_retryable: bool,
+    ) -> None:
+        self._test_cart_payment_error(
+            client,
+            f"/payin/api/v1/cart_payments/{str(uuid.uuid4())}/adjust",
+            request_body,
+            expected_http_status_status_code,
+            expected_body_error_code,
+            expected_retryable,
+        )
 
     def _test_cart_payment_creation_error(
         self,
@@ -493,6 +557,15 @@ class TestCartPayment:
         )
         # Cancel previous cart payment - pending payment intent in provider will be cancelled.
         self._test_cancel_cart_payment(client=client, cart_payment=cart_payment)
+
+        # Cancel a cart payment which is not present. 404 expected
+        self._test_cancel_cart_payment_error(
+            client=client,
+            cart_payment_id=uuid.uuid4(),
+            expected_http_status_status_code=404,
+            expected_body_error_code="payin_61",
+            expected_retryable=False,
+        )
 
         # Auto captured payment
         cart_payment = self._test_cart_payment_creation(
@@ -978,6 +1051,14 @@ class TestCartPayment:
         )
         request_body = self._get_cart_payment_update_request(
             cart_payment=cart_payment,
+            amount=1000,
+            client_description=f"{cart_payment['client_description']}-updated",
+        )
+        self._test_adjust_cart_payment_not_found_error(
+            client, cart_payment, request_body, 404, "payin_61", False
+        )
+        request_body = self._get_cart_payment_update_request(
+            cart_payment=cart_payment,
             amount=-1,
             client_description=f"{cart_payment['client_description']}-updated",
         )
@@ -1071,6 +1152,15 @@ class TestCartPayment:
             cart_payment=cart_payment,
             charge_id=cart_payment["dd_charge_id"],
             amount=-250,
+            original_amount=1000,
+        )
+
+        # Adjustment. Up but cart payment not found
+        self._test_legacy_update_cart_payment_not_found_error(
+            client=client,
+            cart_payment=cart_payment,
+            charge_id=self._get_random_charge_id(cart_payment["dd_charge_id"]),
+            amount=2500,
             original_amount=1000,
         )
 
