@@ -78,7 +78,7 @@ class TestPayoutMethodMiscellaneousRepository:
             payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
         )
         stripe_card = mock_stripe_card()
-        stripe_card.fingerprint = None  # type: ignore
+        stripe_card.last4 = None  # type: ignore
         payout_method_miscellaneous_create = PayoutMethodMiscellaneousCreate(
             payout_account_id=payment_account.id,
             payout_method_type=PayoutExternalAccountType.CARD.value,

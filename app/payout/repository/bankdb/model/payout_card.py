@@ -59,7 +59,6 @@ class PayoutCard(_PayoutCardPartial):
     exp_year: int
     created_at: datetime
     updated_at: datetime
-    fingerprint: str
 
 
 class PayoutCardCreate(_PayoutCardPartial):
@@ -71,4 +70,3 @@ class PayoutCardCreate(_PayoutCardPartial):
     exp_year: int
     created_at: datetime
     updated_at: datetime
-    fingerprint: str

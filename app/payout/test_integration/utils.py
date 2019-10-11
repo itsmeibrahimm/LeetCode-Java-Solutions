@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from app.commons.types import CountryCode, Currency
 from stripe.error import StripeError
@@ -309,6 +309,7 @@ async def prepare_and_insert_payout_card(
     is_default: bool = True,
     created_at: datetime = datetime.utcnow(),
     updated_at: datetime = datetime.utcnow(),
+    fingerprint: Optional[str] = "fingerprint",
 ):
     payout_method = await prepare_and_insert_payout_method(
         payout_method_repo, payout_account_id, is_default
@@ -323,7 +324,7 @@ async def prepare_and_insert_payout_card(
         exp_year=23,
         created_at=created_at,
         updated_at=updated_at,
-        fingerprint="fingerprint",
+        fingerprint=fingerprint,
     )
 
     payout_card = await payout_card_repo.create_payout_card(data)
