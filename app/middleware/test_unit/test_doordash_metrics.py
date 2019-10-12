@@ -76,6 +76,8 @@ class TestDoorDashMetricsMiddleware:
             assert (
                 kwargs["path"] == "/health"
             ), "complete path is logged for routes on app"
+            assert kwargs["size"] > 0, "content length is set"
+            assert kwargs["user_agent"], "user agent is set"
 
             context.reset_mock()
 

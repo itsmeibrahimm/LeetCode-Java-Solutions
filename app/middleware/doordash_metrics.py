@@ -57,6 +57,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
         # the leading path components get stripped off
         # as routing traverses sub-apps
         path = request.scope.get("path", "")
+        user_agent = request.headers.get("User-Agent", "")
 
         # make the request logger available to
         # app-level resources
@@ -72,6 +73,12 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
         latency_ms = (time.perf_counter() - start_time) * 1000
         status_type = f"{response.status_code // 100}XX"
 
+        # size
+        try:
+            size = int(response.headers.get("Content-Length", "0"))
+        except ValueError:
+            size = 0
+
         context.log.info(
             "request complete",
             path=path,
@@ -79,6 +86,8 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
             method=method,
             status_code=str(response.status_code),
             latency=round(latency_ms, 3),
+            user_agent=user_agent,
+            size=size,
         )
 
         tags = {
