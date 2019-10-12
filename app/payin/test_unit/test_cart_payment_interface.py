@@ -572,6 +572,21 @@ class TestCartPaymentInterface:
                 IntentStatus.INIT
             )
 
+    def test_is_update_cancelling_payment(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        assert (
+            cart_payment_interface.is_amount_adjustment_cancelling_payment(
+                cart_payment, 0
+            )
+            is True
+        )
+        assert (
+            cart_payment_interface.is_amount_adjustment_cancelling_payment(
+                cart_payment, 100
+            )
+            is False
+        )
+
     def test_is_amount_adjusted_higher(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
         cart_payment.amount = 500

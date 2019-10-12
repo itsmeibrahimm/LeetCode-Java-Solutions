@@ -719,9 +719,9 @@ class TestCartPayment:
             },
         )
 
-        # Adjust down again
+        # Adjust down again, this time down to zero
         updated_cart_payment = self._test_cart_payment_adjustment(
-            client=client, cart_payment=updated_cart_payment, amount=390
+            client=client, cart_payment=updated_cart_payment, amount=0
         )
 
     def test_cart_payment_adjustment_with_split_payment(

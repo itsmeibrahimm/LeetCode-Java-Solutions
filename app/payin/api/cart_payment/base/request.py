@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, PositiveInt, ConstrainedStr
+from pydantic import BaseModel, PositiveInt, ConstrainedInt, ConstrainedStr
 
 from app.commons.types import CountryCode, Currency
 from app.commons.types import CountryCode
@@ -20,6 +20,14 @@ class ClientDescription(ConstrainedStr):
     """
 
     max_length = 1000
+
+
+class UpdateAmount(ConstrainedInt):
+    """
+    Int used for updating a cart payment amount.  Allows zero or higher to be provided.
+    """
+
+    ge = 0
 
 
 class SplitPayment(BaseModel):
@@ -42,7 +50,7 @@ class CreateCartPaymentBaseRequest(BaseModel):
 
 class UpdateCartPaymentBaseRequest(BaseModel):
     idempotency_key: str
-    amount: PositiveInt
+    amount: UpdateAmount
     client_description: Optional[str] = None
     split_payment: Optional[SplitPayment] = None
 

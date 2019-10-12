@@ -456,6 +456,11 @@ class CartPaymentInterface:
         # Charge status is a subset of Intent status
         return ChargeStatus(intent_status)
 
+    def is_amount_adjustment_cancelling_payment(
+        self, cart_payment: CartPayment, amount: int
+    ) -> bool:
+        return amount == 0
+
     def is_amount_adjusted_higher(self, cart_payment: CartPayment, amount: int) -> bool:
         return amount > cart_payment.amount
 
@@ -2083,6 +2088,9 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
             )
 
+        # TODO Move idempotency key based checks up to here (from inside _update_payment_with_higher_amount,
+        # _update_payment_with_lower_amount functions).
+
         # Update the cart payment
         # TODO PAY-3791 concurrency control for attempts to update the same cart payment
         if self.cart_payment_interface.is_amount_adjusted_higher(cart_payment, amount):
@@ -2099,6 +2107,19 @@ class CartPaymentProcessor:
             payment_intent, pgp_payment_intent = await self._update_payment_with_lower_amount(
                 cart_payment, amount, idempotency_key
             )
+
+            # If new target amount is 0, we treat the operation as equivalent to cancelling the intent.
+            if self.cart_payment_interface.is_amount_adjustment_cancelling_payment(
+                cart_payment, amount
+            ):
+                self.log.info(
+                    "Cancelling cart payment due to zero amount update",
+                    cart_payment_id=cart_payment.id,
+                    payment_intent_id=payment_intent.id,
+                )
+                payment_intent, pgp_payment_intent = await self._cancel_payment_intent(
+                    cart_payment=cart_payment, payment_intent=payment_intent
+                )
         else:
             # Amount is the same: properties of cart payment other than the amount may be changing
             payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
