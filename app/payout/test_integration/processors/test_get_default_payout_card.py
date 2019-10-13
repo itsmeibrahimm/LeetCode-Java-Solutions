@@ -100,7 +100,7 @@ class TestGetDefaultPayoutCard:
     ):
         payout_account = await prepare_and_insert_payment_account(payment_account_repo)
         count = 4
-        card_without_fingerprint = prepare_and_insert_payout_card(
+        card_without_fingerprint = await prepare_and_insert_payout_card(
             payout_method_repo,
             payout_card_repo,
             payout_account_id=payout_account.id,

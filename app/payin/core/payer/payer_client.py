@@ -451,6 +451,8 @@ class PayerOps(PayerOpsInterface):
                 pgp_code=pgp_code,
                 pgp_resource_id=pgp_customer_resource_id,
                 default_payment_method_id=pgp_payment_method_resource_id,
+                country=country,
+                is_primary=True,  # is_primary is always True for payer's first pgp_customer
             )
             payer_entity, pgp_customer_entity = await self.payer_repo.insert_payer_and_pgp_customer(
                 payer_input=payer_input, pgp_customer_input=pgp_customer_input

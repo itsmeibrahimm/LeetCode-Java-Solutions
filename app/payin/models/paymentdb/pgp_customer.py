@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Text, BigInteger, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, Text, BigInteger, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -16,6 +16,8 @@ class PgpCustomerTable(TableDefinition):
     legacy_id: Column = no_init_field(Column("legacy_id", BigInteger))
     pgp_code: Column = no_init_field(Column("pgp_code", Text))
     pgp_resource_id: Column = no_init_field(Column("pgp_resource_id", Text))
+    country: Column = no_init_field(Column("country", Text))
+    is_primary: Column = no_init_field(Column("is_primary", Boolean))
     payer_id: Column = no_init_field(
         Column("payer_id", UUID(as_uuid=True), ForeignKey("payer.id"))
     )

@@ -85,6 +85,8 @@ class PgpCustomerDbEntity(DBEntity):
     id: UUID
     payer_id: UUID
     pgp_resource_id: str
+    country: Optional[CountryCode] = None
+    is_primary: Optional[bool] = None
     currency: Optional[str] = None
     pgp_code: Optional[PgpCode] = None
     legacy_id: Optional[int] = None
