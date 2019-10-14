@@ -1,7 +1,8 @@
 import json
 import os
+import unittest.mock
 from dataclasses import dataclass
-from typing import Any, List, Callable, Tuple, Dict, Union
+from typing import Any, Callable, Dict, List, Tuple, Union
 from unittest.mock import Mock
 
 import pytest
@@ -9,7 +10,6 @@ from _pytest.nodes import Item
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 from pytest_mock import MockFixture
 from starlette.testclient import TestClient
-import unittest.mock
 
 from app.commons import stats
 from app.commons.config.app_config import AppConfig
@@ -17,9 +17,6 @@ from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.context.logger import get_logger
 from app.commons.database.infra import DB
 from app.commons.utils.testing import Stat, parse_raw_stat
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
-from app.payin.repository.payer_repo import PayerRepository
-from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
 os.environ["ENVIRONMENT"] = "testing"
 
@@ -238,24 +235,6 @@ def pytest_collection_modifyitems(items: List[Item]):
         # Dynamically add pytest.mark.integration to integration tests
         if "test_integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
-
-
-# REPOSITORIES
-
-
-@pytest.fixture
-async def cart_payment_repository(app_context: AppContext):
-    return CartPaymentRepository(app_context)
-
-
-@pytest.fixture
-async def payer_repository(app_context: AppContext):
-    yield PayerRepository(app_context)
-
-
-@pytest.fixture
-async def payment_method_repository(app_context: AppContext):
-    yield PaymentMethodRepository(app_context)
 
 
 @pytest.fixture(scope="session")
