@@ -1,2 +1,6 @@
+# Account
 CREATE_STRIPE_ACCOUNT_TYPE = "custom"
 CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES = ["legacy_payments"]
+
+# Pagination
+DEFAULT_PAGE_SIZE = 100

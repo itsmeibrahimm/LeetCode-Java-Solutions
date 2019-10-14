@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Tuple, Optional
 
+from app.commons.test_integration.constants import TEST_DEFAULT_PAGE_SIZE
 from app.commons.types import CountryCode, Currency
 from stripe.error import StripeError
 
-from app.payout.core.account.constants import CREATE_STRIPE_ACCOUNT_TYPE
+from app.payout.constants import CREATE_STRIPE_ACCOUNT_TYPE
 from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.payout_card import PayoutCardCreate, PayoutCard
 from app.payout.repository.bankdb.model.payout_method import (
@@ -17,7 +18,11 @@ from app.payout.repository.bankdb.model.stripe_payout_request import (
 from app.payout.repository.bankdb.model.stripe_managed_account_transfer import (
     StripeManagedAccountTransferCreate,
 )
-from app.payout.repository.bankdb.model.transaction import TransactionCreate
+from app.payout.repository.bankdb.model.transaction import (
+    TransactionCreate,
+    Transaction,
+    TransactionState,
+)
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
@@ -55,6 +60,7 @@ from app.payout.types import (
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
 from app.commons.providers.stripe import stripe_models as models
+from app.payout import types
 
 
 """
@@ -130,7 +136,7 @@ async def prepare_and_insert_payout(
         amount=1000,
         payment_account_id=123,
         status="failed",
-        currency="USD",
+        currency=Currency.USD.value,
         fee=199,
         type="instant",
         idempotency_key=ide_key,
@@ -175,9 +181,14 @@ async def prepare_and_insert_stripe_payout_request(
     return stripe_payout_request
 
 
-async def prepare_and_insert_transaction(transaction_repo: TransactionRepository):
+async def prepare_and_insert_transaction(
+    transaction_repo: TransactionRepository, payout_account_id: int
+) -> Transaction:
     data = TransactionCreate(
-        amount=1000, payment_account_id=123, amount_paid=800, currency="USD"
+        amount=1000,
+        amount_paid=800,
+        payment_account_id=payout_account_id,
+        currency=Currency.USD.value,
     )
 
     transaction = await transaction_repo.create_transaction(data)
@@ -185,7 +196,102 @@ async def prepare_and_insert_transaction(transaction_repo: TransactionRepository
     validate_expected_items_in_dict(
         expected=data.dict(skip_defaults=True), actual=transaction.dict()
     )
+    assert transaction.created_at, "created_at shouldn't be None"
+    assert transaction.updated_at, "updated_at shouldn't be None"
     return transaction
+
+
+async def prepare_and_insert_transaction_list_for_same_account(
+    transaction_repo: TransactionRepository,
+    payout_account_id: int,
+    transfer_id: Optional[int] = None,
+    payout_id: Optional[int] = None,
+    count: int = 10,
+) -> List[Transaction]:
+    transaction_list: List[Transaction] = []
+    for i in range(0, count):
+        data = TransactionCreate(
+            amount=1000,
+            amount_paid=800,
+            payment_account_id=payout_account_id,
+            currency=Currency.USD.value,
+            transfer_id=transfer_id,
+            payout_id=payout_id,
+        )
+
+        transaction = await transaction_repo.create_transaction(data)
+        assert transaction.id, "transaction is created, assigned an ID"
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=transaction.dict()
+        )
+        assert transaction.created_at, "created_at shouldn't be None"
+        assert transaction.updated_at, "updated_at shouldn't be None"
+        transaction_list.insert(0, transaction)
+    return transaction_list
+
+
+async def prepare_and_insert_paid_transaction_list_for_transfer(
+    transaction_repo: TransactionRepository,
+    payout_account_id: int,
+    transfer_id: int,
+    count: int = 5,
+) -> List[Transaction]:
+    transaction_list: List[Transaction] = []
+    for i in range(0, count):
+        data = TransactionCreate(
+            amount=1000,
+            amount_paid=800,
+            payment_account_id=payout_account_id,
+            currency=Currency.USD.value,
+            transfer_id=transfer_id,
+            state=TransactionState.ACTIVE.value,
+        )
+
+        transaction = await transaction_repo.create_transaction(data)
+        assert transaction.id, "transaction is created, assigned an ID"
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=transaction.dict()
+        )
+        assert transaction.created_at, "created_at shouldn't be None"
+        assert transaction.updated_at, "updated_at shouldn't be None"
+        transaction_list.insert(0, transaction)
+    return transaction_list
+
+
+async def prepare_and_insert_transaction_list_for_different_targets(
+    transaction_repo: TransactionRepository,
+    payment_account_repo: PaymentAccountRepository,
+    count: int = TEST_DEFAULT_PAGE_SIZE + 5,
+) -> Tuple[List[Transaction], List[int]]:
+    transaction_list: List[Transaction] = []
+    target_size = 5
+    payment_account_list = await prepare_and_insert_payment_account_list(
+        payment_account_repo, count=target_size
+    )
+    # fake 5 target_id
+    target_id_list: List[int] = [
+        payment_account.id for payment_account in payment_account_list
+    ]
+
+    for i in range(0, count):
+        index = i % target_size
+        payment_account = payment_account_list[index]
+        data = TransactionCreate(
+            amount=1000,
+            amount_paid=800,
+            payment_account_id=payment_account.id,
+            currency=Currency.USD.value,
+            target_type=payment_account.entity,
+            target_id=target_id_list[index],
+        )
+
+        transaction = await transaction_repo.create_transaction(data)
+        assert transaction.id, "transaction is created, assigned an ID"
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=transaction.dict()
+        )
+        transaction_list.insert(0, transaction)
+    return transaction_list, target_id_list
 
 
 async def prepare_and_insert_stripe_transfer(
@@ -249,6 +355,48 @@ async def prepare_and_insert_payment_account(
         expected=data.dict(skip_defaults=True), actual=payment_account.dict()
     )
     return payment_account
+
+
+async def prepare_and_insert_payment_account_list(
+    payment_account_repo: PaymentAccountRepository,
+    account_ids: List[types.PgpAccountId] = None,
+    count: int = 5,
+) -> List[PaymentAccount]:
+    payout_account_list: List[PaymentAccount] = []
+    if account_ids:
+        assert len(account_ids) == count
+    for i in range(0, count):
+        # create payout_account
+        account_id = account_ids[i] if account_ids else None
+        data = PaymentAccountCreate(
+            account_id=account_id,
+            account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
+            entity=types.PayoutAccountTargetType.DASHER
+            if i % 2 == 0
+            else types.PayoutAccountTargetType.STORE,
+            resolve_outstanding_balance_frequency="daily",
+            payout_disabled=True,
+            charges_enabled=True,
+            old_account_id=None,
+            upgraded_to_managed_account_at=datetime.now(timezone.utc),
+            is_verified_with_stripe=True,
+            transfers_enabled=True,
+            statement_descriptor="test_statement_descriptor",
+        )
+
+        assert len(data.__fields_set__) == len(
+            data.__fields__
+        ), "all fields should be set"
+
+        payment_account = await payment_account_repo.create_payment_account(data)
+        assert payment_account.id, "id shouldn't be None"
+        assert payment_account.created_at, "created_at shouldn't be None"
+
+        validate_expected_items_in_dict(
+            expected=data.dict(skip_defaults=True), actual=payment_account.dict()
+        )
+        payout_account_list.append(payment_account)
+    return payout_account_list
 
 
 async def prepare_and_insert_stripe_managed_account(

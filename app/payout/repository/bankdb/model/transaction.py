@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
 from sqlalchemy import Column, DateTime, Integer, Text, text
@@ -25,7 +26,7 @@ class TransactionTable(TableDefinition):
     payment_account_id: Column = no_init_field(
         Column("payment_account_id", Integer, nullable=False)
     )
-    transfer_id: Column = no_init_field(Column("amount", Integer))
+    transfer_id: Column = no_init_field(Column("transfer_id", Integer))
     amount_paid: Column = no_init_field(Column("amount_paid", Integer, nullable=False))
     created_at: Column = no_init_field(
         Column("created_at", DateTime(True), nullable=False)
@@ -39,7 +40,7 @@ class TransactionTable(TableDefinition):
     target_type: Column = no_init_field(Column("target_type", Text))
     state: Column = no_init_field(Column("state", Text))
     updated_at: Column = no_init_field(
-        Column("updated_at", DateTime(True), nullable=False)
+        Column("updated_at", DateTime(True), nullable=False, onupdate=datetime.utcnow)
     )
     dsj_id: Column = no_init_field(Column("dsj_id", Integer))
     payout_id: Column = no_init_field(Column("payout_id", Integer))
@@ -76,8 +77,16 @@ class Transaction(_TransactionPartial):
 
 
 class TransactionCreate(_TransactionPartial):
-    pass
+    amount: int
+    amount_paid: int
+    payment_account_id: int
 
 
 class TransactionUpdate(_TransactionPartial):
     pass
+
+
+class TransactionState(str, Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    CANCELLED = "cancelled"

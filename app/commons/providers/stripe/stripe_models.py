@@ -9,9 +9,9 @@ from app.commons.types import CountryCode
 
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
-from app.payout.core.account.constants import (
-    CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES,
+from app.payout.constants import (
     CREATE_STRIPE_ACCOUNT_TYPE,
+    CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES,
 )
 from app.payout.types import (
     PayoutMethodExternalAccountToken,
