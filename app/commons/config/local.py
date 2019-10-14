@@ -121,4 +121,15 @@ def create_app_config() -> AppConfig:
         MONITOR_INTERVAL_RESOURCE_JOB_POOL=10,
         # Payin
         CAPTURE_CRON_TRIGGER=CronTrigger(minute="*/2"),
+        MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
+        MARQETA_USERNAME=Secret(
+            name="marqeta_username", value="doordash_sandbox_api_consumer"
+        ),
+        MARQETA_PASSWORD=Secret(name="marqeta_password", value="sTZqUU5SAvvNErqY"),
+        MARQETA_JIT_USERNAME=Secret(name="marqeta_jit_username", value=""),
+        MARQETA_JIT_PASSWORD=Secret(name="marqeta_jit_password", value=""),
+        MARQETA_PROGRAM_FUND_TOKEN=Secret(
+            name="marqeta_program_fund_token",
+            value="a6e2bbe7-4f28-43b4-980d-6416f35fe33e",
+        ),
     )

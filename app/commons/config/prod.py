@@ -73,4 +73,10 @@ def create_app_config() -> AppConfig:
         ),
         CAPTURE_CRON_TRIGGER=CronTrigger(hour="0-23"),  # in UTC!
         DEFAULT_CAPTURE_DELAY_IN_MINUTES=10,  # 10 mins
+        MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
+        MARQETA_USERNAME=Secret(name="marqeta_username"),
+        MARQETA_PASSWORD=Secret(name="marqeta_password"),
+        MARQETA_JIT_USERNAME=Secret(name="marqeta_jit_username"),
+        MARQETA_JIT_PASSWORD=Secret(name="marqeta_jit_password"),
+        MARQETA_PROGRAM_FUND_TOKEN=Secret(name="marqeta_program_fund_token"),
     )

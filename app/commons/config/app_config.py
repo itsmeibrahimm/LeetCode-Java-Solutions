@@ -117,6 +117,13 @@ class AppConfig(SecretAware):
     STRIPE_AU_SECRET_KEY: Secret
     STRIPE_AU_PUBLIC_KEY: Secret
 
+    MARQETA_BASE_URL: str
+    MARQETA_USERNAME: Secret
+    MARQETA_PASSWORD: Secret
+    MARQETA_JIT_USERNAME: Secret
+    MARQETA_JIT_PASSWORD: Secret
+    MARQETA_PROGRAM_FUND_TOKEN: Secret
+
     # DSJ client
     DSJ_API_USER_EMAIL: Secret
     DSJ_API_USER_PASSWORD: Secret
