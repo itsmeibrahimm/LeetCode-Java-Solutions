@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, desc, asc
+from sqlalchemy import and_, desc, asc, not_
 from typing_extensions import final
 
 from app.commons import tracing
@@ -50,6 +50,12 @@ class PaymentAccountRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_payment_account_ids_by_sma_ids(
+        self, stripe_managed_account_ids: List[int]
+    ) -> List[int]:
+        pass
+
+    @abstractmethod
     async def update_payment_account_by_id(
         self, payment_account_id: int, data: PaymentAccountUpdate
     ) -> Optional[PaymentAccount]:
@@ -65,6 +71,12 @@ class PaymentAccountRepositoryInterface(ABC):
     async def get_stripe_managed_account_by_ids(
         self, stripe_managed_account_ids: List[int]
     ) -> Dict[int, StripeManagedAccount]:
+        pass
+
+    @abstractmethod
+    async def get_recently_updated_stripe_managed_account(
+        self, last_bank_account_update_allowed_at: datetime
+    ) -> List[int]:
         pass
 
     @abstractmethod
@@ -162,6 +174,22 @@ class PaymentAccountRepository(
         else:
             return []
 
+    async def get_payment_account_ids_by_sma_ids(
+        self, stripe_managed_account_ids: List[int]
+    ) -> List[int]:
+        if len(stripe_managed_account_ids) <= 0:
+            return []
+        stmt = payment_accounts.table.select().where(
+            payment_accounts.account_id.in_(stripe_managed_account_ids)
+        )
+        rows = await self._database.replica().fetch_all(stmt)
+
+        result: List[int] = []
+        for row in rows:
+            payment_account = PaymentAccount.from_row(row)
+            result.append(payment_account.id)
+        return result
+
     async def update_payment_account_by_id(
         self, payment_account_id: int, data: PaymentAccountUpdate
     ) -> Optional[PaymentAccount]:
@@ -216,6 +244,29 @@ class PaymentAccountRepository(
             StripeManagedAccount.from_row(last_row) if last_row else None,
             rows.matched_row_count,
         )
+
+    async def get_recently_updated_stripe_managed_account(
+        self, last_bank_account_update_allowed_at: datetime
+    ) -> List[int]:
+        stmt = (
+            stripe_managed_accounts.table.select()
+            .with_only_columns([stripe_managed_accounts.id])
+            .where(
+                and_(
+                    not_(
+                        stripe_managed_accounts.bank_account_last_updated_at.is_(None)
+                    ),
+                    stripe_managed_accounts.bank_account_last_updated_at.__ge__(
+                        last_bank_account_update_allowed_at
+                    ),
+                )
+            )
+        )
+        rows = await self._database.replica().execute(stmt)
+        result: List[int] = []
+        for row in rows:
+            result.append(row.get("id"))
+        return result
 
     async def create_stripe_managed_account(
         self, data: StripeManagedAccountCreate

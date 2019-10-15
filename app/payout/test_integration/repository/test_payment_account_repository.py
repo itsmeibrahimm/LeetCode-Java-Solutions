@@ -229,3 +229,68 @@ class TestPaymentAccountRepository:
         )
         assert retrieved_sma is None
         assert count == 0
+
+    async def test_get_recently_updated_stripe_managed_account_success(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        # prepare and insert stripe_managed_account
+        first_recently_updated_sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo
+        )
+        # prepare and insert stripe_managed_account
+        second_recently_updated_sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo
+        )
+        third_sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo,
+            bank_account_last_updated_at=datetime(2019, 6, 1, tzinfo=timezone.utc),
+        )
+        retrieved_sma_id_list = await payment_account_repo.get_recently_updated_stripe_managed_account(
+            last_bank_account_update_allowed_at=datetime(
+                2019, 7, 1, tzinfo=timezone.utc
+            )
+        )
+        assert retrieved_sma_id_list
+        assert first_recently_updated_sma.id in retrieved_sma_id_list
+        assert second_recently_updated_sma.id in retrieved_sma_id_list
+        assert third_sma.id not in retrieved_sma_id_list
+
+    async def test_get_recently_updated_stripe_managed_account_not_found(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        retrieved_sma_id_list = await payment_account_repo.get_recently_updated_stripe_managed_account(
+            last_bank_account_update_allowed_at=datetime.now(timezone.utc)
+        )
+        assert not retrieved_sma_id_list
+
+    async def test_get_payment_account_ids_by_sma_ids(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        # prepare and insert first pair stripe_managed_account and payment account
+        first_sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo
+        )
+        first_payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo, account_id=first_sma.id
+        )
+        # prepare and insert first pair stripe_managed_account and payment account
+        second_sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=payment_account_repo
+        )
+        second_payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo, account_id=second_sma.id
+        )
+        sma_ids = [first_sma.id, second_sma.id]
+        retrieved_payment_account_ids = await payment_account_repo.get_payment_account_ids_by_sma_ids(
+            stripe_managed_account_ids=sma_ids
+        )
+        assert retrieved_payment_account_ids
+        assert first_payment_account.id in retrieved_payment_account_ids
+        assert second_payment_account.id in retrieved_payment_account_ids
+
+    async def test_get_payment_account_ids_by_sma_ids_not_found(
+        self, payment_account_repo: PaymentAccountRepository
+    ):
+        assert not await payment_account_repo.get_payment_account_ids_by_sma_ids(
+            stripe_managed_account_ids=[]
+        )

@@ -403,12 +403,13 @@ async def prepare_and_insert_stripe_managed_account(
     payment_account_repo: PaymentAccountRepository,
     stripe_id="stripe_id",
     country_shortname="US",
+    bank_account_last_updated_at=datetime.now(timezone.utc),
 ):
     data = StripeManagedAccountCreate(
         stripe_id=stripe_id,
         country_shortname=country_shortname,
         stripe_last_updated_at=datetime.now(timezone.utc),
-        bank_account_last_updated_at=datetime.now(timezone.utc),
+        bank_account_last_updated_at=bank_account_last_updated_at,
         fingerprint="fingerprint",
         default_bank_last_four="last4",
         default_bank_name="bank",
