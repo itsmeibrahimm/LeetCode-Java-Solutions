@@ -162,3 +162,17 @@ TRANSFER_ERROR_TYPE_TO_FAILED_STATUS = [
     PayoutErrorCode.STRIPE_PAYOUT_ACCT_MISSING,
     PayoutErrorCode.STRIPE_PAYOUT_DISALLOWED,
 ]
+
+
+class PayoutDay(str, Enum):
+    MONDAY = "monday"
+    TUESDAY = "tuesday"
+    WEDNESDAY = "wednesday"
+    THURSDAY = "thursday"
+    FRIDAY = "friday"
+
+
+class TransferType(str, Enum):
+    SCHEDULED = "scheduled"
+    MICRO_DEPOSIT = "micro_deposit"
+    MANUAL = "manual"

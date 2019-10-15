@@ -1,5 +1,9 @@
 from structlog.stdlib import BoundLogger
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.payout.core.transfer.processors.create_transfer import (
+    CreateTransferRequest,
+    CreateTransfer,
+)
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
     SubmitTransfer,
@@ -36,6 +40,12 @@ class TransferProcessors:
         self.payment_account_repo = payment_account_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.managed_account_transfer_repo = managed_account_transfer_repo
+
+    async def create_transfer(self, request: CreateTransferRequest):
+        create_transfer_op = CreateTransfer(
+            logger=self.logger, request=request, transfer_repo=self.transfer_repo
+        )
+        return await create_transfer_op.execute()
 
     async def submit_transfer(self, request: SubmitTransferRequest):
         submit_transfer_op = SubmitTransfer(
