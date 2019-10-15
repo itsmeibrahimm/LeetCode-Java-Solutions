@@ -2026,7 +2026,7 @@ class CartPaymentProcessor:
         payer_id: Optional[uuid.UUID],
         amount: int,
         client_description: Optional[str],
-        split_payment: SplitPayment,
+        split_payment: Optional[SplitPayment],
     ) -> CartPayment:
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
             cart_payment_id

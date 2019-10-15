@@ -154,7 +154,7 @@ class CartPaymentRepository(PayinDBRepository):
         )
 
         async for result in paged_query(
-            self.payment_database.replica(), query, payment_intents.id
+            self.payment_database.replica(), query, payment_intents.created_at
         ):
             yield self.to_payment_intent(result)
 
