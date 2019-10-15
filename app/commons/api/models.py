@@ -4,7 +4,20 @@ from typing import Any
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
-from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
+from starlette.status import (
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
+    HTTP_429_TOO_MANY_REQUESTS,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+)
+
+from app.commons.api.errors import (
+    PaymentErrorCode,
+    payment_error_message_maps,
+    InvalidRequestErrorCode,
+)
 
 
 class PaymentRequest(BaseModel, ABC):
@@ -92,13 +105,80 @@ class PaymentErrorResponseBody(BaseModel):
     retryable: bool
 
 
-class UnknownInternalException(PaymentException):
-    pass
+class BadRequestError(PaymentException):
+    def __init__(self, error_code, err_message):
+        super().__init__(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=error_code,
+            error_message=err_message,
+            retryable=True,
+        )
 
 
-DEFAULT_INTERNAL_EXCEPTION = UnknownInternalException(
-    http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-    error_code="unknown_payment_internal_error",
-    error_message="payment service encountered unknown internal error",
-    retryable=False,
-)
+class InvalidRequestError(PaymentException):
+    def __init__(self, error_code: InvalidRequestErrorCode):
+        super().__init__(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=error_code,
+            error_message=payment_error_message_maps[error_code],
+            retryable=False,
+        )
+
+
+class NotFoundError(PaymentException):
+    def __init__(self,):
+        super().__init__(
+            http_status_code=HTTP_404_NOT_FOUND,
+            error_code=PaymentErrorCode.NOT_FOUND_ERROR,
+            error_message=payment_error_message_maps[PaymentErrorCode.NOT_FOUND_ERROR],
+            retryable=False,
+        )
+
+
+class RateLimitError(PaymentException):
+    def __init__(self):
+        super().__init__(
+            http_status_code=HTTP_429_TOO_MANY_REQUESTS,
+            error_code=PaymentErrorCode.RATE_LIMIT_ERROR,
+            error_message=payment_error_message_maps[PaymentErrorCode.RATE_LIMIT_ERROR],
+            retryable=True,
+        )
+
+
+class AuthenticationError(PaymentException):
+    def __init__(self):
+        super().__init__(
+            http_status_code=HTTP_401_UNAUTHORIZED,
+            error_code=PaymentErrorCode.AUTHENTICATION_ERROR,
+            error_message=payment_error_message_maps[
+                PaymentErrorCode.AUTHENTICATION_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class AuthorizationError(PaymentException):
+    def __init__(self):
+        super().__init__(
+            http_status_code=HTTP_403_FORBIDDEN,
+            error_code=PaymentErrorCode.AUTHORIZATION_ERROR,
+            error_message=payment_error_message_maps[
+                PaymentErrorCode.AUTHORIZATION_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class InternalServerError(PaymentException):
+    def __init__(self):
+        super().__init__(
+            http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            error_code=PaymentErrorCode.UNKNOWN_INTERNAL_ERROR,
+            error_message=payment_error_message_maps[
+                PaymentErrorCode.UNKNOWN_INTERNAL_ERROR
+            ],
+            retryable=False,
+        )
+
+
+DEFAULT_INTERNAL_EXCEPTION = InternalServerError()
