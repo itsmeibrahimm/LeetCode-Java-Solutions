@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -409,6 +409,7 @@ class CapturePaymentIntentTestBase(ABC):
         cart_payment_repository: CartPaymentRepository,
         cart_payment_processor: CartPaymentProcessor,
     ):
+
         # todo: ideally should just use "capture_uncapture_payment_intents" here to run in job pool
         # though this could occasionally cause db transaction cannot be properly closed likely due to
         # some unknown race condition. need to investigate and revise.
@@ -441,9 +442,9 @@ class CapturePaymentIntentTestBase(ABC):
         pass
 
 
-@pytest.mark.external
-@pytest.mark.asyncio
 class TestCapturePaymentIntent(CapturePaymentIntentTestBase):
+    pytestmark = [pytest.mark.asyncio, pytest.mark.external]
+
     @pytest.fixture(autouse=True)
     def enable_stripe_outbound(self, stripe_api: StripeAPISettings):
         stripe_api.enable_outbound()
@@ -558,9 +559,9 @@ class TestCapturePaymentIntent(CapturePaymentIntentTestBase):
         )
 
 
-@pytest.mark.external
-@pytest.mark.asyncio
 class TestCapturePaymentIntentLegacy(CapturePaymentIntentTestBase):
+    pytestmark = [pytest.mark.asyncio, pytest.mark.external]
+
     @pytest.fixture(autouse=True)
     def enable_stripe_outbound(self, stripe_api: StripeAPISettings):
         stripe_api.enable_outbound()
