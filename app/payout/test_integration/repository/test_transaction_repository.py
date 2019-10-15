@@ -143,7 +143,7 @@ class TestTransactionRepository:
         ), "retrieved transaction list matches with expected list"
 
         # 2. add another 5 transactions for the same account and do a get by ids should
-        # return the first page
+        # return all transactions
         transaction_list_b = await prepare_and_insert_transaction_list_for_same_account(
             transaction_repo=transaction_repo,
             payout_account_id=payout_account_id,
@@ -152,15 +152,14 @@ class TestTransactionRepository:
         for transaction in transaction_list:
             transaction_list_b.append(transaction)
         transaction_ids_b = [transaction.id for transaction in transaction_list_b]
-        expected_transaction_list_b = transaction_list_b[:TEST_DEFAULT_PAGE_SIZE]
         retrieved_transaction_list_b = await transaction_repo.get_transaction_by_ids(
-            transaction_ids_b, TEST_DEFAULT_PAGE_SIZE
+            transaction_ids_b
         )
-        assert (
-            len(retrieved_transaction_list_b) == TEST_DEFAULT_PAGE_SIZE
+        assert len(retrieved_transaction_list_b) == len(
+            transaction_list_b
         ), "get transaction list size matches with expected size"
         assert (
-            retrieved_transaction_list_b == expected_transaction_list_b
+            retrieved_transaction_list_b == transaction_list_b
         ), "retrieved transaction list matches with expected list"
 
     async def test_get_transaction_by_ids_return_emtpy(
@@ -457,6 +456,7 @@ class TestTransactionRepository:
         transaction_repo: TransactionRepository,
         payout_account_id: types.PayoutAccountId,
     ):
+        # 1. prepare test data by inserting 30 transactions for the same payout account
         count = 30
         transaction_list = await prepare_and_insert_transaction_list_for_same_account(
             transaction_repo=transaction_repo,
@@ -467,7 +467,7 @@ class TestTransactionRepository:
             :TEST_DEFAULT_PAGE_SIZE
         ]
 
-        # get the first page for payout account id without time range
+        # 2. get the first page for payout account id without time range
         offset = 0
         retrieved_transaction_list_first_page = await transaction_repo.get_transaction_by_payout_account_id(
             payout_account_id=payout_account_id,
@@ -482,7 +482,7 @@ class TestTransactionRepository:
             == expected_transaction_list_first_page_without_time_range
         ), "retrieved transaction list by payout id should match with expected list"
 
-        # get second page of transactions with time_range
+        # 3. get second page of transactions with time_range
         expected_count = 8
         expected_transaction_list_first_page_with_time_range = transaction_list[
             TEST_DEFAULT_PAGE_SIZE : TEST_DEFAULT_PAGE_SIZE + expected_count
@@ -506,7 +506,7 @@ class TestTransactionRepository:
             == expected_transaction_list_first_page_with_time_range
         ), "retrieved transaction list by payout id should match with expected list"
 
-        # get third page of transaction list with start_time only
+        # 4. get third page of transaction list with start_time only
         expected_transaction_list_first_page_with_start_time = transaction_list[
             : TEST_DEFAULT_PAGE_SIZE - 15
         ]
@@ -552,12 +552,14 @@ class TestTransactionRepository:
         transfer_repo: TransferRepository,
         payout_account_id: types.PayoutAccountId,
     ):
+        # 1. prepare test data by adding 6 transactions for the same payout account
         count = 6
         transaction_list_unpaid = await prepare_and_insert_transaction_list_for_same_account(
             transaction_repo=transaction_repo,
             payout_account_id=payout_account_id,
             count=count,
         )
+        # 2. insert another 6 paid transaction for the same payout account
         transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
         await prepare_and_insert_paid_transaction_list_for_transfer(
             transaction_repo=transaction_repo,
@@ -565,6 +567,7 @@ class TestTransactionRepository:
             transfer_id=transfer.id,
             count=count,
         )
+        # 3. fetch unpaid transactions for the same payout account should return up to 10 transactions
         retrieved_unpaid_transaction_list = await transaction_repo.get_unpaid_transaction_by_payout_account_id(
             payout_account_id=payout_account_id, offset=0, limit=TEST_DEFAULT_PAGE_SIZE
         )
@@ -575,7 +578,7 @@ class TestTransactionRepository:
             retrieved_unpaid_transaction_list == transaction_list_unpaid
         ), "retrieved unpaid transaction list by payout id should match with expected list"
 
-        # insert another unpaid transaction with state is ACTIVE
+        # 4. insert another unpaid transaction with state is ACTIVE
         data = TransactionCreate(
             amount=1000,
             amount_paid=800,
@@ -585,7 +588,7 @@ class TestTransactionRepository:
         )
         unpaid_transaction = await transaction_repo.create_transaction(data)
 
-        # get unpaid transaction list again
+        # 5. get unpaid transaction list again should only return the first page of the transactions
         transaction_list_unpaid.insert(0, unpaid_transaction)
         retrieved_unpaid_transaction_list = await transaction_repo.get_unpaid_transaction_by_payout_account_id(
             payout_account_id=payout_account_id, offset=0, limit=TEST_DEFAULT_PAGE_SIZE
@@ -596,6 +599,49 @@ class TestTransactionRepository:
         assert (
             retrieved_unpaid_transaction_list == transaction_list_unpaid
         ), "retrieved unpaid transaction list by payout id should match with expected list"
+
+        # 6. list unpaid by start_time; start_time is the created_at of the 5th transaction
+        index = 5
+        start_time = transaction_list_unpaid[index].created_at
+        expected_transaction_list_with_start_time = transaction_list_unpaid[: index + 1]
+        retrieved_unpaid_transaction_list_with_start_time = await transaction_repo.get_unpaid_transaction_by_payout_account_id(
+            payout_account_id=payout_account_id,
+            offset=0,
+            limit=TEST_DEFAULT_PAGE_SIZE,
+            start_time=start_time,
+        )
+        assert len(retrieved_unpaid_transaction_list_with_start_time) == len(
+            expected_transaction_list_with_start_time
+        ), "list unpaid transaction by start_time should return 6"
+        assert (
+            retrieved_unpaid_transaction_list_with_start_time
+            == expected_transaction_list_with_start_time
+        ), "list unpaid transaction by start_time should match with expected"
+
+        # 7. list unpaid by start_time and end_time
+        # start_time is the created_at of the 5th transaction
+        # end_time is the created_at of the 8th transaction
+        start_at_index = 5
+        end_at_index = 3
+        start_time = transaction_list_unpaid[start_at_index].created_at
+        end_time = transaction_list_unpaid[end_at_index].created_at
+        expected_transaction_list_with_time_range = transaction_list_unpaid[
+            end_at_index : start_at_index + 1
+        ]
+        retrieved_unpaid_transaction_list_with_time_range = await transaction_repo.get_unpaid_transaction_by_payout_account_id(
+            payout_account_id=payout_account_id,
+            offset=0,
+            limit=TEST_DEFAULT_PAGE_SIZE,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert len(retrieved_unpaid_transaction_list_with_time_range) == len(
+            expected_transaction_list_with_time_range
+        ), "list unpaid transaction by time_range should match with expected"
+        assert (
+            retrieved_unpaid_transaction_list_with_time_range
+            == expected_transaction_list_with_time_range
+        ), "list unpaid transaction by start_time should match with expected"
 
     async def test_get_unpaid_transaction_by_payout_account_id_return_empty(
         self,
@@ -617,3 +663,93 @@ class TestTransactionRepository:
             "filtering unpaid transaction list should return an empty "
             "transaction when there's paid transaction only"
         )
+
+    async def test_get_unpaid_transaction(
+        self,
+        transaction_repo: TransactionRepository,
+        transfer_repo: TransferRepository,
+        payment_account_repo: PaymentAccountRepository,
+        payout_account_id: types.PayoutAccountId,
+    ):
+        # 1. prepare test data by adding 6 transactions for the payout account
+        count = 6
+        transaction_list_unpaid = await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payout_account_id,
+            count=count,
+        )
+        # 2. insert another 6 paid transaction for the same payout account
+        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        await prepare_and_insert_paid_transaction_list_for_transfer(
+            transaction_repo=transaction_repo,
+            payout_account_id=payout_account_id,
+            transfer_id=transfer.id,
+            count=count,
+        )
+        # 3. insert another 6 unpaid transactions for another payout account
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
+        transaction_list_unpaid_b = await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payment_account.id,
+            count=count,
+        )
+
+        # 4. fetch unpaid transactions without time_range should return up to 10 transactions
+        expected_first_page_transaction_list = (
+            transaction_list_unpaid_b
+            + transaction_list_unpaid[: TEST_DEFAULT_PAGE_SIZE - count]
+        )
+        retrieved_unpaid_transaction_list_first_page = await transaction_repo.get_unpaid_transaction(
+            offset=0, limit=TEST_DEFAULT_PAGE_SIZE
+        )
+        assert len(retrieved_unpaid_transaction_list_first_page) == len(
+            expected_first_page_transaction_list
+        ), "get unpaid transaction list size should match with expected size"
+        assert (
+            retrieved_unpaid_transaction_list_first_page
+            == expected_first_page_transaction_list
+        ), "retrieved unpaid transaction list should match with expected list"
+
+        # 5. list unpaid by start_time; start_time is the created_at of the 5th transaction
+        total_unpaid_transaction_list = (
+            transaction_list_unpaid_b + transaction_list_unpaid
+        )
+        index = 5
+        start_time = total_unpaid_transaction_list[index].created_at
+        expected_transaction_list_with_start_time = total_unpaid_transaction_list[
+            : index + 1
+        ]
+        retrieved_unpaid_transaction_list_with_start_time = await transaction_repo.get_unpaid_transaction(
+            offset=0, limit=TEST_DEFAULT_PAGE_SIZE, start_time=start_time
+        )
+        assert len(retrieved_unpaid_transaction_list_with_start_time) == len(
+            expected_transaction_list_with_start_time
+        ), "list unpaid transaction by start_time should return 6"
+        assert (
+            retrieved_unpaid_transaction_list_with_start_time
+            == expected_transaction_list_with_start_time
+        ), "list unpaid transaction by start_time should match with expected"
+
+        # 6. list unpaid by start_time and end_time
+        # start_time is the created_at of the 5th transaction
+        # end_time is the created_at of the 8th transaction
+        start_at_index = 5
+        end_at_index = 3
+        start_time = total_unpaid_transaction_list[start_at_index].created_at
+        end_time = total_unpaid_transaction_list[end_at_index].created_at
+        expected_transaction_list_with_time_range = total_unpaid_transaction_list[
+            end_at_index : start_at_index + 1
+        ]
+        retrieved_unpaid_transaction_list_with_time_range = await transaction_repo.get_unpaid_transaction(
+            offset=0,
+            limit=TEST_DEFAULT_PAGE_SIZE,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert len(retrieved_unpaid_transaction_list_with_time_range) == len(
+            expected_transaction_list_with_time_range
+        ), "list unpaid transaction by time_range should match with expected"
+        assert (
+            retrieved_unpaid_transaction_list_with_time_range
+            == expected_transaction_list_with_time_range
+        ), "list unpaid transaction by start_time should match with expected"

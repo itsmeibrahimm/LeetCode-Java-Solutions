@@ -97,6 +97,9 @@ class PayoutErrorCode(str, Enum):
     PAYOUT_CARD_NOT_FOUND = "payout_method_5"
     PAYOUT_ACCOUNT_NOT_MATCH = "payout_method_6"
 
+    # transaction error code
+    TRANSACTION_BAD_QUERY_PARAMETER = "transaction_0"
+
 
 class PayoutError(PaymentException):
     """
@@ -265,5 +268,17 @@ def payout_account_not_match_error() -> PayoutError:
             PayoutErrorCode.PAYOUT_ACCOUNT_NOT_MATCH.value
         ],
         error_code=PayoutErrorCode.PAYOUT_ACCOUNT_NOT_MATCH,
+        retryable=False,
+    )
+
+
+###########################################################
+# transactions Errors                                     #
+###########################################################
+def transaction_bad_query_parameters(error_message: str) -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_message=error_message,
+        error_code=PayoutErrorCode.TRANSACTION_BAD_QUERY_PARAMETER,
         retryable=False,
     )

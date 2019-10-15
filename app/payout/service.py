@@ -7,6 +7,7 @@ from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.transfer.processor import TransferProcessors
+from app.payout.core.transaction.processor import TransactionProcessors
 from app.payout.repository.bankdb import (
     payout,
     stripe_payout_request,
@@ -14,6 +15,7 @@ from app.payout.repository.bankdb import (
     payout_card,
     payout_method,
     payout_method_miscellaneous,
+    transaction,
 )
 from app.payout.repository.maindb import (
     payment_account,
@@ -25,6 +27,7 @@ from app.payout.repository.maindb import (
 __all__ = [
     "create_payout_account_processors",
     "create_transfer_processors",
+    "create_transaction_processors",
     "get_stripe_client",
     "PayoutService",
     "PaymentAccountRepository",
@@ -70,6 +73,7 @@ class PayoutService(BaseService):
     payout_cards: payout_card.PayoutCardRepository
     payout_methods: payout_method.PayoutMethodRepository
     payout_method_miscellaneous: payout_method_miscellaneous.PayoutMethodMiscellaneousRepository
+    transactions: transaction.TransactionRepository
     transfers: transfer.TransferRepository
     payouts: payout.PayoutRepository
     stripe_payout_requests: stripe_payout_request.StripePayoutRequestRepository
@@ -105,6 +109,7 @@ class PayoutService(BaseService):
         self.payout_method_miscellaneous = payout_method_miscellaneous.PayoutMethodMiscellaneousRepository(
             bankdb
         )
+        self.transactions = transaction.TransactionRepository(bankdb)
 
         # dsj_client
         self.dsj_client = self.app_context.dsj_client
@@ -135,6 +140,12 @@ def PayoutMethodMiscellaneousRepository(
     payout_service: PayoutService = Depends()
 ) -> payout_method_miscellaneous.PayoutMethodMiscellaneousRepositoryInterface:
     return payout_service.payout_method_miscellaneous
+
+
+def TransactionRepository(
+    payout_service: PayoutService = Depends()
+) -> transaction.TransactionRepository:
+    return payout_service.transactions
 
 
 def TransferRepository(
@@ -205,3 +216,9 @@ def create_transfer_processors(payout_service: PayoutService = Depends()):
 
 def get_stripe_client(payout_service: PayoutService = Depends()) -> StripeAsyncClient:
     return payout_service.stripe
+
+
+def create_transaction_processors(payout_service: PayoutService = Depends()):
+    return TransactionProcessors(
+        logger=payout_service.log, transaction_repo=payout_service.transactions
+    )

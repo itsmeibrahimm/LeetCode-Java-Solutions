@@ -7,7 +7,6 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.infra import DB
-from app.payout.constants import DEFAULT_PAGE_SIZE
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import transactions
 from app.payout.repository.bankdb.model.transaction import (
@@ -29,7 +28,7 @@ class TransactionRepositoryInterface(ABC):
 
     @abstractmethod
     async def get_transaction_by_ids(
-        self, transaction_ids: List[int], limit: Optional[int] = DEFAULT_PAGE_SIZE
+        self, transaction_ids: List[int]
     ) -> List[Transaction]:
         pass
 
@@ -66,6 +65,16 @@ class TransactionRepositoryInterface(ABC):
     async def get_unpaid_transaction_by_payout_account_id(
         self,
         payout_account_id: int,
+        offset: int,
+        limit: int,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> List[Transaction]:
+        pass
+
+    @abstractmethod
+    async def get_unpaid_transaction(
+        self,
         offset: int,
         limit: int,
         start_time: Optional[datetime] = None,
@@ -133,13 +142,12 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         return [Transaction.from_row(row) for row in rows] if rows else []
 
     async def get_transaction_by_ids(
-        self, transaction_ids: List[int], limit: Optional[int] = DEFAULT_PAGE_SIZE
+        self, transaction_ids: List[int]
     ) -> List[Transaction]:
         stmt = (
             transactions.table.select()
             .where(transactions.id.in_(transaction_ids))
             .order_by(desc(transactions.created_at))
-            .limit(limit)
         )
 
         rows = await self._database.replica().fetch_all(stmt)
@@ -212,55 +220,23 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
     ) -> List[Transaction]:
-        if start_time and end_time:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.created_at.__ge__(start_time),
-                        transactions.created_at.__le__(end_time),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
-        elif start_time:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.created_at.__ge__(start_time),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
-        elif end_time:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.created_at.__le__(end_time),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
-        else:
-            stmt = (
-                transactions.table.select()
-                .where(transactions.payment_account_id == payout_account_id)
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
+        and_statement = and_(
+            # this line is necessary to make a valid and_statement, otherwise it will raise AttributeError
+            transactions.payment_account_id.isnot(None),
+            transactions.payment_account_id == payout_account_id,
+        )
+        if start_time:
+            and_statement.clauses.append(transactions.created_at.__ge__(start_time))
+        if end_time:
+            and_statement.clauses.append(transactions.created_at.__le__(end_time))
 
+        stmt = (
+            transactions.table.select()
+            .where(and_statement)
+            .order_by(desc(transactions.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
             return [Transaction.from_row(row) for row in rows]
@@ -275,83 +251,58 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
     ) -> List[Transaction]:
-        if start_time and end_time:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.transfer_id.is_(None),
-                        transactions.payout_id.is_(None),
-                        or_(
-                            transactions.state.is_(None),
-                            transactions.state == TransactionState.ACTIVE.value,
-                        ),
-                        transactions.created_at.__ge__(start_time),
-                        transactions.created_at.__le__(end_time),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
-        elif start_time:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.transfer_id.is_(None),
-                        transactions.payout_id.is_(None),
-                        or_(
-                            transactions.state.is_(None),
-                            transactions.state == TransactionState.ACTIVE.value,
-                        ),
-                        transactions.created_at.__ge__(start_time),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
-        elif end_time:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.transfer_id.is_(None),
-                        transactions.payout_id.is_(None),
-                        or_(
-                            transactions.state.is_(None),
-                            transactions.state == TransactionState.ACTIVE.value,
-                        ),
-                        transactions.created_at.__le__(end_time),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
+        and_statement = and_(
+            transactions.payment_account_id == payout_account_id,
+            transactions.transfer_id.is_(None),
+            transactions.payout_id.is_(None),
+            or_(
+                transactions.state.is_(None),
+                transactions.state == TransactionState.ACTIVE.value,
+            ),
+        )
+        if start_time:
+            and_statement.clauses.append(transactions.created_at.__ge__(start_time))
+        if end_time:
+            and_statement.clauses.append(transactions.created_at.__le__(end_time))
+        stmt = (
+            transactions.table.select()
+            .where(and_statement)
+            .order_by(desc(transactions.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            return [Transaction.from_row(row) for row in rows]
         else:
-            stmt = (
-                transactions.table.select()
-                .where(
-                    and_(
-                        transactions.payment_account_id == payout_account_id,
-                        transactions.transfer_id.is_(None),
-                        transactions.payout_id.is_(None),
-                        or_(
-                            transactions.state.is_(None),
-                            transactions.state == TransactionState.ACTIVE.value,
-                        ),
-                    )
-                )
-                .order_by(desc(transactions.created_at))
-                .offset(offset)
-                .limit(limit)
-            )
+            return []
 
+    async def get_unpaid_transaction(
+        self,
+        offset: int,
+        limit: int,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> List[Transaction]:
+        and_statement = and_(
+            transactions.transfer_id.is_(None),
+            transactions.payout_id.is_(None),
+            or_(
+                transactions.state.is_(None),
+                transactions.state == TransactionState.ACTIVE.value,
+            ),
+        )
+        if start_time:
+            and_statement.clauses.append(transactions.created_at.__ge__(start_time))
+        if end_time:
+            and_statement.clauses.append(transactions.created_at.__le__(end_time))
+        stmt = (
+            transactions.table.select()
+            .where(and_statement)
+            .order_by(desc(transactions.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
             return [Transaction.from_row(row) for row in rows]

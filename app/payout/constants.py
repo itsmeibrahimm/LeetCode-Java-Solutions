@@ -3,4 +3,5 @@ CREATE_STRIPE_ACCOUNT_TYPE = "custom"
 CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES = ["legacy_payments"]
 
 # Pagination
-DEFAULT_PAGE_SIZE = 100
+# DasherShiftListView list maximum 200 shift therefore we put 200 as the default size for fetch transactions by ids
+DEFAULT_PAGE_SIZE = 200

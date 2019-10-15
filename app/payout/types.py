@@ -8,56 +8,34 @@ PayoutAccountToken = str
 PayoutAccountTargetId = int
 PayoutAccountStatementDescriptor = str
 
-PgpAccountId = int
-PgpExternalAccountId = str
-
-StripeFileHandle = str
-StripeAccountToken = str
-
-# Payout Methods
-PayoutMethodId = int
-PayoutMethodExternalAccountToken = str
-PayoutMethodExternalAccountId = str
-
-# Payouts
-PayoutId = str
-PayoutAmountType = int
-
-# Transfers
-TransferId = int
-
-
-STRIPE_TRANSFER_FAILED_STATUS = "failed"
-UNKNOWN_ERROR_STR = "err"
-
 
 class PayoutAccountTargetType(str, Enum):
     DASHER = "dasher"
     STORE = "store"
 
 
+class AccountType(str, Enum):
+    # payment_account.account_type
+    ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT = "stripe_managed_account"
+
+
+# Pgp Account
+PgpAccountId = int
+PgpExternalAccountId = str
+
+
 class PgpAccountType(str, Enum):
     STRIPE = "stripe_managed_account"
+
+
+# Stripe
+StripeFileHandle = str
+StripeAccountToken = str
 
 
 class StripeBusinessType(str, Enum):
     COMPANY = "company"
     INDIVIDUAL = "individual"
-
-
-class PayoutType(str, Enum):
-    STANDARD = "standard"
-    INSTANT = "instant"
-
-
-class PayoutMethodType(str, Enum):
-    # only used for payout
-    STRIPE = "stripe"
-
-
-class PayoutTargetType(str, Enum):
-    DASHER = "dasher"
-    STORE = "store"
 
 
 class StripePayoutStatus(str, Enum):
@@ -69,18 +47,42 @@ class StripePayoutStatus(str, Enum):
     PENDING = "pending"
 
 
-class ManagedAccountTransferStatus(str, Enum):
-    FAILED = "failed"
-    PAID = "paid"
+# Payout Methods
+PayoutMethodId = int
+PayoutMethodExternalAccountToken = str
+PayoutMethodExternalAccountId = str
 
 
-class AccountType(str, Enum):
-    # payment_account.account_type
-    ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT = "stripe_managed_account"
+class PayoutMethodType(str, Enum):
+    STRIPE = "stripe"
 
 
 class PayoutExternalAccountType(str, Enum):
     CARD = "card"
+
+
+# Payouts
+TransferId = int
+PayoutId = int
+PayoutAmountType = int
+
+STRIPE_TRANSFER_FAILED_STATUS = "failed"
+UNKNOWN_ERROR_STR = "err"
+
+
+class PayoutType(str, Enum):
+    STANDARD = "standard"
+    INSTANT = "instant"
+
+
+class PayoutTargetType(str, Enum):
+    DASHER = "dasher"
+    STORE = "store"
+
+
+class ManagedAccountTransferStatus(str, Enum):
+    FAILED = "failed"
+    PAID = "paid"
 
 
 class StripeTransferSubmissionStatus(str, Enum):
@@ -176,3 +178,13 @@ class TransferType(str, Enum):
     SCHEDULED = "scheduled"
     MICRO_DEPOSIT = "micro_deposit"
     MANUAL = "manual"
+
+
+# Transactions
+TransactionId = int
+
+
+class TransactionState(str, Enum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
