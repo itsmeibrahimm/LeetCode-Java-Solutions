@@ -14,7 +14,7 @@ from app.commons.api.models import PaymentException
 ###########################################################
 payout_error_message_maps = {
     # payout errors
-    # payout_1, payout_4, payout_5, payout_6, payout_8, payout_15 requires customized error message
+    # payout_1, payout_4, payout_5, payout_6, payout_8, payout_15, payout_16 requires customized error message
     "payout_0": "Cannot make stripe transfer without stripe account id.",
     "payout_1": "",
     "payout_2": "Cannot create a stripe managed account(SMA) transfer without SMA fully setup.",
@@ -31,6 +31,13 @@ payout_error_message_maps = {
     "payout_13": "Cannot find payment_account with given id.",
     "payout_14": "Failed to submit stripe payout due to RateLimitError",
     "payout_15": "Can only cancel if status is pending",
+    "payout_16": "",
+    "payout_17": "Amount does not match transaction amount.",
+    "payout_18": "Transfer is in invalid state",
+    "payout_19": "Transfer already deleted.",
+    "payout_20": "Duplicate transfer.",
+    "payout_21": "Transfers are disabled for this account",
+    "payout_22": "Cannot find corresponding transfer with given transfer id",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     "account_1": "PGP account has not set up, please verify your payout account.",
@@ -66,6 +73,13 @@ class PayoutErrorCode(str, Enum):
     INVALID_PAYMENT_ACCOUNT_ID = "payout_13"
     RATE_LIMIT_ERROR = "payout_14"
     INVALID_STRIPE_PAYOUT = "payout_15"
+    DUMMY_TRANSFER_CREATION_FAILED = "payout_16"
+    MISMATCHED_TRANSFER_AMOUNT = "payout_17"
+    TRANSFER_INVALID_STATE = "payout_18"
+    TRANSFER_ALREADY_DELETED = "payout_19"
+    DUPLICATE_TRANSFER = "payout_20"
+    TRANSFER_DISABLED_ERROR = "payout_21"
+    TRANSFER_NOT_FOUND = "payout_22"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"

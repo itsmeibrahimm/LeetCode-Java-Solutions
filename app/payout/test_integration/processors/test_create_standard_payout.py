@@ -47,7 +47,7 @@ from app.payout.types import (
 )
 
 
-class TestCreateStandardPayoutUtils:
+class TestCreateStandardPayout:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture(autouse=True)

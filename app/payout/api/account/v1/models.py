@@ -23,6 +23,7 @@ from app.payout.types import (
     AccountType,
     PayoutExternalAccountType,
     PayoutMethodExternalAccountId,
+    TransferId,
 )
 
 __all__ = [
@@ -124,7 +125,7 @@ class PayoutRequest(PaymentRequest):
     target_type: Optional[PayoutTargetType]
     statement_descriptor: Optional[str]
     payout_idempotency_key: Optional[str]
-    transfer_id: Optional[str]
+    transfer_id: Optional[TransferId]
     payout_id: Optional[str]
     method: Optional[PayoutMethodType]
     submitted_by: Optional[str]

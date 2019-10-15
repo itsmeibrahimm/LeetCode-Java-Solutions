@@ -69,7 +69,7 @@ class CreateStandardPayoutRequest(OperationRequest):
     payout_account_id: PayoutAccountId
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.STANDARD
-    transfer_id: str
+    transfer_id: models.TransferId
     statement_descriptor: str
     target_id: Optional[str] = None
     target_type: Optional[PayoutTargetType] = None
