@@ -17,6 +17,10 @@ from app.payout.repository.maindb.payment_account import (
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
+from app.payout.core.transfer.processors.weekly_create_transfer import (
+    WeeklyCreateTransferRequest,
+    WeeklyCreateTransfer,
+)
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
 
 
@@ -58,3 +62,12 @@ class TransferProcessors:
             managed_account_transfer_repo=self.managed_account_transfer_repo,
         )
         return await submit_transfer_op.execute()
+
+    async def weekly_create_transfer(self, request: WeeklyCreateTransferRequest):
+        weekly_create_transfer_op = WeeklyCreateTransfer(
+            logger=self.logger,
+            request=request,
+            stripe=self.stripe,
+            transfer_repo=self.transfer_repo,
+        )
+        return await weekly_create_transfer_op.execute()

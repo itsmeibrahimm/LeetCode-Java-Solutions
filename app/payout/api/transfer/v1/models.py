@@ -3,7 +3,7 @@ from typing import Optional, List
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.payout.types import PayoutTargetType, PayoutDay
 
-__all__ = ["SubmitTransfer", "CreateTransfer", "Transfer"]
+__all__ = ["SubmitTransfer", "CreateTransfer", "Transfer", "WeeklyCreateTransfer"]
 
 
 class SubmitTransfer(PaymentRequest):
@@ -26,6 +26,15 @@ class CreateTransfer(PaymentRequest):
     target_business_id: Optional[int]
     payout_day: Optional[PayoutDay]
     payout_countries: Optional[List[str]]
+
+
+class WeeklyCreateTransfer(PaymentRequest):
+    payout_day: PayoutDay
+    end_time: datetime
+    payout_countries: List[str]
+    unpaid_txn_start_time: Optional[datetime]
+    start_time: Optional[datetime]
+    exclude_recently_updated_accounts: Optional[bool]
 
 
 class Transfer(PaymentResponse):
