@@ -1,3 +1,0 @@
-"""
-API Request/Response Models
-"""

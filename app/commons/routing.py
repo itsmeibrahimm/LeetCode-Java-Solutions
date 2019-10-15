@@ -137,12 +137,12 @@ class ApiRouterBuilder:
 
     def attach_to_app(self, app: FastAPI):
         app.include_router(
-            self.as_router(),
+            self._as_router(),
             dependencies=self._common_dependencies,
             responses=self._common_responses,
         )
 
-    def as_router(self) -> APIRouter:
+    def _as_router(self) -> APIRouter:
         root_router: APIRouter = APIRouter()
         for prefix, router in self._routers.items():
             root_router.include_router(router, prefix=prefix)
