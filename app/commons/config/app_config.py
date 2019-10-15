@@ -83,6 +83,7 @@ class AppConfig(SecretAware):
     PAYIN_SERVICE_ID: int
     PAYOUT_SERVICE_ID: int
     LEDGER_SERVICE_ID: int
+    PURCHASECARD_SERVICE_ID: int
 
     # Test secret
     TEST_SECRET: Secret
@@ -148,7 +149,7 @@ class AppConfig(SecretAware):
 
     STRIPE_MAX_WORKERS: int = 10
 
-    INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger"})
+    INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger", "purchasecard"})
 
     # Monitoring Intervals
     MONITOR_INTERVAL_EVENT_LOOP_LATENCY: float = 0.5

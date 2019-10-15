@@ -26,6 +26,7 @@ def create_app_config() -> AppConfig:
         PAYIN_SERVICE_ID=1631011374003906560,
         PAYOUT_SERVICE_ID=1631011374003906560,
         LEDGER_SERVICE_ID=1631011374003906560,
+        PURCHASECARD_SERVICE_ID=1631011374003906560,
         TEST_SECRET=Secret(name="hello_world_secret"),
         PAYIN_MAINDB_MASTER_URL=Secret(name="payin_maindb_url"),
         PAYIN_MAINDB_REPLICA_URL=Secret(name="payin_maindb_replica_url"),
