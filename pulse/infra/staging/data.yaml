@@ -1,5 +1,6 @@
 service_name: payment-service
-cron_schedule: "*/10 * * * *"
+cron_schedule: "*/5 * * * *"
+batch_report_schedule: "*/5 * * * *"
 
 service_runtime_config:
   example_service_runtime_config: "this is a runtime config"
@@ -10,6 +11,7 @@ service_env:
   SERVICE_URI: "http://payment-service-web.payment-service.svc.cluster.local"
   REPORT_ENABLED: true
   TEST_ENV: "staging"
+  CUSTOM_FAILURE_MSG: "<!here> Attencion!"
 
 secret_sources:
   - payment-service-pulse
