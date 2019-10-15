@@ -716,7 +716,6 @@ class TestCartPaymentProcessor:
         result = await cart_payment_processor.update_payment_for_legacy_charge(
             idempotency_key=str(uuid.uuid4()),
             dd_charge_id=legacy_charge.id,
-            payer_id=None,
             amount=150,
             client_description=client_description,
             dd_additional_payment_info=legacy_payment.dd_additional_payment_info,
@@ -738,7 +737,6 @@ class TestCartPaymentProcessor:
             await cart_payment_processor.update_payment_for_legacy_charge(
                 idempotency_key=str(uuid.uuid4()),
                 dd_charge_id=legacy_charge.id,
-                payer_id=None,
                 amount=1500,
                 client_description="description",
                 dd_additional_payment_info=None,

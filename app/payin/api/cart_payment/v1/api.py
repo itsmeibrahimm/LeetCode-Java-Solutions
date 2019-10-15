@@ -52,7 +52,6 @@ async def create_cart_payment(
 
     - **payer_id**: DoorDash payer_id or stripe_customer_id
     - **amount**: [int] amount in cents for the payment.  Must be greater than 0.
-    - **payer_country**: [string] payer's country ISO code.  Example: "US".
     - **payment_country**: [string] country ISO code for where payment is happening.  Example: "US".
     - **currency**: [string] currency for the payment.  Must be a doordash supported currency.  Example: "usd".
     - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id

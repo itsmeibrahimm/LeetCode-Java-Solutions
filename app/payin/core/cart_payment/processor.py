@@ -1819,6 +1819,9 @@ class CartPaymentProcessor:
         payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
             cart_payment
         )
+
+        # TODO: refactor the logic - there's no combination of capturable and refundable payment intents.
+        # We can simplify the logic below streamline the handling.
         capturable_intents = self.cart_payment_interface.get_capturable_payment_intents(
             payment_intents
         )
@@ -1826,6 +1829,10 @@ class CartPaymentProcessor:
             payment_intents
         )
         if not capturable_intents and not refundable_intents:
+            self.log.warn(
+                "[_update_payment_with_lower_amount] no payment_intent for adjustment with lower amount.",
+                payment_intents=payment_intents,
+            )
             raise PaymentIntentRefundError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
                 retryable=False,
@@ -1927,7 +1934,6 @@ class CartPaymentProcessor:
         self,
         idempotency_key: str,
         dd_charge_id: int,
-        payer_id: Optional[str],
         amount: int,
         client_description: Optional[str],
         dd_additional_payment_info: Optional[Dict[str, Any]],
@@ -2172,7 +2178,7 @@ class CartPaymentProcessor:
         Returns:
             None
         """
-        self.log.debug(
+        self.log.info(
             "[cancel_payment] Cancel cart_payment", cart_payment_id=cart_payment_id
         )
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(

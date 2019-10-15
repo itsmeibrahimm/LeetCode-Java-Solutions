@@ -112,13 +112,14 @@ async def update_cart_payment(
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):
     log.info(
-        f"Updating cart_payment associated with legacy consumer charge {dd_charge_id}"
+        "Updating cart_payment associated with legacy consumer charge.",
+        dd_charge_id=dd_charge_id,
+        cart_payment_request=cart_payment_request,
     )
     try:
         cart_payment: CartPayment = await cart_payment_processor.update_payment_for_legacy_charge(
             idempotency_key=cart_payment_request.idempotency_key,
             dd_charge_id=dd_charge_id,
-            payer_id=None,
             amount=cart_payment_request.amount,
             client_description=cart_payment_request.client_description,
             dd_additional_payment_info=cart_payment_request.dd_additional_payment_info,
@@ -137,7 +138,11 @@ async def update_cart_payment(
             error_message=payment_error.error_message,
             retryable=payment_error.retryable,
         )
-    log.info(f"Updated cart_payment {cart_payment.id} for legacy charge {dd_charge_id}")
+    log.info(
+        "Updated cart_payment for legacy charge",
+        cart_payment_id=cart_payment.id,
+        dd_charge_id=dd_charge_id,
+    )
     return cart_payment
 
 
