@@ -1,5 +1,4 @@
 import random
-import time
 import uuid
 
 import stripe
@@ -132,7 +131,7 @@ class PaymentUtil:
             payment_country=country,
             currency=currency,
             delay_capture=delay_capture,
-            idempotency_key=str(int(time.time())),
+            idempotency_key=str(uuid.uuid4()),
             client_description="Test_Transaction",
             payer_statement_description="Test_Transaction",
             split_payment=split_payment,
@@ -182,7 +181,7 @@ class PaymentUtil:
             payment_country=country,
             currency=currency,
             delay_capture=delay_capture,
-            idempotency_key=str(int(time.time())),
+            idempotency_key=str(uuid.uuid4()),
             client_description="Test Legacy Transaction",
             payer_statement_description="Test Transaction",
             split_payment=split_payment,
@@ -194,7 +193,7 @@ class PaymentUtil:
     @staticmethod
     def get_update_cart_payment_legacy_request(updated_amount: int):
         return UpdateCartPaymentLegacyRequest(
-            idempotency_key=str(int(time.time())),
+            idempotency_key=str(uuid.uuid4()),
             amount=updated_amount,
             client_description="Update Transaction",
             split_payment=split_payment,
