@@ -9,6 +9,7 @@ from app.payin.core.cart_payment.model import CartPayment, IntentStatus, SplitPa
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.core.exceptions import (
     CartPaymentReadError,
+    CartPaymentUpdateError,
     PayinErrorCode,
     PaymentMethodReadError,
 )
@@ -646,8 +647,14 @@ class TestCartPaymentProcessor:
             payment_intent_id=payment_intent.id, status=IntentStatus.REQUIRES_CAPTURE
         )
 
-        result_payment_intent, result_pgp_payment_intent = await cart_payment_processor._update_state_after_cancel_with_provider(
-            payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
+        provider_payment_intent = (
+            await cart_payment_processor.cart_payment_interface.app_context.stripe.create_payment_intent()
+        )
+
+        result_payment_intent, result_pgp_payment_intent, result_legacy_stripe_charge = await cart_payment_processor._update_state_after_cancel_with_provider(
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_intent=provider_payment_intent,
         )
 
         assert result_payment_intent.status == IntentStatus.CANCELLED
@@ -745,6 +752,32 @@ class TestCartPaymentProcessor:
         assert (
             payment_error.value.error_code
             == PayinErrorCode.CART_PAYMENT_NOT_FOUND.value
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_payment_for_legacy_charge_invalid_amount(
+        self, cart_payment_processor
+    ):
+        legacy_charge = generate_legacy_consumer_charge()
+        legacy_charge = generate_legacy_consumer_charge()
+        legacy_payment = generate_legacy_payment()
+        cart_payment = generate_cart_payment(amount=700)
+        cart_payment_processor.cart_payment_interface.get_cart_payment = FunctionMock(
+            return_value=(cart_payment, legacy_payment)
+        )
+
+        with pytest.raises(CartPaymentUpdateError) as payment_error:
+            await cart_payment_processor.update_payment_for_legacy_charge(
+                idempotency_key=str(uuid.uuid4()),
+                dd_charge_id=legacy_charge.id,
+                amount=-1500,
+                client_description="description",
+                dd_additional_payment_info=None,
+                split_payment=None,
+            )
+        assert (
+            payment_error.value.error_code
+            == PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID.value
         )
 
     @pytest.mark.asyncio

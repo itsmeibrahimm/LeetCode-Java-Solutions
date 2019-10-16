@@ -689,7 +689,7 @@ def stripe_interface():
         return_value=utils.generate_provider_intent()
     )
     stripe.cancel_payment_intent = FunctionMock(
-        return_value=utils.generate_provider_intent()
+        return_value=utils.generate_provider_intent(amount_refunded=500)
     )
 
     async def mocked_capture(*args, **kwargs):

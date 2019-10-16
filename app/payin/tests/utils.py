@@ -340,7 +340,7 @@ def generate_provider_charges(
     return charges
 
 
-def generate_provider_intent():
+def generate_provider_intent(amount: int = 500, amount_refunded: int = 0):
     mocked_intent = create_autospec(StripePaymentIntent)
     mocked_intent.id = "test_intent_id"
     mocked_intent.status = "requires_capture"  # Assume delayed capture is used
@@ -349,6 +349,8 @@ def generate_provider_intent():
     mocked_intent.charges.data[0].status = "succeeded"
     mocked_intent.charges.data[0].currency = "usd"
     mocked_intent.charges.data[0].id = str(uuid.uuid4())
+    mocked_intent.charges.data[0].amount = amount
+    mocked_intent.charges.data[0].amount_refunded = amount_refunded
     return mocked_intent
 
 

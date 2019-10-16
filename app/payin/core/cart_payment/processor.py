@@ -260,6 +260,15 @@ class LegacyPaymentInterface:
             additional_payment_info=legacy_payment.dd_additional_payment_info,
         )
 
+    async def lower_amount_for_uncaptured_payment(
+        self, stripe_id: str, amount_refunded: int
+    ) -> LegacyStripeCharge:
+        return await self.payment_repo.update_legacy_stripe_charge_refund(
+            stripe_id=stripe_id,
+            amount_refunded=amount_refunded,
+            refunded_at=datetime.now(),
+        )
+
     async def update_state_after_provider_submission(
         self,
         legacy_stripe_charge: LegacyStripeCharge,
@@ -302,6 +311,17 @@ class LegacyPaymentInterface:
         return await self.payment_repo.update_legacy_stripe_charge_refund(
             stripe_id=provider_refund.charge,
             amount_refunded=provider_refund.amount,
+            refunded_at=datetime.now(),
+        )
+
+    async def update_charge_after_payment_cancelled(
+        self, provider_payment_intent: ProviderPaymentIntent
+    ):
+        provider_charges = provider_payment_intent.charges
+        provider_charge = provider_charges.data[0]
+        return await self.payment_repo.update_legacy_stripe_charge_refund(
+            stripe_id=provider_charge.id,
+            amount_refunded=provider_charge.amount_refunded,
             refunded_at=datetime.now(),
         )
 
@@ -1023,7 +1043,7 @@ class CartPaymentInterface:
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         reason,
-    ) -> str:
+    ) -> ProviderPaymentIntent:
         try:
             intent_request = StripeCancelPaymentIntentRequest(
                 sid=pgp_payment_intent.resource_id, cancellation_reason=reason
@@ -1034,14 +1054,13 @@ class CartPaymentInterface:
                 payment_intent_id=payment_intent.id,
                 idempotency_key=pgp_payment_intent.idempotency_key,
             )
-            response = await self.stripe_async_client.cancel_payment_intent(
+            return await self.stripe_async_client.cancel_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
                 idempotency_key=self.get_idempotency_key_for_provider_call(
                     payment_intent.idempotency_key, IdempotencyKeyAction.CANCEL
                 ),
             )
-            return response
         except StripeError as e:
             self.req_context.log.warning(
                 "[cancel_provider_payment_charge] Cancel payment not successful",
@@ -1561,16 +1580,18 @@ class CartPaymentProcessor:
         self.legacy_payment_interface = legacy_payment_interface
 
     async def _update_state_after_cancel_with_provider(
-        self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
-    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
-        # provider_refund: ProviderRefund, refund_amount: int
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        provider_payment_intent: ProviderPaymentIntent,
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent, LegacyStripeCharge]:
+        legacy_stripe_charge = await self.legacy_payment_interface.update_charge_after_payment_cancelled(
+            provider_payment_intent
+        )
         payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_payment_after_cancel_with_provider(
             payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
         )
-
-        # TODO: Determine if update to legacy charge pair is needed
-
-        return payment_intent, pgp_payment_intent
+        return payment_intent, pgp_payment_intent, legacy_stripe_charge
 
     async def _update_state_after_provider_error(
         self,
@@ -1680,15 +1701,17 @@ class CartPaymentProcessor:
         if can_intent_be_cancelled:
             # Intent not yet captured: it can be cancelled.
             # Cancel with provider
-            await self.cart_payment_interface.cancel_provider_payment_charge(
+            provider_payment_intent = await self.cart_payment_interface.cancel_provider_payment_charge(
                 payment_intent,
                 pgp_payment_intent,
                 StripeCancelPaymentIntentRequest.CancellationReason.ABANDONED,
             )
 
             # Update state in our system after operation with provider
-            updated_payment_intent, updated_pgp_payment_intent = await self._update_state_after_cancel_with_provider(
-                payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
+            updated_payment_intent, updated_pgp_payment_intent, _ = await self._update_state_after_cancel_with_provider(
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                provider_payment_intent=provider_payment_intent,
             )
         elif can_intent_be_refunded:
             # The intent cannot be cancelled because its state is beyond capture.  Instead we must refund
@@ -1920,6 +1943,21 @@ class CartPaymentProcessor:
 
             # New adjustment attempt: Update the properties of existing models to reflect changed amount.  Provider call not
             # necessary as delayed capture will take the right amount at capture time.
+            if not capturable_pgp_payment_intent.charge_resource_id:
+                self.log.error(
+                    "[_update_payment_with_lower_amount] no charge resource id for pgp_payment_intent.",
+                    payment_intent_id=capturable_intent.id,
+                    pgp_payment_intent_id=capturable_pgp_payment_intent.id,
+                )
+                raise PaymentIntentRefundError(
+                    error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
+                    retryable=False,
+                )
+            amount_refunded = capturable_intent.amount - new_amount
+            await self.legacy_payment_interface.lower_amount_for_uncaptured_payment(
+                stripe_id=capturable_pgp_payment_intent.charge_resource_id,
+                amount_refunded=amount_refunded,
+            )
             payment_intent, pgp_payment_intent = await self.cart_payment_interface.lower_amount_for_uncaptured_payment(
                 cart_payment=cart_payment,
                 payment_intent=capturable_intent,
@@ -1927,7 +1965,6 @@ class CartPaymentProcessor:
                 amount=new_amount,
                 idempotency_key=idempotency_key,
             )
-            # TODO: Check if we need to update existing stripe_charge, or if it will get upated later upon capture
         elif refundable_intents:
             refundable_intent = self.cart_payment_interface.get_most_recent_intent(
                 refundable_intents
@@ -2070,6 +2107,16 @@ class CartPaymentProcessor:
 
         # Amount is a delta.
         new_amount = cart_payment.amount + amount
+        if new_amount < 0:
+            self.log.warning(
+                "Invalid amount provided",
+                amount=new_amount,
+                idempotency_key=idempotency_key,
+                dd_charge_id=dd_charge_id,
+            )
+            raise CartPaymentUpdateError(
+                error_code=PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID, retryable=False
+            )
 
         # Client description cannot exceed 1000: truncated if needed
         payment_client_description = self.get_legacy_client_description(

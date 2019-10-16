@@ -151,7 +151,7 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         country: models.CountryCode,
         request: models.StripeCancelPaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentId:
+    ) -> models.PaymentIntent:
         """
         Cancel a PaymentIntent
         https://stripe.com/docs/api/payment_intents
@@ -479,13 +479,13 @@ class StripeClient(StripeClientInterface):
         country: models.CountryCode,
         request: models.StripeCancelPaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentId:
+    ) -> models.PaymentIntent:
         payment_intent = stripe.PaymentIntent.cancel(
             idempotency_key=idempotency_key,
             **self.settings_for(country),
             **request.dict(skip_defaults=True),
         )
-        return payment_intent.id
+        return payment_intent
 
     @tracing.track_breadcrumb(resource="refund", action="create")
     def refund_charge(
@@ -829,7 +829,7 @@ class StripeAsyncClient:
         country: models.CountryCode,
         request: models.StripeCancelPaymentIntentRequest,
         idempotency_key: models.IdempotencyKey,
-    ) -> models.PaymentIntentId:
+    ) -> models.PaymentIntent:
         return await self.executor_pool.submit(
             self.stripe_client.cancel_payment_intent,
             country=country,

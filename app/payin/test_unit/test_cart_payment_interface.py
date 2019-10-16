@@ -307,7 +307,7 @@ class TestLegacyPaymentInterface:
         assert result_stripe_charge == expected_stripe_charge
 
     @pytest.mark.asyncio
-    async def test_update_legacy_charge_pair_after_capture(
+    async def test_update_legacy_charge_after_capture(
         self, cart_payment_interface, legacy_payment_interface
     ):
         payment_intent = generate_payment_intent(status="requires_capture")
@@ -326,7 +326,41 @@ class TestLegacyPaymentInterface:
         assert result_stripe_charge.status == "succeeded"
 
     @pytest.mark.asyncio
-    async def test_update_legacy_charge_pair_after_refund(
+    async def test_legacy_lower_amount_for_uncaptured_payment(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        stripe_id = "test_stripe_id"
+        amount_refunded = 570
+        result_stripe_charge = await legacy_payment_interface.lower_amount_for_uncaptured_payment(
+            stripe_id=stripe_id, amount_refunded=amount_refunded
+        )
+
+        assert result_stripe_charge
+        assert result_stripe_charge.amount_refunded == amount_refunded
+        assert result_stripe_charge.refunded_at
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_charge_after_payment_cancelled(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        payment_intent = generate_payment_intent(status="requires_capture")
+        pgp_payment_intent = generate_pgp_payment_intent(
+            status="requires_capture", payment_intent_id=payment_intent.id
+        )
+        provider_intent = generate_provider_intent(amount_refunded=500)
+        provider_intent.charges = generate_provider_charges(
+            payment_intent, pgp_payment_intent, 500
+        )
+
+        result_stripe_charge = await legacy_payment_interface.update_charge_after_payment_cancelled(
+            provider_intent
+        )
+        assert result_stripe_charge
+        assert result_stripe_charge.amount_refunded == 500
+        assert result_stripe_charge.refunded_at
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_charge_after_refund(
         self, cart_payment_interface, legacy_payment_interface
     ):
         provider_refund = (
