@@ -8,6 +8,10 @@ from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
     SubmitTransfer,
 )
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepositoryInterface,
+)
+from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepositoryInterface,
 )
@@ -28,6 +32,11 @@ class TransferProcessors:
     logger: BoundLogger
     stripe: StripeAsyncClient
     transfer_repo: TransferRepositoryInterface
+    payment_account_repo: PaymentAccountRepositoryInterface
+    stripe_transfer_repo: StripeTransferRepositoryInterface
+    managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
+    transaction_repo: TransactionRepositoryInterface
+    payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
 
     def __init__(
         self,
@@ -37,6 +46,8 @@ class TransferProcessors:
         payment_account_repo: PaymentAccountRepositoryInterface,
         stripe_transfer_repo: StripeTransferRepositoryInterface,
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
+        transaction_repo: TransactionRepositoryInterface,
+        payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
     ):
         self.logger = logger
         self.stripe = stripe
@@ -44,6 +55,8 @@ class TransferProcessors:
         self.payment_account_repo = payment_account_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.managed_account_transfer_repo = managed_account_transfer_repo
+        self.transaction_repo = transaction_repo
+        self.payment_account_edit_history_repo = payment_account_edit_history_repo
 
     async def create_transfer(self, request: CreateTransferRequest):
         create_transfer_op = CreateTransfer(
@@ -60,6 +73,8 @@ class TransferProcessors:
             payment_account_repo=self.payment_account_repo,
             stripe_transfer_repo=self.stripe_transfer_repo,
             managed_account_transfer_repo=self.managed_account_transfer_repo,
+            transaction_repo=self.transaction_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
         )
         return await submit_transfer_op.execute()
 

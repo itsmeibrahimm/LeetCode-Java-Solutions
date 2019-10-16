@@ -73,17 +73,21 @@ async def prepare_and_insert_transfer(
     transfer_repo: TransferRepository,
     payment_account_id=12345678,
     timestamp=datetime.now(timezone.utc),
+    deleted_at=None,
+    submitted_at=None,
+    amount=123,
+    status="status",
 ):
     data = TransferCreate(
         subtotal=123,
         adjustments="some-adjustment",
-        amount=123,
+        amount=amount,
         method="stripe",
         currency="currency",
-        submitted_at=timestamp,
-        deleted_at=timestamp,
+        submitted_at=submitted_at,
+        deleted_at=deleted_at,
         manual_transfer_reason="manual_transfer_reason",
-        status="status",
+        status=status,
         status_code="status_code",
         submitting_at=timestamp,
         should_retry_on_failure=True,
@@ -185,13 +189,16 @@ async def prepare_and_insert_transaction(
     transaction_repo: TransactionRepository,
     payout_account_id: int,
     state: Optional[TransactionState] = None,
+    transfer_id=None,
+    amount=1000,
 ) -> TransactionDBEntity:
     data = TransactionCreateDBEntity(
-        amount=1000,
+        amount=amount,
         amount_paid=800,
         payment_account_id=payout_account_id,
         currency=Currency.USD.value,
         state=state,
+        transfer_id=transfer_id,
     )
 
     transaction = await transaction_repo.create_transaction(data)
@@ -333,6 +340,7 @@ async def prepare_and_insert_payment_account(
     account_id=None,
     entity="dasher",
     account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
+    transfers_enabled=True,
 ) -> PaymentAccount:
     data = PaymentAccountCreate(
         account_id=account_id,
@@ -344,7 +352,7 @@ async def prepare_and_insert_payment_account(
         old_account_id=1234,
         upgraded_to_managed_account_at=datetime.now(timezone.utc),
         is_verified_with_stripe=True,
-        transfers_enabled=True,
+        transfers_enabled=transfers_enabled,
         statement_descriptor="test_statement_descriptor",
     )
 

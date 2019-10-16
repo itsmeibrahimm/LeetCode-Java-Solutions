@@ -38,6 +38,9 @@ payout_error_message_maps = {
     "payout_20": "Duplicate transfer.",
     "payout_21": "Transfers are disabled for this account",
     "payout_22": "Cannot find corresponding transfer with given transfer id",
+    "payout_23": "transfer_permission_error",
+    "payout_24": "Transfer amount exceeds limit.",
+    "payout_25": "Cannot make a negative transfer.",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     "account_1": "PGP account has not set up, please verify your payout account.",
@@ -82,6 +85,9 @@ class PayoutErrorCode(str, Enum):
     DUPLICATE_TRANSFER = "payout_20"
     TRANSFER_DISABLED_ERROR = "payout_21"
     TRANSFER_NOT_FOUND = "payout_22"
+    TRANSFER_PERMISSION_ERROR = "payout_23"
+    TRANSFER_AMOUNT_OVER_LIMIT = "payout_24"
+    TRANSFER_AMOUNT_NEGATIVE = "payout_25"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"

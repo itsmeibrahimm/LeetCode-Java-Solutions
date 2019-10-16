@@ -64,7 +64,13 @@ async def submit_transfer(
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     submit_transfer_request = SubmitTransferRequest(
-        transfer_id=transfer_id, retry=body.retry, submitted_by=body.submitted_by
+        transfer_id=transfer_id,
+        retry=body.retry,
+        submitted_by=body.submitted_by,
+        statement_descriptor=body.statement_descriptor,
+        target_type=body.target_type,
+        target_id=body.target_id,
+        method=body.method,
     )
     submit_transfer_response = await transfer_processors.submit_transfer(
         submit_transfer_request

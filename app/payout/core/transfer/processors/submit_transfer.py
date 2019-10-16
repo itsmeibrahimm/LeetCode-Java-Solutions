@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import re
 
 from starlette.status import HTTP_400_BAD_REQUEST
 from stripe.error import StripeError
-
+from app.commons.runtime import runtime
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
 from typing import Union, Optional, Dict, List
@@ -17,6 +17,12 @@ from app.commons.providers.stripe.stripe_models import (
     StripeCreatePayoutRequest,
     StripeCreateTransferRequest,
 )
+from app.payout.constants import (
+    CURRENCY_TO_MAX_TRANSFER_AMOUNT_IN_BASE_UNIT,
+    MAX_TRANSFER_AMOUNT_IN_CENTS,
+    FF_CHECK_FOR_RECENT_BANK_CHANGE,
+    DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK,
+)
 from app.payout.core.account.utils import (
     get_country_shortname,
     get_currency_code,
@@ -24,6 +30,10 @@ from app.payout.core.account.utils import (
 )
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepositoryInterface,
+)
+from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepositoryInterface,
 )
@@ -38,7 +48,7 @@ from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransferCreate,
     StripeTransferUpdate,
 )
-from app.payout.repository.maindb.model.transfer import TransferUpdate
+from app.payout.repository.maindb.model.transfer import TransferUpdate, Transfer
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
@@ -63,6 +73,7 @@ from app.payout.types import (
     UNKNOWN_ERROR_STR,
     TRANSFER_ERROR_TYPE_TO_FAILED_STATUS,
     TransferId,
+    TRANSFER_METHOD_TO_SUBMIT_FUNCTION,
 )
 
 
@@ -89,6 +100,8 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
     payment_account_repo: PaymentAccountRepositoryInterface
     stripe_transfer_repo: StripeTransferRepositoryInterface
     managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
+    transaction_repo: TransactionRepositoryInterface
+    payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
 
     def __init__(
         self,
@@ -98,6 +111,8 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         payment_account_repo: PaymentAccountRepositoryInterface,
         stripe_transfer_repo: StripeTransferRepositoryInterface,
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
+        transaction_repo: TransactionRepositoryInterface,
+        payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         stripe: StripeAsyncClient,
         logger: BoundLogger = None,
     ):
@@ -107,13 +122,16 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         self.payment_account_repo = payment_account_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.managed_account_transfer_repo = managed_account_transfer_repo
+        self.transaction_repo = transaction_repo
+        self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.stripe = stripe
 
     async def _execute(self) -> SubmitTransferResponse:
+        payout_method = self.request.method
         self.logger.info(
             "Submitting transfer",
             transfer_id=self.request.transfer_id,
-            method=self.request.method,
+            method=payout_method,
         )
 
         transfer_id = self.request.transfer_id
@@ -139,8 +157,12 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 retryable=False,
             )
 
-        # todo: wait for txn repo GET functions to check in
-        transactions: List[TransactionDBEntity] = []
+        # todo: offset and limit will be updated to optional, will remove these after they are updated
+        transactions: List[
+            TransactionDBEntity
+        ] = await self.transaction_repo.get_transaction_by_transfer_id(
+            transfer_id=transfer_id, offset=0, limit=1000000
+        )
         if transactions:
             transaction_sum = sum(transaction.amount for transaction in transactions)
             diff = abs(transaction_sum - transfer.amount)
@@ -194,8 +216,8 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 retryable=False,
             )
         if not self.request.retry:
-            method = self.request.method or transfer.method
-            if transfer.submitted_at or self.get_latest_transfer_submission(
+            method = payout_method or transfer.method
+            if transfer.submitted_at or await self.get_latest_transfer_submission(
                 transfer_id=transfer_id, method=method
             ):
                 raise PayoutError(
@@ -214,19 +236,21 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     error_code=PayoutErrorCode.TRANSFER_DISABLED_ERROR,
                     retryable=False,
                 )
-        assert self.request.method in [choice[0] for choice in TRANSFER_METHOD_CHOICES]
-        if transfer.amount == 0 or self.request.method in (
+        assert (
+            payout_method
+        ), "payout_method must be valid since we have assign default value to it"
+        if transfer.amount == 0 or payout_method in (
             TransferMethodType.DOORDASH_PAY,
             TransferMethodType.COD_INVOICE,
         ):
             await self.handle_dummy_transfer(
-                transfer_id=transfer_id, method=self.request.method
+                transfer_id=transfer_id, method=payout_method
             )
             return SubmitTransferResponse()
-        # todo: add transfer_amount_check() afterwards
-
+        await self.transfer_amount_check(transfer=transfer)
+        assert payout_method in [choice[0] for choice in TRANSFER_METHOD_CHOICES]
         is_transfer_processing = await self.is_processing_or_processed_for_method(
-            transfer_id=transfer_id, method=self.request.method
+            transfer_id=transfer_id, method=payout_method
         )
         if is_transfer_processing:
             raise PayoutError(
@@ -234,7 +258,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 error_code=PayoutErrorCode.TRANSFER_PROCESSING,
                 retryable=False,
             )
-        if self.request.method == TransferMethodType.STRIPE:
+        if payout_method == TransferMethodType.STRIPE:
             await self.has_stripe_managed_account(
                 payment_account=payment_account, transfer_id=transfer_id
             )
@@ -243,10 +267,10 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 payment_account=payment_account,
                 amount=transfer.amount,
             )
-        # todo: need to handle the logic while method is not 'stripe'
         await self.submit_stripe_transfer(
             transfer_id=transfer_id,
             payment_account=payment_account,
+            method=payout_method,
             amount=transfer.amount,
             statement_descriptor=self.request.statement_descriptor,
             target_type=self.request.target_type,
@@ -294,6 +318,68 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 transfer_id=transfer_id
             )
         return None
+
+    async def transfer_amount_check(self, transfer: Transfer):
+        assert transfer.currency, "currency should be set before calling this function"
+        assert (
+            transfer.payment_account_id
+        ), "payment_account_id should be checked before calling this function, cannot be None"
+
+        default_max_amount = CURRENCY_TO_MAX_TRANSFER_AMOUNT_IN_BASE_UNIT.get(
+            transfer.currency, MAX_TRANSFER_AMOUNT_IN_CENTS  # default to USD
+        )
+        account_limitations = runtime.get_json(
+            "payment_account_transfer_limit_overrides", {}
+        )
+        max_amount_dict = account_limitations.get(
+            transfer.payment_account_id, None
+        ) or runtime.get_int("default_transfer_max", {})
+        max_amount = max_amount_dict.get(transfer.currency, default_max_amount)
+        # check if transfer amount exceeds max amount AND there was a recent bank change
+        should_error_on_large_amt = transfer.amount >= max_amount
+
+        if runtime.get_bool(FF_CHECK_FOR_RECENT_BANK_CHANGE, False):
+            if should_error_on_large_amt:
+                days = runtime.get_int(
+                    DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK, default=14
+                )
+                most_recent_updated_bank_account = await self.payment_account_edit_history_repo.get_most_recent_bank_update(
+                    payment_account_id=transfer.payment_account_id,
+                    within_last_timedelta=timedelta(days=days),
+                )
+                should_error_on_large_amt = (
+                    True if most_recent_updated_bank_account else False
+                )
+        if should_error_on_large_amt:
+            # todo: has_payment_permission requires access to User table, temp set as False and will update later
+            has_payment_permission = False
+            if not has_payment_permission:
+                update_request = TransferUpdate(
+                    status=TransferStatusType.ERROR,
+                    status_code=TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED,
+                )
+                await self.transfer_repo.update_transfer_by_id(
+                    transfer_id=transfer.id, data=update_request
+                )
+                raise PayoutError(
+                    http_status_code=HTTP_400_BAD_REQUEST,
+                    error_code=PayoutErrorCode.TRANSFER_AMOUNT_OVER_LIMIT,
+                    retryable=False,
+                )
+
+        if transfer.amount < 0:
+            update_request = TransferUpdate(
+                status=TransferStatusType.ERROR,
+                status_code=TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED,
+            )
+            await self.transfer_repo.update_transfer_by_id(
+                transfer_id=transfer.id, data=update_request
+            )
+            raise PayoutError(
+                http_status_code=HTTP_400_BAD_REQUEST,
+                error_code=PayoutErrorCode.TRANSFER_AMOUNT_NEGATIVE,
+                retryable=False,
+            )
 
     async def is_processing_or_processed_for_method(
         self, transfer_id: int, method: str
@@ -452,6 +538,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         payment_account: PaymentAccount,
         amount: int,
         statement_descriptor: str,
+        method: str,
         target_type: Optional[PayoutTargetType],
         target_id: Optional[str],
         submitted_by: Optional[int],
@@ -462,90 +549,109 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         :param payment_account: PaymentAccount
         :param amount: int, amount of the transfer
         :param statement_descriptor: str, used to create payout
+        :param method: str, transfer method type
         :param target_type: dasher or store
         :param target_id: dasher id or store id
         :param submitted_by: id of the user that triggered submit_transfer
         """
-        update_request = TransferUpdate(status_code=None, should_retry_on_failure=False)
-        await self.transfer_repo.update_transfer_by_id(
-            transfer_id=transfer_id, data=update_request
+        submit_function_name = TRANSFER_METHOD_TO_SUBMIT_FUNCTION.get(
+            method, "_submit_stripe_transfer"
         )
-        try:
-            request = StripeTransferCreate(
-                transfer_id=transfer_id,
-                submission_status=StripeTransferSubmissionStatus.SUBMITTING,
-                stripe_status="",
-            )
-            stripe_transfer = await self.stripe_transfer_repo.create_stripe_transfer(
-                data=request
-            )
-
-            await self._submit_stripe_transfer(
-                stripe_transfer=stripe_transfer,
-                payment_account=payment_account,
-                amount=amount,
-                statement_descriptor=statement_descriptor,
-                transfer_id=transfer_id,
-                target_type=target_type,
-                target_id=target_id,
-            )
+        self.logger.info(
+            "submitting transfer with function",
+            transfer_id=transfer_id,
+            submit_function_name=submit_function_name,
+        )
+        if submit_function_name:
             update_request = TransferUpdate(
-                submitted_at=datetime.now(timezone.utc), submitted_by_id=submitted_by
+                status_code=None, should_retry_on_failure=False, method=method
             )
             await self.transfer_repo.update_transfer_by_id(
                 transfer_id=transfer_id, data=update_request
             )
-        except PayoutError as e:
-            retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
-                transfer_id=transfer_id
-            )
-            self.logger.info(
-                "Submit Stripe Transfer failed",
-                transfer_id=transfer_id,
-                stripe_transfer_id=retrieved_stripe_transfer.id
-                if retrieved_stripe_transfer
-                else None,
-                error_type=e.error_code,
-                error_message=e.error_message,
-            )
-            if e.error_code in TRANSFER_ERROR_TYPE_TO_FAILED_STATUS:
+            if submit_function_name == TRANSFER_METHOD_TO_SUBMIT_FUNCTION.get(
+                TransferMethodType.CHECK
+            ):
+                await self._submit_check_transfer(
+                    transfer_id=transfer_id, submitted_by=submitted_by
+                )
+            try:
+                request = StripeTransferCreate(
+                    transfer_id=transfer_id,
+                    submission_status=StripeTransferSubmissionStatus.SUBMITTING,
+                    stripe_status="",
+                )
+                stripe_transfer = await self.stripe_transfer_repo.create_stripe_transfer(
+                    data=request
+                )
+
+                await self._submit_stripe_transfer(
+                    stripe_transfer=stripe_transfer,
+                    payment_account=payment_account,
+                    amount=amount,
+                    statement_descriptor=statement_descriptor,
+                    transfer_id=transfer_id,
+                    target_type=target_type,
+                    target_id=target_id,
+                )
                 update_request = TransferUpdate(
-                    status=TransferStatusType.FAILED,
-                    status_code=e.error_code,
-                    submitted_at=datetime.utcnow(),
+                    submitted_at=datetime.now(timezone.utc),
                     submitted_by_id=submitted_by,
                 )
                 await self.transfer_repo.update_transfer_by_id(
                     transfer_id=transfer_id, data=update_request
                 )
-            else:
+            except PayoutError as e:
+                retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+                    transfer_id=transfer_id
+                )
+                self.logger.info(
+                    "Submit Stripe Transfer failed",
+                    transfer_id=transfer_id,
+                    stripe_transfer_id=retrieved_stripe_transfer.id
+                    if retrieved_stripe_transfer
+                    else None,
+                    error_type=e.error_code,
+                    error_message=e.error_message,
+                )
+                if e.error_code in TRANSFER_ERROR_TYPE_TO_FAILED_STATUS:
+                    update_request = TransferUpdate(
+                        status=TransferStatusType.FAILED,
+                        status_code=e.error_code,
+                        submitted_at=datetime.utcnow(),
+                        submitted_by_id=submitted_by,
+                    )
+                    await self.transfer_repo.update_transfer_by_id(
+                        transfer_id=transfer_id, data=update_request
+                    )
+                else:
+                    update_request = TransferUpdate(
+                        status=TransferStatusType.ERROR,
+                        status_code=TransferStatusCodeType.ERROR_SUBMISSION,
+                    )
+                    await self.transfer_repo.update_transfer_by_id(
+                        transfer_id=transfer_id, data=update_request
+                    )
+                raise e
+            except Exception as e:
+                retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+                    transfer_id=transfer_id
+                )
+                self.logger.exception(
+                    "Submit Stripe Transfer got an exception",
+                    transfer_id=transfer_id,
+                    stripe_transfer_id=retrieved_stripe_transfer.id
+                    if retrieved_stripe_transfer
+                    else None,
+                    error_message=e,
+                )
                 update_request = TransferUpdate(
                     status=TransferStatusType.ERROR,
-                    status_code=TransferStatusCodeType.ERROR_SUBMISSION,
+                    status_code=TransferStatusCodeType.UNKNOWN_ERROR,
                 )
                 await self.transfer_repo.update_transfer_by_id(
                     transfer_id=transfer_id, data=update_request
                 )
-            raise e
-        except Exception as e:
-            retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
-                transfer_id=transfer_id
-            )
-            self.logger.exception(
-                "Submit Stripe Transfer got an exception",
-                transfer_id=transfer_id,
-                stripe_transfer_id=retrieved_stripe_transfer.id
-                if retrieved_stripe_transfer
-                else None,
-                error_message=e,
-            )
-            update_request = TransferUpdate(
-                status=TransferStatusType.ERROR,
-                status_code=TransferStatusCodeType.UNKNOWN_ERROR,
-            )
-            await self.transfer_repo.update_transfer_by_id(
-                transfer_id=transfer_id, data=update_request
-            )
 
     async def _submit_stripe_transfer(
         self,
@@ -700,6 +806,27 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 retryable=False,
                 error_message=stripe_error_message,
             )
+
+    async def _submit_check_transfer(
+        self, transfer_id: int, submitted_by: Optional[int]
+    ):
+        # todo: has_payment_permission requires access to User table, temp set as False and will update later
+        has_payment_permission = False
+        if not has_payment_permission:
+            raise PayoutError(
+                http_status_code=HTTP_400_BAD_REQUEST,
+                error_code=PayoutErrorCode.TRANSFER_PERMISSION_ERROR,
+                retryable=False,
+            )
+        update_request = TransferUpdate(
+            status_code=None,
+            status=TransferStatusType.PAID,
+            submitted_at=datetime.now(timezone.utc),
+            submitted_by=submitted_by,
+        )
+        await self.transfer_repo.update_transfer_by_id(
+            transfer_id=transfer_id, data=update_request
+        )
 
     async def get_stripe_account_id(self, payment_account: PaymentAccount) -> str:
         """

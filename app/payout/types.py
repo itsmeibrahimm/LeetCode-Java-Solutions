@@ -165,6 +165,13 @@ TRANSFER_ERROR_TYPE_TO_FAILED_STATUS = [
     PayoutErrorCode.STRIPE_PAYOUT_DISALLOWED,
 ]
 
+TRANSFER_METHOD_TO_SUBMIT_FUNCTION = {
+    TransferMethodType.STRIPE: "_submit_stripe_transfer",
+    TransferMethodType.CHECK: "_submit_check_transfer",
+    TransferMethodType.BANK: None,
+    TransferMethodType.STRIPE_FAST_PAY: None,
+}
+
 
 class PayoutDay(str, Enum):
     MONDAY = "monday"
