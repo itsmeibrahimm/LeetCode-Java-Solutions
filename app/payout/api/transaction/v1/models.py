@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.commons.api.models import PaymentResponse, PaymentRequest
 from app.commons.types import Currency
-from app.payout.types import TransactionState
+import app.payout.types as types
 
 
 class Transaction(PaymentResponse):
@@ -20,7 +20,7 @@ class Transaction(PaymentResponse):
     target_type: Optional[str]
     currency: Optional[Currency]
     idempotency_key: Optional[str]
-    state: Optional[TransactionState]
+    state: Optional[types.TransactionState]
     notes: Optional[str]
     metadata: Optional[dict]
     created_at: datetime
@@ -53,6 +53,11 @@ class TransactionCreate(PaymentRequest):
     created_by_id: Optional[int] = None
     notes: Optional[str] = None
     metadata: Optional[str] = None
+
+
+class ReverseTransaction(PaymentRequest):
+    transaction_id: types.TransactionId
+    reverse_reason: Optional[str]
 
 
 class TimeRange(BaseModel):

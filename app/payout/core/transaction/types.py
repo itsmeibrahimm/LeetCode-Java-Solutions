@@ -20,7 +20,9 @@ class TransactionInternal(OperationResponse):
     idempotency_key: Optional[str]
     state: Optional[types.TransactionState]
     notes: Optional[str]
-    metadata: Optional[dict]
+    # there are multiple types of metadata in db that we need to clean up
+    # use str to avoid 500 caused by ValidationError
+    metadata: Optional[str]
     created_at: datetime
     inserted_at: Optional[datetime]
     updated_at: datetime

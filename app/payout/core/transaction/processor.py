@@ -8,6 +8,10 @@ from app.payout.core.transaction.processors.list_transactions import (
     ListTransactionsRequest,
     ListTransactions,
 )
+from app.payout.core.transaction.processors.reverse_transaction import (
+    ReverseTransactionRequest,
+    ReverseTransaction,
+)
 from app.payout.core.transaction.types import (
     TransactionListInternal,
     TransactionInternal,
@@ -40,3 +44,11 @@ class TransactionProcessors:
             logger=self.logger, transaction_repo=self.transaction_repo, request=request
         )
         return await create_transactions_op.execute()
+
+    async def reverse_transaction(
+        self, request: ReverseTransactionRequest
+    ) -> TransactionInternal:
+        reverse_transaction_op = ReverseTransaction(
+            logger=self.logger, transaction_repo=self.transaction_repo, request=request
+        )
+        return await reverse_transaction_op.execute()

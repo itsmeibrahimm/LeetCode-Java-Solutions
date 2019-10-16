@@ -52,6 +52,8 @@ payout_error_message_maps = {
     "payout_method_4": "Cannot find a payout method with the given id.",
     "payout_method_5": "Cannot find a payout card with the given id.",
     "payout_method_6": "The payout_account id for the payout_method is not matching with the one is given.",
+    # transaction errors
+    "transaction_1": "The transaction is not valid for reverse",
 }
 
 
@@ -99,6 +101,7 @@ class PayoutErrorCode(str, Enum):
 
     # transaction error code
     TRANSACTION_BAD_QUERY_PARAMETER = "transaction_0"
+    TRANSACTION_INVALID = "transaction_1"
 
 
 class PayoutError(PaymentException):
@@ -280,5 +283,16 @@ def transaction_bad_query_parameters(error_message: str) -> PayoutError:
         http_status_code=HTTP_400_BAD_REQUEST,
         error_message=error_message,
         error_code=PayoutErrorCode.TRANSACTION_BAD_QUERY_PARAMETER,
+        retryable=False,
+    )
+
+
+def transaction_invalid(error_message: str) -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_400_BAD_REQUEST,
+        error_message=error_message
+        if error_message
+        else payout_error_message_maps[PayoutErrorCode.TRANSACTION_INVALID.value],
+        error_code=PayoutErrorCode.TRANSACTION_INVALID,
         retryable=False,
     )

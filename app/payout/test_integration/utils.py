@@ -182,13 +182,16 @@ async def prepare_and_insert_stripe_payout_request(
 
 
 async def prepare_and_insert_transaction(
-    transaction_repo: TransactionRepository, payout_account_id: int
+    transaction_repo: TransactionRepository,
+    payout_account_id: int,
+    state: Optional[TransactionState] = None,
 ) -> TransactionDBEntity:
     data = TransactionCreateDBEntity(
         amount=1000,
         amount_paid=800,
         payment_account_id=payout_account_id,
         currency=Currency.USD.value,
+        state=state,
     )
 
     transaction = await transaction_repo.create_transaction(data)

@@ -56,6 +56,7 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     default_payment_router_builder().add_sub_routers(
         {
             "/accounts": account.v1.router,
+            "/transactions": transaction.v1.router,
             "/transfers": transfer.v1.router,
             "/instant_payouts": instant_payout.v1.router,
             "/transaction": transaction.v1.router,
