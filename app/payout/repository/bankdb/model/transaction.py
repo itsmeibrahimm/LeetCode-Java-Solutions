@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 from typing import Optional
 
 from sqlalchemy import Column, DateTime, Integer, Text, text
@@ -67,7 +66,7 @@ class _TransactionPartial(DBEntity):
     inserted_at: Optional[datetime]
 
 
-class Transaction(_TransactionPartial):
+class TransactionDBEntity(_TransactionPartial):
     id: int
     amount: int
     payment_account_id: int
@@ -76,17 +75,11 @@ class Transaction(_TransactionPartial):
     updated_at: datetime
 
 
-class TransactionCreate(_TransactionPartial):
+class TransactionCreateDBEntity(_TransactionPartial):
     amount: int
     amount_paid: int
     payment_account_id: int
 
 
-class TransactionUpdate(_TransactionPartial):
+class TransactionUpdateDBEntity(_TransactionPartial):
     pass
-
-
-class TransactionState(str, Enum):
-    PENDING = "pending"
-    ACTIVE = "active"
-    CANCELLED = "cancelled"

@@ -10,44 +10,48 @@ from app.commons.database.infra import DB
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import transactions
 from app.payout.repository.bankdb.model.transaction import (
-    Transaction,
-    TransactionCreate,
-    TransactionUpdate,
-    TransactionState,
+    TransactionDBEntity,
+    TransactionCreateDBEntity,
+    TransactionUpdateDBEntity,
 )
+from app.payout.types import TransactionState
 
 
 class TransactionRepositoryInterface(ABC):
     @abstractmethod
-    async def create_transaction(self, data: TransactionCreate) -> Transaction:
+    async def create_transaction(
+        self, data: TransactionCreateDBEntity
+    ) -> TransactionDBEntity:
         pass
 
     @abstractmethod
-    async def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
+    async def get_transaction_by_id(
+        self, transaction_id: int
+    ) -> Optional[TransactionDBEntity]:
         pass
 
     @abstractmethod
     async def get_transaction_by_ids(
         self, transaction_ids: List[int]
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
     async def get_transaction_by_target_ids_and_type(
         self, target_ids: List[int], target_type: str, offset: int, limit: int
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
     async def get_transaction_by_transfer_id(
         self, transfer_id: int, offset: int, limit: int
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
     async def get_transaction_by_payout_id(
         self, payout_id: int, offset: int, limit: int
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
@@ -58,7 +62,7 @@ class TransactionRepositoryInterface(ABC):
         limit: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
@@ -69,7 +73,7 @@ class TransactionRepositoryInterface(ABC):
         limit: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
@@ -79,19 +83,19 @@ class TransactionRepositoryInterface(ABC):
         limit: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         pass
 
     @abstractmethod
     async def update_transaction_by_id(
-        self, transaction_id: int, data: TransactionUpdate
-    ) -> Optional[Transaction]:
+        self, transaction_id: int, data: TransactionUpdateDBEntity
+    ) -> Optional[TransactionDBEntity]:
         pass
 
     @abstractmethod
     async def set_transaction_payout_id_by_ids(
-        self, transaction_ids: List[int], data: TransactionUpdate
-    ) -> List[Transaction]:
+        self, transaction_ids: List[int], data: TransactionUpdateDBEntity
+    ) -> List[TransactionDBEntity]:
         pass
 
 
@@ -101,7 +105,9 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
     def __init__(self, database: DB):
         super().__init__(_database=database)
 
-    async def create_transaction(self, data: TransactionCreate) -> Transaction:
+    async def create_transaction(
+        self, data: TransactionCreateDBEntity
+    ) -> TransactionDBEntity:
         ts_now = datetime.utcnow()
         stmt = (
             transactions.table.insert()
@@ -110,16 +116,18 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         )
         row = await self._database.master().fetch_one(stmt)
         assert row is not None
-        return Transaction.from_row(row)
+        return TransactionDBEntity.from_row(row)
 
-    async def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
+    async def get_transaction_by_id(
+        self, transaction_id: int
+    ) -> Optional[TransactionDBEntity]:
         stmt = transactions.table.select().where(transactions.id == transaction_id)
         row = await self._database.replica().fetch_one(stmt)
-        return Transaction.from_row(row) if row else None
+        return TransactionDBEntity.from_row(row) if row else None
 
     async def update_transaction_by_id(
-        self, transaction_id: int, data: TransactionUpdate
-    ) -> Optional[Transaction]:
+        self, transaction_id: int, data: TransactionUpdateDBEntity
+    ) -> Optional[TransactionDBEntity]:
         stmt = (
             transactions.table.update()
             .where(transactions.id == transaction_id)
@@ -127,11 +135,11 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
             .returning(*transactions.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)
-        return Transaction.from_row(row) if row else None
+        return TransactionDBEntity.from_row(row) if row else None
 
     async def set_transaction_payout_id_by_ids(
-        self, transaction_ids: List[int], data: TransactionUpdate
-    ) -> List[Transaction]:
+        self, transaction_ids: List[int], data: TransactionUpdateDBEntity
+    ) -> List[TransactionDBEntity]:
         stmt = (
             transactions.table.update()
             .where(transactions.id.in_(transaction_ids))
@@ -139,11 +147,11 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
             .returning(*transactions.table.columns.values())
         )
         rows = await self._database.master().fetch_all(stmt)
-        return [Transaction.from_row(row) for row in rows] if rows else []
+        return [TransactionDBEntity.from_row(row) for row in rows] if rows else []
 
     async def get_transaction_by_ids(
         self, transaction_ids: List[int]
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         stmt = (
             transactions.table.select()
             .where(transactions.id.in_(transaction_ids))
@@ -152,13 +160,13 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
 
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []
 
     async def get_transaction_by_target_ids_and_type(
         self, target_ids: List[int], target_type: str, offset: int, limit: int
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         stmt = (
             transactions.table.select()
             .where(
@@ -174,13 +182,13 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
 
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []
 
     async def get_transaction_by_transfer_id(
         self, transfer_id: int, offset: int, limit: int
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         stmt = (
             transactions.table.select()
             .where(transactions.transfer_id == transfer_id)
@@ -191,13 +199,13 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
 
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []
 
     async def get_transaction_by_payout_id(
         self, payout_id: int, offset: int, limit: int
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         stmt = (
             transactions.table.select()
             .where(transactions.payout_id == payout_id)
@@ -208,7 +216,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
 
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []
 
@@ -219,7 +227,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         limit: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         and_statement = and_(
             # this line is necessary to make a valid and_statement, otherwise it will raise AttributeError
             transactions.payment_account_id.isnot(None),
@@ -239,7 +247,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         )
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []
 
@@ -250,7 +258,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         limit: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         and_statement = and_(
             transactions.payment_account_id == payout_account_id,
             transactions.transfer_id.is_(None),
@@ -273,7 +281,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         )
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []
 
@@ -283,7 +291,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         limit: int,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
-    ) -> List[Transaction]:
+    ) -> List[TransactionDBEntity]:
         and_statement = and_(
             transactions.transfer_id.is_(None),
             transactions.payout_id.is_(None),
@@ -305,6 +313,6 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         )
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            return [Transaction.from_row(row) for row in rows]
+            return [TransactionDBEntity.from_row(row) for row in rows]
         else:
             return []

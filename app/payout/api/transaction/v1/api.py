@@ -1,7 +1,11 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends
-from starlette.status import HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR
+from starlette.status import (
+    HTTP_200_OK,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_201_CREATED,
+)
 
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.transaction.v1 import models
@@ -10,6 +14,9 @@ from app.payout.core.transaction.processor import TransactionProcessors
 from app.payout.core.transaction.processors.list_transactions import (
     ListTransactionsRequest,
     TimeRange,
+)
+from app.payout.core.transaction.processors.create_transaction import (
+    CreateTransactionRequest,
 )
 from app.payout.service import create_transaction_processors
 
@@ -54,3 +61,24 @@ async def list_transactions(
     return models.TransactionList(
         count=internal_response.count, transaction_list=internal_response.data
     )
+
+
+@router.post(
+    "/",
+    status_code=HTTP_201_CREATED,
+    operation_id="CreateTransaction",
+    response_model=models.Transaction,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def create_transaction(
+    body: models.TransactionCreate,
+    transaction_processors: TransactionProcessors = Depends(
+        create_transaction_processors
+    ),
+):
+    create_transactions_request = CreateTransactionRequest(**body.dict())
+    internal_response = await transaction_processors.create_transaction(
+        create_transactions_request
+    )
+    return models.Transaction(**internal_response.dict())

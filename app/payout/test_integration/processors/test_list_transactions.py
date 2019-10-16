@@ -16,9 +16,8 @@ from app.payout.core.transaction.types import (
     TransactionInternal,
 )
 from app.payout.repository.bankdb.model.transaction import (
-    Transaction,
-    TransactionCreate,
-    TransactionState,
+    TransactionDBEntity,
+    TransactionCreateDBEntity,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.transaction import TransactionRepository
@@ -32,7 +31,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payout,
     prepare_and_insert_paid_transaction_list_for_transfer,
 )
-from app.payout.types import PayoutAccountTargetType
+from app.payout.types import PayoutAccountTargetType, TransactionState
 
 
 class TestListTransactions:
@@ -107,8 +106,8 @@ class TestListTransactions:
         transaction_list, target_id_list = await prepare_and_insert_transaction_list_for_different_targets(
             transaction_repo=transaction_repo, payment_account_repo=payment_account_repo
         )
-        expected_list_for_dasher: List[Transaction] = []
-        expected_list_for_store: List[Transaction] = []
+        expected_list_for_dasher: List[TransactionDBEntity] = []
+        expected_list_for_store: List[TransactionDBEntity] = []
         for transaction in transaction_list:
             if transaction.target_type == PayoutAccountTargetType.DASHER.value:
                 expected_list_for_dasher.append(transaction)
@@ -117,7 +116,7 @@ class TestListTransactions:
 
         # 1. filter by target_ids and "dasher" with offset = 0 and limit = 10
         expected_list_for_dasher_first_page: List[
-            Transaction
+            TransactionDBEntity
         ] = expected_list_for_dasher[:TEST_DEFAULT_PAGE_SIZE]
         offset = 0
         new_offset = offset + len(expected_list_for_dasher_first_page)
@@ -152,9 +151,9 @@ class TestListTransactions:
         ), "filter by target ids and type should match with expected"
 
         # 2. filter by target_ids and "dasher" with offset = 10 and limit = 10
-        expected_list_for_dasher_sec_page: List[Transaction] = expected_list_for_dasher[
-            TEST_DEFAULT_PAGE_SIZE:
-        ]
+        expected_list_for_dasher_sec_page: List[
+            TransactionDBEntity
+        ] = expected_list_for_dasher[TEST_DEFAULT_PAGE_SIZE:]
         offset = len(expected_list_for_dasher_first_page)
         new_offset = offset + len(expected_list_for_dasher_sec_page)
         expected_transaction_list_internal_sec_page = TransactionListInternal(
@@ -661,7 +660,7 @@ class TestListTransactions:
         ), "filter unpaid by payout account id with offset and limit should match with expected"
 
         # 2. insert another unpaid transaction with state is ACTIVE
-        data = TransactionCreate(
+        data = TransactionCreateDBEntity(
             amount=1000,
             amount_paid=800,
             payment_account_id=payout_account.id,

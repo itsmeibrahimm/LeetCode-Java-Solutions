@@ -23,7 +23,7 @@ from app.payout.core.account.utils import (
     get_account_balance,
 )
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
-from app.payout.repository.bankdb.model.transaction import Transaction
+from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepositoryInterface,
 )
@@ -140,7 +140,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             )
 
         # todo: wait for txn repo GET functions to check in
-        transactions: List[Transaction] = []
+        transactions: List[TransactionDBEntity] = []
         if transactions:
             transaction_sum = sum(transaction.amount for transaction in transactions)
             diff = abs(transaction_sum - transfer.amount)

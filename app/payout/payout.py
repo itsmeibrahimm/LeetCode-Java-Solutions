@@ -5,7 +5,7 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import default_payment_router_builder
 from app.middleware.doordash_metrics import ServiceMetricsMiddleware
-from app.payout.api import account, transfer, instant_payout, webhook
+from app.payout.api import account, transfer, instant_payout, webhook, transaction
 
 
 def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -58,6 +58,7 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
             "/accounts": account.v1.router,
             "/transfers": transfer.v1.router,
             "/instant_payouts": instant_payout.v1.router,
+            "/transaction": transaction.v1.router,
         }
     ).add_common_dependencies(
         ApiSecretRouteAuthorizer(config.PAYOUT_SERVICE_ID)

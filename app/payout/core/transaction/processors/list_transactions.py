@@ -12,7 +12,7 @@ from app.payout.core.transaction.types import (
     TransactionListInternal,
     TransactionInternal,
 )
-from app.payout.repository.bankdb.model.transaction import Transaction
+from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 from app.payout import types
 
@@ -59,7 +59,7 @@ class ListTransactions(
         # validate the request
         ListTransactions.validate_list_transactions_request(self.request)
 
-        transactions: List[Transaction] = []
+        transactions: List[TransactionDBEntity] = []
         if self.request.transaction_ids:
             transactions = await self.transaction_repo.get_transaction_by_ids(
                 transaction_ids=self.request.transaction_ids

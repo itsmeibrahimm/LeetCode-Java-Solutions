@@ -19,9 +19,8 @@ from app.payout.repository.bankdb.model.stripe_managed_account_transfer import (
     StripeManagedAccountTransferCreate,
 )
 from app.payout.repository.bankdb.model.transaction import (
-    TransactionCreate,
-    Transaction,
-    TransactionState,
+    TransactionCreateDBEntity,
+    TransactionDBEntity,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
@@ -56,6 +55,7 @@ from app.payout.types import (
     PayoutExternalAccountType,
     AccountType,
     StripeTransferSubmissionStatus,
+    TransactionState,
 )
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
@@ -183,8 +183,8 @@ async def prepare_and_insert_stripe_payout_request(
 
 async def prepare_and_insert_transaction(
     transaction_repo: TransactionRepository, payout_account_id: int
-) -> Transaction:
-    data = TransactionCreate(
+) -> TransactionDBEntity:
+    data = TransactionCreateDBEntity(
         amount=1000,
         amount_paid=800,
         payment_account_id=payout_account_id,
@@ -207,10 +207,10 @@ async def prepare_and_insert_transaction_list_for_same_account(
     transfer_id: Optional[int] = None,
     payout_id: Optional[int] = None,
     count: int = 10,
-) -> List[Transaction]:
-    transaction_list: List[Transaction] = []
+) -> List[TransactionDBEntity]:
+    transaction_list: List[TransactionDBEntity] = []
     for i in range(0, count):
-        data = TransactionCreate(
+        data = TransactionCreateDBEntity(
             amount=1000,
             amount_paid=800,
             payment_account_id=payout_account_id,
@@ -235,10 +235,10 @@ async def prepare_and_insert_paid_transaction_list_for_transfer(
     payout_account_id: int,
     transfer_id: int,
     count: int = 5,
-) -> List[Transaction]:
-    transaction_list: List[Transaction] = []
+) -> List[TransactionDBEntity]:
+    transaction_list: List[TransactionDBEntity] = []
     for i in range(0, count):
-        data = TransactionCreate(
+        data = TransactionCreateDBEntity(
             amount=1000,
             amount_paid=800,
             payment_account_id=payout_account_id,
@@ -262,8 +262,8 @@ async def prepare_and_insert_transaction_list_for_different_targets(
     transaction_repo: TransactionRepository,
     payment_account_repo: PaymentAccountRepository,
     count: int = TEST_DEFAULT_PAGE_SIZE + 5,
-) -> Tuple[List[Transaction], List[int]]:
-    transaction_list: List[Transaction] = []
+) -> Tuple[List[TransactionDBEntity], List[int]]:
+    transaction_list: List[TransactionDBEntity] = []
     target_size = 5
     payment_account_list = await prepare_and_insert_payment_account_list(
         payment_account_repo, count=target_size
@@ -276,7 +276,7 @@ async def prepare_and_insert_transaction_list_for_different_targets(
     for i in range(0, count):
         index = i % target_size
         payment_account = payment_account_list[index]
-        data = TransactionCreate(
+        data = TransactionCreateDBEntity(
             amount=1000,
             amount_paid=800,
             payment_account_id=payment_account.id,

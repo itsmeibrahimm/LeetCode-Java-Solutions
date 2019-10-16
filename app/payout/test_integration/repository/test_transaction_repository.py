@@ -5,10 +5,9 @@ import pytest
 from app.commons.database.infra import DB
 from app.commons.test_integration.constants import TEST_DEFAULT_PAGE_SIZE
 from app.payout.repository.bankdb.model.transaction import (
-    TransactionUpdate,
-    Transaction,
-    TransactionCreate,
-    TransactionState,
+    TransactionUpdateDBEntity,
+    TransactionDBEntity,
+    TransactionCreateDBEntity,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.transaction import TransactionRepository
@@ -24,7 +23,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_paid_transaction_list_for_transfer,
 )
 from app.payout import types
-from app.payout.types import PayoutAccountTargetType
+from app.payout.types import PayoutAccountTargetType, TransactionState
 
 
 class TestTransactionRepository:
@@ -82,7 +81,7 @@ class TestTransactionRepository:
         transaction = await prepare_and_insert_transaction(
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
         )
-        new_data = TransactionUpdate(
+        new_data = TransactionUpdateDBEntity(
             amount=10000, payment_account_id=123, amount_paid=8000
         )
 
@@ -109,7 +108,7 @@ class TestTransactionRepository:
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
         )
         transaction_ids = [first_txn.id, second_txn.id]
-        new_data = TransactionUpdate(payout_id=101)
+        new_data = TransactionUpdateDBEntity(payout_id=101)
 
         updated_rows = await transaction_repo.set_transaction_payout_id_by_ids(
             transaction_ids, new_data
@@ -193,8 +192,8 @@ class TestTransactionRepository:
         )
 
         # get the first page of the total amount
-        expected_list_for_dasher: List[Transaction] = []
-        expected_list_for_store: List[Transaction] = []
+        expected_list_for_dasher: List[TransactionDBEntity] = []
+        expected_list_for_store: List[TransactionDBEntity] = []
         for transaction in transaction_list:
             if transaction.target_type == PayoutAccountTargetType.DASHER.value:
                 expected_list_for_dasher.append(transaction)
@@ -203,7 +202,7 @@ class TestTransactionRepository:
 
         # first page
         expected_list_for_dasher_first_page: List[
-            Transaction
+            TransactionDBEntity
         ] = expected_list_for_dasher[:TEST_DEFAULT_PAGE_SIZE]
         offset = 0
         retrieved_transaction_list_for_dasher_first_page = await transaction_repo.get_transaction_by_target_ids_and_type(
@@ -221,9 +220,9 @@ class TestTransactionRepository:
         ), "retrieved transaction list matches with expected list"
 
         # second page
-        expected_list_for_dasher_sec_page: List[Transaction] = expected_list_for_dasher[
-            TEST_DEFAULT_PAGE_SIZE:
-        ]
+        expected_list_for_dasher_sec_page: List[
+            TransactionDBEntity
+        ] = expected_list_for_dasher[TEST_DEFAULT_PAGE_SIZE:]
         offset = offset + len(retrieved_transaction_list_for_dasher_first_page)
         retrieved_transaction_list_for_dasher_sec_page = await transaction_repo.get_transaction_by_target_ids_and_type(
             target_ids=target_id_list,
@@ -579,7 +578,7 @@ class TestTransactionRepository:
         ), "retrieved unpaid transaction list by payout id should match with expected list"
 
         # 4. insert another unpaid transaction with state is ACTIVE
-        data = TransactionCreate(
+        data = TransactionCreateDBEntity(
             amount=1000,
             amount_paid=800,
             payment_account_id=payout_account_id,
