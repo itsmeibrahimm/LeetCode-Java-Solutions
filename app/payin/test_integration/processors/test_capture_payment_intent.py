@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import List
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,6 +13,7 @@ from app.payin.core.cart_payment.model import (
     CorrelationIds,
     LegacyPayment,
     PaymentIntent,
+    PgpPaymentIntent,
 )
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus
@@ -19,7 +21,25 @@ from app.payin.core.payer.model import Payer
 from app.payin.core.payer.v1.processor import PayerProcessorV1
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
+from app.payin.core.payment_method.types import LegacyPaymentMethodInfo
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
+
+
+@pytest.fixture(autouse=True)
+def enable_stripe_outbound(stripe_api: StripeAPISettings):
+    stripe_api.enable_outbound()
+
+
+@pytest.fixture(autouse=True)
+def override_capture_delay(app_context: AppContext):
+    original_capture_service_delay = (
+        app_context.capture_service.default_capture_delay_in_minutes
+    )
+    app_context.capture_service.default_capture_delay_in_minutes = 0
+    yield
+    app_context.capture_service.default_capture_delay_in_minutes = (
+        original_capture_service_delay
+    )
 
 
 class CapturePaymentIntentTestBase(ABC):
@@ -383,27 +403,6 @@ class CapturePaymentIntentTestBase(ABC):
         assert post_cap_pgp_payment_intents[0].status == IntentStatus.CANCELLED
         assert post_cap_pgp_payment_intents[1].status == IntentStatus.SUCCEEDED
 
-    async def _prepare_payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
-        return await payer_processor_v1.create_payer(
-            dd_payer_id="1",
-            payer_type="store",
-            email=f"{str(uuid4())}@doordash.com)",
-            country=CountryCode.US,
-            description="test-payer",
-        )
-
-    async def _prepare_payment_method(
-        self, payment_method_processor: PaymentMethodProcessor, payer: Payer
-    ) -> PaymentMethod:
-        return await payment_method_processor.create_payment_method(
-            pgp_code=PgpCode.STRIPE,
-            token="tok_mastercard",
-            set_default=True,
-            is_scanned=True,
-            is_active=True,
-            payer_id=payer.id,
-        )
-
     async def _capture_intents(
         self,
         cart_payment_repository: CartPaymentRepository,
@@ -418,7 +417,29 @@ class CapturePaymentIntentTestBase(ABC):
         )
 
         async for payment_intent in uncaptured_payment_intents:
-            await cart_payment_processor.capture_payment(payment_intent)
+            # skip payment_intents created by other integration tests, which, in prod scenario shouldn't happen
+            is_well_formed = await self._is_wellformed_payment_intent(
+                payment_intent, cart_payment_repository
+            )
+            if is_well_formed:
+                await cart_payment_processor.capture_payment(payment_intent)
+
+    async def _is_wellformed_payment_intent(
+        self,
+        payment_intent: PaymentIntent,
+        cart_payment_repository: CartPaymentRepository,
+    ) -> bool:
+        pgp_payment_intents: List[
+            PgpPaymentIntent
+        ] = await cart_payment_repository.find_pgp_payment_intents(payment_intent.id)
+        if not pgp_payment_intents:
+            return False
+        for pgp_payment_intent in pgp_payment_intents:
+            if pgp_payment_intent.status != payment_intent.status:
+                return False
+            if not pgp_payment_intent.resource_id:
+                return False
+        return True
 
     @abstractmethod
     async def _prepare_cart_payment(
@@ -442,34 +463,31 @@ class CapturePaymentIntentTestBase(ABC):
         pass
 
 
-@pytest.mark.skip(reason="skip flaky test for now")
 class TestCapturePaymentIntent(CapturePaymentIntentTestBase):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
-    @pytest.fixture(autouse=True)
-    def enable_stripe_outbound(self, stripe_api: StripeAPISettings):
-        stripe_api.enable_outbound()
-
-    @pytest.fixture(autouse=True)
-    def override_capture_delay(self, app_context: AppContext):
-        original_capture_service_delay = (
-            app_context.capture_service.default_capture_delay_in_minutes
-        )
-        app_context.capture_service.default_capture_delay_in_minutes = 0
-        yield
-        app_context.capture_service.default_capture_delay_in_minutes = (
-            original_capture_service_delay
-        )
-
     @pytest.fixture
     async def payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
-        return await self._prepare_payer(payer_processor_v1)
+        return await payer_processor_v1.create_payer(
+            dd_payer_id="1",
+            payer_type="store",
+            email=f"{str(uuid4())}@doordash.com)",
+            country=CountryCode.US,
+            description="test-payer",
+        )
 
     @pytest.fixture
     async def payment_method(
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
-        return await self._prepare_payment_method(payment_method_processor, payer)
+        return await payment_method_processor.create_payment_method(
+            pgp_code=PgpCode.STRIPE,
+            token="tok_mastercard",
+            set_default=True,
+            is_scanned=True,
+            is_active=True,
+            payer_id=payer.id,
+        )
 
     async def test_capture_after_cart_payment_creation_without_adjustment(
         self,
@@ -560,34 +578,38 @@ class TestCapturePaymentIntent(CapturePaymentIntentTestBase):
         )
 
 
-@pytest.mark.skip(reason="skip flaky test for now")
 class TestCapturePaymentIntentLegacy(CapturePaymentIntentTestBase):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
-    @pytest.fixture(autouse=True)
-    def enable_stripe_outbound(self, stripe_api: StripeAPISettings):
-        stripe_api.enable_outbound()
-
-    @pytest.fixture(autouse=True)
-    def override_capture_delay(self, app_context: AppContext):
-        original_capture_service_delay = (
-            app_context.capture_service.default_capture_delay_in_minutes
-        )
-        app_context.capture_service.default_capture_delay_in_minutes = 0
-        yield
-        app_context.capture_service.default_capture_delay_in_minutes = (
-            original_capture_service_delay
-        )
-
     @pytest.fixture
     async def payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
-        return await self._prepare_payer(payer_processor_v1)
+        return await payer_processor_v1.create_payer(
+            dd_payer_id=f"{str(int(datetime.utcnow().timestamp()))}",
+            payer_type="store",
+            email=f"{str(uuid4())}@doordash.com)",
+            country=CountryCode.US,
+            description="test-payer",
+        )
 
     @pytest.fixture
     async def payment_method(
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
-        return await self._prepare_payment_method(payment_method_processor, payer)
+        assert payer.payment_gateway_provider_customers
+        return await payment_method_processor.create_payment_method(
+            pgp_code=PgpCode.STRIPE,
+            token="tok_mastercard",
+            set_default=True,
+            is_scanned=True,
+            is_active=True,
+            legacy_payment_method_info=LegacyPaymentMethodInfo(
+                country=CountryCode.US,
+                stripe_customer_id=payer.payment_gateway_provider_customers[
+                    0
+                ].payment_provider_customer_id,
+                dd_stripe_customer_id=payer.dd_stripe_customer_id,
+            ),
+        )
 
     async def test_capture_after_cart_payment_creation_without_adjustment(
         self,
@@ -642,7 +664,6 @@ class TestCapturePaymentIntentLegacy(CapturePaymentIntentTestBase):
         request = CartPayment(
             id=uuid4(),
             amount=1000,
-            payer_id=payer.id,
             payment_method_id=payment_method.id,
             delay_capture=True,
             correlation_ids=CorrelationIds(reference_id="123", reference_type="3"),
@@ -658,12 +679,12 @@ class TestCapturePaymentIntentLegacy(CapturePaymentIntentTestBase):
             idempotency_key=str(uuid4()),
             legacy_payment=LegacyPayment(
                 dd_consumer_id=1,
-                dd_country_id=None,
+                dd_country_id=1,
                 dd_stripe_card_id=payment_method.dd_stripe_card_id,
                 stripe_customer_id=payer.payment_gateway_provider_customers[
                     0
                 ].payment_provider_customer_id,
-                stripe_card_id="pm_card_mastercard",
+                stripe_card_id=payment_method.payment_gateway_provider_details.payment_method_id,
             ),
             currency=Currency.USD,
             payment_country=CountryCode(payer.country),

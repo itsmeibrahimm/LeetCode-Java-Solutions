@@ -1,4 +1,6 @@
 import random
+from uuid import uuid4
+from datetime import datetime
 from typing import Optional, Any, Dict
 
 from pydantic import BaseModel
@@ -6,6 +8,7 @@ from starlette.testclient import TestClient
 
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.providers.stripe.stripe_models import CustomerId, Customer
+from app.commons.types import CountryCode
 from app.payin.test_integration.integration_utils import (
     create_payer_v1,
     CreatePayerV1Request,
@@ -214,30 +217,40 @@ class TestPayersV0:
         assert response.status_code == 404
 
     def test_update_cx_default_payment_method(
-        self,
-        client: TestClient,
-        stripe_client: StripeTestClient,
-        stripe_customer: Customer,
+        self, client: TestClient, stripe_client: StripeTestClient
     ):
+        payer = create_payer_v1(
+            client,
+            CreatePayerV1Request(
+                dd_payer_id=f"{str(int(datetime.utcnow().timestamp()))}",
+                payer_type="store",
+                email=f"{str(uuid4())}@doordash.com)",
+                country=CountryCode.US,
+                description="test-payer",
+            ),
+        )
+
+        stripe_customer_id = payer["payment_gateway_provider_customers"][0][
+            "payment_provider_customer_id"
+        ]
         # create payment_method
         payment_method = create_payment_method_v0(
             client=client,
             request=CreatePaymentMethodV0Request(
-                stripe_customer_id=stripe_customer.id,
+                stripe_customer_id=stripe_customer_id,
                 country="US",
                 token="tok_visa",
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                payer_type="marketplace",
-                dd_consumer_id="5",  # pre seeded consumer in maindb.consumer table
+                dd_stripe_customer_id=payer["dd_stripe_customer_id"],
             ),
         )
 
         # set default_payment_method
         update_payer = _update_payer_v0(
             client=client,
-            payer_id=stripe_customer.id,
+            payer_id=stripe_customer_id,
             payer_id_type="stripe_customer_id",
             request=UpdatePayerV0Request(
                 dd_stripe_card_id=payment_method["dd_stripe_card_id"],
