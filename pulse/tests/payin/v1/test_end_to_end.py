@@ -6,19 +6,15 @@ from payin_v1_client import (
     DefaultPaymentMethodV1,
 )
 
-from . import payer_v1_client, payment_method_v1_client
-from .utils import PaymentUtil
+from tests.payin.v1 import payer_v1_client, payment_method_v1_client
+from tests.payin.helper import PaymentUtil
 
 logger = logging.getLogger(__name__)
 
 
 def test_end_to_end():
     # Step 1: create payer object
-    test_payer = payer_v1_client.create_payer_with_http_info(
-        create_payer_request=PaymentUtil.get_create_payer_request(
-            payer_type="store"
-        )  # Due to foreign-key constraint
-    )
+    test_payer = PaymentUtil.create_payer()
     assert test_payer[1] == 201
 
     # Step 2: create payment_method

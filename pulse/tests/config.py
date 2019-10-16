@@ -1,0 +1,1 @@
+STRIPE_US_SECRET_KEY = "sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
