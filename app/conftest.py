@@ -226,6 +226,8 @@ def dummy_app_context(mocker: MockFixture):
         capture_service=mocker.Mock(),
         ids_session=mocker.Mock(),
         dsj_session=mocker.Mock(),
+        marqeta_client=mocker.Mock(),
+        marqeta_session=mocker.Mock(),
     )
 
 

@@ -15,6 +15,7 @@ from app.commons.database.infra import DB
 from app.commons.providers.timed_aio_client import (
     TrackedIdentityClientSession,
     TrackedDsjClientSession,
+    TrackedMarqetaClientSession,
 )
 from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.identity_client import (
@@ -33,6 +34,10 @@ from app.commons.instrumentation.monitor import MonitoringManager
 from app.commons.instrumentation.eventloop import EventLoopMonitor
 from app.commons.instrumentation.pool import stat_thread_pool_jobs
 from app.payin.capture.service import CaptureService
+from app.purchasecard.marqeta_external.marqeta_provider_client import (
+    MarqetaProviderClient,
+    MarqetaClientSettings,
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,10 @@ class AppContext:
 
     dsj_session: aiohttp.ClientSession
 
+    marqeta_session: aiohttp.ClientSession
+
+    marqeta_client: MarqetaProviderClient
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -79,6 +88,7 @@ class AppContext:
                 self.ledger_paymentdb.disconnect(),
                 self.ids_session.close(),
                 self.dsj_session.close(),
+                self.marqeta_session.close(),
             )
         finally:
             # shutdown the threadpool
@@ -191,7 +201,17 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     ids_session: aiohttp.ClientSession = TrackedIdentityClientSession()
     dsj_session: aiohttp.ClientSession = TrackedDsjClientSession()
+    marqeta_session: aiohttp.ClientSession = TrackedMarqetaClientSession()
 
+    marqeta_client: MarqetaProviderClient = MarqetaProviderClient(
+        marqeta_client_settings=MarqetaClientSettings(
+            marqeta_base_url=config.MARQETA_BASE_URL,
+            program_fund_token=config.MARQETA_PROGRAM_FUND_TOKEN.value,
+            username=config.MARQETA_USERNAME.value,
+            password=config.MARQETA_JIT_PASSWORD.value,
+        ),
+        session=marqeta_session,
+    )
     # This can probably be provided/constructed at the Request/Job/Func level eventually. The true resource here is
     # the dsj_session. Similarly identity_client could also be removed, although the stubbing makes it more complex
     dsj_client = DSJClient(
@@ -235,6 +255,8 @@ async def create_app_context(config: AppConfig) -> AppContext:
         capture_service=capture_service,
         ids_session=ids_session,
         dsj_session=dsj_session,
+        marqeta_session=marqeta_session,
+        marqeta_client=marqeta_client,
     )
 
     # start monitoring

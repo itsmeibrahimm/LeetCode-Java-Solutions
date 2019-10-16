@@ -19,3 +19,10 @@ class TrackedDsjClientSession(ClientSession):
     async def _request(self, *args, **kwargs):
         client_response: ClientResponse = await super()._request(*args, **kwargs)
         return client_response
+
+
+class TrackedMarqetaClientSession(ClientSession):
+    @track_identity_http_client_timing(stat_name="io.marqeta-client.latency")
+    async def _request(self, *args, **kwargs):
+        client_response: ClientResponse = await super()._request(*args, **kwargs)
+        return client_response

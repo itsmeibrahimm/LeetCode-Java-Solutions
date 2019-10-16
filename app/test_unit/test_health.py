@@ -51,6 +51,8 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         capture_service=MagicMock(),
         ids_session=MagicMock(),
         dsj_session=MagicMock(),
+        marqeta_client=MagicMock(),
+        marqeta_session=MagicMock(),
     )
     app.extra["context"] = cast(Any, context)
 
