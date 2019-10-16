@@ -119,7 +119,7 @@ class LegacyPaymentInterface:
         self, charge_id: int
     ) -> Optional[uuid.UUID]:
         self.req_context.log.debug(
-            "Looking up stripe charges for charge", charge_id=charge_id
+            "Looking up stripe charges for charge", dd_charge_id=charge_id
         )
 
         payment_intent = await self.payment_repo.get_payment_intent_for_legacy_consumer_charge_id(
@@ -191,7 +191,9 @@ class LegacyPaymentInterface:
         idempotency_key: str,
     ) -> Tuple[LegacyConsumerCharge, LegacyStripeCharge]:
         self.req_context.log.info(
-            "[create_new_payment_charges] Creating charge records in legacy system"
+            "[create_new_payment_charges] Creating charge records in legacy system",
+            dd_consumer_id=legacy_payment.dd_consumer_id,
+            idempotency_key=idempotency_key,
         )
         # New payment: create new consumer charge
         is_stripe_connect_based = (
@@ -265,7 +267,9 @@ class LegacyPaymentInterface:
         provider_payment_intent: ProviderPaymentIntent,
     ) -> LegacyStripeCharge:
         self.req_context.log.info(
-            "[update_state_after_provider_submission] Updating stripe charge record in legacy system"
+            "[update_state_after_provider_submission] Updating stripe charge record in legacy system",
+            idempotency_key=idempotency_key,
+            dd_stripe_charge_id=legacy_stripe_charge.id,
         )
 
         provider_charges = provider_payment_intent.charges
@@ -575,6 +579,7 @@ class CartPaymentInterface:
             "[create_new_payment] Creating new payment for payer",
             payer_id=request_cart_payment.payer_id,
             idempotency_key=idempotency_key,
+            amount=request_cart_payment.amount,
         )
 
         # Capture after
@@ -660,7 +665,7 @@ class CartPaymentInterface:
         provider_charges = provider_intent.charges
         if len(provider_charges.data) > 1:
             # Upon creation, there is expected to be one provider charge.
-            self.req_context.log.warn(
+            self.req_context.log.warning(
                 "[_create_new_charge_pair] Multiple pgp charges at time of creation for intent",
                 payment_intent_id=payment_intent.id,
                 pgp_payment_intent_id=pgp_payment_intent.id,
@@ -812,7 +817,7 @@ class CartPaymentInterface:
                     destination=ConnectedAccountId(pgp_payment_intent.payout_account_id)
                 )
 
-            self.req_context.log.info(
+            self.req_context.log.debug(
                 "[submit_payment_to_provider] Calling provider to create payment intent"
             )
             response = await self.stripe_async_client.create_payment_intent(
@@ -823,9 +828,11 @@ class CartPaymentInterface:
                 ),
             )
             return response
-        except StripeError:
-            self.req_context.log.exception(
-                "[submit_payment_to_provider] Error invoking provider to create a payment intent"
+        except StripeError as e:
+            self.req_context.log.warning(
+                "[submit_payment_to_provider] Could not create payment in provider",
+                payment_intent_id=payment_intent.id,
+                exception=str(e),
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
@@ -836,6 +843,15 @@ class CartPaymentInterface:
                 "[submit_payment_to_provider] Returning mocked payment_intent response for commando mode"
             )
             return COMMANDO_PAYMENT_INTENT
+        except Exception:
+            self.req_context.log.excpetion(
+                "[submit_payment_to_provider] Error invoking provider to create a payment",
+                payment_intent_id=payment_intent.id,
+            )
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=True,
+            )
 
     async def update_payment_after_submission_to_provider(
         self,
@@ -895,17 +911,18 @@ class CartPaymentInterface:
                 amount_to_capture=payment_intent.amount,
             )
 
+            idempotency_key = str(uuid.uuid4())
             self.req_context.log.info(
                 "[submit_capture_to_provider] Capturing payment intent",
                 country=payment_intent.country,
-                idempotency_key=pgp_payment_intent.idempotency_key,
+                idempotency_key=idempotency_key,
             )
             # Make call to Stripe.  The idempotency key used here is generated each time, as we expect retries from a particular request
             # to be triggered through scheduled jobs.
             provider_intent = await self.stripe_async_client.capture_payment_intent(
                 country=CountryCode(payment_intent.country),
                 request=intent_request,
-                idempotency_key=str(uuid.uuid4()),
+                idempotency_key=idempotency_key,
             )
         except InvalidRequestError as e:
             provider_intent = convert_to_stripe_object(
@@ -927,7 +944,11 @@ class CartPaymentInterface:
                 new_status=IntentStatus.REQUIRES_CAPTURE,
                 previous_status=payment_intent.status,
             )
-            self.req_context.log.exception("Provider error during capture")
+            self.req_context.log.warning(
+                "Provider error during capture",
+                payment_intent_id=payment_intent.id,
+                exception=str(e),
+            )
             raise ProviderError(e)
         except Exception as e:
             await self.payment_repo.update_payment_intent_status(
@@ -936,7 +957,8 @@ class CartPaymentInterface:
                 previous_status=payment_intent.status,
             )
             self.req_context.log.exception(
-                "Unknown error capturing intent with provider"
+                "Unknown error capturing intent with provider",
+                payment_intent_id=payment_intent.id,
             )
             raise e
 
@@ -1020,13 +1042,24 @@ class CartPaymentInterface:
                 ),
             )
             return response
-        except:
-            self.req_context.log.exception(
-                "[cancel_provider_payment_charge] Error refunding payment with provider"
+        except StripeError as e:
+            self.req_context.log.warning(
+                "[cancel_provider_payment_charge] Cancel payment not successful",
+                payment_intent_id=payment_intent.id,
+                exception=str(e),
             )
             raise PaymentChargeRefundError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
                 retryable=False,
+            )
+        except Exception:
+            self.req_context.log.exception(
+                "[cancel_provider_payment_charge] Error attempting payment cancellation with provider",
+                payment_intent_id=payment_intent.id,
+            )
+            raise PaymentChargeRefundError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
+                retryable=True,
             )
 
     async def refund_provider_payment(
@@ -1051,6 +1084,8 @@ class CartPaymentInterface:
             self.req_context.log.info(
                 "[refund_provider_payment] Refunding charge",
                 charge_resource_id=pgp_payment_intent.charge_resource_id,
+                payment_intent_id=payment_intent.id,
+                pgp_payment_intent_id=pgp_payment_intent.id,
             )
             response = await self.stripe_async_client.refund_charge(
                 country=CountryCode(payment_intent.country),
@@ -1060,13 +1095,26 @@ class CartPaymentInterface:
                 ),
             )
             return response
-        except:
-            self.req_context.log.exception(
-                "[refund_provider_payment] Error cancelling charge with provider"
+        except StripeError as e:
+            self.req_context.log.warning(
+                "[refund_provider_payment] Cannot refund payment with provider",
+                payment_intent_id=payment_intent.id,
+                refund_id=refund.id,
+                exception=str(e),
             )
             raise PaymentIntentCancelError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
                 retryable=False,
+            )
+        except Exception:
+            self.req_context.log.exception(
+                "[refund_provider_payment] Error refunding payment with provider",
+                payment_intent_id=payment_intent.id,
+                refund_id=refund.id,
+            )
+            raise PaymentIntentCancelError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
+                retryable=True,
             )
 
     async def _update_pgp_charge_from_provider(
@@ -1229,6 +1277,7 @@ class CartPaymentInterface:
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         self.req_context.log.info(
             "[increase_payment_amount] New intent for cart payment, due to higher amount",
+            idempotency_key=idempotency_key,
             cart_payment_id=cart_payment.id,
             new_amount=amount,
             old_amount=cart_payment.amount,
@@ -1243,6 +1292,7 @@ class CartPaymentInterface:
         pgp_intent = await self._get_most_recent_pgp_payment_intent(most_recent_intent)
         self.req_context.log.debug(
             "[increase_payment_amount] Gathering fields from last intent",
+            cart_payment_id=cart_payment.id,
             pgp_payment_intent_id=pgp_intent.id,
         )
 
@@ -1279,6 +1329,7 @@ class CartPaymentInterface:
 
         self.req_context.log.debug(
             "[increase_payment_amount] Created intent pair",
+            cart_pament_id=cart_payment.id,
             payment_intent_id=payment_intent.id,
             pgp_payment_intent_id=pgp_payment_intent.id,
         )
@@ -1337,7 +1388,9 @@ class CartPaymentInterface:
         pgp_payment_method_ref_id = raw_payment_method.pgp_payment_method_resource_id
 
         if not raw_payer.payer_entity:
-            self.req_context.log.error("No payer entity found.")
+            self.req_context.log.error(
+                "[get_pgp_payment_method] No payer entity found."
+            )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
@@ -1349,7 +1402,7 @@ class CartPaymentInterface:
             dd_country_id=legacy_country_id,
         )
         self.req_context.log.debug(
-            "Legacy payment generated for resource lookup",
+            "[get_pgp_payment_method] Legacy payment generated for resource lookup",
             legacy_payment=result_legacy_payment,
         )
         pgp_payment_method = PgpPaymentMethod(
@@ -1369,7 +1422,7 @@ class CartPaymentInterface:
         # those IDs and no lookup is needed.  A LegacyPayment instance is also returned since it is required for
         # persisting charge records in the old system.
         self.req_context.log.debug(
-            "[get_required_payment_resource_ids] Getting payment info."
+            "[get_pgp_payment_method_by_legacy_payment] Getting payment info."
         )
 
         provider_payment_method_id = None
@@ -1378,16 +1431,10 @@ class CartPaymentInterface:
         provider_payer_id = legacy_payment.stripe_customer_id
         provider_payment_method_id = legacy_payment.stripe_card_id
 
-        self.req_context.log.debug(
-            "Found legacy resource ids",
-            provider_payer_id=provider_payer_id,
-            provider_payment_method_id=provider_payment_method_id,
-        )
-
         # Ensure we have the necessary fields.  Though payer_client/payment_method_client already throws exceptions
         # if not found, still check here since we have to support the legacy payment case.
         if not provider_payer_id:
-            self.req_context.log.warn(
+            self.req_context.log.warning(
                 "[get_required_payment_resource_ids] No payer pgp resource ID found."
             )
             raise CartPaymentCreateError(
@@ -1396,7 +1443,7 @@ class CartPaymentInterface:
             )
 
         if not provider_payment_method_id:
-            self.req_context.log.warn(
+            self.req_context.log.warning(
                 "[get_required_payment_resource_ids] No payment method pgp resource ID found."
             )
             raise CartPaymentCreateError(
@@ -1417,8 +1464,9 @@ class CartPaymentInterface:
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         self.req_context.log.info(
-            "[mark_payment_as_failed] Failed to mark payment as failed.",
+            "[mark_payment_as_failed] Marking intent pair as failed.",
             payment_intent_id=payment_intent.id,
+            pgp_payment_intent_id=pgp_payment_intent.id,
         )
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_status(
@@ -1721,6 +1769,9 @@ class CartPaymentProcessor:
                 self.log.info(
                     "[_update_payment_with_higher_amount] Duplicate amount increase request for idempotency_key",
                     idempotency_key=idempotency_key,
+                    cart_payment_id=cart_payment.id,
+                    payment_intent_id=existing_payment_intent.id,
+                    pgp_payment_intent_id=pgp_payment_intent.id,
                 )
                 pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
                     existing_payment_intent
@@ -1742,16 +1793,23 @@ class CartPaymentProcessor:
             )
             if not legacy_stripe_charge:
                 self.log.error(
-                    "Cannot find legacy charge for cart payment adjustment",
+                    "[_update_payment_with_higher_amount] Cannot find legacy charge for cart payment adjustment",
                     dd_charge_id=payment_intent.legacy_consumer_charge_id,
                     idempotency_key=idempotency_key,
+                    cart_payment_id=cart_payment.id,
+                    payment_intent_id=payment_intent.id,
+                    pgp_payment_intent_id=pgp_payment_intent.id,
                 )
                 raise CartPaymentUpdateError(
                     error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID, retryable=False
                 )
 
             self.log.info(
-                "[_update_payment_with_higher_amount] Process existing intents for amount increase request"
+                "[_update_payment_with_higher_amount] Process existing intents for amount increase request",
+                idempotency_key=idempotency_key,
+                cart_payment_id=cart_payment.id,
+                payment_intent_id=payment_intent.id,
+                pgp_payment_intent_id=pgp_payment_intent.id,
             )
         else:
             # First attempt at cart payment adjustment for this idempotency key.
@@ -1853,8 +1911,10 @@ class CartPaymentProcessor:
             )
             if adjustment_history:
                 self.log.info(
-                    "Duplicate adjustment for idempotency_key",
+                    "[_update_payment_with_lower_amount] Duplicate adjustment for idempotency_key",
                     idempotency_key=idempotency_key,
+                    payment_intent_id=capturable_intent.id,
+                    pgp_payment_intent_id=capturable_pgp_payment_intent.id,
                 )
                 return capturable_intent, capturable_pgp_payment_intent
 
@@ -1887,10 +1947,18 @@ class CartPaymentProcessor:
             if existing_refund and existing_pgp_refund:
                 if self.cart_payment_interface.is_refund_ended(existing_refund):
                     # Refund already handled.
-                    self.log.info("Refund already completed")
+                    self.log.info(
+                        "[_update_payment_with_lower_amount] Refund already completed",
+                        refund_id=existing_refund.id,
+                        pgp_refund_id=existing_pgp_refund.id,
+                    )
                     return refundable_intent, refundable_pgp_payment_intent
 
-                self.log.info("Processing existing refund")
+                self.log.info(
+                    "[_update_payment_with_lower_amount] Processing existing refund",
+                    refund_id=existing_refund.id,
+                    pgp_refund_id=existing_pgp_refund.id,
+                )
                 refund = existing_refund
                 pgp_refund = existing_pgp_refund
             else:
@@ -1967,7 +2035,7 @@ class CartPaymentProcessor:
             # relying on the new service.
             self.log.info(
                 "[update_payment_for_legacy_charge] Did not find cart payment for consumer charge",
-                charge_id=dd_charge_id,
+                dd_charge_id=dd_charge_id,
             )
             raise CartPaymentReadError(
                 error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
@@ -1987,7 +2055,7 @@ class CartPaymentProcessor:
         )
         if not legacy_consumer_charge:
             self.log.error(
-                "Failed to find legacy consumer charge for charge id",
+                "[update_payment_for_legacy_charge] Failed to find legacy consumer charge for charge id",
                 dd_charge_id=dd_charge_id,
             )
             raise CartPaymentReadError(
@@ -2039,7 +2107,8 @@ class CartPaymentProcessor:
 
         if not cart_payment.payer_id:
             self.log.error(
-                "Cart payment missing payer id", cart_payment_id=cart_payment.id
+                "[update_payment] Cart payment missing payer id",
+                cart_payment_id=cart_payment.id,
             )
             raise CartPaymentReadError(
                 error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
@@ -2228,6 +2297,7 @@ class CartPaymentProcessor:
         self.log.info(
             "[capture_payment] Capture attempt for payment_intent",
             payment_intent_id=payment_intent.id,
+            amount=payment_intent.amount,
         )
 
         if not self.cart_payment_interface.does_intent_require_capture(payment_intent):
@@ -2334,7 +2404,7 @@ class CartPaymentProcessor:
 
         Arguments:
             request_cart_payment {CartPayment} -- CartPayment model containing request parameters provided by client.
-            request_legacy_payment {LegacyPayment} -- LegacyPayment model containing legacy fields.  For v0 use only.
+            pgp_payment_method {PgpPaymentMethod} -- Payment method to use for cart payment creation.
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             payment_country {CountryCode} -- ISO country code for payment
             payer_country {CountryCode} -- ISO country code for the payer who the payment is being created for.
@@ -2358,8 +2428,10 @@ class CartPaymentProcessor:
                 existing_payment_intent
             ):
                 self.log.info(
-                    "[create_payment] Duplicate cart payment creation request",
+                    "[_create_payment] Duplicate cart payment creation request",
                     idempotency_key=existing_payment_intent.idempotency_key,
+                    cart_payment_id=existing_cart_payment.id,
+                    payment_intent_id=existing_payment_intent.id,
                 )
                 pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
                     existing_payment_intent
@@ -2386,7 +2458,8 @@ class CartPaymentProcessor:
             )
             if not legacy_consumer_charge or not legacy_stripe_charge:
                 self.log.error(
-                    "[create_payment] Missing legacy charge information for cart payment",
+                    "[_create_payment] Missing legacy charge information for cart payment",
+                    idempotency_key=existing_payment_intent.idempotency_key,
                     cart_payment_id=cart_payment.id,
                     payment_intent_id=payment_intent.id,
                 )
@@ -2395,8 +2468,10 @@ class CartPaymentProcessor:
                 )
 
             self.log.info(
-                "[create_payment] Processing existing intents for cart payment creation request",
+                "[_create_payment] Processing existing intents for cart payment creation request",
                 idempotency_key=existing_payment_intent.idempotency_key,
+                cart_payment_id=cart_payment.id,
+                payment_intent_id=payment_intent.id,
             )
         else:
             legacy_consumer_charge, legacy_stripe_charge = await self.legacy_payment_interface.create_new_payment_charges(
@@ -2643,6 +2718,6 @@ class CommandoProcessor(CartPaymentProcessor):
                 )
             )
             total += len(results)
-            self.log.info(f"Attempted to recoup payment_intents", amount=len(results))
+            self.log.info("Attempted to recoup payment_intents", amount=len(results))
 
         return total, results
