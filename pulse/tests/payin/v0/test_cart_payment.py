@@ -1,6 +1,7 @@
 import logging
 import time
 
+import pytest
 from payin_v0_client import ApiException
 
 from tests.payin.helper import PaymentUtil
@@ -121,6 +122,7 @@ def test_create_legacy_cart_payment_with_invalid_request():
     assert error_reason == "Unprocessable Entity"
 
 
+@pytest.mark.skip(reason="flaky test")
 def test_update_legacy_cart_payment_higher_without_delay_capture():
     payer = PaymentUtil.create_payer()
     assert payer[1] == 201

@@ -73,7 +73,7 @@ def create_app_config() -> AppConfig:
             release=f"payment-service@release-{os.getenv('RELEASE_TAG')}",
         ),
         CAPTURE_CRON_TRIGGER=CronTrigger(hour="0-23"),  # in UTC!
-        DEFAULT_CAPTURE_DELAY_IN_MINUTES=10,  # 10 mins
+        DEFAULT_CAPTURE_DELAY_IN_MINUTES=60,  # 60 mins
         MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
         MARQETA_USERNAME=Secret(name="marqeta_username"),
         MARQETA_PASSWORD=Secret(name="marqeta_password"),
