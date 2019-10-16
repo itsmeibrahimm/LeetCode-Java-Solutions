@@ -20,7 +20,7 @@ def decorate_api_call(func):
             kwargs["_preload_content"] = True
 
         if "_request_timeout" not in kwargs:
-            kwargs["_request_timeout"] = 5  # seconds
+            kwargs["_request_timeout"] = 10  # seconds
 
         logger.info(f"Calling [{func.__name__}] with arguments={kwargs}")
 
