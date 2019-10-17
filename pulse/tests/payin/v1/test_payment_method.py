@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def test_create_payment_method_with_invalid_input():
+    error_status = -1
+    error_reason = ""
     try:
         payment_method_v1_client.create_payment_method_with_http_info(
             create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
@@ -19,10 +21,15 @@ def test_create_payment_method_with_invalid_input():
             )
         )
     except ApiException as e:
-        assert e.status == 422
+        error_status = e.status
+        error_reason = e.reason
+    assert error_status == 422
+    assert error_reason == "Unprocessable Entity"
 
 
 def test_create_payment_method_with_payer_not_found():
+    error_status = -1
+    error_reason = ""
     try:
         payment_method_v1_client.create_payment_method_with_http_info(
             create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
@@ -30,7 +37,10 @@ def test_create_payment_method_with_payer_not_found():
             )
         )
     except ApiException as e:
-        assert e.status == 404
+        error_status = e.status
+        error_reason = e.reason
+    assert error_status == 404
+    assert error_reason == "Not Found"
 
 
 def test_successful_get_payment_method():
@@ -42,11 +52,11 @@ def test_successful_get_payment_method():
     )
     assert payment_method[1] == 201
     assert payment_method[0].deleted_at is None
-
     retrieved_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
         payment_method_id=payment_method[0].id
     )
     assert retrieved_payment_method[1] == 200
+    assert retrieved_payment_method[0] == payment_method[0]
 
 
 def test_get_payment_method_with_missing_input():
@@ -65,6 +75,10 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
     )
     assert payment_method[1] == 201
     assert payment_method[0].deleted_at is None
+    assert (
+        test_payer.payment_gateway_provider_customers[0].payment_provider_customer_id
+        == payment_method[0].payment_gateway_provider_details.customer_id
+    )
 
     # step 2: get payment method using payer_id and payment_method_id
     get_payment_method = payment_method_v1_client.get_payment_method_with_http_info(

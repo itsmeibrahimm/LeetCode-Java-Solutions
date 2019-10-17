@@ -39,9 +39,7 @@ class StripeUtil:
     @staticmethod
     def create_stripe_customer():
         stripe.api_key = STRIPE_US_SECRET_KEY
-        return stripe.Customer.create(
-            description="Customer for test.case@example.com", source="tok_visa"
-        )
+        return stripe.Customer.create(description="Customer for test.case@example.com")
 
 
 def get_correlation_ids(reference_id: str, reference_id_type: str):
