@@ -936,6 +936,8 @@ class CartPaymentInterface:
                 "[submit_capture_to_provider] Capturing payment intent",
                 country=payment_intent.country,
                 idempotency_key=idempotency_key,
+                amount_to_capture=payment_intent.amount,
+                pgp_payment_intent_id=pgp_payment_intent.resource_id,
             )
             # Make call to Stripe.  The idempotency key used here is generated each time, as we expect retries from a particular request
             # to be triggered through scheduled jobs.
@@ -2348,7 +2350,7 @@ class CartPaymentProcessor:
         )
 
         if not self.cart_payment_interface.does_intent_require_capture(payment_intent):
-            self.log.info(
+            self.log.warning(
                 "[capture_payment] Payment intent not eligible for capturing",
                 payment_intent_id=payment_intent.id,
                 payment_intent_status=payment_intent.status,
@@ -2374,7 +2376,7 @@ class CartPaymentProcessor:
         )
 
         # Update state in our system
-        updated_payment_intent, updated_pgp_payment_intent = await self.cart_payment_interface.update_payment_after_capture_with_provider(
+        await self.cart_payment_interface.update_payment_after_capture_with_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,

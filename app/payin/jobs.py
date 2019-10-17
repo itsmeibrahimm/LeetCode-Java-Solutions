@@ -86,12 +86,16 @@ async def capture_uncaptured_payment_intents(
         datetime.utcnow()
     )
 
+    count: int = 0
     async for payment_intent in uncaptured_payment_intents:
+        count += 1
         await job_pool.spawn(
             cart_payment_processor.capture_payment(payment_intent), cb=job_callback
         )
     app_context.log.info(
-        "[payment-service cron job] triggered", job="capture_uncaptured_payment_intents"
+        "[payment-service cron job] triggered",
+        payment_intent_count=count,
+        job="capture_uncaptured_payment_intents",
     )
 
 
