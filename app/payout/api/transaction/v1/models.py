@@ -22,7 +22,7 @@ class Transaction(PaymentResponse):
     idempotency_key: Optional[str]
     state: Optional[types.TransactionState]
     notes: Optional[str]
-    metadata: Optional[dict]
+    metadata: Optional[str]
     created_at: datetime
     inserted_at: Optional[datetime]
     updated_at: datetime
@@ -56,7 +56,6 @@ class TransactionCreate(PaymentRequest):
 
 
 class ReverseTransaction(PaymentRequest):
-    transaction_id: types.TransactionId
     reverse_reason: Optional[str]
 
 

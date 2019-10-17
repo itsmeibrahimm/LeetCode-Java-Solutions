@@ -12,7 +12,9 @@ from app.payout.repository.bankdb.transaction import TransactionRepositoryInterf
 
 class CreateTransactionRequest(OperationRequest):
     amount: int
-    amount_paid: int = 0  # same default behavior as DSJ
+    amount_paid: Optional[
+        int
+    ] = None  # will be default to 0 at DB layer, same default behavior as DSJ
     payment_account_id: int
     idempotency_key: str
     currency: str
@@ -49,11 +51,9 @@ class CreateTransaction(AsyncOperation[CreateTransactionRequest, TransactionInte
         self.transaction_repo = transaction_repo
 
     async def _execute(self) -> TransactionInternal:
-        transaction_create_request_to_repo = TransactionCreateDBEntity(
-            **self.request.dict()
-        )
+        db_entity_request = self._convert_request_to_db_entity_request()
         transaction = await self.transaction_repo.create_transaction(
-            data=transaction_create_request_to_repo
+            data=db_entity_request
         )
 
         return TransactionInternal(
@@ -64,3 +64,15 @@ class CreateTransaction(AsyncOperation[CreateTransactionRequest, TransactionInte
         self, internal_exec: BaseException
     ) -> Union[PaymentException, TransactionInternal]:
         raise DEFAULT_INTERNAL_EXCEPTION
+
+    def _convert_request_to_db_entity_request(self):
+        """
+        helper function to convert processor level request to db/repo level request
+        handle default values as needed
+
+        :return:
+        """
+        fields = self.request.dict()
+        if fields.get("amount_paid") is None:
+            fields["amount_paid"] = 0  # default to 0 as in DSJ
+        return TransactionCreateDBEntity(**fields)
