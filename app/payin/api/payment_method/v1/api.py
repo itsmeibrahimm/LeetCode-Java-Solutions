@@ -67,7 +67,9 @@ async def create_payment_method(
         )
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError as e:
-        log.error(f"[create_payment_method][{req_body.payer_id}] PaymentError. {e}")
+        log.exception(
+            "[create_payment_method] PaymentError.", payer_id=req_body.payer_id
+        )
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
             http_status = HTTP_400_BAD_REQUEST
         elif e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value:
@@ -119,7 +121,9 @@ async def get_payment_method(
         )
     except PaymentError as e:
         log.warn(
-            f"[get_payment_method][{payment_method_id}] PaymentMethodReadError. {e}"
+            "[get_payment_method] PaymentMethodReadError.",
+            payment_method_id=payment_method_id,
+            exc_info=e,
         )
         raise PaymentException(
             http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -151,7 +155,7 @@ async def list_payment_methods(
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     log.info(
-        f"[list_payment_method] receive request",
+        "[list_payment_method] receive request",
         payer_id=payer_id,
         active_only=active_only,
         force_update=force_update,
@@ -165,7 +169,7 @@ async def list_payment_methods(
             force_update=force_update,
         )
     except PaymentError as e:
-        log.warn(f"[list_payment_methods] PaymentError {e}")
+        log.warn("[list_payment_methods] PaymentError", exc_info=e)
 
     return payment_methods_list
 
@@ -202,8 +206,9 @@ async def delete_payment_method(
             payment_method_id=payment_method_id
         )
     except PaymentError as e:
-        log.error(
-            f"[delete_payment_method][{payment_method_id}] PaymentMethodReadError. {e}"
+        log.exception(
+            "[delete_payment_method] PaymentMethodReadError.",
+            payment_method_id=payment_method_id,
         )
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
             http_status = HTTP_404_NOT_FOUND

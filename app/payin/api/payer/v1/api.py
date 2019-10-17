@@ -60,9 +60,10 @@ async def create_payer(
     if req_body.dd_payer_id:
         try:
             int(req_body.dd_payer_id)
-        except ValueError as e:
-            log.error(
-                f"[create_payer][{req_body.dd_payer_id}] Value error for non-numeric value. {e}"
+        except ValueError:
+            log.exception(
+                "[create_payer] Value error for non-numeric value.",
+                dd_payer_id=req_body.dd_payer_id,
             )
             raise PaymentException(
                 http_status_code=HTTP_422_UNPROCESSABLE_ENTITY,

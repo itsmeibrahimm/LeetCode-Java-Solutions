@@ -38,7 +38,9 @@ class DisputeProcessor:
         :return: Dispute object
         """
 
-        self.log.info(f"[get_dispute] dispute_id:{dd_stripe_dispute_id}")
+        self.log.info(
+            "[get_dispute] getting dispute", dd_stripe_dispute_id=dd_stripe_dispute_id
+        )
         dispute = await self.dispute_client.get_raw_dispute(
             dispute_id=dd_stripe_dispute_id,
             dispute_id_type=DisputeIdType.DD_STRIPE_DISPUTE_ID,
@@ -109,7 +111,7 @@ class DisputeProcessor:
             or dd_stripe_card_id
             or dd_consumer_id
         ):
-            self.log.warn(f"[list_disputes] No parameters provided")
+            self.log.warn("[list_disputes] No parameters provided")
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
             )

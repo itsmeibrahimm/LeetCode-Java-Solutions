@@ -56,7 +56,7 @@ async def get_payer(
     - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
     """
 
-    log.info("[get_payer] payer_id=%s", payer_id)
+    log.info("[get_payer] received request", payer_id=payer_id)
     try:
         payer: Payer = await payer_processor.get_payer(
             legacy_payer_info=LegacyPayerInfo(
@@ -118,7 +118,7 @@ async def update_default_payment_method(
 
     """
 
-    log.info("[update_payer] payer_id=%s", payer_id)
+    log.info("[update_payer] received request", payer_id=payer_id)
     try:
         payer: Payer = await payer_processor.update_default_payment_method(
             legacy_payer_info=LegacyPayerInfo(

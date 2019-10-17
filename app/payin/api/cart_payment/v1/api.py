@@ -70,7 +70,7 @@ async def create_cart_payment(
 
     """
 
-    log.info(f"Creating cart_payment for payer {cart_payment_request.payer_id}")
+    log.info("Creating cart_payment for payer", payer_id=cart_payment_request.payer_id)
 
     try:
         cart_payment = await cart_payment_processor.create_payment(
@@ -85,12 +85,14 @@ async def create_cart_payment(
         )
 
         log.info(
-            f"Created cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
+            "Created cart_payment",
+            cart_payment_id=cart_payment.id,
+            payer_id=cart_payment.payer_id,
         )
         # Legacy info not returned for new V1 API
         return cart_payment
     except PaymentError as payment_error:
-        log.info(f"exception from create_cart_payment() {payment_error}")
+        log.info("Exception from create_cart_payment()", exc_info=payment_error)
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
         if payment_error.error_code in (
             PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
@@ -142,7 +144,7 @@ async def update_cart_payment(
     - **client_description** [string] client description
     - **split_payment** [json object] Optional, new split payment to use for the payment
     """
-    log.info(f"Updating cart_payment {cart_payment_id}")
+    log.info("Updating cart_payment", cart_payment_id=cart_payment_id)
     try:
         cart_payment = await cart_payment_processor.update_payment(
             idempotency_key=cart_payment_request.idempotency_key,
@@ -170,7 +172,9 @@ async def update_cart_payment(
             retryable=payment_error.retryable,
         )
     log.info(
-        f"Updated cart_payment {cart_payment.id} for payer {cart_payment.payer_id}"
+        "Updated cart_payment",
+        cart_payment_id=cart_payment.id,
+        payer_id=cart_payment.payer_id,
     )
     return cart_payment
 
@@ -200,7 +204,7 @@ async def cancel_cart_payment(
 
     - **cart_payment_id**: ID of cart payment to cancel.
     """
-    log.info(f"Cancelling cart_payment {cart_payment_id}")
+    log.info("Cancelling cart_payment", cart_payment_id=cart_payment_id)
     try:
         cart_payment = await cart_payment_processor.cancel_payment(
             cart_payment_id=cart_payment_id
@@ -222,5 +226,5 @@ async def cancel_cart_payment(
             error_message=payment_error.error_message,
             retryable=payment_error.retryable,
         )
-    log.info(f"Cancelled cart_payment {cart_payment_id}")
+    log.info("Cancelled cart_payment", cart_payment_id=cart_payment_id)
     return cart_payment

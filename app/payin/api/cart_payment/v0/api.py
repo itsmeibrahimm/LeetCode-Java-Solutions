@@ -52,7 +52,7 @@ async def create_cart_payment_for_legacy_client(
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):
-    log.info(f"Creating cart_payment for legacy client.")
+    log.info("Creating cart_payment for legacy client.")
 
     try:
         cart_payment, legacy_consumer_charge_id = await cart_payment_processor.legacy_create_payment(
@@ -68,7 +68,9 @@ async def create_cart_payment_for_legacy_client(
             currency=cart_payment_request.currency,
         )
 
-        log.info(f"Created cart_payment {cart_payment.id} for legacy client.")
+        log.info(
+            "Created cart_payment for legacy client.", cart_payment_id=cart_payment.id
+        )
         return form_create_response(
             cart_payment=cart_payment,
             legacy_consumer_charge_id=legacy_consumer_charge_id,
@@ -169,11 +171,11 @@ async def cancel_cart_payment(
     Cancel an existing cart payment.  If the payment method associated with the cart payment was
     charged, a full refund is issued.
     """
-    log.info(f"Cancelling cart_payment for legacy charge {dd_charge_id}")
+    log.info("Cancelling cart_payment for legacy charge", dd_charge_id=dd_charge_id)
     cart_payment = await cart_payment_processor.cancel_payment_for_legacy_charge(
         dd_charge_id=dd_charge_id
     )
-    log.info(f"Cancelled cart_payment for legacy charge {dd_charge_id}")
+    log.info("Cancelled cart_payment for legacy charge", dd_charge_id=dd_charge_id)
     return cart_payment
 
 

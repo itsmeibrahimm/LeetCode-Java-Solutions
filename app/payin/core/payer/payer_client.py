@@ -88,15 +88,18 @@ class PayerClient:
             )
             if exist_payer:
                 self.log.info(
-                    f"[has_existing_payer][{exist_payer.id}] payer already exists. dd_payer_id:[{dd_payer_id}], payer_type:[{payer_type}]"
+                    "[has_existing_payer] payer already exists",
+                    payer_id=dd_payer_id,
+                    payer_type=payer_type,
                 )
                 # raise PayerCreationError(
                 #     error_code=PayinErrorCode.PAYER_CREATE_PAYER_ALREADY_EXIST,
                 #     retryable=False,
                 # )
-        except DataError as e:
-            self.log.error(
-                f"[has_existing_payer][{dd_payer_id}] DataError when reading from payers table: {e}"
+        except DataError:
+            self.log.exception(
+                "[has_existing_payer] DataError when reading from payers table.",
+                dd_payer_id=dd_payer_id,
             )
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=True
@@ -217,9 +220,9 @@ class PayerClient:
                             id=raw_payer.stripe_customer_entity.id
                         ),
                     )
-        except DataError as e:
-            self.log.error(
-                f"[force_update_payer] DataError when reading data from db: {e}"
+        except DataError:
+            self.log.exception(
+                "[force_update_payer] DataError when reading data from db"
             )
             raise PayerUpdateError(
                 error_code=PayinErrorCode.PAYER_UPDATE_DB_ERROR, retryable=True
@@ -315,9 +318,9 @@ class PayerClient:
             stripe_cus: Customer = await self.stripe_async_client.create_customer(
                 country=country, request=creat_cus_req
             )
-        except Exception as e:
-            self.log.error(
-                f"[pgp_create_customer] error while creating stripe customer. {e}"
+        except Exception:
+            self.log.exception(
+                "[pgp_create_customer] error while creating stripe customer."
             )
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_CREATE_STRIPE_ERROR, retryable=False
@@ -335,8 +338,8 @@ class PayerClient:
                 country=country, request=get_cus_req
             )
         except StripeError as e:
-            self.log.error(
-                f"[pgp_get_customer] error while creating stripe customer. {e}"
+            self.log.exception(
+                "[pgp_get_customer] error while creating stripe customer."
             )
             if e.http_status == 404:
                 raise PayerReadError(
@@ -365,9 +368,11 @@ class PayerClient:
             stripe_customer = await self.stripe_async_client.update_customer(
                 country=input_country, request=update_cus_req
             )
-        except Exception as e:
-            self.log.error(
-                f"[pgp_update_customer_default_payment_method][{pgp_customer_resource_id}][{pgp_payment_method_resource_id}] error while updating stripe customer {e}"
+        except Exception:
+            self.log.exception(
+                "[pgp_update_customer_default_payment_method] Error while updating stripe customer",
+                pgp_customer_resource_id=pgp_customer_resource_id,
+                pgp_payment_method_resource_id=pgp_payment_method_resource_id,
             )
             raise PayerUpdateError(
                 error_code=PayinErrorCode.PAYER_UPDATE_STRIPE_ERROR, retryable=False
@@ -458,13 +463,13 @@ class PayerOps(PayerOpsInterface):
                 payer_input=payer_input, pgp_customer_input=pgp_customer_input
             )
             self.log.info(
-                "[create_payer_impl][%s] create payer/pgp_customer completed. stripe_customer_id_id:%s",
-                payer_entity.id,
-                pgp_customer_resource_id,
+                "[create_payer_impl] create payer/pgp_customer completed.",
+                payer_id=payer_entity.id,
+                stripe_customer_id=pgp_customer_resource_id,
             )
-        except DataError as e:
-            self.log.error(
-                f"[create_payer_impl][{pgp_code}] DataError when writing into db. {e}"
+        except DataError:
+            self.log.exception(
+                "[create_payer_impl] DataError when writing into db.", pgp_code=pgp_code
             )
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA, retryable=True
@@ -505,9 +510,9 @@ class PayerOps(PayerOpsInterface):
                         )
                     )
                     is_found = True if (payer_entity and stripe_cus_entity) else False
-        except DataError as e:
-            self.log.error(
-                f"[get_payer_raw_objects] DataError when reading data from db: {e}"
+        except DataError:
+            self.log.exception(
+                "[get_payer_raw_objects] DataError when reading data from db."
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False
@@ -604,9 +609,10 @@ class LegacyPayerOps(PayerOpsInterface):
             if not stripe_customer_entity:
                 try:
                     owner_id = int(dd_payer_id)
-                except ValueError as e:
-                    self.log.error(
-                        f"[create_payer_impl][{dd_payer_id}] Value error for non-numeric value. {e}"
+                except ValueError:
+                    self.log.exception(
+                        "[create_payer_impl] Value error for non-numeric value.",
+                        dd_payer_id=dd_payer_id,
                     )
                     raise PayerCreationError(
                         error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
@@ -625,8 +631,8 @@ class LegacyPayerOps(PayerOpsInterface):
                 "[create_payer_raw_objects] create stripe_customer completed.",
                 payer_id=payer_entity.id,
             )
-        except DataError as e:
-            self.log.error(f"[create_payer_impl] DataError when writing into db. {e}")
+        except DataError:
+            self.log.exception("[create_payer_impl] DataError when writing into db.")
             raise PayerCreationError(
                 error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA, retryable=True
             )
@@ -677,11 +683,13 @@ class LegacyPayerOps(PayerOpsInterface):
                         ...
                 if not is_found:
                     self.log.error(
-                        f"[get_payer_raw_objects][{payer_id}] no record in db, should retrieve from stripe. [{payer_id_type}][{payer_type}]"
+                        "[get_payer_raw_objects] no record in db, should retrieve from stripe.",
+                        payer_id=payer_id,
+                        payer_id_type=payer_id_type,
                     )
-        except DataError as e:
-            self.log.error(
-                f"[get_payer_raw_objects] DataError when reading data from db: {e}"
+        except DataError:
+            self.log.exception(
+                "[get_payer_raw_objects] DataError when reading data from db."
             )
             raise PayerReadError(
                 error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False

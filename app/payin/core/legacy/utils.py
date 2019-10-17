@@ -14,7 +14,8 @@ def get_country_id_by_code(country: str) -> int:
         return LegacyCountryId.AU
 
     logger.warn(
-        f"country {country} does not exist in LegacyCountryId map; defaulting to US"
+        "Country does not exist in LegacyCountryId map; defaulting to US",
+        country=country,
     )
     return LegacyCountryId.US
 
@@ -28,6 +29,7 @@ def get_country_code_by_id(legacy_country_id: int) -> CountryCode:
         return CountryCode.AU
 
     logger.warn(
-        f"country id {legacy_country_id} does not exist in LegacyCountryId map; defaulting to US"
+        "Country id does not exist in LegacyCountryId map; defaulting to US",
+        country_id=legacy_country_id,
     )
     return CountryCode.US

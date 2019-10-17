@@ -73,15 +73,15 @@ class DisputeClient:
                     stripe_dispute_id=dispute_id, dispute_id_type=dispute_id_type
                 )
             )
-        except DataError as e:
-            self.log.error(
-                f"[get_raw_dispute][{dispute_id} DataError while reading db. {e}"
+        except DataError:
+            self.log.exception(
+                "[get_raw_dispute] DataError while reading db.", dispute_id=dispute_id
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
             )
         if dispute_entity is None:
-            self.log.error("[get_raw_dispute] Dispute not found:[%s]", dispute_id)
+            self.log.error("[get_raw_dispute] Dispute not found", dispute_id=dispute_id)
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
             )
@@ -95,8 +95,8 @@ class DisputeClient:
             response = await self.stripe_async_client.update_dispute(
                 country=country, request=request
             )
-        except StripeError as e:
-            self.log.error(f"Error updating the stripe dispute: {e}")
+        except StripeError:
+            self.log.exception("Error updating the stripe dispute")
             raise DisputeUpdateError(
                 error_code=PayinErrorCode.DISPUTE_UPDATE_STRIPE_ERROR, retryable=False
             )
@@ -113,16 +113,18 @@ class DisputeClient:
                 ),
                 request_where=UpdateStripeDisputeWhereInput(id=dd_stripe_dispute_id),
             )
-        except DataError as e:
-            self.log.error(
-                f"[update_raw_dispute_submitted_time][{dd_stripe_dispute_id}] DataError while reading db. {e}"
+        except DataError:
+            self.log.exception(
+                "[update_raw_dispute_submitted_time] DataError while reading db.",
+                dd_stripe_dispute_id=dd_stripe_dispute_id,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR, retryable=True
             )
         if not updated_dispute_db_entity:
             self.log.warn(
-                f"[update_raw_dispute_submitted_time][{dd_stripe_dispute_id}] error. empty data returned from DB after update submitted_at"
+                "[update_raw_dispute_submitted_time] empty data returned from DB after update submitted_at",
+                dd_stripe_dispute_id=dd_stripe_dispute_id,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR, retryable=True
@@ -135,7 +137,9 @@ class DisputeClient:
         ]
         if len(invalid_reasons) > 0:
             self.log.error(
-                f"[get_cumulative_count][{id}] invalid reasons provided:[{invalid_reasons}]"
+                "[get_cumulative_count] invalid reasons provided",
+                dd_stripe_dispute_id=id,
+                invalid_reasons=invalid_reasons,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_READ_INVALID_DATA, retryable=False
@@ -157,7 +161,7 @@ class DisputeClient:
             or dd_stripe_card_id
             or dd_consumer_id
         ):
-            self.log.warn(f"[list_disputes] No parameters provided")
+            self.log.warn("[list_disputes] No parameters provided")
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
             )
@@ -199,10 +203,8 @@ class DisputeClient:
                         start_time=start_time,
                     )
                 )
-            except DataError as e:
-                self.log.error(
-                    f"[get_cumulative_count][{id} DataError while reading db. {e}"
-                )
+            except DataError:
+                self.log.error("[get_cumulative_count] DataError while reading db.")
                 raise DisputeReadError(
                     error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
                 )
@@ -216,9 +218,9 @@ class DisputeClient:
                         card_ids=stripe_card_ids, start_time=start_time, reasons=reasons
                     )
                 )
-            except DataError as e:
-                self.log.error(
-                    f"[get_cumulative_amount][{id} DataError while reading db. {e}"
+            except DataError:
+                self.log.exception(
+                    "[get_cumulative_amount] DataError while reading db."
                 )
                 raise DisputeReadError(
                     error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
@@ -240,25 +242,25 @@ class DisputeClient:
                     id=dispute_id, id_type=dispute_id_type
                 )
             )
-        except DataError as e:
-            self.log.error(
-                f"[get_disputes_charge_metadata] DataError while reading db. {e}"
+        except DataError:
+            self.log.exception(
+                "[get_disputes_charge_metadata] DataError while reading db."
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
             )
         if stripe_dispute_entity is None:
             self.log.error(
-                "[get_dispute_charge_metadata_object] Dispute not found:[%s]",
-                dispute_id,
+                "[get_dispute_charge_metadata_object] Dispute not found",
+                dispute_id=dispute_id,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
             )
         if consumer_charge_entity is None:
             self.log.error(
-                "[get_dispute_charge_metadata_object] Dispute not found:[%s]",
-                dispute_id,
+                "[get_dispute_charge_metadata_object] Dispute not found",
+                dispute_id=dispute_id,
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE,

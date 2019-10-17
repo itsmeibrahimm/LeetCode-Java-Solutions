@@ -82,9 +82,7 @@ async def submit_dispute_evidence(
     log: BoundLogger = Depends(get_logger_from_req),
     dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
 ) -> Dispute:
-    log.info(
-        "[update_dispute] update_dispute started for dispute_id=%s", stripe_dispute_id
-    )
+    log.info("[update_dispute] update_dispute started", dispute_id=stripe_dispute_id)
     try:
         dispute: Dispute = await dispute_processor.submit_dispute_evidence(
             stripe_dispute_id=stripe_dispute_id, evidence=evidence, country=country
@@ -100,9 +98,7 @@ async def submit_dispute_evidence(
             error_message=e.error_message,
             retryable=e.retryable,
         )
-    log.info(
-        "[update_dispute] update_dispute completed for dispute_id=%s", stripe_dispute_id
-    )
+    log.info("[update_dispute] update_dispute completed", dispute_id=stripe_dispute_id)
     return dispute
 
 
@@ -161,10 +157,14 @@ async def list_disputes(
             retryable=False,
         )
     log.info(
-        f"[list_disputes] list disputes started for payment_method_id: {dd_payment_method_id} "
-        f"stripe_payment_method_id: {stripe_payment_method_id} stripe_card_id: {dd_stripe_card_id} "
-        f"consumer_id: {dd_consumer_id}"
-        f"start_time: {start_time} reasons: {reasons} distinct: {distinct}"
+        "[list_disputes] list disputes started",
+        payment_method_id=dd_payment_method_id,
+        stripe_payment_method_id=stripe_payment_method_id,
+        stripe_card_id=dd_stripe_card_id,
+        dd_consumer_id=dd_consumer_id,
+        start_time=start_time,
+        reasons=reasons,
+        distinct=distinct,
     )
     try:
         dispute_list = await dispute_processor.list_disputes(
@@ -219,7 +219,9 @@ async def get_dispute_charge_metadata(
         Valid values include "dd_stripe_dispute_id" and "stripe_dispute_id"
     """
     log.info(
-        f"[get_dispute_charge_metadata] get_dispute_charge_metadata started for dispute_id={dispute_id} dispute_id_type={dispute_id_type}"
+        "[get_dispute_charge_metadata] get_dispute_charge_metadata started",
+        dispute_id=dispute_id,
+        dispute_id_type=dispute_id_type,
     )
     try:
         dispute_charge_metadata: DisputeChargeMetadata = await dispute_processor.get_dispute_charge_metadata(
@@ -241,6 +243,8 @@ async def get_dispute_charge_metadata(
             retryable=e.retryable,
         )
     log.info(
-        f"[get_dispute_charge_metadata] get_dispute_charge_metadata completed for dispute_id={dispute_id} dispute_id_type={dispute_id_type}"
+        "[get_dispute_charge_metadata] get_dispute_charge_metadata completed",
+        dispute_id=dispute_id,
+        dispute_id_type=dispute_id_type,
     )
     return dispute_charge_metadata

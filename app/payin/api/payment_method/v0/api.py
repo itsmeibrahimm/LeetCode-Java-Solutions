@@ -84,7 +84,7 @@ async def create_payment_method(
             dd_stripe_customer_id=req_body.dd_stripe_customer_id,
         )
     except PaymentError as e:
-        log.error(
+        log.exception(
             "[create_payment_method] PaymentError.",
             stripe_customer_id=req_body.stripe_customer_id,
             payer_type=req_body.payer_type,
@@ -138,7 +138,9 @@ async def get_payment_method(
     """
 
     log.info(
-        f"[get_payment_method] receive request: payment_method_id={payment_method_id} payment_method_id_type={payment_method_id_type}"
+        "[get_payment_method] received request",
+        payment_method_id=payment_method_id,
+        payment_method_id_type=payment_method_id_type,
     )
 
     try:
@@ -150,7 +152,9 @@ async def get_payment_method(
         )
     except PaymentError as e:
         log.warn(
-            f"[get_payment_method][{payment_method_id}][{payment_method_id_type}] PaymentMethodReadError."
+            "[get_payment_method] PaymentMethodReadError.",
+            payment_method_id=payment_method_id,
+            payment_method_id_type=payment_method_id_type,
         )
         raise PaymentException(
             http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -184,7 +188,12 @@ async def list_payment_methods(
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     log.info(
-        f"[list_payment_method] receive request dd_consumer_id:{dd_consumer_id} stripe_cusotmer_id:{stripe_cusotmer_id} country:{country} active_only:{active_only} force_update:{force_update}"
+        "[list_payment_method] receive request",
+        dd_consumer_id=dd_consumer_id,
+        stripe_cusotmer_id=stripe_cusotmer_id,
+        country=country,
+        active_only=active_only,
+        orce_update=force_update,
     )
 
     raise PaymentException(
@@ -234,8 +243,10 @@ async def delete_payment_method(
             payment_method_id_type=payment_method_id_type,
         )
     except PaymentError as e:
-        log.error(
-            f"[delete_payment_method][{payment_method_id}][{payment_method_id_type}] PaymentMethodReadError."
+        log.exception(
+            "[delete_payment_method] PaymentMethodReadError.",
+            payment_method_id=payment_method_id,
+            payment_method_id_type=payment_method_id_type,
         )
         if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
             http_status = HTTP_404_NOT_FOUND
