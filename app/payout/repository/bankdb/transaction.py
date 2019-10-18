@@ -50,6 +50,12 @@ class TransactionRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_transaction_by_transfer_id_without_limit(
+        self, transfer_id: int
+    ) -> List[TransactionDBEntity]:
+        pass
+
+    @abstractmethod
     async def get_transaction_by_payout_id(
         self, payout_id: int, offset: int, limit: int
     ) -> List[TransactionDBEntity]:
@@ -198,6 +204,21 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
             .order_by(desc(transactions.created_at))
             .offset(offset)
             .limit(limit)
+        )
+
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            return [TransactionDBEntity.from_row(row) for row in rows]
+        else:
+            return []
+
+    async def get_transaction_by_transfer_id_without_limit(
+        self, transfer_id: int
+    ) -> List[TransactionDBEntity]:
+        stmt = (
+            transactions.table.select()
+            .where(transactions.transfer_id == transfer_id)
+            .order_by(desc(transactions.created_at))
         )
 
         rows = await self._database.replica().fetch_all(stmt)

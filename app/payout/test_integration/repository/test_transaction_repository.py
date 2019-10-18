@@ -372,6 +372,32 @@ class TestTransactionRepository:
             "empty transaction list"
         )
 
+    async def test_get_transaction_by_transfer_id_without_limit(
+        self,
+        transaction_repo: TransactionRepository,
+        transfer_repo: TransferRepository,
+        payout_account_id: types.PayoutAccountId,
+    ):
+        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        count = 13
+        transaction_list = await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payout_account_id,
+            transfer_id=transfer.id,
+            count=count,
+        )
+
+        # get total transactions for transfer
+        retrieved_transaction_list = await transaction_repo.get_transaction_by_transfer_id_without_limit(
+            transfer_id=transfer.id
+        )
+        assert len(retrieved_transaction_list) == len(
+            transaction_list
+        ), "get transaction list by transfer id size should match with expected size"
+        assert (
+            retrieved_transaction_list == transaction_list
+        ), "retrieved transaction list by transfer id should match with expected list"
+
     async def test_get_transaction_by_payout_id(
         self,
         transaction_repo: TransactionRepository,
