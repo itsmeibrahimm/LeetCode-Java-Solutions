@@ -1,5 +1,9 @@
 from structlog.stdlib import BoundLogger
 
+from app.payout.core.transaction.processors.attach_payout import (
+    AttachPayoutRequest,
+    AttachPayout,
+)
 from app.payout.core.transaction.processors.create_transaction import (
     CreateTransactionRequest,
     CreateTransaction,
@@ -52,3 +56,11 @@ class TransactionProcessors:
             logger=self.logger, transaction_repo=self.transaction_repo, request=request
         )
         return await reverse_transaction_op.execute()
+
+    async def attach_payout(
+        self, request: AttachPayoutRequest
+    ) -> TransactionListInternal:
+        attach_payout_op = AttachPayout(
+            logger=self.logger, transaction_repo=self.transaction_repo, request=request
+        )
+        return await attach_payout_op.execute()

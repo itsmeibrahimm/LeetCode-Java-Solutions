@@ -108,15 +108,15 @@ class TestTransactionRepository:
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
         )
         transaction_ids = [first_txn.id, second_txn.id]
-        new_data = TransactionUpdateDBEntity(payout_id=101)
 
+        new_payout_id = 101
         updated_rows = await transaction_repo.set_transaction_payout_id_by_ids(
-            transaction_ids, new_data
+            transaction_ids, payout_id=new_payout_id
         )
         assert updated_rows, "updated"
         assert len(updated_rows) == 2, "both rows updated"
         for row in updated_rows:
-            assert row.payout_id == new_data.payout_id, "payout id updated"
+            assert row.payout_id == new_payout_id, "payout id updated"
 
     async def test_get_transaction_by_ids(
         self,

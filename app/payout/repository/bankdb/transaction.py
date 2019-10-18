@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from operator import attrgetter
 from typing import Optional, List
 
 from sqlalchemy import and_, desc, or_
@@ -94,7 +95,7 @@ class TransactionRepositoryInterface(ABC):
 
     @abstractmethod
     async def set_transaction_payout_id_by_ids(
-        self, transaction_ids: List[int], data: TransactionUpdateDBEntity
+        self, transaction_ids: List[int], payout_id: Optional[int] = None
     ) -> List[TransactionDBEntity]:
         pass
 
@@ -138,16 +139,18 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         return TransactionDBEntity.from_row(row) if row else None
 
     async def set_transaction_payout_id_by_ids(
-        self, transaction_ids: List[int], data: TransactionUpdateDBEntity
+        self, transaction_ids: List[int], payout_id: Optional[int] = None
     ) -> List[TransactionDBEntity]:
         stmt = (
             transactions.table.update()
             .where(transactions.id.in_(transaction_ids))
-            .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
+            .values(payout_id=payout_id, updated_at=datetime.utcnow())
             .returning(*transactions.table.columns.values())
         )
         rows = await self._database.master().fetch_all(stmt)
-        return [TransactionDBEntity.from_row(row) for row in rows] if rows else []
+        results = [TransactionDBEntity.from_row(row) for row in rows] if rows else []
+        sorted_results = sorted(results, key=attrgetter("created_at"), reverse=True)
+        return sorted_results
 
     async def get_transaction_by_ids(
         self, transaction_ids: List[int]
