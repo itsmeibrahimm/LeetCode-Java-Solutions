@@ -10,7 +10,11 @@ from app.payout.api import account, transfer, instant_payout, webhook, transacti
 
 def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Declare sub app
-    app_v0 = FastAPI(openapi_prefix="/payout/api/v0", description="Payout service v0")
+    app_v0 = FastAPI(
+        title="Payout Service",
+        openapi_prefix="/payout/api/v0",
+        description="Payout service v0",
+    )
     set_context_for_app(app_v0, context)
 
     # allow tracking of service-level metrics
@@ -41,7 +45,11 @@ def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
 
 def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Declare sub app
-    app_v1 = FastAPI(openapi_prefix="/payout/api/v1", description="Payout service v1")
+    app_v1 = FastAPI(
+        title="Payout Service",
+        openapi_prefix="/payout/api/v1",
+        description="Payout service v1",
+    )
     set_context_for_app(app_v1, context)
 
     # allow tracking of service-level metrics

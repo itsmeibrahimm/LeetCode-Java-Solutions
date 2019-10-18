@@ -7,7 +7,7 @@ from app.commons.types import CountryCode, Currency
 from app.payout.api.account.v1.models import CreatePayoutAccount
 from app.payout.types import PayoutAccountTargetType
 
-from app.payout.api.transaction.v1.models import TransactionCreate, ReverseTransaction
+from app.payout.api.transaction.v1 import models
 from app.payout.test_integration.api import (
     create_account_url,
     create_transaction_url,
@@ -42,7 +42,7 @@ class TestTransactionV1:
         test_idempotency_key = (
             f"test_create_then_list_transactions_{payout_account['id']}_{uuid4()}"
         )
-        tx_creation_req = TransactionCreate(
+        tx_creation_req = models.TransactionCreate(
             amount=10,
             payment_account_id=payout_account["id"],
             idempotency_key=test_idempotency_key,
@@ -63,8 +63,11 @@ class TestTransactionV1:
     ):
         idempotency_key = new_transaction["idempotency_key"]
 
-        tx_list_req = {"transaction_ids": [new_transaction["id"]]}
-        response = client.get(list_transactions_url(), json=tx_list_req)
+        # query param is comma-separated list and contains dupe ids
+        tx_list_req = {
+            "transaction_ids": f"{new_transaction['id']},{new_transaction['id']}"
+        }
+        response = client.get(list_transactions_url(), params=tx_list_req)
         assert response.status_code == 200
         tx_retrieved: dict = response.json()
         assert tx_retrieved["count"] == 1, "retrieved 1 transaction"
@@ -75,7 +78,7 @@ class TestTransactionV1:
     def test_create_then_reverse_transactions(
         self, client: TestClient, new_transaction: dict
     ):
-        tx_reverse_req = ReverseTransaction(reverse_reason=None)
+        tx_reverse_req = models.ReverseTransaction(reverse_reason=None)
         response = client.post(
             reverse_transaction_url(new_transaction["id"]), json=tx_reverse_req.dict()
         )

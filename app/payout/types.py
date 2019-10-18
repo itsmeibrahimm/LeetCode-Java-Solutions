@@ -9,6 +9,14 @@ PayoutAccountTargetId = int
 PayoutAccountStatementDescriptor = str
 
 
+class CommaSeperatedArrayStr(str):
+    def __init__(self, str):
+        self.str = str
+
+    def __to_array__(self):
+        return self.str.split(",")
+
+
 class PayoutAccountTargetType(str, Enum):
     DASHER = "dasher"
     STORE = "store"

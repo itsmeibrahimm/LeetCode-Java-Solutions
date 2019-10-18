@@ -1,6 +1,7 @@
-from typing import List, Optional
+from typing import Optional
+from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Body, Path
 from starlette.status import (
     HTTP_200_OK,
     HTTP_500_INTERNAL_SERVER_ERROR,
@@ -36,28 +37,73 @@ router = APIRouter()
     tags=api_tags,
 )
 async def list_transactions(
-    transaction_ids: Optional[List[types.TransactionId]],
-    target_ids: Optional[List[types.PayoutAccountTargetId]],
-    target_type: Optional[types.PayoutAccountTargetType],
-    transfer_id: Optional[types.TransferId],
-    payout_id: Optional[types.PayoutId],
-    payout_account_id: Optional[types.PayoutAccountId],
-    time_range: Optional[models.TimeRange],
-    unpaid: Optional[bool] = True,
+    ts_start: Optional[int] = Query(
+        default=None, description="Start timestamp epoch seconds (inclusive)"
+    ),
+    ts_end: Optional[int] = Query(
+        default=None, description="End timestamp epoch seconds (inclusive)"
+    ),
+    target_type: Optional[types.PayoutAccountTargetType] = Query(
+        default=None, description="Target type"
+    ),
+    target_ids: Optional[str] = Query(
+        default=None, description="Comma separated target ids"
+    ),
+    transfer_id: Optional[types.TransferId] = Query(
+        default=None, description="Transfer ID"
+    ),
+    payout_id: Optional[types.PayoutId] = Query(default=None, description="Payout ID"),
+    payout_account_id: Optional[types.PayoutAccountId] = Query(
+        default=None, description="Payment Account ID"
+    ),
+    unpaid: Optional[bool] = Query(
+        default=True, description="Unpaid transaction only if true"
+    ),
+    transaction_ids: Optional[str] = Query(
+        default=None, description="Comma separated transaction ids"
+    ),
     transaction_processors: TransactionProcessors = Depends(
         create_transaction_processors
     ),
 ):
+    ##
+    # convert the query params from API to biz layer data model
+    ##
+
+    # params
+    transaction_id_list = None
+    if transaction_ids:
+        transaction_id_list = list(set(transaction_ids.split(",")))
+
+    target_id_list = None
+    if target_ids:
+        target_id_list = list(set(target_ids.split(",")))
+
+    start_time = None
+    if ts_start:
+        start_time = datetime.fromtimestamp(ts_start)
+
+    end_time = None
+    if ts_end:
+        end_time = datetime.fromtimestamp(ts_end)
+
+    time_range = TimeRange(start_time=start_time, end_time=end_time)
+
+    # construct biz layer data model
     list_transactions_request = ListTransactionsRequest(
-        transaction_ids=transaction_ids,
-        target_ids=target_ids,
+        transaction_ids=transaction_id_list,
+        target_ids=target_id_list,
         target_type=target_type,
         transfer_id=transfer_id,
         payout_id=payout_id,
         payout_account_id=payout_account_id,
-        time_range=TimeRange(**time_range.dict()) if time_range else None,
+        time_range=time_range,
         unpaid=unpaid,
     )
+
+    ##
+    # process the request and format response
+    ##
     internal_response = await transaction_processors.list_transactions(
         list_transactions_request
     )
@@ -75,7 +121,7 @@ async def list_transactions(
     tags=api_tags,
 )
 async def create_transaction(
-    body: models.TransactionCreate,
+    body: models.TransactionCreate = Body(...),
     transaction_processors: TransactionProcessors = Depends(
         create_transaction_processors
     ),
@@ -96,8 +142,8 @@ async def create_transaction(
     tags=api_tags,
 )
 async def reverse_transaction(
-    transaction_id: types.TransactionId,
-    body: models.ReverseTransaction,
+    transaction_id: types.TransactionId = Path(..., description="Transaction ID"),
+    body: models.ReverseTransaction = Body(...),
     transaction_processors: TransactionProcessors = Depends(
         create_transaction_processors
     ),
