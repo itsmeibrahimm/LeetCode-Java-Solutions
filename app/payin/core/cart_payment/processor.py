@@ -955,6 +955,10 @@ class CartPaymentInterface:
                 e.code == "payment_intent_unexpected_state"
                 and provider_intent.status == "succeeded"
             ):
+                self.req_context.log.warn(
+                    "[submit_capture_to_provider] payment_intent is already captured",
+                    payment_intent_id=payment_intent.id,
+                )
                 pass
             else:
                 raise InvalidProviderRequestError(e)

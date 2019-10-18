@@ -7,8 +7,8 @@ from app.commons.context.logger import get_logger
 from app.commons.context.req_context import build_req_context
 from app.commons.jobs.pool import JobPool
 from app.payin.core.cart_payment.processor import (
-    CartPaymentProcessor,
     CartPaymentInterface,
+    CartPaymentProcessor,
     LegacyPaymentInterface,
 )
 from app.payin.core.cart_payment.types import IntentStatus
@@ -22,8 +22,10 @@ logger = get_logger("jobs")
 
 
 async def job_callback(res, err, ctx):
-    if err:  # error handling
-        logger.exception("Exception running job")
+    if err:
+        logger.error(
+            "Exception running job", exc_info=err[0]
+        )  # err = (exec, traceback)
     else:
         logger.debug("Job successfully completed")
 
@@ -86,15 +88,30 @@ async def capture_uncaptured_payment_intents(
         datetime.utcnow()
     )
 
-    count: int = 0
+    payment_intent_count: int = 0
+    payment_intent_skipped_count: int = 0
+    expire_cutoff_days = 7
     async for payment_intent in uncaptured_payment_intents:
-        count += 1
-        await job_pool.spawn(
-            cart_payment_processor.capture_payment(payment_intent), cb=job_callback
-        )
+        payment_intent_count += 1
+        if payment_intent.created_at + timedelta(
+            days=expire_cutoff_days
+        ) < datetime.now(payment_intent.created_at.tzinfo):
+            # TODO: [PAYIN-120] this is a dirty fix to avoid spamming stripe by capture expired intents.
+            app_context.log.warn(
+                f"[payment-service cron job] skipping payment_intent created more than {expire_cutoff_days} days",
+                job="capture_uncaptured_payment_intents",
+                payment_intent_id=payment_intent.id,
+                payment_intent_created_at=payment_intent.created_at,
+            )
+            payment_intent_skipped_count += 1
+        else:
+            await job_pool.spawn(
+                cart_payment_processor.capture_payment(payment_intent), cb=job_callback
+            )
     app_context.log.info(
         "[payment-service cron job] triggered",
-        payment_intent_count=count,
+        payment_intent_count=payment_intent_count,
+        payment_intent_skipped_count=payment_intent_skipped_count,
         job="capture_uncaptured_payment_intents",
     )
 
@@ -118,16 +135,31 @@ async def resolve_capturing_payment_intents(app_context: AppContext, job_pool: J
     cutoff = datetime.utcnow() - timedelta(hours=1)
     payment_intents = await cart_payment_repo.find_payment_intents_in_capturing(cutoff)
 
+    count = 0
     for payment_intent in payment_intents:
+        count += 1
+        new_status = IntentStatus.REQUIRES_CAPTURE.value
+        app_context.log.info(
+            "[payment-service cron job] flip capturing intent to requires_capture",
+            job="resolve_capturing_payment_intents",
+            payment_intent_id=payment_intent.id,
+            payment_intent_prev_status=payment_intent.status,
+            payment_intent_new_status=new_status,
+            payment_intent_last_updated_at=payment_intent.updated_at,
+            payment_intent_capture_after=payment_intent.capture_after,
+            payment_intent_created_at=payment_intent.created_at,
+        )
         await job_pool.spawn(
             cart_payment_repo.update_payment_intent_status(
                 payment_intent.id,
-                new_status=IntentStatus.REQUIRES_CAPTURE.value,
+                new_status=new_status,
                 previous_status=payment_intent.status,
             )
         )
     app_context.log.info(
-        "[payment-service cron job] triggered", job="resolve_capturing_payment_intents"
+        "[payment-service cron job] triggered",
+        job="resolve_capturing_payment_intents",
+        payment_intent_count=count,
     )
 
 
