@@ -21,6 +21,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payout,
     prepare_and_insert_transfer,
     prepare_and_insert_paid_transaction_list_for_transfer,
+    list_diff,
 )
 from app.payout import types
 from app.payout.types import PayoutAccountTargetType, TransactionState
@@ -689,6 +690,61 @@ class TestTransactionRepository:
             "transaction when there's paid transaction only"
         )
 
+    async def test_get_unpaid_transaction_by_payout_account_id_without_limit(
+        self,
+        transaction_repo: TransactionRepository,
+        transfer_repo: TransferRepository,
+        payout_account_id: types.PayoutAccountId,
+    ):
+        # 1. prepare test data by adding 16 transactions for the same payout account
+        count = 16
+        transaction_list_unpaid = await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payout_account_id,
+            count=count,
+        )
+        # 2. insert another 6 paid transaction for the same payout account
+        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        await prepare_and_insert_paid_transaction_list_for_transfer(
+            transaction_repo=transaction_repo,
+            payout_account_id=payout_account_id,
+            transfer_id=transfer.id,
+            count=count,
+        )
+        # 3. fetch unpaid transactions for the same payout account should all transactions
+        retrieved_unpaid_transaction_list = await transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit(
+            payout_account_id=payout_account_id
+        )
+        assert len(retrieved_unpaid_transaction_list) == len(
+            transaction_list_unpaid
+        ), "get unpaid transaction list by payout id size should match with expected size"
+        assert (
+            retrieved_unpaid_transaction_list == transaction_list_unpaid
+        ), "retrieved unpaid transaction list by payout id should match with expected list"
+        # 4. insert another 4 unpaid transactions for the same payout account
+        count_b = 4
+        transaction_list_unpaid_b = await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payout_account_id,
+            count=count_b,
+        )
+        # 5. fetch unpaid transactions for the same payout account with start_time and end_time
+        start_time = transaction_list_unpaid_b[count_b - 1].created_at
+        end_time = transaction_list_unpaid_b[1].created_at
+        expected_transaction_list_with_time_range = transaction_list_unpaid_b[1:count_b]
+        retrieved_unpaid_transaction_list_with_time_range = await transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit(
+            payout_account_id=payout_account_id,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert len(retrieved_unpaid_transaction_list_with_time_range) == len(
+            expected_transaction_list_with_time_range
+        ), "get unpaid transaction list with start_time  by payout id size should match with expected size"
+        assert (
+            retrieved_unpaid_transaction_list_with_time_range
+            == expected_transaction_list_with_time_range
+        ), "retrieved unpaid transaction list with start_time by payout id should match with expected list"
+
     async def test_get_unpaid_transaction(
         self,
         transaction_repo: TransactionRepository,
@@ -778,3 +834,77 @@ class TestTransactionRepository:
             retrieved_unpaid_transaction_list_with_time_range
             == expected_transaction_list_with_time_range
         ), "list unpaid transaction by start_time should match with expected"
+
+    async def test_get_payout_account_ids_for_unpaid_transactions_without_limit(
+        self,
+        transaction_repo: TransactionRepository,
+        transfer_repo: TransferRepository,
+        payment_account_repo: PaymentAccountRepository,
+    ):
+        # 0. found the existing payout account ids for all unpaid transactions
+        existing_payout_account_ids = (
+            await transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit()
+        )
+
+        # 1. prepare 2 payout_account
+        payment_account_a = await prepare_and_insert_payment_account(
+            payment_account_repo
+        )
+        payment_account_b = await prepare_and_insert_payment_account(
+            payment_account_repo
+        )
+
+        # adding 2 unpaid transactions for the payout_account_a
+        count_a = 2
+        count_b = 3
+        transaction_list_a = await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payment_account_a.id,
+            count=count_a,
+        )
+        # adding 3 unpaid transactions for the payout_account_b
+        await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payment_account_b.id,
+            count=count_b,
+        )
+        # adding 1 paid transaction for payout_account_b
+        await prepare_and_insert_paid_transaction_list_for_transfer(
+            transaction_repo=transaction_repo,
+            payout_account_id=payment_account_b.id,
+            transfer_id=1,
+            count=1,
+        )
+        # 2. get distinct payout account id
+        # the diff between retrieved payout_account_id list and the list before should match with expected
+        expected_payout_account_ids = [payment_account_a.id, payment_account_b.id]
+        retrieved_payout_account_ids = (
+            await transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit()
+        )
+        actual_diff = list_diff(
+            existing_payout_account_ids, retrieved_payout_account_ids
+        )
+        actual_diff.sort()
+        assert (
+            expected_payout_account_ids == actual_diff
+        ), "get distinct payout account ids for unpaid transactions match with expected"
+        # 3. insert payout account c and insert 1 unpaid transaction for it
+        payment_account_c = await prepare_and_insert_payment_account(
+            payment_account_repo
+        )
+        count_c = 1
+        await prepare_and_insert_transaction_list_for_same_account(
+            transaction_repo=transaction_repo,
+            payout_account_id=payment_account_c.id,
+            count=count_c,
+        )
+        start_time = transaction_list_a[count_a - 1].created_at
+        # 4. get distinct payout account ids with start_time
+        expected_payout_account_ids.append(payment_account_c.id)
+        retrieved_payout_account_ids_with_start_time = await transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit(
+            start_time=start_time
+        )
+        retrieved_payout_account_ids_with_start_time.sort()
+        assert (
+            expected_payout_account_ids == retrieved_payout_account_ids_with_start_time
+        ), "get distinct payout account ids with start_time for unpaid transactions match with expected"

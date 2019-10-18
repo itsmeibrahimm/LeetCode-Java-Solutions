@@ -767,3 +767,8 @@ def construct_stripe_error(code="error_code", error_type="error_type") -> Stripe
         json_body={"error": {"code": code, "message": "error_msg", "type": error_type}}
     )
     return error
+
+
+def list_diff(list_before, list_after):
+    diff = [item for item in list_after if item not in list_before]
+    return diff

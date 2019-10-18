@@ -84,6 +84,15 @@ class TransactionRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_unpaid_transaction_by_payout_account_id_without_limit(
+        self,
+        payout_account_id: int,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> List[TransactionDBEntity]:
+        pass
+
+    @abstractmethod
     async def get_unpaid_transaction(
         self,
         offset: int,
@@ -103,6 +112,12 @@ class TransactionRepositoryInterface(ABC):
     async def set_transaction_payout_id_by_ids(
         self, transaction_ids: List[int], payout_id: Optional[int] = None
     ) -> List[TransactionDBEntity]:
+        pass
+
+    @abstractmethod
+    async def get_payout_account_ids_for_unpaid_transactions_without_limit(
+        self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
+    ) -> List[int]:
         pass
 
 
@@ -309,6 +324,36 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         else:
             return []
 
+    async def get_unpaid_transaction_by_payout_account_id_without_limit(
+        self,
+        payout_account_id: int,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> List[TransactionDBEntity]:
+        and_statement = and_(
+            transactions.payment_account_id == payout_account_id,
+            transactions.transfer_id.is_(None),
+            transactions.payout_id.is_(None),
+            or_(
+                transactions.state.is_(None),
+                transactions.state == TransactionState.ACTIVE.value,
+            ),
+        )
+        if start_time:
+            and_statement.clauses.append(transactions.created_at.__ge__(start_time))
+        if end_time:
+            and_statement.clauses.append(transactions.created_at.__le__(end_time))
+        stmt = (
+            transactions.table.select()
+            .where(and_statement)
+            .order_by(desc(transactions.created_at))
+        )
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            return [TransactionDBEntity.from_row(row) for row in rows]
+        else:
+            return []
+
     async def get_unpaid_transaction(
         self,
         offset: int,
@@ -338,5 +383,34 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
             return [TransactionDBEntity.from_row(row) for row in rows]
+        else:
+            return []
+
+    async def get_payout_account_ids_for_unpaid_transactions_without_limit(
+        self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
+    ) -> List[int]:
+        and_statement = and_(
+            transactions.transfer_id.is_(None),
+            transactions.payout_id.is_(None),
+            or_(
+                transactions.state.is_(None),
+                transactions.state == TransactionState.ACTIVE.value,
+            ),
+        )
+        if start_time:
+            and_statement.clauses.append(transactions.created_at.__ge__(start_time))
+        if end_time:
+            and_statement.clauses.append(transactions.created_at.__le__(end_time))
+        stmt = (
+            transactions.table.select()
+            .distinct(transactions.payment_account_id)
+            .where(and_statement)
+            .order_by(desc(transactions.payment_account_id))
+        )
+
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            results = [TransactionDBEntity.from_row(row) for row in rows]
+            return [transaction.payment_account_id for transaction in results]
         else:
             return []
