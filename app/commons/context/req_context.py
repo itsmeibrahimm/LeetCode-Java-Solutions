@@ -50,6 +50,7 @@ def set_context_for_req(request: Request) -> ReqContext:
         stripe_client=app_context.stripe_client,
         commando=commando_mode,
     )
+    set_request_id(req_id),
     req_context = ReqContext(
         req_id=req_id,
         log=log,

@@ -7,6 +7,7 @@ from app.commons.config.app_config import (
     SentryConfig,
 )
 from app.commons.config.secrets import Secret
+from apscheduler.triggers.cron import CronTrigger
 
 
 def create_app_config() -> AppConfig:
@@ -84,5 +85,5 @@ def create_app_config() -> AppConfig:
             name="marqeta_program_fund_token",
             value="a6e2bbe7-4f28-43b4-980d-6416f35fe33e",
         ),
-        DEFAULT_CAPTURE_DELAY_IN_MINUTES=60,
+        CAPTURE_CRON_TRIGGER=CronTrigger(hour="0-23"),
     )
