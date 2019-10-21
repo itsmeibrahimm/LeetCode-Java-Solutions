@@ -28,8 +28,8 @@ module "payment-service-web" {
   service_hpa_max_replicas                  = "15"
   service_hpa_cpu_target_avg_util           = "50"
 
-  service_resource_requests_memory          = "2Gi"
-  service_resource_limits_memory            = "2Gi"
+  service_resource_requests_memory          = "4Gi"
+  service_resource_limits_memory            = "4Gi"
   service_resource_requests_cpu             = "1024m"
   service_resource_limits_cpu               = "1024m"
 
@@ -116,8 +116,8 @@ module "payment-service-cron" {
   service_liveness_probe_failure_threshold  = "3"
   service_liveness_probe_path               = "/"
 
-  service_resource_requests_memory          = "2Gi"
-  service_resource_limits_memory            = "2Gi"
+  service_resource_requests_memory          = "4Gi"
+  service_resource_limits_memory            = "4Gi"
   service_resource_requests_cpu             = "1024m"
   service_resource_limits_cpu               = "1024m"
 
