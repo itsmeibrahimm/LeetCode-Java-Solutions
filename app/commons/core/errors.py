@@ -24,6 +24,7 @@ class PGPErrorCode(str, Enum):
     PGP_AUTHORIZATION_ERROR = "pgp_authorization_error"
     PGP_IDEMPOTENCY_ERROR = "pgp_idempotency_error"
     PGP_INVALID_REQUEST_ERROR = "pgp_invalid_request_error"
+    PGP_RESOURCE_NOT_FOUND_ERROR = "pgp_resource_not_found_error"
 
 
 pgp_error_message_maps = {
@@ -33,6 +34,7 @@ pgp_error_message_maps = {
     PGPErrorCode.PGP_AUTHENTICATION_ERROR: "Authentication error while talking to PGP.",
     PGPErrorCode.PGP_AUTHORIZATION_ERROR: "Authorization error while talking to PGP.",
     PGPErrorCode.PGP_IDEMPOTENCY_ERROR: "Idempotency error while talking to PGP.",
+    PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR: "Resource not found from PGP.",
 }
 
 
@@ -99,11 +101,22 @@ class DBProgrammingError(DatabaseError):
 
 
 class PGPError(PaymentError):
+    """PGP general errors.
+
+    This is the base class for all PGP related errors.
+    """
+
     def __init__(self, error_code: str, error_message: str, retryable: bool):
         super().__init__(error_code, error_message, retryable)
 
 
 class PGPConnectionError(PGPError):
+    """PGP Connection Error.
+
+    This error means failed to connect to PGP because of network problem, dns problems. Usually it is thrown from
+    client side, not actually hit PGP service.
+    """
+
     def __init__(self):
         super().__init__(
             error_code=PGPErrorCode.PGP_CONNECTION_ERROR,
@@ -113,6 +126,11 @@ class PGPConnectionError(PGPError):
 
 
 class PGPApiError(PGPError):
+    """PGP API Error.
+
+    This error means there is a PGP internal error. The status code got from PGP is 500.
+    """
+
     def __init__(self):
         super().__init__(
             error_code=PGPErrorCode.PGP_API_ERROR,
@@ -122,6 +140,11 @@ class PGPApiError(PGPError):
 
 
 class PGPRateLimitError(PGPError):
+    """PGP RateLimitError Error.
+
+    This error means PGP rate limit has been reached. Too many requests sent to PGP at the same time.
+    """
+
     def __init__(self):
         super().__init__(
             error_code=PGPErrorCode.PGP_RATE_LIMIT_ERROR,
@@ -131,6 +154,11 @@ class PGPRateLimitError(PGPError):
 
 
 class PGPAuthenticationError(PGPError):
+    """PGP Authentication Error.
+
+    This error means failed to authenticate with PGP. Mostly the reason is because of invalid api key.
+    """
+
     def __init__(self):
         super().__init__(
             error_code=PGPErrorCode.PGP_AUTHENTICATION_ERROR,
@@ -140,6 +168,11 @@ class PGPAuthenticationError(PGPError):
 
 
 class PGPAuthorizationError(PGPError):
+    """PGP Authorization Error.
+
+    This error means failed to perform operations with current key/token. Mostly it's because of permission setup.
+    """
+
     def __init__(self):
         super().__init__(
             error_code=PGPErrorCode.PGP_AUTHORIZATION_ERROR,
@@ -149,6 +182,12 @@ class PGPAuthorizationError(PGPError):
 
 
 class PGPIdempotencyError(PGPError):
+    """PGP Idempotency Error.
+
+    This error means error occurs when an idempotency key is re-used on a request that does not match the first
+    request's API endpoint and parameters.
+    """
+
     def __init__(self):
         super().__init__(
             error_code=PGPErrorCode.PGP_IDEMPOTENCY_ERROR,
@@ -158,10 +197,32 @@ class PGPIdempotencyError(PGPError):
 
 
 class PGPInvalidRequestError(PGPError):
+    """PGP Invalid Request Error.
+
+    This error means the request our service sends to PGP is invalid because of internal misconfiguration, such as
+    key expired, url mismatched.
+    """
+
     def __init__(self, error_message):
         # need to pass in error_message to detail the reason of invalid request
         super().__init__(
             error_code=PGPErrorCode.PGP_INVALID_REQUEST_ERROR,
             error_message=error_message,
+            retryable=False,
+        )
+
+
+class PGPResourceNotFoundError(PGPError):
+    """PGP Resource Not Found Error.
+
+    This error means the resource we are trying to retrieve from PGP does not exist. The status code from PGP is 404.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR,
+            error_message=pgp_error_message_maps[
+                PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR
+            ],
             retryable=False,
         )
