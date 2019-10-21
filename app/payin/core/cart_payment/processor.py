@@ -34,6 +34,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeRefundChargeRequest,
     TransferData,
 )
+from app.commons.timing import track_func
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
@@ -343,7 +344,7 @@ class IdempotencyKeyAction(Enum):
     REFUND = "refund"
 
 
-@tracing.track_breadcrumb(processor_name="cart_payments", only_trackable=False)
+@tracing.track_breadcrumb(processor_name="cart_payment_interface", only_trackable=False)
 class CartPaymentInterface:
     ENABLE_NEW_CHARGE_TABLES = False
 
@@ -961,7 +962,7 @@ class CartPaymentInterface:
                 )
                 pass
             else:
-                raise InvalidProviderRequestError(e)
+                raise InvalidProviderRequestError(e) from e
         except StripeError as e:
             # All other Stripe errors (ie. not InvalidRequestError) can be considered retryable errors
             # Re-setting the state back to REQUIRES_CAPTURE allows it to be picked up again by the regular cron
@@ -1570,6 +1571,7 @@ class CartPaymentInterface:
         return (updated_payment_intent, updated_pgp_payment_intent)
 
 
+@tracing.track_breadcrumb(processor_name="cart_payment_processor", only_trackable=True)
 class CartPaymentProcessor:
     # TODO: use payer_country passed to processor functions to get the right stripe platform key within CartPaymentInterface.
 
@@ -2033,6 +2035,8 @@ class CartPaymentProcessor:
 
         return payment_intent, pgp_payment_intent
 
+    @track_func
+    @tracing.trackable
     def get_legacy_client_description(
         self, request_client_description: Optional[str]
     ) -> Optional[str]:
@@ -2041,6 +2045,8 @@ class CartPaymentProcessor:
 
         return request_client_description[:1000]
 
+    @track_func
+    @tracing.trackable
     async def update_payment_for_legacy_charge(
         self,
         idempotency_key: str,
@@ -2140,6 +2146,8 @@ class CartPaymentProcessor:
             split_payment=split_payment,
         )
 
+    @track_func
+    @tracing.trackable
     async def update_payment(
         self,
         idempotency_key: str,
@@ -2272,6 +2280,8 @@ class CartPaymentProcessor:
             updated_cart_payment, payment_intent, pgp_payment_intent
         )
 
+    @track_func
+    @tracing.trackable
     async def cancel_payment_for_legacy_charge(self, dd_charge_id: int) -> CartPayment:
         """Cancel cart payment associated with legacy consumer charge ID.
 
@@ -2291,6 +2301,8 @@ class CartPaymentProcessor:
 
         return await self.cancel_payment(cart_payment_id)
 
+    @track_func
+    @tracing.trackable
     async def cancel_payment(self, cart_payment_id: uuid.UUID) -> CartPayment:
         """Cancel a previously submitted cart payment.  Results in full refund if charge was made.
 
@@ -2335,6 +2347,8 @@ class CartPaymentProcessor:
 
         return cart_payment
 
+    @track_func
+    @tracing.trackable
     async def capture_payment(self, payment_intent: PaymentIntent) -> None:
         """Capture a payment intent.
 
@@ -2389,6 +2403,17 @@ class CartPaymentProcessor:
             provider_payment_intent
         )
 
+        # todo change this to be stats other than log
+        create_to_capture_time: timedelta = datetime.now(
+            payment_intent.created_at.tzinfo
+        ) - payment_intent.created_at
+        self.log.info(
+            "[capture_payment] payment_intent capture stats",
+            create_to_capture_time_sec=create_to_capture_time.seconds,
+        )
+
+    @track_func
+    @tracing.trackable
     async def legacy_create_payment(
         self,
         request_cart_payment: CartPayment,
@@ -2417,6 +2442,8 @@ class CartPaymentProcessor:
             currency=currency,
         )
 
+    @track_func
+    @tracing.trackable
     async def create_payment(
         self,
         request_cart_payment: CartPayment,
@@ -2597,6 +2624,8 @@ class CartPaymentProcessor:
         )
         return cart_payment, legacy_consumer_charge.id
 
+    @track_func
+    @tracing.trackable
     async def get_payer_by_id(self, payer_id: uuid.UUID) -> Payer:
         return (
             await self.cart_payment_interface.payer_client.get_raw_payer(

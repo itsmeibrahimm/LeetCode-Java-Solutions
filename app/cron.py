@@ -2,12 +2,13 @@ import asyncio
 import os
 import signal
 
-# ensure logger is loaded before newrelic init,
-# so we don't reload the module and get duplicate log messages
-from app.commons.context.logger import get_logger
 from apscheduler.triggers.cron import CronTrigger
 
 from app.commons.config.newrelic_loader import init_newrelic_agent
+
+# ensure logger is loaded before newrelic init,
+# so we don't reload the module and get duplicate log messages
+from app.commons.context.logger import get_logger
 
 init_newrelic_agent()
 
@@ -17,15 +18,14 @@ import pytz
 from app.commons.jobs.scheduler import Scheduler
 from doordash_python_stats.ddstats import doorstats_global, DoorStatsProxyMultiServer
 
-from app.commons.context.app_context import create_app_context
 from app.commons.instrumentation.pool import stat_resource_pool_jobs
 from app.commons.jobs.pool import adjust_pool_sizes
 from app.commons.jobs.startup_util import init_worker_resources
 from app.commons.runtime import runtime
 from app.payin.jobs import (
-    capture_uncaptured_payment_intents,
-    resolve_capturing_payment_intents,
-    emit_problematic_capture_count,
+    CaptureUncapturedPaymentIntents,
+    ResolveCapturingPaymentIntents,
+    EmitProblematicCaptureCount,
 )
 
 logger = get_logger("cron")
@@ -66,7 +66,6 @@ scheduler = Scheduler()
 scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC timezone
 
 loop = asyncio.get_event_loop()
-app_context = loop.run_until_complete(create_app_context(app_config))
 
 app_context.monitor.add(
     stat_resource_pool_jobs(
@@ -77,26 +76,34 @@ app_context.monitor.add(
     interval_secs=app_config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
 )
 
+capture_uncaptured_payment_intents = CaptureUncapturedPaymentIntents(
+    app_context=app_context, job_pool=stripe_pool
+)
 scheduler.add_job(
-    capture_uncaptured_payment_intents,
-    app_config.CAPTURE_CRON_TRIGGER,
-    kwargs={"app_context": app_context, "job_pool": stripe_pool},
+    func=capture_uncaptured_payment_intents.run,
+    name=capture_uncaptured_payment_intents.job_name,
+    trigger=app_config.CAPTURE_CRON_TRIGGER,
 )
 
+resolve_capturing_payment_intents = ResolveCapturingPaymentIntents(
+    app_context=app_context, job_pool=stripe_pool
+)
 scheduler.add_job(
-    resolve_capturing_payment_intents,
-    app_config.CAPTURE_CRON_TRIGGER,
-    kwargs={"app_context": app_context, "job_pool": stripe_pool},
+    func=resolve_capturing_payment_intents.run,
+    name=resolve_capturing_payment_intents.job_name,
+    trigger=app_config.CAPTURE_CRON_TRIGGER,
 )
 
+emit_problematic_capture_count = EmitProblematicCaptureCount(
+    app_context=app_context,
+    job_pool=stripe_pool,
+    statsd_client=doorstats_global,
+    problematic_threshold=app_config.PROBLEMATIC_CAPTURE_THRESHOLD,
+)
 scheduler.add_job(
-    emit_problematic_capture_count,
-    CronTrigger(hour="*"),
-    kwargs={
-        "app_context": app_context,
-        "statsd_client": doorstats_global,
-        "problematic_threshold": app_config.PROBLEMATIC_CAPTURE_THRESHOLD,
-    },
+    func=emit_problematic_capture_count.run,
+    name=emit_problematic_capture_count.job_name,
+    trigger=CronTrigger(hour="*"),
 )
 
 scheduler.add_job(

@@ -2,12 +2,12 @@ from datetime import timedelta
 from typing import List
 
 import pytest
-from asynctest import patch
+from asynctest import patch, Mock
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 
 from app.commons.context.app_context import AppContext
 from app.commons.utils.testing import Stat
-from app.payin.jobs import emit_problematic_capture_count
+from app.payin.jobs import EmitProblematicCaptureCount
 
 
 @pytest.mark.asyncio
@@ -21,11 +21,13 @@ async def test_emit_problematic_capture_count(
     service_statsd_client: DoorStatsProxyMultiServer,
     get_mock_statsd_events,
 ):
-    await emit_problematic_capture_count(
+    job_instance = EmitProblematicCaptureCount(
         app_context=app_context,
+        job_pool=Mock(),
         statsd_client=service_statsd_client,
         problematic_threshold=timedelta(days=2),
     )
+    await job_instance.run()
     events: List[Stat] = get_mock_statsd_events()
     assert len(events) == 1
     stat = events[0]

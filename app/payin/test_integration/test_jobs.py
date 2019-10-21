@@ -7,8 +7,8 @@ from app.payin.conftest import PaymentIntentFactory
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.jobs import (
-    capture_uncaptured_payment_intents,
-    resolve_capturing_payment_intents,
+    CaptureUncapturedPaymentIntents,
+    ResolveCapturingPaymentIntents,
 )
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
@@ -36,9 +36,10 @@ class TestCaptureUncapturedPaymentIntents:
         cart_payment_repository: CartPaymentRepository,
         stripe_pool: JobPool,
     ):
-        await capture_uncaptured_payment_intents(
+        job_instance = CaptureUncapturedPaymentIntents(
             app_context=app_context, job_pool=stripe_pool
         )
+        await job_instance.run()
         mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture_before_cutoff.assert_called_once()  # type: ignore
 
     @pytest.mark.asyncio
@@ -66,9 +67,10 @@ class TestCaptureUncapturedPaymentIntents:
         mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture_before_cutoff = (  # type: ignore
             mock_find_payment_intents_that_require_capture
         )
-        await capture_uncaptured_payment_intents(
+        job_instance = CaptureUncapturedPaymentIntents(
             app_context=app_context, job_pool=stripe_pool
         )
+        await job_instance.run()
         mock_cart_payment_processor.return_value.capture_payment.assert_called_once_with(  # type: ignore
             payment_intent
         )
@@ -90,9 +92,10 @@ class TestResolveCapturingPaymentIntents:
         mock_cart_payment_repository.return_value.find_payment_intents_in_capturing.return_value = [  # type: ignore
             payment_intent
         ]
-        await resolve_capturing_payment_intents(
+        job_instance = ResolveCapturingPaymentIntents(
             app_context=app_context, job_pool=stripe_pool
         )
+        await job_instance.run()
         mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once_with(  # type: ignore
             id=payment_intent.id,
             new_status=IntentStatus.REQUIRES_CAPTURE.value,

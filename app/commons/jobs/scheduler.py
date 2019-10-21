@@ -22,6 +22,8 @@ class Scheduler(AsyncIOScheduler):
         replace_existing=False,
         **trigger_args
     ):
+        # todo PAYIN-126 temporarily disable NR here for further investigation on
+        # runtime error happened since 10/12 https://sentry.io/share/issue/22c311ab907b45e0b05d3fc71bd3c90b/
         background_task = newrelic.agent.BackgroundTaskWrapper(func)
         return super().add_job(
             background_task,

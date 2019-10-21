@@ -72,7 +72,7 @@ def get_context_from_req(request: Request) -> ReqContext:
     return req_context
 
 
-def build_req_context(app_context: AppContext):
+def build_req_context(app_context: AppContext, **additional_req_log_kwargs):
     req_id = uuid4()
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
     commando_legacy_payment_white_list = runtime.get_json(
@@ -85,9 +85,10 @@ def build_req_context(app_context: AppContext):
         stripe_client=app_context.stripe_client,
         commando=commando_mode,
     )
+
     return ReqContext(
         req_id=req_id,
-        log=app_context.log.bind(req_id=req_id),
+        log=app_context.log.bind(req_id=req_id, **additional_req_log_kwargs),
         commando_mode=commando_mode,
         stripe_async_client=stripe_async_client,
         commando_legacy_payment_white_list=commando_legacy_payment_white_list,
