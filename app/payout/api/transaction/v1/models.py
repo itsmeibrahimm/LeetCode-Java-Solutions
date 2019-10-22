@@ -7,7 +7,7 @@ from pydantic import BaseModel, Schema
 
 from app.commons.api.models import PaymentResponse, PaymentRequest
 from app.commons.types import Currency
-import app.payout.models as types
+import app.payout.models as payout_models
 
 
 ################################
@@ -24,7 +24,7 @@ class TransactionCreate(PaymentRequest):
     # required fields
     #
     amount: int = Schema(default=..., description="The amount of transaction in cents")
-    payment_account_id: int = Schema(
+    payment_account_id: payout_models.PayoutAccountId = Schema(
         default=...,
         description="The payment account id under which the transaction to be created",
     )
@@ -34,11 +34,11 @@ class TransactionCreate(PaymentRequest):
     currency: Currency = Schema(
         default=..., description="The currency code for the transaction to be created"
     )
-    target_id: int = Schema(
+    target_id: payout_models.TransactionTargetId = Schema(
         default=...,
         description="The target id (e.g., delivery id) for the transaction to be created",
     )
-    target_type: str = Schema(
+    target_type: payout_models.TransactionTargetType = Schema(
         default=...,
         description="The target type (e.g., delivery) for the transaction to be created",
     )
@@ -78,26 +78,28 @@ class ReverseTransaction(PaymentRequest):
 
 
 class Transaction(PaymentResponse):
-    id: int = Schema(default=..., description="Transaction ID")
+    id: payout_models.TransactionId = Schema(default=..., description="Transaction ID")
     amount: int = Schema(default=..., description="Transaction amount in cents")
     amount_paid: int = Schema(
         default=...,
         description="Amount transferred to stripe destination account in cents",
     )
-    payout_account_id: int = Schema(
+    payout_account_id: payout_models.PayoutAccountId = Schema(
         default=..., description="Payment account id (will be renamed)"
     )
-    transfer_id: Optional[int] = Schema(
+    transfer_id: Optional[payout_models.TransferId] = Schema(
         default=None, description="Associated transfer ID"
     )
-    payout_id: Optional[int] = Schema(default=None, description="Associated payout ID")
+    payout_id: Optional[payout_models.PayoutId] = Schema(
+        default=None, description="Associated payout ID"
+    )
     created_by_id: Optional[int] = Schema(
         default=None, description="User ID who created the transaction"
     )
-    target_id: Optional[int] = Schema(
+    target_id: Optional[payout_models.TransactionTargetId] = Schema(
         default=None, description="The target id (e.g., delivery id) of the transaction"
     )
-    target_type: Optional[str] = Schema(
+    target_type: Optional[payout_models.TransactionTargetType] = Schema(
         default=None, description="The target type (e.g., delivery) of the transaction"
     )
     currency: Optional[Currency] = Schema(
@@ -106,7 +108,7 @@ class Transaction(PaymentResponse):
     idempotency_key: Optional[str] = Schema(
         default=None, description="The idempotency key of the transaction"
     )
-    state: Optional[types.TransactionState] = Schema(
+    state: Optional[payout_models.TransactionState] = Schema(
         default=None, description="The state of the transaction"
     )
     notes: Optional[str] = Schema(

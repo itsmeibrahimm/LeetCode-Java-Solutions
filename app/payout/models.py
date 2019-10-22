@@ -197,6 +197,20 @@ class TransferType(str, Enum):
 
 # Transactions
 TransactionId = int
+TransactionTargetId = int
+
+
+class TransactionTargetType(str, Enum):
+    MERCHANT_DELIVERY = "merchant_delivery"
+    DASHER_JOB = "dasher_job"
+    DASHER_SHIFT = "dasher_shift"
+    DASHER_DELIVERY = "dasher_delivery"
+    DELIVERY_ERROR = "delivery_error"
+    DELIVERY_RECEIPT = "delivery_receipt"
+    STORE_PAYMENT = "store_payment"
+    VEHICLE_PARTNER_PAYMENT = "vehicle_partner_payment"
+    PAYOUT_FEE = "payout_fee"
+    MICRO_DEPOSIT = "micro_deposit"
 
 
 class TransactionState(str, Enum):

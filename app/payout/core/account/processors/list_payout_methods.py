@@ -3,7 +3,7 @@ from typing import Union, Optional, List
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
-from app.payout.core.account import models as account_models
+import app.payout.core.account.models as account_models
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
 from app.payout.models import PayoutAccountId, PayoutExternalAccountType

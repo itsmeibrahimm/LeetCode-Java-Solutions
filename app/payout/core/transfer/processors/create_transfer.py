@@ -45,7 +45,7 @@ from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
-from app.payout import models as payout_models
+import app.payout.models as payout_models
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.commons.runtime import runtime
 

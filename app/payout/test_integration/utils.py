@@ -54,7 +54,7 @@ from app.payout.repository.maindb.transfer import TransferRepository
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
 from app.commons.providers.stripe import stripe_models as models
-from app.payout import models as payout_models
+import app.payout.models as payout_models
 
 
 """
@@ -286,7 +286,9 @@ async def prepare_and_insert_transaction_list_for_different_targets(
             amount_paid=800,
             payment_account_id=payment_account.id,
             currency=Currency.USD.value,
-            target_type=payment_account.entity,
+            target_type=payout_models.TransactionTargetType.DASHER_DELIVERY
+            if i % 2 == 0
+            else payout_models.TransactionTargetType.DASHER_JOB,
             target_id=target_id_list[index],
         )
 

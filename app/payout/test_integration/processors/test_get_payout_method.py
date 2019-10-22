@@ -7,7 +7,7 @@ from app.payout.core.account.processors.get_payout_method import (
     GetPayoutMethodRequest,
     GetPayoutMethod,
 )
-from app.payout.core.account import models as account_models
+import app.payout.core.account.models as account_models
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,

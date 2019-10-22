@@ -24,8 +24,8 @@ class TimeRange(BaseModel):
 
 class ListTransactionsRequest(OperationRequest):
     transaction_ids: Optional[List[models.TransactionId]]
-    target_ids: Optional[List[models.PayoutAccountTargetId]]
-    target_type: Optional[models.PayoutAccountTargetType]
+    target_ids: Optional[List[models.TransactionTargetId]]
+    target_type: Optional[models.TransactionTargetType]
     transfer_id: Optional[models.TransferId]
     payout_id: Optional[models.PayoutId]
     payout_account_id: Optional[models.PayoutAccountId]

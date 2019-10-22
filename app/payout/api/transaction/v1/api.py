@@ -10,7 +10,7 @@ from starlette.status import (
 
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.transaction.v1 import models
-from app.payout import models as payout_models
+import app.payout.models as payout_models
 from app.payout.core.transaction.processor import TransactionProcessors
 from app.payout.core.transaction.processors.list_transactions import (
     ListTransactionsRequest,
@@ -43,7 +43,7 @@ async def list_transactions(
     ts_end: Optional[int] = Query(
         default=None, description="End timestamp epoch seconds (inclusive)"
     ),
-    target_type: Optional[payout_models.PayoutAccountTargetType] = Query(
+    target_type: Optional[payout_models.TransactionTargetType] = Query(
         default=None, description="Target type"
     ),
     target_ids: Optional[str] = Query(

@@ -7,7 +7,7 @@ from app.commons.core.processor import (
     OperationRequest,
     OperationResponse,
 )
-from app.payout.core.account import models as account_models
+import app.payout.core.account.models as account_models
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )

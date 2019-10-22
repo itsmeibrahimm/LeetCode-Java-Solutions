@@ -3,7 +3,7 @@ from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
-from app.payout.core.account import models as account_models
+import app.payout.core.account.models as account_models
 from app.payout.core.exceptions import (
     payout_method_not_found_error,
     payout_card_not_found_error,

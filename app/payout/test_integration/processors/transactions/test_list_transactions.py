@@ -31,7 +31,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payout,
     prepare_and_insert_paid_transaction_list_for_transfer,
 )
-from app.payout.models import PayoutAccountTargetType, TransactionState
+import app.payout.models as payout_models
 
 
 class TestListTransactions:
@@ -106,18 +106,21 @@ class TestListTransactions:
         transaction_list, target_id_list = await prepare_and_insert_transaction_list_for_different_targets(
             transaction_repo=transaction_repo, payment_account_repo=payment_account_repo
         )
-        expected_list_for_dasher: List[TransactionDBEntity] = []
-        expected_list_for_store: List[TransactionDBEntity] = []
+        expected_list_for_dasher_delivery: List[TransactionDBEntity] = []
+        expected_list_for_dasher_job: List[TransactionDBEntity] = []
         for transaction in transaction_list:
-            if transaction.target_type == PayoutAccountTargetType.DASHER.value:
-                expected_list_for_dasher.append(transaction)
+            if (
+                transaction.target_type
+                == payout_models.TransactionTargetType.DASHER_DELIVERY.value
+            ):
+                expected_list_for_dasher_delivery.append(transaction)
             else:
-                expected_list_for_store.append(transaction)
+                expected_list_for_dasher_job.append(transaction)
 
         # 1. filter by target_ids and "dasher" with offset = 0 and limit = 10
         expected_list_for_dasher_first_page: List[
             TransactionDBEntity
-        ] = expected_list_for_dasher[:TEST_DEFAULT_PAGE_SIZE]
+        ] = expected_list_for_dasher_delivery[:TEST_DEFAULT_PAGE_SIZE]
         offset = 0
         new_offset = offset + len(expected_list_for_dasher_first_page)
         expected_transaction_list_internal = TransactionListInternal(
@@ -133,7 +136,7 @@ class TestListTransactions:
         )
         request_by_target_ids_and_type = ListTransactionsRequest(
             target_ids=target_id_list,
-            target_type=PayoutAccountTargetType.DASHER,
+            target_type=payout_models.TransactionTargetType.DASHER_DELIVERY,
             offset=offset,
             limit=TEST_DEFAULT_PAGE_SIZE,
         )
@@ -153,7 +156,7 @@ class TestListTransactions:
         # 2. filter by target_ids and "dasher" with offset = 10 and limit = 10
         expected_list_for_dasher_sec_page: List[
             TransactionDBEntity
-        ] = expected_list_for_dasher[TEST_DEFAULT_PAGE_SIZE:]
+        ] = expected_list_for_dasher_delivery[TEST_DEFAULT_PAGE_SIZE:]
         offset = len(expected_list_for_dasher_first_page)
         new_offset = offset + len(expected_list_for_dasher_sec_page)
         expected_transaction_list_internal_sec_page = TransactionListInternal(
@@ -169,7 +172,7 @@ class TestListTransactions:
         )
         request_by_target_ids_and_type_sec_page = ListTransactionsRequest(
             target_ids=target_id_list,
-            target_type=PayoutAccountTargetType.DASHER,
+            target_type=payout_models.TransactionTargetType.DASHER_DELIVERY,
             offset=offset,
             limit=TEST_DEFAULT_PAGE_SIZE,
         )
@@ -192,7 +195,7 @@ class TestListTransactions:
             actual_list_by_target_ids_and_type.count
             + actual_list_by_target_ids_and_type_sec_page.count
         )
-        assert total == len(expected_list_for_dasher), (
+        assert total == len(expected_list_for_dasher_delivery), (
             "total transaction number for dasher should be the sum of "
             "first page and second page"
         )
@@ -665,7 +668,7 @@ class TestListTransactions:
             amount_paid=800,
             payment_account_id=payout_account.id,
             currency=Currency.USD.value,
-            state=TransactionState.ACTIVE.value,
+            state=payout_models.TransactionState.ACTIVE.value,
         )
         unpaid_transaction = await transaction_repo.create_transaction(data)
 

@@ -8,7 +8,7 @@ from app.payout.core.account.processors.list_payout_methods import (
     ListPayoutMethod,
     ListPayoutMethodRequest,
 )
-from app.payout.core.account import models as account_models
+import app.payout.core.account.models as account_models
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
