@@ -955,11 +955,10 @@ cart_payment_delay_capture_state_transit_tests = [
         create_and_partial_refund_and_full_refund_test_data,
         id="create_and_partial_refund_and_full_refund",
     ),
-    # todo PAYIN-124 ignore this before fixing stripe_charge.amount_refunded logic
-    # pytest.param(
-    #     create_and_partial_refund_and_partial_refund_test_data,
-    #     id="create_and_partial_refund_and_partial_refund_test_data",
-    # ),
+    pytest.param(
+        create_and_partial_refund_and_partial_refund_test_data,
+        id="create_and_partial_refund_and_partial_refund_test_data",
+    ),
     # ignore this for now, when determine higher amount adjust, we only look at cartpayment amount
     # but not captureable amount for simplification
     # pytest.param(create_and_partial_refund_and_adjust_to_no_exceed_original_test_data,

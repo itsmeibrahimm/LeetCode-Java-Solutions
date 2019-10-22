@@ -578,6 +578,45 @@ class TestCartPayment:
         # Cancel previous cart payment, resulting in provider refund of already captured intent
         self._test_cancel_cart_payment(client=client, cart_payment=cart_payment)
 
+    def test_cancellation_after_adjustments(
+        self, stripe_api: StripeAPISettings, client: TestClient
+    ):
+        stripe_api.enable_outbound()
+        payer = self._test_payer_creation(client)
+        payment_method = self._test_payment_method_creation(client, payer)
+
+        # Initial payment, delay capture
+        cart_payment = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=525,
+            delay_capture=True,
+        )
+
+        # Adjust up once
+        self._test_cart_payment_adjustment(
+            client=client, cart_payment=cart_payment, amount=650
+        )
+
+        # Adjust up again
+        self._test_cart_payment_adjustment(
+            client=client, cart_payment=cart_payment, amount=770
+        )
+
+        # Bring down once
+        self._test_cart_payment_adjustment(
+            client=client, cart_payment=cart_payment, amount=680
+        )
+
+        # Reduce again
+        self._test_cart_payment_adjustment(
+            client=client, cart_payment=cart_payment, amount=480
+        )
+
+        # Now cancel
+        self._test_cancel_cart_payment(client=client, cart_payment=cart_payment)
+
     def test_cart_payment_multiple_adjustments_up_then_down(
         self, stripe_api: StripeAPISettings, client: TestClient
     ):

@@ -439,6 +439,15 @@ class MockedPaymentRepo:
             refunded_at=None,
         )
 
+    async def update_legacy_stripe_charge_add_to_amount_refunded(
+        self, stripe_id: str, additional_amount_refunded: int, refunded_at: datetime
+    ):
+        return utils.generate_legacy_stripe_charge(
+            stripe_id=stripe_id,
+            amount_refunded=additional_amount_refunded,
+            refunded_at=refunded_at,
+        )
+
     async def update_legacy_stripe_charge_refund(
         self, stripe_id: str, amount_refunded: int, refunded_at: datetime
     ):
@@ -633,6 +642,9 @@ def cart_payment_repo():
         mocked_repo.get_legacy_consumer_charge_by_id
     )
     payment_repo.insert_legacy_stripe_charge = mocked_repo.insert_legacy_stripe_charge
+    payment_repo.update_legacy_stripe_charge_add_to_amount_refunded = (
+        mocked_repo.update_legacy_stripe_charge_add_to_amount_refunded
+    )
     payment_repo.update_legacy_stripe_charge_refund = (
         mocked_repo.update_legacy_stripe_charge_refund
     )

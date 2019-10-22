@@ -944,6 +944,24 @@ class CartPaymentRepository(PayinDBRepository):
             refunded_at=row[stripe_charges.refunded_at],
         )
 
+    async def update_legacy_stripe_charge_add_to_amount_refunded(
+        self, stripe_id: str, additional_amount_refunded: int, refunded_at: datetime
+    ):
+        statement = (
+            stripe_charges.table.update()
+            .where(stripe_charges.stripe_id == stripe_id)
+            .values(
+                amount_refunded=(
+                    stripe_charges.amount_refunded + additional_amount_refunded
+                ),
+                refunded_at=refunded_at,
+            )
+            .returning(*stripe_charges.table.columns.values())
+        )
+
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row)
+
     async def update_legacy_stripe_charge_refund(
         self, stripe_id: str, amount_refunded: int, refunded_at: datetime
     ):

@@ -264,9 +264,9 @@ class LegacyPaymentInterface:
     async def lower_amount_for_uncaptured_payment(
         self, stripe_id: str, amount_refunded: int
     ) -> LegacyStripeCharge:
-        return await self.payment_repo.update_legacy_stripe_charge_refund(
+        return await self.payment_repo.update_legacy_stripe_charge_add_to_amount_refunded(
             stripe_id=stripe_id,
-            amount_refunded=amount_refunded,
+            additional_amount_refunded=amount_refunded,
             refunded_at=datetime.now(),
         )
 

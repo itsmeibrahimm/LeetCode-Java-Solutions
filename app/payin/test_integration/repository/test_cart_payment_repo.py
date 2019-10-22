@@ -1121,6 +1121,35 @@ class TestLegacyCharges:
         assert result == expected_stripe_charge
 
     @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_add_to_amount_refunded(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge: LegacyStripeCharge,
+    ):
+        result = await cart_payment_repository.update_legacy_stripe_charge_add_to_amount_refunded(
+            stripe_id=stripe_charge.stripe_id,
+            additional_amount_refunded=200,
+            refunded_at=datetime.now(),
+        )
+
+        expected_result = stripe_charge
+        expected_result.amount_refunded = 200
+        expected_result.refunded_at = result.refunded_at
+        assert result == expected_result
+
+        # Call a second time, verify amount_refunded was added to
+        result = await cart_payment_repository.update_legacy_stripe_charge_add_to_amount_refunded(
+            stripe_id=stripe_charge.stripe_id,
+            additional_amount_refunded=300,
+            refunded_at=datetime.now(),
+        )
+
+        expected_result = stripe_charge
+        expected_result.amount_refunded = 500
+        expected_result.refunded_at = result.refunded_at
+        assert result == expected_result
+
+    @pytest.mark.asyncio
     async def test_update_legacy_stripe_charge_refund(
         self,
         cart_payment_repository: CartPaymentRepository,
