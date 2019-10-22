@@ -120,6 +120,12 @@ class TransactionRepositoryInterface(ABC):
     ) -> List[int]:
         pass
 
+    @abstractmethod
+    async def update_transaction_ids_without_transfer_id(
+        self, transaction_ids: List[int], data: TransactionUpdateDBEntity
+    ) -> List[TransactionDBEntity]:
+        pass
+
 
 @final
 @tracing.track_breadcrumb(repository_name="transaction")
@@ -414,3 +420,20 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
             return [transaction.payment_account_id for transaction in results]
         else:
             return []
+
+    async def update_transaction_ids_without_transfer_id(
+        self, transaction_ids: List[int], data: TransactionUpdateDBEntity
+    ) -> List[TransactionDBEntity]:
+        stmt = (
+            transactions.table.update()
+            .where(
+                and_(
+                    transactions.id.in_(transaction_ids),
+                    transactions.transfer_id.is_(None),
+                )
+            )
+            .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
+            .returning(*transactions.table.columns.values())
+        )
+        rows = await self._database.master().fetch_all(stmt)
+        return [TransactionDBEntity.from_row(row) for row in rows] if rows else []

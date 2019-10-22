@@ -703,7 +703,7 @@ class TestTransactionRepository:
             payout_account_id=payout_account_id,
             count=count,
         )
-        # 2. insert another 6 paid transaction for the same payout account
+        # 2. insert another 16 paid transaction for the same payout account
         transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
         await prepare_and_insert_paid_transaction_list_for_transfer(
             transaction_repo=transaction_repo,
@@ -908,3 +908,47 @@ class TestTransactionRepository:
         assert (
             expected_payout_account_ids == retrieved_payout_account_ids_with_start_time
         ), "get distinct payout account ids with start_time for unpaid transactions match with expected"
+
+    async def test_update_transaction_ids_without_transfer_id(
+        self,
+        transaction_repo: TransactionRepository,
+        transfer_repo: TransferRepository,
+        payment_account_repo: PaymentAccountRepository,
+    ):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+        )
+        transaction_without_transfer_id_a = await prepare_and_insert_transaction(
+            transaction_repo=transaction_repo, payout_account_id=payment_account.id
+        )
+        transaction_without_transfer_id_b = await prepare_and_insert_transaction(
+            transaction_repo=transaction_repo, payout_account_id=payment_account.id
+        )
+        transaction_with_transfer_id = await prepare_and_insert_transaction(
+            transaction_repo=transaction_repo,
+            payout_account_id=payment_account.id,
+            transfer_id=123,
+        )
+
+        transaction_ids = [
+            transaction_without_transfer_id_a.id,
+            transaction_without_transfer_id_b.id,
+            transaction_with_transfer_id.id,
+        ]
+        request = TransactionUpdateDBEntity(transfer_id=transfer.id)
+        updated_transactions = await transaction_repo.update_transaction_ids_without_transfer_id(
+            transaction_ids=transaction_ids, data=request
+        )
+        assert len(updated_transactions) == 2
+        assert updated_transactions[0].transfer_id == transfer.id
+        assert updated_transactions[1].transfer_id == transfer.id
+        updated_transaction_ids = [
+            updated_transactions[0].id,
+            updated_transactions[1].id,
+        ]
+        assert transaction_without_transfer_id_a.id in updated_transaction_ids
+        assert transaction_without_transfer_id_b.id in updated_transaction_ids
+        assert transaction_with_transfer_id.id not in updated_transaction_ids

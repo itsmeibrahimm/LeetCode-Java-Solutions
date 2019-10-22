@@ -24,7 +24,6 @@ class CreateTransfer(PaymentRequest):
     target_id: Optional[int]
     target_type: Optional[PayoutTargetType]
     target_business_id: Optional[int]
-    payout_day: Optional[PayoutDay]
     payout_countries: Optional[List[str]]
 
 

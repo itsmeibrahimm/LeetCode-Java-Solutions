@@ -60,7 +60,13 @@ class TransferProcessors:
 
     async def create_transfer(self, request: CreateTransferRequest):
         create_transfer_op = CreateTransfer(
-            logger=self.logger, request=request, transfer_repo=self.transfer_repo
+            logger=self.logger,
+            request=request,
+            transfer_repo=self.transfer_repo,
+            payment_account_repo=self.payment_account_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            transaction_repo=self.transaction_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
         )
         return await create_transfer_op.execute()
 
