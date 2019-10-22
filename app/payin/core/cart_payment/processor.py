@@ -1,6 +1,6 @@
 import uuid
 from asyncio import gather
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, NewType
 
@@ -900,6 +900,8 @@ class CartPaymentInterface:
                 status=target_intent_status,
                 resource_id=provider_payment_intent.id,
                 charge_resource_id=provider_payment_intent.charges.data[0].id,
+                amount_capturable=provider_payment_intent.amount_capturable,
+                amount_received=provider_payment_intent.amount_received,
             )
             if self.ENABLE_NEW_CHARGE_TABLES:
                 await self._create_new_charge_pair(
@@ -960,7 +962,6 @@ class CartPaymentInterface:
                     "[submit_capture_to_provider] payment_intent is already captured",
                     payment_intent_id=payment_intent.id,
                 )
-                pass
             else:
                 raise InvalidProviderRequestError(e) from e
         except StripeError as e:
@@ -1012,15 +1013,18 @@ class CartPaymentInterface:
 
         # Update state
         async with self.payment_repo.payment_database_transaction():
-            # TODO try gather
-            updated_payment_intent = await self.payment_repo.update_payment_intent(
+            updated_payment_intent = await self.payment_repo.update_payment_intent_capture_state(
                 id=payment_intent.id,
                 status=new_intent_status,
-                amount_received=payment_intent.amount,
-                captured_at=datetime.utcnow(),
+                captured_at=datetime.now(timezone.utc),
             )
-            updated_pgp_payment_intent = await self.payment_repo.update_pgp_payment_intent_status(
-                pgp_payment_intent.id, new_intent_status
+            updated_pgp_payment_intent = await self.payment_repo.update_pgp_payment_intent(
+                id=pgp_payment_intent.id,
+                status=new_intent_status,
+                resource_id=provider_payment_intent.id,
+                charge_resource_id=provider_payment_intent.charges.data[0].id,
+                amount_capturable=provider_payment_intent.amount_capturable,
+                amount_received=provider_payment_intent.amount_received,
             )
 
             if self.ENABLE_NEW_CHARGE_TABLES:
@@ -1366,20 +1370,17 @@ class CartPaymentInterface:
         self,
         cart_payment: CartPayment,
         payment_intent: PaymentIntent,
-        pgp_payment_intent: PgpPaymentIntent,
         amount: int,
         idempotency_key: str,
-    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+    ) -> PaymentIntent:
         # There is no need to call provider at this point in time.  The original auth done upon cart payment
         # creation is sufficient to cover a lower amount, so there is no need to update the amount with the provider.
         # Instead we will record updated amounts in our system, which will be reflected at time of (delayed) capture.
+        # We skip updating the pgp_payment_intent since state in the provider is not changed yet.
 
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_amount(
                 id=payment_intent.id, amount=amount
-            )
-            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_amount(
-                id=pgp_payment_intent.id, amount=amount
             )
             if self.ENABLE_NEW_CHARGE_TABLES:
                 await self._update_charge_pair_after_amount_reduction(
@@ -1396,7 +1397,7 @@ class CartPaymentInterface:
                 idempotency_key=idempotency_key,
             )
 
-        return updated_intent, updated_pgp_intent
+        return updated_intent
 
     async def get_pgp_payment_method(
         self, payer_id: uuid.UUID, payment_method_id: uuid.UUID, legacy_country_id: int
@@ -1573,8 +1574,6 @@ class CartPaymentInterface:
 
 @tracing.track_breadcrumb(processor_name="cart_payment_processor", only_trackable=True)
 class CartPaymentProcessor:
-    # TODO: use payer_country passed to processor functions to get the right stripe platform key within CartPaymentInterface.
-
     def __init__(
         self,
         log: BoundLogger = Depends(get_logger_from_req),
@@ -1966,13 +1965,13 @@ class CartPaymentProcessor:
                 stripe_id=capturable_pgp_payment_intent.charge_resource_id,
                 amount_refunded=amount_refunded,
             )
-            payment_intent, pgp_payment_intent = await self.cart_payment_interface.lower_amount_for_uncaptured_payment(
+            payment_intent = await self.cart_payment_interface.lower_amount_for_uncaptured_payment(
                 cart_payment=cart_payment,
                 payment_intent=capturable_intent,
-                pgp_payment_intent=capturable_pgp_payment_intent,
                 amount=new_amount,
                 idempotency_key=idempotency_key,
             )
+            pgp_payment_intent = capturable_pgp_payment_intent
         elif refundable_intents:
             refundable_intent = self.cart_payment_interface.get_most_recent_intent(
                 refundable_intents
@@ -2634,7 +2633,7 @@ class CartPaymentProcessor:
         ).to_payer()
 
 
-# TODO: Decouple CommandoProcessor from CartPaymentProcessor
+# TODO PAYIN-36 Decouple CommandoProcessor from CartPaymentProcessor
 class CommandoProcessor(CartPaymentProcessor):
     """
     I'm sneaky

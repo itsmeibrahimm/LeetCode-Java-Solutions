@@ -845,8 +845,6 @@ class TestCartPaymentInterface:
             idempotency_key=idempotency_key,
             amount_initiated=request_cart_payment.amount,
             amount=request_cart_payment.amount,
-            amount_capturable=None,
-            amount_received=None,
             application_fee_amount=None,
             capture_method=CaptureMethod.MANUAL.value,
             country=country,
@@ -970,8 +968,6 @@ class TestCartPaymentInterface:
             idempotency_key="idempotency_key",
             amount_initiated=cart_payment.amount,
             amount=cart_payment.amount,
-            amount_capturable=None,
-            amount_received=None,
             application_fee_amount=None,
             capture_method="manual",
             country="US",
@@ -1422,11 +1418,9 @@ class TestCartPaymentInterface:
     async def test_lower_amount_for_uncaptured_payment(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
         payment_intent = generate_payment_intent()
-        pgp_payment_intent = generate_pgp_payment_intent()
-        result_intent, result_pgp_intent = await cart_payment_interface.lower_amount_for_uncaptured_payment(
+        result_intent = await cart_payment_interface.lower_amount_for_uncaptured_payment(
             cart_payment=cart_payment,
             payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
             amount=200,
             idempotency_key=str(uuid.uuid4()),
         )
@@ -1689,3 +1683,24 @@ class TestCapturePaymentWithProvider(object):
             intent, pgp_intent
         )
         assert provider_intent
+
+    @pytest.mark.asyncio
+    async def test_update_payment_after_capture_with_provider(
+        self, cart_payment_interface
+    ):
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+
+        provider_intent = await cart_payment_interface.submit_capture_to_provider(
+            intent, pgp_intent
+        )
+        provider_intent.amount_received = 750
+        provider_intent.amount_capturable = 0
+        provider_intent.status = "succeeded"
+
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_capture_with_provider(
+            intent, pgp_intent, provider_intent
+        )
+        assert result_pgp_intent.amount_received == provider_intent.amount_received
+        assert result_pgp_intent.amount_capturable == provider_intent.amount_capturable
+        assert result_pgp_intent.status == IntentStatus.SUCCEEDED

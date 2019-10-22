@@ -63,10 +63,8 @@ class PaymentIntent(BaseModel):
     id: UUID
     cart_payment_id: UUID
     idempotency_key: str
-    amount_initiated: int
-    amount: int
-    amount_capturable: Optional[int]  # TODO fix use of this field
-    amount_received: Optional[int]
+    amount_initiated: int  # Amount of payment intent at time of cart payment creation
+    amount: int  # Current amount of payment intent (may change after initial value with adjustments)
     application_fee_amount: Optional[int]
     capture_method: str
     country: CountryCode

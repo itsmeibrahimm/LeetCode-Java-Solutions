@@ -118,8 +118,6 @@ class MockedPaymentRepo:
             idempotency_key=idempotency_key,
             amount_initiated=amount_initiated,
             amount=amount,
-            amount_capturable=None,
-            amount_received=None,
             application_fee_amount=application_fee_amount,
             capture_method=capture_method,
             country=country,
@@ -136,14 +134,11 @@ class MockedPaymentRepo:
             capture_after=capture_after,
         )
 
-    async def update_payment_intent(
-        self, id: UUID, status: str, amount_received: int, captured_at: datetime
+    async def update_payment_intent_capture_state(
+        self, id: UUID, status: str, captured_at: datetime
     ):
         return utils.generate_payment_intent(
-            id=id,
-            status=status,
-            amount_received=amount_received,
-            captured_at=captured_at,
+            id=id, status=status, captured_at=captured_at
         )
 
     async def update_payment_intent_status(
@@ -217,13 +212,21 @@ class MockedPaymentRepo:
         return utils.generate_pgp_payment_intent(id=id, amount=amount)
 
     async def update_pgp_payment_intent(
-        self, id: UUID, status: str, resource_id: str, charge_resource_id: str
+        self,
+        id: UUID,
+        status: str,
+        resource_id: str,
+        charge_resource_id: str,
+        amount_capturable: int,
+        amount_received: int,
     ) -> PgpPaymentIntent:
         return utils.generate_pgp_payment_intent(
             id=id,
             status=status,
             resource_id=resource_id,
             charge_resource_id=charge_resource_id,
+            amount_capturable=amount_capturable,
+            amount_received=amount_received,
         )
 
     async def find_pgp_payment_intents(
@@ -586,7 +589,9 @@ def cart_payment_repo():
 
     # Intent DB Functions
     payment_repo.insert_payment_intent = mocked_repo.insert_payment_intent
-    payment_repo.update_payment_intent = mocked_repo.update_payment_intent
+    payment_repo.update_payment_intent_capture_state = (
+        mocked_repo.update_payment_intent_capture_state
+    )
     payment_repo.update_payment_intent_status = mocked_repo.update_payment_intent_status
     payment_repo.update_payment_intent_amount = mocked_repo.update_payment_intent_amount
     payment_repo.get_payment_intents_for_cart_payment = (
@@ -594,6 +599,9 @@ def cart_payment_repo():
     )
     payment_repo.get_payment_intent_for_legacy_consumer_charge_id = (
         mocked_repo.get_payment_intent_for_legacy_consumer_charge_id
+    )
+    payment_repo.update_payment_intent_capture_state = (
+        mocked_repo.update_payment_intent_capture_state
     )
 
     # Pgp Intent DB Functions

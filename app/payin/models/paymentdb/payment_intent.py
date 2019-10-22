@@ -19,8 +19,6 @@ class PaymentIntentTable(TableDefinition):
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
     amount_initiated: Column = no_init_field(Column("amount_initiated", Integer))
     amount: Column = no_init_field(Column("amount", Integer))
-    amount_capturable: Column = no_init_field(Column("amount_capturable", Integer))
-    amount_received: Column = no_init_field(Column("amount_received", Integer))
     application_fee_amount: Column = no_init_field(
         Column("application_fee_amount", Integer)
     )

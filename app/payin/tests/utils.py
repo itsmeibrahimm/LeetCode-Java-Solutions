@@ -60,8 +60,6 @@ def generate_payment_intent(
     amount: int = 500,
     idempotency_key: str = None,
     capture_method: str = "manual",
-    amount_capturable: Optional[int] = None,
-    amount_received: Optional[int] = None,
     captured_at: Optional[datetime] = None,
     legacy_consumer_charge_id: LegacyConsumerChargeId = LegacyConsumerChargeId(1),
     application_fee_amount: int = 0,
@@ -72,8 +70,6 @@ def generate_payment_intent(
         idempotency_key=idempotency_key if idempotency_key else str(uuid.uuid4()),
         amount_initiated=0,
         amount=amount,
-        amount_capturable=amount_capturable if amount_capturable else amount,
-        amount_received=amount_received,
         application_fee_amount=application_fee_amount,
         capture_method=capture_method,
         country=CountryCode.US,
@@ -94,6 +90,8 @@ def generate_pgp_payment_intent(
     payment_intent_id: uuid.UUID = None,
     status: str = "init",
     amount: int = 500,
+    amount_capturable: int = 500,
+    amount_received: int = 0,
     capture_method: str = "manual",
     resource_id: str = None,
     charge_resource_id: str = "charge_resource_id",
@@ -112,8 +110,8 @@ def generate_pgp_payment_intent(
         customer_resource_id=str(uuid.uuid4()),
         currency=Currency.USD.value,
         amount=amount,
-        amount_capturable=0,
-        amount_received=0,
+        amount_capturable=amount_capturable,
+        amount_received=amount_received,
         application_fee_amount=0,
         payout_account_id=payout_account_id,
         capture_method=capture_method,
@@ -344,6 +342,9 @@ def generate_provider_intent(amount: int = 500, amount_refunded: int = 0):
     mocked_intent = create_autospec(StripePaymentIntent)
     mocked_intent.id = "test_intent_id"
     mocked_intent.status = "requires_capture"  # Assume delayed capture is used
+    mocked_intent.amount = amount
+    mocked_intent.amount_received = 0
+    mocked_intent.amount_capturable = amount
     mocked_intent.charges = MagicMock()
     mocked_intent.charges.data = [MagicMock()]
     mocked_intent.charges.data[0].status = "succeeded"

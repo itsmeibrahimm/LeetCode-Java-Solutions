@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import cast
 from uuid import uuid4, UUID
 
@@ -269,6 +269,40 @@ class TestPaymentIntent:
         assert uncaptured_payment_intent_ids == [payment_intent.id]
 
     @pytest.mark.asyncio
+    async def test_update_payment_intent_capture_state(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        captured_at = datetime.now(timezone.utc)
+        result = await cart_payment_repository.update_payment_intent_capture_state(
+            id=payment_intent.id, status=IntentStatus.SUCCEEDED, captured_at=captured_at
+        )
+
+        expected_result = PaymentIntent(
+            id=payment_intent.id,
+            cart_payment_id=payment_intent.cart_payment_id,
+            idempotency_key=payment_intent.idempotency_key,
+            amount_initiated=payment_intent.amount_initiated,
+            amount=payment_intent.amount,
+            application_fee_amount=payment_intent.application_fee_amount,
+            capture_method=payment_intent.capture_method,
+            country=payment_intent.country,
+            currency=payment_intent.currency,
+            status=IntentStatus.SUCCEEDED,
+            statement_descriptor=payment_intent.statement_descriptor,
+            payment_method_id=payment_intent.payment_method_id,
+            metadata=payment_intent.metadata,
+            legacy_consumer_charge_id=payment_intent.legacy_consumer_charge_id,
+            created_at=payment_intent.created_at,
+            updated_at=result.updated_at,  # Generated
+            captured_at=captured_at,  # Updated
+            cancelled_at=payment_intent.cancelled_at,
+            capture_after=payment_intent.capture_after,
+        )
+        assert result == expected_result
+
+    @pytest.mark.asyncio
     async def test_update_payment_intent_amount(
         self,
         cart_payment_repository: CartPaymentRepository,
@@ -284,8 +318,6 @@ class TestPaymentIntent:
             idempotency_key=payment_intent.idempotency_key,
             amount_initiated=payment_intent.amount_initiated,
             amount=(payment_intent.amount + 100),  # Updated
-            amount_capturable=payment_intent.amount_capturable,
-            amount_received=payment_intent.amount_received,
             application_fee_amount=payment_intent.application_fee_amount,
             capture_method=payment_intent.capture_method,
             country=payment_intent.country,
@@ -460,6 +492,49 @@ class TestPgpPaymentIntent:
             capture_method=pgp_payment_intent.capture_method,
             created_at=pgp_payment_intent.created_at,
             updated_at=result.updated_at,  # Don't know exact date ahead of time
+            captured_at=pgp_payment_intent.captured_at,
+            cancelled_at=pgp_payment_intent.cancelled_at,
+        )
+        assert result == expected_intent
+
+    @pytest.mark.asyncio
+    async def test_update_pgp_payment_intent(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        pgp_payment_intent: PgpPaymentIntent,
+    ):
+        charge_resource_id = f"{pgp_payment_intent.charge_resource_id}-updated"
+        resource_id = f"{pgp_payment_intent.resource_id}-updated"
+        result = await cart_payment_repository.update_pgp_payment_intent(
+            id=pgp_payment_intent.id,
+            status=IntentStatus.FAILED,
+            charge_resource_id=charge_resource_id,
+            resource_id=resource_id,
+            amount_capturable=0,
+            amount_received=500,
+        )
+        assert result
+
+        expected_intent = PgpPaymentIntent(
+            id=pgp_payment_intent.id,
+            payment_intent_id=pgp_payment_intent.payment_intent_id,
+            idempotency_key=pgp_payment_intent.idempotency_key,
+            pgp_code=pgp_payment_intent.pgp_code,
+            resource_id=resource_id,  # Updated
+            status=IntentStatus.FAILED,  # Updated
+            invoice_resource_id=pgp_payment_intent.invoice_resource_id,
+            charge_resource_id=charge_resource_id,  # Updated
+            payment_method_resource_id=pgp_payment_intent.payment_method_resource_id,
+            customer_resource_id=pgp_payment_intent.customer_resource_id,
+            currency=pgp_payment_intent.currency,
+            amount=pgp_payment_intent.amount,
+            amount_capturable=0,  # Updated
+            amount_received=500,  # Updated
+            application_fee_amount=pgp_payment_intent.application_fee_amount,
+            payout_account_id=pgp_payment_intent.payout_account_id,
+            capture_method=pgp_payment_intent.capture_method,
+            created_at=pgp_payment_intent.created_at,
+            updated_at=result.updated_at,  # Generated
             captured_at=pgp_payment_intent.captured_at,
             cancelled_at=pgp_payment_intent.cancelled_at,
         )
@@ -844,6 +919,40 @@ class TestCartPayment:
             deleted_at=None,
         )
 
+        assert result == expected_cart_payment
+
+    @pytest.mark.asyncio
+    async def test_update_cart_payment_details(
+        self, cart_payment_repository: CartPaymentRepository, payer: Payer
+    ):
+        cart_payment = await cart_payment_repository.insert_cart_payment(
+            id=uuid4(),
+            payer_id=UUID(str(payer.id)),
+            amount_original=99,
+            amount_total=100,
+            client_description="Test description",
+            reference_id="99",
+            reference_type="88",
+            delay_capture=True,
+            metadata=None,
+            legacy_consumer_id=1,
+            legacy_stripe_card_id=1,
+            legacy_provider_customer_id="stripe_customer_id",
+            legacy_provider_card_id="stripe_card_id",
+        )
+
+        new_amount = cart_payment.amount + 100
+        new_description = f"{cart_payment.client_description}-updated"
+        result = await cart_payment_repository.update_cart_payment_details(
+            cart_payment_id=cart_payment.id,
+            amount=new_amount,
+            client_description=new_description,
+        )
+
+        expected_cart_payment = cart_payment
+        expected_cart_payment.amount = new_amount
+        expected_cart_payment.client_description = new_description
+        expected_cart_payment.updated_at = result.updated_at  # Generated
         assert result == expected_cart_payment
 
 

@@ -99,8 +99,6 @@ class PaymentIntentFactory(factory.Factory):
     idempotency_key = factory.LazyAttribute(lambda o: str(uuid4()))
     amount_initiated = 100
     amount = 100
-    amount_capturable = 100
-    amount_received = 0
     application_fee_amount = 0
     capture_method = CaptureMethod.MANUAL
     country = CountryCode.US

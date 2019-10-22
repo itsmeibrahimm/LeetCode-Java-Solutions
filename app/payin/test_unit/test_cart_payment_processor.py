@@ -466,10 +466,12 @@ class TestCartPaymentProcessor:
                 status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
             )
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
-            return_value=generate_pgp_payment_intent(
-                status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
-            )
+        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+            return_value=[
+                generate_pgp_payment_intent(
+                    status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
+                )
+            ]
         )
 
         result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(

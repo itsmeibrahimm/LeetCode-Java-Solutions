@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
+
 from uuid import UUID, uuid4
 
 import pytest
@@ -30,6 +31,7 @@ from app.payin.repository.cart_payment_repo import CartPaymentRepository
 class PgpPaymentIntentState:
     status: IntentStatus
     amnt: int
+    # TODO: Add amount_received, amount_capturable and verify during tests
 
 
 @dataclass
@@ -140,7 +142,7 @@ create_and_partial_refund_test_data = [
                 amnt=500,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=500, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -161,7 +163,7 @@ create_and_partial_refund_test_data = [
                 amnt=500,
                 status=IntentStatus.SUCCEEDED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=500, status=IntentStatus.SUCCEEDED
+                    amnt=1000, status=IntentStatus.SUCCEEDED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -206,7 +208,7 @@ create_and_full_refund_test_data = [
                 amnt=0,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=0, status=IntentStatus.CANCELLED
+                    amnt=1000, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -227,7 +229,7 @@ create_and_full_refund_test_data = [
                 amnt=0,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=0, status=IntentStatus.CANCELLED
+                    amnt=1000, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -272,7 +274,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                 amnt=800,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=800, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -293,7 +295,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                 amnt=0,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=0, status=IntentStatus.CANCELLED
+                    amnt=1000, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -314,7 +316,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                 amnt=0,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=0, status=IntentStatus.CANCELLED
+                    amnt=1000, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -359,7 +361,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                 amnt=800,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=800, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -446,7 +448,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                 amnt=800,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=800, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -467,7 +469,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                 amnt=800,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=800, status=IntentStatus.CANCELLED
+                    amnt=1000, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -500,7 +502,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                 amnt=800,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=800, status=IntentStatus.CANCELLED
+                    amnt=1000, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -692,7 +694,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                 amnt=0,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=0, status=IntentStatus.CANCELLED
+                    amnt=1300, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1300,
@@ -725,7 +727,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                 amnt=0,
                 status=IntentStatus.CANCELLED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=0, status=IntentStatus.CANCELLED
+                    amnt=1300, status=IntentStatus.CANCELLED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1300,
@@ -815,7 +817,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                 amnt=1000,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1300, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1300,
@@ -848,7 +850,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                 amnt=1000,
                 status=IntentStatus.SUCCEEDED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=1000, status=IntentStatus.SUCCEEDED
+                    amnt=1300, status=IntentStatus.SUCCEEDED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1300,
@@ -893,7 +895,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                 amnt=800,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=800, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -914,7 +916,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                 amnt=600,
                 status=IntentStatus.REQUIRES_CAPTURE,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=600, status=IntentStatus.REQUIRES_CAPTURE
+                    amnt=1000, status=IntentStatus.REQUIRES_CAPTURE
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -935,7 +937,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                 amnt=600,
                 status=IntentStatus.SUCCEEDED,
                 pgp_payment_intent_state=PgpPaymentIntentState(
-                    amnt=600, status=IntentStatus.SUCCEEDED
+                    amnt=1000, status=IntentStatus.SUCCEEDED
                 ),
                 stripe_charge_state=StripeChargeState(
                     amnt=1000,
@@ -1046,7 +1048,7 @@ class CapturePaymentIntentTestBase(ABC):
                 )
             except AssertionError as e:
                 raise AssertionError(
-                    f"Failed cart payment state change: {new_cart_payment_state}"
+                    f"Failed cart payment state change: {new_cart_payment_state}, exception {e}"
                 ) from e
 
     async def _update_and_verify_cart_payment_states(
@@ -1207,6 +1209,9 @@ class CapturePaymentIntentTestBase(ABC):
         payment_intent: PaymentIntent,
         cart_payment_repository: CartPaymentRepository,
     ) -> bool:
+        if payment_intent.created_at < datetime.now(timezone.utc) - timedelta(days=7):
+            return False
+
         pgp_payment_intents: List[
             PgpPaymentIntent
         ] = await cart_payment_repository.find_pgp_payment_intents(payment_intent.id)

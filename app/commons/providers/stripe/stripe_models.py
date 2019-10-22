@@ -609,8 +609,8 @@ class PaymentIntent(StripeBaseModel):
     id: str
     object: str
     amount: int
-    amount_capturable: Optional[int]
-    amount_received: Optional[int]
+    amount_capturable: int
+    amount_received: int
     application: Optional[str]
     application_fee_amount: Optional[int]
     canceled_at: Optional[datetime]

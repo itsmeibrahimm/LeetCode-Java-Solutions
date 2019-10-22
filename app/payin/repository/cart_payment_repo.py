@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Any, List, Optional, Tuple, Dict, AsyncIterator, Union
 from uuid import UUID
 
-from IPython.utils.tz import utcnow
 from sqlalchemy import and_, select, func, not_
 from sqlalchemy.sql.functions import now
 from typing_extensions import final
@@ -226,7 +225,11 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             cart_payments.table.update()
             .where(cart_payments.id == cart_payment_id)
-            .values(amount_total=amount, client_description=client_description)
+            .values(
+                amount_total=amount,
+                client_description=client_description,
+                updated_at=datetime.now(timezone.utc),
+            )
             .returning(*cart_payments.table.columns.values())
         )
 
@@ -285,8 +288,6 @@ class CartPaymentRepository(PayinDBRepository):
             idempotency_key=row[payment_intents.idempotency_key],
             amount_initiated=row[payment_intents.amount_initiated],
             amount=row[payment_intents.amount],
-            amount_capturable=row[payment_intents.amount_capturable],
-            amount_received=row[payment_intents.amount_received],
             application_fee_amount=row[payment_intents.application_fee_amount],
             capture_method=row[payment_intents.capture_method],
             country=row[payment_intents.country],
@@ -324,7 +325,7 @@ class CartPaymentRepository(PayinDBRepository):
                     payment_intents.id == id, payment_intents.status == previous_status
                 )
             )
-            .values(status=new_status, updated_at=utcnow())
+            .values(status=new_status, updated_at=datetime.now(timezone.utc))
             .returning(*payment_intents.table.columns.values())
         )
 
@@ -336,14 +337,16 @@ class CartPaymentRepository(PayinDBRepository):
 
         return self.to_payment_intent(row)
 
-    async def update_payment_intent(
-        self, id: UUID, status: str, amount_received: int, captured_at: datetime
-    ):
+    async def update_payment_intent_capture_state(
+        self, id: UUID, status: str, captured_at: datetime
+    ) -> PaymentIntent:
         statement = (
             payment_intents.table.update()
             .where(payment_intents.id == id)
             .values(
-                status=status, amount_received=amount_received, captured_at=captured_at
+                status=status,
+                captured_at=captured_at,
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(*payment_intents.table.columns.values())
         )
@@ -357,7 +360,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             payment_intents.table.update()
             .where(payment_intents.id == id)
-            .values(amount=amount)
+            .values(amount=amount, updated_at=datetime.now(timezone.utc))
             .returning(*payment_intents.table.columns.values())
         )
 
@@ -459,7 +462,13 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_pgp_payment_intent(row)
 
     async def update_pgp_payment_intent(
-        self, id: UUID, status: str, resource_id: str, charge_resource_id: str
+        self,
+        id: UUID,
+        status: str,
+        resource_id: str,
+        charge_resource_id: str,
+        amount_capturable: int,
+        amount_received: int,
     ) -> PgpPaymentIntent:
         statement = (
             pgp_payment_intents.table.update()
@@ -468,6 +477,9 @@ class CartPaymentRepository(PayinDBRepository):
                 status=status,
                 resource_id=resource_id,
                 charge_resource_id=charge_resource_id,
+                amount_capturable=amount_capturable,
+                amount_received=amount_received,
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(*pgp_payment_intents.table.columns.values())
         )
@@ -481,7 +493,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             pgp_payment_intents.table.update()
             .where(pgp_payment_intents.id == id)
-            .values(status=status)
+            .values(status=status, updated_at=datetime.now(timezone.utc))
             .returning(*pgp_payment_intents.table.columns.values())
         )
 
@@ -494,7 +506,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             pgp_payment_intents.table.update()
             .where(pgp_payment_intents.id == id)
-            .values(amount=amount)
+            .values(amount=amount, updated_at=datetime.now(timezone.utc))
             .returning(*pgp_payment_intents.table.columns.values())
         )
 
@@ -682,7 +694,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             payment_charges.table.update()
             .where(payment_charges.payment_intent_id == payment_intent_id)
-            .values(status=status)
+            .values(status=status, updated_at=datetime.now(timezone.utc))
             .returning(*payment_charges.table.columns.values())
         )
 
@@ -695,7 +707,11 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             payment_charges.table.update()
             .where(payment_charges.payment_intent_id == payment_intent_id)
-            .values(status=status, amount_refunded=amount_refunded)
+            .values(
+                status=status,
+                amount_refunded=amount_refunded,
+                updated_at=datetime.now(timezone.utc),
+            )
             .returning(*payment_charges.table.columns.values())
         )
 
@@ -708,7 +724,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             payment_charges.table.update()
             .where(payment_charges.payment_intent_id == payment_intent_id)
-            .values(amount=amount)
+            .values(amount=amount, updated_at=datetime.now(timezone.utc))
             .returning(*payment_charges.table.columns.values())
         )
 
@@ -791,7 +807,12 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             pgp_payment_charges.table.update()
             .where(pgp_payment_charges.payment_charge_id == str(payment_charge_id))
-            .values(status=status, amount=amount, amount_refunded=amount_refunded)
+            .values(
+                status=status,
+                amount=amount,
+                amount_refunded=amount_refunded,
+                updated_at=datetime.now(timezone.utc),
+            )
             .returning(*pgp_payment_charges.table.columns.values())
         )
 
@@ -804,7 +825,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             pgp_payment_charges.table.update()
             .where(pgp_payment_charges.payment_charge_id == str(payment_charge_id))
-            .values(amount=amount)
+            .values(amount=amount, updated_at=datetime.now(timezone.utc))
             .returning(*pgp_payment_charges.table.columns.values())
         )
 
@@ -817,7 +838,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             pgp_payment_charges.table.update()
             .where(pgp_payment_charges.payment_charge_id == payment_charge_id)
-            .values(status=status)
+            .values(status=status, updated_at=datetime.now(timezone.utc))
             .returning(*pgp_payment_charges.table.columns.values())
         )
 
@@ -1102,7 +1123,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             refunds.table.update()
             .where(refunds.id == refund_id)
-            .values(status=status.value, updated_at=utcnow())
+            .values(status=status.value, updated_at=datetime.now(timezone.utc))
             .returning(*refunds.table.columns.values())
         )
 
@@ -1168,7 +1189,7 @@ class CartPaymentRepository(PayinDBRepository):
             .values(
                 status=status.value,
                 pgp_resource_id=pgp_resource_id,
-                updated_at=utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(*pgp_refunds.table.columns.values())
         )
