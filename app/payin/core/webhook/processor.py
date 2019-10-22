@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Dict, cast
+from uuid import UUID
 
 from fastapi import Depends
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
-from app.payin.api.webhook.v1.request import StripeWebHookEvent
+from app.payin.core import feature_flags
+from app.payin.core.cart_payment.model import PaymentIntent
+from app.payin.core.webhook.model import StripeWebHookEvent
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
 
@@ -45,7 +48,128 @@ class ChargeRefundHandler(BaseWebhookHandler):
         self.cart_payment_repository = cart_payment_repository
 
     async def __call__(self, event: StripeWebHookEvent, country_code: str):
-        self.log.info(f"Handling {self.TYPE_NAME} webhook for country {country_code}")
+        self.log.info(
+            "Handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
+
+
+class PaymentIntentAmountCapturableUpdatedHandler(BaseWebhookHandler):
+    TYPE_NAME = "payment_intent.amount_capturable_updated"
+
+    def __init__(
+        self,
+        cart_payment_repository: CartPaymentRepository = Depends(
+            CartPaymentRepository.get_repository
+        ),
+        log: BoundLogger = Depends(get_logger_from_req),
+    ):
+        self.log = log
+        self.cart_payment_repository = cart_payment_repository
+
+    async def __call__(self, event: StripeWebHookEvent, country_code: str):
+        self.log.info(
+            "Handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
+
+
+class PaymentIntentCreatedHandler(BaseWebhookHandler):
+    TYPE_NAME = "payment_intent.created"
+
+    def __init__(
+        self,
+        cart_payment_repository: CartPaymentRepository = Depends(
+            CartPaymentRepository.get_repository
+        ),
+        log: BoundLogger = Depends(get_logger_from_req),
+    ):
+        self.log = log
+        self.cart_payment_repository = cart_payment_repository
+
+    def verify_payment_intent_blob(
+        self, payment_intent: PaymentIntent, payment_intent_blob
+    ):
+        return (
+            payment_intent.status == payment_intent_blob.get("status", None)
+            and payment_intent.amount == payment_intent_blob.get("amount", None)
+            and payment_intent.application_fee_amount
+            == payment_intent_blob.get("application_fee_amount", None)
+        )
+
+    async def __call__(self, event: StripeWebHookEvent, country_code: str):
+        self.log.info(
+            "Handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
+        if not feature_flags.stripe_payment_intent_webhook_event_enabled():
+            self.log.info("handle_stripe_payment_intent_webhook turned off.")
+            return False
+        webhook_data = event.data.object
+        stripe_id = webhook_data.get("id", None)
+        if not stripe_id:
+            self.log.info("not valid stripe_id.")
+            return False
+        payment_intent_id: UUID = webhook_data.get("metadata", {}).get(
+            "payment_intent_id", None
+        )
+        if not payment_intent_id:
+            self.log.info("payment_intent_id not found in metadata. Unable to verify")
+            return False
+        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id(
+            id=payment_intent_id
+        )
+        if not payment_intent:
+            self.log.error(
+                "Payment intent record not found for the incoming Stripe webhook: ",
+                str(webhook_data),
+            )
+            return False
+        if not self.verify_payment_intent_blob(payment_intent, webhook_data):
+            self.log.error(
+                "Data mismatch for payment intent record for incoming Stripe webhook: ",
+                str(webhook_data),
+            )
+            return False
+        self.log.info(
+            "Finished handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
+        return True
+
+
+class PaymentIntentPaymentFailedHandler(BaseWebhookHandler):
+    TYPE_NAME = "payment_intent.payment_failed"
+
+    def __init__(
+        self,
+        cart_payment_repository: CartPaymentRepository = Depends(
+            CartPaymentRepository.get_repository
+        ),
+        log: BoundLogger = Depends(get_logger_from_req),
+    ):
+        self.log = log
+        self.cart_payment_repository = cart_payment_repository
+
+    async def __call__(self, event: StripeWebHookEvent, country_code: str):
+        self.log.info(
+            "Handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
+
+
+class PaymentIntentSucceededHandler(BaseWebhookHandler):
+    TYPE_NAME = "payment_intent.succeeded"
+
+    def __init__(
+        self,
+        cart_payment_repository: CartPaymentRepository = Depends(
+            CartPaymentRepository.get_repository
+        ),
+        log: BoundLogger = Depends(get_logger_from_req),
+    ):
+        self.log = log
+        self.cart_payment_repository = cart_payment_repository
+
+    async def __call__(self, event: StripeWebHookEvent, country_code: str):
+        self.log.info(
+            "Handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
 
 
 class WebhookHandlerContainer:
@@ -58,12 +182,37 @@ class WebhookHandlerContainer:
         self,
         log: BoundLogger = Depends(get_logger_from_req),
         charge_refund_handler: ChargeRefundHandler = Depends(ChargeRefundHandler),
+        payment_intent_amount_capturable_update_handler: PaymentIntentAmountCapturableUpdatedHandler = Depends(
+            PaymentIntentAmountCapturableUpdatedHandler
+        ),
+        payment_intent_created_handler: PaymentIntentCreatedHandler = Depends(
+            PaymentIntentCreatedHandler
+        ),
+        payment_intent_failed_handler: PaymentIntentPaymentFailedHandler = Depends(
+            PaymentIntentPaymentFailedHandler
+        ),
+        payment_intent_succeeded_handler: PaymentIntentSucceededHandler = Depends(
+            PaymentIntentSucceededHandler
+        ),
     ):
         self.log = log
         self.internal_container: Dict[str, BaseWebhookHandler] = {}
 
         # Add handlers for new webhooks here !
         self._add_new_handler(ChargeRefundHandler.TYPE_NAME, charge_refund_handler)
+        self._add_new_handler(
+            PaymentIntentAmountCapturableUpdatedHandler.TYPE_NAME,
+            payment_intent_amount_capturable_update_handler,
+        )
+        self._add_new_handler(
+            PaymentIntentCreatedHandler.TYPE_NAME, payment_intent_created_handler
+        )
+        self._add_new_handler(
+            PaymentIntentPaymentFailedHandler.TYPE_NAME, payment_intent_failed_handler
+        )
+        self._add_new_handler(
+            PaymentIntentSucceededHandler.TYPE_NAME, payment_intent_succeeded_handler
+        )
 
     def _add_new_handler(self, type: str, handler: BaseWebhookHandler):
         self.internal_container = self.internal_container or {}
@@ -80,13 +229,12 @@ class WebhookHandlerContainer:
 
 class WebhookProcessor:
     def __init__(
-        self,
-        stripe_webhook_event: StripeWebHookEvent,
-        container: WebhookHandlerContainer = Depends(WebhookHandlerContainer),
+        self, container: WebhookHandlerContainer = Depends(WebhookHandlerContainer)
     ):
-        self.event = stripe_webhook_event
         self.container = container
 
-    async def process_webhook(self, country_code: str):
-        handler = self.container.provide_handler(self.event.type)
-        await handler(self.event, country_code)
+    async def process_webhook(
+        self, country_code: str, stripe_webhook_event: StripeWebHookEvent
+    ):
+        handler = self.container.provide_handler(stripe_webhook_event.type)
+        await handler(cast(StripeWebHookEvent, stripe_webhook_event), country_code)

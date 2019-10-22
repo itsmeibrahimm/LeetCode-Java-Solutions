@@ -258,6 +258,22 @@ class TestPaymentIntent:
         assert uncaptured_payment_intents == []
 
     @pytest.mark.asyncio
+    async def test_get_payment_intent_by_id(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        retrieved_correct_payment_intent = await cart_payment_repository.get_payment_intent_by_id(
+            id=payment_intent.id
+        )
+        assert retrieved_correct_payment_intent
+        assert retrieved_correct_payment_intent == payment_intent
+        retrieved_incorrect_payment_intent = await cart_payment_repository.get_payment_intent_by_id(
+            id=uuid4()
+        )
+        assert not retrieved_incorrect_payment_intent
+
+    @pytest.mark.asyncio
     @pytest.mark.skip("fix this to not relying on forcerollback")
     async def test_find_uncaptured_payment_intents_when_one_exists(
         self, cart_payment_repository: CartPaymentRepository, payment_intent

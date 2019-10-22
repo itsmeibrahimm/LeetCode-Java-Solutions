@@ -513,6 +513,11 @@ class CartPaymentRepository(PayinDBRepository):
         row = await self.payment_database.master().fetch_one(statement)
         return self.to_pgp_payment_intent(row)
 
+    async def get_payment_intent_by_id(self, id: UUID) -> Optional[PaymentIntent]:
+        statement = payment_intents.table.select().where(payment_intents.id == id)
+        row = await self.payment_database.replica().fetch_one(statement)
+        return self.to_payment_intent(row) if row else None
+
     async def find_pgp_payment_intents(
         self, payment_intent_id: UUID
     ) -> List[PgpPaymentIntent]:

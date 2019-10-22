@@ -1,6 +1,10 @@
+from typing import cast
+
 from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK
 
+from app.payin.api.webhook.v1.request import StripeWebHookEventRequest
+from app.payin.core.webhook.model import StripeWebHookEvent
 from app.payin.core.webhook.processor import WebhookProcessor
 
 
@@ -15,6 +19,11 @@ router = APIRouter()
     tags=api_tags,
 )
 async def handle_payin_webhook(
-    country_code: str, webhook_processor: WebhookProcessor = Depends(WebhookProcessor)
+    event: StripeWebHookEventRequest,
+    country_code: str,
+    webhook_processor: WebhookProcessor = Depends(WebhookProcessor),
 ):
-    await webhook_processor.process_webhook(country_code=country_code)
+
+    await webhook_processor.process_webhook(
+        country_code=country_code, stripe_webhook_event=cast(StripeWebHookEvent, event)
+    )
