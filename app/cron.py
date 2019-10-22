@@ -40,6 +40,10 @@ async def run_health_server(port: int = 80):
     """
 
     async def handler(request):
+        logger.info(
+            "current payment-service release",
+            release_tag=os.getenv("RELEASE_TAG", "unknown"),
+        )
         return web.Response(text="OK")
 
     server = web.Server(handler)

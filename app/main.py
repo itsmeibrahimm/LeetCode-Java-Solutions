@@ -13,7 +13,7 @@ from app.commons.context.app_context import (
     remove_context_for_app,
     set_context_for_app,
 )
-from app.commons.context.logger import init_logger as log
+from app.commons.context.logger import init_logger as init_log, root_logger
 from app.commons.api.exceptions import register_payment_exception_handler
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.example_v1.app import example_v1
@@ -55,6 +55,10 @@ register_payment_exception_handler(app)
     responses={HTTP_503_SERVICE_UNAVAILABLE: {"model": PaymentErrorResponseBody}},
 )
 async def get_health():
+    root_logger.info(
+        "current payment-service release",
+        release_tag=os.getenv("RELEASE_TAG", "unknown"),
+    )
     if app_context_exists(app):
         return "OK"
     raise PaymentException(
@@ -84,7 +88,7 @@ async def startup():
         context = await create_app_context(config)
         set_context_for_app(app, context)
     except Exception:
-        log.exception("failed to create application context")
+        init_log.exception("failed to create application context")
         raise
 
     # set up the global statsd client
@@ -101,7 +105,7 @@ async def startup():
         ]:
             app.mount(payout_app.openapi_prefix, payout_app)
 
-        log.info("mounted", app="payout")
+        init_log.info("mounted", app="payout")
 
     if "payin" in config.INCLUDED_APPS:
         for payin_app in [
@@ -110,21 +114,21 @@ async def startup():
         ]:
             app.mount(payin_app.openapi_prefix, payin_app)
 
-        log.info("mounted", app="payin")
+        init_log.info("mounted", app="payin")
 
     if "ledger" in config.INCLUDED_APPS:
         ledger_app = create_ledger_app(context, config)
         app.mount(ledger_app.openapi_prefix, ledger_app)
-        log.info("mounted", app="ledger")
+        init_log.info("mounted", app="ledger")
 
     if "purchasecard" in config.INCLUDED_APPS:
         purchasecard_app = make_purchasecard_v0_app(context, config)
         app.mount(purchasecard_app.openapi_prefix, purchasecard_app)
-        log.info("mounted", app="purchasecard")
+        init_log.info("mounted", app="purchasecard")
 
     app.mount(example_v1.openapi_prefix, example_v1)
 
-    log.info("finished startup")
+    init_log.info("finished startup")
 
 
 @app.on_event("shutdown")
