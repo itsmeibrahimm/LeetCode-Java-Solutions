@@ -86,6 +86,7 @@ from app.payin.core.types import (
     PgpPaymentMethodResourceId,
 )
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from doordash_python_stats.ddstats import doorstats_global
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
 
@@ -2073,6 +2074,12 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- The updated cart payment representation.
         """
+        self.log.info(
+            "[update_payment_for_legacy_charge] updating cart_payment",
+            idempotency_key=idempotency_key,
+            dd_charge_id=dd_charge_id,
+            amount=amount,
+        )
         cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(
             dd_charge_id
         )
@@ -2134,7 +2141,7 @@ class CartPaymentProcessor:
             client_description
         )
 
-        return await self._update_payment(
+        updated_cart_payment = await self._update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
@@ -2144,6 +2151,13 @@ class CartPaymentProcessor:
             client_description=payment_client_description,
             split_payment=split_payment,
         )
+        self.log.info(
+            "[update_payment_for_legacy_charge] updated cart_payment",
+            idempotency_key=idempotency_key,
+            dd_charge_id=dd_charge_id,
+            amount=amount,
+        )
+        return updated_cart_payment
 
     @track_func
     @tracing.trackable
@@ -2156,6 +2170,13 @@ class CartPaymentProcessor:
         client_description: Optional[str],
         split_payment: Optional[SplitPayment],
     ) -> CartPayment:
+        self.log.info(
+            "[update_payment] updating cart_payment",
+            idempotency_key=idempotency_key,
+            cart_payment_id=cart_payment_id,
+            amount=amount,
+            payer_id=payer_id,
+        )
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
             cart_payment_id
         )
@@ -2175,7 +2196,7 @@ class CartPaymentProcessor:
             )
         payer = await self.get_payer_by_id(cart_payment.payer_id)
 
-        return await self._update_payment(
+        updated_cart_payment = await self._update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
@@ -2185,6 +2206,15 @@ class CartPaymentProcessor:
             client_description=client_description,
             split_payment=split_payment,
         )
+        self.log.info(
+            "[update_payment] updated cart_payment",
+            idempotency_key=idempotency_key,
+            cart_payment_id=cart_payment_id,
+            amount=amount,
+            payer_id=payer_id,
+        )
+
+        return updated_cart_payment
 
     async def _update_payment(
         self,
@@ -2290,6 +2320,10 @@ class CartPaymentProcessor:
         Returns:
             None
         """
+        self.log.info(
+            "[cancel_payment_for_legacy_charge] cancelling payment",
+            dd_charge_id=dd_charge_id,
+        )
         cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(
             dd_charge_id
         )
@@ -2298,7 +2332,12 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
             )
 
-        return await self.cancel_payment(cart_payment_id)
+        cancelled_payment = await self.cancel_payment(cart_payment_id)
+        self.log.info(
+            "[cancel_payment_for_legacy_charge] cancelling payment",
+            dd_charge_id=dd_charge_id,
+        )
+        return cancelled_payment
 
     @track_func
     @tracing.trackable
@@ -2312,7 +2351,7 @@ class CartPaymentProcessor:
             None
         """
         self.log.info(
-            "[cancel_payment] Cancel cart_payment", cart_payment_id=cart_payment_id
+            "[cancel_payment] Canceling cart_payment", cart_payment_id=cart_payment_id
         )
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
             cart_payment_id
@@ -2344,6 +2383,9 @@ class CartPaymentProcessor:
         if len(intent_operations) > 0:
             await gather(*intent_operations)
 
+        self.log.info(
+            "[cancel_payment] Cancelled cart_payment", cart_payment_id=cart_payment_id
+        )
         return cart_payment
 
     @track_func
@@ -2361,11 +2403,31 @@ class CartPaymentProcessor:
             None
         """
         self.log.info(
-            "[capture_payment] Capture attempt for payment_intent",
+            "[capture_payment] Capturing payment_intent",
             payment_intent_id=payment_intent.id,
             amount=payment_intent.amount,
         )
 
+        try:
+            await self._capture_payment(payment_intent)
+            create_to_capture_time: timedelta = datetime.now(
+                payment_intent.created_at.tzinfo
+            ) - payment_intent.created_at
+            self.log.info(
+                "[capture_payment] Captured payment_intent",
+                payment_intent_id=payment_intent.id,
+                amount=payment_intent.amount,
+                create_to_capture_time_sec=create_to_capture_time.seconds,
+            )
+            doorstats_global.incr("capture-payment.success")
+            doorstats_global.gauge(
+                "capture-payment.capture-delay-sec", create_to_capture_time.seconds
+            )
+        except Exception:
+            doorstats_global.incr("capture-payment.failed")
+            raise
+
+    async def _capture_payment(self, payment_intent: PaymentIntent) -> None:
         if not self.cart_payment_interface.does_intent_require_capture(payment_intent):
             self.log.warning(
                 "[capture_payment] Payment intent not eligible for capturing",
@@ -2402,15 +2464,6 @@ class CartPaymentProcessor:
             provider_payment_intent
         )
 
-        # todo change this to be stats other than log
-        create_to_capture_time: timedelta = datetime.now(
-            payment_intent.created_at.tzinfo
-        ) - payment_intent.created_at
-        self.log.info(
-            "[capture_payment] payment_intent capture stats",
-            create_to_capture_time_sec=create_to_capture_time.seconds,
-        )
-
     @track_func
     @tracing.trackable
     async def legacy_create_payment(
@@ -2422,6 +2475,10 @@ class CartPaymentProcessor:
         payer_country: CountryCode,
         currency: Currency,
     ) -> Tuple[CartPayment, LegacyConsumerChargeId]:
+        self.log.info(
+            "[legacy_create_payment] creating cart_payment",
+            idempotency_key=idempotency_key,
+        )
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=legacy_payment
         )
@@ -2431,7 +2488,7 @@ class CartPaymentProcessor:
             request_cart_payment.client_description
         )
 
-        return await self._create_payment(
+        cart_payment, legacy_consumer_charge_id = await self._create_payment(
             request_cart_payment=request_cart_payment,
             pgp_payment_method=pgp_payment_method,
             legacy_payment=legacy_payment,
@@ -2440,6 +2497,16 @@ class CartPaymentProcessor:
             payer_country=payer_country,
             currency=currency,
         )
+
+        self.log.info(
+            "[legacy_create_payment] created cart_payment",
+            cart_payment_id=cart_payment.id if cart_payment else None,
+            legacy_consumer_charge_id=legacy_consumer_charge_id
+            if legacy_consumer_charge_id
+            else None,
+        )
+
+        return cart_payment, legacy_consumer_charge_id
 
     @track_func
     @tracing.trackable
@@ -2450,6 +2517,15 @@ class CartPaymentProcessor:
         payment_country: CountryCode,
         currency: Currency,
     ) -> CartPayment:
+        self.log.info(
+            "[create_payment] creating cart_payment",
+            idempotency_key=idempotency_key,
+            payer_id=request_cart_payment.payer_id,
+            amount=request_cart_payment.amount,
+            payment_method_id=request_cart_payment.payment_method_id,
+            delay_capture=request_cart_payment.delay_capture,
+            correlation_ids=request_cart_payment.correlation_ids,
+        )
         assert request_cart_payment.payer_id
         assert request_cart_payment.payment_method_id
         pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
@@ -2466,6 +2542,16 @@ class CartPaymentProcessor:
             payment_country=payment_country,
             payer_country=CountryCode(payer.country),
             currency=currency,
+        )
+        self.log.info(
+            "[create_payment] created cart_payment",
+            cart_payment_id=cart_payment.id,
+            idempotency_key=idempotency_key,
+            payer_id=request_cart_payment.payer_id,
+            amount=request_cart_payment.amount,
+            payment_method_id=request_cart_payment.payment_method_id,
+            delay_capture=request_cart_payment.delay_capture,
+            correlation_ids=request_cart_payment.correlation_ids,
         )
         return cart_payment
 

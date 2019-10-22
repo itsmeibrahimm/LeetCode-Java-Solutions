@@ -6,7 +6,7 @@ import pytest
 import app.payin.core.cart_payment.processor as processor
 from app.commons.types import CountryCode, Currency
 from app.payin.core.cart_payment.model import CartPayment, IntentStatus, SplitPayment
-from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
+from app.payin.core.cart_payment.types import LegacyStripeChargeStatus, RefundStatus
 from app.payin.core.exceptions import (
     CartPaymentReadError,
     CartPaymentUpdateError,
@@ -15,9 +15,6 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
-import app.payin.core.cart_payment.processor as processor
-from app.payin.core.cart_payment.model import IntentStatus, CartPayment
-from app.payin.core.cart_payment.types import LegacyStripeChargeStatus, RefundStatus
 from app.payin.tests.utils import (
     FunctionMock,
     generate_cart_payment,
@@ -25,11 +22,10 @@ from app.payin.tests.utils import (
     generate_legacy_payment,
     generate_legacy_stripe_charge,
     generate_payment_intent,
-    generate_pgp_payment_intent,
-    generate_refund,
-    generate_pgp_refund,
     generate_payment_intent_adjustment_history,
-    FunctionMock,
+    generate_pgp_payment_intent,
+    generate_pgp_refund,
+    generate_refund,
 )
 
 
@@ -125,6 +121,7 @@ class TestCartPaymentProcessor:
             payment_repo=cart_payment_repo,
         )
         cart_payment_processor = processor.CartPaymentProcessor(
+            log=MagicMock(),
             cart_payment_interface=cart_payment_interface,
             legacy_payment_interface=legacy_payment_interface,
         )
@@ -170,6 +167,7 @@ class TestCartPaymentProcessor:
             payment_repo=cart_payment_repo,
         )
         cart_payment_processor = processor.CartPaymentProcessor(
+            log=MagicMock(),
             cart_payment_interface=cart_payment_interface,
             legacy_payment_interface=legacy_payment_interface,
         )
