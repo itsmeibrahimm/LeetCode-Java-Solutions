@@ -20,7 +20,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_and_insert_stripe_managed_account,
 )
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 from app.testcase_utils import validate_expected_items_in_dict
 
 

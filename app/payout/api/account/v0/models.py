@@ -8,7 +8,7 @@ from app.commons.api.models import PaymentRequest, PaymentResponse
 # Dummy v0 api models copied directly from db domain models. Just to make sure v0 API signature is stable
 # even if underlying db model changes, so we don't need to worry about DSJ v0 integration
 from app.payout.repository.maindb.model import stripe_managed_account
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 
 
 class Entity(str, Enum):

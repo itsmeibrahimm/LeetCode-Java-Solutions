@@ -51,16 +51,10 @@ from app.payout.repository.maindb.model.transfer import TransferCreate
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
-from app.payout.types import (
-    PayoutExternalAccountType,
-    AccountType,
-    StripeTransferSubmissionStatus,
-    TransactionState,
-)
 from app.testcase_utils import validate_expected_items_in_dict
 import uuid
 from app.commons.providers.stripe import stripe_models as models
-from app.payout import types
+from app.payout import models as payout_models
 
 
 """
@@ -189,7 +183,7 @@ async def prepare_and_insert_stripe_payout_request(
 async def prepare_and_insert_transaction(
     transaction_repo: TransactionRepository,
     payout_account_id: int,
-    state: Optional[TransactionState] = None,
+    state: Optional[payout_models.TransactionState] = None,
     transfer_id=None,
     amount=1000,
 ) -> TransactionDBEntity:
@@ -255,7 +249,7 @@ async def prepare_and_insert_paid_transaction_list_for_transfer(
             payment_account_id=payout_account_id,
             currency=Currency.USD.value,
             transfer_id=transfer_id,
-            state=TransactionState.ACTIVE.value,
+            state=payout_models.TransactionState.ACTIVE.value,
         )
 
         transaction = await transaction_repo.create_transaction(data)
@@ -324,7 +318,7 @@ async def prepare_and_insert_stripe_transfer(
         bank_name="bank_name",
         submission_error_code="submission_error_code",
         submission_error_type="submission_error_type",
-        submission_status=StripeTransferSubmissionStatus.SUBMITTING,
+        submission_status=payout_models.StripeTransferSubmissionStatus.SUBMITTING,
         submitted_at=datetime.now(timezone.utc),
     )
 
@@ -340,7 +334,7 @@ async def prepare_and_insert_payment_account(
     payment_account_repo: PaymentAccountRepository,
     account_id=None,
     entity="dasher",
-    account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
+    account_type=payout_models.AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
     transfers_enabled=True,
 ) -> PaymentAccount:
     data = PaymentAccountCreate(
@@ -371,7 +365,7 @@ async def prepare_and_insert_payment_account(
 
 async def prepare_and_insert_payment_account_list(
     payment_account_repo: PaymentAccountRepository,
-    account_ids: List[types.PgpAccountId] = None,
+    account_ids: List[payout_models.PgpAccountId] = None,
     count: int = 5,
 ) -> List[PaymentAccount]:
     payout_account_list: List[PaymentAccount] = []
@@ -382,10 +376,10 @@ async def prepare_and_insert_payment_account_list(
         account_id = account_ids[i] if account_ids else None
         data = PaymentAccountCreate(
             account_id=account_id,
-            account_type=AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
-            entity=types.PayoutAccountTargetType.DASHER
+            account_type=payout_models.AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
+            entity=payout_models.PayoutAccountTargetType.DASHER
             if i % 2 == 0
-            else types.PayoutAccountTargetType.STORE,
+            else payout_models.PayoutAccountTargetType.STORE,
             resolve_outstanding_balance_frequency="daily",
             payout_disabled=True,
             charges_enabled=True,
@@ -502,7 +496,7 @@ async def prepare_and_insert_payout_method(
     is_default: bool = True,
 ):
     data = PayoutMethodCreate(
-        type=PayoutExternalAccountType.CARD.value,
+        type=payout_models.PayoutExternalAccountType.CARD.value,
         currency=Currency.USD.value,
         country=CountryCode.US.value,
         payment_account_id=payout_account_id,
@@ -561,7 +555,7 @@ async def prepare_payout_method_list(
     for i in range(0, count):
         # create a payout_method
         data = PayoutMethodCreate(
-            type=PayoutExternalAccountType.CARD.value,
+            type=payout_models.PayoutExternalAccountType.CARD.value,
             currency=Currency.USD.value,
             country=CountryCode.US.value,
             payment_account_id=payout_account_id,

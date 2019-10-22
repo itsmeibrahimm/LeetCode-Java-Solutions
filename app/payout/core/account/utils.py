@@ -13,7 +13,7 @@ from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
 from app.commons.providers.stripe import stripe_models as models
-from app.payout.types import PayoutAccountId
+from app.payout.models import PayoutAccountId
 
 COUNTRY_TO_CURRENCY_CODE = {
     "US": "USD",

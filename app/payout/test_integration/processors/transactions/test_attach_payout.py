@@ -11,7 +11,7 @@ from app.payout.core.transaction.processors.attach_payout import (
     ERROR_MSG_TRANSACTION_HAS_TRANSFER_ID_CANNOT_BE_ATTACHED_TO_PAYOUT_ID,
     ERROR_MSG_INPUT_CONTAIN_INVALID_TRANSACTION,
 )
-from app.payout.core.transaction.types import (
+from app.payout.core.transaction.models import (
     TransactionListInternal,
     TransactionInternal,
 )

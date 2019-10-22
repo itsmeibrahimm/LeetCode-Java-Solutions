@@ -37,7 +37,7 @@ from app.payout.test_integration.utils import (
     construct_stripe_error,
     mock_balance,
 )
-from app.payout.types import (
+from app.payout.models import (
     PayoutType,
     ManagedAccountTransferStatus,
     StripeTransferSubmissionStatus,

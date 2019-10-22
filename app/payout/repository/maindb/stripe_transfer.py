@@ -14,7 +14,7 @@ from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransferUpdate,
     StripeTransferCreate,
 )
-from app.payout.types import StripePayoutStatus
+from app.payout.models import StripePayoutStatus
 
 
 class StripeTransferRepositoryInterface(ABC):

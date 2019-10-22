@@ -21,7 +21,7 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountUpdate,
     StripeManagedAccountCreateAndPaymentAccountUpdate,
 )
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 
 
 class PaymentAccountRepositoryInterface(ABC):

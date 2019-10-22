@@ -2,7 +2,7 @@ from app.payout.repository.maindb.model.transfer import Transfer
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
-from app.payout.types import TransferStatusType, TransferMethodType
+from app.payout.models import TransferStatusType, TransferMethodType
 
 
 async def determine_transfer_status_from_latest_submission(

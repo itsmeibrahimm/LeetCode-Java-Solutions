@@ -8,13 +8,13 @@ from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.constants import DEFAULT_PAGE_SIZE
 from app.payout.core.exceptions import transaction_bad_query_parameters
-from app.payout.core.transaction.types import (
+from app.payout.core.transaction.models import (
     TransactionListInternal,
     TransactionInternal,
 )
 from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
-from app.payout import types
+from app.payout import models
 
 
 class TimeRange(BaseModel):
@@ -23,12 +23,12 @@ class TimeRange(BaseModel):
 
 
 class ListTransactionsRequest(OperationRequest):
-    transaction_ids: Optional[List[types.TransactionId]]
-    target_ids: Optional[List[types.PayoutAccountTargetId]]
-    target_type: Optional[types.PayoutAccountTargetType]
-    transfer_id: Optional[types.TransferId]
-    payout_id: Optional[types.PayoutId]
-    payout_account_id: Optional[types.PayoutAccountId]
+    transaction_ids: Optional[List[models.TransactionId]]
+    target_ids: Optional[List[models.PayoutAccountTargetId]]
+    target_type: Optional[models.PayoutAccountTargetType]
+    transfer_id: Optional[models.TransferId]
+    payout_id: Optional[models.PayoutId]
+    payout_account_id: Optional[models.PayoutAccountId]
     time_range: Optional[TimeRange]
     unpaid: Optional[bool] = False
     offset: int = 0

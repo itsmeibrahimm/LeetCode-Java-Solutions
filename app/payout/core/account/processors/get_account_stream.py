@@ -7,7 +7,7 @@ from app.commons.core.processor import (
     OperationRequest,
     OperationResponse,
 )
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
@@ -20,7 +20,7 @@ class GetPayoutAccountStreamRequest(OperationRequest):
 
 class GetPayoutAccountStreamResponse(OperationResponse):
     new_offset: Optional[int]
-    items: List[PayoutAccountInternal]
+    items: List[account_models.PayoutAccountInternal]
 
 
 class GetPayoutAccountStream(
@@ -53,7 +53,7 @@ class GetPayoutAccountStream(
             account_ids
         )
 
-        items: List[PayoutAccountInternal] = []
+        items: List[account_models.PayoutAccountInternal] = []
         for payment_account in payment_accounts:
             pgp_external_account_id: Optional[str] = None
             if payment_account.account_id:
@@ -63,7 +63,7 @@ class GetPayoutAccountStream(
                 if stripe_managed_account:
                     pgp_external_account_id = stripe_managed_account.stripe_id
 
-            payout_account = PayoutAccountInternal(
+            payout_account = account_models.PayoutAccountInternal(
                 payment_account=payment_account,
                 pgp_external_account_id=pgp_external_account_id,
             )

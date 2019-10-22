@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
-from app.payout.core.transaction.types import TransactionInternal
+from app.payout.core.transaction.models import TransactionInternal
 from app.payout.repository.bankdb.model.transaction import TransactionCreateDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 

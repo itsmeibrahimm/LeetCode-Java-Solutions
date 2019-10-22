@@ -1,6 +1,6 @@
 from starlette.testclient import TestClient
 
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 from app.testcase_utils import validate_expected_items_in_dict
 
 ACCOUNT_ENDPOINT = "/payout/api/v0/accounts"

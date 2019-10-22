@@ -1,4 +1,4 @@
-from app.payout.core.transaction.types import TransactionInternal
+from app.payout.core.transaction.models import TransactionInternal
 from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 
 

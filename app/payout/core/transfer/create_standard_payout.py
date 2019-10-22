@@ -45,7 +45,7 @@ from app.payout.repository.maindb.payment_account import (
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
-from app.payout.types import (
+from app.payout.models import (
     PayoutAccountId,
     PayoutAmountType,
     PayoutMethodType,

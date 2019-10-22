@@ -10,7 +10,7 @@ from starlette.status import (
 
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.transaction.v1 import models
-from app.payout import types
+from app.payout import models as payout_models
 from app.payout.core.transaction.processor import TransactionProcessors
 from app.payout.core.transaction.processors.list_transactions import (
     ListTransactionsRequest,
@@ -43,17 +43,19 @@ async def list_transactions(
     ts_end: Optional[int] = Query(
         default=None, description="End timestamp epoch seconds (inclusive)"
     ),
-    target_type: Optional[types.PayoutAccountTargetType] = Query(
+    target_type: Optional[payout_models.PayoutAccountTargetType] = Query(
         default=None, description="Target type"
     ),
     target_ids: Optional[str] = Query(
         default=None, description="Comma separated target ids"
     ),
-    transfer_id: Optional[types.TransferId] = Query(
+    transfer_id: Optional[payout_models.TransferId] = Query(
         default=None, description="Transfer ID"
     ),
-    payout_id: Optional[types.PayoutId] = Query(default=None, description="Payout ID"),
-    payout_account_id: Optional[types.PayoutAccountId] = Query(
+    payout_id: Optional[payout_models.PayoutId] = Query(
+        default=None, description="Payout ID"
+    ),
+    payout_account_id: Optional[payout_models.PayoutAccountId] = Query(
         default=None, description="Payment Account ID"
     ),
     unpaid: Optional[bool] = Query(
@@ -142,7 +144,9 @@ async def create_transaction(
     tags=api_tags,
 )
 async def reverse_transaction(
-    transaction_id: types.TransactionId = Path(..., description="Transaction ID"),
+    transaction_id: payout_models.TransactionId = Path(
+        ..., description="Transaction ID"
+    ),
     body: models.ReverseTransaction = Body(...),
     transaction_processors: TransactionProcessors = Depends(
         create_transaction_processors

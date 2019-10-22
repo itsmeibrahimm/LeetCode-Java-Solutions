@@ -39,13 +39,13 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
-from app.payout.types import (
+from app.payout.models import (
     PayoutAccountId,
     PayoutAmountType,
     PayoutMethodType,
     PayoutType,
 )
-from app.payout.types import StripePayoutStatus
+from app.payout.models import StripePayoutStatus
 
 
 class CreateInstantPayoutResponse(OperationResponse):

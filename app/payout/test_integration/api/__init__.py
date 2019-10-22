@@ -1,7 +1,3 @@
-from app.payout.types import PayoutTargetType
-from app.commons.types import CountryCode
-
-
 TRANSACTION_ENDPOINT = "/payout/api/v1/transactions"
 ACCOUNT_ENDPOINT = "/payout/api/v1/accounts"
 
@@ -46,7 +42,5 @@ def list_payout_method_url(account_id: int, limit: int = 50):
     return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods?limit={limit}"
 
 
-def get_onboarding_requirements_by_stages_url(
-    entity_type: PayoutTargetType, country_shortname: CountryCode
-):
-    return f"{ACCOUNT_ENDPOINT}/onboarding_required_fields/{entity_type}/{country_shortname}"
+def get_onboarding_requirements_by_stages_url():
+    return f"{ACCOUNT_ENDPOINT}/onboarding_required_fields/"

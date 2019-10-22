@@ -7,7 +7,7 @@ from pydantic import BaseModel, Schema
 
 from app.commons.api.models import PaymentResponse, PaymentRequest
 from app.commons.types import Currency
-import app.payout.types as types
+import app.payout.models as types
 
 
 ################################

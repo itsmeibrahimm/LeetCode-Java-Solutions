@@ -19,7 +19,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transaction,
 )
 import app.payout.core.transaction.utils as utils
-from app.payout.types import TransactionState
+from app.payout.models import TransactionState
 
 
 class TestReverseTransactions:

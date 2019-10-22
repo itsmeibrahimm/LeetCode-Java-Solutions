@@ -11,7 +11,7 @@ from app.payout.core.transaction.processors.list_transactions import (
     ListTransactions,
     TimeRange,
 )
-from app.payout.core.transaction.types import (
+from app.payout.core.transaction.models import (
     TransactionListInternal,
     TransactionInternal,
 )
@@ -31,7 +31,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payout,
     prepare_and_insert_paid_transaction_list_for_transfer,
 )
-from app.payout.types import PayoutAccountTargetType, TransactionState
+from app.payout.models import PayoutAccountTargetType, TransactionState
 
 
 class TestListTransactions:

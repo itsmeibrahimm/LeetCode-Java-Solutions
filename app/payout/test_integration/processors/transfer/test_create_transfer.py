@@ -29,7 +29,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transaction,
     prepare_and_insert_stripe_managed_account,
 )
-from app.payout.types import PayoutTargetType, TransferStatusType, TransferType
+from app.payout.models import PayoutTargetType, TransferStatusType, TransferType
 
 
 class TestCreateTransfer:

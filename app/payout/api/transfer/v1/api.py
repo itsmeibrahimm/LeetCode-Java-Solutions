@@ -1,14 +1,9 @@
-from fastapi import APIRouter, Depends
-from app.payout.api.transfer.v1.models import CreateTransfer
+from fastapi import APIRouter, Depends, Body, Path
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from app.commons.providers.stripe.stripe_models import TransferId
 from app.commons.api.models import PaymentErrorResponseBody
-from app.payout.api.account.v1 import models
-from app.payout.api.transfer.v1.models import (
-    SubmitTransfer,
-    WeeklyCreateTransfer,
-    Transfer,
-)
+from app.payout.api.account.v1 import models as account_models
+from app.payout.api.transfer.v1 import models as transfer_models
 from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.core.transfer.processors.create_transfer import CreateTransferRequest
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
@@ -30,7 +25,9 @@ router = APIRouter()
     tags=api_tags,
 )
 async def create_transfer(
-    body: CreateTransfer,
+    body: transfer_models.CreateTransfer = Body(
+        ..., description="Create a new transfer request body"
+    ),
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     create_transfer_request = CreateTransferRequest(
@@ -47,7 +44,7 @@ async def create_transfer(
     create_transfer_response = await transfer_processors.create_transfer(
         create_transfer_request
     )
-    return Transfer(**create_transfer_response.dict())
+    return transfer_models.Transfer(**create_transfer_response.dict())
 
 
 @router.post(
@@ -58,8 +55,10 @@ async def create_transfer(
     tags=api_tags,
 )
 async def submit_transfer(
-    transfer_id: TransferId,
-    body: SubmitTransfer,
+    transfer_id: TransferId = Path(..., description="Transfer ID"),
+    body: transfer_models.SubmitTransfer = Body(
+        ..., description="Request body for submitting transfer"
+    ),
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     submit_transfer_request = SubmitTransferRequest(
@@ -74,7 +73,7 @@ async def submit_transfer(
     submit_transfer_response = await transfer_processors.submit_transfer(
         submit_transfer_request
     )
-    return models.Payout(**submit_transfer_response.dict())
+    return account_models.Payout(**submit_transfer_response.dict())
 
 
 # todo: revise url
@@ -86,7 +85,7 @@ async def submit_transfer(
     tags=api_tags,
 )
 async def weekly_create_transfer(
-    body: WeeklyCreateTransfer,
+    body: transfer_models.WeeklyCreateTransfer,
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     weekly_create_transfer_request = WeeklyCreateTransferRequest(
@@ -100,4 +99,4 @@ async def weekly_create_transfer(
     weekly_create_transfer_response = await transfer_processors.weekly_create_transfer(
         weekly_create_transfer_request
     )
-    return Transfer(**weekly_create_transfer_response.dict())
+    return transfer_models.Transfer(**weekly_create_transfer_response.dict())

@@ -3,12 +3,12 @@ from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import OperationRequest, AsyncOperation
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.model.payment_account import PaymentAccountUpdate
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
-from app.payout.types import PayoutAccountId
+from app.payout.models import PayoutAccountId
 
 
 class UpdatePayoutAccountStatementDescriptorRequest(OperationRequest):
@@ -17,7 +17,10 @@ class UpdatePayoutAccountStatementDescriptorRequest(OperationRequest):
 
 
 class UpdatePayoutAccountStatementDescriptor(
-    AsyncOperation[UpdatePayoutAccountStatementDescriptorRequest, PayoutAccountInternal]
+    AsyncOperation[
+        UpdatePayoutAccountStatementDescriptorRequest,
+        account_models.PayoutAccountInternal,
+    ]
 ):
     """
     Processor to create a payout account
@@ -36,16 +39,16 @@ class UpdatePayoutAccountStatementDescriptor(
         self.request = request
         self.payment_account_repo = payment_account_repo
 
-    async def _execute(self) -> PayoutAccountInternal:
+    async def _execute(self) -> account_models.PayoutAccountInternal:
         payment_account = await self.payment_account_repo.update_payment_account_by_id(
             payment_account_id=self.request.payout_account_id,
             data=PaymentAccountUpdate(
                 statement_descriptor=self.request.statement_descriptor
             ),
         )
-        return PayoutAccountInternal(payment_account=payment_account)
+        return account_models.PayoutAccountInternal(payment_account=payment_account)
 
     def _handle_exception(
         self, dep_exec: BaseException
-    ) -> Union[PaymentException, PayoutAccountInternal]:
+    ) -> Union[PaymentException, account_models.PayoutAccountInternal]:
         raise DEFAULT_INTERNAL_EXCEPTION

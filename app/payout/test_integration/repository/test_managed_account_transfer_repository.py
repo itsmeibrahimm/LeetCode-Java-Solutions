@@ -14,7 +14,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transfer,
     prepare_and_insert_managed_account_transfer,
 )
-from app.payout.types import ManagedAccountTransferStatus
+from app.payout.models import ManagedAccountTransferStatus
 
 
 class TestTransferRepository:

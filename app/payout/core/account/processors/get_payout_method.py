@@ -3,7 +3,7 @@ from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
-from app.payout.core.account.types import PayoutCardInternal
+from app.payout.core.account import models as account_models
 from app.payout.core.exceptions import (
     payout_method_not_found_error,
     payout_card_not_found_error,
@@ -11,7 +11,7 @@ from app.payout.core.exceptions import (
 )
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
-from app.payout.types import PayoutAccountId, PayoutMethodId
+from app.payout.models import PayoutAccountId, PayoutMethodId
 
 
 class GetPayoutMethodRequest(OperationRequest):
@@ -19,7 +19,9 @@ class GetPayoutMethodRequest(OperationRequest):
     payout_method_id: PayoutMethodId
 
 
-class GetPayoutMethod(AsyncOperation[GetPayoutMethodRequest, PayoutCardInternal]):
+class GetPayoutMethod(
+    AsyncOperation[GetPayoutMethodRequest, account_models.PayoutCardInternal]
+):
     """
     Processor to get a payout method
     """
@@ -40,7 +42,7 @@ class GetPayoutMethod(AsyncOperation[GetPayoutMethodRequest, PayoutCardInternal]
         self.payout_card_repo = payout_card_repo
         self.payout_method_repo = payout_method_repo
 
-    async def _execute(self) -> PayoutCardInternal:
+    async def _execute(self) -> account_models.PayoutCardInternal:
         payout_method = await self.payout_method_repo.get_payout_method_by_id(
             payout_method_id=self.request.payout_method_id
         )
@@ -65,7 +67,7 @@ class GetPayoutMethod(AsyncOperation[GetPayoutMethodRequest, PayoutCardInternal]
             )
             raise payout_card_not_found_error()
 
-        return PayoutCardInternal(
+        return account_models.PayoutCardInternal(
             stripe_card_id=payout_card.stripe_card_id,
             last4=payout_card.last4,
             brand=payout_card.brand,
@@ -85,5 +87,5 @@ class GetPayoutMethod(AsyncOperation[GetPayoutMethodRequest, PayoutCardInternal]
 
     def _handle_exception(
         self, internal_exec: BaseException
-    ) -> Union[PaymentException, PayoutCardInternal]:
+    ) -> Union[PaymentException, account_models.PayoutCardInternal]:
         raise DEFAULT_INTERNAL_EXCEPTION

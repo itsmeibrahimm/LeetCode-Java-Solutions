@@ -13,7 +13,7 @@ from app.payout.constants import (
     CREATE_STRIPE_ACCOUNT_TYPE,
     CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES,
 )
-from app.payout.types import (
+from app.payout.models import (
     PayoutMethodExternalAccountToken,
     PayoutType,
     PgpExternalAccountId,

@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from app.commons.core.processor import OperationResponse
 from app.commons.types import Currency
-from app.payout import types
+from app.payout import models
 
 
 class TransactionInternal(OperationResponse):
@@ -18,7 +18,7 @@ class TransactionInternal(OperationResponse):
     target_type: Optional[str]
     currency: Optional[Currency]
     idempotency_key: Optional[str]
-    state: Optional[types.TransactionState]
+    state: Optional[models.TransactionState]
     notes: Optional[str]
     # there are multiple types of metadata in db that we need to clean up
     # use str to avoid 500 caused by ValidationError

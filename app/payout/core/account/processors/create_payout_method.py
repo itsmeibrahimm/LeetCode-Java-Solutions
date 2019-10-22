@@ -8,7 +8,7 @@ from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import CreateExternalAccountRequest
 from app.commons.types import CountryCode
-from app.payout.core.account.types import PayoutCardInternal
+from app.payout.core.account import models as account_models
 from app.payout.core.account.utils import (
     get_stripe_managed_account_by_payout_account_id,
 )
@@ -25,7 +25,7 @@ from app.payout.repository.bankdb.payout_method_miscellaneous import (
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
-from app.payout.types import (
+from app.payout.models import (
     PayoutMethodExternalAccountToken,
     PayoutExternalAccountType,
     PayoutAccountId,
@@ -38,7 +38,9 @@ class CreatePayoutMethodRequest(OperationRequest):
     type: PayoutExternalAccountType
 
 
-class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInternal]):
+class CreatePayoutMethod(
+    AsyncOperation[CreatePayoutMethodRequest, account_models.PayoutCardInternal]
+):
     """
     Processor to create a payout method
     """
@@ -62,7 +64,7 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
         self.payout_method_miscellaneous_repo = payout_method_miscellaneous_repo
         self.stripe = stripe
 
-    async def _execute(self) -> PayoutCardInternal:
+    async def _execute(self) -> account_models.PayoutCardInternal:
         stripe_managed_account = await get_stripe_managed_account_by_payout_account_id(
             payout_account_id=self.request.payout_account_id,
             payment_account_repository=self.payment_account_repo,
@@ -124,7 +126,7 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
             payout_account_id=self.request.payout_account_id,
         )
 
-        return PayoutCardInternal(
+        return account_models.PayoutCardInternal(
             stripe_card_id=payout_card.stripe_card_id,
             last4=payout_card.last4,
             brand=payout_card.brand,
@@ -144,5 +146,5 @@ class CreatePayoutMethod(AsyncOperation[CreatePayoutMethodRequest, PayoutCardInt
 
     def _handle_exception(
         self, dep_exec: BaseException
-    ) -> Union[PaymentException, PayoutCardInternal]:
+    ) -> Union[PaymentException, account_models.PayoutCardInternal]:
         raise DEFAULT_INTERNAL_EXCEPTION

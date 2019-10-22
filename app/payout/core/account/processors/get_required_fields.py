@@ -6,8 +6,8 @@ from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.commons.runtime import runtime
 from app.commons.types import CountryCode
-from app.payout.core.account.types import VerificationRequirementsOnboarding
-from app.payout.types import PayoutTargetType, StripeBusinessType
+from app.payout.core.account import models
+from app.payout.models import PayoutTargetType, StripeBusinessType
 
 
 class GetRequiredFieldsRequest(OperationRequest):
@@ -16,7 +16,7 @@ class GetRequiredFieldsRequest(OperationRequest):
 
 
 class GetPaymentsOnboardingRequirements(
-    AsyncOperation[GetRequiredFieldsRequest, VerificationRequirementsOnboarding]
+    AsyncOperation[GetRequiredFieldsRequest, models.VerificationRequirementsOnboarding]
 ):
     """
     Processor to get required fields during onboarding
@@ -112,11 +112,11 @@ class GetPaymentsOnboardingRequirements(
                 )
         else:
             required_fields_by_country_and_entity = {}
-        return VerificationRequirementsOnboarding(
+        return models.VerificationRequirementsOnboarding(
             required_fields_stages=json.dumps(required_fields_by_country_and_entity)
         )
 
     def _handle_exception(
         self, internal_exec: BaseException
-    ) -> Union[PaymentException, VerificationRequirementsOnboarding]:
+    ) -> Union[PaymentException, models.VerificationRequirementsOnboarding]:
         raise DEFAULT_INTERNAL_EXCEPTION

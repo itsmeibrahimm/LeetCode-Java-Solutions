@@ -18,7 +18,7 @@ from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 
 
 @final

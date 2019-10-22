@@ -11,7 +11,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transfer,
     prepare_and_insert_stripe_transfer,
 )
-from app.payout.types import TransferStatusType, TransferMethodType
+from app.payout.models import TransferStatusType, TransferMethodType
 
 
 class TestTransferUtils:

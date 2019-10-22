@@ -1,10 +1,17 @@
+#  type: ignore
+
 from datetime import datetime
 from typing import List, Optional
+from pydantic import Schema
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.commons.types import CountryCode, Currency
-from app.payout.core.account.types import Address, DateOfBirth, VerificationRequirements
-from app.payout.types import (
+from app.payout.core.account.models import (
+    Address,
+    DateOfBirth,
+    VerificationRequirements,
+)
+from app.payout.models import (
     PayoutAccountId,
     PayoutAccountToken,
     PayoutMethodId,
@@ -23,7 +30,6 @@ from app.payout.types import (
     AccountType,
     PayoutExternalAccountType,
     PayoutMethodExternalAccountId,
-    TransferId,
 )
 
 __all__ = [
@@ -33,24 +39,61 @@ __all__ = [
     "PayoutAccount",
     "PayoutAccountToken",
     "VerificationDetailsWithToken",
+    "UpdatePayoutAccountStatementDescriptor",
 ]
 
 
+class UpdatePayoutAccountStatementDescriptor(PaymentRequest):
+    statement_descriptor: str
+
+
 class CreatePayoutAccount(PaymentRequest):
-    target_id: PayoutAccountTargetId
-    target_type: PayoutAccountTargetType
-    country: CountryCode
-    currency: Currency
-    statement_descriptor: Optional[str]
+    """
+    Request model for creating a payout account
+    """
+
+    target_id: PayoutAccountTargetId = Schema(
+        default=...,
+        description="The target id (e.g., store id) for the payout account to be created",
+    )
+    target_type: PayoutAccountTargetType = Schema(
+        default=...,
+        description="The target type (e.g., store) for the payout account to be created",
+    )
+    country: CountryCode = Schema(
+        default=..., description="The country code for the payout account to be created"
+    )
+    currency: Currency = Schema(
+        default=...,
+        description="The currency code for the payout account to be created",
+    )
+    statement_descriptor: Optional[str] = Schema(
+        default=None,
+        description="The statement descriptor for the payout account to be created",
+    )
 
 
 class PayoutAccount(PaymentResponse):
-    id: PayoutAccountId
-    statement_descriptor: str
-    pgp_account_type: Optional[AccountType]
-    pgp_account_id: Optional[PgpAccountId]
-    pgp_external_account_id: Optional[PgpExternalAccountId]
-    verification_requirements: Optional[VerificationRequirements]
+    """
+    Response model for a payout account
+    """
+
+    id: PayoutAccountId = Schema(default=..., description="Payout Account ID")
+    statement_descriptor: str = Schema(
+        default=..., description="The statement descriptor for the payout account"
+    )
+    pgp_account_type: Optional[AccountType] = Schema(
+        default=None, description="Payout account type"
+    )
+    pgp_account_id: Optional[PgpAccountId] = Schema(
+        default=None, description="Linked payment provider Account ID"
+    )
+    pgp_external_account_id: Optional[PgpExternalAccountId] = Schema(
+        default=None, description="Linked external payment provider account ID"
+    )
+    verification_requirements: Optional[VerificationRequirements] = Schema(
+        default=None, description="Required info to pass account verification"
+    )
     # todo: add payout_methods, payout_schedule
 
 
@@ -76,63 +119,111 @@ class VerificationDetails(PaymentRequest):
 
 
 class VerificationDetailsWithToken(PaymentRequest):
-    account_token: StripeAccountToken
+    """
+    Request model for account verification info
+    """
+
+    account_token: StripeAccountToken = Schema(
+        default=..., description="Token for the account info for verification"
+    )
     # we need pass in country and currency to create stripe account unless payment account table can store them
-    country: CountryCode
-    currency: Currency
+    country: CountryCode = Schema(default=..., description="Account country")
+    currency: Currency = Schema(default=..., description="Account currency")
 
 
 class CreatePayoutMethod(PaymentRequest):
-    token: PayoutMethodExternalAccountToken
-    type: PayoutExternalAccountType
+    """
+    Request model for payout method
+    """
+
+    token: PayoutMethodExternalAccountToken = Schema(
+        default=..., description="Token for the payout method"
+    )
+    type: PayoutExternalAccountType = Schema(
+        default=..., description="Payout method type"
+    )
 
 
 class PayoutMethod(PaymentResponse):
     """
-    Bank or Debit Card
+    Response model of generic payout method
     """
 
-    id: PayoutMethodId
-    type: PayoutExternalAccountType
-    payout_account_id: PayoutAccountId
-    country: CountryCode
-    currency: Currency
-    created_at: datetime
-    updated_at: datetime
-    deleted_at: Optional[datetime]
+    id: PayoutMethodId = Schema(default=..., description="Payout method ID")
+    type: PayoutExternalAccountType = Schema(
+        default=..., description="Payout method type"
+    )
+    payout_account_id: PayoutAccountId = Schema(
+        default=..., description="Payout Account ID"
+    )
+    country: CountryCode = Schema(default=..., description="Country Code")
+    currency: Currency = Schema(default=..., description="Currency Code")
+    created_at: datetime = Schema(default=..., description="Created at timestamp")
+    updated_at: datetime = Schema(default=..., description="Updated at timestamp")
+    deleted_at: Optional[datetime] = Schema(
+        default=None, description="Deleted at timestamp"
+    )
 
 
 class PayoutMethodCard(PayoutMethod):
-    stripe_card_id: PayoutMethodExternalAccountId
-    last4: str
-    brand: str
-    is_default: bool
-    exp_month: int
-    exp_year: int
-    fingerprint: str
+    """
+    Response model of payout method (card type)
+    """
+
+    stripe_card_id: PayoutMethodExternalAccountId = Schema(
+        default=..., description="External Card ID"
+    )
+    last4: str = Schema(default=..., description="Card last 4 digits")
+    brand: str = Schema(default=..., description="Card brand")
+    is_default: bool = Schema(default=..., description="Is default boolean")
+    exp_month: int = Schema(default=..., description="Exp month")
+    exp_year: int = Schema(default=..., description="Exp year")
+    fingerprint: str = Schema(default=..., description="Card fingerprint")
 
 
 class PayoutMethodBankAccount(PayoutMethod):
-    bank_name: str
-    bank_last_4: str
-    fingerprint: str
+    """
+    Response model of payout method (bank type)
+    """
+
+    bank_name: str = Schema(default=..., description="Bank name")
+    bank_last_4: str = Schema(default=..., description="Bank last 4 digits")
+    fingerprint: str = Schema(default=..., description="Bank account fingerprint")
 
 
 class PayoutRequest(PaymentRequest):
-    amount: PayoutAmountType
-    payout_type: PayoutType
-    target_id: Optional[str]
-    target_type: Optional[PayoutTargetType]
-    statement_descriptor: Optional[str]
-    payout_idempotency_key: Optional[str]
-    transfer_id: Optional[TransferId]
-    payout_id: Optional[str]
-    method: Optional[PayoutMethodType]
-    submitted_by: Optional[str]
+    """
+    Request model of creating a payout
+    """
+
+    amount: PayoutAmountType = Schema(
+        default=..., description="Amount in cents to be paid out"
+    )
+    payout_type: PayoutType = Schema(default=..., description="Payout type")
+    target_id: Optional[str] = Schema(
+        default=None, description="Target id of the payout"
+    )
+    target_type: Optional[PayoutTargetType] = Schema(
+        default=None, description="Target type of the payout"
+    )
+    statement_descriptor: Optional[str] = Schema(
+        default=None, description="Statement descriptor for the payout"
+    )
+    payout_idempotency_key: Optional[str] = Schema(
+        default=None, description="Idempotency key of the payout"
+    )
+    method: Optional[PayoutMethodType] = Schema(
+        default=None, description="Payout method"
+    )
+    submitted_by: Optional[str] = Schema(default=None, description="Submitted by")
 
 
 class Payout(PaymentResponse):
-    pass
+    """
+    Response model of creating a payout
+    """
+
+    id: int = Schema(default=..., description="Payout ID")
 
 
 class ListPayoutMethod(PaymentRequest):
@@ -141,5 +232,9 @@ class ListPayoutMethod(PaymentRequest):
 
 
 class PayoutMethodList(PaymentResponse):
-    count: int
-    card_list: List[PayoutMethodCard]
+    """
+    Response model of payout method list
+    """
+
+    count: int = Schema(default=..., description="Number of results returned")
+    card_list: List[PayoutMethodCard] = Schema(default=..., description="List of cards")

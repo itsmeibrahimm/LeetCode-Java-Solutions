@@ -7,6 +7,7 @@ from starlette.status import (
 )
 from structlog.stdlib import BoundLogger
 from typing import Optional
+from fastapi import APIRouter, Depends, Body, Path, Query
 
 from app.commons.providers.stripe.stripe_models import TransferId
 from app.commons.types import CountryCode
@@ -40,12 +41,7 @@ from app.payout.core.account.processors.verify_account import VerifyPayoutAccoun
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.service import create_payout_account_processors
-from app.payout.types import (
-    PayoutAccountStatementDescriptor,
-    PayoutType,
-    PayoutTargetType,
-    PayoutExternalAccountType,
-)
+from app.payout.models import PayoutType, PayoutTargetType, PayoutExternalAccountType
 
 api_tags = ["AccountsV1"]
 router = APIRouter()
@@ -97,7 +93,9 @@ async def get_payout_account_stream(
     tags=api_tags,
 )
 async def create_payout_account(
-    body: models.CreatePayoutAccount,
+    body: models.CreatePayoutAccount = Body(
+        ..., description="Request body for creating a payout account"
+    ),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -123,7 +121,9 @@ async def create_payout_account(
     tags=api_tags,
 )
 async def get_payout_account(
-    payout_account_id: models.PayoutAccountId,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -145,14 +145,19 @@ async def get_payout_account(
     tags=api_tags,
 )
 async def update_payout_account_statement_descriptor(
-    payout_account_id: models.PayoutAccountId,
-    statement_descriptor: PayoutAccountStatementDescriptor,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    body: models.UpdatePayoutAccountStatementDescriptor = Body(
+        ..., description="Statement descriptor for payouts"
+    ),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
 ):
     internal_request = UpdatePayoutAccountStatementDescriptorRequest(
-        payout_account_id=payout_account_id, statement_descriptor=statement_descriptor
+        payout_account_id=payout_account_id,
+        statement_descriptor=body.dict().get("statement_descriptor"),
     )
     internal_response = await payout_account_processors.update_payout_account_statement_descriptor(
         internal_request
@@ -170,8 +175,12 @@ async def update_payout_account_statement_descriptor(
     tags=api_tags,
 )
 async def verify_payout_account_legacy(
-    payout_account_id: models.PayoutAccountId,
-    verification_details: models.VerificationDetailsWithToken,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    verification_details: models.VerificationDetailsWithToken = Body(
+        ..., description="Verification details with token, country and currency"
+    ),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -190,13 +199,13 @@ async def verify_payout_account_legacy(
 
 @router.post(
     "/{payout_account_id}/verify",
-    operation_id="VerifyPayoutAccount",
+    operation_id="VerifyPayoutAccountToBeImplemented",
     status_code=HTTP_200_OK,
     response_model=models.PayoutAccount,
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
-async def verify_payout_account(
+async def verify_payout_account_to_be_implemented(
     payout_account_id: models.PayoutAccountId,
     verification_details: models.VerificationDetailsWithToken,
     payout_account_processors: PayoutAccountProcessors = Depends(
@@ -216,14 +225,18 @@ async def verify_payout_account(
     tags=api_tags,
 )
 async def create_payout_method(
-    payout_account_id: models.PayoutAccountId,
-    request: models.CreatePayoutMethod,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    payout_method: models.CreatePayoutMethod = Body(..., description="Payout Method"),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
 ):
     internal_request = CreatePayoutMethodRequest(
-        payout_account_id=payout_account_id, token=request.token, type=request.type
+        payout_account_id=payout_account_id,
+        token=payout_method.token,
+        type=payout_method.type,
     )
     internal_response = await payout_account_processors.create_payout_method(
         internal_request
@@ -242,8 +255,10 @@ async def create_payout_method(
     tags=api_tags,
 )
 async def get_payout_method(
-    payout_account_id: models.PayoutAccountId,
-    payout_method_id: models.PayoutMethodId,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    payout_method_id: models.PayoutMethodId = Path(..., description="Payout Method ID"),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -268,9 +283,13 @@ async def get_payout_method(
     tags=api_tags,
 )
 async def list_payout_method(
-    payout_account_id: models.PayoutAccountId,
-    payout_method_type: models.PayoutExternalAccountType = PayoutExternalAccountType.CARD,
-    limit: int = 50,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    payout_method_type: models.PayoutExternalAccountType = Query(
+        default=PayoutExternalAccountType.CARD, description="Payout method type"
+    ),
+    limit: int = Query(default=50, description="Default limit of returned results"),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -283,6 +302,8 @@ async def list_payout_method(
     internal_response = await payout_account_processors.list_payout_method(
         internal_request
     )
+
+    # TODO: need to merge card and bank payout methods
     payout_method_card_list = []
     for card_internal in internal_response.data:
         payout_method_card_list.append(
@@ -298,7 +319,8 @@ async def list_payout_method(
 @router.post(
     "/{payout_account_id}/payouts",
     operation_id="CreatePayout",
-    status_code=HTTP_200_OK,
+    status_code=HTTP_201_CREATED,
+    response_model=models.Payout,
     responses={
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
         HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
@@ -306,8 +328,10 @@ async def list_payout_method(
     tags=api_tags,
 )
 async def create_payout(
-    payout_account_id: models.PayoutAccountId,
-    body: models.PayoutRequest,
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    body: models.PayoutRequest = Body(..., description="Create payout request body"),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -375,8 +399,10 @@ async def create_payout(
     tags=api_tags,
 )
 async def cancel_payout(
-    transfer_id: TransferId,
-    payout_account_id: models.PayoutAccountId,
+    transfer_id: TransferId = Path(..., description="Transfer ID"),
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -391,15 +417,15 @@ async def cancel_payout(
 
 
 @router.get(
-    "/onboarding_required_fields/{entity_type}/{country_shortname}",
+    "/onboarding_required_fields/",
     status_code=HTTP_200_OK,
     operation_id="GetOnboardingRequirementsByStages",
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
 async def get_onboarding_requirements_by_stages(
-    entity_type: PayoutTargetType,
-    country_shortname: CountryCode,
+    entity_type: PayoutTargetType = Query(..., description="Payout target type"),
+    country_shortname: CountryCode = Query(..., description="Country shortname"),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),

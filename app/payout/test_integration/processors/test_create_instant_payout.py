@@ -43,7 +43,7 @@ from app.payout.test_integration.utils import (
     mock_transfer,
     mock_balance,
 )
-from app.payout.types import PayoutType
+from app.payout.models import PayoutType
 
 
 async def _prepare_test_create_stripe_payout_with_exception(

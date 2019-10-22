@@ -15,7 +15,7 @@ from app.payout.test_integration.utils import (
     mock_stripe_card,
     prepare_payout_method_list,
 )
-from app.payout.types import PayoutExternalAccountType
+from app.payout.models import PayoutExternalAccountType
 
 
 class TestPayoutMethodMiscellaneousRepository:

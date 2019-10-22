@@ -9,10 +9,10 @@ from app.payout.core.account.processors.create_account import (
     CreatePayoutAccount,
     CreatePayoutAccountRequest,
 )
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
-from app.payout.types import PayoutAccountTargetType
+from app.payout.models import PayoutAccountTargetType
 
 
 class TestCreatePayoutAccount:
@@ -51,7 +51,7 @@ class TestCreatePayoutAccount:
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.create_payment_account",
             side_effect=mock_create_payment_account,
         )
-        created_payout_account: PayoutAccountInternal = await create_account_op._execute()
+        created_payout_account: account_models.PayoutAccountInternal = await create_account_op._execute()
         assert created_payout_account.payment_account.id == 1
         assert (
             created_payout_account.payment_account.statement_descriptor

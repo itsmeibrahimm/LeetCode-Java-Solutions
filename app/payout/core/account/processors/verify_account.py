@@ -9,7 +9,7 @@ from app.commons.providers.stripe.stripe_models import (
     UpdateAccountRequest,
 )
 from app.commons.types import CountryCode
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models
 from app.payout.core.exceptions import (
     payout_account_not_found_error,
     pgp_account_create_invalid_request,
@@ -22,7 +22,7 @@ from app.payout.repository.maindb.model.stripe_managed_account import (
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
-from app.payout.types import PayoutAccountId, StripeAccountToken
+from app.payout.models import PayoutAccountId, StripeAccountToken
 import stripe.error as stripe_error
 
 
@@ -33,7 +33,7 @@ class VerifyPayoutAccountRequest(OperationRequest):
 
 
 class VerifyPayoutAccount(
-    AsyncOperation[VerifyPayoutAccountRequest, PayoutAccountInternal]
+    AsyncOperation[VerifyPayoutAccountRequest, models.PayoutAccountInternal]
 ):
     """
     Processor to verify a payout account
@@ -55,7 +55,7 @@ class VerifyPayoutAccount(
         self.payment_account_repo = payment_account_repo
         self.stripe_client = stripe_client
 
-    async def _execute(self) -> PayoutAccountInternal:
+    async def _execute(self) -> models.PayoutAccountInternal:
         # get payout account
         payment_account = await self.payment_account_repo.get_payment_account_by_id(
             self.request.payout_account_id
@@ -125,11 +125,11 @@ class VerifyPayoutAccount(
                 stripe_error_message = error_info.get("message")
                 raise pgp_account_update_error(stripe_error_message)
 
-        return PayoutAccountInternal(
+        return models.PayoutAccountInternal(
             payment_account=payment_account, pgp_external_account_id=stripe_account.id
         )
 
     def _handle_exception(
         self, internal_exec: BaseException
-    ) -> Union[PaymentException, PayoutAccountInternal]:
+    ) -> Union[PaymentException, models.PayoutAccountInternal]:
         raise DEFAULT_INTERNAL_EXCEPTION

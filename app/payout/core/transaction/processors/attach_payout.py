@@ -4,12 +4,12 @@ from typing import Union, List, Optional
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.exceptions import transaction_invalid
-from app.payout.core.transaction.types import (
+from app.payout.core.transaction.models import (
     TransactionInternal,
     TransactionListInternal,
 )
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
-from app.payout import types
+from app.payout import models
 import app.payout.core.transaction.utils as utils
 
 ERROR_MSG_INPUT_CONTAIN_INVALID_TRANSACTION = "The input transaction ids contain invalid transaction which is not allowed to attach to payout id."
@@ -19,8 +19,8 @@ ERROR_MSG_TRANSACTION_HAS_TRANSFER_ID_CANNOT_BE_ATTACHED_TO_PAYOUT_ID = (
 
 
 class AttachPayoutRequest(OperationRequest):
-    transaction_ids: List[types.TransactionId]
-    payout_id: Optional[types.PayoutId] = None
+    transaction_ids: List[models.TransactionId]
+    payout_id: Optional[models.PayoutId] = None
 
 
 class AttachPayout(AsyncOperation[AttachPayoutRequest, TransactionListInternal]):

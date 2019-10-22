@@ -10,7 +10,7 @@ from app.payout.core.account.processors.get_account import (
     GetPayoutAccountRequest,
     GetPayoutAccount,
 )
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models as account_models
 from app.payout.core.exceptions import (
     payout_account_not_found_error,
     PayoutErrorCode,
@@ -22,7 +22,7 @@ from app.payout.repository.maindb.model.payment_account import (
     PaymentAccount,
 )
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 
 
 class TestGetPayoutAccount:
@@ -84,7 +84,7 @@ class TestGetPayoutAccount:
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_payment_account_by_id",
             side_effect=mock_get_payment_account,
         )
-        get_payout_account: PayoutAccountInternal = await get_account_op._execute()
+        get_payout_account: account_models.PayoutAccountInternal = await get_account_op._execute()
         assert get_payout_account.payment_account.id == data.account_id
         assert (
             get_payout_account.payment_account.statement_descriptor

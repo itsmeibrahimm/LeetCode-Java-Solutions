@@ -8,7 +8,7 @@ from app.payout.core.account.processors.list_payout_methods import (
     ListPayoutMethod,
     ListPayoutMethodRequest,
 )
-from app.payout.core.account.types import PayoutCardInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
@@ -54,14 +54,14 @@ class TestListPayoutMethod:
             payout_method_repo=payout_method_repo,
             request=request,
         )
-        expected_card_list: List[PayoutCardInternal] = []
+        expected_card_list: List[account_models.PayoutCardInternal] = []
         for payout_card in payout_card_list:
             payout_method = await payout_method_repo.get_payout_method_by_id(
                 payout_method_id=payout_card.id
             )
             assert payout_method
             expected_card_list.append(
-                PayoutCardInternal(
+                account_models.PayoutCardInternal(
                     stripe_card_id=payout_card.stripe_card_id,
                     last4=payout_card.last4,
                     brand=payout_card.brand,
@@ -107,7 +107,7 @@ class TestListPayoutMethod:
             payout_method_repo=payout_method_repo,
             request=request,
         )
-        expected_card_list: List[PayoutCardInternal] = []
+        expected_card_list: List[account_models.PayoutCardInternal] = []
         for payout_card in payout_card_list:
             payout_method = await payout_method_repo.get_payout_method_by_id(
                 payout_method_id=payout_card.id
@@ -116,7 +116,7 @@ class TestListPayoutMethod:
             if len(expected_card_list) == limit:
                 break
             expected_card_list.append(
-                PayoutCardInternal(
+                account_models.PayoutCardInternal(
                     stripe_card_id=payout_card.stripe_card_id,
                     last4=payout_card.last4,
                     brand=payout_card.brand,

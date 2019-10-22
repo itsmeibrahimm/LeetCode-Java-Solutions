@@ -7,10 +7,10 @@ from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.constants import TRANSACTION_REVERSAL_PREFIX
 from app.payout.core.exceptions import transaction_invalid
-from app.payout.core.transaction.types import TransactionInternal
+from app.payout.core.transaction.models import TransactionInternal
 from app.payout.repository.bankdb.model.transaction import TransactionCreateDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
-from app.payout import types
+from app.payout import models
 import app.payout.core.transaction.utils as utils
 
 ERROR_MSG_TRANSACTION_NOT_EXIST_FOR_REVERSE = (
@@ -22,7 +22,7 @@ ERROR_MSG_TRANSACTION_ALREADY_CANCELLED = (
 
 
 class ReverseTransactionRequest(OperationRequest):
-    transaction_id: types.TransactionId
+    transaction_id: models.TransactionId
     reverse_reason: Optional[str]
 
 
@@ -53,7 +53,7 @@ class ReverseTransaction(
         )
         if not transaction:
             raise transaction_invalid(ERROR_MSG_TRANSACTION_NOT_EXIST_FOR_REVERSE)
-        if transaction.state == types.TransactionState.CANCELLED.value:
+        if transaction.state == models.TransactionState.CANCELLED.value:
             raise transaction_invalid(ERROR_MSG_TRANSACTION_ALREADY_CANCELLED)
 
         # create a negative transaction for the original one
@@ -84,7 +84,7 @@ class ReverseTransaction(
 
     @staticmethod
     def metadata_for_reversal(
-        transaction_id: types.TransactionId, reverse_reason: Optional[str] = None
+        transaction_id: models.TransactionId, reverse_reason: Optional[str] = None
     ) -> dict:
         if not reverse_reason:
             reverse_reason = "Voiding txn {transaction_id}".format(

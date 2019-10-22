@@ -4,21 +4,16 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
-from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe import stripe_models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
-from app.commons.providers.stripe.stripe_models import CreateAccountTokenMetaDataRequest
 from app.commons.test_integration.constants import (
     VISA_DEBIT_CARD_TOKEN,
     MASTER_CARD_DEBIT_CARD_TOKEN,
 )
 from app.commons.test_integration.utils import prepare_and_validate_stripe_account_token
 from app.commons.types import CountryCode, Currency
-from app.payout.api.account.v1.models import (
-    CreatePayoutAccount,
-    VerificationDetailsWithToken,
-    CreatePayoutMethod,
-)
-from app.payout.types import (
+from app.payout.api.account.v1 import models as account_models
+from app.payout.models import (
     StripeAccountToken,
     PayoutTargetType,
     PayoutAccountTargetType,
@@ -44,15 +39,15 @@ class TestAccountV1:
 
         return StripeTestClient(
             [
-                models.StripeClientSettings(
+                stripe_models.StripeClientSettings(
                     api_key=app_config.STRIPE_US_SECRET_KEY.value,
                     country=CountryCode.US,
                 ),
-                models.StripeClientSettings(
+                stripe_models.StripeClientSettings(
                     api_key=app_config.STRIPE_CA_SECRET_KEY.value,
                     country=CountryCode.CA,
                 ),
-                models.StripeClientSettings(
+                stripe_models.StripeClientSettings(
                     api_key=app_config.STRIPE_AU_SECRET_KEY.value,
                     country=CountryCode.AU,
                 ),
@@ -61,13 +56,13 @@ class TestAccountV1:
 
     @pytest.fixture
     def account_token(self, stripe_test: StripeTestClient) -> StripeAccountToken:
-        data = models.CreateAccountTokenMetaDataRequest(
+        data = stripe_models.CreateAccountTokenMetaDataRequest(
             business_type="individual",
-            individual=models.Individual(
+            individual=stripe_models.Individual(
                 first_name="Test",
                 last_name="Payment",
-                dob=models.DateOfBirth(day=1, month=1, year=1990),
-                address=models.Address(
+                dob=stripe_models.DateOfBirth(day=1, month=1, year=1990),
+                address=stripe_models.Address(
                     city="Mountain View",
                     country=CountryCode.US.value,
                     line1="123 Castro St",
@@ -80,15 +75,15 @@ class TestAccountV1:
             tos_shown_and_accepted=True,
         )
         account_token = stripe_test.create_account_token(
-            request=models.CreateAccountTokenRequest(
+            request=stripe_models.CreateAccountTokenRequest(
                 account=data, country=CountryCode.US
             )
         )
         return account_token.id
 
     @pytest.fixture
-    def create_payout_account(self) -> CreatePayoutAccount:
-        return CreatePayoutAccount(
+    def create_payout_account(self) -> account_models.CreatePayoutAccount:
+        return account_models.CreatePayoutAccount(
             target_id=1,
             target_type=PayoutAccountTargetType.DASHER,
             country=CountryCode.US,
@@ -98,7 +93,9 @@ class TestAccountV1:
 
     @pytest.fixture
     def payout_account(
-        self, client: TestClient, create_payout_account: CreatePayoutAccount
+        self,
+        client: TestClient,
+        create_payout_account: account_models.CreatePayoutAccount,
     ) -> dict:
         response = client.post(create_account_url(), json=create_payout_account.dict())
         assert response.status_code == 201
@@ -117,7 +114,7 @@ class TestAccountV1:
         payout_account: dict,
     ) -> dict:
         # Verify to create pgp account
-        verification_details_request = VerificationDetailsWithToken(
+        verification_details_request = account_models.VerificationDetailsWithToken(
             account_token=account_token, country=CountryCode.US, currency=Currency.USD
         )
         response = client.post(
@@ -141,7 +138,7 @@ class TestAccountV1:
     ):
         response = client.patch(
             update_account_statement_descriptor(payout_account["id"]),
-            params={"statement_descriptor": "update_statement_descriptor"},
+            json={"statement_descriptor": "update_statement_descriptor"},
         )
         updated_account: dict = response.json()
         assert response.status_code == 200
@@ -156,13 +153,13 @@ class TestAccountV1:
         # Verify to update pgp account
         first_name = "Frosty"
         last_name = "Fish"
-        updated_create_account_token_data = CreateAccountTokenMetaDataRequest(
+        updated_create_account_token_data = stripe_models.CreateAccountTokenMetaDataRequest(
             business_type="individual",
-            individual=models.Individual(
+            individual=stripe_models.Individual(
                 first_name=first_name,
                 last_name=last_name,
-                dob=models.DateOfBirth(day=5, month=5, year=1991),
-                address=models.Address(
+                dob=stripe_models.DateOfBirth(day=5, month=5, year=1991),
+                address=stripe_models.Address(
                     city="Mountain View",
                     country=CountryCode.US.value,
                     line1="123 Castro St",
@@ -177,7 +174,7 @@ class TestAccountV1:
         new_token = prepare_and_validate_stripe_account_token(
             stripe_client=stripe_test, data=updated_create_account_token_data
         )
-        verification_details_request = VerificationDetailsWithToken(
+        verification_details_request = account_models.VerificationDetailsWithToken(
             account_token=new_token.id, country=CountryCode.US, currency=Currency.USD
         )
         response = client.post(
@@ -196,7 +193,7 @@ class TestAccountV1:
         )
 
     def test_add_payout_method(self, client: TestClient, verified_payout_account: dict):
-        request = CreatePayoutMethod(
+        request = account_models.CreatePayoutMethod(
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
@@ -207,7 +204,7 @@ class TestAccountV1:
         assert payout_card_internal["stripe_card_id"]
 
     def test_get_payout_method(self, client: TestClient, verified_payout_account: dict):
-        request = CreatePayoutMethod(
+        request = account_models.CreatePayoutMethod(
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
@@ -231,7 +228,7 @@ class TestAccountV1:
         self, client: TestClient, verified_payout_account: dict
     ):
         expected_card_list: List[dict] = []
-        request_visa = CreatePayoutMethod(
+        request_visa = account_models.CreatePayoutMethod(
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response_visa = client.post(
@@ -245,7 +242,7 @@ class TestAccountV1:
         created_payout_card_visa["is_default"] = False
         expected_card_list.insert(0, created_payout_card_visa)
 
-        request_mastercard = CreatePayoutMethod(
+        request_mastercard = account_models.CreatePayoutMethod(
             token=MASTER_CARD_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response_mastercard = client.post(
@@ -281,9 +278,11 @@ class TestAccountV1:
 
     def test_get_onboarding_requirements_by_stages(self, client: TestClient):
         response = client.get(
-            get_onboarding_requirements_by_stages_url(
-                PayoutTargetType.STORE, CountryCode.CA
-            )
+            get_onboarding_requirements_by_stages_url(),
+            params={
+                "entity_type": PayoutTargetType.STORE,
+                "country_shortname": CountryCode.CA,
+            },
         )
 
         required_fields = response.json()

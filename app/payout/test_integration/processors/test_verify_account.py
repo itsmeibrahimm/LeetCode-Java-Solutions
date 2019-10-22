@@ -20,7 +20,7 @@ from app.payout.core.account.processors.verify_account import (
     VerifyPayoutAccountRequest,
     VerifyPayoutAccount,
 )
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models as account_models
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.test_integration.utils import (
@@ -98,7 +98,7 @@ class TestVerifyPayoutAccount:
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.create_account",
             side_effect=mock_create_stripe_account,
         )
-        verified_payout_account: PayoutAccountInternal = await verify_account_op._execute()
+        verified_payout_account: account_models.PayoutAccountInternal = await verify_account_op._execute()
         assert mock_create_account.called
         args, kwargs = mock_create_account.call_args
         assert kwargs["request"] == create_account_request
@@ -198,7 +198,7 @@ class TestVerifyPayoutAccount:
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.update_account",
             side_effect=mock_update_stripe_account,
         )
-        verified_payout_account: PayoutAccountInternal = await verify_account_op._execute()
+        verified_payout_account: account_models.PayoutAccountInternal = await verify_account_op._execute()
         assert mock_update_account.called
         args, kwargs = mock_update_account.call_args
         assert kwargs["request"] == create_account_request

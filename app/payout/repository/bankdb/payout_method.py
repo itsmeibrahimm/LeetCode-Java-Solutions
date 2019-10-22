@@ -16,7 +16,7 @@ from app.payout.repository.bankdb.model.payout_method import (
     PayoutMethod,
     PayoutMethodUpdate,
 )
-from app.payout.types import PayoutExternalAccountType
+from app.payout.models import PayoutExternalAccountType
 
 
 class PayoutMethodRepositoryInterface(ABC):

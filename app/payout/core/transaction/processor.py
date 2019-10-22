@@ -16,7 +16,7 @@ from app.payout.core.transaction.processors.reverse_transaction import (
     ReverseTransactionRequest,
     ReverseTransaction,
 )
-from app.payout.core.transaction.types import (
+from app.payout.core.transaction.models import (
     TransactionListInternal,
     TransactionInternal,
 )

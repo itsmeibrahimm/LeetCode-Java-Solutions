@@ -45,7 +45,7 @@ from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
-from app.payout.types import PayoutTargetType, TransferStatusType, TransferType
+from app.payout import models as payout_models
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.commons.runtime import runtime
 
@@ -62,7 +62,7 @@ class CreateTransferRequest(OperationRequest):
     end_time: datetime
     start_time: Optional[datetime]
     target_id: Optional[int]
-    target_type: Optional[PayoutTargetType]
+    target_type: Optional[payout_models.PayoutTargetType]
     target_business_id: Optional[int]
     payout_countries: Optional[List[str]]
 
@@ -114,7 +114,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             )
         # logic within following if statement is from create_transfer_for_account_id
         # when a transfer creation is triggered manually, we do not need to execute following logic
-        if self.request.transfer_type != TransferType.MANUAL:
+        if self.request.transfer_type != payout_models.TransferType.MANUAL:
             if self.request.payout_countries:
                 stripe_managed_account = (
                     await self.payment_account_repo.get_stripe_managed_account_by_id(
@@ -166,7 +166,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     async def should_payment_account_be_auto_paid_weekly(
         self,
         payment_account_id: int,
-        target_type: Optional[PayoutTargetType],
+        target_type: Optional[payout_models.PayoutTargetType],
         target_id: Optional[int],
         target_biz_id: Optional[int],
     ) -> bool:
@@ -196,7 +196,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self,
         payout_date_time: datetime,
         payment_account_id: int,
-        target_type: Optional[PayoutTargetType],
+        target_type: Optional[payout_models.PayoutTargetType],
         target_id: Optional[int],
         target_biz_id: Optional[int],
     ) -> bool:
@@ -204,7 +204,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         if runtime.get_bool(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False):
             try:
                 if (
-                    target_type == PayoutTargetType.STORE
+                    target_type == payout_models.PayoutTargetType.STORE
                     and target_biz_id
                     not in runtime.get_json(
                         FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE, []
@@ -302,7 +302,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             adjustments="{}",
             method="",
             currency=currency,
-            status=TransferStatusType.CREATING,
+            status=payout_models.TransferStatusType.CREATING,
         )
         transfer = await self.transfer_repo.create_transfer(data=create_request)
         transaction_ids = [transaction.id for transaction in unpaid_transactions]

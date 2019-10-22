@@ -43,7 +43,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transaction,
     mock_transfer,
 )
-from app.payout.types import (
+from app.payout.models import (
     PayoutTargetType,
     TransferStatusType,
     TransferStatusCodeType,

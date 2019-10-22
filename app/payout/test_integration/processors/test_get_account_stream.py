@@ -11,7 +11,7 @@ from app.payout.core.account.processors.get_account_stream import (
 )
 from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 
 
 class TestGetPayoutAccountStream:

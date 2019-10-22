@@ -17,7 +17,7 @@ from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethod,
     CreatePayoutMethodRequest,
 )
-from app.payout.core.account.types import PayoutCardInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.bankdb.model.payout_card import PayoutCard
 from app.payout.repository.bankdb.model.payout_method import PayoutMethod
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
@@ -33,7 +33,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     mock_stripe_card,
 )
-from app.payout.types import PayoutExternalAccountType
+from app.payout.models import PayoutExternalAccountType
 
 
 class TestCreatePayoutMethod:
@@ -158,7 +158,7 @@ class TestCreatePayoutMethod:
             stripe=stripe_async_client,
         )
 
-        expected_default_payout_card = PayoutCardInternal(
+        expected_default_payout_card = account_models.PayoutCardInternal(
             stripe_card_id=payout_card.stripe_card_id,
             last4=payout_card.last4,
             brand=payout_card.brand,
@@ -175,6 +175,6 @@ class TestCreatePayoutMethod:
             updated_at=payout_method.updated_at,
             deleted_at=payout_method.deleted_at,
         )
-        payout_card_internal: PayoutCardInternal = await create_payout_method_op._execute()
+        payout_card_internal: account_models.PayoutCardInternal = await create_payout_method_op._execute()
         assert payout_card_internal.payout_account_id == payout_account.id
         assert payout_card_internal == expected_default_payout_card

@@ -57,7 +57,7 @@ from app.payout.repository.maindb.stripe_transfer import (
 )
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
 from app.commons.providers.stripe import stripe_models as models
-from app.payout.types import (
+from app.payout.models import (
     TransferStatusType,
     PayoutMethodType,
     TransferStatusCodeType,

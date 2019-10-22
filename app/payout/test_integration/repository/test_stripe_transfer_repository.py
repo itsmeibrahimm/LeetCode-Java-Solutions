@@ -9,7 +9,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_stripe_transfer,
     prepare_and_insert_transfer,
 )
-from app.payout.types import StripePayoutStatus
+from app.payout.models import StripePayoutStatus
 
 
 class TestTransferRepository:

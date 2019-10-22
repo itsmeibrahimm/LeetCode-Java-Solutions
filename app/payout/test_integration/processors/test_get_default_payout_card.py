@@ -6,7 +6,7 @@ from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
     GetDefaultPayoutCard,
 )
-from app.payout.core.account.types import PayoutCardInternal
+from app.payout.core.account import models as account_models
 from app.payout.core.exceptions import (
     PayoutErrorCode,
     payout_error_message_maps,
@@ -62,7 +62,7 @@ class TestGetDefaultPayoutCard:
             default_payout_card.id
         )
         assert default_payout_method
-        expected_default_payout_card = PayoutCardInternal(
+        expected_default_payout_card = account_models.PayoutCardInternal(
             stripe_card_id=default_payout_card.stripe_card_id,
             last4=default_payout_card.last4,
             brand=default_payout_card.brand,
@@ -87,7 +87,7 @@ class TestGetDefaultPayoutCard:
             request=request,
         )
 
-        actual_default_payout_card: PayoutCardInternal = await get_default_payout_card_op._execute()
+        actual_default_payout_card: account_models.PayoutCardInternal = await get_default_payout_card_op._execute()
         assert actual_default_payout_card.payout_account_id == payout_account.id
         assert actual_default_payout_card == expected_default_payout_card
 
@@ -124,7 +124,7 @@ class TestGetDefaultPayoutCard:
             default_payout_card.id
         )
         assert default_payout_method
-        expected_default_payout_card = PayoutCardInternal(
+        expected_default_payout_card = account_models.PayoutCardInternal(
             stripe_card_id=default_payout_card.stripe_card_id,
             last4=default_payout_card.last4,
             brand=default_payout_card.brand,
@@ -149,7 +149,7 @@ class TestGetDefaultPayoutCard:
             request=request,
         )
 
-        actual_default_payout_card: PayoutCardInternal = await get_default_payout_card_op._execute()
+        actual_default_payout_card: account_models.PayoutCardInternal = await get_default_payout_card_op._execute()
         assert actual_default_payout_card.payout_account_id == payout_account.id
         assert actual_default_payout_card == expected_default_payout_card
 

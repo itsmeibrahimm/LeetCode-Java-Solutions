@@ -8,7 +8,7 @@ from typing_extensions import final
 
 from app.commons.database.model import DBEntity, TableDefinition
 from app.commons.utils.dataclass_extensions import no_init_field
-from app.payout.types import StripeTransferSubmissionStatus
+from app.payout.models import StripeTransferSubmissionStatus
 
 
 @final

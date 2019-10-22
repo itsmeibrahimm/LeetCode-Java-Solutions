@@ -27,7 +27,6 @@ from app.payout.core.transfer.create_standard_payout import (
 )
 from app.payout.core.account.processors.get_account import (
     GetPayoutAccountRequest,
-    PayoutAccountInternal,
     GetPayoutAccount,
 )
 from app.payout.core.account.processors.get_account_stream import (
@@ -47,7 +46,7 @@ from app.payout.core.account.processors.list_payout_methods import (
     ListPayoutMethodRequest,
     ListPayoutMethod,
 )
-from app.payout.core.account.types import PayoutCardInternal, PayoutCardListInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
 from app.payout.repository.bankdb.payout_method_miscellaneous import (
@@ -68,7 +67,6 @@ from app.payout.core.account.processors.get_required_fields import (
     GetPaymentsOnboardingRequirements,
     GetRequiredFieldsRequest,
 )
-from app.payout.core.account.types import VerificationRequirementsOnboarding
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepositoryInterface,
 )
@@ -81,7 +79,7 @@ from app.payout.repository.maindb.payment_account import (
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
-from app.payout.types import PayoutTargetType
+from app.payout.models import PayoutTargetType
 
 
 class PayoutAccountProcessors:
@@ -132,7 +130,7 @@ class PayoutAccountProcessors:
 
     async def create_payout_account(
         self, request: CreatePayoutAccountRequest
-    ) -> PayoutAccountInternal:
+    ) -> account_models.PayoutAccountInternal:
         create_account_op = CreatePayoutAccount(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -142,7 +140,7 @@ class PayoutAccountProcessors:
 
     async def get_payout_account(
         self, request: GetPayoutAccountRequest
-    ) -> PayoutAccountInternal:
+    ) -> account_models.PayoutAccountInternal:
         get_account_op = GetPayoutAccount(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -152,7 +150,7 @@ class PayoutAccountProcessors:
 
     async def update_payout_account_statement_descriptor(
         self, request: UpdatePayoutAccountStatementDescriptorRequest
-    ) -> PayoutAccountInternal:
+    ) -> account_models.PayoutAccountInternal:
         update_account_op = UpdatePayoutAccountStatementDescriptor(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -162,7 +160,7 @@ class PayoutAccountProcessors:
 
     async def verify_payout_account(
         self, request: VerifyPayoutAccountRequest
-    ) -> PayoutAccountInternal:
+    ) -> account_models.PayoutAccountInternal:
         verify_account_op = VerifyPayoutAccount(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -173,7 +171,7 @@ class PayoutAccountProcessors:
 
     async def get_default_payout_card(
         self, request: GetDefaultPayoutCardRequest
-    ) -> PayoutCardInternal:
+    ) -> account_models.PayoutCardInternal:
         get_payout_card_op = GetDefaultPayoutCard(
             request=request,
             payout_card_repo=self.payout_card_repo,
@@ -184,7 +182,7 @@ class PayoutAccountProcessors:
 
     async def create_payout_method(
         self, request: CreatePayoutMethodRequest
-    ) -> PayoutCardInternal:
+    ) -> account_models.PayoutCardInternal:
         create_payout_method_op = CreatePayoutMethod(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -196,7 +194,7 @@ class PayoutAccountProcessors:
 
     async def get_payout_method(
         self, request: GetPayoutMethodRequest
-    ) -> PayoutCardInternal:
+    ) -> account_models.PayoutCardInternal:
         get_payout_method_op = GetPayoutMethod(
             logger=self.logger,
             payout_card_repo=self.payout_card_repo,
@@ -207,7 +205,7 @@ class PayoutAccountProcessors:
 
     async def list_payout_method(
         self, request: ListPayoutMethodRequest
-    ) -> PayoutCardListInternal:
+    ) -> account_models.PayoutCardListInternal:
         list_payout_method_op = ListPayoutMethod(
             logger=self.logger,
             payout_card_repo=self.payout_card_repo,
@@ -254,7 +252,7 @@ class PayoutAccountProcessors:
 
     async def get_onboarding_requirements_by_stages(
         self, entity_type: PayoutTargetType, country_shortname: CountryCode
-    ) -> VerificationRequirementsOnboarding:
+    ) -> account_models.VerificationRequirementsOnboarding:
         request: GetRequiredFieldsRequest = GetRequiredFieldsRequest(
             entity_type=entity_type, country_shortname=country_shortname
         )

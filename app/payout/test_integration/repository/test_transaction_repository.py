@@ -23,8 +23,8 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_paid_transaction_list_for_transfer,
     list_diff,
 )
-from app.payout import types
-from app.payout.types import PayoutAccountTargetType, TransactionState
+from app.payout import models
+from app.payout.models import PayoutAccountTargetType, TransactionState
 
 
 class TestTransactionRepository:
@@ -49,14 +49,14 @@ class TestTransactionRepository:
     @pytest.fixture
     async def payout_account_id(
         self, payment_account_repo: PaymentAccountRepository
-    ) -> types.PayoutAccountId:
+    ) -> models.PayoutAccountId:
         payment_account = await prepare_and_insert_payment_account(payment_account_repo)
         return payment_account.id
 
     async def test_create_transaction(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         await prepare_and_insert_transaction(
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
@@ -65,7 +65,7 @@ class TestTransactionRepository:
     async def test_create_get_transaction(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         transaction = await prepare_and_insert_transaction(
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
@@ -77,7 +77,7 @@ class TestTransactionRepository:
     async def test_update_transaction_by_id(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         transaction = await prepare_and_insert_transaction(
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
@@ -100,7 +100,7 @@ class TestTransactionRepository:
     async def test_set_transaction_payout_id_by_ids(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         first_txn = await prepare_and_insert_transaction(
             transaction_repo=transaction_repo, payout_account_id=payout_account_id
@@ -122,7 +122,7 @@ class TestTransactionRepository:
     async def test_get_transaction_by_ids(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # 1. add 10 transaction for the same account and do a get by ids should return
         # all the transactions
@@ -165,7 +165,7 @@ class TestTransactionRepository:
     async def test_get_transaction_by_ids_return_emtpy(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         transaction_ids: List[int] = []
         retrieved_transaction_list = await transaction_repo.get_transaction_by_ids(
@@ -279,7 +279,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         transfer_a = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
         transfer_b = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
@@ -345,7 +345,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # filter by transfer_id = -999
         transaction_list_invalid_transfer_id = await transaction_repo.get_transaction_by_transfer_id(
@@ -377,7 +377,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
         count = 13
@@ -403,7 +403,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         payout_repo: PayoutRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         payout_a = await prepare_and_insert_payout(payout_repo=payout_repo)
         payout_b = await prepare_and_insert_payout(payout_repo=payout_repo)
@@ -467,7 +467,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         payout_repo: PayoutRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # filter by payout_id = -999
         transaction_list_invalid_payout_id = await transaction_repo.get_transaction_by_payout_id(
@@ -480,7 +480,7 @@ class TestTransactionRepository:
     async def test_get_transaction_by_payout_account_id(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # 1. prepare test data by inserting 30 transactions for the same payout account
         count = 30
@@ -561,7 +561,7 @@ class TestTransactionRepository:
     async def test_get_transaction_by_payout_account_id_return_empty(
         self,
         transaction_repo: TransactionRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # filter by invalid payout account id
         retrieved_transaction_invalid_payout_account_id = await transaction_repo.get_transaction_by_payout_account_id(
@@ -576,7 +576,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # 1. prepare test data by adding 6 transactions for the same payout account
         count = 6
@@ -673,7 +673,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
         await prepare_and_insert_paid_transaction_list_for_transfer(
@@ -694,7 +694,7 @@ class TestTransactionRepository:
         self,
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # 1. prepare test data by adding 16 transactions for the same payout account
         count = 16
@@ -750,7 +750,7 @@ class TestTransactionRepository:
         transaction_repo: TransactionRepository,
         transfer_repo: TransferRepository,
         payment_account_repo: PaymentAccountRepository,
-        payout_account_id: types.PayoutAccountId,
+        payout_account_id: models.PayoutAccountId,
     ):
         # 1. prepare test data by adding 6 transactions for the payout account
         count = 6

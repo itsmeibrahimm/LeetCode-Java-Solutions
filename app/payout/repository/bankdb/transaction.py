@@ -15,7 +15,7 @@ from app.payout.repository.bankdb.model.transaction import (
     TransactionCreateDBEntity,
     TransactionUpdateDBEntity,
 )
-from app.payout.types import TransactionState
+from app.payout.models import TransactionState
 
 
 class TransactionRepositoryInterface(ABC):

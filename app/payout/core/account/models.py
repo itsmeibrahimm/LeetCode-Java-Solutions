@@ -1,14 +1,16 @@
+#  type: ignore
+
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Json
+from pydantic import BaseModel, Json, Schema
 
 from app.commons.core.processor import OperationResponse
 from app.commons.types import CountryCode, Currency
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
-from app.payout.types import PgpExternalAccountId
+from app.payout.models import PgpExternalAccountId
 
 
 class VerificationStatus(str, Enum):
@@ -34,15 +36,37 @@ class Address(BaseModel):
 
 
 class VerificationRequirements(BaseModel):
-    class RequiredFields(BaseModel):
-        currently_due: List[str] = []
-        eventually_due: List[str] = []
-        past_due: List[str] = []
+    """
+    Model for required info to pass account verification
+    """
 
-    verification_status: Optional[VerificationStatus] = None
-    due_by: Optional[datetime] = None
-    additional_error_info: Optional[str] = None
-    required_fields: Optional[RequiredFields] = RequiredFields()
+    class RequiredFields(BaseModel):
+        """
+        Model for the Required Fields
+        """
+
+        currently_due: List[str] = Schema(
+            default=..., description="Currently required fields"
+        )
+        eventually_due: List[str] = Schema(
+            default=..., description="Eventually required fields"
+        )
+        past_due: List[str] = Schema(
+            default=..., description="Past due required fields"
+        )
+
+    verification_status: Optional[VerificationStatus] = Schema(
+        default=None, description="Current account verification status"
+    )
+    due_by: Optional[datetime] = Schema(
+        default=None, description="Due time for the required info"
+    )
+    additional_error_info: Optional[str] = Schema(
+        default=None, description="Additional error info"
+    )
+    required_fields: Optional[RequiredFields] = Schema(
+        default=None, description="Required fields"
+    )
 
 
 class PayoutAccountInternal(OperationResponse):

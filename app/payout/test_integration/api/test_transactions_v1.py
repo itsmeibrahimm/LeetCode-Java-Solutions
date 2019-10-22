@@ -4,8 +4,8 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.commons.types import CountryCode, Currency
-from app.payout.api.account.v1.models import CreatePayoutAccount
-from app.payout.types import PayoutAccountTargetType
+from app.payout.api.account.v1 import models as account_models
+from app.payout.models import PayoutAccountTargetType
 
 from app.payout.api.transaction.v1 import models
 from app.payout.test_integration.api import (
@@ -19,7 +19,7 @@ from app.payout.test_integration.api import (
 class TestTransactionV1:
     @pytest.fixture
     def payout_account(self, client: TestClient) -> dict:
-        create_payment_account_req = CreatePayoutAccount(
+        create_payment_account_req = account_models.CreatePayoutAccount(
             target_id=1,
             target_type=PayoutAccountTargetType.DASHER,
             country=CountryCode.US,

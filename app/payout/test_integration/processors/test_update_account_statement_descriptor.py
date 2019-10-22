@@ -8,10 +8,10 @@ from app.payout.core.account.processors.update_account_statement_descriptor impo
     UpdatePayoutAccountStatementDescriptorRequest,
     UpdatePayoutAccountStatementDescriptor,
 )
-from app.payout.core.account.types import PayoutAccountInternal
+from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
-from app.payout.types import AccountType
+from app.payout.models import AccountType
 
 
 class TestUpdatePayoutAccount:
@@ -55,7 +55,7 @@ class TestUpdatePayoutAccount:
             request=request,
         )
 
-        updated_payout_account: PayoutAccountInternal = await update_account_op._execute()
+        updated_payout_account: account_models.PayoutAccountInternal = await update_account_op._execute()
         assert (
             updated_payout_account.payment_account.statement_descriptor
             == "update_statement_descriptor"
