@@ -109,7 +109,7 @@ def create_app_config() -> AppConfig:
         # don't need frequent monitoring for dev
         MONITOR_INTERVAL_EVENT_LOOP_LATENCY=10,
         MONITOR_INTERVAL_RESOURCE_JOB_POOL=10,
-        MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
+        MARQETA_BASE_URL="https://doordash-dev.marqeta.com/v3/",
         MARQETA_USERNAME=Secret(
             name="marqeta_username", value="doordash_sandbox_api_consumer"
         ),

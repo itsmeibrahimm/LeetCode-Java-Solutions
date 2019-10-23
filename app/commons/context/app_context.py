@@ -208,7 +208,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
             marqeta_base_url=config.MARQETA_BASE_URL,
             program_fund_token=config.MARQETA_PROGRAM_FUND_TOKEN.value,
             username=config.MARQETA_USERNAME.value,
-            password=config.MARQETA_JIT_PASSWORD.value,
+            password=config.MARQETA_PASSWORD.value,
         ),
         session=marqeta_session,
     )

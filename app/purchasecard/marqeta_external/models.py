@@ -6,3 +6,7 @@ class MarqetaProviderCreateUserRequest(BaseModel):
     first_name: str
     last_name: str
     email: str
+
+
+class MarqetaProviderCreateUserResponse(BaseModel):
+    token: str

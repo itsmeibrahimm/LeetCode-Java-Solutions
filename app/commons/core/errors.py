@@ -38,6 +38,17 @@ pgp_error_message_maps = {
 }
 
 
+class MarqetaErrorCode(str, Enum):
+    MARQETA_RESOURCE_ALREADY_CREATED_ERROR = "marqeta_resource_already_created_error"
+    MARQETA_CREATE_USER_ERROR = "create_marqeta_user_error"
+
+
+marqeta_error_message_maps = {
+    MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR: "Marqeta resource already created.",
+    MarqetaErrorCode.MARQETA_CREATE_USER_ERROR: "Error creating Marqeta user.",
+}
+
+
 class PaymentError(Exception):
     """
     Base class for all payment internal exceptions. This is base class that can be inherited by
@@ -223,6 +234,28 @@ class PGPResourceNotFoundError(PGPError):
             error_code=PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR,
             error_message=pgp_error_message_maps[
                 PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaResourceAlreadyCreatedError(PaymentError):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCreateUserError(PaymentError):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_CREATE_USER_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_CREATE_USER_ERROR
             ],
             retryable=False,
         )

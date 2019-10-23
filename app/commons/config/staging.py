@@ -74,7 +74,7 @@ def create_app_config() -> AppConfig:
             environment="staging",
             release=f"payment-service@release-{os.getenv('RELEASE_TAG')}",
         ),
-        MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
+        MARQETA_BASE_URL="https://doordash-dev.marqeta.com/v3/",
         MARQETA_USERNAME=Secret(
             name="marqeta_username", value="doordash_sandbox_api_consumer"
         ),

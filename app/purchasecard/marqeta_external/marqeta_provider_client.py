@@ -1,9 +1,16 @@
-from typing import Optional, Tuple
+from typing import Optional, Any
 
 import aiohttp
+from aiohttp import BasicAuth
 from pydantic import BaseModel
 
-from app.purchasecard.marqeta_external.models import MarqetaProviderCreateUserRequest
+from app.purchasecard.marqeta_external.models import (
+    MarqetaProviderCreateUserRequest,
+    MarqetaProviderCreateUserResponse,
+)
+import app.purchasecard.marqeta_external.error as marqeta_error
+
+SAME_EMAIL_ERROR_CODE = "400057"
 
 
 class MarqetaClientSettings(BaseModel):
@@ -40,23 +47,40 @@ class MarqetaProviderClient:
         self._session = session
         self._default_timeout = default_timeout
 
-    def _get_auth(self) -> Tuple[Optional[str], Optional[str]]:
-        return self._username, self._password
+    def _get_auth(self) -> BasicAuth:
+        return BasicAuth(login=self._username, password=self._password)
+
+    @classmethod
+    async def _handle_status(cls, response_status: int, json_resp_body: Any):
+        if response_status != 201:
+            if response_status == 400:
+                raise marqeta_error.MarqetaBadRequest(json_resp_body)
+            elif response_status == 409:
+                raise marqeta_error.MarqetaResourceAlreadyCreated(json_resp_body)
+            else:
+                raise marqeta_error.MarqetaAPIError(json_resp_body)
 
     async def create_marqeta_user(
         self, req: MarqetaProviderCreateUserRequest, timeout: Optional[float] = None
-    ):
+    ) -> MarqetaProviderCreateUserResponse:
         """
-        TODO: @jasmine-tea remember to add a test!
         :param req:
         :param timeout:
         :return:
         """
-        aiotimeout = aiohttp.ClientTimeout(total=(timeout or self._default_timeout))
+        aio_timeout = aiohttp.ClientTimeout(total=(timeout or self._default_timeout))
 
         url = self._marqeta_base_url + "users"
 
         async with self._session.post(
-            url, auth=self._get_auth(), data=req.dict(), timeout=aiotimeout
+            url=url, auth=self._get_auth(), json=req.dict(), timeout=aio_timeout
         ) as resp:
-            return resp.json()
+            try:
+                json_resp_body = await resp.json()
+                await self._handle_status(resp.status, json_resp_body)
+
+            except marqeta_error.MarqetaBadRequest:
+                if json_resp_body["error_code"] == SAME_EMAIL_ERROR_CODE:
+                    raise marqeta_error.DuplicateEmail()
+
+            return MarqetaProviderCreateUserResponse(**json_resp_body)
