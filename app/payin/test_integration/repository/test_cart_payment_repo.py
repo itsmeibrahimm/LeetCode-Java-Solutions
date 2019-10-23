@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import cast
+from typing import cast, Optional, Tuple
 from uuid import uuid4, UUID
 
 import pytest
@@ -1426,3 +1426,47 @@ class TestCountPaymentIntentsThatRequireCapture:
         assert (
             result_after - result_before
         ) == 1, "there should be one payment intent matched"
+
+
+class TestUpdatePaymentAndPgpPaymentIntentStatus:
+    pytestmark = [pytest.mark.asyncio]
+
+    async def test_success(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+    ):
+        pi_pgpi: Optional[
+            Tuple[PaymentIntent, PgpPaymentIntent]
+        ] = await cart_payment_repository.update_payment_and_pgp_payment_intent_status(
+            new_status=IntentStatus.CANCELLED,
+            payment_intent_id=payment_intent.id,
+            pgp_payment_intent_id=pgp_payment_intent.id,
+        )
+        assert pi_pgpi
+        assert pi_pgpi[0].status == IntentStatus.CANCELLED
+        assert pi_pgpi[1].status == IntentStatus.CANCELLED
+
+        pi_pgpi = await cart_payment_repository.update_payment_and_pgp_payment_intent_status(
+            new_status=IntentStatus.SUCCEEDED,
+            payment_intent_id=payment_intent.id,
+            pgp_payment_intent_id=pgp_payment_intent.id,
+        )
+        assert pi_pgpi
+
+        assert pi_pgpi[0].status == IntentStatus.SUCCEEDED
+        assert pi_pgpi[1].status == IntentStatus.SUCCEEDED
+
+    async def test_not_found(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+    ):
+        result = await cart_payment_repository.update_payment_and_pgp_payment_intent_status(
+            new_status=IntentStatus.CANCELLED,
+            payment_intent_id=uuid4(),
+            pgp_payment_intent_id=pgp_payment_intent.id,
+        )
+        assert not result

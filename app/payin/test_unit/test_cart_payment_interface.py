@@ -7,60 +7,57 @@ import asynctest
 import pytest
 from asynctest import create_autospec
 from freezegun import freeze_time
-from stripe.error import StripeError, InvalidRequestError
+from stripe.error import InvalidRequestError, StripeError
 
-from app.commons.types import Currency, PgpCode
-from app.commons.providers.stripe.stripe_models import StripeCreatePaymentIntentRequest
 from app.commons.providers.errors import StripeCommandoError
-from app.commons.types import LegacyCountryId, CountryCode
-from app.payin.conftest import PgpPaymentIntentFactory, PaymentIntentFactory
+from app.commons.providers.stripe.stripe_models import StripeCreatePaymentIntentRequest
+from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
+from app.payin.conftest import PaymentIntentFactory, PgpPaymentIntentFactory
 from app.payin.core.cart_payment.model import (
     CartPayment,
-    PaymentIntent,
-    PgpPaymentIntent,
-    PaymentCharge,
-    PgpPaymentCharge,
     LegacyConsumerCharge,
     LegacyStripeCharge,
+    PaymentCharge,
+    PaymentIntent,
+    PgpPaymentCharge,
+    PgpPaymentIntent,
     SplitPayment,
 )
-from app.payin.core.cart_payment.processor import (
-    CartPaymentProcessor,
-    IdempotencyKeyAction,
-)
+from app.payin.core.cart_payment.processor import IdempotencyKeyAction
 from app.payin.core.cart_payment.types import (
-    IntentStatus,
-    ChargeStatus,
     CaptureMethod,
-    LegacyStripeChargeStatus,
+    ChargeStatus,
+    IntentStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
     RefundStatus,
 )
 from app.payin.core.exceptions import (
     CartPaymentCreateError,
+    InvalidProviderRequestError,
+    PayinErrorCode,
     PaymentChargeRefundError,
     PaymentIntentCancelError,
-    PayinErrorCode,
-    PaymentIntentCouldNotBeUpdatedError,
     PaymentIntentConcurrentAccessError,
+    PaymentIntentCouldNotBeUpdatedError,
     ProviderError,
-    InvalidProviderRequestError,
+    ProviderPaymentIntentUnexpectedStatusError,
 )
 from app.payin.core.payment_method.types import PgpPaymentMethod
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.tests.utils import (
-    generate_payment_intent,
-    generate_pgp_payment_intent,
+    FunctionMock,
     generate_cart_payment,
+    generate_legacy_consumer_charge,
+    generate_legacy_payment,
+    generate_legacy_stripe_charge,
+    generate_payment_intent,
+    generate_payment_intent_adjustment_history,
+    generate_pgp_payment_intent,
+    generate_pgp_refund,
     generate_provider_charges,
     generate_provider_intent,
-    generate_legacy_payment,
-    generate_legacy_consumer_charge,
-    generate_legacy_stripe_charge,
     generate_refund,
-    generate_pgp_refund,
-    generate_payment_intent_adjustment_history,
-    FunctionMock,
 )
 
 
@@ -1542,21 +1539,20 @@ class TestCartPaymentInterface:
 
 class TestCapturePayment:
     @pytest.mark.asyncio
-    async def test_cannot_acquire_lock(
-        self, cart_payment_processor: CartPaymentProcessor
-    ):
+    async def test_cannot_acquire_lock(self, cart_payment_processor):
         payment_intent = PaymentIntentFactory(status=IntentStatus.REQUIRES_CAPTURE)
         cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status = (  # type: ignore
             MagicMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status.side_effect = (  # type: ignore
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status.side_effect = (
+            # type: ignore
             PaymentIntentCouldNotBeUpdatedError()
         )
         with pytest.raises(PaymentIntentConcurrentAccessError):
             await cart_payment_processor.capture_payment(payment_intent)
 
     @pytest.mark.asyncio
-    async def test_success(self, cart_payment_processor: CartPaymentProcessor):
+    async def test_success(self, cart_payment_processor):
         payment_intent = PaymentIntentFactory(
             status=IntentStatus.REQUIRES_CAPTURE
         )  # type: PaymentIntent
@@ -1566,13 +1562,15 @@ class TestCapturePayment:
         cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status = (  # type: ignore
             asynctest.CoroutineMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status.return_value = (  # type: ignore
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status.return_value = (
+            # type: ignore
             payment_intent
         )
         cart_payment_processor.cart_payment_interface.submit_capture_to_provider = create_autospec(  # type: ignore
             cart_payment_processor.cart_payment_interface.submit_capture_to_provider
         )
-        cart_payment_processor.cart_payment_interface._get_intent_status_from_provider_status = create_autospec(  # type: ignore
+        cart_payment_processor.cart_payment_interface._get_intent_status_from_provider_status = create_autospec(
+            # type: ignore
             cart_payment_processor.cart_payment_interface._get_intent_status_from_provider_status,
             return_value=IntentStatus.SUCCEEDED,
         )
@@ -1583,12 +1581,15 @@ class TestCapturePayment:
         cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = (  # type: ignore
             asynctest.CoroutineMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents.return_value = [  # type: ignore
+        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents.return_value = [
+            # type: ignore
             pgp_payment_intent
         ]
         await cart_payment_processor.capture_payment(payment_intent)
-        cart_payment_processor.cart_payment_interface.submit_capture_to_provider.assert_called_once_with(  # type: ignore
-            payment_intent, pgp_payment_intent
+        cart_payment_processor.cart_payment_interface.submit_capture_to_provider.assert_called_once_with(
+            # type: ignore
+            payment_intent,
+            pgp_payment_intent,
         )
 
 
@@ -1628,7 +1629,28 @@ class TestCapturePaymentWithProvider(object):
             await cart_payment_interface.submit_capture_to_provider(intent, pgp_intent)
 
     @pytest.mark.asyncio
-    async def test_capture_payment_with_invalid_request_error_not_succeeded(
+    async def test_submit_capture_to_provider_unexpected_status_not_success_or_cancel(
+        self, cart_payment_interface
+    ):
+        mocked_stripe_function = FunctionMock()
+        mocked_stripe_function.side_effect = InvalidRequestError(
+            "Payment intent already captured",
+            "",
+            code="payment_intent_unexpected_state",
+            json_body={"error": {"payment_intent": {"status": "failed"}}},
+        )
+        cart_payment_interface.app_context.stripe.capture_payment_intent = (
+            mocked_stripe_function
+        )
+
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+
+        with pytest.raises(InvalidProviderRequestError):
+            await cart_payment_interface.submit_capture_to_provider(intent, pgp_intent)
+
+    @pytest.mark.asyncio
+    async def test_submit_capture_to_provider_unexpected_status_success_or_cancel(
         self, cart_payment_interface
     ):
         mocked_stripe_function = FunctionMock()
@@ -1645,47 +1667,27 @@ class TestCapturePaymentWithProvider(object):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
 
-        with pytest.raises(InvalidProviderRequestError):
+        with pytest.raises(ProviderPaymentIntentUnexpectedStatusError) as info:
             await cart_payment_interface.submit_capture_to_provider(intent, pgp_intent)
+        error = info.value
+        assert isinstance(error, ProviderPaymentIntentUnexpectedStatusError)
+        assert error.pgp_payment_intent_status == pgp_intent.status
+        assert error.provider_payment_intent_status == "canceled"
+        assert isinstance(error.orig_error, InvalidRequestError)
 
-    @pytest.mark.asyncio
-    async def test_capture_payment_with_invalid_request_error_succeeded(
-        self, cart_payment_interface
-    ):
-        mocked_stripe_function = FunctionMock()
         mocked_stripe_function.side_effect = InvalidRequestError(
             "Payment intent already captured",
             "",
             code="payment_intent_unexpected_state",
-            json_body={
-                "error": {
-                    "payment_intent": {
-                        "status": "succeeded",
-                        "charges": {
-                            "data": [
-                                {
-                                    "amount": 100,
-                                    "amount_refunded": 0,
-                                    "id": uuid.uuid4(),
-                                    "status": "succeeded",
-                                }
-                            ]
-                        },
-                    }
-                }
-            },
+            json_body={"error": {"payment_intent": {"status": "succeeded"}}},
         )
-        cart_payment_interface.app_context.stripe.capture_payment_intent = (
-            mocked_stripe_function
-        )
-
-        intent = generate_payment_intent(status="requires_capture")
-        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-
-        provider_intent = await cart_payment_interface.submit_capture_to_provider(
-            intent, pgp_intent
-        )
-        assert provider_intent
+        with pytest.raises(ProviderPaymentIntentUnexpectedStatusError) as info:
+            await cart_payment_interface.submit_capture_to_provider(intent, pgp_intent)
+        error = info.value
+        assert isinstance(error, ProviderPaymentIntentUnexpectedStatusError)
+        assert error.pgp_payment_intent_status == pgp_intent.status
+        assert error.provider_payment_intent_status == "succeeded"
+        assert isinstance(error.orig_error, InvalidRequestError)
 
     @pytest.mark.asyncio
     async def test_update_payment_after_capture_with_provider(

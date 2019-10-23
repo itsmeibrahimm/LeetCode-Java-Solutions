@@ -2,7 +2,7 @@ import uuid
 from asyncio import gather
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, NewType
+from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
 
 from fastapi import Depends
 from stripe.error import InvalidRequestError, StripeError
@@ -44,12 +44,12 @@ from app.payin.core.cart_payment.model import (
     LegacyStripeCharge,
     PaymentCharge,
     PaymentIntent,
+    PaymentIntentAdjustmentHistory,
     PgpPaymentCharge,
     PgpPaymentIntent,
-    SplitPayment,
-    PaymentIntentAdjustmentHistory,
-    Refund,
     PgpRefund,
+    Refund,
+    SplitPayment,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -73,8 +73,9 @@ from app.payin.core.exceptions import (
     PaymentIntentNotInRequiresCaptureState,
     PaymentIntentRefundError,
     ProviderError,
+    ProviderPaymentIntentUnexpectedStatusError,
 )
-from app.payin.core.legacy.utils import get_country_id_by_code, get_country_code_by_id
+from app.payin.core.legacy.utils import get_country_code_by_id, get_country_id_by_code
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
@@ -467,7 +468,7 @@ class CartPaymentInterface:
     def _get_intent_status_from_provider_status(
         self, provider_status: str
     ) -> IntentStatus:
-        return IntentStatus(provider_status)
+        return IntentStatus.from_str(provider_status)
 
     def _get_refund_status_from_provider_refund(
         self, provider_status: str
@@ -955,15 +956,13 @@ class CartPaymentInterface:
             provider_intent = convert_to_stripe_object(
                 e.json_body["error"]["payment_intent"]
             )
-            # Payment intent has already been captured
-            if (
-                e.code == "payment_intent_unexpected_state"
-                and provider_intent.status == "succeeded"
-            ):
-                self.req_context.log.warn(
-                    "[submit_capture_to_provider] payment_intent is already captured",
-                    payment_intent_id=payment_intent.id,
-                )
+
+            if e.code == "payment_intent_unexpected_state":
+                raise ProviderPaymentIntentUnexpectedStatusError(
+                    provider_payment_intent_status=provider_intent.status,
+                    pgp_payment_intent_status=pgp_payment_intent.status,
+                    original_error=e,
+                ) from e
             else:
                 raise InvalidProviderRequestError(e) from e
         except StripeError as e:
@@ -993,6 +992,36 @@ class CartPaymentInterface:
             raise e
 
         return provider_intent
+
+    async def update_payment_and_pgp_intent_status_only(
+        self,
+        new_status: IntentStatus,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+        updateable_new_statues = [IntentStatus.SUCCEEDED, IntentStatus.CANCELLED]
+        if new_status not in updateable_new_statues:
+            raise ValueError(
+                f"only support updating {updateable_new_statues} but found {new_status}"
+            )
+        if payment_intent.id != pgp_payment_intent.payment_intent_id:
+            raise ValueError(
+                f"payment_intent and pgp_payment_intent mismatch: payment_intent_id={payment_intent.id}, "
+                f"pgp_payment_intent_id={pgp_payment_intent.id}"
+            )
+
+        if self.ENABLE_NEW_CHARGE_TABLES:
+            raise NotImplementedError()
+        else:
+            payment_intent_and_pgp_intent = await self.payment_repo.update_payment_and_pgp_payment_intent_status(
+                new_status=new_status,
+                payment_intent_id=payment_intent.id,
+                pgp_payment_intent_id=pgp_payment_intent.id,
+            )
+
+            if not payment_intent_and_pgp_intent:
+                raise ValueError("payment_intent and pgp_intent shouldn't be None")
+            return payment_intent_and_pgp_intent
 
     async def update_payment_after_capture_with_provider(
         self,
@@ -2459,9 +2488,32 @@ class CartPaymentProcessor:
         )
 
         # Call to provider to capture, with idempotency key
-        provider_payment_intent = await self.cart_payment_interface.submit_capture_to_provider(
-            payment_intent, pgp_payment_intent
-        )
+        try:
+            provider_payment_intent = await self.cart_payment_interface.submit_capture_to_provider(
+                payment_intent, pgp_payment_intent
+            )
+        except ProviderPaymentIntentUnexpectedStatusError as e:
+            self.log.error(
+                "[capture_payment] failed to capture payment intent due to unexpected provider payment intent status",
+                provider_payment_intent_status=e.provider_payment_intent_status,
+                payment_service_pgp_payment_intent_status=pgp_payment_intent.status,
+                payment_service_payment_intent_status=payment_intent.status,
+                payment_intent_id=payment_intent.id,
+                pgp_payment_intent_id=pgp_payment_intent.id,
+            )
+            if e.provider_payment_intent_status in ["succeeded", "canceled"]:
+                self.log.info(
+                    "[capture_payment] sync from provider payment intent status for unexpected status",
+                    new_status=e.provider_payment_intent_status,
+                )
+                await self.cart_payment_interface.update_payment_and_pgp_intent_status_only(
+                    new_status=IntentStatus.from_str(e.provider_payment_intent_status),
+                    payment_intent=payment_intent,
+                    pgp_payment_intent=pgp_payment_intent,
+                )
+                return
+            else:
+                raise
 
         # Update state in our system
         await self.cart_payment_interface.update_payment_after_capture_with_provider(

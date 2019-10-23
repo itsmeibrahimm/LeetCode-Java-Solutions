@@ -1,7 +1,7 @@
 from enum import Enum
 
 from app.commons.core.errors import PaymentError
-
+from app.payin.core.cart_payment.types import IntentStatus
 
 payin_error_message_maps = {
     "payin_1": "Invalid data types. Please verify your input again!",
@@ -238,6 +238,25 @@ class UnhandledProviderError(BaseProviderError):
 
 class InvalidProviderRequestError(BaseProviderError):
     pass
+
+
+class ProviderPaymentIntentUnexpectedStatusError(InvalidProviderRequestError):
+    """
+    Model an error raised from pgp when desired action cannot be applied to target pgp object
+    """
+
+    provider_payment_intent_status: str
+    pgp_payment_intent_status: IntentStatus
+
+    def __init__(
+        self,
+        provider_payment_intent_status: str,
+        pgp_payment_intent_status: IntentStatus,
+        original_error: Exception,
+    ):
+        super().__init__(original_error)
+        self.provider_payment_intent_status = provider_payment_intent_status
+        self.pgp_payment_intent_status = pgp_payment_intent_status
 
 
 class CommandoModeShortCircuit(PayinError):

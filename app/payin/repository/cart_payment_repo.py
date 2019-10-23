@@ -533,6 +533,48 @@ class CartPaymentRepository(PayinDBRepository):
             matched_intents.append(self.to_pgp_payment_intent(row))
         return matched_intents
 
+    async def update_payment_and_pgp_payment_intent_status(
+        self,
+        *,
+        new_status: IntentStatus,
+        payment_intent_id: UUID,
+        pgp_payment_intent_id: UUID,
+    ) -> Optional[Tuple[PaymentIntent, PgpPaymentIntent]]:
+        updated_at = datetime.now(timezone.utc)
+        update_payment_intent_stmt = (
+            payment_intents.table.update()
+            .where(payment_intents.id == payment_intent_id)
+            .values(status=new_status, updated_at=updated_at)
+            .returning(*payment_intents.table.columns.values())
+        )
+        update_pgp_payment_intent_stmt = (
+            pgp_payment_intents.table.update()
+            .where(
+                and_(
+                    pgp_payment_intents.id == pgp_payment_intent_id,
+                    pgp_payment_intents.payment_intent_id == payment_intent_id,
+                )
+            )
+            .values(status=new_status, updated_at=updated_at)
+            .returning(*pgp_payment_intents.table.columns.values())
+        )
+        async with self.payment_database_transaction():
+            pgp_payment_intent_row = await self.payment_database.master().fetch_one(
+                update_pgp_payment_intent_stmt
+            )
+            if not pgp_payment_intent_row:
+                return None
+            payment_intent_row = await self.payment_database.master().fetch_one(
+                update_payment_intent_stmt
+            )
+            if not payment_intent_row:
+                raise ValueError(f"payment_intent_id={payment_intent_id} not found")
+
+        return (
+            self.to_payment_intent(payment_intent_row),
+            self.to_pgp_payment_intent(pgp_payment_intent_row),
+        )
+
     def to_pgp_payment_intent(self, row: Any) -> PgpPaymentIntent:
         return PgpPaymentIntent(
             id=row[pgp_payment_intents.id],

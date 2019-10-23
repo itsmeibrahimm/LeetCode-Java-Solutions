@@ -27,6 +27,13 @@ class IntentStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+    # todo PAYIN-130 update "cancelled" in payin domain to "canceled" to sync with stripe
+    @classmethod
+    def from_str(cls, value: str) -> "IntentStatus":
+        if value in ["canceled", "cancelled"]:
+            return cls("cancelled")
+        return cls(value)
+
 
 class RefundStatus(str, Enum):
     PROCESSING = "processing"
