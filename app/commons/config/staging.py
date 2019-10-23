@@ -22,7 +22,7 @@ def create_app_config() -> AppConfig:
         API_STATSD_CONFIG=ApiStatsDConfig(
             TAGS={"service_name": "payment-service", "cluster": "staging"}
         ),
-        IDENTITY_SERVICE_HTTP_ENDPOINT="https://identity-service.doorcrawl.com",
+        IDENTITY_SERVICE_HTTP_ENDPOINT="http://identity-service-helm-web.staging",
         IDENTITY_SERVICE_GRPC_ENDPOINT="identity.doorcrawl-int.com:50051",
         PAYIN_SERVICE_ID=1631011374003906560,
         PAYOUT_SERVICE_ID=1631011374003906560,
