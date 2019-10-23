@@ -515,10 +515,10 @@ class TestCartPaymentProcessor:
                 status=IntentStatus.SUCCEEDED, amount=new_amount
             )
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_pgp_payment_intent_amount = FunctionMock(
-            return_value=generate_pgp_payment_intent(
-                status=IntentStatus.SUCCEEDED, amount=new_amount
-            )
+        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+            return_value=[
+                generate_pgp_payment_intent(status=IntentStatus.SUCCEEDED, amount=780)
+            ]
         )
 
         result_intent, result_pgp_intent = await cart_payment_processor._update_payment_with_lower_amount(
@@ -530,7 +530,7 @@ class TestCartPaymentProcessor:
         assert result_intent.status == IntentStatus.SUCCEEDED
         assert result_intent.amount == 700
         assert result_pgp_intent.status == IntentStatus.SUCCEEDED
-        assert result_pgp_intent.amount == 700
+        assert result_pgp_intent.amount == 780  # PgpPaymentIntent amount not modified
 
         # Simulate resubmit after previous request that did not complete successfully:
         # Refund created, but not processed completely.
@@ -585,7 +585,7 @@ class TestCartPaymentProcessor:
         )
         # TODO verify expected values
         assert result_intent.amount == 0
-        assert result_pgp_intent.amount == 0
+        assert result_pgp_intent.amount == payment_intent.amount
 
     @pytest.mark.asyncio
     async def test_update_state_after_provider_error(self, cart_payment_processor):
@@ -633,7 +633,7 @@ class TestCartPaymentProcessor:
 
         # TODO verify expected values
         assert result_payment_intent.amount == 0
-        assert result_pgp_payment_intent.amount == 0
+        assert result_pgp_payment_intent.amount == pgp_payment_intent.amount
 
     @pytest.mark.asyncio
     async def test_update_state_after_cancel_with_provider(

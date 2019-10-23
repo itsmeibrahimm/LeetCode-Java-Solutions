@@ -1307,8 +1307,12 @@ class TestCartPaymentInterface:
     ):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        provider_intent = generate_provider_intent()
+        provider_intent.charges = generate_provider_charges(intent, pgp_intent)
         result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_cancel_with_provider(
-            payment_intent=intent, pgp_payment_intent=pgp_intent
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            provider_payment_intent=provider_intent,
         )
 
         assert result_intent
@@ -1355,7 +1359,7 @@ class TestCartPaymentInterface:
             await cart_payment_interface.app_context.stripe.refund_charge()
         )
 
-        result_payment_intent, result_pgp_payment_intent = await cart_payment_interface.update_payment_after_refund_with_provider(
+        result_payment_intent = await cart_payment_interface.update_payment_after_refund_with_provider(
             refund_amount=100,
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
@@ -1364,7 +1368,6 @@ class TestCartPaymentInterface:
             provider_refund=provider_refund,
         )
         assert result_payment_intent.amount == payment_intent.amount - 100
-        assert result_pgp_payment_intent.amount == pgp_payment_intent.amount - 100
 
     @pytest.mark.asyncio
     async def test_increase_payment_amount(self, cart_payment_interface):

@@ -6,6 +6,7 @@ from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import ReqContext
 from app.commons.jobs.pool import JobPool
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.conftest import StripeAPISettings
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
     CartPaymentProcessor,
@@ -188,4 +189,21 @@ def payment_method_processor(
         app_ctxt=app_context,
         payment_method_client=payment_method_client,
         payer_client=payer_client,
+    )
+
+
+@pytest.fixture(autouse=True)
+def enable_stripe_outbound(stripe_api: StripeAPISettings):
+    stripe_api.enable_outbound()
+
+
+@pytest.fixture(autouse=True)
+def override_capture_delay(app_context: AppContext):
+    original_capture_service_delay = (
+        app_context.capture_service.default_capture_delay_in_minutes
+    )
+    app_context.capture_service.default_capture_delay_in_minutes = 0
+    yield
+    app_context.capture_service.default_capture_delay_in_minutes = (
+        original_capture_service_delay
     )

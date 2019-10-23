@@ -310,9 +310,10 @@ class LegacyPaymentInterface:
     async def update_charge_after_payment_refunded(
         self, provider_refund: ProviderRefund
     ) -> LegacyStripeCharge:
-        return await self.payment_repo.update_legacy_stripe_charge_refund(
+        # The refund was for a specific amount.  Add that to the current refunded amount for the legacy stripe charge record.
+        return await self.payment_repo.update_legacy_stripe_charge_add_to_amount_refunded(
             stripe_id=provider_refund.charge,
-            amount_refunded=provider_refund.amount,
+            additional_amount_refunded=provider_refund.amount,
             refunded_at=datetime.now(),
         )
 
@@ -1205,7 +1206,10 @@ class CartPaymentInterface:
         return payment_charge, pgp_payment_charge
 
     async def update_payment_after_cancel_with_provider(
-        self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        provider_payment_intent: ProviderPaymentIntent,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_status(
@@ -1213,8 +1217,13 @@ class CartPaymentInterface:
                 new_status=IntentStatus.CANCELLED,
                 previous_status=payment_intent.status,
             )
-            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_status(
-                id=pgp_payment_intent.id, status=IntentStatus.CANCELLED
+            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
+                id=pgp_payment_intent.id,
+                status=IntentStatus.CANCELLED,
+                resource_id=provider_payment_intent.id,
+                charge_resource_id=provider_payment_intent.charges.data[0].id,
+                amount_capturable=provider_payment_intent.amount_capturable,
+                amount_received=provider_payment_intent.amount_received,
             )
             if self.ENABLE_NEW_CHARGE_TABLES:
                 await self._update_charge_pair_after_cancel(
@@ -1272,7 +1281,7 @@ class CartPaymentInterface:
         refund: Refund,
         pgp_refund: PgpRefund,
         provider_refund: ProviderRefund,
-    ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+    ) -> PaymentIntent:
         target_refund_status = self._get_refund_status_from_provider_refund(
             provider_refund.status
         )
@@ -1280,9 +1289,7 @@ class CartPaymentInterface:
             updated_intent = await self.payment_repo.update_payment_intent_amount(
                 id=payment_intent.id, amount=(payment_intent.amount - refund_amount)
             )
-            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_amount(
-                id=pgp_payment_intent.id, amount=(payment_intent.amount - refund_amount)
-            )
+            # PgpPaymentIntent is not updated since the provider amount does not change.
             await self.payment_repo.update_refund_status(
                 refund_id=refund.id, status=target_refund_status
             )
@@ -1296,7 +1303,7 @@ class CartPaymentInterface:
                     payment_intent=payment_intent, provider_refund=provider_refund
                 )
 
-        return updated_intent, updated_pgp_intent
+        return updated_intent
 
     async def increase_payment_amount(
         self,
@@ -1597,7 +1604,9 @@ class CartPaymentProcessor:
             provider_payment_intent
         )
         payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_payment_after_cancel_with_provider(
-            payment_intent=payment_intent, pgp_payment_intent=pgp_payment_intent
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            provider_payment_intent=provider_payment_intent,
         )
         return payment_intent, pgp_payment_intent, legacy_stripe_charge
 
@@ -1665,7 +1674,7 @@ class CartPaymentProcessor:
         provider_refund: ProviderRefund,
         refund_amount: int,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
-        payment_intent, pgp_payment_intent = await self.cart_payment_interface.update_payment_after_refund_with_provider(
+        updated_payment_intent = await self.cart_payment_interface.update_payment_after_refund_with_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
                 payment_intent
@@ -1679,7 +1688,7 @@ class CartPaymentProcessor:
         await self.legacy_payment_interface.update_charge_after_payment_refunded(
             provider_refund=provider_refund
         )
-        return payment_intent, pgp_payment_intent
+        return updated_payment_intent, pgp_payment_intent
 
     async def _cancel_payment_intent(
         self, cart_payment: CartPayment, payment_intent: PaymentIntent
