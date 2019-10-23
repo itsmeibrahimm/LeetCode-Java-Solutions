@@ -318,8 +318,8 @@ async def list_payout_method(
 
 @router.post(
     "/{payout_account_id}/payouts",
-    operation_id="CreatePayout",
-    status_code=HTTP_201_CREATED,
+    operation_id="InitiatePayout",
+    status_code=HTTP_200_OK,
     response_model=models.Payout,
     responses={
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
@@ -327,11 +327,13 @@ async def list_payout_method(
     },
     tags=api_tags,
 )
-async def create_payout(
+async def initiate_payout(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
-    body: models.PayoutRequest = Body(..., description="Create payout request body"),
+    body: models.InitiatePayoutRequest = Body(
+        ..., description="Initiate a payout request body"
+    ),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),

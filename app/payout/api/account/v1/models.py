@@ -30,6 +30,7 @@ from app.payout.models import (
     AccountType,
     PayoutExternalAccountType,
     PayoutMethodExternalAccountId,
+    TransferId,
 )
 
 __all__ = [
@@ -191,9 +192,9 @@ class PayoutMethodBankAccount(PayoutMethod):
     fingerprint: str = Schema(default=..., description="Bank account fingerprint")
 
 
-class PayoutRequest(PaymentRequest):
+class InitiatePayoutRequest(PaymentRequest):
     """
-    Request model of creating a payout
+    Request model of initiating a payout
     """
 
     amount: PayoutAmountType = Schema(
@@ -216,6 +217,8 @@ class PayoutRequest(PaymentRequest):
         default=None, description="Payout method"
     )
     submitted_by: Optional[str] = Schema(default=None, description="Submitted by")
+    transfer_id: Optional[TransferId] = Schema(default=None, description="Transfer ID")
+    payout_id: Optional[str] = Schema(default=None, description="Payout ID")
 
 
 class Payout(PaymentResponse):
