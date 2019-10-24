@@ -2559,6 +2559,9 @@ class CartPaymentProcessor:
         self.log.info(
             "[legacy_create_payment] creating cart_payment",
             idempotency_key=idempotency_key,
+            dd_consumer_id=legacy_payment.dd_consumer_id,
+            amount=request_cart_payment.amount,
+            correlation_ids=request_cart_payment.correlation_ids,
         )
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=legacy_payment
@@ -2581,6 +2584,10 @@ class CartPaymentProcessor:
 
         self.log.info(
             "[legacy_create_payment] created cart_payment",
+            idempotency_key=idempotency_key,
+            dd_consumer_id=legacy_payment.dd_consumer_id,
+            amount=request_cart_payment.amount,
+            correlation_ids=request_cart_payment.correlation_ids,
             cart_payment_id=cart_payment.id if cart_payment else None,
             legacy_consumer_charge_id=legacy_consumer_charge_id
             if legacy_consumer_charge_id
