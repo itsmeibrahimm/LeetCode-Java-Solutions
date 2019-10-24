@@ -856,12 +856,22 @@ class CartPaymentInterface:
             self.req_context.log.warning(
                 "[submit_payment_to_provider] Could not create payment in provider",
                 payment_intent_id=payment_intent.id,
+                stripe_error_code=e.code,
                 exception=str(e),
             )
-            raise CartPaymentCreateError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
-            )
+            error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR
+            if e.code == "card_declined":
+                error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR
+            elif e.code == "expired_card":
+                error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR
+            elif e.code == "processing_error":
+                error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR
+            elif e.code == "incorrect_number":
+                error_code = (
+                    PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR
+                )
+
+            raise CartPaymentCreateError(error_code=error_code, retryable=False)
         except StripeCommandoError:
             self.req_context.log.info(
                 "[submit_payment_to_provider] Returning mocked payment_intent response for commando mode"
@@ -976,6 +986,7 @@ class CartPaymentInterface:
             self.req_context.log.warning(
                 "Provider error during capture",
                 payment_intent_id=payment_intent.id,
+                stripe_error_code=e.code,
                 exception=str(e),
             )
             raise ProviderError(e)
@@ -1107,6 +1118,7 @@ class CartPaymentInterface:
             self.req_context.log.warning(
                 "[cancel_provider_payment_charge] Cancel payment not successful",
                 payment_intent_id=payment_intent.id,
+                stripe_error_code=e.code,
                 exception=str(e),
             )
             raise PaymentChargeRefundError(
@@ -1161,6 +1173,7 @@ class CartPaymentInterface:
                 "[refund_provider_payment] Cannot refund payment with provider",
                 payment_intent_id=payment_intent.id,
                 refund_id=refund.id,
+                stripe_error_code=e.code,
                 exception=str(e),
             )
             raise PaymentIntentCancelError(

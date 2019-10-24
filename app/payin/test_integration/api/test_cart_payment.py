@@ -475,6 +475,23 @@ class TestCartPayment:
             expected_retryable,
         )
 
+    def _test_legacy_cart_payment_creation_error(
+        self,
+        client: TestClient,
+        request_body: Dict[str, Any],
+        expected_http_status_status_code: int,
+        expected_body_error_code: str,
+        expected_retryable: bool,
+    ) -> None:
+        self._test_cart_payment_error(
+            client,
+            "/payin/api/v0/cart_payments",
+            request_body,
+            expected_http_status_status_code,
+            expected_body_error_code,
+            expected_retryable,
+        )
+
     def _test_cart_payment_creation_error(
         self,
         client: TestClient,
@@ -983,12 +1000,12 @@ class TestCartPayment:
 
         request_body = self._get_cart_payment_create_request(payer, payment_method)
         self._test_cart_payment_creation_error(
-            client, request_body, 500, "payin_40", False
+            client, request_body, 402, "payin_43", False
         )
 
         # Resubmit same request
         self._test_cart_payment_creation_error(
-            client, request_body, 500, "payin_40", False
+            client, request_body, 402, "payin_43", False
         )
 
     def test_cart_payment_validation(
@@ -1103,6 +1120,64 @@ class TestCartPayment:
         )
         self._test_cart_payment_update_error(
             client, cart_payment, request_body, 422, "request_validation_error", False
+        )
+
+    def test_legacy_payment_card_use_errors(
+        self,
+        stripe_api: StripeAPISettings,
+        stripe_customer: StripeCustomer,
+        client: TestClient,
+    ):
+        stripe_api.enable_outbound()
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_chargeDeclined",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 402, "payin_43", False
+        )
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_chargeDeclinedInsufficientFunds",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 402, "payin_43", False
+        )
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_chargeDeclinedFraudulent",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 402, "payin_43", False
+        )
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_chargeDeclinedExpiredCard",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 402, "payin_44", False
+        )
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_chargeDeclinedProcessingError",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 402, "payin_45", False
         )
 
     def test_legacy_payment_client_description(

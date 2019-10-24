@@ -19,6 +19,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
+    HTTP_402_PAYMENT_REQUIRED,
     HTTP_403_FORBIDDEN,
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_404_NOT_FOUND,
@@ -99,6 +100,13 @@ async def create_cart_payment(
             PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
         ):
             http_status_code = HTTP_400_BAD_REQUEST
+        elif payment_error.error_code in [
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
+        ]:
+            http_status_code = HTTP_402_PAYMENT_REQUIRED
         elif (
             payment_error.error_code
             == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
