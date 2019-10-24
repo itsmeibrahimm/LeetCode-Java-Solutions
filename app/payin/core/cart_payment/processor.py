@@ -811,6 +811,13 @@ class CartPaymentInterface:
             ).id
             pgp_customer_resource_id = None
 
+        # For retrieval of payment intent as a part of the webhook
+        # https://stripe.com/docs/payments/payment-intents/verifying-status#webhooks
+        payment_intent_metadata = (
+            payment_intent.metadata if payment_intent.metadata else {}
+        )
+        payment_intent_metadata["payment_intent_id"] = str(payment_intent.id)
+
         # Actually create the payment intent
         try:
             intent_request = StripeCreatePaymentIntentRequest(
@@ -827,7 +834,7 @@ class CartPaymentInterface:
                 customer=pgp_customer_resource_id,
                 description=provider_description,
                 statement_descriptor=payment_intent.statement_descriptor,
-                metadata=payment_intent.metadata,
+                metadata=payment_intent_metadata,
             )
 
             if (

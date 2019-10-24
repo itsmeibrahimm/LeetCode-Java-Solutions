@@ -1036,6 +1036,16 @@ class TestCartPaymentInterface:
             pgp_payment_method=pgp_payment_method,
             provider_description="test_description",
         )
+        name, args, kwargs = cart_payment_interface.stripe_async_client.create_payment_intent.mock_calls[
+            0
+        ]
+        assert kwargs
+        assert kwargs.get("request", None)
+        assert kwargs["request"].metadata
+        assert kwargs["request"].metadata.get("payment_intent_id", None)
+        assert kwargs["request"].metadata.get("payment_intent_id", None) == str(
+            intent.id
+        )
         assert response
 
     @pytest.mark.asyncio
@@ -1088,7 +1098,16 @@ class TestCartPaymentInterface:
                 pgp_payment_method=pgp_payment_method,
                 provider_description="test_description",
             )
-
+        name, args, kwargs = cart_payment_interface.stripe_async_client.create_payment_intent.mock_calls[
+            0
+        ]
+        assert kwargs
+        assert kwargs.get("request", None)
+        assert kwargs["request"].metadata
+        assert kwargs["request"].metadata.get("payment_intent_id", None)
+        assert kwargs["request"].metadata.get("payment_intent_id", None) == str(
+            intent.id
+        )
         assert (
             payment_error.value.error_code
             == PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR
