@@ -1,6 +1,8 @@
 from typing import List
 
 import pytest
+import pytest_mock
+
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
@@ -28,7 +30,9 @@ from app.payout.test_integration.api import (
     get_payout_method_url,
     list_payout_method_url,
     get_onboarding_requirements_by_stages_url,
+    get_initiate_payout_url,
 )
+from app.payout.core.transfer.create_instant_payout import CreateInstantPayoutResponse
 
 
 class TestAccountV1:
@@ -126,6 +130,19 @@ class TestAccountV1:
         assert verified_account["pgp_account_id"]
         assert verified_account["pgp_external_account_id"]
         return verified_account
+
+    @pytest.fixture
+    def verified_payout_account_with_payout_card(
+        self, client: TestClient, verified_payout_account: dict
+    ) -> dict:
+        request = account_models.CreatePayoutMethod(
+            token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+        )
+        response = client.post(
+            create_payout_method_url(verified_payout_account["id"]), json=request.dict()
+        )
+        assert response.status_code == 201
+        return verified_payout_account
 
     def test_get_payout_account(self, client: TestClient, payout_account: dict):
         response = client.get(get_account_by_id_url(payout_account["id"]))
@@ -292,3 +309,66 @@ class TestAccountV1:
         assert "business_name" in stages.get("stage_0")
         assert "tax_id_CA" in stages.get("stage_1")
         assert response.status_code == 200
+
+    def test_initiate_standard_payout(
+        self,
+        mocker: pytest_mock.MockFixture,
+        client: TestClient,
+        verified_payout_account: dict,
+    ):
+        # mock out processor/biz layer logic, test for API layer handling only
+        async def mock_standard_pay(req):
+            return CreateInstantPayoutResponse()
+
+        mocker.patch(
+            "app.payout.core.account.processor.PayoutAccountProcessors.create_standard_payout",
+            side_effect=mock_standard_pay,
+        )
+
+        request_body = account_models.InitiatePayoutRequest(
+            amount=100,
+            payout_type="standard",
+            statement_descriptor="test_initiate_payout-api-call",
+            target_id=1,
+            target_type="store",
+            transfer_id=100,
+            method="stripe",
+        )
+        response = client.post(
+            get_initiate_payout_url(verified_payout_account["id"]),
+            json=request_body.dict(),
+        )
+        assert response.status_code == 200
+        assert response.json() == {"id": None}
+
+    def test_initiate_fast_payout(
+        self,
+        mocker: pytest_mock.MockFixture,
+        client: TestClient,
+        verified_payout_account_with_payout_card: dict,
+    ):
+        # mock out processor/biz layer logic, test for API layer handling only
+        async def mock_fast_pay(req):
+            return CreateInstantPayoutResponse()
+
+        mocker.patch(
+            "app.payout.core.account.processor.PayoutAccountProcessors.create_instant_payout",
+            side_effect=mock_fast_pay,
+        )
+
+        request_body = account_models.InitiatePayoutRequest(
+            amount=100,
+            payout_type="instant",
+            statement_descriptor="test_initiate_payout-api-call",
+            target_id=1,
+            target_type="store",
+            payout_id=100,
+            method="stripe",
+            payout_idempotency_key="test_initiate_payout-api-call-ik",
+        )
+        response = client.post(
+            get_initiate_payout_url(verified_payout_account_with_payout_card["id"]),
+            json=request_body.dict(),
+        )
+        assert response.status_code == 200
+        assert response.json() == {"id": None}

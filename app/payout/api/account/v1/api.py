@@ -371,7 +371,6 @@ async def initiate_payout(
                 error_code=PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND,
                 retryable=False,
             )
-
         payout_card_id = payout_card_method.id
         instant_payout_request = CreateInstantPayoutRequest(
             payout_account_id=payout_account_id,

@@ -44,3 +44,7 @@ def list_payout_method_url(account_id: int, limit: int = 50):
 
 def get_onboarding_requirements_by_stages_url():
     return f"{ACCOUNT_ENDPOINT}/onboarding_required_fields/"
+
+
+def get_initiate_payout_url(payout_account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{payout_account_id}/payouts"

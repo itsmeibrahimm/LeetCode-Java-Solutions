@@ -226,7 +226,7 @@ class Payout(PaymentResponse):
     Response model of creating a payout
     """
 
-    id: int = Schema(default=..., description="Payout ID")
+    id: Optional[int] = Schema(default=..., description="Payout ID")
 
 
 class ListPayoutMethod(PaymentRequest):
