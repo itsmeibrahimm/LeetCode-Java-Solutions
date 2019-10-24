@@ -71,6 +71,7 @@ class TestCaptureUncapturedPaymentIntents:
             app_context=app_context, job_pool=stripe_pool
         )
         await job_instance.run()
+        await stripe_pool.join()
         mock_cart_payment_processor.return_value.capture_payment.assert_called_once_with(  # type: ignore
             payment_intent
         )

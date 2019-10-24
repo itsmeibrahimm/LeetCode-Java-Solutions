@@ -50,7 +50,6 @@ def set_context_for_req(request: Request) -> ReqContext:
         stripe_client=app_context.stripe_client,
         commando=commando_mode,
     )
-    set_request_id(req_id),
     req_context = ReqContext(
         req_id=req_id,
         log=log,
@@ -74,6 +73,7 @@ def get_context_from_req(request: Request) -> ReqContext:
 
 def build_req_context(app_context: AppContext, **additional_req_log_kwargs):
     req_id = uuid4()
+    set_request_id(req_id)
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
     commando_legacy_payment_white_list = runtime.get_json(
         STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, []

@@ -9,6 +9,7 @@ from app.commons.context.app_context import AppContext
 from app.commons.context.logger import get_logger
 from app.commons.context.req_context import ReqContext, build_req_context
 from app.commons.jobs.pool import JobPool
+from app.payin.core.cart_payment.model import PaymentIntent
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
     CartPaymentProcessor,
@@ -41,7 +42,7 @@ class JobInstanceContext:
         self.job_name = job_name
         self.job_instance_id = str(uuid4())
         self.log = app_context.log.bind(
-            job_id=self.job_instance_id, job_name=self.job_name
+            job_instance_id=self.job_instance_id, job_name=self.job_name
         )
 
     def build_req_context(self) -> ReqContext:
@@ -127,13 +128,6 @@ class CaptureUncapturedPaymentIntents(Job):
             context=job_instance_cxt.app_context
         )
 
-        cart_payment_processor: CartPaymentProcessor = self._build_request_scoped_cart_payment_processor(
-            cart_payment_repo=cart_payment_repo,
-            payer_repo=payer_repo,
-            payment_method_repo=payment_method_repo,
-            job_instance_cxt=job_instance_cxt,
-        )
-
         uncaptured_payment_intents = cart_payment_repo.find_payment_intents_that_require_capture_before_cutoff(
             datetime.utcnow()
         )
@@ -155,7 +149,13 @@ class CaptureUncapturedPaymentIntents(Job):
                 payment_intent_skipped_count += 1
             else:
                 await job_instance_cxt.job_pool.spawn(
-                    cart_payment_processor.capture_payment(payment_intent),
+                    self._capture_payment(
+                        payment_intent=payment_intent,
+                        cart_payment_repo=cart_payment_repo,
+                        payer_repo=payer_repo,
+                        payment_method_repo=payment_method_repo,
+                        job_instance_cxt=job_instance_cxt,
+                    ),
                     cb=job_callback,
                 )
         job_instance_cxt.log.info(
@@ -163,6 +163,31 @@ class CaptureUncapturedPaymentIntents(Job):
             payment_intent_count=payment_intent_count,
             payment_intent_skipped_count=payment_intent_skipped_count,
         )
+
+    async def _capture_payment(
+        self,
+        payment_intent: PaymentIntent,
+        cart_payment_repo: CartPaymentRepository,
+        payer_repo: PayerRepository,
+        payment_method_repo: PaymentMethodRepository,
+        job_instance_cxt: JobInstanceContext,
+    ):
+        """
+        Build request scoped processor and  attach req_id to each processor call
+        :param payment_intent:
+        :param cart_payment_repo:
+        :param payer_repo:
+        :param payment_method_repo:
+        :param job_instance_cxt:
+        :return:
+        """
+        cart_payment_processor: CartPaymentProcessor = self._build_request_scoped_cart_payment_processor(
+            cart_payment_repo=cart_payment_repo,
+            payer_repo=payer_repo,
+            payment_method_repo=payment_method_repo,
+            job_instance_cxt=job_instance_cxt,
+        )
+        await cart_payment_processor.capture_payment(payment_intent)
 
     def _build_request_scoped_cart_payment_processor(
         self,
