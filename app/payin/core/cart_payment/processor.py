@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
 
+from doordash_python_stats.ddstats import doorstats_global
 from fastapi import Depends
 from stripe.error import InvalidRequestError, StripeError
 from stripe.util import convert_to_stripe_object
@@ -87,7 +88,6 @@ from app.payin.core.types import (
     PgpPaymentMethodResourceId,
 )
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
-from doordash_python_stats.ddstats import doorstats_global
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
 
@@ -580,11 +580,6 @@ class CartPaymentInterface:
         # From credential_owner, get payer_id
         # return cart_payment.payer_id == payer_id and cart_payment.payer_id == request_payer_id
         return True
-
-    def is_capture_immediate(self, payment_intent: PaymentIntent) -> bool:
-        # TODO control percentage of intents for delayed capture here with a config parameter
-        return False
-        # return True
 
     async def create_new_payment(
         self,
@@ -1699,14 +1694,6 @@ class CartPaymentProcessor:
             idempotency_key=payment_intent.idempotency_key,
             provider_payment_intent=provider_payment_intent,
         )
-
-        # When submitting a new intent, capture may happen if:
-        # (a) Caller specified capture_method = auto.  This happens above when updating state, and intents are already transitioned to success/failed states.
-        # (b) Caller specified capture_method = manual (delay capture) but based on config we are not going to wait - handled below.
-        if self.cart_payment_interface.is_capture_immediate(
-            payment_intent
-        ) and self.cart_payment_interface.does_intent_require_capture(payment_intent):
-            await self.capture_payment(payment_intent)
 
         return (
             updated_payment_intent,
@@ -2930,14 +2917,6 @@ class CommandoProcessor(CartPaymentProcessor):
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
         )
-
-        # When submitting a new intent, capture may happen if:
-        # (a) Caller specified capture_method = auto.  This happens above when updating state, and intents are already transitioned to success/failed states.
-        # (b) Caller specified capture_method = manual (delay capture) but based on config we are not going to wait - handled below.
-        if self.cart_payment_interface.is_capture_immediate(
-            payment_intent
-        ) and self.cart_payment_interface.does_intent_require_capture(payment_intent):
-            await self.capture_payment(payment_intent)
 
         self.log.info(
             "Recoup attempted",

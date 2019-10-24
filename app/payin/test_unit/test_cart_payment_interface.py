@@ -790,14 +790,6 @@ class TestCartPaymentInterface:
             is True
         )
 
-    def test_is_capture_immediate(self, cart_payment_interface):
-        # Stub function: return value is fixed
-        intent = generate_payment_intent(capture_method="manual")
-        assert cart_payment_interface.is_capture_immediate(intent) is False
-
-        intent = generate_payment_intent(capture_method="auto")
-        assert cart_payment_interface.is_capture_immediate(intent) is False
-
     @pytest.mark.asyncio
     @freeze_time("2011-01-01")
     async def test_create_new_payment(self, cart_payment_interface, stripe_interface):
