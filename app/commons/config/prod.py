@@ -1,10 +1,11 @@
 import os
 
+import pytz
 from apscheduler.triggers.cron import CronTrigger
 
 from app.commons.config.app_config import (
-    AppConfig,
     ApiStatsDConfig,
+    AppConfig,
     DBConfig,
     SentryConfig,
 )
@@ -72,7 +73,10 @@ def create_app_config() -> AppConfig:
             environment="prod",
             release=f"payment-service@release-{os.getenv('RELEASE_TAG')}",
         ),
-        CAPTURE_CRON_TRIGGER=CronTrigger(hour="0-23"),  # in UTC!
+        # exclude 16:00 - 18:00 pacific time 3 hourly triggers to avoid US peak hour
+        CAPTURE_CRON_TRIGGER=CronTrigger(
+            hour="0-15,19-23", timezone=pytz.timezone("US/Pacific")
+        ),
         DEFAULT_CAPTURE_DELAY_IN_MINUTES=60,  # 60 mins
         MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
         MARQETA_USERNAME=Secret(name="marqeta_username"),
