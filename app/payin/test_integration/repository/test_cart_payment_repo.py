@@ -1251,27 +1251,31 @@ class TestLegacyCharges:
         cart_payment_repository: CartPaymentRepository,
         stripe_charge: LegacyStripeCharge,
     ):
+        refunded_at = datetime.now(timezone.utc)
         result = await cart_payment_repository.update_legacy_stripe_charge_add_to_amount_refunded(
             stripe_id=stripe_charge.stripe_id,
             additional_amount_refunded=200,
-            refunded_at=datetime.now(),
+            refunded_at=refunded_at,
         )
 
         expected_result = stripe_charge
         expected_result.amount_refunded = 200
-        expected_result.refunded_at = result.refunded_at
+        expected_result.refunded_at = refunded_at
+        expected_result.updated_at = result.updated_at  # Generated
         assert result == expected_result
 
         # Call a second time, verify amount_refunded was added to
+        refunded_at = datetime.now(timezone.utc)
         result = await cart_payment_repository.update_legacy_stripe_charge_add_to_amount_refunded(
             stripe_id=stripe_charge.stripe_id,
             additional_amount_refunded=300,
-            refunded_at=datetime.now(),
+            refunded_at=refunded_at,
         )
 
         expected_result = stripe_charge
         expected_result.amount_refunded = 500
-        expected_result.refunded_at = result.refunded_at
+        expected_result.refunded_at = refunded_at
+        expected_result.updated_at = result.updated_at  # Generated
         assert result == expected_result
 
     @pytest.mark.asyncio
@@ -1280,15 +1284,17 @@ class TestLegacyCharges:
         cart_payment_repository: CartPaymentRepository,
         stripe_charge: LegacyStripeCharge,
     ):
+        refunded_at = datetime.now(timezone.utc)
         result = await cart_payment_repository.update_legacy_stripe_charge_refund(
             stripe_id=stripe_charge.stripe_id,
             amount_refunded=200,
-            refunded_at=datetime.now(),
+            refunded_at=refunded_at,
         )
 
         expected_result = stripe_charge
         expected_result.amount_refunded = 200
-        expected_result.refunded_at = result.refunded_at
+        expected_result.refunded_at = refunded_at
+        expected_result.updated_at = result.updated_at  # Generated
         assert result == expected_result
 
     @pytest.mark.asyncio
@@ -1310,6 +1316,7 @@ class TestLegacyCharges:
         expected_result.amount = 450
         expected_result.amount_refunded = 300
         expected_result.status = LegacyStripeChargeStatus.SUCCEEDED
+        expected_result.updated_at = result.updated_at  # Generated
         assert result == expected_result
 
     @pytest.mark.asyncio
@@ -1325,6 +1332,7 @@ class TestLegacyCharges:
 
         expected_result = stripe_charge
         expected_result.status = LegacyStripeChargeStatus.FAILED
+        expected_result.updated_at = result.updated_at  # Generated
         assert result == expected_result
 
     @pytest.mark.asyncio
@@ -1344,6 +1352,7 @@ class TestLegacyCharges:
         expected_result.status = LegacyStripeChargeStatus.FAILED
         expected_result.stripe_id = "generated id"
         expected_result.error_reason = "generic error"
+        expected_result.updated_at = result.updated_at  # Generated
         assert result == expected_result
 
     @pytest.mark.asyncio

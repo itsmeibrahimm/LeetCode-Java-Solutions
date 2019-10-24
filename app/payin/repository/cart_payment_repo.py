@@ -916,7 +916,7 @@ class CartPaymentRepository(PayinDBRepository):
             consumer_charges.stripe_customer_id: stripe_customer_id,
             consumer_charges.total: total,
             consumer_charges.original_total: original_total,
-            consumer_charges.created_at: datetime.utcnow(),
+            consumer_charges.created_at: datetime.now(timezone.utc),
         }
 
         statement = (
@@ -967,7 +967,7 @@ class CartPaymentRepository(PayinDBRepository):
         description: Optional[str],
         error_reason: Optional[str],
     ) -> LegacyStripeCharge:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         data = {
             stripe_charges.stripe_id: stripe_id,
             stripe_charges.card_id: card_id,
@@ -1023,6 +1023,7 @@ class CartPaymentRepository(PayinDBRepository):
                     stripe_charges.amount_refunded + additional_amount_refunded
                 ),
                 refunded_at=refunded_at,
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(*stripe_charges.table.columns.values())
         )
@@ -1036,7 +1037,11 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             stripe_charges.table.update()
             .where(stripe_charges.stripe_id == stripe_id)
-            .values(amount_refunded=amount_refunded, refunded_at=refunded_at)
+            .values(
+                amount_refunded=amount_refunded,
+                refunded_at=refunded_at,
+                updated_at=datetime.now(timezone.utc),
+            )
             .returning(*stripe_charges.table.columns.values())
         )
 
@@ -1059,6 +1064,7 @@ class CartPaymentRepository(PayinDBRepository):
                 amount=amount,
                 amount_refunded=amount_refunded,
                 status=status.value,
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(*stripe_charges.table.columns.values())
         )
@@ -1076,7 +1082,12 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             stripe_charges.table.update()
             .where(stripe_charges.id == id)
-            .values(stripe_id=stripe_id, status=status.value, error_reason=error_reason)
+            .values(
+                stripe_id=stripe_id,
+                status=status.value,
+                error_reason=error_reason,
+                updated_at=datetime.now(timezone.utc),
+            )
             .returning(*stripe_charges.table.columns.values())
         )
 
@@ -1089,7 +1100,7 @@ class CartPaymentRepository(PayinDBRepository):
         statement = (
             stripe_charges.table.update()
             .where(stripe_charges.stripe_id == stripe_charge_id)
-            .values(status=status.value)
+            .values(status=status.value, updated_at=datetime.now(timezone.utc))
             .returning(*stripe_charges.table.columns.values())
         )
 
