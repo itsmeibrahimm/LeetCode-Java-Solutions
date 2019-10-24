@@ -125,11 +125,18 @@ class AppConfig(SecretAware):
     MARQETA_JIT_PASSWORD: Secret
     MARQETA_PROGRAM_FUND_TOKEN: Secret
 
+    # Redis Instances
+    REDIS_INSTANCES: List[tuple]
+
     # DSJ client
     DSJ_API_USER_EMAIL: Secret
     DSJ_API_USER_PASSWORD: Secret
     DSJ_API_BASE_URL: str
     DSJ_API_JWT_TOKEN_TTL: int = 1800  # in seconds
+
+    # Redis Instance with default values
+    REDIS_LOCK_DEFAULT_TIMEOUT: float = 10.0  # in seconds
+    REDIS_LOCK_MAX_RETRY: int = 3
 
     # Stats
     STATSD_SERVER: str = "localhost"

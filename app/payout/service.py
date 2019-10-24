@@ -1,3 +1,4 @@
+from aioredlock import Aioredlock
 from fastapi import Depends
 from starlette.requests import Request
 
@@ -50,6 +51,7 @@ __all__ = [
     "TransactionRepositoryInterface",
     "PaymentAccountEditHistoryRepository",
     "PaymentAccountEditHistoryRepositoryInterface",
+    "RedisLockManager",
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
@@ -93,6 +95,7 @@ class PayoutService(BaseService):
 
     dsj_client: DSJClient
     stripe: StripeAsyncClient
+    redis_lock_manager: Aioredlock
 
     def __init__(self, request: Request):
         super().__init__(request)
@@ -130,6 +133,8 @@ class PayoutService(BaseService):
 
         # stripe
         self.stripe = get_stripe_async_client_from_req(request)  # type:ignore
+
+        self.redis_lock_manager = self.app_context.redis_lock_manager
 
 
 def PaymentAccountRepository(
@@ -206,6 +211,10 @@ def PaymentAccountEditHistoryRepository(
 
 def DSJClientHandle(payout_service: PayoutService = Depends()):
     return payout_service.dsj_client
+
+
+def RedisLockManager(payout_service: PayoutService = Depends()):
+    return payout_service.redis_lock_manager
 
 
 def create_payout_account_processors(payout_service: PayoutService = Depends()):

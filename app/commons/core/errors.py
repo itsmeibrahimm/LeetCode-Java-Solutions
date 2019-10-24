@@ -16,6 +16,17 @@ db_error_message_maps = {
 }
 
 
+class PaymentLockErrorCode(str, Enum):
+    LOCK_ACQUIRE_ERROR = "lock_acquire_error"
+    LOCK_RELEASE_ERROR = "lock_release_error"
+
+
+payment_lock_error_message_maps = {
+    PaymentLockErrorCode.LOCK_ACQUIRE_ERROR: "unable to acquire a lock",
+    PaymentLockErrorCode.LOCK_RELEASE_ERROR: "unable to release the lock",
+}
+
+
 class PGPErrorCode(str, Enum):
     PGP_CONNECTION_ERROR = "pgp_connection_error"
     PGP_API_ERROR = "pgp_api_error"
@@ -68,6 +79,45 @@ class PaymentError(Exception):
         self.error_code = error_code
         self.error_message = error_message
         self.retryable = retryable
+
+
+class PaymentLockError(PaymentError):
+    """Payment Lock Base Error."""
+
+    def __init__(self, error_code: str, error_message: str, retryable: bool):
+        super().__init__(error_code, error_message, retryable)
+
+
+class PaymentLockAcquireError(PaymentLockError):
+    """Payment Lock Acquire Error.
+
+    Raised when unable to acquire a lock using PaymentLock.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentLockErrorCode.LOCK_ACQUIRE_ERROR,
+            error_message=payment_lock_error_message_maps[
+                PaymentLockErrorCode.LOCK_ACQUIRE_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentLockReleaseError(PaymentLockError):
+    """Payment Lock Release Error.
+
+    Raised when unable to release a lock using PaymentLock.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentLockErrorCode.LOCK_RELEASE_ERROR,
+            error_message=payment_lock_error_message_maps[
+                PaymentLockErrorCode.LOCK_RELEASE_ERROR
+            ],
+            retryable=False,
+        )
 
 
 class DatabaseError(PaymentError):

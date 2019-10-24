@@ -25,3 +25,9 @@ services:
     ports:
       - 12111:12111 # http
       - 12112:12111 # https
+
+  payment.redis:
+    image: redis:2.8.23
+    container_name: payment.redis
+    ports:
+      - 6380:6379

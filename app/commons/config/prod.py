@@ -84,4 +84,9 @@ def create_app_config() -> AppConfig:
         MARQETA_JIT_USERNAME=Secret(name="marqeta_jit_username"),
         MARQETA_JIT_PASSWORD=Secret(name="marqeta_jit_password"),
         MARQETA_PROGRAM_FUND_TOKEN=Secret(name="marqeta_program_fund_token"),
+        # currently using merchant_datastore redis instance, which is the same as the one used for payment in DSJ
+        # better to switch to payment's own redis instance after instant payout/transfer migration
+        REDIS_INSTANCES=[
+            ("prod-default-d.mhazzc.ng.0001.usw2.cache.amazonaws.com", 6379)
+        ],
     )

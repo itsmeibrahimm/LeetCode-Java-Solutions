@@ -63,7 +63,7 @@ local-server: local-dependency
 
 .PHONY: local-dependency
 local-dependency:
-	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock
+	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock payment.redis
 
 .PHONY: apply-migrations
 apply-migrations:

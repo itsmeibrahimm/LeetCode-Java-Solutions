@@ -228,6 +228,7 @@ def dummy_app_context(mocker: MockFixture):
         dsj_session=mocker.Mock(),
         marqeta_client=mocker.Mock(),
         marqeta_session=mocker.Mock(),
+        redis_lock_manager=mocker.Mock(),
     )
 
 

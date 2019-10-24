@@ -5,6 +5,7 @@ from random import choice
 from typing import Any, cast
 
 import aiohttp
+from aioredlock import Aioredlock
 from starlette.requests import Request
 from structlog.stdlib import BoundLogger
 
@@ -71,6 +72,8 @@ class AppContext:
 
     marqeta_client: MarqetaProviderClient
 
+    redis_lock_manager: Aioredlock
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -89,6 +92,7 @@ class AppContext:
                 self.ids_session.close(),
                 self.dsj_session.close(),
                 self.marqeta_session.close(),
+                self.redis_lock_manager.destroy(),
             )
         finally:
             # shutdown the threadpool
@@ -239,6 +243,12 @@ async def create_app_context(config: AppConfig) -> AppContext:
         default_capture_delay_in_minutes=config.DEFAULT_CAPTURE_DELAY_IN_MINUTES
     )
 
+    redis_lock_manager = Aioredlock(
+        redis_connections=config.REDIS_INSTANCES,
+        lock_timeout=config.REDIS_LOCK_DEFAULT_TIMEOUT,
+        retry_count=config.REDIS_LOCK_MAX_RETRY,
+    )
+
     context = AppContext(
         log=root_logger,
         monitor=monitor,
@@ -257,6 +267,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         dsj_session=dsj_session,
         marqeta_session=marqeta_session,
         marqeta_client=marqeta_client,
+        redis_lock_manager=redis_lock_manager,
     )
 
     # start monitoring
