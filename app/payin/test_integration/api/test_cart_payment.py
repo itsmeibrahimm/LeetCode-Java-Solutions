@@ -1234,6 +1234,21 @@ class TestCartPayment:
             == request_body["client_description"][:1000]
         )
 
+    def test_legacy_card_use(
+        self,
+        stripe_api: StripeAPISettings,
+        stripe_customer: StripeCustomer,
+        client: TestClient,
+    ):
+        # PAYIN-140: Use "None" for stripe_customer_id
+        self._test_cart_payment_legacy_payment_creation(
+            client=client,
+            stripe_customer_id="None",
+            stripe_card_id="pm_card_mastercard",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+
     def test_legacy_payment(
         self,
         stripe_api: StripeAPISettings,

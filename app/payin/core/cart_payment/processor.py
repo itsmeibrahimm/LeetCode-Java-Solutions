@@ -813,6 +813,10 @@ class CartPaymentInterface:
         )
         payment_intent_metadata["payment_intent_id"] = str(payment_intent.id)
 
+        # TODO PAYIN-140: Remove this, which is a workaround until that issue is resolved.
+        if pgp_customer_resource_id == "None":
+            pgp_customer_resource_id = None
+
         # Actually create the payment intent
         try:
             intent_request = StripeCreatePaymentIntentRequest(
