@@ -633,7 +633,7 @@ class StripeClient(StripeClientInterface):
         )
         return account
 
-    @tracing.track_breadcrumb(resource="payout_method", action="create")
+    @tracing.track_breadcrumb(resource="payoutmethod", action="create")
     def create_external_account_card(
         self, request: models.CreateExternalAccountRequest
     ) -> models.StripeCard:
@@ -644,7 +644,7 @@ class StripeClient(StripeClientInterface):
         )
         return card
 
-    @tracing.track_breadcrumb(resource="payout_method", action="clone")
+    @tracing.track_breadcrumb(resource="paymentmethod", action="clone")
     def clone_payment_method(
         self, request: models.ClonePaymentMethodRequest, country: CountryCode
     ) -> models.PaymentMethod:
