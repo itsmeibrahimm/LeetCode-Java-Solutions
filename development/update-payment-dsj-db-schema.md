@@ -6,34 +6,23 @@ Instructions on how to dump DSJ maindb and bankdb schemas to separate local post
 
 ## Step-by-step guide
 
-### 1. Refresh DSJ local DB schema
-1. Checked out latest [doorstep-django project](https://github.com/doordash/doorstep-django) if you haven't.
-2. Make sure DSJ postgres container is **NOT** running.
-```bash
-docker rm -vf doorstep-django.postgres # remove running DSJ postgres container and its volumes
-```
-2. Update doorstep-django local postgres data volume. ([reference](https://github.com/doordash/doorstep-django/wiki/How-to-Develop#getting-the-database-schema-locally))
-```bash
-$ cd PATH/TO/DSJ/PROJECT
-$ dd-toolbox doorstep-django snap-to-schema
-```
+### 1. Update payment-dsj schema file
+1. Go to [PgAnalyze](https://app.pganalyze.com/databases/13362/tables) and looking for MainDB or BankDB's newly
+updated table schema you want to add
+2. Correspondly, in `payment-service/development/db-schemas/bankdb_dump.sql` or/and
+`payment-service/development/db-schemas/maindbdb_dump.sql` find creation statements of the table you want to update
+and update according to latest schema shown in PgAnalyze
 
-### 2. Update payment-dsj schema file
-This script will start doorstep-django.postgres container and dump out maindb/bankdb schemas to your local payment repo directory.
-```bash
-$ cd PATH/TO/PAYMENT/PROJECT
-$ ./development/dump-dsj-db-schemas.sh
-```
-
-### 3. Validate updated payment-dsj db schema
+### 2. Validate updated payment-dsj db schema
 Recreate your local payment.dsj-postgres container and load updated schemas. Verify if updates are reflected in the new container.
 ```bash
 $ cd PATH/TO/PAYMENT/PROJECT
+$ rm -rf  ~/.mountedvolumes/payment.dsj-postgres # !!! Note this will delete all your local dev DB data
 $ docker-compose -f ./docker-compose.nodeploy.yml up -d --force-recreate --renew-anon-volumes payment.dsj-postgres
 $ docker exec -it payment.dsj-postgres psql [ maindb_dev | maindb_test | bandb_dev | bankdb_test ]
 ```
 
-### 4. Create a new pull request to update refreshed DB schema in payment repo
+### 3. Create a new pull request to update refreshed DB schema in payment repo
 - After above steps you maindb_dump.sql and bankdb_dump.sql should be updated to your local payment repo directory:
 ```
 payment-service/development/

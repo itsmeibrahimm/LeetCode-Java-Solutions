@@ -25,3 +25,4 @@ services:
     depends_on:
       - payment.dsj-postgres
       - payment.stripe-mock
+      - payment.redis

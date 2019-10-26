@@ -5,7 +5,6 @@ import pytest
 from asynctest import patch, Mock
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 
-from app.commons.context.app_context import AppContext
 from app.commons.utils.testing import Stat
 from app.payin.jobs import EmitProblematicCaptureCount
 
@@ -17,12 +16,11 @@ from app.payin.jobs import EmitProblematicCaptureCount
 )
 async def test_emit_problematic_capture_count(
     mock_count_payment_intents_that_require_capture,
-    app_context: AppContext,
     service_statsd_client: DoorStatsProxyMultiServer,
     get_mock_statsd_events,
 ):
     job_instance = EmitProblematicCaptureCount(
-        app_context=app_context,
+        app_context=Mock(),
         job_pool=Mock(),
         statsd_client=service_statsd_client,
         problematic_threshold=timedelta(days=2),
