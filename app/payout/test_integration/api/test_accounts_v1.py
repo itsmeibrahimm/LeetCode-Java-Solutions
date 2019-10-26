@@ -339,7 +339,7 @@ class TestAccountV1:
             json=request_body.dict(),
         )
         assert response.status_code == 200
-        assert response.json() == {"id": None}
+        assert response.json() == {"id": 0}
 
     def test_initiate_fast_payout(
         self,
@@ -371,4 +371,4 @@ class TestAccountV1:
             json=request_body.dict(),
         )
         assert response.status_code == 200
-        assert response.json() == {"id": None}
+        assert response.json() == {"id": 0}

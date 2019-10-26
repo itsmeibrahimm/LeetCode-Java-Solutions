@@ -354,7 +354,10 @@ async def initiate_payout(
         standard_payout_response = await payout_account_processors.create_standard_payout(
             standard_payout_request
         )
-        return models.Payout(**standard_payout_response.dict())
+
+        # hotfix for pass client side data validator
+        # can not set default at Model directly due to our own constraint/enforcement
+        return models.Payout(**standard_payout_response.dict(), id=0)
     else:
         retrieve_method_request = GetDefaultPayoutCardRequest(
             payout_account_id=payout_account_id
@@ -386,7 +389,10 @@ async def initiate_payout(
         instant_payout_response = await payout_account_processors.create_instant_payout(
             instant_payout_request
         )
-        return models.Payout(**instant_payout_response.dict())
+
+        # hotfix for pass client side data validator
+        # can not set default at Model directly due to our own constraint/enforcement
+        return models.Payout(**instant_payout_response.dict(), id=0)
 
 
 @router.post(
