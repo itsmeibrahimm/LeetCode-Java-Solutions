@@ -4,6 +4,7 @@ from app.commons.database.infra import DB
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
 )
+from app.payout.repository.maindb.model.transfer import TransferStatus
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
@@ -11,7 +12,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transfer,
     prepare_and_insert_stripe_transfer,
 )
-from app.payout.models import TransferStatusType, TransferMethodType
+from app.payout.models import TransferMethodType
 
 
 class TestTransferUtils:
@@ -47,7 +48,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.DELETED
+        assert status == TransferStatus.DELETED
 
     async def test_determine_transfer_status_from_latest_submission_new_transfer(self):
         transfer = await prepare_and_insert_transfer(
@@ -56,7 +57,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.NEW
+        assert status == TransferStatus.NEW
 
     async def test_determine_transfer_status_from_latest_submission_transfer_paid_doordash_pay(
         self
@@ -69,7 +70,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.PAID
+        assert status == TransferStatus.PAID
 
     async def test_determine_transfer_status_from_latest_submission_transfer_paid_zero_amount(
         self
@@ -82,7 +83,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.PAID
+        assert status == TransferStatus.PAID
 
     async def test_determine_transfer_status_from_latest_submission_transfer_paid_non_stripe_method_and_submitted(
         self
@@ -95,7 +96,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.PAID
+        assert status == TransferStatus.PAID
 
     async def test_determine_transfer_status_from_latest_submission_transfer_paid_non_stripe_method_not_submitted(
         self
@@ -106,7 +107,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.NEW
+        assert status == TransferStatus.NEW
 
     async def test_determine_transfer_status_from_latest_submission_no_stripe_transfer(
         self
@@ -115,7 +116,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.NEW
+        assert status == TransferStatus.NEW
 
     async def test_determine_transfer_status_from_latest_submission_pending_stripe_transfer(
         self
@@ -129,7 +130,7 @@ class TestTransferUtils:
         status = await determine_transfer_status_from_latest_submission(
             transfer=transfer, stripe_transfer_repo=self.stripe_transfer_repo
         )
-        assert status == TransferStatusType.PENDING
+        assert status == TransferStatus.PENDING
 
     async def test_determine_transfer_status_from_latest_submission_invalid_status_stripe_transfer(
         self

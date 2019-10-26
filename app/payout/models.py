@@ -106,38 +106,6 @@ class StripeErrorCode(str, Enum):
     INVALID_REQUEST_ERROR = "invalid_request_error"
 
 
-class TransferStatusType(object):
-    CREATING = (
-        "creating"
-    )  # When a Payout is created on DD, but also in the process of updating associated transactions
-    CREATED = "created"  # When a Payout is created on stripe side
-    NEW = (
-        "new"
-    )  # When a Payout has been created on DD and ready for submission; Money is still in the SMA balance
-    SUBMITTING = (
-        "submitting"
-    )  # When a Payout has been created on DD, and submission to Stripe is in progress
-    PENDING = (
-        "pending"
-    )  # When a Payout is communicated to Stripe, but communication to Bank still in progress, money has left in SMA balance
-    IN_TRANSIT = (
-        "in_transit"
-    )  # When a Payout has been communicated to the Bank by Stripe
-    PAID = "paid"  # When a Payout has deposited money into corresponding bank account
-    FAILED = (
-        "failed"
-    )  # When a Payout failed to deposited to bank account on bank side, money has re-entered SMA balance
-    CANCELLED = (
-        "cancelled"
-    )  # When a Payout is confirmed to have been cancelled, money has re-entered SMA balance
-    DELETED = (
-        "deleted"
-    )  # When a Payout has been manually deleted, money is still in SMA balance.
-    ERROR = (
-        "error"
-    )  # When a Payout fails for a systemic issue e.g. Connection/Timeout/RateLimiting
-
-
 class TransferStatusCodeType(object):
     ERROR_AMOUNT_LIMIT_EXCEEDED = "amount_limit_exceeded_error"
     ERROR_NO_GATEWAY_ACCOUNT = "no_gateway_account_error"

@@ -28,6 +28,7 @@ from app.payout.repository.bankdb.transaction import TransactionRepository
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepository,
 )
+from app.payout.repository.maindb.model.transfer import TransferStatus
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
@@ -45,7 +46,6 @@ from app.payout.test_integration.utils import (
 )
 from app.payout.models import (
     PayoutTargetType,
-    TransferStatusType,
     TransferStatusCodeType,
     StripeTransferSubmissionStatus,
     StripeErrorCode,
@@ -205,7 +205,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.ERROR
+        assert retrieved_transfer.status == TransferStatus.ERROR
         assert (
             retrieved_transfer.status_code == TransferStatusCodeType.ERROR_INVALID_STATE
         )
@@ -246,7 +246,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.ERROR
+        assert retrieved_transfer.status == TransferStatus.ERROR
         assert (
             retrieved_transfer.status_code
             == TransferStatusCodeType.ERROR_AMOUNT_MISMATCH
@@ -334,7 +334,7 @@ class TestSubmitTransfer:
             transfer_repo=transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
-            status=TransferStatusType.ERROR,
+            status=TransferStatus.ERROR,
         )
         await prepare_and_insert_transaction(
             transaction_repo=transaction_repo,
@@ -383,7 +383,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.PAID
+        assert retrieved_transfer.status == TransferStatus.PAID
         assert retrieved_transfer.submitted_at
         assert not retrieved_transfer.status_code
 
@@ -417,7 +417,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.PAID
+        assert retrieved_transfer.status == TransferStatus.PAID
         assert retrieved_transfer.submitted_at
         assert not retrieved_transfer.status_code
 
@@ -522,7 +522,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.PENDING
+        assert retrieved_transfer.status == TransferStatus.PENDING
         assert retrieved_transfer.submitted_at
         assert not retrieved_transfer.status_code
 
@@ -541,7 +541,7 @@ class TestSubmitTransfer:
         )
         assert retrieved_transfer
         assert retrieved_transfer.method == "stripe"
-        assert retrieved_transfer.status == TransferStatusType.PAID
+        assert retrieved_transfer.status == TransferStatus.PAID
         assert not retrieved_transfer.status_code
 
     async def test_get_latest_transfer_submission_success(
@@ -645,7 +645,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.ERROR
+        assert retrieved_transfer.status == TransferStatus.ERROR
         assert (
             retrieved_transfer.status_code
             == TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED
@@ -699,7 +699,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.ERROR
+        assert retrieved_transfer.status == TransferStatus.ERROR
         assert (
             retrieved_transfer.status_code
             == TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED
@@ -786,7 +786,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.FAILED
+        assert retrieved_transfer.status == TransferStatus.FAILED
         assert (
             retrieved_transfer.status_code
             == TransferStatusCodeType.ERROR_NO_GATEWAY_ACCOUNT
@@ -831,7 +831,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.FAILED
+        assert retrieved_transfer.status == TransferStatus.FAILED
         assert (
             retrieved_transfer.status_code
             == TransferStatusCodeType.ERROR_NO_GATEWAY_ACCOUNT
@@ -1427,7 +1427,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id
         )
         assert retrieved_transfer
-        assert retrieved_transfer.status == TransferStatusType.ERROR
+        assert retrieved_transfer.status == TransferStatus.ERROR
         assert (
             retrieved_transfer.status_code
             == TransferStatusCodeType.ERROR_ACCOUNT_ID_MISMATCH

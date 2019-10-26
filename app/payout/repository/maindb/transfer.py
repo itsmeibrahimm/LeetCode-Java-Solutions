@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 from typing_extensions import final
 
 from app.commons import tracing
@@ -29,6 +29,10 @@ class TransferRepositoryInterface(ABC):
     ) -> Optional[Transfer]:
         pass
 
+    @abstractmethod
+    async def get_transfers_by_ids(self, transfer_ids: List[int]) -> List[Transfer]:
+        pass
+
 
 @final
 @tracing.track_breadcrumb(repository_name="transfer")
@@ -52,6 +56,12 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         stmt = transfers.table.select().where(transfers.id == transfer_id)
         row = await self._database.replica().fetch_one(stmt)
         return Transfer.from_row(row) if row else None
+
+    async def get_transfers_by_ids(self, transfer_ids: List[int]) -> List[Transfer]:
+        stmt = transfers.table.select().where(transfers.id.in_(transfer_ids))
+        rows = await self._database.master().fetch_all(stmt)
+        results = [Transfer.from_row(row) for row in rows] if rows else []
+        return results
 
     async def update_transfer_by_id(
         self, transfer_id: int, data: TransferUpdate

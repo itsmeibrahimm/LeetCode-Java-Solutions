@@ -118,36 +118,33 @@ class TransferUpdate(_TransferPartial):
     pass
 
 
-class TransferStatus(Enum):
-    # The following comments are all guesses, based on reading through code -- @sean
+class TransferStatus(str, Enum):
     CREATING = (
         "creating"
     )  # When a Payout is created on DD, but also in the process of updating associated transactions
     CREATED = "created"  # When a Payout is created on stripe side
     NEW = (
         "new"
-    )  # When a Payout has been created on DoorDash and ready for submission; Money is still in the Stripe Managed Account balance at this point
+    )  # When a Payout has been created on DD and ready for submission; Money is still in the SMA balance
     SUBMITTING = (
         "submitting"
-    )  # When a Payout has been created on DoorDash, and submission to Stripe is in progress
+    )  # When a Payout has been created on DD, and submission to Stripe is in progress
     PENDING = (
         "pending"
-    )  # When a Payout is communicated to Stripe, but Stripe has yet to communicate to the Bank.  Money has left the Stripe Managed Account balance at this point
+    )  # When a Payout is communicated to Stripe, but communication to Bank still in progress, money has left in SMA balance
     IN_TRANSIT = (
         "in_transit"
     )  # When a Payout has been communicated to the Bank by Stripe
-    PAID = (
-        "paid"
-    )  # When a Payout is confirmed to have depsited money into the managed account's Bank by Stripe
+    PAID = "paid"  # When a Payout has deposited money into corresponding bank account
     FAILED = (
         "failed"
-    )  # When a Payout is confirmed to have been failed by the Bank, Money has re-entered the Stripe Managed Account balance at this point
+    )  # When a Payout failed to deposited to bank account on bank side, money has re-entered SMA balance
     CANCELLED = (
         "cancelled"
-    )  # When a Payout is confirmed to have been cancelled (not sure by who), Money has re-entered the Stripe Managed Account balance at this point
+    )  # When a Payout is confirmed to have been cancelled, money has re-entered SMA balance
     DELETED = (
         "deleted"
-    )  # When a Payout has been manually deleted by someone on the Payments team, Money is still in the Stripe Managed Account balance.
+    )  # When a Payout has been manually deleted, money is still in SMA balance.
     ERROR = (
         "error"
     )  # When a Payout fails for a systemic issue e.g. Connection/Timeout/RateLimiting

@@ -48,7 +48,11 @@ from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransferCreate,
     StripeTransferUpdate,
 )
-from app.payout.repository.maindb.model.transfer import TransferUpdate, Transfer
+from app.payout.repository.maindb.model.transfer import (
+    TransferUpdate,
+    Transfer,
+    TransferStatus,
+)
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
 )
@@ -58,7 +62,6 @@ from app.payout.repository.maindb.stripe_transfer import (
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
 from app.commons.providers.stripe import stripe_models as models
 from app.payout.models import (
-    TransferStatusType,
     PayoutMethodType,
     TransferStatusCodeType,
     TransferMethodType,
@@ -168,7 +171,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             diff = abs(transaction_sum - transfer.amount)
             if diff:
                 update_request = TransferUpdate(
-                    status=TransferStatusType.ERROR,
+                    status=TransferStatus.ERROR,
                     status_code=TransferStatusCodeType.ERROR_AMOUNT_MISMATCH,
                 )
                 await self.transfer_repo.update_transfer_by_id(
@@ -181,7 +184,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 )
         else:
             update_request = TransferUpdate(
-                status=TransferStatusType.ERROR,
+                status=TransferStatus.ERROR,
                 status_code=TransferStatusCodeType.ERROR_INVALID_STATE,
             )
             await self.transfer_repo.update_transfer_by_id(
@@ -228,7 +231,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         else:
             # Do not attempt to transfer if this is a retry and the payment account doesnt have transfers enabled
             if (
-                transfer.status == TransferStatusType.ERROR
+                transfer.status == TransferStatus.ERROR
                 and not payment_account.transfers_enabled
             ):
                 raise PayoutError(
@@ -295,7 +298,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             update_request = TransferUpdate(
                 method=method,
                 submitted_at=datetime.utcnow(),
-                status=TransferStatusType.PAID,
+                status=TransferStatus.PAID,
                 status_code=None,
             )
             await self.transfer_repo.update_transfer_by_id(
@@ -355,7 +358,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             has_payment_permission = False
             if not has_payment_permission:
                 update_request = TransferUpdate(
-                    status=TransferStatusType.ERROR,
+                    status=TransferStatus.ERROR,
                     status_code=TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED,
                 )
                 await self.transfer_repo.update_transfer_by_id(
@@ -369,7 +372,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
 
         if transfer.amount < 0:
             update_request = TransferUpdate(
-                status=TransferStatusType.ERROR,
+                status=TransferStatus.ERROR,
                 status_code=TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED,
             )
             await self.transfer_repo.update_transfer_by_id(
@@ -413,7 +416,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             if stripe_managed_account:
                 return True
         update_request = TransferUpdate(
-            status=TransferStatusType.FAILED,
+            status=TransferStatus.FAILED,
             status_code=TransferStatusCodeType.ERROR_NO_GATEWAY_ACCOUNT,
         )
         await self.transfer_repo.update_transfer_by_id(
@@ -518,7 +521,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         if managed_account_transfer and managed_account_transfer.payment_account_id:
             if payment_account.id != managed_account_transfer.payment_account_id:
                 update_request = TransferUpdate(
-                    status=TransferStatusType.ERROR,
+                    status=TransferStatus.ERROR,
                     status_code=TransferStatusCodeType.ERROR_ACCOUNT_ID_MISMATCH,
                 )
                 await self.transfer_repo.update_transfer_by_id(
@@ -616,7 +619,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 )
                 if e.error_code in TRANSFER_ERROR_TYPE_TO_FAILED_STATUS:
                     update_request = TransferUpdate(
-                        status=TransferStatusType.FAILED,
+                        status=TransferStatus.FAILED,
                         status_code=e.error_code,
                         submitted_at=datetime.utcnow(),
                         submitted_by_id=submitted_by,
@@ -626,7 +629,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     )
                 else:
                     update_request = TransferUpdate(
-                        status=TransferStatusType.ERROR,
+                        status=TransferStatus.ERROR,
                         status_code=TransferStatusCodeType.ERROR_SUBMISSION,
                     )
                     await self.transfer_repo.update_transfer_by_id(
@@ -646,7 +649,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     error_message=e,
                 )
                 update_request = TransferUpdate(
-                    status=TransferStatusType.ERROR,
+                    status=TransferStatus.ERROR,
                     status_code=TransferStatusCodeType.UNKNOWN_ERROR,
                 )
                 await self.transfer_repo.update_transfer_by_id(
@@ -724,7 +727,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 stripe_request_id=updated_stripe_transfer.stripe_request_id,
             )
             update_transfer_request = TransferUpdate(
-                status=TransferStatusType.PENDING, status_code=None
+                status=TransferStatus.PENDING, status_code=None
             )
             await self.transfer_repo.update_transfer_by_id(
                 transfer_id=transfer_id, data=update_transfer_request
@@ -820,7 +823,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             )
         update_request = TransferUpdate(
             status_code=None,
-            status=TransferStatusType.PAID,
+            status=TransferStatus.PAID,
             submitted_at=datetime.now(timezone.utc),
             submitted_by=submitted_by,
         )

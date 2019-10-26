@@ -37,6 +37,7 @@ from app.payout.repository.maindb.model.transfer import (
     Transfer,
     TransferCreate,
     TransferUpdate,
+    TransferStatus,
 )
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
@@ -302,7 +303,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             adjustments="{}",
             method="",
             currency=currency,
-            status=payout_models.TransferStatusType.CREATING,
+            status=TransferStatus.CREATING,
         )
         transfer = await self.transfer_repo.create_transfer(data=create_request)
         transaction_ids = [transaction.id for transaction in unpaid_transactions]

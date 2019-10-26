@@ -20,6 +20,7 @@ from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepository,
 )
 from app.payout.repository.bankdb.transaction import TransactionRepository
+from app.payout.repository.maindb.model.transfer import TransferStatus
 
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
@@ -29,7 +30,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transaction,
     prepare_and_insert_stripe_managed_account,
 )
-from app.payout.models import PayoutTargetType, TransferStatusType, TransferType
+from app.payout.models import PayoutTargetType, TransferType
 
 
 class TestCreateTransfer:
@@ -138,7 +139,7 @@ class TestCreateTransfer:
         )
         response = await create_transfer_op._execute()
         assert response.transfer
-        assert response.transfer.status == TransferStatusType.NEW
+        assert response.transfer.status == TransferStatus.NEW
         assert response.transfer.payment_account_id == payment_account.id
         assert response.transfer.amount == response.transfer.subtotal
         assert response.transfer.amount == transaction.amount
@@ -221,7 +222,7 @@ class TestCreateTransfer:
 
         response = await create_transfer_op._execute()
         assert response.transfer
-        assert response.transfer.status == TransferStatusType.NEW
+        assert response.transfer.status == TransferStatus.NEW
         assert response.transfer.payment_account_id == payment_account.id
         assert response.transfer.amount == response.transfer.subtotal
         assert response.transfer.amount == transaction.amount
@@ -262,7 +263,7 @@ class TestCreateTransfer:
         )
         assert retrieved_transaction
         assert retrieved_transaction.transfer_id == transfer.id
-        assert transfer.status == TransferStatusType.NEW
+        assert transfer.status == TransferStatus.NEW
 
     async def test_create_with_redis_lock_no_unpaid_transactions(self):
         payment_account = await prepare_and_insert_payment_account(
@@ -298,7 +299,7 @@ class TestCreateTransfer:
         )
         assert retrieved_transaction
         assert retrieved_transaction.transfer_id == transfer.id
-        assert transfer.status == TransferStatusType.NEW
+        assert transfer.status == TransferStatus.NEW
 
     async def test_should_block_mx_payout_disable_payout_delay_after_bank_change(self):
         # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE

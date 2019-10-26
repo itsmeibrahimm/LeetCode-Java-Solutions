@@ -45,6 +45,19 @@ class TestTransferRepository:
     async def test_get_transfer_by_id_not_found(self, transfer_repo):
         assert not await transfer_repo.get_transfer_by_id(transfer_id=-1)
 
+    async def test_get_transfers_by_ids(self, transfer_repo):
+        transfer_a = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer_b = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer_c = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer_ids = [transfer_a.id, transfer_b.id]
+        retrieved_transfers = await transfer_repo.get_transfers_by_ids(
+            transfer_ids=transfer_ids
+        )
+        assert len(retrieved_transfers) == 2
+        assert transfer_a in retrieved_transfers
+        assert transfer_b in retrieved_transfers
+        assert transfer_c not in retrieved_transfers
+
     async def test_update_transfer_by_id_not_found(self, transfer_repo):
         assert not await transfer_repo.update_transfer_by_id(
             transfer_id=-1, data=TransferUpdate(subtotal=100)

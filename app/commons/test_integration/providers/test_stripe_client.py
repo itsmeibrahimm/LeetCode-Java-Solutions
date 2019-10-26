@@ -166,7 +166,7 @@ class TestStripeClient:
         with pytest.raises(InvalidRequestError):
             stripe.retrieve_payout(
                 country=models.CountryCode.US,
-                request=models.RetrievePayout(
+                request=models.StripeRetrievePayoutRequest(
                     stripe_account="acct_1FGdyOBOQHMRR5FG", id="invalid_payout_id"
                 ),
             )
