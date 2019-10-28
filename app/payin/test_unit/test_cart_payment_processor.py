@@ -8,6 +8,7 @@ from app.commons.types import CountryCode, Currency
 from app.payin.core.cart_payment.model import CartPayment, IntentStatus, SplitPayment
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus, RefundStatus
 from app.payin.core.exceptions import (
+    CartPaymentCreateError,
     CartPaymentReadError,
     CartPaymentUpdateError,
     PayinErrorCode,
@@ -213,7 +214,14 @@ class TestCartPaymentProcessor:
         cart_payment_processor._update_state_after_provider_error = FunctionMock()
         cart_payment_processor._get_payer_from_cart_payment = FunctionMock()
         cart_payment_processor.cart_payment_interface.submit_payment_to_provider = FunctionMock(
-            side_effect=Exception()
+            side_effect=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=None,
+            )
         )
 
         with pytest.raises(Exception):
@@ -594,6 +602,14 @@ class TestCartPaymentProcessor:
         legacy_stripe_charge = generate_legacy_stripe_charge()
 
         result_intent, result_pgp_intent, result_stripe_charge = await cart_payment_processor._update_state_after_provider_error(
+            creation_exception=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ),
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             legacy_stripe_charge=legacy_stripe_charge,

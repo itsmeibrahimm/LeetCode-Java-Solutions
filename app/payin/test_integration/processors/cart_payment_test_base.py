@@ -10,12 +10,15 @@ from app.commons.types import CountryCode, Currency, PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
+    LegacyConsumerCharge,
+    LegacyStripeCharge,
     LegacyPayment,
     PaymentIntent,
     PgpPaymentIntent,
 )
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
+from app.payin.core.exceptions import CartPaymentCreateError
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.v1.processor import PayerProcessorV1
 from app.payin.core.payment_method.model import PaymentMethod
@@ -28,8 +31,8 @@ from app.payin.repository.cart_payment_repo import CartPaymentRepository
 class PgpPaymentIntentState:
     status: IntentStatus
     amount: int
-    amount_received: int
-    amount_capturable: int
+    amount_received: Optional[int]
+    amount_capturable: Optional[int]
 
 
 @dataclass
@@ -37,6 +40,7 @@ class StripeChargeState:
     status: LegacyStripeChargeStatus
     amount: int
     amount_refunded: int
+    error_reason: str
 
 
 @dataclass
@@ -64,7 +68,126 @@ class CartPaymentState:
             )
 
 
-class CapturePaymentIntentTestBase(ABC):
+class CartPaymentTestBase(ABC):
+    def _verify_payment_intent_state(
+        self,
+        actual_payment_intent: PaymentIntent,
+        expected_payment_intent_state: PaymentIntentState,
+    ):
+        assert actual_payment_intent
+        assert (
+            actual_payment_intent.amount == expected_payment_intent_state.amount
+        ), "payment_intent amount mismatch"
+        assert (
+            actual_payment_intent.status == expected_payment_intent_state.status
+        ), "payment_intent status mismatch"
+
+    def _verify_pgp_payment_intent_state(
+        self,
+        actual_pgp_payment_intent: PgpPaymentIntent,
+        expected_pgp_payment_intent_state: PgpPaymentIntentState,
+    ):
+        assert (
+            actual_pgp_payment_intent.amount == expected_pgp_payment_intent_state.amount
+        ), "pgp_payment_intent amount mismatch"
+        assert (
+            actual_pgp_payment_intent.amount_capturable
+            == expected_pgp_payment_intent_state.amount_capturable
+        ), "pgp_payment_intent amount_capturable mismatch"
+        assert (
+            actual_pgp_payment_intent.amount_received
+            == expected_pgp_payment_intent_state.amount_received
+        ), "pgp_payment_intent amount_received mismatch"
+
+    def _verify_consumer_charge_state(
+        self, actual_consumer_charge: LegacyConsumerCharge, expected_amount: int
+    ):
+        assert (
+            actual_consumer_charge.original_total == expected_amount
+        ), "consumer charge amount always = init cart payment amount"
+
+    def _verify_stripe_charge_state(
+        self,
+        actual_stripe_charge: LegacyStripeCharge,
+        expected_payment_intent_state: StripeChargeState,
+    ):
+        assert (
+            actual_stripe_charge.amount == expected_payment_intent_state.amount
+        ), "stripe charge amount mismatch"
+        assert (
+            actual_stripe_charge.status == expected_payment_intent_state.status
+        ), "stripe charge status mismatch"
+        assert (
+            actual_stripe_charge.amount_refunded
+            == expected_payment_intent_state.amount_refunded
+        ), "stripe charge amount_refunded mismatch"
+        assert (
+            actual_stripe_charge.error_reason
+            == expected_payment_intent_state.error_reason
+        ), "stripe charge error_reason mismatch"
+        assert actual_stripe_charge.stripe_id, "stripe charge resource id missing"
+
+    async def _test_cart_payment_creation_error(
+        self,
+        cart_payment_state: CartPaymentState,
+        cart_payment_processor: CartPaymentProcessor,
+        cart_payment_repository: CartPaymentRepository,
+        payer: Payer,
+        payment_method: PaymentMethod,
+    ):
+        # Try to create cart payment, requiring that failure happens
+        idempotency_key = str(uuid4())
+        with pytest.raises(CartPaymentCreateError):
+            await self._prepare_cart_payment(
+                payer=payer,
+                payment_method=payment_method,
+                delay_capture=cart_payment_state.delay_capture,
+                cart_payment_processor=cart_payment_processor,
+                idempotency_key=idempotency_key,
+            )
+
+        # Verify intent, pgp intent
+        payment_intent = await cart_payment_repository.get_payment_intent_for_idempotency_key(
+            idempotency_key=idempotency_key
+        )
+
+        assert payment_intent
+        self._verify_payment_intent_state(
+            payment_intent, cart_payment_state.payment_intent_states[0]
+        )
+
+        all_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+            cart_payment_id=payment_intent.cart_payment_id
+        )
+        assert len(all_intents) == 1
+        assert all_intents[0].id == payment_intent.id
+
+        pgp_payment_intents = await cart_payment_repository.find_pgp_payment_intents(
+            payment_intent.id
+        )
+        assert len(pgp_payment_intents) == 1
+        self._verify_pgp_payment_intent_state(
+            pgp_payment_intents[0],
+            cart_payment_state.payment_intent_states[0].pgp_payment_intent_state,
+        )
+
+        # Verify legacy consumer charge, stripe charge
+        consumer_charge, stripe_charge = await cart_payment_processor.legacy_payment_interface.find_existing_payment_charge(
+            charge_id=payment_intent.legacy_consumer_charge_id,
+            idempotency_key=payment_intent.idempotency_key,
+        )
+
+        assert consumer_charge, "consumer charge not found!"
+        assert stripe_charge, "stripe charge not found!"
+
+        self._verify_consumer_charge_state(
+            consumer_charge, cart_payment_state.payment_intent_states[0].amount
+        )
+        self._verify_stripe_charge_state(
+            stripe_charge,
+            cart_payment_state.payment_intent_states[0].stripe_charge_state,
+        )
+
     async def _test_cart_payment_state_transition(
         self,
         cart_payment_states: List[CartPaymentState],
@@ -80,6 +203,7 @@ class CapturePaymentIntentTestBase(ABC):
             payment_method=payment_method,
             delay_capture=init_cart_payment_state.delay_capture,
             cart_payment_processor=cart_payment_processor,
+            idempotency_key=str(uuid4()),
         )
 
         assert (
@@ -177,12 +301,7 @@ class CapturePaymentIntentTestBase(ABC):
             updated_payment_intents, new_cart_payment_state.payment_intent_states
         ):
             # verify new path
-            assert (
-                payment_intent.amount == payment_intent_state.amount
-            ), "payment_intent amount mismatch"
-            assert (
-                payment_intent.status == payment_intent_state.status
-            ), "payment_intent status mismatch"
+            self._verify_payment_intent_state(payment_intent, payment_intent_state)
             pgp_payment_intents = await cart_payment_repository.find_pgp_payment_intents(
                 payment_intent.id
             )
@@ -203,8 +322,8 @@ class CapturePaymentIntentTestBase(ABC):
                     payment_intent.id
                 ]
                 if new_cart_payment_state.delay_capture:
-                    # TODO Fix this to work for the immediate capture case, where a record is added for the refund of past intents.\
-                    # TODO verify expected refund state
+                    # TODO Fix this to work for the immediate capture case, where a record is added for the refund of past intents
+                    # TODO Verify expected refund state
                     assert (
                         payment_intent_adjustment_history
                     ), "payment_intent_adjustment_history not found!"
@@ -225,22 +344,9 @@ class CapturePaymentIntentTestBase(ABC):
             assert (
                 len(pgp_payment_intents) == 1
             ), "number of pgp_payment_intent mismatch"
-            assert (
-                pgp_payment_intents[0].status
-                == payment_intent_state.pgp_payment_intent_state.status
-            ), "pgp_payment_intent status mismatch"
-            assert (
-                pgp_payment_intents[0].amount
-                == payment_intent_state.pgp_payment_intent_state.amount
-            ), "pgp_payment_intent amount mismatch"
-            assert (
-                pgp_payment_intents[0].amount_capturable
-                == payment_intent_state.pgp_payment_intent_state.amount_capturable
-            ), "pgp_payment_intent amount_capturable mismatch"
-            assert (
-                pgp_payment_intents[0].amount_received
-                == payment_intent_state.pgp_payment_intent_state.amount_received
-            ), "pgp_payment_intent amount_received mismatch"
+            self._verify_pgp_payment_intent_state(
+                pgp_payment_intents[0], payment_intent_state.pgp_payment_intent_state
+            )
 
             # verify legacy path
             consumer_charge, stripe_charge = await cart_payment_processor.legacy_payment_interface.find_existing_payment_charge(
@@ -249,19 +355,12 @@ class CapturePaymentIntentTestBase(ABC):
             )
             assert consumer_charge, "consumer charge not found!"
             assert stripe_charge, "stripe charge not found!"
-            assert (
-                consumer_charge.original_total == init_cart_payment.amount
-            ), "consumer charge amount always = init cart payment amount"
-            assert (
-                stripe_charge.amount == payment_intent_state.stripe_charge_state.amount
-            ), "stripe charge amount mismatch"
-            assert (
-                stripe_charge.status == payment_intent_state.stripe_charge_state.status
-            ), "stripe charge status mismatch"
-            assert (
-                stripe_charge.amount_refunded
-                == payment_intent_state.stripe_charge_state.amount_refunded
-            ), "stripe charge amount_refunded mismatch"
+            self._verify_consumer_charge_state(
+                consumer_charge, init_cart_payment.amount
+            )
+            self._verify_stripe_charge_state(
+                stripe_charge, payment_intent_state.stripe_charge_state
+            )
 
     async def _capture_intents(
         self,
@@ -269,7 +368,7 @@ class CapturePaymentIntentTestBase(ABC):
         cart_payment_processor: CartPaymentProcessor,
     ):
 
-        # todo: ideally should just use "capture_uncapture_payment_intents" here to run in job pool
+        # TODO ideally should just use "capture_uncapture_payment_intents" here to run in job pool
         # though this could occasionally cause db transaction cannot be properly closed likely due to
         # some unknown race condition. need to investigate and revise.
         uncaptured_payment_intents = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
@@ -311,6 +410,7 @@ class CapturePaymentIntentTestBase(ABC):
         payment_method: PaymentMethod,
         delay_capture: bool,
         cart_payment_processor: CartPaymentProcessor,
+        idempotency_key: str,
     ) -> CartPayment:
         pass
 
@@ -327,7 +427,7 @@ class CapturePaymentIntentTestBase(ABC):
         pass
 
 
-class CapturePaymentIntentTest(CapturePaymentIntentTestBase):
+class CartPaymentTest(CartPaymentTestBase):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
     @pytest.fixture
@@ -359,6 +459,7 @@ class CapturePaymentIntentTest(CapturePaymentIntentTestBase):
         payment_method: PaymentMethod,
         delay_capture: bool,
         cart_payment_processor: CartPaymentProcessor,
+        idempotency_key: str,
     ) -> CartPayment:
         request = CartPayment(
             id=uuid4(),
@@ -373,7 +474,7 @@ class CapturePaymentIntentTest(CapturePaymentIntentTestBase):
         )
         created = await cart_payment_processor.create_payment(
             request_cart_payment=request,
-            idempotency_key=str(uuid4()),
+            idempotency_key=idempotency_key,
             currency=Currency.USD,
             payment_country=CountryCode(payer.country),
         )
@@ -399,7 +500,7 @@ class CapturePaymentIntentTest(CapturePaymentIntentTestBase):
         )
 
 
-class CapturePaymentIntentLegacyTest(CapturePaymentIntentTestBase):
+class CartPaymentLegacyTest(CartPaymentTestBase):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
     @pytest.fixture
@@ -438,6 +539,7 @@ class CapturePaymentIntentLegacyTest(CapturePaymentIntentTestBase):
         payment_method: PaymentMethod,
         delay_capture: bool,
         cart_payment_processor: CartPaymentProcessor,
+        idempotency_key: str,
     ) -> CartPayment:
         request = CartPayment(
             id=uuid4(),
@@ -454,7 +556,7 @@ class CapturePaymentIntentLegacyTest(CapturePaymentIntentTestBase):
 
         created, _ = await cart_payment_processor.legacy_create_payment(
             request_cart_payment=request,
-            idempotency_key=str(uuid4()),
+            idempotency_key=idempotency_key,
             legacy_payment=LegacyPayment(
                 dd_consumer_id=1,
                 dd_country_id=1,

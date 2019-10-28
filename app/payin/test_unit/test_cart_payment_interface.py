@@ -372,16 +372,177 @@ class TestLegacyPaymentInterface:
         assert result_stripe_charge.refunded_at
 
     @pytest.mark.asyncio
-    async def test_mark_charge_as_failed(
+    async def test_extract_error_reason_from_exception(self, legacy_payment_interface):
+        # Use provider decline code if it is provided
+        exception = CartPaymentCreateError(
+            error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
+            retryable=False,
+            provider_charge_id=str(uuid.uuid4()),
+            provider_error_code="card_declined",
+            provider_decline_code="generic_decline",
+            has_provider_error_details=True,
+        )
+        assert (
+            legacy_payment_interface._extract_error_reason_from_exception(exception)
+            == "generic_decline"
+        )
+
+        # If no decline code, use provider error code
+        exception = CartPaymentCreateError(
+            error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
+            retryable=False,
+            provider_charge_id=str(uuid.uuid4()),
+            provider_error_code="card_declined",
+            provider_decline_code=None,
+            has_provider_error_details=True,
+        )
+        assert (
+            legacy_payment_interface._extract_error_reason_from_exception(exception)
+            == "card_declined"
+        )
+
+        # Error details exist but not specific fields like error_code, and error happened from calling provider
+        exception = CartPaymentCreateError(
+            error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+            retryable=False,
+            provider_charge_id=None,
+            provider_error_code=None,
+            provider_decline_code=None,
+            has_provider_error_details=True,
+        )
+        assert (
+            legacy_payment_interface._extract_error_reason_from_exception(exception)
+            == "empty_error_reason"
+        )
+
+        # No error details, but error from calling provider
+        exception = CartPaymentCreateError(
+            error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+            retryable=False,
+            provider_charge_id=None,
+            provider_error_code=None,
+            provider_decline_code=None,
+            has_provider_error_details=False,
+        )
+        assert (
+            legacy_payment_interface._extract_error_reason_from_exception(exception)
+            == "generic_stripe_api_error"
+        )
+
+        # Error but not from calling provider
+        exception = CartPaymentCreateError(
+            error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
+            retryable=False,
+            provider_charge_id=None,
+            provider_error_code=None,
+            provider_decline_code=None,
+            has_provider_error_details=False,
+        )
+        assert (
+            legacy_payment_interface._extract_error_reason_from_exception(exception)
+            == "generic_exception"
+        )
+
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed_generic_message(
         self, cart_payment_interface, legacy_payment_interface
     ):
         legacy_stripe_charge = generate_legacy_stripe_charge()
         result = await legacy_payment_interface.mark_charge_as_failed(
-            legacy_stripe_charge
+            stripe_charge=legacy_stripe_charge,
+            creation_exception=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
+                retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ),
         )
         assert result.status == LegacyStripeChargeStatus.FAILED
         assert result.stripe_id.startswith("stripeid_lost_")
         assert result.error_reason == "generic_exception"
+
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed_error_code_message(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        stripe_id = str(uuid.uuid4())
+        result = await legacy_payment_interface.mark_charge_as_failed(
+            stripe_charge=legacy_stripe_charge,
+            creation_exception=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+                provider_charge_id=stripe_id,
+                provider_error_code="card declined",
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ),
+        )
+        assert result.status == LegacyStripeChargeStatus.FAILED
+        assert result.stripe_id == stripe_id
+        assert result.error_reason == "card declined"
+
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed_decline_code_message(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        result = await legacy_payment_interface.mark_charge_as_failed(
+            stripe_charge=legacy_stripe_charge,
+            creation_exception=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+                provider_charge_id=None,
+                provider_error_code="card_declined",
+                provider_decline_code="generic_decline",
+                has_provider_error_details=False,
+            ),
+        )
+        assert result.status == LegacyStripeChargeStatus.FAILED
+        assert result.stripe_id.startswith("stripeid_lost_")
+        assert result.error_reason == "generic_decline"
+
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed_empty_error_reason_message(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        result = await legacy_payment_interface.mark_charge_as_failed(
+            stripe_charge=legacy_stripe_charge,
+            creation_exception=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=True,
+            ),
+        )
+        assert result.status == LegacyStripeChargeStatus.FAILED
+        assert result.stripe_id.startswith("stripeid_lost_")
+        assert result.error_reason == "empty_error_reason"
+
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed_generic_stripe_message(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        result = await legacy_payment_interface.mark_charge_as_failed(
+            stripe_charge=legacy_stripe_charge,
+            creation_exception=CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ),
+        )
+        assert result.status == LegacyStripeChargeStatus.FAILED
+        assert result.stripe_id.startswith("stripeid_lost_")
+        assert result.error_reason == "generic_stripe_api_error"
 
 
 class TestCartPaymentInterface:

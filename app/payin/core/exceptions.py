@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional
 
 from app.commons.core.errors import PaymentError
 from app.payin.core.cart_payment.types import IntentStatus
@@ -34,6 +35,7 @@ payin_error_message_maps = {
     "payin_44": "Cannot create payment.  Payment card expired.",
     "payin_45": "Cannot create payment.  Payment card cannot be processed.",
     "payin_46": "Cannot create payment.  Payment card number incorrect.",
+    "payin_47": "An error occurred attempting your payment request.  Please try again later.",
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
@@ -81,6 +83,7 @@ class PayinErrorCode(str, Enum):
     PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR = "payin_44"
     PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR = "payin_45"
     PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR = "payin_46"
+    PAYMENT_INTENT_CREATE_ERROR = "payin_47"
     PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
     PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
     PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"
@@ -167,7 +170,22 @@ class PaymentMethodListError(PayinError):
 # CartPayment Errors                                      #
 ###########################################################
 class CartPaymentCreateError(PayinError):
-    pass
+    def __init__(
+        self,
+        error_code: PayinErrorCode,
+        retryable: bool,
+        provider_charge_id: Optional[str],
+        provider_error_code: Optional[str],
+        provider_decline_code: Optional[str],
+        has_provider_error_details: bool,
+    ):
+        super(CartPaymentCreateError, self).__init__(
+            error_code=error_code, retryable=retryable
+        )
+        self.provider_error_code = provider_error_code
+        self.provider_decline_code = provider_decline_code
+        self.provider_charge_id = provider_charge_id
+        self.has_provider_error_details = has_provider_error_details
 
 
 class CartPaymentReadError(PayinError):

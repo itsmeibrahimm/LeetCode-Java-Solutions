@@ -329,14 +329,44 @@ class LegacyPaymentInterface:
             refunded_at=datetime.now(),
         )
 
+    def _extract_error_reason_from_exception(
+        self, creation_exception: CartPaymentCreateError
+    ) -> str:
+        if creation_exception.provider_decline_code:
+            # Provider decline code is most specific error and is favored
+            error_reason = creation_exception.provider_decline_code
+        elif creation_exception.provider_error_code:
+            # Provider error code is next most descriptive
+            error_reason = creation_exception.provider_error_code
+        elif (
+            creation_exception.error_code
+            == PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR
+        ):
+            # An error was received from stripe, but we still lack more detailed fields above.
+            if creation_exception.has_provider_error_details:
+                # Error details were found, but no specific info was extracted.
+                error_reason = "empty_error_reason"
+            else:
+                # Error details not found.  Default to generic message reflecting stripe usage.
+                error_reason = "generic_stripe_api_error"
+        else:
+            # Fallback to generic error message
+            error_reason = "generic_exception"
+
+        return error_reason
+
     async def mark_charge_as_failed(
-        self, stripe_charge: LegacyStripeCharge
+        self,
+        stripe_charge: LegacyStripeCharge,
+        creation_exception: CartPaymentCreateError,
     ) -> LegacyStripeCharge:
         return await self.payment_repo.update_legacy_stripe_charge_error_details(
             id=stripe_charge.id,
-            stripe_id=f"stripeid_lost_{str(uuid.uuid4())}",
+            stripe_id=creation_exception.provider_charge_id
+            if creation_exception.provider_charge_id
+            else f"stripeid_lost_{str(uuid.uuid4())}",
             status=LegacyStripeChargeStatus.FAILED,
-            error_reason="generic_exception",
+            error_reason=self._extract_error_reason_from_exception(creation_exception),
         )
 
 
@@ -877,7 +907,16 @@ class CartPaymentInterface:
                     PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR
                 )
 
-            raise CartPaymentCreateError(error_code=error_code, retryable=False)
+            json_body = e.json_body if e.json_body else {}
+            error_details = json_body.get("error", {})
+            raise CartPaymentCreateError(
+                error_code=error_code,
+                retryable=False,
+                provider_charge_id=error_details.get("charge", None),
+                provider_error_code=error_details.get("code", None),
+                provider_decline_code=error_details.get("decline_code", None),
+                has_provider_error_details=True if json_body else False,
+            )
         except StripeCommandoError:
             self.req_context.log.info(
                 "[submit_payment_to_provider] Returning mocked payment_intent response for commando mode"
@@ -889,8 +928,12 @@ class CartPaymentInterface:
                 payment_intent_id=payment_intent.id,
             )
             raise CartPaymentCreateError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
                 retryable=True,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
             )
 
     async def update_payment_after_submission_to_provider(
@@ -1477,6 +1520,10 @@ class CartPaymentInterface:
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
             )
 
         result_legacy_payment = LegacyPayment(
@@ -1523,6 +1570,10 @@ class CartPaymentInterface:
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
             )
 
         if not provider_payment_method_id:
@@ -1532,6 +1583,10 @@ class CartPaymentInterface:
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
                 retryable=False,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
             )
 
         pgp_payment_method = PgpPaymentMethod(
@@ -1660,13 +1715,14 @@ class CartPaymentProcessor:
 
     async def _update_state_after_provider_error(
         self,
+        creation_exception: CartPaymentCreateError,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
         legacy_stripe_charge: LegacyStripeCharge,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent, LegacyStripeCharge]:
         # Legacy system: update stripe_charge to failed
         stripe_charge = await self.legacy_payment_interface.mark_charge_as_failed(
-            legacy_stripe_charge
+            stripe_charge=legacy_stripe_charge, creation_exception=creation_exception
         )
 
         updated_payment_intent, updated_pgp_payment_intent = await self.cart_payment_interface.mark_payment_as_failed(
@@ -1915,14 +1971,22 @@ class CartPaymentProcessor:
         # the provider.  To keep implementation as simple as possible we simply create a new intent in this case.
 
         # Call to provider to create payment on their side, and update state in our system based on the result
-        # TODO catch error and update state accordingly: both payment_intent/pgp_payment_intent, and legacy charges
-        provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
-            payer_country=payer_country,
-            payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
-            pgp_payment_method=pgp_payment_method,
-            provider_description=intent_description,
-        )
+        try:
+            provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
+                payer_country=payer_country,
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                pgp_payment_method=pgp_payment_method,
+                provider_description=intent_description,
+            )
+        except CartPaymentCreateError as e:
+            await self._update_state_after_provider_error(
+                creation_exception=e,
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                legacy_stripe_charge=legacy_stripe_charge,
+            )
+            raise
 
         # Update state of payment in our system now that payment exists in provider.
         # Update legacy values in main db
@@ -2708,7 +2772,12 @@ class CartPaymentProcessor:
                     payment_intent_id=payment_intent.id,
                 )
                 raise CartPaymentCreateError(
-                    error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID, retryable=False
+                    error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID,
+                    retryable=False,
+                    provider_charge_id=None,
+                    provider_error_code=None,
+                    provider_decline_code=None,
+                    has_provider_error_details=False,
                 )
 
             self.log.info(
@@ -2759,9 +2828,11 @@ class CartPaymentProcessor:
                 pgp_payment_method=pgp_payment_method,
                 provider_description=request_cart_payment.client_description,
             )
-        except Exception:
-            # If an error occurs reaching out to the provider, update state in our system accordingly
+        except CartPaymentCreateError as e:
+            # If any error occurs reaching out to the provider, cart_payment_interface.submit_payment_to_provider throws an exception
+            # of type CartPaymentCreateError.  In this case, update state in our system accordingly
             await self._update_state_after_provider_error(
+                creation_exception=e,
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
                 legacy_stripe_charge=legacy_stripe_charge,
@@ -2897,13 +2968,22 @@ class CommandoProcessor(CartPaymentProcessor):
         else:
             payer_country = get_country_code_by_id(legacy_consumer_charge.country_id)
 
-        provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
-            payer_country=payer_country,
-            payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
-            pgp_payment_method=pgp_payment_method,
-            provider_description=cart_payment.client_description,
-        )
+        try:
+            provider_payment_intent = await self.cart_payment_interface.submit_payment_to_provider(
+                payer_country=payer_country,
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                pgp_payment_method=pgp_payment_method,
+                provider_description=cart_payment.client_description,
+            )
+        except CartPaymentCreateError as e:
+            await self._update_state_after_provider_error(
+                creation_exception=e,
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                legacy_stripe_charge=legacy_stripe_charge,
+            )
+            raise
 
         # Update state of payment in our system now that payment exists in provider.
         # Also takes care of triggering immediate capture if needed.

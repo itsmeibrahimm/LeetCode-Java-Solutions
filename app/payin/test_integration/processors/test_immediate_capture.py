@@ -7,9 +7,9 @@ from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeSt
 from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
-from app.payin.test_integration.processors.capture_payment_intent_test_base import (
-    CapturePaymentIntentLegacyTest,
-    CapturePaymentIntentTest,
+from app.payin.test_integration.processors.cart_payment_test_base import (
+    CartPaymentLegacyTest,
+    CartPaymentTest,
     CartPaymentState,
     PaymentIntentState,
     PgpPaymentIntentState,
@@ -38,6 +38,7 @@ create_no_adjust_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -65,6 +66,7 @@ create_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -90,6 +92,7 @@ create_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=500,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -118,6 +121,7 @@ create_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -143,6 +147,7 @@ create_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -171,6 +176,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -196,6 +202,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=200,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -221,6 +228,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -249,6 +257,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -274,6 +283,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=200,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -299,6 +309,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -314,6 +325,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount=850,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -342,6 +354,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -367,6 +380,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=200,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -392,6 +406,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -407,6 +422,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount=1100,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -435,6 +451,7 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -460,6 +477,7 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -475,6 +493,7 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount=1300,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -503,6 +522,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -528,6 +548,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -543,6 +564,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount=1300,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -568,6 +590,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -583,6 +606,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount=1300,
                     amount_refunded=1300,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -611,6 +635,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -636,6 +661,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -651,6 +677,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount=1300,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -676,6 +703,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=1000,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
             PaymentIntentState(
@@ -691,6 +719,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount=1300,
                     amount_refunded=300,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             ),
         ],
@@ -719,6 +748,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=0,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -744,6 +774,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=200,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -769,6 +800,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount=1000,
                     amount_refunded=400,
                     status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
                 ),
             )
         ],
@@ -810,7 +842,7 @@ cart_payment_immediate_capture_state_transit_tests = [
 ]
 
 
-class TestImmediateCapturePaymentIntent(CapturePaymentIntentTest):
+class TestImmediateCapturePaymentIntent(CartPaymentTest):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
     @pytest.mark.parametrize(
@@ -833,7 +865,7 @@ class TestImmediateCapturePaymentIntent(CapturePaymentIntentTest):
         )
 
 
-class TestImmediateCapturePaymentIntentLegacy(CapturePaymentIntentLegacyTest):
+class TestImmediateCapturePaymentIntentLegacy(CartPaymentLegacyTest):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
     @pytest.mark.parametrize(
