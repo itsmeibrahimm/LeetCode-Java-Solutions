@@ -14,7 +14,7 @@ Before start integration, something developer should know first:
   - Integration Test: (short-term solution) interact with Payment Service on Staging.
 
 ## Integration Step by Step
-1. Request IDS API Key by [here](https://doordash.atlassian.net/wiki/spaces/PE/pages/762970379/Identity+Service#IdentityService-Services,ClientsandTokensTerms). Payin Service enforces IDS authentication. Client needs to acquire a valid API Key and provide in HTTP request header x-api-key for each request.
+1. Request IDS API Key against `payment-service` by [here](https://doordash.atlassian.net/wiki/spaces/PE/pages/762970379/Identity+Service#IdentityService-Services,ClientsandTokensTerms). Payin Service enforces IDS authentication. Client needs to acquire a valid API Key and provide in HTTP request header x-api-key for each request.
 
 2. Experience Payin Service through FastAPI doc. This is the fastest way to experience Payin Servie PAIs without changing any line of code.
 
