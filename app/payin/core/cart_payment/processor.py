@@ -906,7 +906,6 @@ class CartPaymentInterface:
                 error_code = (
                     PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR
                 )
-
             json_body = e.json_body if e.json_body else {}
             error_details = json_body.get("error", {})
             raise CartPaymentCreateError(
@@ -916,13 +915,13 @@ class CartPaymentInterface:
                 provider_error_code=error_details.get("code", None),
                 provider_decline_code=error_details.get("decline_code", None),
                 has_provider_error_details=True if json_body else False,
-            )
+            ) from e
         except StripeCommandoError:
             self.req_context.log.info(
                 "[submit_payment_to_provider] Returning mocked payment_intent response for commando mode"
             )
             return COMMANDO_PAYMENT_INTENT
-        except Exception:
+        except Exception as e:
             self.req_context.log.excpetion(
                 "[submit_payment_to_provider] Error invoking provider to create a payment",
                 payment_intent_id=payment_intent.id,
@@ -934,7 +933,7 @@ class CartPaymentInterface:
                 provider_error_code=None,
                 provider_decline_code=None,
                 has_provider_error_details=False,
-            )
+            ) from e
 
     async def update_payment_after_submission_to_provider(
         self,

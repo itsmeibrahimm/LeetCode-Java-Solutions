@@ -1,18 +1,18 @@
 import abc
 from enum import Enum
 from types import TracebackType
-from typing import Any, Callable, List, Dict, Optional, Type
-from typing_extensions import Literal
+from typing import Any, Callable, Dict, List, Optional, Type
 
-import structlog
 import requests
+import structlog
 from aiohttp import ClientResponse
 from doordash_python_stats import ddstats
+from typing_extensions import Literal
 
 from app.commons import tracing
 from app.commons.context.logger import root_logger as default_logger
+from app.commons.stats import get_request_logger, get_service_stats_client
 from app.commons.timing.base import format_exc_name
-from app.commons.stats import get_service_stats_client, get_request_logger
 from app.commons.tracing import Processor
 
 
@@ -79,6 +79,47 @@ def log_http_client_timing(
     )
 
 
+def log_stripe_http_client_timing(
+    tracker: "HttpClientTimingManager", timer: HttpClientTracker
+):
+    """
+    emit logs for http client requests
+    """
+    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
+
+    context = timer.breadcrumb.dict(
+        include={
+            "application_name",
+            "provider_name",
+            "action",
+            "resource",
+            "status_code",
+            "country",
+            "req_id",
+        },
+        skip_defaults=True,
+    )
+
+    if timer.status_code:
+        context["status_code"] = timer.status_code
+    if timer.client_request_id:
+        context["client_request_id"] = timer.client_request_id
+
+    context["request_status"] = timer.request_status
+    if timer.exception_name:
+        context["exception_name"] = timer.exception_name
+
+    if isinstance(timer, StripeClientTracker):
+        if timer.stripe_error_code:
+            context["stripe_error_code"] = timer.stripe_error_code
+        if timer.stripe_decline_code:
+            context["stripe_decline_code"] = timer.stripe_decline_code
+
+    log.info(
+        "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
+    )
+
+
 def stat_http_client_timing(
     tracker: "HttpClientTimingManager", timer: HttpClientTracker
 ):
@@ -106,6 +147,41 @@ def stat_http_client_timing(
 
     stats.timing(tracker.stat_name, timer.delta_ms, tags=tags)
     log.debug("statsd: %s", tracker.stat_name, latency_ms=timer.delta_ms, tags=tags)
+
+
+def stat_stripe_http_client_timing(
+    tracker: "HttpClientTimingManager", timer: HttpClientTracker
+):
+    """
+    emit stats for http client requests
+    """
+    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
+    stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
+
+    tags = timer.breadcrumb.dict(
+        include={
+            "application_name",
+            "provider_name",
+            "action",
+            "resource",
+            "status_code",
+            "country",
+        },
+        skip_defaults=True,
+    )
+    if timer.status_code:
+        tags["status_code"] = timer.status_code
+
+    tags["request_status"] = timer.request_status
+
+    if isinstance(timer, StripeClientTracker):
+        if timer.stripe_error_code:
+            tags["stripe_error_code"] = timer.stripe_error_code
+        if timer.stripe_decline_code:
+            tags["stripe_decline_code"] = timer.stripe_decline_code
+
+    stats.timing(tracker.stat_name, timer.delta_ms, tags=tags)
+    log.info("statsd: %s", tracker.stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
 class HttpClientTimingManager(
@@ -145,6 +221,15 @@ class HttpClientTimingManager(
 
 
 class StripeClientTracker(HttpClientTracker):
+
+    stripe_error_code: Optional[str]
+    stripe_decline_code: Optional[str]
+
+    def __init__(self):
+        super(StripeClientTracker, self).__init__()
+        self.stripe_error_code = None
+        self.stripe_decline_code = None
+
     def process_result(self, result: requests.Response):
         """
         Process a requests HTTP response to get the status code
@@ -159,6 +244,12 @@ class StripeClientTracker(HttpClientTracker):
 
         # stripe returns their request id
         self.client_request_id = result.headers.get("Request-Id", "")
+        response_json = result.json()
+        error_body = (
+            response_json.get("error", {}) if isinstance(response_json, dict) else {}
+        )
+        self.stripe_decline_code = error_body.get("decline_code", None)
+        self.stripe_error_code = error_body.get("code", None)
 
     def __exit__(
         self,
@@ -190,7 +281,7 @@ class StripeClientTracker(HttpClientTracker):
 
 
 class StripeTimingManager(HttpClientTimingManager):
-    processors = [log_http_client_timing, stat_http_client_timing]
+    processors = [log_stripe_http_client_timing, stat_stripe_http_client_timing]
 
     def create_tracker(
         self,
