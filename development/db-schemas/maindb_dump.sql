@@ -6531,7 +6531,8 @@ CREATE TABLE marqeta_transaction (
     card_acceptor text NOT NULL,
     currency text,
     timed_out boolean,
-    delivery_id integer NOT NULL
+    delivery_id integer NOT NULL,
+    shift_delivery_assignment_id integer
 );
 
 

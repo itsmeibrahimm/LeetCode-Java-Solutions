@@ -64,6 +64,9 @@ psql --username=root -d ${dbname} -f /tmp/db-schemas/maindb_dump.sql
 # Two grant statements cover payout and payin table separately for readibility.
 psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
     GRANT INSERT, SELECT, UPDATE, DELETE ON
+        card_acceptor,
+        card_acceptor_store_association,
+        delivery_funding,
         managed_account_transfer,
         marqeta_card,
         marqeta_card_ownership,
@@ -72,6 +75,7 @@ psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
         marqeta_transaction,
         marqeta_transaction_event,
         payment_account,
+        store_mastercard_data,
         stripe_managed_account,
         stripe_transfer,
         transfer
