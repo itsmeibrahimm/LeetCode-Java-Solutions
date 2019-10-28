@@ -267,11 +267,8 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         start_time: Optional[datetime],
     ) -> Tuple[Optional[Transfer], List[int]]:
         # todo: add redis lock after it is done
-        # todo: need to remove offset and limit after
-        unpaid_transactions = await self.transaction_repo.get_unpaid_transaction_by_payout_account_id(
+        unpaid_transactions = await self.transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit(
             payout_account_id=payment_account_id,
-            offset=0,
-            limit=1000000,
             start_time=start_time,
             end_time=end_time,
         )

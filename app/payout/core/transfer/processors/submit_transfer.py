@@ -160,11 +160,10 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 retryable=False,
             )
 
-        # todo: offset and limit will be updated to optional, will remove these after they are updated
         transactions: List[
             TransactionDBEntity
-        ] = await self.transaction_repo.get_transaction_by_transfer_id(
-            transfer_id=transfer_id, offset=0, limit=1000000
+        ] = await self.transaction_repo.get_transaction_by_transfer_id_without_limit(
+            transfer_id=transfer_id
         )
         if transactions:
             transaction_sum = sum(transaction.amount for transaction in transactions)

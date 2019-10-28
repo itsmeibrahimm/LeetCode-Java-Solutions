@@ -309,7 +309,6 @@ class CreateInstantPayout(
     def _handle_exception(
         self, dep_exec: Exception
     ) -> Union[PaymentException, CreateInstantPayoutResponse]:
-        # TODO write actual exception handling
         raise DEFAULT_INTERNAL_EXCEPTION
 
     async def create_sma_and_stripe_transfer(
