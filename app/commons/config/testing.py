@@ -10,6 +10,7 @@ def create_app_config() -> AppConfig:
     """
     # allow db endpoint (host:port) be overridden in docker compose
     dsj_db_endpoint: str = os.getenv("DSJ_DB_ENDPOINT", "localhost:5435")
+    redis_endpoint: str = os.getenv("REDIS_ENDPOINT", "localhost:6380")
 
     return AppConfig(
         ENVIRONMENT="testing",
@@ -120,5 +121,6 @@ def create_app_config() -> AppConfig:
             name="marqeta_program_fund_token",
             value="a6e2bbe7-4f28-43b4-980d-6416f35fe33e",
         ),
-        REDIS_INSTANCES=[("payment.redis", 6379)],
+        # Assume the redis_endpoint is properly set in the format of "host:port"
+        REDIS_INSTANCES=[(redis_endpoint.split(":")[0], redis_endpoint.split(":")[1])],
     )

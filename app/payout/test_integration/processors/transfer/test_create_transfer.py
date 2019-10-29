@@ -418,6 +418,9 @@ class TestCreateTransfer:
     async def test_create_transfer_for_unpaid_transactions_not_acquire_lock(
         self, app_context: AppContext, mock_set_lock
     ):
+        mock_create_with_redis_lock = self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.create_with_redis_lock"
+        )
         # overwrite redis instances to some unknown address
         app_context.redis_lock_manager.redis = Redis(
             [("unknown_address", 1111)], config.REDIS_LOCK_DEFAULT_TIMEOUT
@@ -449,7 +452,4 @@ class TestCreateTransfer:
                 start_time=None,
             )
 
-        mock_create_with_redis_lock = self.mocker.patch(
-            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.create_with_redis_lock"
-        )
         mock_create_with_redis_lock.assert_not_called()
