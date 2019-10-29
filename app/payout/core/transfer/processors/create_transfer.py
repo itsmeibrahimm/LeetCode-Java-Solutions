@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from aioredlock import Aioredlock
 from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
@@ -10,6 +11,7 @@ from app.commons.core.processor import (
     OperationRequest,
     OperationResponse,
 )
+from app.commons.lock.locks import PaymentLock
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
     FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE,
@@ -78,6 +80,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
     transaction_repo: TransactionRepositoryInterface
     stripe_transfer_repo: StripeTransferRepositoryInterface
+    payment_lock_manager: Aioredlock
 
     def __init__(
         self,
@@ -88,6 +91,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         transaction_repo: TransactionRepositoryInterface,
         stripe_transfer_repo: StripeTransferRepositoryInterface,
+        payment_lock_manager: Aioredlock,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -97,6 +101,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.transaction_repo = transaction_repo
         self.stripe_transfer_repo = stripe_transfer_repo
+        self.payment_lock_manager = payment_lock_manager
 
     async def _execute(self) -> CreateTransferResponse:
         self.logger.info(
@@ -201,7 +206,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         target_id: Optional[int],
         target_biz_id: Optional[int],
     ) -> bool:
-        # todo: copy existing nimda variables and runtime flags into PS
         if runtime.get_bool(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False):
             try:
                 if (
@@ -248,16 +252,19 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         currency: Optional[str],
         start_time: Optional[datetime],
     ) -> Tuple[Optional[Transfer], List[int]]:
-        # todo: add payment lock after it is done
-        transfer, transaction_ids = await self.create_with_redis_lock(
-            payment_account_id=payment_account_id,
-            currency=currency,
-            start_time=start_time,
-            end_time=end_time,
-        )
-        if not transfer or not transaction_ids:
-            return None, []
-        return transfer, transaction_ids
+        # lock_name should be the same as the one for instant payout
+        lock_name = "create_transfer_for_payment_account:{}".format(payment_account_id)
+        # todo: PAYOUT-411: add retry when exception raised
+        async with PaymentLock(lock_name, self.payment_lock_manager):
+            transfer, transaction_ids = await self.create_with_redis_lock(
+                payment_account_id=payment_account_id,
+                currency=currency,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            if not transfer or not transaction_ids:
+                return None, []
+            return transfer, transaction_ids
 
     async def create_with_redis_lock(
         self,
@@ -266,7 +273,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         currency: Optional[str],
         start_time: Optional[datetime],
     ) -> Tuple[Optional[Transfer], List[int]]:
-        # todo: add redis lock after it is done
         unpaid_transactions = await self.transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit(
             payout_account_id=payment_account_id,
             start_time=start_time,

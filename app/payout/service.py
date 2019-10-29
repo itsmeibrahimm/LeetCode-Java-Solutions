@@ -242,6 +242,7 @@ def create_transfer_processors(payout_service: PayoutService = Depends()):
         managed_account_transfer_repo=payout_service.managed_account_transfers,
         transaction_repo=payout_service.transactions,
         payment_account_edit_history_repo=payout_service.payment_account_edit_history,
+        payment_lock_manager=payout_service.redis_lock_manager,
     )
 
 

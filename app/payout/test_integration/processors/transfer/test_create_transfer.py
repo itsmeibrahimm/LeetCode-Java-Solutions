@@ -5,6 +5,14 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
+from app.commons.context.app_context import AppContext
+from aioredlock.redis import Redis
+
+from app.commons.core.errors import PaymentLockAcquireError
+from app.main import config
+from asynctest import mock
+from aioredlock import LockError
+
 from app.commons.database.infra import DB
 from app.payout.core.exceptions import (
     PayoutError,
@@ -45,6 +53,7 @@ class TestCreateTransfer:
         transfer_repo: TransferRepository,
         transaction_repo: TransactionRepository,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
+        app_context: AppContext,
     ):
         self.create_transfer_operation = CreateTransfer(
             transfer_repo=transfer_repo,
@@ -52,6 +61,7 @@ class TestCreateTransfer:
             payment_account_repo=payment_account_repo,
             transaction_repo=transaction_repo,
             payment_account_edit_history_repo=payment_account_edit_history_repo,
+            payment_lock_manager=app_context.redis_lock_manager,
             logger=mocker.Mock(),
             request=CreateTransferRequest(
                 payout_account_id=123,
@@ -65,6 +75,7 @@ class TestCreateTransfer:
         self.payment_account_repo = payment_account_repo
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
+        self.payment_lock_manager = app_context.redis_lock_manager
         self.mocker = mocker
 
     @pytest.fixture
@@ -89,6 +100,11 @@ class TestCreateTransfer:
     ) -> PaymentAccountEditHistoryRepository:
         return PaymentAccountEditHistoryRepository(database=payout_bankdb)
 
+    @pytest.fixture
+    def mock_set_lock(self):
+        with mock.patch("aioredlock.redis.Redis.set_lock") as mock_set_lock:
+            yield mock_set_lock
+
     def _construct_create_transfer_op(
         self,
         payment_account_id: int,
@@ -102,6 +118,7 @@ class TestCreateTransfer:
             payment_account_repo=self.payment_account_repo,
             transaction_repo=self.transaction_repo,
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            payment_lock_manager=self.payment_lock_manager,
             logger=self.mocker.Mock(),
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
@@ -397,3 +414,42 @@ class TestCreateTransfer:
             target_id=None,
             target_biz_id=123,
         )
+
+    async def test_create_transfer_for_unpaid_transactions_not_acquire_lock(
+        self, app_context: AppContext, mock_set_lock
+    ):
+        # overwrite redis instances to some unknown address
+        app_context.redis_lock_manager.redis = Redis(
+            [("unknown_address", 1111)], config.REDIS_LOCK_DEFAULT_TIMEOUT
+        )
+        # Should raise PaymentLockAcquireError when can't connect to redis
+        mock_set_lock.side_effect = LockError
+        create_transfer_op = CreateTransfer(
+            transfer_repo=self.transfer_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
+            payment_account_repo=self.payment_account_repo,
+            transaction_repo=self.transaction_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            payment_lock_manager=self.payment_lock_manager,
+            logger=self.mocker.Mock(),
+            request=CreateTransferRequest(
+                payout_account_id=111,
+                transfer_type=TransferType.SCHEDULED,
+                bank_info_recently_changed=False,
+                end_time=datetime.utcnow(),
+                payout_countries=None,
+                target_type=None,
+            ),
+        )
+        with pytest.raises(PaymentLockAcquireError):
+            await create_transfer_op.create_transfer_for_unpaid_transactions(
+                payment_account_id=123,
+                end_time=datetime.utcnow(),
+                currency="usd",
+                start_time=None,
+            )
+
+        mock_create_with_redis_lock = self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.create_with_redis_lock"
+        )
+        mock_create_with_redis_lock.assert_not_called()
