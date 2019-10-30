@@ -3,20 +3,20 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel
+from pydantic import BaseModel, Schema
 from starlette.status import (
-    HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-    HTTP_429_TOO_MANY_REQUESTS,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+    HTTP_429_TOO_MANY_REQUESTS,
+    HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
 from app.commons.api.errors import (
+    InvalidRequestErrorCode,
     PaymentErrorCode,
     payment_error_message_maps,
-    InvalidRequestErrorCode,
 )
 
 
@@ -100,9 +100,18 @@ class PaymentErrorResponseBody(BaseModel):
     :param retryable: identify if the error is retryable or not.
     """
 
-    error_code: str
-    error_message: str
-    retryable: bool
+    error_code: str = Schema(  # type: ignore
+        default=...,
+        description="codified payment service error code that client can consume programmatically",
+    )
+    retryable: bool = Schema(  # type: ignore
+        default=..., description="whether client can retry on this error"
+    )
+    error_message: str = Schema(  # type: ignore
+        default=...,
+        description="descriptive message for client to understand more about the error. "
+        "client should NEVER rely on error message in their codified business logic",
+    )
 
 
 class BadRequestError(PaymentException):

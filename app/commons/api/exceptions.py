@@ -1,9 +1,10 @@
-import json
+from typing import Any, Dict
 
 from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -113,6 +114,28 @@ async def payment_internal_error_handler(
     )
 
 
+def _get_error_field_path(error: Dict[str, Any]) -> str:
+    path_components = error.get("loc", [])
+    if hasattr(path_components, "__iter__"):
+        return ".".join(component for component in path_components)
+    return str(path_components)
+
+
+def _build_field_error_display(error: Dict[str, Any]) -> str:
+    return f"{_get_error_field_path(error)}: {error.get('msg', 'validation failed')}"
+
+
+def _build_request_validation_error_display(validation_error: ValidationError) -> str:
+    error_count = len(validation_error.errors())
+    field_errors = "; ".join(
+        _build_field_error_display(error) for error in validation_error.errors()
+    )
+    return (
+        f"{error_count} request validation error{'s' if error_count > 1 else ''}"
+        f" for {validation_error.model.__name__}. {field_errors}"
+    )
+
+
 async def payment_request_validation_exception_handler(
     request: Request, exception: RequestValidationError
 ) -> JSONResponse:
@@ -127,7 +150,7 @@ async def payment_request_validation_exception_handler(
             content=jsonable_encoder(
                 PaymentErrorResponseBody(
                     error_code="request_validation_error",
-                    error_message=json.dumps(exception.errors()),
+                    error_message=_build_request_validation_error_display(exception),
                     retryable=False,
                 )
             ),
