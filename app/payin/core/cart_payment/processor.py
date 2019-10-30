@@ -282,6 +282,7 @@ class LegacyPaymentInterface:
             "[update_state_after_provider_submission] Updating stripe charge record in legacy system",
             idempotency_key=idempotency_key,
             dd_stripe_charge_id=legacy_stripe_charge.id,
+            provider_payment_intent_id=provider_payment_intent.id,
         )
 
         provider_charges = provider_payment_intent.charges
@@ -2616,6 +2617,9 @@ class CartPaymentProcessor:
             dd_consumer_id=legacy_payment.dd_consumer_id,
             amount=request_cart_payment.amount,
             correlation_ids=request_cart_payment.correlation_ids,
+            payer_country=payer_country,
+            payment_country=payment_country,
+            stripe_customer_id=legacy_payment.stripe_customer_id,
         )
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=legacy_payment
@@ -2646,6 +2650,9 @@ class CartPaymentProcessor:
             legacy_consumer_charge_id=legacy_consumer_charge_id
             if legacy_consumer_charge_id
             else None,
+            payer_country=payer_country,
+            payment_country=payment_country,
+            stripe_customer_id=legacy_payment.stripe_customer_id,
         )
 
         return cart_payment, legacy_consumer_charge_id
@@ -2720,6 +2727,14 @@ class CartPaymentProcessor:
         Returns:
             CartPayment -- A CartPayment model for the created payment.
         """
+        self.log.info(
+            "[_create_payment] Creating legacy payment",
+            stripe_customer_id=legacy_payment.stripe_customer_id,
+            payer_country=payer_country,
+            payment_country=payment_country,
+            idempotency_key=idempotency_key,
+            stripe_card_id=legacy_payment.stripe_card_id,
+        )
         # Check for resubmission by client
         existing_cart_payment, existing_legacy_payment, existing_payment_intent = await self.cart_payment_interface.find_existing_payment(
             request_cart_payment.payer_id, idempotency_key
@@ -2739,6 +2754,9 @@ class CartPaymentProcessor:
                     idempotency_key=existing_payment_intent.idempotency_key,
                     cart_payment_id=existing_cart_payment.id,
                     payment_intent_id=existing_payment_intent.id,
+                    payer_country=payer_country,
+                    payment_country=payment_country,
+                    stripe_customer_id=legacy_payment.stripe_customer_id,
                 )
                 pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
                     existing_payment_intent
@@ -2769,6 +2787,10 @@ class CartPaymentProcessor:
                     idempotency_key=existing_payment_intent.idempotency_key,
                     cart_payment_id=cart_payment.id,
                     payment_intent_id=payment_intent.id,
+                    payer_country=payer_country,
+                    payment_country=payment_country,
+                    stripe_customer_id=legacy_payment.stripe_customer_id,
+                    stripe_card_id=legacy_payment.stripe_card_id,
                 )
                 raise CartPaymentCreateError(
                     error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID,
@@ -2784,6 +2806,10 @@ class CartPaymentProcessor:
                 idempotency_key=existing_payment_intent.idempotency_key,
                 cart_payment_id=cart_payment.id,
                 payment_intent_id=payment_intent.id,
+                payer_country=payer_country,
+                payment_country=payment_country,
+                stripe_customer_id=legacy_payment.stripe_customer_id,
+                stripe_card_id=legacy_payment.stripe_card_id,
             )
         else:
             legacy_consumer_charge, legacy_stripe_charge = await self.legacy_payment_interface.create_new_payment_charges(
@@ -2826,6 +2852,14 @@ class CartPaymentProcessor:
                 pgp_payment_intent=pgp_payment_intent,
                 pgp_payment_method=pgp_payment_method,
                 provider_description=request_cart_payment.client_description,
+            )
+            self.log.info(
+                "[_create_payment] Stripe Payment Intent created successfully",
+                provider_payment_intent_id=provider_payment_intent.id,
+                payment_intent_id=payment_intent.id,
+                payer_country=payer_country,
+                payment_country=payment_country,
+                stripe_customer_id=legacy_payment.stripe_customer_id,
             )
         except CartPaymentCreateError as e:
             # If any error occurs reaching out to the provider, cart_payment_interface.submit_payment_to_provider throws an exception
