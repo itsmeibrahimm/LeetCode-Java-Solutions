@@ -2,7 +2,7 @@ from stripe.error import StripeError
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
-from typing import Union, List, Optional
+from typing import Union, Optional
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -35,7 +35,7 @@ class UpdateTransferByStripeTransferStatusResponse(OperationResponse):
 
 
 class UpdateTransferByStripeTransferStatusRequest(OperationRequest):
-    transfer_ids: List[int]
+    transfer_id: int
 
 
 class UpdateTransferByStripeTransferStatus(
@@ -68,43 +68,43 @@ class UpdateTransferByStripeTransferStatus(
 
     async def _execute(self) -> UpdateTransferByStripeTransferStatusResponse:
         self.logger.info(
-            "[monitor_stripe_transfer_status_for_transfer_id_v1] Checking chunk transfer_ids",
-            transfer_ids=self.request.transfer_ids,
+            "[monitor_stripe_transfer_status_for_transfer_id_v1] Checking transfer_id",
+            transfer_id=self.request.transfer_id,
         )
-        transfers = await self.transfer_repo.get_transfers_by_ids(
-            transfer_ids=self.request.transfer_ids
+        transfer = await self.transfer_repo.get_transfer_by_id(
+            transfer_id=self.request.transfer_id
         )
-        for transfer in transfers:
-            try:
-                stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
-                    transfer_id=transfer.id
-                )
-                if not stripe_transfer:
-                    continue
-                previous_stripe_status = stripe_transfer.stripe_status
-                new_transfer_status = TransferStatus.stripe_status_to_transfer_status(
-                    stripe_transfer.stripe_status
-                )
-                if (
-                    await self.sync_stripe_status(stripe_transfer=stripe_transfer)
-                    or transfer.status != new_transfer_status
-                ):
-                    self.logger.warning(
-                        "[monitor_stripe_transfer_status_for_transfer_id_v1] updating incorrect stripe transfer status for transfer",
-                        transfer_id=transfer.id,
-                        transfer_status=transfer.status,
-                        previous_stripe_status=previous_stripe_status,
-                        new_transfer_status=new_transfer_status,
-                        new_stripe_transfer_status=stripe_transfer.stripe_status,
-                    )
-                    await self.update_transfer_status_from_latest_submission(
-                        transfer=transfer
-                    )
-            except Exception:
-                self.logger.exception(
-                    "[monitor_stripe_transfer_status_for_transfer_id_v1] Error checking stripe status for transfer",
+        assert transfer, "transfer must be valid with given transfer_id"
+        try:
+            stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+                transfer_id=transfer.id
+            )
+            if not stripe_transfer:
+                return UpdateTransferByStripeTransferStatusResponse()
+            previous_stripe_status = stripe_transfer.stripe_status
+            new_transfer_status = TransferStatus.stripe_status_to_transfer_status(
+                stripe_transfer.stripe_status
+            )
+            if (
+                await self.sync_stripe_status(stripe_transfer=stripe_transfer)
+                or transfer.status != new_transfer_status
+            ):
+                self.logger.warning(
+                    "[monitor_stripe_transfer_status_for_transfer_id_v1] updating incorrect stripe transfer status for transfer",
                     transfer_id=transfer.id,
+                    transfer_status=transfer.status,
+                    previous_stripe_status=previous_stripe_status,
+                    new_transfer_status=new_transfer_status,
+                    new_stripe_transfer_status=stripe_transfer.stripe_status,
                 )
+                await self.update_transfer_status_from_latest_submission(
+                    transfer=transfer
+                )
+        except Exception:
+            self.logger.exception(
+                "[monitor_stripe_transfer_status_for_transfer_id_v1] Error checking stripe status for transfer",
+                transfer_id=transfer.id,
+            )
         # todo: investigate on how to do doorstats.incr here
         self.logger.info(
             "[monitor_stripe_transfer_status_for_transfer_id_v1] Completed checking chunk"

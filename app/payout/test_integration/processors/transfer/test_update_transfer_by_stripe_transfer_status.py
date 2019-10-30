@@ -42,7 +42,7 @@ class TestUpdateTransferByStripeTransferStatus:
             stripe_transfer_repo=stripe_transfer_repo,
             logger=mocker.Mock(),
             stripe=stripe,
-            request=UpdateTransferByStripeTransferStatusRequest(transfer_ids=[]),
+            request=UpdateTransferByStripeTransferStatusRequest(transfer_id=12345),
         )
         self.transfer_repo = transfer_repo
         self.stripe_transfer_repo = stripe_transfer_repo
@@ -212,15 +212,16 @@ class TestUpdateTransferByStripeTransferStatus:
         assert retrieved_stripe_transfer
         assert retrieved_stripe_transfer.stripe_status == mocked_payout.status
 
-    async def test_execute_update_transfer_by_stripe_transfer_status(self):
-        # prepare two transfers, one with stripe_transfer associated with is and the other without stripe_transfer
-        transfer_a = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
+    async def test_execute_update_transfer_by_stripe_transfer_status_with_stripe_transfer_success(
+        self
+    ):
+        # prepare transfer with stripe_transfer associated with it
+        transfer = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
         await prepare_and_insert_stripe_transfer(
             stripe_transfer_repo=self.stripe_transfer_repo,
-            transfer_id=transfer_a.id,
+            transfer_id=transfer.id,
             stripe_status="pending",
         )
-        transfer_b = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
 
         update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
             transfer_repo=self.transfer_repo,
@@ -228,18 +229,35 @@ class TestUpdateTransferByStripeTransferStatus:
             logger=self.mocker.Mock(),
             stripe=self.stripe,
             request=UpdateTransferByStripeTransferStatusRequest(
-                transfer_ids=[transfer_a.id, transfer_b.id]
+                transfer_id=transfer.id
             ),
         )
-        # no updates excepted for transfer_b and transfer_a should be updated to PENDING status
+        # transfer should be updated to PENDING status
         await update_transfer_by_stripe_transfer_status_op._execute()
-        retrieved_transfer_a = await self.transfer_repo.get_transfer_by_id(
-            transfer_id=transfer_a.id
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
+            transfer_id=transfer.id
         )
-        retrieved_transfer_b = await self.transfer_repo.get_transfer_by_id(
-            transfer_id=transfer_b.id
+        assert retrieved_transfer
+        assert retrieved_transfer.status == TransferStatus.PENDING
+
+    async def test_execute_update_transfer_by_stripe_transfer_status_without_stripe_transfer_no_update(
+        self
+    ):
+        # prepare transfer without corresponding stripe_transfer
+        transfer = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
+        update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
+            transfer_repo=self.transfer_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
+            logger=self.mocker.Mock(),
+            stripe=self.stripe,
+            request=UpdateTransferByStripeTransferStatusRequest(
+                transfer_id=transfer.id
+            ),
         )
-        assert retrieved_transfer_a
-        assert retrieved_transfer_a.status == TransferStatus.PENDING
-        assert retrieved_transfer_b
-        assert retrieved_transfer_b == transfer_b
+        await update_transfer_by_stripe_transfer_status_op._execute()
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
+            transfer_id=transfer.id
+        )
+        # no updates excepted for transfer
+        assert retrieved_transfer
+        assert retrieved_transfer == transfer
