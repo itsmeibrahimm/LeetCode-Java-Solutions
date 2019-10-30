@@ -605,7 +605,9 @@ class TestSubmitTransfer:
         transfer = await prepare_and_insert_transfer(
             transfer_repo=transfer_repo, payment_account_id=payment_account.id
         )
-        await self.submit_transfer_operation.transfer_amount_check(transfer=transfer)
+        await self.submit_transfer_operation.transfer_amount_check(
+            transfer=transfer, submitted_by=None
+        )
 
     async def test_transfer_amount_check_negative_transfer_amount(
         self,
@@ -631,7 +633,7 @@ class TestSubmitTransfer:
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.transfer_amount_check(
-                transfer=transfer
+                transfer=transfer, submitted_by=None
             )
         assert e.value.status_code == HTTP_400_BAD_REQUEST
         assert e.value.error_code == PayoutErrorCode.TRANSFER_AMOUNT_NEGATIVE
@@ -663,6 +665,7 @@ class TestSubmitTransfer:
         mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
         mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
         mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+        mocker.patch("app.commons.runtime.runtime.get_str", return_value="123")
 
         @asyncio.coroutine
         def mock_get_bank_update(*args, **kwargs):
@@ -684,7 +687,7 @@ class TestSubmitTransfer:
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.transfer_amount_check(
-                transfer=transfer
+                transfer=transfer, submitted_by=None
             )
         assert e.value.status_code == HTTP_400_BAD_REQUEST
         assert e.value.error_code == PayoutErrorCode.TRANSFER_AMOUNT_OVER_LIMIT
@@ -1053,6 +1056,7 @@ class TestSubmitTransfer:
         payment_account_repo: PaymentAccountRepository,
         transfer_repo: TransferRepository,
     ):
+        self.mocker.patch("app.commons.runtime.runtime.get_str", return_value="123")
         # prepare and insert payment_account and transfer
         payment_account = await prepare_and_insert_payment_account(
             payment_account_repo=payment_account_repo
@@ -1497,3 +1501,29 @@ class TestSubmitTransfer:
             message=msg
         )
         assert error_msg == "err"
+
+    async def test_does_user_have_payments_superpowers_empty_user_list(self):
+        is_admin = self.submit_transfer_operation.does_user_have_payments_superpowers(
+            user_list=[], runtime_list_name="transfer_amount_limitation_admins"
+        )
+        assert not is_admin
+
+    async def test_does_user_have_payments_superpowers_user_not_in_the_runtime_list(
+        self
+    ):
+        self.mocker.patch(
+            "app.commons.runtime.runtime.get_str", return_value="123, 234, 345"
+        )
+        is_admin = self.submit_transfer_operation.does_user_have_payments_superpowers(
+            user_list=[987], runtime_list_name="transfer_amount_limitation_admins"
+        )
+        assert not is_admin
+
+    async def test_does_user_have_payments_superpowers_user_in_the_runtime_list(self):
+        self.mocker.patch(
+            "app.commons.runtime.runtime.get_str", return_value="123, 234, 345"
+        )
+        is_admin = self.submit_transfer_operation.does_user_have_payments_superpowers(
+            user_list=[123], runtime_list_name="transfer_amount_limitation_admins"
+        )
+        assert is_admin

@@ -22,6 +22,7 @@ from app.payout.constants import (
     MAX_TRANSFER_AMOUNT_IN_CENTS,
     FF_CHECK_FOR_RECENT_BANK_CHANGE,
     DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK,
+    DEFAULT_USER_EMAIL_FOR_SUPERPOWERS,
 )
 from app.payout.core.account.utils import (
     get_country_shortname,
@@ -249,7 +250,9 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 transfer_id=transfer_id, method=payout_method
             )
             return SubmitTransferResponse()
-        await self.transfer_amount_check(transfer=transfer)
+        await self.transfer_amount_check(
+            transfer=transfer, submitted_by=self.request.submitted_by
+        )
         assert payout_method in [choice[0] for choice in TRANSFER_METHOD_CHOICES]
         is_transfer_processing = await self.is_processing_or_processed_for_method(
             transfer_id=transfer_id, method=payout_method
@@ -321,7 +324,9 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             )
         return None
 
-    async def transfer_amount_check(self, transfer: Transfer):
+    async def transfer_amount_check(
+        self, transfer: Transfer, submitted_by: Optional[int]
+    ):
         assert transfer.currency, "currency should be set before calling this function"
         assert (
             transfer.payment_account_id
@@ -353,8 +358,15 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     True if most_recent_updated_bank_account else False
                 )
         if should_error_on_large_amt:
-            # todo: has_payment_permission requires access to User table, temp set as False and will update later
-            has_payment_permission = False
+            user_list = []
+            if submitted_by:
+                user_list.append(submitted_by)
+            if transfer.created_by_id:
+                user_list.append(transfer.created_by_id)
+            has_payment_permission = self.does_user_have_payments_superpowers(
+                user_list=user_list,
+                runtime_list_name="transfer_amount_limitation_admins",
+            )
             if not has_payment_permission:
                 update_request = TransferUpdate(
                     status=TransferStatus.ERROR,
@@ -812,8 +824,20 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
     async def _submit_check_transfer(
         self, transfer_id: int, submitted_by: Optional[int]
     ):
-        # todo: has_payment_permission requires access to User table, temp set as False and will update later
-        has_payment_permission = False
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
+            transfer_id=transfer_id
+        )
+        assert retrieved_transfer, "given transfer_id must be valid"
+
+        user_list = []
+        if submitted_by:
+            user_list.append(submitted_by)
+        if retrieved_transfer.created_by_id:
+            user_list.append(retrieved_transfer.created_by_id)
+
+        has_payment_permission = self.does_user_have_payments_superpowers(
+            user_list=user_list, runtime_list_name="transfer_amount_limitation_admins"
+        )
         if not has_payment_permission:
             raise PayoutError(
                 http_status_code=HTTP_400_BAD_REQUEST,
@@ -1000,3 +1024,26 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 if message_pattern.match(message):
                     return failure_code
         return UNKNOWN_ERROR_STR
+
+    def does_user_have_payments_superpowers(
+        self, user_list: List[int], runtime_list_name: str
+    ):
+        """
+        Check if the user is admin to submit transfer. Instead of accessing User table like in dsj,
+        use user_id and cast str read from runtime to int directly
+        :param user_list: List of users that submit/create the transfer
+        :param runtime_list_name: name of the runtime that to retrieve, runtime will contain a string of ids
+        :return:
+        """
+        has_super_power = False
+        if user_list and runtime_list_name:
+            runtime_user_id_str = runtime.get_str(
+                runtime_list_name, DEFAULT_USER_EMAIL_FOR_SUPERPOWERS
+            )
+            runtime_user_id_list = [
+                int(user_id.strip()) for user_id in runtime_user_id_str.split(",")
+            ]
+            has_super_power = len(runtime_user_id_list) > 0 and any(
+                user_id in runtime_user_id_list for user_id in user_list
+            )
+        return has_super_power

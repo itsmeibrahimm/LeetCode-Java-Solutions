@@ -87,7 +87,7 @@ async def prepare_and_insert_transfer(
         submitting_at=timestamp,
         should_retry_on_failure=True,
         statement_description="statement_description",
-        created_by_id=123,
+        created_by_id=None,
         deleted_by_id=321,
         payment_account_id=payment_account_id,
         recipient_id=321,

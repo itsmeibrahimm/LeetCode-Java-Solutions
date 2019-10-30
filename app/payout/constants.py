@@ -33,6 +33,8 @@ DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME = (
     "DISABLE_MERCHANT_PAYMENT_ACCOUNT_AUTO_PAYMENT_LIST"
 )
 
+DEFAULT_USER_EMAIL_FOR_SUPERPOWERS = "20156288"  # niket@doordash.com
+
 # Fraud related runtime for creating transfers
 FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE = (
     "fraud_enable_mx_payout_delay_after_bank_change"
