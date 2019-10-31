@@ -923,7 +923,7 @@ class CartPaymentInterface:
             )
             return COMMANDO_PAYMENT_INTENT
         except Exception as e:
-            self.req_context.log.excpetion(
+            self.req_context.log.exception(
                 "[submit_payment_to_provider] Error invoking provider to create a payment",
                 payment_intent_id=payment_intent.id,
             )
