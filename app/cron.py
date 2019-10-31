@@ -9,6 +9,7 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
 from app.commons.context.logger import get_logger
+from app.payout.jobs import MonitorTransfersWithIncorrectStatus
 
 init_newrelic_agent()
 
@@ -108,6 +109,15 @@ scheduler.add_job(
     func=emit_problematic_capture_count.run,
     name=emit_problematic_capture_count.job_name,
     trigger=CronTrigger(hour="*"),
+)
+
+monitor_transfers_with_incorrect_status = MonitorTransfersWithIncorrectStatus(
+    app_context=app_context, job_pool=stripe_pool
+)
+scheduler.add_job(
+    func=monitor_transfers_with_incorrect_status.run,
+    name=monitor_transfers_with_incorrect_status.job_name,
+    trigger=CronTrigger(hour="23"),
 )
 
 scheduler.add_job(
