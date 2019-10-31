@@ -226,7 +226,7 @@ class TestBreadcrumbs:
     def test_breadcrumb_utils(self):
         a = tracing.Breadcrumb(application_name="my-app-v2")
         b = tracing.Breadcrumb(processor_name="myproc")
-        merged = tracing._merge_breadcrumbs(a, b)
+        merged = tracing._combine_and_replace_breadcrumbs(src=a, addition=b)
         assert merged == tracing.Breadcrumb(
             application_name="my-app-v2", processor_name="myproc"
         )
@@ -241,19 +241,23 @@ class TestBreadcrumbs:
     def test_nested(self):
         assert tracing.get_current_breadcrumb() == tracing.Breadcrumb()
 
-        with tracing.breadcrumb_as(tracing.Breadcrumb(application_name="nested")):
+        with tracing.breadcrumb_ctxt_manager(
+            tracing.Breadcrumb(application_name="nested")
+        ):
             assert tracing.get_current_breadcrumb() == tracing.Breadcrumb(
                 application_name="nested"
             )
             assert len(tracing.get_breadcrumbs()) == 1
 
-            with tracing.breadcrumb_as(tracing.Breadcrumb(processor_name="multiple")):
+            with tracing.breadcrumb_ctxt_manager(
+                tracing.Breadcrumb(processor_name="multiple")
+            ):
                 assert tracing.get_current_breadcrumb() == tracing.Breadcrumb(
                     application_name="nested", processor_name="multiple"
                 )
                 assert len(tracing.get_breadcrumbs()) == 2
 
-                with tracing.breadcrumb_as(
+                with tracing.breadcrumb_ctxt_manager(
                     tracing.Breadcrumb(repository_name="levels")
                 ):
                     assert tracing.get_current_breadcrumb() == tracing.Breadcrumb(

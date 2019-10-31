@@ -406,7 +406,7 @@ class TransactionTimingManager(ExecuteTimingManager):
         )
         # tracing: set transaction name
         obj.stack.enter_context(
-            tracing.breadcrumb_as(
+            tracing.breadcrumb_ctxt_manager(
                 tracing.Breadcrumb(transaction_name=obj.tracker.calling_function_name),
                 # the contextmanager will not be awaited in the same task
                 restore=False,

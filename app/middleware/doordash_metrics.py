@@ -134,7 +134,9 @@ class ServiceMetricsMiddleware(BaseHTTPMiddleware):
         self: Any, request: Request, call_next: RequestResponseEndpoint
     ):
         # use the service's client instead of the global statsd client
-        with set_service_stats_client(self.statsd_client), tracing.breadcrumb_as(
+        with set_service_stats_client(
+            self.statsd_client
+        ), tracing.breadcrumb_ctxt_manager(
             tracing.Breadcrumb(application_name=self.application_name)
         ):
             response = await call_next(request)

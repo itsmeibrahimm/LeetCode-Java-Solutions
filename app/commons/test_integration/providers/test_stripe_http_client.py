@@ -44,7 +44,7 @@ class TestStripeHttpClient:
     async def test_exception(self, get_mock_statsd_events, unused_tcp_port: int):
         client = stripe_http_client.TimedRequestsClient()
         url = f"http://localhost:{unused_tcp_port}"
-        with pytest.raises(stripe.error.StripeError), tracing.breadcrumb_as(
+        with pytest.raises(stripe.error.StripeError), tracing.breadcrumb_ctxt_manager(
             tracing.Breadcrumb(application_name="myapp", country="US")
         ):
             client.request("GET", url, {})
@@ -70,7 +70,7 @@ class TestStripeHttpClient:
         client = stripe_http_client.TimedRequestsClient()
         port = server_port
 
-        with tracing.breadcrumb_as(
+        with tracing.breadcrumb_ctxt_manager(
             tracing.Breadcrumb(application_name="app2", country="AU")
         ):
             url = f"http://localhost:{port}/"
@@ -92,7 +92,7 @@ class TestStripeHttpClient:
 
         reset_mock_statsd_events()
 
-        with tracing.breadcrumb_as(
+        with tracing.breadcrumb_ctxt_manager(
             tracing.Breadcrumb(application_name="myapp", country="CA")
         ):
             url = f"http://localhost:{port}/error"

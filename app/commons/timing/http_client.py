@@ -1,7 +1,7 @@
 import abc
 from enum import Enum
 from types import TracebackType
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, Generic, List, Optional, Type, TypeVar, ClassVar
 
 import requests
 import structlog
@@ -24,9 +24,9 @@ class RequestStatus(str, Enum):
     exception = "exception"  # client exception
 
 
-class HttpClientTracker(tracing.BaseTimer, metaclass=abc.ABCMeta):
+class HttpClientTimer(tracing.BaseTimer, metaclass=abc.ABCMeta):
     """
-    Generic tracker for HTTP Clients
+    Generic timing tracker for HTTP Clients
     """
 
     status_code: str = ""
@@ -43,85 +43,73 @@ class HttpClientTracker(tracing.BaseTimer, metaclass=abc.ABCMeta):
         """
         ...
 
+    def get_log_context(self) -> Dict[str, Any]:
+        """
+        Return a dict contains all context can be used for logging.
+        for example, {"application_name":"payment-service", "resource":"paymentaccount"}
+        """
+        context = self._common_context()
+        context["req_id"] = self.breadcrumb.req_id
+
+        if self.client_request_id:
+            context["client_request_id"] = self.client_request_id
+
+        if self.exception_name:
+            context["exception_name"] = self.exception_name
+        return context
+
+    def get_stat_tags(self) -> Dict[str, Any]:
+        """
+        Return a dict contains point tags that can be used to emit stats.
+        """
+        return self._common_context()
+
+    def _common_context(self) -> Dict[str, Any]:
+        """
+        Return base context as a dict for logging or stats use.
+        !!Note!! DO NOT put any key with high cardinality values (e.g. req_id) in this base dimension
+        as it will explode our metrics
+        """
+
+        context = self.breadcrumb.dict(
+            include={
+                "application_name",
+                "provider_name",
+                "action",
+                "resource",
+                "status_code",
+                "country",
+            },
+            skip_defaults=True,
+        )
+
+        if self.status_code:
+            context["status_code"] = self.status_code
+
+        context["request_status"] = self.request_status
+
+        return context
+
 
 def log_http_client_timing(
-    tracker: "HttpClientTimingManager", timer: HttpClientTracker
+    timing_manager: "HttpClientTimingManager", timer: HttpClientTimer
 ):
     """
     emit logs for http client requests
     """
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
 
-    context = timer.breadcrumb.dict(
-        include={
-            "application_name",
-            "provider_name",
-            "action",
-            "resource",
-            "status_code",
-            "country",
-            "req_id",
-        },
-        skip_defaults=True,
-    )
-
-    if timer.status_code:
-        context["status_code"] = timer.status_code
-    if timer.client_request_id:
-        context["client_request_id"] = timer.client_request_id
-
-    context["request_status"] = timer.request_status
-    if timer.exception_name:
-        context["exception_name"] = timer.exception_name
+    log_context = timer.get_log_context()
 
     log.info(
-        "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
-    )
-
-
-def log_stripe_http_client_timing(
-    tracker: "HttpClientTimingManager", timer: HttpClientTracker
-):
-    """
-    emit logs for http client requests
-    """
-    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-
-    context = timer.breadcrumb.dict(
-        include={
-            "application_name",
-            "provider_name",
-            "action",
-            "resource",
-            "status_code",
-            "country",
-            "req_id",
-        },
-        skip_defaults=True,
-    )
-
-    if timer.status_code:
-        context["status_code"] = timer.status_code
-    if timer.client_request_id:
-        context["client_request_id"] = timer.client_request_id
-
-    context["request_status"] = timer.request_status
-    if timer.exception_name:
-        context["exception_name"] = timer.exception_name
-
-    if isinstance(timer, StripeClientTracker):
-        if timer.stripe_error_code:
-            context["stripe_error_code"] = timer.stripe_error_code
-        if timer.stripe_decline_code:
-            context["stripe_decline_code"] = timer.stripe_decline_code
-
-    log.info(
-        "client request complete", latency_ms=round(timer.delta_ms, 3), context=context
+        "client request complete",
+        latency_ms=round(timer.delta_ms, 3),
+        context=log_context,
     )
 
 
 def stat_http_client_timing(
-    tracker: "HttpClientTimingManager", timer: HttpClientTracker
+    timing_manager: "HttpClientTimingManager", timer: HttpClientTimer
 ):
     """
     emit stats for http client requests
@@ -129,70 +117,34 @@ def stat_http_client_timing(
     log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
     stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
 
-    tags = timer.breadcrumb.dict(
-        include={
-            "application_name",
-            "provider_name",
-            "action",
-            "resource",
-            "status_code",
-            "country",
-        },
-        skip_defaults=True,
+    stats_tags = timer.get_stat_tags()
+
+    stats.timing(timing_manager.stat_name, timer.delta_ms, tags=stats_tags)
+    log.debug(
+        "statsd: %s",
+        timing_manager.stat_name,
+        latency_ms=timer.delta_ms,
+        tags=stats_tags,
     )
-    if timer.status_code:
-        tags["status_code"] = timer.status_code
-
-    tags["request_status"] = timer.request_status
-
-    stats.timing(tracker.stat_name, timer.delta_ms, tags=tags)
-    log.debug("statsd: %s", tracker.stat_name, latency_ms=timer.delta_ms, tags=tags)
 
 
-def stat_stripe_http_client_timing(
-    tracker: "HttpClientTimingManager", timer: HttpClientTracker
-):
-    """
-    emit stats for http client requests
-    """
-    log: structlog.stdlib.BoundLogger = get_request_logger(default=default_logger)
-    stats: ddstats.DoorStatsProxyMultiServer = get_service_stats_client()
-
-    tags = timer.breadcrumb.dict(
-        include={
-            "application_name",
-            "provider_name",
-            "action",
-            "resource",
-            "status_code",
-            "country",
-        },
-        skip_defaults=True,
-    )
-    if timer.status_code:
-        tags["status_code"] = timer.status_code
-
-    tags["request_status"] = timer.request_status
-
-    if isinstance(timer, StripeClientTracker):
-        if timer.stripe_error_code:
-            tags["stripe_error_code"] = timer.stripe_error_code
-        if timer.stripe_decline_code:
-            tags["stripe_decline_code"] = timer.stripe_decline_code
-
-    stats.timing(tracker.stat_name, timer.delta_ms, tags=tags)
-    log.info("statsd: %s", tracker.stat_name, latency_ms=timer.delta_ms, tags=tags)
+THttpClientTimer = TypeVar("THttpClientTimer", bound=HttpClientTimer)
 
 
 class HttpClientTimingManager(
-    tracing.TimingManager[HttpClientTracker], metaclass=abc.ABCMeta
+    Generic[THttpClientTimer],
+    tracing.TimingManager[THttpClientTimer],
+    metaclass=abc.ABCMeta,
 ):
     """
     Generic Timing Manager for HTTP Clients
     """
 
     stat_name: str
-    processors = [log_http_client_timing, stat_http_client_timing]
+
+    default_processors: ClassVar[
+        List[Callable[["HttpClientTimingManager", HttpClientTimer], Any]]
+    ] = [log_http_client_timing, stat_http_client_timing]
 
     def __init__(
         self,
@@ -203,6 +155,7 @@ class HttpClientTimingManager(
         processors: Optional[List[Processor]] = None,
         only_trackable=False,
     ):
+        processors = processors or HttpClientTimingManager.default_processors
         self.stat_name = stat_name
         super().__init__(
             send=send, rate=rate, processors=processors, only_trackable=only_trackable
@@ -216,19 +169,23 @@ class HttpClientTimingManager(
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> HttpClientTracker:
+    ) -> THttpClientTimer:
         ...
 
 
-class StripeClientTracker(HttpClientTracker):
+class StripeClientTimer(HttpClientTimer):
 
     stripe_error_code: Optional[str]
     stripe_decline_code: Optional[str]
+    stripe_error_type: Optional[str]
+    stripe_error_message: Optional[str]
 
     def __init__(self):
-        super(StripeClientTracker, self).__init__()
+        super(StripeClientTimer, self).__init__()
         self.stripe_error_code = None
         self.stripe_decline_code = None
+        self.stripe_error_type = None
+        self.stripe_error_message = None
 
     def process_result(self, result: requests.Response):
         """
@@ -250,6 +207,30 @@ class StripeClientTracker(HttpClientTracker):
         )
         self.stripe_decline_code = error_body.get("decline_code", None)
         self.stripe_error_code = error_body.get("code", None)
+        self.stripe_error_type = error_body.get("type", None)
+        self.stripe_error_message = error_body.get("message", None)
+
+    def get_log_context(self) -> Dict[str, Any]:
+        context = super().get_log_context()
+        if self.stripe_error_code:
+            context["stripe_error_code"] = self.stripe_error_code
+        if self.stripe_decline_code:
+            context["stripe_decline_code"] = self.stripe_decline_code
+        if self.stripe_error_type:
+            context["stripe_error_type"] = self.stripe_error_type
+        if self.stripe_error_message:
+            context["stripe_error_message"] = self.stripe_error_message
+        return context
+
+    def get_stat_tags(self) -> Dict[str, Any]:
+        tags = super().get_stat_tags()
+        if self.stripe_error_code:
+            tags["stripe_error_code"] = self.stripe_error_code
+        if self.stripe_decline_code:
+            tags["stripe_decline_code"] = self.stripe_decline_code
+        if self.stripe_error_type:
+            tags["stripe_error_type"] = self.stripe_error_type
+        return tags
 
     def __exit__(
         self,
@@ -280,9 +261,7 @@ class StripeClientTracker(HttpClientTracker):
         return False
 
 
-class StripeTimingManager(HttpClientTimingManager):
-    processors = [log_stripe_http_client_timing, stat_stripe_http_client_timing]
-
+class StripeTimingManager(HttpClientTimingManager[StripeClientTimer]):
     def create_tracker(
         self,
         obj=tracing.Unspecified,
@@ -290,15 +269,15 @@ class StripeTimingManager(HttpClientTimingManager):
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> HttpClientTracker:
-        return StripeClientTracker()
+    ) -> StripeClientTimer:
+        return StripeClientTimer()
 
 
 def track_stripe_http_client(**kwargs):
     return StripeTimingManager(**kwargs)
 
 
-class IdentityAioHttpTracker(HttpClientTracker):
+class IdentityAioHttpTimer(HttpClientTimer):
     status_code: str = ""
 
     def process_result(self, result: ClientResponse):
@@ -309,8 +288,7 @@ class IdentityAioHttpTracker(HttpClientTracker):
         self.status_code = str(result.status)
 
 
-class IdentityClientTimingManager(HttpClientTimingManager):
-    processors = [log_http_client_timing, stat_http_client_timing]
+class IdentityClientTimingManager(HttpClientTimingManager[IdentityAioHttpTimer]):
     """
     Manages two stats for this client io / security
     """
@@ -339,8 +317,8 @@ class IdentityClientTimingManager(HttpClientTimingManager):
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> HttpClientTracker:
-        return IdentityAioHttpTracker()
+    ) -> IdentityAioHttpTimer:
+        return IdentityAioHttpTimer()
 
 
 def track_identity_http_client_timing(**kwargs):

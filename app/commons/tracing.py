@@ -91,34 +91,37 @@ def get_current_breadcrumb() -> Breadcrumb:
 
 
 @contextmanager
-def breadcrumb_as(breadcrumb: Breadcrumb, restore=True):
+def breadcrumb_ctxt_manager(breadcrumb: Breadcrumb, restore=True):
+    token = None
     try:
         crumbs = get_breadcrumbs()
-        crumb = _add_breadcrumb(crumbs, breadcrumb)
+        crumb = _push_breadcrumb(crumbs, breadcrumb)
         token = BREADCRUMBS.set(crumbs)
         yield crumb
     finally:
         if token and restore:
             BREADCRUMBS.reset(token)
-        _remove_breadcrumb(crumbs)
+        _pop_breadcrumb()
 
 
-def _merge_breadcrumbs(a: Breadcrumb, b: Breadcrumb):
-    values = {**a.dict()}
+def _combine_and_replace_breadcrumbs(*, src: Breadcrumb, addition: Breadcrumb):
+    values = {**src.dict()}
     # only override values that are set
-    values.update(b.dict(skip_defaults=True))
-    fields_set = set([*a.__fields_set__, *b.__fields_set__])
+    values.update(addition.dict(skip_defaults=True))
+    fields_set = {*src.__fields_set__, *addition.__fields_set__}
     return Breadcrumb.construct(values, fields_set)
 
 
-def _add_breadcrumb(crumbs: Deque[Breadcrumb], breadcrumb: Breadcrumb) -> Breadcrumb:
+def _push_breadcrumb(crumbs: Deque[Breadcrumb], breadcrumb: Breadcrumb) -> Breadcrumb:
     previous_crumb = Breadcrumb() if not len(crumbs) else crumbs[0]
-    next_crumb = _merge_breadcrumbs(previous_crumb, breadcrumb)
+    next_crumb = _combine_and_replace_breadcrumbs(
+        src=previous_crumb, addition=breadcrumb
+    )
     crumbs.appendleft(next_crumb)
     return next_crumb
 
 
-def _remove_breadcrumb(crumbs: Deque[Breadcrumb]) -> Breadcrumb:
+def _pop_breadcrumb() -> Breadcrumb:
     stack = get_breadcrumbs()
 
     if len(stack) > 0:
@@ -142,10 +145,10 @@ def is_trackable(func):
     return getattr(func, "__trackable__", None) is Trackable
 
 
-TR = TypeVar("TR", bound=ContextManager)
+TTracker = TypeVar("TTracker", bound=ContextManager)
 
 
-class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
+class TrackingManager(Generic[TTracker], metaclass=abc.ABCMeta):
     __trackable__ = Trackable
     only_trackable: bool
 
@@ -163,7 +166,7 @@ class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
         """
         self.only_trackable = only_trackable
 
-    def process_tracker(self, tracker: TR):
+    def process_tracker(self, tracker: TTracker):
         """
         callback receiving the tracker when it exits
         """
@@ -177,7 +180,7 @@ class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
         func: Callable,
         args: List[Any],
         kwargs: Dict[str, Any],
-    ) -> TR:
+    ) -> TTracker:
         """
         Generate a tracker
         """
@@ -215,7 +218,7 @@ class TrackingManager(Generic[TR], metaclass=abc.ABCMeta):
 
     def _start_tracker(
         self, stack: ExitStack, *, obj=Unspecified, func, args, kwargs
-    ) -> TR:
+    ) -> TTracker:
         # NOTE: context manager exits are called in reverse order
         tracker = self.create_tracker(obj=obj, func=func, args=args, kwargs=kwargs)
         # process_tracker callback is the last thing called,
@@ -338,6 +341,11 @@ class BreadcrumbManager(TrackingManager):
         from_kwargs: Optional[Dict[str, str]] = None,
         only_trackable=False,
     ):
+        """
+        :param breadcrumb:
+        :param from_kwargs:
+        :param only_trackable:
+        """
         super().__init__(only_trackable=only_trackable)
         self.breadcrumb = breadcrumb
         self.from_kwargs = from_kwargs or {}
@@ -391,12 +399,14 @@ class BreadcrumbManager(TrackingManager):
         args: List[Any],
         kwargs: Dict[str, Any],
     ) -> ContextManager:
-        initial_fields = self.breadcrumb
-        additional_fields = BreadcrumbManager.breadcrumb_from_kwargs(
+        initial_breadcrumb = self.breadcrumb
+        additional_breadcrumb = BreadcrumbManager.breadcrumb_from_kwargs(
             self.from_kwargs, kwargs
         )
-        combined_fields = _merge_breadcrumbs(initial_fields, additional_fields)
-        return breadcrumb_as(combined_fields)
+        combined_breadcrumb = _combine_and_replace_breadcrumbs(
+            src=initial_breadcrumb, addition=additional_breadcrumb
+        )
+        return breadcrumb_ctxt_manager(combined_breadcrumb)
 
 
 def track_breadcrumb(
