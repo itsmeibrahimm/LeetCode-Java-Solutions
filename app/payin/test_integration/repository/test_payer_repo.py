@@ -55,7 +55,7 @@ class TestPayerRepository:
             is_primary=True,
             pgp_code="stripe",
             legacy_id=1,
-            account_balance=100,
+            balance=100,
             default_payment_method_id="fake_default_payment_method_id",
             created_at=datetime.utcnow(),
         )
@@ -65,7 +65,7 @@ class TestPayerRepository:
         assert pgp_customer.country is not None
         assert pgp_customer.is_primary is not None
         assert pgp_customer.legacy_id is not None
-        assert pgp_customer.account_balance is not None
+        assert pgp_customer.balance is not None
         assert pgp_customer.default_payment_method_id is not None
 
         get_pgp_customer = await payer_repository.get_pgp_customer(

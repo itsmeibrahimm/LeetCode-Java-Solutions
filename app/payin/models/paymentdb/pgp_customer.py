@@ -22,7 +22,7 @@ class PgpCustomerTable(TableDefinition):
         Column("payer_id", UUID(as_uuid=True), ForeignKey("payer.id"))
     )
     currency: Column = no_init_field(Column("currency", Text))
-    account_balance: Column = no_init_field(Column("account_balance", BigInteger))
+    balance: Column = no_init_field(Column("balance", BigInteger))
     default_payment_method_id: Column = no_init_field(
         Column("default_payment_method_id", Text)
     )

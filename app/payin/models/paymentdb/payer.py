@@ -19,7 +19,7 @@ class PayerTable(TableDefinition):
         Column("legacy_stripe_customer_id", Text)
     )
     country: Column = no_init_field(Column("country", Text))
-    account_balance: Column = no_init_field(Column("account_balance", BigInteger))
+    balance: Column = no_init_field(Column("balance", BigInteger))
     description: Column = no_init_field(Column("description", Text))
     metadata: Column = no_init_field(Column("metadata", JSON))
     created_at: Column = no_init_field(Column("created_at", DateTime(True)))

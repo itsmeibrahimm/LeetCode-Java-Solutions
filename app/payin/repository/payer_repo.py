@@ -28,7 +28,7 @@ class PayerDbEntity(DBEntity):
     payer_type: str
     country: CountryCode
     legacy_stripe_customer_id: Optional[str] = None
-    account_balance: Optional[int] = None
+    balance: Optional[int] = None
     description: Optional[str] = None
     dd_payer_id: Optional[str] = None
     metadata: Optional[dict] = None
@@ -90,7 +90,7 @@ class PgpCustomerDbEntity(DBEntity):
     currency: Optional[str] = None
     pgp_code: Optional[PgpCode] = None
     legacy_id: Optional[int] = None
-    account_balance: Optional[int] = None
+    balance: Optional[int] = None
     default_payment_method_id: Optional[str] = None
     legacy_default_source_id: Optional[str] = None
     created_at: Optional[datetime] = None

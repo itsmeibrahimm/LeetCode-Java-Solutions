@@ -17,7 +17,7 @@ class PgpPaymentIntentTable(TableDefinition):
         Column("payment_intent_id", UUID(as_uuid=True))
     )
     idempotency_key: Column = no_init_field(Column("idempotency_key", Text))
-    provider: Column = no_init_field(Column("provider", Text))
+    pgp_code: Column = no_init_field(Column("pgp_code", Text))
     resource_id: Column = no_init_field(Column("resource_id", Text))
     invoice_resource_id: Column = no_init_field(Column("invoice_resource_id", Text))
     charge_resource_id: Column = no_init_field(Column("charge_resource_id", Text))
