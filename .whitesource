@@ -1,0 +1,13 @@
+{
+  "scanSettings": {
+    "configMode": "AUTO",
+    "configExternalURL": "",
+    "projectToken" : "8d2fb1ca9fad4fadb4d457e15d9d82f92cada878e213400494e811cced58ea59"
+  },
+  "checkRunSettings": {
+    "vulnerableCheckRunConclusionLevel": "failure"
+  },
+  "issueSettings": {
+    "minSeverityLevel": "NONE"
+  }
+}
