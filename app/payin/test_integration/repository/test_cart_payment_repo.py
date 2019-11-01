@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from typing import cast, Optional, Tuple
 from uuid import uuid4, UUID
 
@@ -6,6 +6,7 @@ import pytest
 from IPython.utils.tz import utcnow
 
 from app.commons.types import CountryCode, LegacyCountryId, Currency, PgpCode
+from app.commons.utils.validation import self_or_fail_if_none
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
@@ -29,28 +30,36 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
-from app.payin.core.payer.model import Payer
 from app.payin.core.payer.types import PayerType
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
-from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
+from app.payin.repository.payer_repo import (
+    PayerRepository,
+    InsertPayerInput,
+    PayerDbEntity,
+)
 from app.payin.repository.payment_method_repo import (
     PaymentMethodRepository,
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
+    PgpPaymentMethodDbEntity,
+    StripeCardDbEntity,
+    GetStripeCardByStripeIdInput,
 )
 
 
 @pytest.fixture
-async def payer(payer_repository: PayerRepository):
+async def payer(payer_repository: PayerRepository) -> PayerDbEntity:
     insert_payer_input = InsertPayerInput(
         id=uuid4(), payer_type=PayerType.STORE, country=CountryCode.US
     )
-    yield await payer_repository.insert_payer(insert_payer_input)
+    return await payer_repository.insert_payer(insert_payer_input)
 
 
 @pytest.fixture
-async def payment_method(payer, payment_method_repository: PaymentMethodRepository):
+async def payment_method(
+    payer: PayerDbEntity, payment_method_repository: PaymentMethodRepository
+) -> PgpPaymentMethodDbEntity:
     insert_payment_method = InsertPgpPaymentMethodInput(
         id=uuid4(),
         pgp_code=PgpCode.STRIPE,
@@ -73,12 +82,70 @@ async def payment_method(payer, payment_method_repository: PaymentMethodReposito
     )
     await payment_method_repository.insert_stripe_card(insert_stripe_card)
 
-    yield insert_pm_result
+    return insert_pm_result
 
 
 @pytest.fixture
-async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Payer):
-    yield await cart_payment_repository.insert_cart_payment(
+async def stripe_card(
+    payment_method: PgpPaymentMethodDbEntity,
+    payment_method_repository: PaymentMethodRepository,
+) -> StripeCardDbEntity:
+
+    return self_or_fail_if_none(
+        await payment_method_repository.get_stripe_card_by_stripe_id(
+            input=GetStripeCardByStripeIdInput(stripe_id=payment_method.pgp_resource_id)
+        )
+    )
+
+
+@pytest.fixture
+async def payment_method_expired(
+    payer: PayerDbEntity, payment_method_repository: PaymentMethodRepository
+) -> PgpPaymentMethodDbEntity:
+    insert_payment_method = InsertPgpPaymentMethodInput(
+        id=uuid4(),
+        pgp_code=PgpCode.STRIPE,
+        pgp_resource_id=str(uuid4()),
+        payer_id=payer.id,
+    )
+
+    insert_stripe_card = InsertStripeCardInput(
+        stripe_id=insert_payment_method.pgp_resource_id,
+        fingerprint="fingerprint",
+        last4="1500",
+        dynamic_last4="1500",
+        exp_month="1",
+        exp_year="1990",
+        type="mastercard",
+        active=True,
+    )
+    insert_pm_result = await payment_method_repository.insert_pgp_payment_method(
+        insert_payment_method
+    )
+    await payment_method_repository.insert_stripe_card(insert_stripe_card)
+
+    return insert_pm_result
+
+
+@pytest.fixture
+async def stripe_card_expired(
+    payment_method_expired: PgpPaymentMethodDbEntity,
+    payment_method_repository: PaymentMethodRepository,
+) -> StripeCardDbEntity:
+    return self_or_fail_if_none(
+        await payment_method_repository.get_stripe_card_by_stripe_id(
+            input=GetStripeCardByStripeIdInput(
+                stripe_id=payment_method_expired.pgp_resource_id
+            )
+        )
+    )
+
+
+@pytest.fixture
+async def cart_payment(
+    cart_payment_repository: CartPaymentRepository, payer: PayerDbEntity
+) -> CartPayment:
+    return await cart_payment_repository.insert_cart_payment(
         id=uuid4(),
         payer_id=cast(UUID, payer.id),
         amount_original=99,
@@ -97,10 +164,10 @@ async def cart_payment(cart_payment_repository: CartPaymentRepository, payer: Pa
 
 async def create_payment_intent(
     cart_payment_repository: CartPaymentRepository,
-    payer,
-    payment_method,
+    payer: PayerDbEntity,
+    payment_method: PgpPaymentMethodDbEntity,
     payment_intent__capture_after,
-):
+) -> PaymentIntent:
     cart_payment_id = uuid4()
     await cart_payment_repository.insert_cart_payment(
         id=cart_payment_id,
@@ -149,11 +216,11 @@ def payment_intent__capture_after() -> datetime:
 @pytest.fixture
 async def payment_intent(
     cart_payment_repository: CartPaymentRepository,
-    payer,
-    payment_method,
+    payer: PayerDbEntity,
+    payment_method: PgpPaymentMethodDbEntity,
     payment_intent__capture_after: datetime,
-):
-    yield await create_payment_intent(
+) -> PaymentIntent:
+    return await create_payment_intent(
         cart_payment_repository, payer, payment_method, payment_intent__capture_after
     )
 
@@ -358,7 +425,7 @@ class TestPaymentIntentAdjustmentHistory:
         self,
         cart_payment_repository: CartPaymentRepository,
         cart_payment: CartPayment,
-        payment_method,
+        payment_method: PgpPaymentMethodDbEntity,
     ):
         payment_intent = await cart_payment_repository.insert_payment_intent(
             id=uuid4(),
@@ -899,7 +966,7 @@ class TestCartPayment:
 
     @pytest.mark.asyncio
     async def test_insert_cart_payment(
-        self, cart_payment_repository: CartPaymentRepository, payer: Payer
+        self, cart_payment_repository: CartPaymentRepository, payer: PayerDbEntity
     ):
         id = uuid4()
         result = await cart_payment_repository.insert_cart_payment(
@@ -939,7 +1006,7 @@ class TestCartPayment:
 
     @pytest.mark.asyncio
     async def test_update_cart_payment_details(
-        self, cart_payment_repository: CartPaymentRepository, payer: Payer
+        self, cart_payment_repository: CartPaymentRepository, payer: PayerDbEntity
     ):
         cart_payment = await cart_payment_repository.insert_cart_payment(
             id=uuid4(),
@@ -1413,9 +1480,9 @@ class TestCountPaymentIntentsThatRequireCapture:
     async def test_success(
         self,
         cart_payment_repository: CartPaymentRepository,
-        payment_method,
+        payment_method: PgpPaymentMethodDbEntity,
         payment_intent: PaymentIntent,
-        payer: Payer,
+        payer: PayerDbEntity,
         payment_intent__capture_after: datetime,
     ):
         # Our databases are not data-less for each test run, so we need to count the payment intents before and after
@@ -1479,3 +1546,136 @@ class TestUpdatePaymentAndPgpPaymentIntentStatus:
             pgp_payment_intent_id=pgp_payment_intent.id,
         )
         assert not result
+
+
+class TestExistingSuccessChargeForStripeCard:
+    pytestmark = [pytest.mark.asyncio]
+
+    @pytest.fixture
+    async def consumer_charge(self, cart_payment_repository: CartPaymentRepository):
+        yield await cart_payment_repository.insert_legacy_consumer_charge(
+            target_ct_id=1,
+            target_id=2,
+            consumer_id=1,  # Use of pre-seeded consumer to satisfy FK constraint
+            idempotency_key=str(uuid4()),
+            is_stripe_connect_based=False,
+            country_id=LegacyCountryId.US,
+            currency=Currency.USD,
+            stripe_customer_id=None,
+            total=800,
+            original_total=800,
+        )
+
+    @pytest.fixture
+    async def stripe_charge_succeeded(
+        self,
+        stripe_card: StripeCardDbEntity,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+
+        return await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id=str(uuid4()),
+            card_id=stripe_card.id,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=Currency.USD,
+            status=LegacyStripeChargeStatus.SUCCEEDED,
+            idempotency_key=str(uuid4()),
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="test description",
+            error_reason="",
+        )
+
+    @pytest.fixture
+    async def stripe_charge_failed(
+        self,
+        stripe_card: StripeCardDbEntity,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        return await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id=str(uuid4()),
+            card_id=stripe_card.id,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=Currency.USD,
+            status=LegacyStripeChargeStatus.FAILED,
+            idempotency_key=str(uuid4()),
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="test description",
+            error_reason="",
+        )
+
+    @pytest.fixture
+    async def stripe_charge_succeeded_with_expired_stripe_card(
+        self,
+        stripe_card_expired,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        return await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id=str(uuid4()),
+            card_id=stripe_card_expired.id,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=Currency.USD,
+            status=LegacyStripeChargeStatus.SUCCEEDED,
+            idempotency_key=str(uuid4()),
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="test description",
+            error_reason="",
+        )
+
+    async def test_success_charge_exists(
+        self,
+        stripe_card: StripeCardDbEntity,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge_succeeded: LegacyStripeCharge,
+        stripe_charge_failed: LegacyStripeCharge,
+    ):
+        assert stripe_charge_succeeded.card_id == stripe_card.id
+        assert stripe_charge_failed.card_id == stripe_card.id
+        assert await cart_payment_repository.is_stripe_card_valid_and_has_success_charge_record(
+            stripe_card_stripe_id=stripe_card.stripe_id
+        )
+
+    async def test_no_charge_match(
+        self,
+        stripe_card: StripeCardDbEntity,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge_succeeded: LegacyStripeCharge,
+    ):
+        assert stripe_charge_succeeded.card_id == stripe_card.id
+        assert not await cart_payment_repository.is_stripe_card_valid_and_has_success_charge_record(
+            stripe_card_stripe_id=stripe_card.stripe_id + str(uuid4())
+        )
+
+    async def test_no_success_charge(
+        self,
+        stripe_card: StripeCardDbEntity,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge_failed: LegacyStripeCharge,
+    ):
+        assert stripe_charge_failed.card_id == stripe_card.id
+        assert not await cart_payment_repository.is_stripe_card_valid_and_has_success_charge_record(
+            stripe_card_stripe_id=stripe_card.stripe_id
+        )
+
+    async def test_success_charge_exists_but_card_expired(
+        self,
+        stripe_card_expired,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge_succeeded_with_expired_stripe_card: LegacyStripeCharge,
+    ):
+        assert (
+            stripe_charge_succeeded_with_expired_stripe_card.card_id
+            == stripe_card_expired.id
+        )
+        assert int(stripe_card_expired.exp_month) < date.today().month
+        assert not await cart_payment_repository.is_stripe_card_valid_and_has_success_charge_record(
+            stripe_card_stripe_id=stripe_card_expired.stripe_id
+        )

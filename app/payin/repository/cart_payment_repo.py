@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from typing import Any, List, Optional, Tuple, Dict, AsyncIterator, Union
 from uuid import UUID
 
@@ -32,7 +32,7 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
-from app.payin.models.maindb import consumer_charges, stripe_charges
+from app.payin.models.maindb import consumer_charges, stripe_charges, stripe_cards
 from app.payin.models.paymentdb import (
     cart_payments,
     payment_intents,
@@ -44,6 +44,7 @@ from app.payin.models.paymentdb import (
     pgp_refunds,
 )
 from app.payin.repository.base import PayinDBRepository
+from app.payin.repository.payment_method_repo import StripeCardDbEntity
 
 
 @final
@@ -1124,6 +1125,50 @@ class CartPaymentRepository(PayinDBRepository):
         )
         results = await self.main_database.replica().fetch_all(statement)
         return [self.to_legacy_stripe_charge(row) for row in results]
+
+    async def is_stripe_card_valid_and_has_success_charge_record(
+        self, stripe_card_stripe_id: str
+    ) -> bool:
+
+        get_stripe_card = stripe_cards.table.select().where(
+            stripe_cards.stripe_id == stripe_card_stripe_id
+        )
+
+        stripe_card_row = await self.main_database.replica().fetch_one(get_stripe_card)
+
+        if not stripe_card_row:
+            return False
+
+        card: StripeCardDbEntity = StripeCardDbEntity.from_row(stripe_card_row)
+
+        is_not_expired = False
+        if (
+            card
+            and card.active
+            and card.exp_month.isdigit()
+            and card.exp_year.isdigit()
+        ):
+            today = date.today()
+            is_not_expired = (today.year < int(card.exp_year)) or (
+                today.year == int(card.exp_year) and today.month <= int(card.exp_month)
+            )
+
+        if is_not_expired:
+            get_stripe_charge = (
+                stripe_charges.table.select()
+                .where(
+                    and_(
+                        stripe_charges.card_id == card.id,
+                        stripe_charges.status
+                        == LegacyStripeChargeStatus.SUCCEEDED.value,
+                    )
+                )
+                .limit(1)
+            )
+            result = await self.main_database.replica().fetch_one(get_stripe_charge)
+            return bool(result)
+
+        return False
 
     async def insert_refund(
         self,

@@ -1,4 +1,5 @@
 import abc
+import asyncio
 from typing import Any, Optional
 
 import stripe
@@ -803,6 +804,8 @@ class StripeAsyncClient:
         idempotency_key: models.IdempotencyKey,
     ) -> models.PaymentIntent:
         if self.commando:
+            # mimic DSJ behavior. sleep 4 sec before returning to prevent attacker realizing commando mode
+            await asyncio.sleep(4)
             raise StripeCommandoError()
         return await self.executor_pool.submit(
             self.stripe_client.create_payment_intent,

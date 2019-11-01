@@ -1216,6 +1216,7 @@ class TestCartPaymentInterface:
                 "payment_resource_id"
             ),
         )
+        cart_payment_interface.req_context.verify_card_in_commando_mode = False
         response = await cart_payment_interface.submit_payment_to_provider(
             payer_country=CountryCode.US,
             payment_intent=intent,
@@ -1225,6 +1226,59 @@ class TestCartPaymentInterface:
         )
         assert response
         assert response.status == IntentStatus.PENDING.value
+
+    @pytest.mark.asyncio
+    async def test_submit_commando_payment_to_provider_verify_card_failed(
+        self, cart_payment_interface, runtime_setter
+    ):
+        mocked_create_payment_intent = MagicMock()
+        mocked_create_payment_intent.side_effect = StripeCommandoError
+        cart_payment_interface.stripe_async_client.create_payment_intent = (
+            mocked_create_payment_intent
+        )
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        pgp_payment_method = PgpPaymentMethod(
+            pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                "payment_resource_id"
+            ),
+        )
+
+        mocked_is_card_verified = FunctionMock(return_value=False)
+        cart_payment_interface._is_card_verified = mocked_is_card_verified
+
+        with pytest.raises(CartPaymentCreateError):
+            await cart_payment_interface.submit_payment_to_provider(
+                payer_country=CountryCode.US,
+                payment_intent=intent,
+                pgp_payment_intent=pgp_intent,
+                pgp_payment_method=pgp_payment_method,
+                provider_description="test_description",
+            )
+
+    @pytest.mark.asyncio
+    async def test_commando_mode_verify_card(
+        self, cart_payment_interface, runtime_setter
+    ):
+        mocked_is_stripe_card_valid_and_has_success_charge_record = FunctionMock()
+        cart_payment_interface.payment_repo.is_stripe_card_valid_and_has_success_charge_record = (
+            mocked_is_stripe_card_valid_and_has_success_charge_record
+        )
+
+        cart_payment_interface.req_context.verify_card_in_commando_mode = False
+        mocked_is_stripe_card_valid_and_has_success_charge_record.return_value = False
+        assert await cart_payment_interface._is_card_verified(MagicMock())
+
+        mocked_is_stripe_card_valid_and_has_success_charge_record.return_value = True
+        assert await cart_payment_interface._is_card_verified(MagicMock())
+
+        cart_payment_interface.req_context.verify_card_in_commando_mode = True
+        mocked_is_stripe_card_valid_and_has_success_charge_record.return_value = False
+        assert not await cart_payment_interface._is_card_verified(MagicMock())
+
+        mocked_is_stripe_card_valid_and_has_success_charge_record.return_value = True
+        assert await cart_payment_interface._is_card_verified(MagicMock())
 
     @pytest.mark.asyncio
     async def test_submit_payment_to_provider_error(self, cart_payment_interface):

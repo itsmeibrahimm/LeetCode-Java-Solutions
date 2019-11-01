@@ -32,6 +32,7 @@ def test_newrelic_middleware(mocker: MockFixture):
                 correlation_id=correlation_id,
                 stripe_async_client=mocker.Mock(),
                 commando_legacy_payment_white_list=[],
+                verify_card_in_commando_mode=False,
             )
             return await call_next(request)
 

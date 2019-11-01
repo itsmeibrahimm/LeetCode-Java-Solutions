@@ -917,11 +917,25 @@ class CartPaymentInterface:
                 provider_decline_code=error_details.get("decline_code", None),
                 has_provider_error_details=True if json_body else False,
             ) from e
-        except StripeCommandoError:
-            self.req_context.log.info(
-                "[submit_payment_to_provider] Returning mocked payment_intent response for commando mode"
+        except StripeCommandoError as e:
+            if await self._is_card_verified(pgp_payment_method=pgp_payment_method):
+                self.req_context.log.info(
+                    "[submit_payment_to_provider] Returning mocked payment_intent response for commando mode"
+                )
+                return COMMANDO_PAYMENT_INTENT
+
+            self.req_context.log.warning(
+                "[submit_payment_to_provider] Did not honor payment_intent creation in commando mode",
+                payment_intent_id=payment_intent.id,
             )
-            return COMMANDO_PAYMENT_INTENT
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
+                retryable=True,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ) from e
         except Exception as e:
             self.req_context.log.exception(
                 "[submit_payment_to_provider] Error invoking provider to create a payment",
@@ -935,6 +949,13 @@ class CartPaymentInterface:
                 provider_decline_code=None,
                 has_provider_error_details=False,
             ) from e
+
+    async def _is_card_verified(self, pgp_payment_method: PgpPaymentMethod) -> bool:
+        if self.req_context.verify_card_in_commando_mode:
+            return await self.payment_repo.is_stripe_card_valid_and_has_success_charge_record(
+                stripe_card_stripe_id=pgp_payment_method.pgp_payment_method_resource_id
+            )
+        return True
 
     async def update_payment_after_submission_to_provider(
         self,

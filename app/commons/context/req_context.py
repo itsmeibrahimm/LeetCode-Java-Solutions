@@ -14,6 +14,7 @@ from app.commons.context.app_context import AppContext, get_context_from_app
 from app.commons.operational_flags import (
     STRIPE_COMMANDO_MODE_BOOLEAN,
     STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY,
+    VERIFY_CARD_IN_COMMANDO_MODE,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.runtime import runtime
@@ -27,6 +28,7 @@ class ReqContext:
     commando_mode: bool
     stripe_async_client: StripeAsyncClient
     commando_legacy_payment_white_list: List  # whitelist of consumer_ids
+    verify_card_in_commando_mode: bool
     correlation_id: Optional[str] = None
 
 
@@ -41,6 +43,9 @@ def set_context_for_req(request: Request) -> ReqContext:
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
     commando_legacy_payment_white_list = runtime.get_json(
         STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, []
+    )
+    verify_card_in_commando_mode = runtime.get_boolean(
+        VERIFY_CARD_IN_COMMANDO_MODE, False
     )
 
     # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
@@ -57,6 +62,7 @@ def set_context_for_req(request: Request) -> ReqContext:
         correlation_id=correlation_id,
         stripe_async_client=stripe_async_client,
         commando_legacy_payment_white_list=commando_legacy_payment_white_list,
+        verify_card_in_commando_mode=verify_card_in_commando_mode,
     )
 
     state = cast(Any, request.state)
@@ -78,6 +84,10 @@ def build_req_context(app_context: AppContext, **additional_req_log_kwargs):
     commando_legacy_payment_white_list = runtime.get_json(
         STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, []
     )
+    verify_card_in_commando_mode = runtime.get_boolean(
+        VERIFY_CARD_IN_COMMANDO_MODE, False
+    )
+
     # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
     # per request level
     stripe_async_client = StripeAsyncClient(
@@ -92,6 +102,7 @@ def build_req_context(app_context: AppContext, **additional_req_log_kwargs):
         commando_mode=commando_mode,
         stripe_async_client=stripe_async_client,
         commando_legacy_payment_white_list=commando_legacy_payment_white_list,
+        verify_card_in_commando_mode=verify_card_in_commando_mode,
     )
 
 
@@ -123,6 +134,7 @@ def override_commando_mode_context(request: Request, commando_mode: bool):
         correlation_id=old_ctxt.correlation_id,
         stripe_async_client=old_ctxt.stripe_async_client,
         commando_legacy_payment_white_list=old_ctxt.commando_legacy_payment_white_list,
+        verify_card_in_commando_mode=old_ctxt.verify_card_in_commando_mode,
     )
     state = cast(Any, request.state)
     state.context = req_context

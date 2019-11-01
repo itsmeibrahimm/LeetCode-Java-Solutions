@@ -32,6 +32,7 @@ def _build_request_context(
         commando_mode=False,
         stripe_async_client=stripe_async_client,
         commando_legacy_payment_white_list=[],
+        verify_card_in_commando_mode=False,
     )
 
 

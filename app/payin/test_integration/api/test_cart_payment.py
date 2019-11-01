@@ -1,26 +1,36 @@
 import random
+import uuid
 from asyncio import AbstractEventLoop
+from typing import Any, Dict, Optional, List
 
 import pytest
-import uuid
+import requests
 from starlette.testclient import TestClient
-from typing import Any, Optional, Dict
 
 from app.commons.context.app_context import AppContext
+from app.commons.operational_flags import (
+    STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY,
+    STRIPE_COMMANDO_MODE_BOOLEAN,
+    VERIFY_CARD_IN_COMMANDO_MODE,
+)
 from app.commons.providers.stripe.stripe_models import Customer as StripeCustomer
 from app.commons.types import CountryCode
-from app.commons.operational_flags import (
-    STRIPE_COMMANDO_MODE_BOOLEAN,
-    STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY,
-)
-from app.conftest import StripeAPISettings, RuntimeSetter, RuntimeContextManager
-
+from app.commons.utils.validation import self_or_fail_if_none
+from app.conftest import RuntimeContextManager, RuntimeSetter, StripeAPISettings
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
 # is marked as external.  The stripe simulator does not return the correct result since it does
 # persist state.
+from app.payin.core.cart_payment.model import LegacyStripeCharge
 from app.payin.core.cart_payment.processor import CommandoProcessor
+from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
+from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.payment_method_repo import (
+    PaymentMethodRepository,
+    GetStripeCardByStripeIdInput,
+    StripeCardDbEntity,
+)
 from app.payin.test_integration.integration_utils import build_commando_processor
 
 
@@ -151,6 +161,7 @@ class TestCartPayment:
         amount: int = 500,
         idempotency_key: Optional[str] = None,
         split_payment: Optional[Dict[str, Any]] = None,
+        dd_stripe_card_id: int = 1,
     ) -> Dict[str, Any]:
         # No payer_id or payment_method_id.  Instead we use legacy_payment.
         request_body = {
@@ -174,7 +185,7 @@ class TestCartPayment:
                     "application_fee": 500,
                     "metadata": {"is_first_order": True},
                 },
-                "dd_stripe_card_id": "1",
+                "dd_stripe_card_id": f"{str(dd_stripe_card_id)}",
             },
         }
 
@@ -243,6 +254,28 @@ class TestCartPayment:
             if id != charge_id:
                 return id
 
+    def _create_cart_payment_legacy_get_raw_response(
+        self,
+        client: TestClient,
+        stripe_customer_id: str,
+        stripe_card_id: str,
+        amount: int,
+        merchant_country: CountryCode,
+        split_payment: Optional[Dict[str, Any]] = None,
+        dd_stripe_card_id: int = 1,
+    ) -> requests.Response:
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer_id,
+            stripe_card_id=stripe_card_id,
+            amount=amount,
+            split_payment=split_payment,
+            merchant_country=merchant_country,
+            dd_stripe_card_id=dd_stripe_card_id,
+        )
+
+        return client.post("/payin/api/v0/cart_payments", json=request_body)
+
     def _test_cart_payment_legacy_payment_creation(
         self,
         client: TestClient,
@@ -251,6 +284,7 @@ class TestCartPayment:
         amount: int,
         merchant_country: CountryCode,
         split_payment: Optional[Dict[str, Any]] = None,
+        dd_stripe_card_id: int = 1,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
             stripe_customer_id=stripe_customer_id,
@@ -258,9 +292,18 @@ class TestCartPayment:
             amount=amount,
             split_payment=split_payment,
             merchant_country=merchant_country,
+            dd_stripe_card_id=dd_stripe_card_id,
         )
 
-        response = client.post("/payin/api/v0/cart_payments", json=request_body)
+        response = self._create_cart_payment_legacy_get_raw_response(
+            client=client,
+            stripe_customer_id=stripe_customer_id,
+            stripe_card_id=stripe_card_id,
+            amount=amount,
+            split_payment=split_payment,
+            merchant_country=merchant_country,
+            dd_stripe_card_id=dd_stripe_card_id,
+        )
         assert response.status_code == 201
         cart_payment = response.json()
 
@@ -956,37 +999,119 @@ class TestCartPayment:
             "payment_method_id"
         ]
 
-        # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
-        with RuntimeContextManager(
-            STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, [1], runtime_setter
-        ):
-            cart_payment = self._test_cart_payment_legacy_payment_creation(
-                client=client,
-                stripe_customer_id=provider_account_id,
-                stripe_card_id=provider_card_id,
-                amount=700,
-                merchant_country=CountryCode.US,
-            )
-            assert cart_payment
+        payment_method_repository = PaymentMethodRepository(app_context)
 
-        cart_payment = self._test_cart_payment_legacy_payment_creation(
+        stripe_card: StripeCardDbEntity = self_or_fail_if_none(
+            event_loop.run_until_complete(
+                payment_method_repository.get_stripe_card_by_stripe_id(
+                    input=GetStripeCardByStripeIdInput(stripe_id=provider_card_id)
+                )
+            )
+        )
+
+        assert stripe_card.id
+
+        cart_payment_1 = self._test_cart_payment_legacy_payment_creation(
             client=client,
             stripe_customer_id=provider_account_id,
             stripe_card_id=provider_card_id,
             amount=900,
             merchant_country=CountryCode.US,
+            dd_stripe_card_id=stripe_card.id,
         )
 
-        assert cart_payment
+        assert cart_payment_1
+
+        # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
+        # With allow all payment intent in commando mode
+        with RuntimeContextManager(
+            STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, [1], runtime_setter
+        ), RuntimeContextManager(VERIFY_CARD_IN_COMMANDO_MODE, False, runtime_setter):
+            cart_payment_2 = self._test_cart_payment_legacy_payment_creation(
+                client=client,
+                stripe_customer_id=provider_account_id,
+                stripe_card_id=provider_card_id,
+                amount=700,
+                merchant_country=CountryCode.US,
+                dd_stripe_card_id=stripe_card.id,
+            )
+            assert cart_payment_2
+
+        # Test that we only allow a VERIFIED card in commando mode
+        with RuntimeContextManager(
+            STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, [1], runtime_setter
+        ), RuntimeContextManager(VERIFY_CARD_IN_COMMANDO_MODE, True, runtime_setter):
+            cart_payment_3 = self._test_cart_payment_legacy_payment_creation(
+                client=client,
+                stripe_customer_id=provider_account_id,
+                stripe_card_id=provider_card_id,
+                amount=800,
+                merchant_country=CountryCode.US,
+                dd_stripe_card_id=stripe_card.id,
+            )
+            assert cart_payment_3
+
+        # Now make the stripe card we have used cannot be verified by invalid stripe charges created by this card
+        cart_payment_repo = CartPaymentRepository(app_context)
+        for cp in (cart_payment_1, cart_payment_2, cart_payment_3):
+            charge_id = int(cp["dd_charge_id"])
+            stripe_charges: List[LegacyStripeCharge] = event_loop.run_until_complete(
+                cart_payment_repo.get_legacy_stripe_charges_by_charge_id(
+                    charge_id=charge_id
+                )
+            )
+            assert len(stripe_charges) == 1
+            event_loop.run_until_complete(
+                cart_payment_repo.update_legacy_stripe_charge_status(
+                    stripe_charge_id=stripe_charges[0].stripe_id,
+                    status=LegacyStripeChargeStatus.FAILED,
+                )
+            )
+
+        # After invalidated all previous charges to failed, this attempt should fail when we don't allow
+        # commando mode on card without previous successful charges
+        with RuntimeContextManager(
+            STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, [1], runtime_setter
+        ), RuntimeContextManager(VERIFY_CARD_IN_COMMANDO_MODE, True, runtime_setter):
+            expected_failed_response = self._create_cart_payment_legacy_get_raw_response(
+                client=client,
+                stripe_customer_id=provider_account_id,
+                stripe_card_id=provider_card_id,
+                amount=900,
+                merchant_country=CountryCode.US,
+                dd_stripe_card_id=stripe_card.id,
+            )
+            assert expected_failed_response.status_code == 500
+
+        # But this one will pass, if we allow all card in commando mode WITHOUT verifying
+        with RuntimeContextManager(
+            STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY, [1], runtime_setter
+        ), RuntimeContextManager(VERIFY_CARD_IN_COMMANDO_MODE, False, runtime_setter):
+            cart_payment_4 = self._test_cart_payment_legacy_payment_creation(
+                client=client,
+                stripe_customer_id=provider_account_id,
+                stripe_card_id=provider_card_id,
+                amount=1000,
+                merchant_country=CountryCode.US,
+                dd_stripe_card_id=stripe_card.id,
+            )
+            assert cart_payment_4
 
         commando_processor: CommandoProcessor = build_commando_processor(
             app_context=app_context
         )
+
         total, result = event_loop.run_until_complete(commando_processor.recoup())
-
-        assert result[0][1] == 700
-
-        assert total == 1
+        assert total == 3
+        assert len(result) == total
+        assert cart_payment_3["amount"] != cart_payment_2["amount"]
+        assert cart_payment_4["amount"] != cart_payment_3["amount"]
+        assert cart_payment_4["amount"] != cart_payment_2["amount"]
+        assert {
+            int(cart_payment_2["amount"]),
+            int(cart_payment_3["amount"]),
+            int(cart_payment_4["amount"]),
+        } == {result[0][1], result[1][1], result[2][1]}
 
     def test_payment_provider_error(
         self, stripe_api: StripeAPISettings, client: TestClient
