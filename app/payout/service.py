@@ -7,6 +7,7 @@ from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
 from app.payout.core.account.processor import PayoutAccountProcessors
+from app.payout.core.instant_payout.processor import InstantPayoutProcessors
 from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.core.transaction.processor import TransactionProcessors
 from app.payout.repository.bankdb import (
@@ -52,6 +53,7 @@ __all__ = [
     "PaymentAccountEditHistoryRepository",
     "PaymentAccountEditHistoryRepositoryInterface",
     "RedisLockManager",
+    "create_instant_payout_processors",
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
@@ -253,4 +255,18 @@ def get_stripe_client(payout_service: PayoutService = Depends()) -> StripeAsyncC
 def create_transaction_processors(payout_service: PayoutService = Depends()):
     return TransactionProcessors(
         logger=payout_service.log, transaction_repo=payout_service.transactions
+    )
+
+
+def create_instant_payout_processors(payout_service: PayoutService = Depends()):
+    return InstantPayoutProcessors(
+        logger=payout_service.log,
+        payout_account_repo=payout_service.payment_accounts,
+        payout_card_repo=payout_service.payout_cards,
+        payout_method_repo=payout_service.payout_methods,
+        payout_repo=payout_service.payouts,
+        stripe_payout_request_repo=payout_service.stripe_payout_requests,
+        transaction_repo=payout_service.transactions,
+        stripe=payout_service.stripe,
+        payment_lock_manager=payout_service.redis_lock_manager,
     )

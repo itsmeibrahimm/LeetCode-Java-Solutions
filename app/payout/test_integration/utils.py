@@ -129,12 +129,15 @@ async def prepare_and_insert_managed_account_transfer(
 
 
 async def prepare_and_insert_payout(
-    payout_repo: PayoutRepository, ide_key="stripe-payout-request-idempotency-key-001"
+    payout_repo: PayoutRepository,
+    ide_key="stripe-payout-request-idempotency-key-001",
+    status="failed",
+    payout_account_id=123,
 ):
     data = PayoutCreate(
         amount=1000,
-        payment_account_id=123,
-        status="failed",
+        payment_account_id=payout_account_id,
+        status=status,
         currency=Currency.USD.value,
         fee=199,
         type="instant",

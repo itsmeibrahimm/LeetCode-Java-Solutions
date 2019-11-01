@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.commons.api.models import PaymentException
 from app.commons.context.logger import get_logger
+from app.commons.core.errors import PaymentError
 
 
 class OperationResponse(BaseModel):
@@ -36,6 +37,7 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
         try:
             return await self._execute()
         except Exception as internal_exec:
+            # todo: Kevin to fix PaymentException. It should not be PaymentException.
             if isinstance(internal_exec, PaymentException):
                 raise
             self.logger.error(
@@ -44,7 +46,7 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
             )
             exec_or_result = self._handle_exception(internal_exec)
             if isinstance(exec_or_result, Exception):
-                raise exec_or_result
+                raise
             return exec_or_result
 
     @abstractmethod
@@ -56,8 +58,10 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
 
     @abstractmethod
     def _handle_exception(
-        self, internal_exec: Exception
-    ) -> Union[PaymentException, RespT]:
+        self,
+        internal_exec: Exception
+        # todo: Kevin, remove PaymentException
+    ) -> Union[PaymentException, PaymentError, RespT]:
         """
         define how do handler or translate exceptions raised within this processor and its dependencies
         """

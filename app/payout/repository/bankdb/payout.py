@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+
+from sqlalchemy import and_, desc
 from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.infra import DB
+from app.payout.core.instant_payout.models import InstantPayoutStatusType
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model.payout import Payout, PayoutCreate, PayoutUpdate
 from app.payout.repository.bankdb.model import payouts
@@ -23,6 +26,18 @@ class PayoutRepositoryInterface(ABC):
     async def update_payout_by_id(
         self, payout_id: int, data: PayoutUpdate
     ) -> Optional[Payout]:
+        pass
+
+    @abstractmethod
+    async def list_payout_by_payout_account_id(
+        self,
+        payout_account_id: int,
+        offset: int,
+        statuses: Optional[List[InstantPayoutStatusType]] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        limit: Optional[int] = 10,
+    ) -> List[Payout]:
         pass
 
 
@@ -62,3 +77,34 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
         )
         row = await self._database.master().fetch_one(stmt)
         return Payout.from_row(row) if row else None
+
+    async def list_payout_by_payout_account_id(
+        self,
+        payout_account_id: int,
+        offset: int,
+        statuses: Optional[List[InstantPayoutStatusType]] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        limit: Optional[int] = 10,
+    ):
+        conditions = [payouts.payment_account_id == payout_account_id]
+
+        if statuses:
+            conditions.append(payouts.status.in_(statuses))
+        if start_time:
+            conditions.append(payouts.created_at.__ge__(start_time))
+        if end_time:
+            conditions.append(payouts.created_at.__le__(end_time))
+
+        stmt = (
+            payouts.table.select()
+            .where(and_(*conditions))
+            .order_by(desc(payouts.id))
+            .offset(offset)
+            .limit(limit)
+        )
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            return [Payout.from_row(row) for row in rows]
+        else:
+            return []
