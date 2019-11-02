@@ -8,6 +8,14 @@ from app.purchasecard.marqeta_external.marqeta_provider_client import (
 )
 from structlog.stdlib import BoundLogger
 
+from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
+from app.purchasecard.repository.marqeta_card_ownership import (
+    MarqetaCardOwnershipRepository,
+)
+from app.purchasecard.repository.marqeta_card_transition import (
+    MarqetaCardTransitionRepository,
+)
+
 
 class PurchaseCardContainer:
 
@@ -33,3 +41,19 @@ class PurchaseCardContainer:
     @property
     def user_processor(self) -> UserProcessor:
         return UserProcessor(marqeta_client=self.marqeta_client, logger=self.logger)
+
+    @property
+    def marqeta_card_repository(self) -> MarqetaCardRepository:
+        return MarqetaCardRepository(database=self.app_context.purchasecard_maindb)
+
+    @property
+    def marqeta_card_ownership_repository(self) -> MarqetaCardOwnershipRepository:
+        return MarqetaCardOwnershipRepository(
+            database=self.app_context.purchasecard_maindb
+        )
+
+    @property
+    def marqeta_card_transition_repository(self) -> MarqetaCardTransitionRepository:
+        return MarqetaCardTransitionRepository(
+            database=self.app_context.purchasecard_maindb
+        )

@@ -88,6 +88,14 @@ def create_app_config() -> AppConfig:
             name="ledger_paymentdb_url",
             value=f"postgresql://ledger_user@{dsj_db_endpoint}/paymentdb_dev",
         ),
+        PURCHASECARD_MAINDB_MASTER_URL=Secret(
+            name="purchasecard_maindb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
+        ),
+        PURCHASECARD_MAINDB_REPLICA_URL=Secret(
+            name="purchasecard_maindb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
+        ),
         DEFAULT_DB_CONFIG=DBConfig(
             replica_pool_max_size=1, master_pool_max_size=5, debug=True
         ),

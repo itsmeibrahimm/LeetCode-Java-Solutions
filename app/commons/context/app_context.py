@@ -53,6 +53,7 @@ class AppContext:
     payin_paymentdb: DB
     ledger_maindb: DB
     ledger_paymentdb: DB
+    purchasecard_maindb: DB
 
     stripe_thread_pool: ThreadPoolHelper
 
@@ -89,6 +90,7 @@ class AppContext:
                 self.payin_paymentdb.disconnect(),
                 self.ledger_maindb.disconnect(),
                 self.ledger_paymentdb.disconnect(),
+                self.purchasecard_maindb.disconnect(),
                 self.ids_session.close(),
                 self.dsj_session.close(),
                 self.marqeta_session.close(),
@@ -143,6 +145,14 @@ async def create_app_context(config: AppConfig) -> AppContext:
         db_config=config.DEFAULT_DB_CONFIG,
         master_url=config.LEDGER_MAINDB_MASTER_URL,
         replica_url=config.LEDGER_MAINDB_REPLICA_URL,
+        alternative_replica=selected_maindb_replica,
+    )
+
+    purchasecard_maindb = DB.create_with_alternative_replica(
+        db_id="purchasecard_maindb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PURCHASECARD_MAINDB_MASTER_URL,
+        replica_url=config.PURCHASECARD_MAINDB_REPLICA_URL,
         alternative_replica=selected_maindb_replica,
     )
 
@@ -258,6 +268,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         payin_paymentdb=payin_paymentdb,
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
+        purchasecard_maindb=purchasecard_maindb,
         dsj_client=dsj_client,
         identity_client=identity_client,
         stripe_client=stripe_client,
