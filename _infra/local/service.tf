@@ -20,7 +20,7 @@ module "payment-service-web" {
   namespace                                 = "payment-service"
   service_name                              = "payment-service"
   service_app                               = "web"
-  service_contact_info                      = "eng-devprod@doordash.com"
+  service_contact_info                      = "eng-payment@doordash.com"
   service_docker_image                      = "payment-service"
   service_docker_image_tag                  = "localbuild"
   service_image_pull_policy                 = "Never"
@@ -57,13 +57,54 @@ module "payment-service-cron" {
   namespace                                 = "payment-service"
   service_name                              = "payment-service"
   service_app                               = "cron"
-  service_contact_info                      = "eng-devprod@doordash.com"
+  service_contact_info                      = "eng-payment@doordash.com"
   service_docker_image                      = "payment-service"
   service_docker_image_tag                  = "localbuild"
   service_image_pull_policy                 = "Never"
 
   service_cmd                               = "python"
-  service_cmd_args                          = "app/cron.py"
+  service_cmd_args                          = "app/payin_cron.py"
+
+  service_max_surge                         = "200%"
+  service_max_unavailable                   = "0"
+  service_replica_count                     = "1"
+  service_container_port                    = "80"
+
+  service_resource_requests_memory          = "2Gi"
+  service_resource_limits_memory            = "2Gi"
+  service_resource_requests_cpu             = "1024m"
+  service_resource_limits_cpu               = "1024m"
+
+  service_liveness_probe_init_delay         = "20"
+  service_liveness_probe_period             = "10"
+  service_liveness_probe_failure_threshold  = "3"
+  service_liveness_probe_path               = "/"
+
+  runtime_enable                            = "false"
+
+  net_service_enable                        = "true"
+  net_service_type                          = "ClusterIP"
+  net_service_port                          = "80"
+
+  service_environments_variables = <<EOF
+    ENVIRONMENT=local
+   EOF
+}
+
+
+module "payment-service-payout-cron" {
+  source = "git::https://github.com/doordash/terraform-kubernetes-microservice.git?ref=master"
+
+  namespace                                 = "payment-service"
+  service_name                              = "payment-service"
+  service_app                               = "payout-cron"
+  service_contact_info                      = "eng-payment@doordash.com"
+  service_docker_image                      = "payment-service"
+  service_docker_image_tag                  = "localbuild"
+  service_image_pull_policy                 = "Never"
+
+  service_cmd                               = "python"
+  service_cmd_args                          = "app/payout_cron.py"
 
   service_max_surge                         = "200%"
   service_max_unavailable                   = "0"

@@ -20,9 +20,11 @@ services:
     tty: true
     depends_on:
       - payment.dsj-postgres
+      - payment.redis
+      - payment.stripe-mock
 
   cron:
-    container_name: payment.cron
+    container_name: payin.cron
     build:
       context: "."
       args:
@@ -32,11 +34,30 @@ services:
     volumes:
       - $PWD/app:/home/app
       - $PWD/development:/home/development
-    command: ["python", "app/cron.py"]
+    command: ["python", "app/payin_cron.py"]
     tty: true
     depends_on:
       - payment.dsj-postgres
+      - payment.redis
+      - payment.stripe-mock
 
+  payout-cron:
+    container_name: payout.cron
+    build:
+      context: "."
+      args:
+        - FURY_TOKEN=${FURY_TOKEN:?FURY_TOKEN. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_USERNAME=${ARTIFACTORY_USERNAME:?ARTIFACTORY_USERNAME. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+        - ARTIFACTORY_PASSWORD=${ARTIFACTORY_PASSWORD:?ARTIFACTORY_PASSWORD. Please run New Engineer Setup Guide. https://drd.sh/PZKD9P/}
+    volumes:
+      - $PWD/app:/home/app
+      - $PWD/development:/home/development
+    command: ["python", "app/payout_cron.py"]
+    tty: true
+    depends_on:
+      - payment.dsj-postgres
+      - payment.redis
+      - payment.stripe-mock
 
   admin:
     container_name: payment.admin
@@ -55,3 +76,5 @@ services:
     tty: true
     depends_on:
       - payment.dsj-postgres
+      - payment.redis
+      - payment.stripe-mock

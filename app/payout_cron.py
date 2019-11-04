@@ -23,11 +23,6 @@ from app.commons.instrumentation.pool import stat_resource_pool_jobs
 from app.commons.jobs.pool import adjust_pool_sizes
 from app.commons.jobs.startup_util import init_worker_resources
 from app.commons.runtime import runtime
-from app.payin.jobs import (
-    CaptureUncapturedPaymentIntents,
-    ResolveCapturingPaymentIntents,
-    EmitProblematicCaptureCount,
-)
 
 logger = get_logger("cron")
 
@@ -74,42 +69,13 @@ loop = asyncio.get_event_loop()
 
 app_context.monitor.add(
     stat_resource_pool_jobs(
-        stat_prefix="resource.job_pools",
+        stat_prefix="resource.job_pools.payout",
         pool_name=stripe_pool.name,
         pool_job_stats=stripe_pool,
     ),
     interval_secs=app_config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
 )
 
-capture_uncaptured_payment_intents = CaptureUncapturedPaymentIntents(
-    app_context=app_context, job_pool=stripe_pool
-)
-scheduler.add_job(
-    func=capture_uncaptured_payment_intents.run,
-    name=capture_uncaptured_payment_intents.job_name,
-    trigger=app_config.CAPTURE_CRON_TRIGGER,
-)
-
-resolve_capturing_payment_intents = ResolveCapturingPaymentIntents(
-    app_context=app_context, job_pool=stripe_pool
-)
-scheduler.add_job(
-    func=resolve_capturing_payment_intents.run,
-    name=resolve_capturing_payment_intents.job_name,
-    trigger=app_config.CAPTURE_CRON_TRIGGER,
-)
-
-emit_problematic_capture_count = EmitProblematicCaptureCount(
-    app_context=app_context,
-    job_pool=stripe_pool,
-    statsd_client=doorstats_global,
-    problematic_threshold=app_config.PROBLEMATIC_CAPTURE_THRESHOLD,
-)
-scheduler.add_job(
-    func=emit_problematic_capture_count.run,
-    name=emit_problematic_capture_count.job_name,
-    trigger=CronTrigger(hour="*"),
-)
 
 monitor_transfers_with_incorrect_status = MonitorTransfersWithIncorrectStatus(
     app_context=app_context, job_pool=stripe_pool
