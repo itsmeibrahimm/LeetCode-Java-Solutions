@@ -2612,13 +2612,17 @@ class CartPaymentProcessor:
                 raise
 
         # Update state in our system
+
+        # This seems redundant since StripeCharge.status will always be "succeeded" after a successful authorization
+        # And when capture succeeded to here, this is essentially a noop update.
+        await self.legacy_payment_interface.update_charge_after_payment_captured(
+            provider_payment_intent
+        )
+
         await self.cart_payment_interface.update_payment_after_capture_with_provider(
             payment_intent=payment_intent,
             pgp_payment_intent=pgp_payment_intent,
             provider_payment_intent=provider_payment_intent,
-        )
-        await self.legacy_payment_interface.update_charge_after_payment_captured(
-            provider_payment_intent
         )
 
     @track_func
