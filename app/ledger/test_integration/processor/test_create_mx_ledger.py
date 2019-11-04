@@ -1,7 +1,8 @@
 import uuid
 import pytest
 import pytest_mock
-from psycopg2._psycopg import DataError
+
+from app.commons.core.errors import DBDataError
 from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.ledger.core.exceptions import (
@@ -60,7 +61,7 @@ class TestCreateMxLedger:
         mx_transaction_repo: MxTransactionRepository,
     ):
         payment_account_id = str(uuid.uuid4())
-        error = DataError("Test data error.")
+        error = DBDataError("Test data error.")
         mocker.patch(
             "app.ledger.repository.mx_transaction_repository.MxTransactionRepository.create_ledger_and_insert_mx_transaction",
             side_effect=error,

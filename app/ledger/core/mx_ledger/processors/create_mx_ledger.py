@@ -2,10 +2,10 @@ from datetime import datetime
 from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.core.errors import DBDataError
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.ledger.core.mx_ledger.types import MxLedgerInternal
 import uuid
-from psycopg2._psycopg import DataError
 from structlog.stdlib import BoundLogger
 from app.ledger.core.data_types import InsertMxTransactionWithLedgerInput
 from app.ledger.core.exceptions import LedgerErrorCode, MxLedgerCreationError
@@ -62,7 +62,7 @@ class CreateMxLedger(AsyncOperation[CreateMxLedgerRequest, MxLedgerInternal]):
             raise Exception(
                 "By now only is micro-deposit supported for mx_ledger creation"
             )
-        except DataError as e:
+        except DBDataError as e:
             self.logger.error(
                 "[create_mx_ledger] Invalid input data while creating ledger", error=e
             )

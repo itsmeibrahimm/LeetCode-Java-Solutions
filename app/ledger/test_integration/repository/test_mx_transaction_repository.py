@@ -1,10 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-
-import psycopg2
 import pytest
-from psycopg2 import errorcodes
-
+from app.commons.core.errors import DBIntegrityError, DatabaseErrorCode
 from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.ledger.core.data_types import (
@@ -103,11 +100,11 @@ class TestMxTransactionRepository:
         )
         await mx_transaction_repository.insert_mx_transaction(mx_transaction_to_insert)
 
-        with pytest.raises(psycopg2.IntegrityError) as e:
+        with pytest.raises(DBIntegrityError) as e:
             await mx_transaction_repository.insert_mx_transaction(
                 mx_transaction_to_insert
             )
-        assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
+        assert e.value.error_code == DatabaseErrorCode.DB_INTEGRITY_ERROR
 
     async def test_create_ledger_and_insert_mx_transaction_success(
         self,
@@ -243,12 +240,12 @@ class TestMxTransactionRepository:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        with pytest.raises(psycopg2.IntegrityError) as e:
+        with pytest.raises(DBIntegrityError) as e:
             async with mx_ledger_repository._database.master().connection() as connection:
                 await mx_transaction_repository.create_ledger_and_insert_mx_transaction(
                     request_input, connection
                 )
-        assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
+        assert e.value.error_code == DatabaseErrorCode.DB_INTEGRITY_ERROR
 
     async def test_create_ledger_and_insert_mx_transaction_raise_exception_with_scheduled_type_and_without_interval_type(
         self,

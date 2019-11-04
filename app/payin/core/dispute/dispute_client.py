@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Optional, List
 
 from fastapi import Depends
-from psycopg2._psycopg import DataError
 from stripe.error import StripeError
 from structlog.stdlib import BoundLogger
 
@@ -12,6 +11,7 @@ from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
+from app.commons.core.errors import DBDataError
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import StripeUpdateDisputeRequest
 from app.commons.types import CountryCode
@@ -73,9 +73,9 @@ class DisputeClient:
                     stripe_dispute_id=dispute_id, dispute_id_type=dispute_id_type
                 )
             )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[get_raw_dispute] DataError while reading db.", dispute_id=dispute_id
+                "[get_raw_dispute] DBDataError while reading db.", dispute_id=dispute_id
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
@@ -113,9 +113,9 @@ class DisputeClient:
                 ),
                 request_where=UpdateStripeDisputeWhereInput(id=dd_stripe_dispute_id),
             )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[update_raw_dispute_submitted_time] DataError while reading db.",
+                "[update_raw_dispute_submitted_time] DBDataError while reading db.",
                 dd_stripe_dispute_id=dd_stripe_dispute_id,
             )
             raise DisputeReadError(
@@ -203,8 +203,8 @@ class DisputeClient:
                         start_time=start_time,
                     )
                 )
-            except DataError:
-                self.log.error("[get_cumulative_count] DataError while reading db.")
+            except DBDataError:
+                self.log.error("[get_cumulative_count] DBDataError while reading db.")
                 raise DisputeReadError(
                     error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
                 )
@@ -218,9 +218,9 @@ class DisputeClient:
                         card_ids=stripe_card_ids, start_time=start_time, reasons=reasons
                     )
                 )
-            except DataError:
+            except DBDataError:
                 self.log.exception(
-                    "[get_cumulative_amount] DataError while reading db."
+                    "[get_cumulative_amount] DBDataError while reading db."
                 )
                 raise DisputeReadError(
                     error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
@@ -242,9 +242,9 @@ class DisputeClient:
                     id=dispute_id, id_type=dispute_id_type
                 )
             )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[get_disputes_charge_metadata] DataError while reading db."
+                "[get_disputes_charge_metadata] DBDataError while reading db."
             )
             raise DisputeReadError(
                 error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False

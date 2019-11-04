@@ -12,6 +12,7 @@ from aiopg.sa import (
 )
 from aiopg.sa.result import ResultProxy, RowProxy
 
+from app.commons.database.client.error_handlers import translate_db_error
 from app.commons.timing import database as database_timing
 from app.commons.database.client.interface import (
     DBConnection,
@@ -226,6 +227,7 @@ class AioConnection(DBConnection, database_timing.Database):
     def transaction(self) -> AioTransaction:
         return AioTransaction(connection=self)
 
+    @translate_db_error
     @database_timing.track_execute
     async def execute(self, stmt) -> AioMultiResult:
         async with self._query_lock:
@@ -237,6 +239,7 @@ class AioConnection(DBConnection, database_timing.Database):
                 result_proxy.close()
             return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
+    @translate_db_error
     @database_timing.track_execute
     async def fetch_one(self, stmt) -> Optional[AioResult]:
         async with self._query_lock:
@@ -248,6 +251,7 @@ class AioConnection(DBConnection, database_timing.Database):
                 result_proxy.close()
             return AioResult(result, result_proxy.rowcount) if result else None
 
+    @translate_db_error
     @database_timing.track_execute
     async def fetch_all(self, stmt) -> AioMultiResult:
         async with self._query_lock:
@@ -259,6 +263,7 @@ class AioConnection(DBConnection, database_timing.Database):
                 result_proxy.close()
             return AioMultiResult(row_proxies, matched_row_count=result_proxy.rowcount)
 
+    @translate_db_error
     @database_timing.track_execute
     async def fetch_value(self, stmt):
         async with self._query_lock:

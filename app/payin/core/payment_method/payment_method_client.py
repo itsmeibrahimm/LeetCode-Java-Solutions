@@ -4,7 +4,6 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends
-from psycopg2._psycopg import DataError
 from structlog.stdlib import BoundLogger
 
 from app.commons import tracing
@@ -13,6 +12,7 @@ from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
+from app.commons.core.errors import DBDataError
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
@@ -133,9 +133,9 @@ class PaymentMethodClient:
 
             # TODO: add new state in pgp_payment_methods table to keep track of cross DB consistency
 
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[create_raw_payment_method] DataError when write db.",
+                "[create_raw_payment_method] DBDataError when write db.",
                 payer_id=payer_id,
             )
             raise PaymentMethodCreateError(
@@ -277,9 +277,9 @@ class PaymentMethodClient:
             return RawPaymentMethod(
                 pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
             )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[get_duplicate_payment_method] DataError when read db.",
+                "[get_duplicate_payment_method] DBDataError when read db.",
                 stripe_payment_method_id=stripe_payment_method.id,
             )
             raise PaymentMethodReadError(
@@ -312,9 +312,9 @@ class PaymentMethodClient:
                         id=raw_payment_method.stripe_card_entity.id
                     ),
                 )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[detach_payment_method] DataError when read db.",
+                "[detach_payment_method] DBDataError when read db.",
                 pgp_payment_method_id=pgp_payment_method_id,
             )
             raise PaymentMethodDeleteError(
@@ -411,9 +411,9 @@ class PaymentMethodClient:
                     stripe_customer_id=stripe_customer_id
                 )
             )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[get_dd_stripe_card_ids_by_stripe_customer_id] DataError when read db.",
+                "[get_dd_stripe_card_ids_by_stripe_customer_id] DBDataError when read db.",
                 stripe_customer_id=stripe_customer_id,
             )
             raise PaymentMethodReadError(
@@ -465,9 +465,9 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
                 sc_entity = await self.payment_method_repo.get_stripe_card_by_stripe_id(
                     GetStripeCardByStripeIdInput(stripe_id=pm_entity.pgp_resource_id)
                 )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[get_payment_method_raw_objects] DataError when read db",
+                "[get_payment_method_raw_objects] DBDataError when read db",
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
             )
@@ -563,9 +563,9 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
                     retryable=False,
                 )
-        except DataError:
+        except DBDataError:
             self.log.exception(
-                "[get_payment_method_raw_objects] DataError when read db.",
+                "[get_payment_method_raw_objects] DBDataError when read db.",
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
             )

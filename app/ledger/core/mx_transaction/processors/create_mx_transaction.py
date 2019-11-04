@@ -1,8 +1,5 @@
 from datetime import datetime
 from typing import Union, Optional
-
-import psycopg2
-from psycopg2.errorcodes import UNIQUE_VIOLATION, LOCK_NOT_AVAILABLE
 from tenacity import (
     RetryError,
     retry,
@@ -12,8 +9,14 @@ from tenacity import (
 )
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.core.errors import (
+    DBDataError,
+    DBOperationLockNotAvailableError,
+    DBOperationError,
+    DBIntegrityUniqueViolationError,
+    DBIntegrityError,
+)
 from app.commons.core.processor import OperationRequest, AsyncOperation
-from psycopg2._psycopg import DataError, OperationalError
 from structlog.stdlib import BoundLogger
 from app.ledger.core.data_types import InsertMxTransactionWithLedgerInput
 from app.ledger.core.exceptions import (
@@ -127,7 +130,7 @@ class CreateMxTransaction(
                 request_input
             )
             return mx_transaction
-        except DataError as e:
+        except DBDataError as e:
             self.logger.error(
                 "[create_mx_transaction_and_upsert_mx_ledgers] Invalid input data while creating mx transaction and upserting ledger",
                 error=e,
@@ -136,16 +139,7 @@ class CreateMxTransaction(
             raise MxTransactionCreationError(
                 error_code=LedgerErrorCode.MX_TXN_CREATE_ERROR, retryable=True
             )
-        except psycopg2.IntegrityError as e:
-            if e.pgcode != UNIQUE_VIOLATION:
-                self.logger.error(
-                    "[create_ledger_and_insert_mx_transaction] IntegrityError caught while creating ledger and inserting mx_transaction",
-                    error=e,
-                )
-                raise MxLedgerCreationError(
-                    error_code=LedgerErrorCode.MX_LEDGER_CREATE_INTEGRITY_ERROR,
-                    retryable=True,
-                )
+        except DBIntegrityUniqueViolationError as e:
             self.logger.warn(
                 "[create_ledger_and_insert_mx_transaction] Retry to update ledger balance instead of insert due to unique constraints violation",
                 error=e,
@@ -155,15 +149,16 @@ class CreateMxTransaction(
                 error_code=LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR,
                 retryable=True,
             )
-        except OperationalError as e:
-            if e.pgcode != LOCK_NOT_AVAILABLE:
-                self.logger.error(
-                    "[insert_mx_transaction_and_update_ledger] OperationalError caught while inserting mx_transaction and updating ledger",
-                    error=e,
-                )
-                raise MxTransactionCreationError(
-                    error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR, retryable=True
-                )
+        except DBIntegrityError as e:
+            self.logger.error(
+                "[create_ledger_and_insert_mx_transaction] IntegrityError caught while creating ledger and inserting mx_transaction",
+                error=e,
+            )
+            raise MxLedgerCreationError(
+                error_code=LedgerErrorCode.MX_LEDGER_CREATE_INTEGRITY_ERROR,
+                retryable=True,
+            )
+        except DBOperationLockNotAvailableError as e:
             self.logger.warn(
                 "[insert_mx_transaction_and_update_ledger] Cannot obtain lock while updating ledger balance",
                 error=e,
@@ -171,4 +166,12 @@ class CreateMxTransaction(
             raise MxLedgerLockError(
                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
                 retryable=True,
+            )
+        except DBOperationError as e:
+            self.logger.error(
+                "[insert_mx_transaction_and_update_ledger] OperationalError caught while inserting mx_transaction and updating ledger",
+                error=e,
+            )
+            raise MxTransactionCreationError(
+                error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR, retryable=True
             )

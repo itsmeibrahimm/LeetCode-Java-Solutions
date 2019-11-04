@@ -2,12 +2,15 @@ from uuid import UUID
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.core.errors import (
+    DBDataError,
+    DBOperationError,
+    DBOperationLockNotAvailableError,
+)
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.ledger.core.mx_ledger.types import MxLedgerInternal
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepositoryInterface
 import uuid
-from psycopg2._psycopg import DataError, OperationalError
-from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 from structlog.stdlib import BoundLogger
 from tenacity import (
     retry,
@@ -111,7 +114,7 @@ class ProcessMxLedger(AsyncOperation[ProcessMxLedgerRequest, MxLedgerInternal]):
                 process_mx_ledger_request
             )
             return to_mx_ledger(mx_ledger)
-        except DataError as e:
+        except DBDataError as e:
             self.logger.error(
                 "[process_ledger_and_scheduled_ledger] Invalid input data while processing ledger",
                 mx_ledger_id=mx_ledger_id,
@@ -120,16 +123,7 @@ class ProcessMxLedger(AsyncOperation[ProcessMxLedgerRequest, MxLedgerInternal]):
             raise MxLedgerProcessError(
                 error_code=LedgerErrorCode.MX_LEDGER_PROCESS_ERROR, retryable=True
             )
-        except OperationalError as e:
-            if e.pgcode != LOCK_NOT_AVAILABLE:
-                self.logger.error(
-                    "[process_ledger_and_scheduled_ledger] OperationalError caught while processing ledger",
-                    mx_ledger_id=mx_ledger_id,
-                    error=e,
-                )
-                raise MxLedgerProcessError(
-                    error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR, retryable=True
-                )
+        except DBOperationLockNotAvailableError as e:
             self.logger.warn(
                 "[process_ledger_and_scheduled_ledger] Cannot obtain lock while updating ledger",
                 mx_ledger_id=mx_ledger_id,
@@ -138,6 +132,15 @@ class ProcessMxLedger(AsyncOperation[ProcessMxLedgerRequest, MxLedgerInternal]):
             raise MxLedgerLockError(
                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
                 retryable=True,
+            )
+        except DBOperationError as e:
+            self.logger.error(
+                "[process_ledger_and_scheduled_ledger] OperationalError caught while processing ledger",
+                mx_ledger_id=mx_ledger_id,
+                error=e,
+            )
+            raise MxLedgerProcessError(
+                error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR, retryable=True
             )
         except Exception as e:
             self.logger.error(

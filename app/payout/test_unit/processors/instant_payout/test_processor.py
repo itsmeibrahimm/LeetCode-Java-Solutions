@@ -189,7 +189,7 @@ class TestInstantPayoutProcessors:
     async def test_check_instant_payout_raise_exception(
         self, mock_check_payout_account
     ):
-        mock_check_payout_account.side_effect = DBConnectionError
+        mock_check_payout_account.side_effect = DBConnectionError("some error")
 
         with pytest.raises(DBConnectionError):
             await self.instant_payout_processor.check_instant_payout_eligibility(

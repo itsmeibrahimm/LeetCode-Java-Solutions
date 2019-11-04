@@ -5,10 +5,9 @@ from datetime import datetime, timezone
 import pytest
 import pytest_mock
 from asynctest import patch
-from psycopg2._psycopg import DataError, OperationalError
-from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 from tenacity import RetryError
 
+from app.commons.core.errors import DBDataError, DBOperationLockNotAvailableError
 from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.ledger.core.data_types import (
@@ -269,7 +268,7 @@ class TestCreateMxTransaction:
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
-        error = DataError("Test data error.")
+        error = DBDataError("Test data error.")
         mocker.patch(
             "app.ledger.repository.mx_transaction_repository.MxTransactionRepository.create_ledger_and_insert_mx_transaction",
             side_effect=error,
@@ -362,7 +361,7 @@ class TestCreateMxTransaction:
         mx_transaction_repository: MxTransactionRepository,
         mx_scheduled_ledger_repository: MxScheduledLedgerRepository,
     ):
-        error = DataError("Test data error.")
+        error = DBDataError("Test data error.")
         payment_account_id = str(uuid.uuid4())
         mock_mx_scheduled_ledger = GetMxScheduledLedgerOutput(
             id=uuid.uuid4(),
@@ -467,11 +466,7 @@ class TestCreateMxTransaction:
             target_type=MxTransactionType.MERCHANT_DELIVERY,
         )
 
-        # todo: maybe need to fix this later
-        class SubOE(OperationalError):
-            pgcode = LOCK_NOT_AVAILABLE
-
-        error = SubOE("Test lock not available error")
+        error = DBOperationLockNotAvailableError()
         mock_update_ledger.side_effect = error
         create_mx_transaction_op = self._construct_mx_transaction_op(
             payment_account_id=payment_account_id

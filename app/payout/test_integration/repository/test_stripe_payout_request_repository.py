@@ -1,8 +1,8 @@
-import psycopg2
 import pytest
 import json
 from datetime import datetime
 
+from app.commons.core.errors import DBIntegrityUniqueViolationError
 from app.commons.database.infra import DB
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestUpdate,
@@ -84,16 +84,13 @@ class TestPayoutRepository:
         )
 
         # insert another stripe_payout_request with same payout id
-        with pytest.raises(psycopg2.IntegrityError) as e:
+        with pytest.raises(DBIntegrityUniqueViolationError) as e:
             await prepare_and_insert_stripe_payout_request(
                 stripe_payout_request_repo=stripe_payout_request_repo,
                 payout_id=payout.id,
             )
         err_msg = str(e.value)
-        assert (
-            'duplicate key value violates unique constraint "stripe_payout_requests_payout_id_key"'
-            in err_msg
-        )
+        assert "unique violation error" in err_msg
 
     async def test_update_stripe_payout_request_by_id(
         self,

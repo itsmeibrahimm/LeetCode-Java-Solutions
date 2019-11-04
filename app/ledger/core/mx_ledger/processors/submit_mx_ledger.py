@@ -1,12 +1,17 @@
 from uuid import UUID
-from psycopg2.errorcodes import LOCK_NOT_AVAILABLE, UNIQUE_VIOLATION
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.core.errors import (
+    DBOperationError,
+    DBIntegrityError,
+    DBDataError,
+    DBOperationLockNotAvailableError,
+    DBIntegrityUniqueViolationError,
+)
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.ledger.core.mx_ledger.types import MxLedgerInternal
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepositoryInterface
-from psycopg2._psycopg import DataError, OperationalError, IntegrityError
 from structlog.stdlib import BoundLogger
 from tenacity import (
     RetryError,
@@ -94,7 +99,7 @@ class SubmitMxLedger(AsyncOperation[SubmitMxLedgerRequest, MxLedgerInternal]):
                 mx_ledger = await self.mx_ledger_repo.move_ledger_state_to_submitted(
                     submit_ledger_request
                 )
-            except DataError as e:
+            except DBDataError as e:
                 self.logger.error(
                     "[submit mx_ledger] Invalid input data while submitting ledger",
                     mx_ledger_id=mx_ledger_id,
@@ -113,7 +118,7 @@ class SubmitMxLedger(AsyncOperation[SubmitMxLedgerRequest, MxLedgerInternal]):
                     paid_ledger_request
                 )
                 return to_mx_ledger(mx_ledger)
-            except DataError as e:
+            except DBDataError as e:
                 self.logger.error(
                     "[submit mx_ledger] Invalid input data while submitting ledger",
                     mx_ledger_id=mx_ledger_id,
@@ -175,7 +180,7 @@ class SubmitMxLedger(AsyncOperation[SubmitMxLedgerRequest, MxLedgerInternal]):
                 rollover_negative_ledger_request, self.mx_transaction_repo
             )
             return rolled_mx_ledger
-        except DataError as e:
+        except DBDataError as e:
             self.logger.error(
                 "[rollover_negative_balanced_ledger_impl] Invalid input data while submitting ledger",
                 mx_ledger_id=mx_ledger_id,
@@ -184,16 +189,7 @@ class SubmitMxLedger(AsyncOperation[SubmitMxLedgerRequest, MxLedgerInternal]):
             raise MxLedgerSubmissionError(
                 error_code=LedgerErrorCode.MX_LEDGER_SUBMIT_ERROR, retryable=True
             )
-        except OperationalError as e:
-            if e.pgcode != LOCK_NOT_AVAILABLE:
-                self.logger.error(
-                    "[rollover_negative_balanced_ledger_impl] OperationalError caught while rolling over negative balanced ledger",
-                    mx_ledger_id=mx_ledger_id,
-                    error=e,
-                )
-                raise MxLedgerProcessError(
-                    error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR, retryable=True
-                )
+        except DBOperationLockNotAvailableError as e:
             self.logger.warn(
                 "[rollover_negative_balanced_ledger_impl] Cannot obtain lock while rolling over negative balanced ledger",
                 mx_ledger_id=mx_ledger_id,
@@ -203,16 +199,16 @@ class SubmitMxLedger(AsyncOperation[SubmitMxLedgerRequest, MxLedgerInternal]):
                 error_code=LedgerErrorCode.MX_LEDGER_UPDATE_LOCK_NOT_AVAILABLE_ERROR,
                 retryable=True,
             )
-        except IntegrityError as e:
-            if e.pgcode != UNIQUE_VIOLATION:
-                self.logger.error(
-                    "[rollover_negative_balanced_ledger_impl] IntegrityError caught while creating ledger and inserting mx_transaction",
-                    error=e,
-                )
-                raise MxLedgerProcessError(
-                    error_code=LedgerErrorCode.MX_LEDGER_CREATE_INTEGRITY_ERROR,
-                    retryable=True,
-                )
+        except DBOperationError as e:
+            self.logger.error(
+                "[rollover_negative_balanced_ledger_impl] OperationalError caught while rolling over negative balanced ledger",
+                mx_ledger_id=mx_ledger_id,
+                error=e,
+            )
+            raise MxLedgerProcessError(
+                error_code=LedgerErrorCode.MX_TXN_OPERATIONAL_ERROR, retryable=True
+            )
+        except DBIntegrityUniqueViolationError as e:
             self.logger.warn(
                 "[rollover_negative_balanced_ledger_impl] Retry to update ledger balance instead of insert due to unique constraints violation",
                 error=e,
@@ -220,5 +216,14 @@ class SubmitMxLedger(AsyncOperation[SubmitMxLedgerRequest, MxLedgerInternal]):
             # retry with insert_mx_txn_and_update_ledger due to unique constraints violation
             raise MxLedgerCreateUniqueViolationError(
                 error_code=LedgerErrorCode.MX_LEDGER_CREATE_UNIQUE_VIOLATION_ERROR,
+                retryable=True,
+            )
+        except DBIntegrityError as e:
+            self.logger.error(
+                "[rollover_negative_balanced_ledger_impl] IntegrityError caught while creating ledger and inserting mx_transaction",
+                error=e,
+            )
+            raise MxLedgerProcessError(
+                error_code=LedgerErrorCode.MX_LEDGER_CREATE_INTEGRITY_ERROR,
                 retryable=True,
             )

@@ -4,15 +4,18 @@ from enum import Enum
 class DatabaseErrorCode(str, Enum):
     DB_CONNECTION_ERROR = "db_connection_error"
     DB_OPERATION_ERROR = "db_operation_error"
+    DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR = "db_operation_lock_not_available_error"
     DB_INTEGRITY_ERROR = "db_integrity_error"
+    DB_INTEGRITY_UNIQUE_VIOLATION_ERROR = "db_integrity_unique_violation_error"
     DB_PROGRAMMING_ERROR = "db_programming_error"
+    DB_DATA_ERROR = "db_data_error"
+    DB_INTERNAL_ERROR = "db_internal_error"
+    DB_NOT_SUPPORTED_ERROR = "db_not_supported_error"
 
 
-db_error_message_maps = {
-    DatabaseErrorCode.DB_CONNECTION_ERROR: "Failed to connect to db.",
-    DatabaseErrorCode.DB_OPERATION_ERROR: "Cancel statement due to timeout.",
-    DatabaseErrorCode.DB_INTEGRITY_ERROR: "Db integrity error.",
-    DatabaseErrorCode.DB_PROGRAMMING_ERROR: "SQL error.",
+database_error_message_maps = {
+    DatabaseErrorCode.DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR: "lock is not available",
+    DatabaseErrorCode.DB_INTEGRITY_UNIQUE_VIOLATION_ERROR: "unique violation error",
 }
 
 
@@ -126,37 +129,134 @@ class DatabaseError(PaymentError):
 
 
 class DBConnectionError(DatabaseError):
-    def __init__(self):
+    """DB Connection Error.
+
+    Exception raised for errors that are related to the database interface rather than the database itself, e.g., failed
+    to connect to db.
+
+    """
+
+    def __init__(self, error_message):
         super().__init__(
             error_code=DatabaseErrorCode.DB_CONNECTION_ERROR,
-            error_message=db_error_message_maps[DatabaseErrorCode.DB_CONNECTION_ERROR],
-            retryable=True,
-        )
-
-
-class DBOperationError(DatabaseError):
-    def __init__(self):
-        super().__init__(
-            error_code=DatabaseErrorCode.DB_OPERATION_ERROR,
-            error_message=db_error_message_maps[DatabaseErrorCode.DB_OPERATION_ERROR],
-            retryable=True,
-        )
-
-
-class DBIntegrityError(DatabaseError):
-    def __init__(self):
-        super().__init__(
-            error_code=DatabaseErrorCode.DB_INTEGRITY_ERROR,
-            error_message=db_error_message_maps[DatabaseErrorCode.DB_INTEGRITY_ERROR],
+            error_message=error_message,
             retryable=False,
         )
 
 
-class DBProgrammingError(DatabaseError):
+class DBOperationError(DatabaseError):
+    """DB Operation Error.
+
+    Exception raised for errors that are related to the database's operation and not necessarily under the control
+    of the programmer.
+    """
+
+    def __init__(self, error_message):
+        super().__init__(
+            error_code=DatabaseErrorCode.DB_OPERATION_ERROR,
+            error_message=error_message,
+            retryable=True,
+        )
+
+
+class DBOperationLockNotAvailableError(DBOperationError):
+    """DB Operation Error specifically for lock not available error in ledger.
+
+    Exception raised for errors that are related to the database's operation and not necessarily under the control
+    of the programmer.
+    """
+
     def __init__(self):
         super().__init__(
+            error_message=database_error_message_maps[
+                DatabaseErrorCode.DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR
+            ]
+        )
+
+
+class DBIntegrityError(DatabaseError):
+    """DB Integrity Error.
+
+    Exception raised when the relational integrity of the database is affected, e.g. a foreign key check fails.
+    """
+
+    def __init__(self, error_message):
+        super().__init__(
+            error_code=DatabaseErrorCode.DB_INTEGRITY_ERROR,
+            error_message=error_message,
+            retryable=False,
+        )
+
+
+class DBIntegrityUniqueViolationError(DBIntegrityError):
+    """DB Operation Error specifically for unique violation error in ledger.
+
+    Exception raised for errors that are related to the database's operation and not necessarily under the control
+    of the programmer.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_message=database_error_message_maps[
+                DatabaseErrorCode.DB_INTEGRITY_UNIQUE_VIOLATION_ERROR
+            ]
+        )
+
+
+class DBProgrammingError(DatabaseError):
+    """DB Programming Error.
+
+    Exception raised for programming errors, e.g. table not found or already exists, syntax error in the SQL statement,
+    wrong number of parameters specified, etc.
+    """
+
+    def __init__(self, error_message):
+        super().__init__(
             error_code=DatabaseErrorCode.DB_PROGRAMMING_ERROR,
-            error_message=db_error_message_maps[DatabaseErrorCode.DB_PROGRAMMING_ERROR],
+            error_message=error_message,
+            retryable=False,
+        )
+
+
+class DBDataError(DatabaseError):
+    """DB Data Error.
+
+    Exception raised for errors that are due to problems with the processed data like division by zero, numeric
+    value out of range, etc.
+    """
+
+    def __init__(self, error_message):
+        super().__init__(
+            error_code=DatabaseErrorCode.DB_DATA_ERROR,
+            error_message=error_message,
+            retryable=False,
+        )
+
+
+class DBInternalError(DatabaseError):
+    """DB Internal Error.
+
+    Exception raised when the database encounters an internal error, e.g. the cursor is not valid anymore.
+    """
+
+    def __init__(self, error_message):
+        super().__init__(
+            error_code=DatabaseErrorCode.DB_INTERNAL_ERROR,
+            error_message=error_message,
+            retryable=False,
+        )
+
+
+class DBNotSupportedError(DatabaseError):
+    """DB Not Supported Error.
+
+    Exception raised in case a method or database API was used which is not supported by the database.
+    """
+
+    def __init__(self, error_message):
+        super().__init__(
+            error_code=DatabaseErrorCode.DB_NOT_SUPPORTED_ERROR,
+            error_message=error_message,
             retryable=False,
         )
 

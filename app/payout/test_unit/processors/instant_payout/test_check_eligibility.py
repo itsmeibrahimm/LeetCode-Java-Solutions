@@ -160,8 +160,8 @@ class TestCheckPayoutAccount:
     async def test_raise_db_error_when_get_payout_account_error(
         self, mock_payout_account_repo
     ):
-        mock_payout_account_repo.get_payment_account_by_id.side_effect = (
-            DBConnectionError
+        mock_payout_account_repo.get_payment_account_by_id.side_effect = DBConnectionError(
+            "some error"
         )
         with pytest.raises(DBConnectionError):
             await self.payout_account_check.execute()
@@ -172,8 +172,8 @@ class TestCheckPayoutAccount:
         mock_payout_account_repo.get_payment_account_by_id.return_value = (
             self.payout_account
         )
-        mock_payout_account_repo.get_stripe_managed_account_by_id.side_effect = (
-            DBConnectionError
+        mock_payout_account_repo.get_stripe_managed_account_by_id.side_effect = DBConnectionError(
+            "some error"
         )
         with pytest.raises(DBConnectionError):
             await self.payout_account_check.execute()
@@ -260,8 +260,8 @@ class TestCheckPayoutCard:
     async def test_raise_db_error_when_get_payout_method_error(
         self, mock_payout_method_repo, mock_payout_card_repo
     ):
-        mock_payout_method_repo.list_payout_methods_by_payout_account_id.side_effect = (
-            DBConnectionError
+        mock_payout_method_repo.list_payout_methods_by_payout_account_id.side_effect = DBConnectionError(
+            "some error"
         )
         with pytest.raises(DBConnectionError):
             await self.payout_card_check.execute()
@@ -272,7 +272,9 @@ class TestCheckPayoutCard:
         mock_payout_method_repo.list_payout_methods_by_payout_account_id.return_value = [
             self.payout_method
         ]
-        mock_payout_card_repo.list_payout_cards_by_ids.side_effect = DBIntegrityError
+        mock_payout_card_repo.list_payout_cards_by_ids.side_effect = DBIntegrityError(
+            "some error"
+        )
         with pytest.raises(DBIntegrityError):
             await self.payout_card_check.execute()
 
@@ -331,8 +333,8 @@ class TestCheckPayoutAccountBalance:
     async def test_raise_db_error_when_get_unpaid_transaction_error(
         self, mock_transaction_repo
     ):
-        mock_transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit.side_effect = (
-            DBConnectionError
+        mock_transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit.side_effect = DBConnectionError(
+            "some error"
         )
         with pytest.raises(DBConnectionError):
             await self.payout_account_balance_check.execute()
@@ -378,7 +380,9 @@ class TestCheckInstantPayoutDailyLimit:
         )
 
     async def test_raise_db_error_when_list_payout_error(self, mock_payout_repo):
-        mock_payout_repo.list_payout_by_payout_account_id.side_effect = DBIntegrityError
+        mock_payout_repo.list_payout_by_payout_account_id.side_effect = DBIntegrityError(
+            "some error"
+        )
         with pytest.raises(DBIntegrityError):
             await self.instant_payout_daily_limit_check.execute()
 

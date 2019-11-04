@@ -1,10 +1,7 @@
 import uuid
 from datetime import datetime
-
-import psycopg2
 import pytest
-from psycopg2 import errorcodes
-
+from app.commons.core.errors import DBIntegrityError, DatabaseErrorCode
 from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.ledger.core.data_types import (
@@ -79,9 +76,9 @@ class TestMxLedgerRepository:
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
-        with pytest.raises(psycopg2.IntegrityError) as e:
+        with pytest.raises(DBIntegrityError) as e:
             await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
-        assert e.value.pgcode == errorcodes.UNIQUE_VIOLATION
+        assert e.value.error_code == DatabaseErrorCode.DB_INTEGRITY_ERROR
 
     async def test_update_mx_ledger_balance_success(
         self, mx_ledger_repository: MxLedgerRepository

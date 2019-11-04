@@ -5,9 +5,8 @@ from datetime import datetime
 import pytest
 import pytest_mock
 from asynctest import patch
-from psycopg2._psycopg import DataError, OperationalError
-from psycopg2.errorcodes import LOCK_NOT_AVAILABLE
 
+from app.commons.core.errors import DBDataError, DBOperationLockNotAvailableError
 from app.commons.database.infra import DB
 from app.ledger.core.data_types import GetMxLedgerByIdInput
 from app.ledger.core.exceptions import (
@@ -141,7 +140,7 @@ class TestProcessMxLedger:
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
-        error = DataError("Test data error.")
+        error = DBDataError("Test data error.")
         self.mocker.patch(
             "app.ledger.repository.mx_ledger_repository.MxLedgerRepository.move_ledger_state_to_processing_and_close_schedule_ledger",
             side_effect=error,
@@ -178,17 +177,13 @@ class TestProcessMxLedger:
         )
         await mx_ledger_repository.insert_mx_ledger(mx_ledger_to_insert)
 
-        # todo: maybe need to fix this later
-        class SubOE(OperationalError):
-            pgcode = LOCK_NOT_AVAILABLE
-
-        error = SubOE("Test lock not available error")
+        error = DBOperationLockNotAvailableError()
         mock_process_ledger.side_effect = error
-        create_mx_ledger_op = self._construct_process_ledger_request(
+        process_mx_ledger_op = self._construct_process_ledger_request(
             mx_ledger_id=ledger_id
         )
         with pytest.raises(MxLedgerProcessError) as e:
-            await create_mx_ledger_op._execute()
+            await process_mx_ledger_op._execute()
 
         assert (
             e.value.error_code
