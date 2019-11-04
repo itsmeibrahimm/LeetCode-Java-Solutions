@@ -33,7 +33,6 @@ async def create_transfer(
     create_transfer_request = CreateTransferRequest(
         payout_account_id=body.payout_account_id,
         transfer_type=body.transfer_type,
-        bank_info_recently_changed=body.bank_info_recently_changed,
         start_time=body.start_time,
         end_time=body.end_time,
         target_id=body.target_id,

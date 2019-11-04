@@ -66,7 +66,6 @@ class TestCreateTransfer:
             request=CreateTransferRequest(
                 payout_account_id=123,
                 transfer_type=TransferType.SCHEDULED,
-                bank_info_recently_changed=False,
                 end_time=datetime.now(timezone.utc),
             ),
         )
@@ -123,7 +122,6 @@ class TestCreateTransfer:
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
                 transfer_type=transfer_type,
-                bank_info_recently_changed=False,
                 end_time=datetime.utcnow(),
                 payout_countries=payout_countries,
                 target_type=target_type,
@@ -438,7 +436,6 @@ class TestCreateTransfer:
             request=CreateTransferRequest(
                 payout_account_id=111,
                 transfer_type=TransferType.SCHEDULED,
-                bank_info_recently_changed=False,
                 end_time=datetime.utcnow(),
                 payout_countries=None,
                 target_type=None,

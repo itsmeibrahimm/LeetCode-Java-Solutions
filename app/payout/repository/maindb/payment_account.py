@@ -74,7 +74,7 @@ class PaymentAccountRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_recently_updated_stripe_managed_account(
+    async def get_recently_updated_stripe_managed_account_ids(
         self, last_bank_account_update_allowed_at: datetime
     ) -> List[int]:
         pass
@@ -245,7 +245,7 @@ class PaymentAccountRepository(
             rows.matched_row_count,
         )
 
-    async def get_recently_updated_stripe_managed_account(
+    async def get_recently_updated_stripe_managed_account_ids(
         self, last_bank_account_update_allowed_at: datetime
     ) -> List[int]:
         stmt = (

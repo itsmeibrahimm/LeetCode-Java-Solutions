@@ -1,14 +1,33 @@
+from datetime import datetime, timedelta
+
+from aioredlock import Aioredlock
+
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
-from typing import Union, Optional
+from typing import Union, Optional, List
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
     OperationResponse,
 )
-from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.payout.core.transfer.processors.create_transfer import (
+    CreateTransferRequest,
+    CreateTransfer,
+)
+from app.payout.models import PayoutDay, TransferType
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepositoryInterface,
+)
+from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
+from app.commons.runtime import runtime
+from random import shuffle
+from app.payout.repository.maindb.payment_account import (
+    PaymentAccountRepositoryInterface,
+)
+from app.payout.repository.maindb.stripe_transfer import (
+    StripeTransferRepositoryInterface,
+)
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
-from app.commons.providers.stripe import stripe_models as models
 
 
 class WeeklyCreateTransferResponse(OperationResponse):
@@ -16,9 +35,11 @@ class WeeklyCreateTransferResponse(OperationResponse):
 
 
 class WeeklyCreateTransferRequest(OperationRequest):
-    transfer_id: models.TransferId
-    retry: Optional[bool]
-    submitted_by: Optional[int]
+    payout_day: PayoutDay
+    payout_countries: List[str]
+    end_time: datetime
+    unpaid_txn_start_time: datetime
+    exclude_recently_updated_accounts: Optional[bool] = False
 
 
 class WeeklyCreateTransfer(
@@ -29,25 +50,132 @@ class WeeklyCreateTransfer(
     """
 
     transfer_repo: TransferRepositoryInterface
+    transaction_repo: TransactionRepositoryInterface
+    payment_account_repo: PaymentAccountRepositoryInterface
+    payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
+    stripe_transfer_repo: StripeTransferRepositoryInterface
+    payment_lock_manager: Aioredlock
 
     def __init__(
         self,
         request: WeeklyCreateTransferRequest,
         *,
         transfer_repo: TransferRepositoryInterface,
-        stripe: StripeAsyncClient,
+        transaction_repo: TransactionRepositoryInterface,
+        payment_account_repo: PaymentAccountRepositoryInterface,
+        payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
+        stripe_transfer_repo: StripeTransferRepositoryInterface,
+        payment_lock_manager: Aioredlock,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
         self.request = request
         self.transfer_repo = transfer_repo
-        self.stripe = stripe
+        self.transaction_repo = transaction_repo
+        self.payment_account_repo = payment_account_repo
+        self.payment_account_edit_history_repo = payment_account_edit_history_repo
+        self.stripe_transfer_repo = stripe_transfer_repo
+        self.payment_lock_manager = payment_lock_manager
 
     async def _execute(self) -> WeeklyCreateTransferResponse:
-        self.logger.info("Creating transfer, called by weekly_create_transfer.")
+        payout_day = self.request.payout_day
+        end_time = self.request.end_time
+        unpaid_txn_start_time = self.request.unpaid_txn_start_time
+        exclude_recently_updated_accounts = (
+            self.request.exclude_recently_updated_accounts
+        )
+
+        self.logger.info(
+            "Executing weekly_create_transfers",
+            payout_day=payout_day,
+            end_time=end_time,
+            unpaid_txn_start_time=unpaid_txn_start_time,
+            exclude_recently_updated_accounts=exclude_recently_updated_accounts,
+        )
+        unpaid_payment_account_ids = await self.transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit(
+            start_time=unpaid_txn_start_time, end_time=end_time
+        )
+        payment_account_ids = unpaid_payment_account_ids
+        self.logger.info(
+            "[Weekly Create Transfers] total unpaid_payment_account_ids count",
+            total_number=len(payment_account_ids),
+        )
+
+        # ATO prevention: exclude payment account ids that should be blocked because of ATO and only apply this to dx
+        if exclude_recently_updated_accounts:
+            ids_blocked_by_ato = await self.get_payment_account_ids_blocked_by_ato()
+            payment_account_ids = list(
+                set(unpaid_payment_account_ids) - set(ids_blocked_by_ato)
+            )
+            self.logger.info(
+                "Executing weekly_create_transfers with accounts blocked by ATO excluded",
+                total_ato_accounts=len(unpaid_payment_account_ids)
+                - len(payment_account_ids),
+                total_unpaid_accounts=len(unpaid_payment_account_ids),
+            )
+
+        # randomize the account ids so they're not processed in any specific order and spread out
+        # the accounts that may have more transactions or slower task execution
+        shuffle(payment_account_ids)
+
+        transfer_count = 0
+        for account_id in payment_account_ids:
+            # todo: put create_transfer_for_account_id into queue
+            create_transfer_request = CreateTransferRequest(
+                payout_account_id=account_id,
+                transfer_type=TransferType.SCHEDULED,
+                end_time=end_time,
+                payout_day=payout_day,
+                payout_countries=self.request.payout_countries,
+                start_time=None,
+            )
+            create_transfer_op = CreateTransfer(
+                logger=self.logger,
+                request=create_transfer_request,
+                transfer_repo=self.transfer_repo,
+                payment_account_repo=self.payment_account_repo,
+                payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+                transaction_repo=self.transaction_repo,
+                stripe_transfer_repo=self.stripe_transfer_repo,
+                payment_lock_manager=self.payment_lock_manager,
+            )
+            await create_transfer_op.execute()
+            transfer_count += 1
+
+        self.logger.info(
+            "Finished executing weekly_create_transfers.",
+            payout_day=payout_day,
+            end_time=end_time,
+            unpaid_txn_start_time=unpaid_txn_start_time,
+            transfer_count=transfer_count,
+        )
+        # todo: add submit_after_creation field to make sure we can decide to do submit_transfer in create_transfer
+
         return WeeklyCreateTransferResponse()
 
     def _handle_exception(
         self, dep_exec: BaseException
     ) -> Union[PaymentException, WeeklyCreateTransferResponse]:
         raise DEFAULT_INTERNAL_EXCEPTION
+
+    async def get_payment_account_ids_blocked_by_ato(self) -> List[int]:
+        """
+        ATO prevention hack
+        Get a list of payment account ids that should be blocked by Account Takeover
+        :rtype: list
+        """
+        payout_blocks_in_hours = runtime.get_int(
+            "DASHER_ATO_PREVENTION_THRESHOLD_IN_HOURS", default=0
+        )
+        if payout_blocks_in_hours == 0:
+            return []
+        last_bank_account_update_allowed_at = datetime.utcnow() - timedelta(
+            hours=payout_blocks_in_hours
+        )
+        recently_updated_managed_account_ids = await self.payment_account_repo.get_recently_updated_stripe_managed_account_ids(
+            last_bank_account_update_allowed_at=last_bank_account_update_allowed_at
+        )
+        recently_updated_payment_account_ids = await self.payment_account_repo.get_payment_account_ids_by_sma_ids(
+            stripe_managed_account_ids=recently_updated_managed_account_ids
+        )
+        return recently_updated_payment_account_ids

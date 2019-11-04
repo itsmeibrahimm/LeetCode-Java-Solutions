@@ -61,7 +61,6 @@ class CreateTransferResponse(OperationResponse):
 class CreateTransferRequest(OperationRequest):
     payout_account_id: int
     transfer_type: str
-    bank_info_recently_changed: bool
     end_time: datetime
     start_time: Optional[datetime]
     target_id: Optional[int]

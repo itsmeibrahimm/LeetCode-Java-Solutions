@@ -245,7 +245,7 @@ class TestPaymentAccountRepository:
             payment_account_repo=payment_account_repo,
             bank_account_last_updated_at=datetime(2019, 6, 1, tzinfo=timezone.utc),
         )
-        retrieved_sma_id_list = await payment_account_repo.get_recently_updated_stripe_managed_account(
+        retrieved_sma_id_list = await payment_account_repo.get_recently_updated_stripe_managed_account_ids(
             last_bank_account_update_allowed_at=datetime(
                 2019, 7, 1, tzinfo=timezone.utc
             )
@@ -258,7 +258,7 @@ class TestPaymentAccountRepository:
     async def test_get_recently_updated_stripe_managed_account_not_found(
         self, payment_account_repo: PaymentAccountRepository
     ):
-        retrieved_sma_id_list = await payment_account_repo.get_recently_updated_stripe_managed_account(
+        retrieved_sma_id_list = await payment_account_repo.get_recently_updated_stripe_managed_account_ids(
             last_bank_account_update_allowed_at=datetime.now(timezone.utc)
         )
         assert not retrieved_sma_id_list

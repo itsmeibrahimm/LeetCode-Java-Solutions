@@ -39,9 +39,6 @@ class CreateTransfer(PaymentRequest):
 
     payout_account_id: int = Schema(default=..., description="Payout account ID")
     transfer_type: str = Schema(default=..., description="Transfer type")
-    bank_info_recently_changed: bool = Schema(
-        default=..., description="Boolean flag for bank info recently changed event"
-    )
     start_time: Optional[datetime] = Schema(default=None, description="Start timestamp")
     end_time: Optional[datetime] = Schema(default=None, description="End timestamp")
     target_id: Optional[int] = Schema(default=None, description="Target ID")
@@ -51,7 +48,6 @@ class CreateTransfer(PaymentRequest):
     target_business_id: Optional[int] = Schema(
         default=None, description="Target business ID"
     )
-    payout_day: Optional[PayoutDay] = Schema(default=None, description="Payout day")
     payout_countries: Optional[List[str]] = Schema(
         default=None, description="Payout countries"
     )

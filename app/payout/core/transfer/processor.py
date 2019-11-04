@@ -93,7 +93,11 @@ class TransferProcessors:
         weekly_create_transfer_op = WeeklyCreateTransfer(
             logger=self.logger,
             request=request,
-            stripe=self.stripe,
             transfer_repo=self.transfer_repo,
+            payment_lock_manager=self.payment_lock_manager,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            payment_account_repo=self.payment_account_repo,
+            transaction_repo=self.transaction_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
         )
         return await weekly_create_transfer_op.execute()
