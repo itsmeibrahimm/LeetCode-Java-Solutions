@@ -62,8 +62,8 @@ module "payment-service-webhook" {
   service_replica_count                     = "2"
   service_container_port                    = "80"
 
-  service_resource_requests_memory          = "2Gi"
-  service_resource_limits_memory            = "2Gi"
+  service_resource_requests_memory          = "4Gi"
+  service_resource_limits_memory            = "4Gi"
   service_resource_requests_cpu             = "1024m"
   service_resource_limits_cpu               = "1024m"
 
