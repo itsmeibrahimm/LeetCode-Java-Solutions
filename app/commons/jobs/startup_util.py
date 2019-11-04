@@ -32,6 +32,10 @@ def init_worker_resources(
 
     loop = asyncio.get_event_loop()
     app_context = loop.run_until_complete(create_app_context(app_config))
-    stripe_pool = JobPool.create_pool(size=20, name=pool_name)
+
+    # syncing stripe client pool with jobpool to achieve optimal concurrency
+    stripe_pool = JobPool.create_pool(
+        size=app_config.STRIPE_MAX_WORKERS, name=pool_name
+    )
 
     return app_config, app_context, stripe_pool

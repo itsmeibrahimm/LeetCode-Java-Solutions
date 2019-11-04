@@ -157,7 +157,8 @@ class AppConfig(SecretAware):
 
     SENTRY_CONFIG: Optional[SentryConfig] = None
 
-    STRIPE_MAX_WORKERS: int = 10
+    # PAYIN-189 Split web, cron resource initialization
+    STRIPE_MAX_WORKERS: int = 20
 
     INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger", "purchasecard"})
 
