@@ -8,10 +8,8 @@ from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.constants import DEFAULT_PAGE_SIZE
 from app.payout.core.exceptions import transaction_bad_query_parameters
-from app.payout.core.transaction.models import (
-    TransactionListInternal,
-    TransactionInternal,
-)
+from app.payout.core.transaction.models import TransactionListInternal
+from app.payout.core.transaction.utils import get_transaction_internal_from_db_entity
 from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 from app.payout import models
@@ -110,12 +108,11 @@ class ListTransactions(
         new_offset: Optional[int] = None
         if self.request.offset is not None:
             new_offset = self.request.offset + len(transactions)
-        transaction_internal_list = [
-            TransactionInternal(
-                **transaction.dict(), payout_account_id=transaction.payment_account_id
+        transaction_internal_list = []
+        for transaction in transactions:
+            transaction_internal_list.append(
+                get_transaction_internal_from_db_entity(transaction)
             )
-            for transaction in transactions
-        ]
         return TransactionListInternal(
             data=transaction_internal_list,
             count=len(transaction_internal_list),

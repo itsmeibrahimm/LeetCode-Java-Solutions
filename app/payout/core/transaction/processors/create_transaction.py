@@ -6,6 +6,7 @@ from typing import Optional, Union
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.transaction.models import TransactionInternal
+from app.payout.core.transaction.utils import get_transaction_internal_from_db_entity
 from app.payout.repository.bankdb.model.transaction import TransactionCreateDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 
@@ -56,9 +57,7 @@ class CreateTransaction(AsyncOperation[CreateTransactionRequest, TransactionInte
             data=db_entity_request
         )
 
-        return TransactionInternal(
-            **transaction.dict(), payout_account_id=transaction.payment_account_id
-        )
+        return get_transaction_internal_from_db_entity(transaction)
 
     def _handle_exception(
         self, internal_exec: BaseException
@@ -75,4 +74,12 @@ class CreateTransaction(AsyncOperation[CreateTransactionRequest, TransactionInte
         fields = self.request.dict()
         if fields.get("amount_paid") is None:
             fields["amount_paid"] = 0  # default to 0 as in DSJ
+
+        # temp fix for currency lower-case vs upper-case issue
+        # refactor once we finalize a convention
+        # (Now, DB is upper case, but internal model is lower)
+        currency = fields.get("currency")
+        if currency:
+            fields["currency"] = currency.upper()
+
         return TransactionCreateDBEntity(**fields)

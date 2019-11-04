@@ -59,7 +59,7 @@ class AttachPayout(AsyncOperation[AttachPayoutRequest, TransactionListInternal])
             payout_id=self.request.payout_id,
         )
         transaction_internal_list: List[TransactionInternal] = [
-            utils.to_transaction_internal(transaction)
+            utils.get_transaction_internal_from_db_entity(transaction)
             for transaction in updated_transactions
         ]
         return TransactionListInternal(

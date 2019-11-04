@@ -72,7 +72,8 @@ class TestAttachPayout:
         )
         updated_transaction_list_internal = await attach_payout_op._execute()
         expected_transaction_list: List[TransactionInternal] = [
-            utils.to_transaction_internal(transaction) for transaction in transactions
+            utils.get_transaction_internal_from_db_entity(transaction)
+            for transaction in transactions
         ]
         for transaction in expected_transaction_list:
             transaction.payout_id = payout.id
@@ -92,7 +93,8 @@ class TestAttachPayout:
         )
         detach_payout_transaction_list_internal = await detach_payout_op._execute()
         expected_detached_transaction_list: List[TransactionInternal] = [
-            utils.to_transaction_internal(transaction) for transaction in transactions
+            utils.get_transaction_internal_from_db_entity(transaction)
+            for transaction in transactions
         ]
         for transaction in expected_detached_transaction_list:
             transaction.payout_id = None

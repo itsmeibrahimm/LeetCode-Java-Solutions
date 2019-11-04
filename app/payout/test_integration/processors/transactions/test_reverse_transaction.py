@@ -73,7 +73,7 @@ class TestReverseTransactions:
             created_at=actual_transaction_internal.created_at,
             updated_at=actual_transaction_internal.updated_at,
         )
-        expected_transaction_internal = utils.to_transaction_internal(
+        expected_transaction_internal = utils.get_transaction_internal_from_db_entity(
             expected_transaction
         )
         assert (
@@ -116,7 +116,7 @@ class TestReverseTransactions:
             created_at=actual_reversed_transaction_with_reason_internal.created_at,
             updated_at=actual_reversed_transaction_with_reason_internal.updated_at,
         )
-        expected_transaction_with_reason_internal = utils.to_transaction_internal(
+        expected_transaction_with_reason_internal = utils.get_transaction_internal_from_db_entity(
             expected_reversed_transaction_with_reason
         )
         assert (

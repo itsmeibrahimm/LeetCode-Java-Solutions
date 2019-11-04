@@ -75,7 +75,7 @@ class ReverseTransaction(
                 target_type=transaction.target_type,
             )
         )
-        return utils.to_transaction_internal(reversed_transaction)
+        return utils.get_transaction_internal_from_db_entity(reversed_transaction)
 
     def _handle_exception(
         self, internal_exec: BaseException
