@@ -1,68 +1,6 @@
 from enum import Enum
 
 
-class DatabaseErrorCode(str, Enum):
-    DB_CONNECTION_ERROR = "db_connection_error"
-    DB_OPERATION_ERROR = "db_operation_error"
-    DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR = "db_operation_lock_not_available_error"
-    DB_INTEGRITY_ERROR = "db_integrity_error"
-    DB_INTEGRITY_UNIQUE_VIOLATION_ERROR = "db_integrity_unique_violation_error"
-    DB_PROGRAMMING_ERROR = "db_programming_error"
-    DB_DATA_ERROR = "db_data_error"
-    DB_INTERNAL_ERROR = "db_internal_error"
-    DB_NOT_SUPPORTED_ERROR = "db_not_supported_error"
-
-
-database_error_message_maps = {
-    DatabaseErrorCode.DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR: "lock is not available",
-    DatabaseErrorCode.DB_INTEGRITY_UNIQUE_VIOLATION_ERROR: "unique violation error",
-}
-
-
-class PaymentLockErrorCode(str, Enum):
-    LOCK_ACQUIRE_ERROR = "lock_acquire_error"
-    LOCK_RELEASE_ERROR = "lock_release_error"
-
-
-payment_lock_error_message_maps = {
-    PaymentLockErrorCode.LOCK_ACQUIRE_ERROR: "unable to acquire a lock",
-    PaymentLockErrorCode.LOCK_RELEASE_ERROR: "unable to release the lock",
-}
-
-
-class PGPErrorCode(str, Enum):
-    PGP_CONNECTION_ERROR = "pgp_connection_error"
-    PGP_API_ERROR = "pgp_api_error"
-    PGP_RATE_LIMIT_ERROR = "pgp_rate_limit_error"
-    PGP_AUTHENTICATION_ERROR = "pgp_authentication_error"
-    PGP_AUTHORIZATION_ERROR = "pgp_authorization_error"
-    PGP_IDEMPOTENCY_ERROR = "pgp_idempotency_error"
-    PGP_INVALID_REQUEST_ERROR = "pgp_invalid_request_error"
-    PGP_RESOURCE_NOT_FOUND_ERROR = "pgp_resource_not_found_error"
-
-
-pgp_error_message_maps = {
-    PGPErrorCode.PGP_CONNECTION_ERROR: "Failed to connect to PGP",
-    PGPErrorCode.PGP_API_ERROR: "Error talking to PGP service.",
-    PGPErrorCode.PGP_RATE_LIMIT_ERROR: "Too many requests to PGP.",
-    PGPErrorCode.PGP_AUTHENTICATION_ERROR: "Authentication error while talking to PGP.",
-    PGPErrorCode.PGP_AUTHORIZATION_ERROR: "Authorization error while talking to PGP.",
-    PGPErrorCode.PGP_IDEMPOTENCY_ERROR: "Idempotency error while talking to PGP.",
-    PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR: "Resource not found from PGP.",
-}
-
-
-class MarqetaErrorCode(str, Enum):
-    MARQETA_RESOURCE_ALREADY_CREATED_ERROR = "marqeta_resource_already_created_error"
-    MARQETA_CREATE_USER_ERROR = "create_marqeta_user_error"
-
-
-marqeta_error_message_maps = {
-    MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR: "Marqeta resource already created.",
-    MarqetaErrorCode.MARQETA_CREATE_USER_ERROR: "Error creating Marqeta user.",
-}
-
-
 class PaymentError(Exception):
     """
     Base class for all payment internal exceptions. This is base class that can be inherited by
@@ -84,43 +22,34 @@ class PaymentError(Exception):
         self.retryable = retryable
 
 
-class PaymentLockError(PaymentError):
-    """Payment Lock Base Error."""
+###########################################
+# DataBaseError
+#   - DBConnectionError
+#   - DBOperationError
+#     + DBOperationLockNotAvailableError
+#   - DBIntegrityError
+#     + DBIntegrityUniqueViolationError
+#   - DBProgrammingError
+#   - DBDataError
+#   - DBInternalError
+#   - DBNotSupportedError
+###########################################
+class DatabaseErrorCode(str, Enum):
+    DB_CONNECTION_ERROR = "db_connection_error"
+    DB_OPERATION_ERROR = "db_operation_error"
+    DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR = "db_operation_lock_not_available_error"
+    DB_INTEGRITY_ERROR = "db_integrity_error"
+    DB_INTEGRITY_UNIQUE_VIOLATION_ERROR = "db_integrity_unique_violation_error"
+    DB_PROGRAMMING_ERROR = "db_programming_error"
+    DB_DATA_ERROR = "db_data_error"
+    DB_INTERNAL_ERROR = "db_internal_error"
+    DB_NOT_SUPPORTED_ERROR = "db_not_supported_error"
 
-    def __init__(self, error_code: str, error_message: str, retryable: bool):
-        super().__init__(error_code, error_message, retryable)
 
-
-class PaymentLockAcquireError(PaymentLockError):
-    """Payment Lock Acquire Error.
-
-    Raised when unable to acquire a lock using PaymentLock.
-    """
-
-    def __init__(self):
-        super().__init__(
-            error_code=PaymentLockErrorCode.LOCK_ACQUIRE_ERROR,
-            error_message=payment_lock_error_message_maps[
-                PaymentLockErrorCode.LOCK_ACQUIRE_ERROR
-            ],
-            retryable=True,
-        )
-
-
-class PaymentLockReleaseError(PaymentLockError):
-    """Payment Lock Release Error.
-
-    Raised when unable to release a lock using PaymentLock.
-    """
-
-    def __init__(self):
-        super().__init__(
-            error_code=PaymentLockErrorCode.LOCK_RELEASE_ERROR,
-            error_message=payment_lock_error_message_maps[
-                PaymentLockErrorCode.LOCK_RELEASE_ERROR
-            ],
-            retryable=False,
-        )
+database_error_message_maps = {
+    DatabaseErrorCode.DB_OPERATION_LOCK_NOT_AVAILABLE_ERROR: "lock is not available",
+    DatabaseErrorCode.DB_INTEGRITY_UNIQUE_VIOLATION_ERROR: "unique violation error",
+}
 
 
 class DatabaseError(PaymentError):
@@ -261,6 +190,39 @@ class DBNotSupportedError(DatabaseError):
         )
 
 
+####################################
+# PGPError
+#   - PGPConnectionError
+#   - PGPApiError
+#   - PGPRateLimitError
+#   - PGPAuthenticationError
+#   - PGPAuthorizationError
+#   - PGPIdempotencyError
+#   - PGPInvalidRequestError
+#   - PGPResourceNotFoundError
+####################################
+class PGPErrorCode(str, Enum):
+    PGP_CONNECTION_ERROR = "pgp_connection_error"
+    PGP_API_ERROR = "pgp_api_error"
+    PGP_RATE_LIMIT_ERROR = "pgp_rate_limit_error"
+    PGP_AUTHENTICATION_ERROR = "pgp_authentication_error"
+    PGP_AUTHORIZATION_ERROR = "pgp_authorization_error"
+    PGP_IDEMPOTENCY_ERROR = "pgp_idempotency_error"
+    PGP_INVALID_REQUEST_ERROR = "pgp_invalid_request_error"
+    PGP_RESOURCE_NOT_FOUND_ERROR = "pgp_resource_not_found_error"
+
+
+pgp_error_message_maps = {
+    PGPErrorCode.PGP_CONNECTION_ERROR: "Failed to connect to PGP",
+    PGPErrorCode.PGP_API_ERROR: "Error talking to PGP service.",
+    PGPErrorCode.PGP_RATE_LIMIT_ERROR: "Too many requests to PGP.",
+    PGPErrorCode.PGP_AUTHENTICATION_ERROR: "Authentication error while talking to PGP.",
+    PGPErrorCode.PGP_AUTHORIZATION_ERROR: "Authorization error while talking to PGP.",
+    PGPErrorCode.PGP_IDEMPOTENCY_ERROR: "Idempotency error while talking to PGP.",
+    PGPErrorCode.PGP_RESOURCE_NOT_FOUND_ERROR: "Resource not found from PGP.",
+}
+
+
 class PGPError(PaymentError):
     """PGP general errors.
 
@@ -387,6 +349,77 @@ class PGPResourceNotFoundError(PGPError):
             ],
             retryable=False,
         )
+
+
+####################################
+# PaymentLockError
+#   - PaymentLockAcquireError
+#   - PaymentLockReleaseError
+####################################
+class PaymentLockErrorCode(str, Enum):
+    LOCK_ACQUIRE_ERROR = "lock_acquire_error"
+    LOCK_RELEASE_ERROR = "lock_release_error"
+
+
+payment_lock_error_message_maps = {
+    PaymentLockErrorCode.LOCK_ACQUIRE_ERROR: "unable to acquire a lock",
+    PaymentLockErrorCode.LOCK_RELEASE_ERROR: "unable to release the lock",
+}
+
+
+class PaymentLockError(PaymentError):
+    """Payment Lock Base Error."""
+
+    def __init__(self, error_code: str, error_message: str, retryable: bool):
+        super().__init__(error_code, error_message, retryable)
+
+
+class PaymentLockAcquireError(PaymentLockError):
+    """Payment Lock Acquire Error.
+
+    Raised when unable to acquire a lock using PaymentLock.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentLockErrorCode.LOCK_ACQUIRE_ERROR,
+            error_message=payment_lock_error_message_maps[
+                PaymentLockErrorCode.LOCK_ACQUIRE_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentLockReleaseError(PaymentLockError):
+    """Payment Lock Release Error.
+
+    Raised when unable to release a lock using PaymentLock.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentLockErrorCode.LOCK_RELEASE_ERROR,
+            error_message=payment_lock_error_message_maps[
+                PaymentLockErrorCode.LOCK_RELEASE_ERROR
+            ],
+            retryable=False,
+        )
+
+
+####################################
+# Marqeta Related Errors
+#   - MarqetaResourceAlreadyCreatedError
+#   - MarqetaCreateUserError
+####################################
+class MarqetaErrorCode(str, Enum):
+    MARQETA_RESOURCE_ALREADY_CREATED_ERROR = "marqeta_resource_already_created_error"
+    MARQETA_CREATE_USER_ERROR = "create_marqeta_user_error"
+
+
+marqeta_error_message_maps = {
+    MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR: "Marqeta resource already created.",
+    MarqetaErrorCode.MARQETA_CREATE_USER_ERROR: "Error creating Marqeta user.",
+}
 
 
 class MarqetaResourceAlreadyCreatedError(PaymentError):
