@@ -19,7 +19,6 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
-    HTTP_402_PAYMENT_REQUIRED,
     HTTP_403_FORBIDDEN,
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_404_NOT_FOUND,
@@ -95,18 +94,15 @@ async def create_cart_payment(
     except PaymentError as payment_error:
         log.info("Exception from create_cart_payment()", exc_info=payment_error)
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        if payment_error.error_code in (
+        if payment_error.error_code in [
             PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
             PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-        ):
-            http_status_code = HTTP_400_BAD_REQUEST
-        elif payment_error.error_code in [
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
         ]:
-            http_status_code = HTTP_402_PAYMENT_REQUIRED
+            http_status_code = HTTP_400_BAD_REQUEST
         elif (
             payment_error.error_code
             == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
@@ -164,12 +160,18 @@ async def update_cart_payment(
         )
     except PaymentError as payment_error:
         http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        if payment_error.error_code == PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA:
+        if payment_error.error_code in [
+            PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
+        ]:
             http_status_code = HTTP_400_BAD_REQUEST
-        elif (
-            payment_error.error_code
-            == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
-        ):
+        elif payment_error.error_code in [
+            PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
+            PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH,
+        ]:
             http_status_code = HTTP_403_FORBIDDEN
         elif payment_error.error_code == PayinErrorCode.CART_PAYMENT_NOT_FOUND:
             http_status_code = HTTP_404_NOT_FOUND

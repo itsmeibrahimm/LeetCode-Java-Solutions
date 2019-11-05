@@ -1125,12 +1125,12 @@ class TestCartPayment:
 
         request_body = self._get_cart_payment_create_request(payer, payment_method)
         self._test_cart_payment_creation_error(
-            client, request_body, 402, "payin_43", False
+            client, request_body, 400, "payin_43", False
         )
 
         # Resubmit same request
         self._test_cart_payment_creation_error(
-            client, request_body, 402, "payin_43", False
+            client, request_body, 400, "payin_43", False
         )
 
     def test_cart_payment_validation(
@@ -1262,7 +1262,7 @@ class TestCartPayment:
             merchant_country=CountryCode.US,
         )
         self._test_legacy_cart_payment_creation_error(
-            client, request_body, 402, "payin_43", False
+            client, request_body, 400, "payin_43", False
         )
 
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -1272,7 +1272,7 @@ class TestCartPayment:
             merchant_country=CountryCode.US,
         )
         self._test_legacy_cart_payment_creation_error(
-            client, request_body, 402, "payin_43", False
+            client, request_body, 400, "payin_43", False
         )
 
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -1282,7 +1282,7 @@ class TestCartPayment:
             merchant_country=CountryCode.US,
         )
         self._test_legacy_cart_payment_creation_error(
-            client, request_body, 402, "payin_43", False
+            client, request_body, 400, "payin_43", False
         )
 
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -1292,7 +1292,7 @@ class TestCartPayment:
             merchant_country=CountryCode.US,
         )
         self._test_legacy_cart_payment_creation_error(
-            client, request_body, 402, "payin_44", False
+            client, request_body, 400, "payin_44", False
         )
 
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -1302,7 +1302,7 @@ class TestCartPayment:
             merchant_country=CountryCode.US,
         )
         self._test_legacy_cart_payment_creation_error(
-            client, request_body, 402, "payin_45", False
+            client, request_body, 400, "payin_45", False
         )
 
     def test_legacy_payment_client_description(
