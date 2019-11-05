@@ -37,7 +37,7 @@ class SubmitSMATransfer(AsyncOperation[SMATransferRequest, SMATransferResponse])
             metadata=InstantPayoutDefaultMetaData,
             idempotency_key=self.request.idempotency_key,
         )
-        stripe_transfer = await self.stripe_client.create_transfer(
+        stripe_transfer = await self.stripe_client.create_transfer_with_stripe_error_translation(
             country=self.request.country,
             currency=self.request.currency,
             destination=self.request.destination,

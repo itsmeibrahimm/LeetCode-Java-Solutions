@@ -530,8 +530,48 @@ class StripeClient(StripeClientInterface):
         )
         return transfer
 
+    @translate_stripe_error
+    @tracing.track_breadcrumb(resource="transfer", action="create")
+    def create_transfer_with_stripe_error_translation(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        destination: models.Destination,
+        amount: models.Amount,
+        request: models.StripeCreateTransferRequest,
+    ) -> models.Transfer:
+        transfer = stripe.Transfer.create(
+            currency=currency,
+            destination=destination,
+            amount=amount,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return transfer
+
     @tracing.track_breadcrumb(resource="payout", action="create")
     def create_payout(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        amount: models.Amount,
+        stripe_account: models.StripeAccountId,
+        request: models.StripeCreatePayoutRequest,
+    ) -> models.Payout:
+        payout = stripe.Payout.create(
+            currency=currency,
+            amount=amount,
+            stripe_account=stripe_account,
+            **self.settings_for(country),
+            **request.dict(skip_defaults=True),
+        )
+        return payout
+
+    @translate_stripe_error
+    @tracing.track_breadcrumb(resource="payout", action="create")
+    def create_payout_with_stripe_error_translation(
         self,
         *,
         country: models.CountryCode,
@@ -597,9 +637,18 @@ class StripeClient(StripeClientInterface):
         )
         return payout
 
-    @translate_stripe_error
     @tracing.track_breadcrumb(resource="balance", action="retrieve")
     def retrieve_balance(
+        self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
+    ) -> models.Balance:
+        balance = stripe.Balance.retrieve(
+            stripe_account=stripe_account, **self.settings_for(country)
+        )
+        return balance
+
+    @translate_stripe_error
+    @tracing.track_breadcrumb(resource="balance", action="retrieve")
+    def retrieve_balance_with_stripe_error_translation(
         self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
     ) -> models.Balance:
         balance = stripe.Balance.retrieve(
@@ -882,6 +931,28 @@ class StripeAsyncClient:
             request=request,
         )
 
+    async def create_transfer_with_stripe_error_translation(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        destination: models.Destination,
+        amount: models.Amount,
+        request: models.StripeCreateTransferRequest,
+    ) -> models.Transfer:
+        """Create transfer with Stripe Error Translation.
+
+        Copied from create_transfer to adopt stripe error translation, and not block weekly transfer roll out.
+        """
+        return await self.executor_pool.submit(
+            self.stripe_client.create_transfer_with_stripe_error_translation,
+            country=country,
+            currency=currency,
+            destination=destination,
+            amount=amount,
+            request=request,
+        )
+
     async def create_payout(
         self,
         *,
@@ -893,6 +964,28 @@ class StripeAsyncClient:
     ) -> models.Payout:
         return await self.executor_pool.submit(
             self.stripe_client.create_payout,
+            currency=currency,
+            amount=amount,
+            country=country,
+            stripe_account=stripe_account,
+            request=request,
+        )
+
+    async def create_payout_with_stripe_error_translation(
+        self,
+        *,
+        country: models.CountryCode,
+        currency: models.Currency,
+        amount: models.Amount,
+        stripe_account: models.StripeAccountId,
+        request: models.StripeCreatePayoutRequest,
+    ) -> models.Payout:
+        """Create payout with Stripe Error Translation.
+
+        Copied from create_payout to adopt stripe error translation, and not block weekly transfer roll out.
+        """
+        return await self.executor_pool.submit(
+            self.stripe_client.create_payout_with_stripe_error_translation,
             currency=currency,
             amount=amount,
             country=country,
@@ -947,6 +1040,19 @@ class StripeAsyncClient:
     ) -> models.Balance:
         return await self.executor_pool.submit(
             self.stripe_client.retrieve_balance,
+            stripe_account=stripe_account,
+            country=country,
+        )
+
+    async def retrieve_balance_with_stripe_error_translation(
+        self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
+    ) -> models.Balance:
+        """Retrieve balance with Stripe Error Translation.
+
+        Copied from retrieve_balance to adopt stripe error translation, and not block weekly transfer roll out.
+        """
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_balance_with_stripe_error_translation,
             stripe_account=stripe_account,
             country=country,
         )

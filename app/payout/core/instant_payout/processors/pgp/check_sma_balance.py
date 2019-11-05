@@ -29,7 +29,7 @@ class CheckSMABalance(AsyncOperation[CheckSMABalanceRequest, SMABalance]):
         self.stripe_client = stripe_client
 
     async def _execute(self) -> SMABalance:
-        balance = await self.stripe_client.retrieve_balance(
+        balance = await self.stripe_client.retrieve_balance_with_stripe_error_translation(
             stripe_account=self.stripe_managed_account_id, country=self.country
         )
         try:

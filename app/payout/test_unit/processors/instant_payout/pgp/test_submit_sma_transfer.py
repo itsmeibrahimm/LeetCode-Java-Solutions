@@ -27,7 +27,9 @@ class TestSubmitSMATransfer:
         self.stripe_async_client = StripeAsyncClient(
             executor_pool=MagicMock(), stripe_client=self.stripe_client
         )
-        self.stripe_async_client.create_transfer = CoroutineMock()
+        self.stripe_async_client.create_transfer_with_stripe_error_translation = (
+            CoroutineMock()
+        )
 
         self.request = SMATransferRequest(
             amount=Amount(100),
@@ -42,7 +44,9 @@ class TestSubmitSMATransfer:
 
     async def test_successfully_submit_sma_transfer(self):
         stripe_transfer = mock_transfer()
-        self.stripe_async_client.create_transfer.return_value = stripe_transfer
+        self.stripe_async_client.create_transfer_with_stripe_error_translation.return_value = (
+            stripe_transfer
+        )
 
         assert await self.submit_sma_transfer.execute() == SMATransferResponse(
             stripe_transfer_id=stripe_transfer.id,
@@ -55,6 +59,8 @@ class TestSubmitSMATransfer:
     async def test_should_raise_exception_when_stripe_return_stripe_return_exception(
         self
     ):
-        self.stripe_async_client.create_transfer.side_effect = PGPConnectionError
+        self.stripe_async_client.create_transfer_with_stripe_error_translation.side_effect = (
+            PGPConnectionError
+        )
         with pytest.raises(PGPConnectionError):
             await self.submit_sma_transfer.execute()

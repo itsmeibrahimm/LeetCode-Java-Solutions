@@ -44,7 +44,7 @@ class SubmitInstantPayout(
             statement_descriptor=InstantPayoutDefaultStatementDescriptor,
             idempotency_key=self.request.idempotency_key,
         )
-        stripe_payout = await self.stripe_client.create_payout(
+        stripe_payout = await self.stripe_client.create_payout_with_stripe_error_translation(
             country=self.request.country,
             currency=self.request.currency,
             amount=self.request.amount,

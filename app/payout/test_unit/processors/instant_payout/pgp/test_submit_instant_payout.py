@@ -32,7 +32,9 @@ class TestSubmitInstantPayout:
         self.stripe_async_client = StripeAsyncClient(
             executor_pool=MagicMock(), stripe_client=self.stripe_client
         )
-        self.stripe_async_client.create_payout = CoroutineMock()
+        self.stripe_async_client.create_payout_with_stripe_error_translation = (
+            CoroutineMock()
+        )
 
         self.request = SubmitInstantPayoutRequest(
             country=CountryCode.US,
@@ -48,7 +50,9 @@ class TestSubmitInstantPayout:
 
     async def test_successfully_submit_instant_payout(self):
         stripe_payout = mock_payout()
-        self.stripe_async_client.create_payout.return_value = stripe_payout
+        self.stripe_async_client.create_payout_with_stripe_error_translation.return_value = (
+            stripe_payout
+        )
 
         assert await self.submit_instant_payout.execute() == SubmitInstantPayoutResponse(
             stripe_payout_id=stripe_payout.id,
@@ -60,6 +64,8 @@ class TestSubmitInstantPayout:
         )
 
     async def test_should_raise_exception_when_stripe_return_exception(self):
-        self.stripe_async_client.create_payout.side_effect = PGPConnectionError
+        self.stripe_async_client.create_payout_with_stripe_error_translation.side_effect = (
+            PGPConnectionError
+        )
         with pytest.raises(PGPConnectionError):
             await self.submit_instant_payout.execute()
