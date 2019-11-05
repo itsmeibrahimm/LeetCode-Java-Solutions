@@ -253,6 +253,7 @@ class StripeCreateTransferRequest(StripeBaseModel):
     source_transaction: Optional[str]
     source_type: Optional[str]
     transfer_group: Optional[str]
+    idempotency_key: Optional[str]
 
 
 class StripeCreatePayoutRequest(StripeBaseModel):
@@ -262,6 +263,7 @@ class StripeCreatePayoutRequest(StripeBaseModel):
     method: Optional[str]
     source_type: Optional[str]
     statement_descriptor: Optional[str]
+    idempotency_key: Optional[str]
 
 
 class StripeCreateCardRequest(StripeBaseModel):

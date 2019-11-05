@@ -3,8 +3,14 @@ from enum import Enum
 from typing import Optional
 
 from app.commons.core.processor import OperationResponse, OperationRequest
-from app.commons.providers.stripe.stripe_models import StripeAccountId
-from app.commons.types import Currency, CountryCode
+from app.commons.providers.stripe.stripe_models import (
+    StripeAccountId,
+    Destination,
+    Amount,
+    Currency,
+    IdempotencyKey,
+)
+from app.commons.types import CountryCode
 from app.payout.models import PayoutAccountTargetType, PgpAccountType
 
 
@@ -33,6 +39,16 @@ InstantPayoutCardChangeBlockTimeInDays = 7  # 7 days block
 class InstantPayoutFees(int, Enum):
     STANDARD_FEE = 199
 
+
+InstantPayoutDefaultMethod = "instant"
+
+InstantPayoutDefaultMetaData = {"service_origin": "payment-service"}
+
+InstantPayoutDefaultStatementDescriptor = "Doordash, Inc. FastPay"
+
+InstantPayoutSMATransferDefaultDescription = "Doordash, Inc. SMA Transfer"
+
+InstantPayoutDefaultDescription = "Doordash, Inc. FastPay"
 
 ############################################
 # Payment Eligibility Request and Response
@@ -94,6 +110,46 @@ class CheckSMABalanceRequest(OperationRequest):
 
 class SMABalance(OperationResponse):
     balance: int
+
+
+############################################
+# Submit SMA Transfer Request and Response
+############################################
+class SMATransferRequest(OperationRequest):
+    amount: Amount
+    currency: Currency
+    destination: Destination
+    country: CountryCode
+    idempotency_key: IdempotencyKey
+
+
+class SMATransferResponse(OperationResponse):
+    stripe_transfer_id: str
+    stripe_object: str
+    amount: Amount
+    currency: Currency
+    destination: Destination
+
+
+############################################
+# Submit InstantPayout Request and Response
+############################################
+class SubmitInstantPayoutRequest(OperationRequest):
+    country: CountryCode
+    stripe_account_id: StripeAccountId
+    amount: Amount
+    currency: Currency
+    destination: Destination
+    idempotency_key: IdempotencyKey
+
+
+class SubmitInstantPayoutResponse(OperationResponse):
+    stripe_payout_id: str
+    stripe_object: str
+    status: str
+    amount: Amount
+    currency: Currency
+    destination: Destination
 
 
 ############################################
