@@ -666,6 +666,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 await self.transfer_repo.update_transfer_by_id(
                     transfer_id=transfer_id, data=update_request
                 )
+                raise e
 
     async def _submit_stripe_transfer(
         self,
