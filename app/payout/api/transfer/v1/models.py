@@ -51,6 +51,9 @@ class CreateTransfer(PaymentRequest):
     payout_countries: Optional[List[str]] = Schema(
         default=None, description="Payout countries"
     )
+    created_by_id: Optional[int] = Schema(
+        default=None, description="User id that creates the manual transfer"
+    )
 
 
 class WeeklyCreateTransfer(PaymentRequest):

@@ -110,6 +110,7 @@ class TestCreateTransfer:
         transfer_type=TransferType.SCHEDULED,
         payout_countries=None,
         target_type=None,
+        created_by_id=None,
     ):
         return CreateTransfer(
             transfer_repo=self.transfer_repo,
@@ -125,6 +126,7 @@ class TestCreateTransfer:
                 end_time=datetime.utcnow(),
                 payout_countries=payout_countries,
                 target_type=target_type,
+                created_by_id=created_by_id,
             ),
         )
 
@@ -149,8 +151,11 @@ class TestCreateTransfer:
         transaction = await prepare_and_insert_transaction(
             transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
         )
+        created_by_id = 9999
         create_transfer_op = self._construct_create_transfer_op(
-            payment_account_id=payment_account.id, transfer_type=TransferType.MANUAL
+            payment_account_id=payment_account.id,
+            transfer_type=TransferType.MANUAL,
+            created_by_id=created_by_id,
         )
         response = await create_transfer_op._execute()
         assert response.transfer
@@ -158,6 +163,9 @@ class TestCreateTransfer:
         assert response.transfer.payment_account_id == payment_account.id
         assert response.transfer.amount == response.transfer.subtotal
         assert response.transfer.amount == transaction.amount
+        assert response.transfer.created_by_id == created_by_id
+        assert response.transfer.manual_transfer_reason == "payout unpaid transactions"
+
         assert transaction.id == response.transaction_ids[0]
         retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
             transaction_id=transaction.id
@@ -241,6 +249,9 @@ class TestCreateTransfer:
         assert response.transfer.payment_account_id == payment_account.id
         assert response.transfer.amount == response.transfer.subtotal
         assert response.transfer.amount == transaction.amount
+
+        assert not response.transfer.created_by_id
+        assert not response.transfer.manual_transfer_reason
         assert transaction.id == response.transaction_ids[0]
         retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
             transaction_id=transaction.id

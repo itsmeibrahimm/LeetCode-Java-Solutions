@@ -39,6 +39,7 @@ async def create_transfer(
         target_type=body.target_type,
         target_business_id=body.target_business_id,
         payout_countries=body.payout_countries,
+        created_by_id=body.created_by_id,
     )
     create_transfer_response = await transfer_processors.create_transfer(
         create_transfer_request

@@ -67,6 +67,7 @@ class CreateTransferRequest(OperationRequest):
     target_type: Optional[payout_models.PayoutTargetType]
     target_business_id: Optional[int]
     payout_countries: Optional[List[str]]
+    created_by_id: Optional[int]
 
 
 class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferResponse]):
@@ -159,8 +160,18 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             start_time=self.request.start_time,
             end_time=self.request.end_time,
         )
+        # update transfer created_by and reason if transfer type is MANUAL
+        updated_transfer = transfer
+        if transfer and self.request.transfer_type == payout_models.TransferType.MANUAL:
+            update_transfer_request = TransferUpdate(
+                created_by_id=self.request.created_by_id,
+                manual_transfer_reason="payout unpaid transactions",
+            )
+            updated_transfer = await self.transfer_repo.update_transfer_by_id(
+                transfer_id=transfer.id, data=update_transfer_request
+            )
         return CreateTransferResponse(
-            transfer=transfer, transaction_ids=transaction_ids
+            transfer=updated_transfer, transaction_ids=transaction_ids
         )
 
     def _handle_exception(
