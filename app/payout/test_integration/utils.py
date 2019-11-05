@@ -427,6 +427,8 @@ async def prepare_and_insert_stripe_managed_account(
         verification_disabled_reason="no-reason",
         verification_due_by=datetime.now(timezone.utc),
         verification_fields_needed="a lot",
+        verification_status="PENDING",
+        verification_error_info="",
     )
 
     assert len(data.__fields_set__) == len(data.__fields__), "all fields should be set"

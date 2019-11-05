@@ -47,6 +47,10 @@ class StripeManagedAccountTable(TableDefinition):
     verification_fields_needed: Column = no_init_field(
         Column("verification_fields_needed", Text)
     )
+    verification_status: Column = no_init_field(Column("verification_status", Text))
+    verification_error_info: Column = no_init_field(
+        Column("verification_error_info", Text)
+    )
 
 
 class _StripeManagedAccountPartial(DBEntity):
@@ -60,6 +64,8 @@ class _StripeManagedAccountPartial(DBEntity):
     verification_fields_needed: Optional[str]
     country_shortname: Optional[str]
     stripe_id: Optional[str]
+    verification_status: Optional[str]
+    verification_error_info: Optional[str]
 
 
 class StripeManagedAccount(_StripeManagedAccountPartial):

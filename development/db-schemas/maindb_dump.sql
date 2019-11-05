@@ -9108,7 +9108,9 @@ CREATE TABLE stripe_managed_account (
     default_bank_name text,
     verification_disabled_reason text,
     verification_due_by timestamp with time zone,
-    verification_fields_needed text
+    verification_fields_needed text,
+    verification_error_info text,
+    verification_status text
 );
 
 
@@ -18903,7 +18905,7 @@ SELECT pg_catalog.setval('stripe_dispute_id_seq', 1, false);
 -- Data for Name: stripe_managed_account; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY stripe_managed_account (id, stripe_id, country_shortname, stripe_last_updated_at, bank_account_last_updated_at, fingerprint, default_bank_last_four, default_bank_name, verification_disabled_reason, verification_due_by, verification_fields_needed) FROM stdin;
+COPY stripe_managed_account (id, stripe_id, country_shortname, stripe_last_updated_at, bank_account_last_updated_at, fingerprint, default_bank_last_four, default_bank_name, verification_disabled_reason, verification_due_by, verification_fields_needed, verification_error_info, verification_status) FROM stdin;
 \.
 
 

@@ -17,7 +17,7 @@ class VerificationStatus(str, Enum):
     BLOCKED = "blocked"
     PENDING = "pending"
     VERIFIED = "verified"
-    FAILED = "failed"
+    FIELDS_REQUIRED = "fields_required"
 
 
 class DateOfBirth(BaseModel):

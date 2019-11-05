@@ -29,6 +29,7 @@ from app.commons.types import CountryCode, Currency
 from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.models import PayoutExternalAccountType
 
+
 pytestmark = [
     # mark all these tests as stripe tests
     pytest.mark.stripe,

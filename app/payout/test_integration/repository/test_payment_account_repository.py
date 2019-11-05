@@ -156,6 +156,8 @@ class TestPaymentAccountRepository:
             verification_disabled_reason="no-reason",
             verification_due_by=datetime.now(timezone.utc),
             verification_fields_needed="a lot",
+            verification_status="PENDING",
+            verification_error_info="",
         )
 
         sma_1 = await payment_account_repo.create_stripe_managed_account(data_1)
@@ -176,6 +178,8 @@ class TestPaymentAccountRepository:
             verification_disabled_reason="no-reason",
             verification_due_by=datetime.now(timezone.utc),
             verification_fields_needed="a lot",
+            verification_status="PENDING",
+            verification_error_info="",
         )
 
         sma_2 = await payment_account_repo.create_stripe_managed_account(data_2)

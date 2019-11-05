@@ -994,7 +994,7 @@ class StripeAsyncClient:
         )
 
     async def retrieve_stripe_account(
-        self, *, request: models.RetrieveAccountRequest
+        self, request: models.RetrieveAccountRequest
     ) -> models.Account:
         return await self.executor_pool.submit(
             self.stripe_client.retrieve_stripe_account, request=request
