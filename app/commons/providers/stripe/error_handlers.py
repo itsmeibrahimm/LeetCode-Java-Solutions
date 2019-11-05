@@ -31,7 +31,7 @@ PGPInvalidRequestErrorStripeErrorCode = [
 ]
 
 
-def handle_stripe_error(func):
+def translate_stripe_error(func):
     """Translate Stripe Errors into payment processor layer errors.
 
     This function maps stripe errors into corresponding payment errors, so that the processor and above layers does not
@@ -48,7 +48,7 @@ def handle_stripe_error(func):
     def wrapper(*args, **kwargs):
         if asyncio.iscoroutinefunction(func):
             raise Exception(
-                "handle_stripe_error decorator can't not used in async function."
+                "translate_stripe_error decorator can't not used in async function."
             )
         try:
             result = func(*args, **kwargs)

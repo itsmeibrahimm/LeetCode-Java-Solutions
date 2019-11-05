@@ -14,7 +14,7 @@ from app.commons.providers.stripe.stripe_http_client import (
     set_default_http_client,
 )
 from app.commons.providers.stripe.stripe_models import CreateAccountTokenRequest
-from app.commons.providers.stripe.error_handlers import handle_stripe_error
+from app.commons.providers.stripe.error_handlers import translate_stripe_error
 from app.commons.types import CountryCode
 from app.commons.utils.pool import ThreadPoolHelper
 
@@ -597,6 +597,7 @@ class StripeClient(StripeClientInterface):
         )
         return payout
 
+    @translate_stripe_error
     @tracing.track_breadcrumb(resource="balance", action="retrieve")
     def retrieve_balance(
         self, *, stripe_account: models.StripeAccountId, country: models.CountryCode
@@ -665,7 +666,7 @@ class StripeClient(StripeClientInterface):
             request.customer, source=request.source, **self.settings_for(country)
         )
 
-    @handle_stripe_error
+    @translate_stripe_error
     @tracing.track_breadcrumb(resource="account", action="retrieve")
     def retrieve_stripe_account(
         self, *, request: models.RetrieveAccountRequest

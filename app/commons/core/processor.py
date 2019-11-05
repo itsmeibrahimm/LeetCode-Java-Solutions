@@ -46,7 +46,7 @@ class AsyncOperation(ABC, Generic[ReqT, RespT]):
             )
             exec_or_result = self._handle_exception(internal_exec)
             if isinstance(exec_or_result, Exception):
-                raise
+                raise exec_or_result from internal_exec
             return exec_or_result
 
     @abstractmethod

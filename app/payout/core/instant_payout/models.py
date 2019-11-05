@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Optional
 
 from app.commons.core.processor import OperationResponse, OperationRequest
+from app.commons.providers.stripe.stripe_models import StripeAccountId
 from app.commons.types import Currency, CountryCode
 from app.payout.models import PayoutAccountTargetType, PgpAccountType
 
@@ -31,6 +32,11 @@ InstantPayoutCardChangeBlockTimeInDays = 7  # 7 days block
 
 class InstantPayoutFees(int, Enum):
     STANDARD_FEE = 199
+
+
+############################################
+# Payment Eligibility Request and Response
+############################################
 
 
 class PaymentEligibilityReasons(str, Enum):
@@ -73,4 +79,29 @@ class PayoutCardEligibility(InternalPaymentEligibility):
 
 
 class InstantPayoutDailyLimitEligibility(InternalPaymentEligibility):
+    pass
+
+
+############################################
+# SMA Balance Check Request and Response
+############################################
+
+
+class CheckSMABalanceRequest(OperationRequest):
+    stripe_managed_account_id: StripeAccountId
+    country: CountryCode
+
+
+class SMABalance(OperationResponse):
+    balance: int
+
+
+############################################
+# Create Instant Payout Request and Response
+############################################
+class CreateInstantPayoutRequest(OperationRequest):
+    pass
+
+
+class InstantPayoutResponse(OperationResponse):
     pass
