@@ -102,6 +102,6 @@ async def get_account_balance(
         )
         try:
             return balance.available[0].amount
-        except KeyError:
+        except AttributeError:
             return 0
     return 0
