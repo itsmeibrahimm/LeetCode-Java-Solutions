@@ -14,6 +14,7 @@ from app.payout.repository.maindb.model.transfer import (
     Transfer,
     TransferCreate,
     TransferUpdate,
+    TransferStatus,
 )
 
 
@@ -40,6 +41,10 @@ class TransferRepositoryInterface(ABC):
     async def get_transfers_by_submitted_at_and_method(
         self, start_time: datetime
     ) -> List[int]:
+        pass
+
+    @abstractmethod
+    async def get_unsubmitted_transfer_ids(self, created_before: datetime) -> List[int]:
         pass
 
 
@@ -78,6 +83,21 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         query = and_(
             transfers.submitted_at.__ge__(start_time),
             transfers.method == TransferMethodType.STRIPE,
+        )
+        stmt = transfers.table.select().where(query)
+        rows = await self._database.replica().fetch_all(stmt)
+
+        if rows:
+            results = [Transfer.from_row(row) for row in rows]
+            return [transfer.id for transfer in results]
+        else:
+            return []
+
+    async def get_unsubmitted_transfer_ids(self, created_before: datetime) -> List[int]:
+        query = and_(
+            transfers.created_at.__lt__(created_before),
+            transfers.amount.__gt__(0),
+            transfers.status == TransferStatus.NEW,
         )
         stmt = transfers.table.select().where(query)
         rows = await self._database.replica().fetch_all(stmt)

@@ -9,6 +9,10 @@ from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
     SubmitTransfer,
 )
+from app.payout.core.transfer.processors.submit_unsubmitted_transfers import (
+    SubmitUnsubmittedTransfers,
+    SubmitUnsubmittedTransfersRequest,
+)
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
 )
@@ -101,3 +105,18 @@ class TransferProcessors:
             stripe_transfer_repo=self.stripe_transfer_repo,
         )
         return await weekly_create_transfer_op.execute()
+
+    async def submit_unsubmitted_transfers(
+        self, request: SubmitUnsubmittedTransfersRequest
+    ):
+        submit_unsubmitted_transfers_op = SubmitUnsubmittedTransfers(
+            request=request,
+            transfer_repo=self.transfer_repo,
+            transaction_repo=self.transaction_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
+            payment_account_repo=self.payment_account_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            stripe=self.stripe,
+        )
+        return await submit_unsubmitted_transfers_op.execute()

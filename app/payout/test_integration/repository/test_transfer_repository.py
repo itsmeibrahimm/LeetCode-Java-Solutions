@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 
 from app.commons.database.infra import DB
-from app.payout.repository.maindb.model.transfer import TransferUpdate
+from app.payout.repository.maindb.model.transfer import TransferUpdate, TransferStatus
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import prepare_and_insert_transfer
@@ -83,6 +83,32 @@ class TestTransferRepository:
         assert len(new_transfer_ids) - len(original_transfer_ids) == 1
         diff = list(set(new_transfer_ids) - set(original_transfer_ids))
         assert diff[0] == transfer.id
+
+    async def test_get_unsubmitted_transfer_ids_not_found(self, transfer_repo):
+        timestamp = datetime.now(timezone.utc) + timedelta(days=1)
+        original_transfer_ids = await transfer_repo.get_unsubmitted_transfer_ids(
+            created_before=timestamp
+        )
+        new_transfer_ids = await transfer_repo.get_unsubmitted_transfer_ids(
+            created_before=timestamp
+        )
+        assert len(new_transfer_ids) == len(original_transfer_ids)
+
+    async def test_get_unsubmitted_transfer_ids_success(self, transfer_repo):
+        timestamp = datetime.now(timezone.utc) + timedelta(days=1)
+        original_transfer_ids = await transfer_repo.get_unsubmitted_transfer_ids(
+            created_before=timestamp
+        )
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.NEW
+        )
+        new_transfer_ids = await transfer_repo.get_unsubmitted_transfer_ids(
+            created_before=timestamp
+        )
+        assert len(new_transfer_ids) - len(original_transfer_ids) == 1
+        assert (
+            list(set(new_transfer_ids) - set(original_transfer_ids))[0] == transfer.id
+        )
 
     async def test_update_transfer_by_id_not_found(self, transfer_repo):
         assert not await transfer_repo.update_transfer_by_id(
