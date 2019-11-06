@@ -7,9 +7,6 @@ from app.payout.api.transfer.v1 import models as transfer_models
 from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.core.transfer.processors.create_transfer import CreateTransferRequest
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
-from app.payout.core.transfer.processors.weekly_create_transfer import (
-    WeeklyCreateTransferRequest,
-)
 from app.payout.service import create_transfer_processors
 
 
@@ -74,35 +71,3 @@ async def submit_transfer(
         submit_transfer_request
     )
     return account_models.Payout(**submit_transfer_response.dict())
-
-
-# todo: revise url
-@router.post(
-    "/weekly_create_transfer",
-    operation_id="WeeklyCreateTransfer",
-    status_code=HTTP_201_CREATED,
-    responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
-    tags=api_tags,
-)
-async def weekly_create_transfer(
-    body: transfer_models.WeeklyCreateTransfer,
-    transfer_processors: TransferProcessors = Depends(create_transfer_processors),
-):
-    weekly_create_transfer_request = WeeklyCreateTransferRequest(
-        payout_day=body.payout_day,
-        end_time=body.end_time,
-        payout_countries=body.payout_countries,
-        unpaid_txn_start_time=body.unpaid_txn_start_time,
-        start_time=body.start_time,
-        exclude_recently_updated_accounts=body.exclude_recently_updated_accounts,
-        submit_after_creation=body.submit_after_creation,
-        statement_descriptor=body.statement_descriptor,
-        target_id=body.target_id,
-        target_type=body.target_type,
-        method=body.method,
-        retry=body.retry,
-    )
-    weekly_create_transfer_response = await transfer_processors.weekly_create_transfer(
-        weekly_create_transfer_request
-    )
-    return transfer_models.Transfer(**weekly_create_transfer_response.dict())

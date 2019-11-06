@@ -66,7 +66,7 @@ class WeeklyCreateTransfer(
     AsyncOperation[WeeklyCreateTransferRequest, WeeklyCreateTransferResponse]
 ):
     """
-    Processor to create a transfer when called by weekly_create_transfer in dsj.
+    Processor to create a transfer when triggered by cron job .
     """
 
     transfer_repo: TransferRepositoryInterface
