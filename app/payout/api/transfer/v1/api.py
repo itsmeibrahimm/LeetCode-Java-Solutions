@@ -95,6 +95,12 @@ async def weekly_create_transfer(
         unpaid_txn_start_time=body.unpaid_txn_start_time,
         start_time=body.start_time,
         exclude_recently_updated_accounts=body.exclude_recently_updated_accounts,
+        submit_after_creation=body.submit_after_creation,
+        statement_descriptor=body.statement_descriptor,
+        target_id=body.target_id,
+        target_type=body.target_type,
+        method=body.method,
+        retry=body.retry,
     )
     weekly_create_transfer_response = await transfer_processors.weekly_create_transfer(
         weekly_create_transfer_request

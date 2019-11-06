@@ -64,12 +64,24 @@ class WeeklyCreateTransfer(PaymentRequest):
     payout_day: PayoutDay = Schema(..., description="Payout day")
     end_time: datetime = Schema(..., description="End timestamp")
     payout_countries: List[str] = Schema(..., description="Payout countries")
+    statement_descriptor: str = Schema(..., description="Statement descriptor")
     unpaid_txn_start_time: Optional[datetime] = Schema(
         ..., description="Start timestamp"
     )
     start_time: Optional[datetime] = Schema(..., description="Start timestamp")
     exclude_recently_updated_accounts: Optional[bool] = Schema(
         ..., description="Boolean flag to exclude recently updated accounts"
+    )
+    submit_after_creation: Optional[bool] = Schema(
+        ..., description="Boolean flag to decide submit transfer or not"
+    )
+    target_id: Optional[str] = Schema(..., description="Id of store or dasher")
+    target_type: Optional[PayoutTargetType] = Schema(
+        ..., description="Type of store or dasher"
+    )
+    method: Optional[str] = Schema(..., description="Payout method")
+    retry: Optional[bool] = Schema(
+        ..., description="Boolean flag to decide retry submitted transfer or not"
     )
 
 

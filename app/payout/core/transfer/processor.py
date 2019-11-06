@@ -103,6 +103,8 @@ class TransferProcessors:
             payment_account_repo=self.payment_account_repo,
             transaction_repo=self.transaction_repo,
             stripe_transfer_repo=self.stripe_transfer_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
+            stripe=self.stripe,
         )
         return await weekly_create_transfer_op.execute()
 
