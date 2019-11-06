@@ -187,7 +187,9 @@ class DisputeClient:
                 else PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID,
             )
             if raw_payment_method:
-                legacy_dd_stripe_card_id = raw_payment_method.legacy_dd_stripe_card_id()
+                legacy_dd_stripe_card_id = str(
+                    raw_payment_method.legacy_dd_stripe_card_id
+                )
                 if legacy_dd_stripe_card_id:
                     dispute_db_entities = await self.dispute_repo.list_disputes_by_payment_method_id(
                         input=GetAllStripeDisputesByPaymentMethodIdInput(

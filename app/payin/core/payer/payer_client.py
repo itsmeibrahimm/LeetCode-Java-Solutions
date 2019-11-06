@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends
@@ -34,7 +34,14 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.types import PayerType
-from app.payin.core.types import PayerIdType, MixedUuidStrType
+from app.payin.core.payment_method.model import PaymentMethodIds, RawPaymentMethod
+from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
+from app.payin.core.types import (
+    PayerIdType,
+    MixedUuidStrType,
+    PaymentMethodIdType,
+    PgpPayerResourceId,
+)
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
     InsertPgpCustomerInput,
@@ -54,7 +61,10 @@ from app.payin.repository.payer_repo import (
     GetPgpCustomerInput,
     GetPayerByLegacyStripeCustomerIdInput,
     GetPayerByDDPayerIdInput,
+    UpdatePayerSetInput,
+    UpdatePayerWhereInput,
 )
+from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
 
 @tracing.track_breadcrumb(processor_name="payers")
@@ -149,19 +159,25 @@ class PayerClient:
     async def force_update_payer(
         self, raw_payer: RawPayer, country: CountryCode
     ) -> RawPayer:
-        pgp_customer_id: Optional[
-            str
-        ] = raw_payer.pgp_payer_resource_id if raw_payer.pgp_payer_resource_id else None
-        if not pgp_customer_id:
-            self.log.info(
-                "[force_update_payer] pgp_customer_id is none, skip force update"
-            )
-            return raw_payer
+        # The behavior on stripe when we delete/detach a card:
+        # 1) if the card is default_payment_method: stripe will leave
+        # pgp_customer.invoice_settings.default_payment_method as empty
+        # 2) if th card is default source: stripe will automatically apply the previous successful card
+        # as new default source in pgp_customer.default_source
+
+        pgp_customer_resource_id: PgpPayerResourceId = raw_payer.pgp_payer_resource_id
 
         # Step 1: retrieve customer from payment provider
         input_country = raw_payer.country() if raw_payer.country() else country
         pgp_customer: StripeCustomer = await self.pgp_get_customer(
-            pgp_customer_id=pgp_customer_id, country=CountryCode(input_country)
+            pgp_customer_id=pgp_customer_resource_id, country=CountryCode(input_country)
+        )
+
+        self.log.info(
+            "[force_update_payer] retrieved stripe_customer",
+            pgp_customer_resource_id=pgp_customer_resource_id,
+            default_source=pgp_customer.default_source,
+            default_payment_method=pgp_customer.invoice_settings.default_payment_method,
         )
 
         # Step 2: compare the elements
@@ -220,6 +236,69 @@ class PayerClient:
                             id=raw_payer.stripe_customer_entity.id
                         ),
                     )
+
+            # update default_payment_method in payers table.
+            if raw_payer.payer_entity:
+                need_updated = False
+                pgp_default_pm_resource_id: str = (
+                    pgp_customer.invoice_settings.default_payment_method
+                    or pgp_customer.default_source
+                )
+                payer_input: UpdatePayerSetInput = UpdatePayerSetInput(
+                    updated_at=datetime.now(timezone.utc),
+                    legacy_default_dd_stripe_card_id=None,
+                )
+
+                if pgp_default_pm_resource_id:
+                    payment_method_repo: PaymentMethodRepository = PaymentMethodRepository(
+                        context=self.app_ctxt
+                    )
+                    payment_method_client = PaymentMethodClient(
+                        payment_method_repo=payment_method_repo,
+                        log=self.log,
+                        app_ctxt=self.app_ctxt,
+                        stripe_async_client=self.stripe_async_client,
+                    )
+                    raw_pm: RawPaymentMethod = await payment_method_client.get_raw_payment_method_without_payer_auth(
+                        payment_method_id=pgp_default_pm_resource_id,
+                        payment_method_id_type=PaymentMethodIdType.STRIPE_PAYMENT_METHOD_ID,
+                    )
+                    if (
+                        raw_payer.payer_entity.default_payment_method_id
+                        != raw_pm.payment_method_id
+                    ) or (
+                        raw_payer.payer_entity.legacy_default_dd_stripe_card_id
+                        != raw_pm.legacy_dd_stripe_card_id
+                    ):
+                        # update default_payment_method_id and default_legacy_dd_stripe_card_id
+                        self.log.info(
+                            "[force_update_payer] update payer entity",
+                            default_payment_method_id=raw_pm.payment_method_id,
+                            legacy_default_dd_stripe_card_id=raw_pm.legacy_dd_stripe_card_id,
+                        )
+                        payer_input.legacy_default_dd_stripe_card_id = (
+                            raw_pm.legacy_dd_stripe_card_id
+                        )
+                        payer_input.default_payment_method_id = raw_pm.payment_method_id
+                        need_updated = True
+                else:
+                    if (
+                        raw_payer.payer_entity.default_payment_method_id
+                        or raw_payer.payer_entity.legacy_default_dd_stripe_card_id
+                    ):
+                        self.log.info(
+                            "[force_update_payer] update payer entity to cleanup default payment method"
+                        )
+                        payer_input.legacy_default_dd_stripe_card_id = None
+                        payer_input.default_payment_method_id = None
+                        need_updated = True
+                if need_updated:
+                    raw_payer.payer_entity = await self.payer_repo.update_payer_by_id(
+                        request_set=payer_input,
+                        request_where=UpdatePayerWhereInput(
+                            id=raw_payer.payer_entity.id
+                        ),
+                    )
         except DBDataError:
             self.log.exception(
                 "[force_update_payer] DBDataError when reading data from db"
@@ -232,7 +311,7 @@ class PayerClient:
     async def update_default_payment_method(
         self,
         raw_payer: RawPayer,
-        pgp_payment_method_resource_id: str,
+        payment_method_ids: PaymentMethodIds,
         payer_id: MixedUuidStrType,
         payer_id_type: Optional[PayerIdType] = None,
         description: Optional[str] = None,
@@ -247,7 +326,7 @@ class PayerClient:
 
         updated_raw_payer = await payer_interface.update_payer_default_payment_method(
             raw_payer=raw_payer,
-            pgp_default_payment_method_id=pgp_payment_method_resource_id,
+            payment_method_ids=payment_method_ids,
             payer_id=payer_id,
             payer_id_type=payer_id_type,
         )
@@ -267,7 +346,7 @@ class PayerClient:
                 pgp_customer_resource_id=updated_raw_payer.stripe_customer_entity.stripe_id,
                 pgp_code=PgpCode.STRIPE,
                 payer_type=updated_raw_payer.stripe_customer_entity.owner_type,
-                pgp_payment_method_res_id=pgp_payment_method_resource_id,
+                pgp_payment_method_res_id=payment_method_ids.pgp_payment_method_resource_id,
                 description=description,
             )
         return updated_raw_payer
@@ -415,15 +494,54 @@ class PayerOpsInterface:
     ) -> RawPayer:
         ...
 
-    @abstractmethod
     async def update_payer_default_payment_method(
         self,
         raw_payer: RawPayer,
-        pgp_default_payment_method_id: str,
+        payment_method_ids: PaymentMethodIds,
         payer_id: MixedUuidStrType,
         payer_id_type: Optional[str] = None,
     ) -> RawPayer:
-        ...
+        if raw_payer.payer_entity:
+            # update default_payment_method_id and default_legacy_dd_stripe_card_id
+            raw_payer.payer_entity = await self.payer_repo.update_payer_by_id(
+                request_set=UpdatePayerSetInput(
+                    updated_at=datetime.now(timezone.utc),
+                    legacy_default_dd_stripe_card_id=payment_method_ids.dd_stripe_card_id,
+                    default_payment_method_id=payment_method_ids.payment_method_id,
+                ),
+                request_where=UpdatePayerWhereInput(id=raw_payer.payer_entity.id),
+            )
+        if raw_payer.pgp_customer_entity:
+            # update pgp_customers.default_payment_method_id for marketplace payer
+            raw_payer.pgp_customer_entity = await self.payer_repo.update_pgp_customer(
+                UpdatePgpCustomerSetInput(
+                    default_payment_method_id=payment_method_ids.pgp_payment_method_resource_id,
+                    updated_at=datetime.now(timezone.utc),
+                ),
+                UpdatePgpCustomerWhereInput(id=raw_payer.pgp_customer_entity.id),
+            )
+        elif raw_payer.stripe_customer_entity:
+            # update stripe_customer.default_card for non-marketplace payer
+            raw_payer.stripe_customer_entity = await self.payer_repo.update_stripe_customer(
+                UpdateStripeCustomerSetInput(
+                    default_source=payment_method_ids.pgp_payment_method_resource_id
+                ),
+                UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
+            )
+        else:
+            self.log.warn(
+                "[update_payer_default_payment_method] pgp_customer_entity and stripe_customer_entity dont exist",
+                payer_id=payer_id,
+                payer_id_type=payer_id_type,
+            )
+
+        self.log.info(
+            "[update_payer_default_payment_method] pgp_customers update default_payment_method completed",
+            payer_id=payer_id,
+            payer_id_type=payer_id_type,
+            pgp_default_payment_method_id=payment_method_ids.pgp_payment_method_resource_id,
+        )
+        return raw_payer
 
 
 class PayerOps(PayerOpsInterface):
@@ -532,45 +650,6 @@ class PayerOps(PayerOpsInterface):
             pgp_customer_entity=pgp_cus_entity,
             stripe_customer_entity=stripe_cus_entity,
         )
-
-    async def update_payer_default_payment_method(
-        self,
-        raw_payer: RawPayer,
-        pgp_default_payment_method_id: str,
-        payer_id: MixedUuidStrType,
-        payer_id_type: Optional[str] = None,
-    ) -> RawPayer:
-        if raw_payer.pgp_customer_entity:
-            # update pgp_customers.default_payment_method_id for marketplace payer
-            raw_payer.pgp_customer_entity = await self.payer_repo.update_pgp_customer(
-                UpdatePgpCustomerSetInput(
-                    default_payment_method_id=pgp_default_payment_method_id,
-                    updated_at=datetime.utcnow(),
-                ),
-                UpdatePgpCustomerWhereInput(id=raw_payer.pgp_customer_entity.id),
-            )
-        elif raw_payer.stripe_customer_entity:
-            # update stripe_customer.default_card for non-marketplace payer
-            raw_payer.stripe_customer_entity = await self.payer_repo.update_stripe_customer(
-                UpdateStripeCustomerSetInput(
-                    default_source=pgp_default_payment_method_id
-                ),
-                UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
-            )
-        else:
-            self.log.info(
-                "[update_payer_default_payment_method] payer object doesn't exist",
-                payer_id=payer_id,
-                payer_id_type=payer_id_type,
-            )
-
-        self.log.info(
-            "[update_payer_default_payment_method] pgp_customers update default_payment_method completed",
-            payer_id=payer_id,
-            payer_id_type=payer_id_type,
-            pgp_default_payment_method_id=pgp_default_payment_method_id,
-        )
-        return raw_payer
 
 
 class LegacyPayerOps(PayerOpsInterface):
@@ -709,26 +788,3 @@ class LegacyPayerOps(PayerOpsInterface):
             pgp_customer_entity=pgp_cus_entity,
             stripe_customer_entity=stripe_cus_entity,
         )
-
-    async def update_payer_default_payment_method(
-        self,
-        raw_payer: RawPayer,
-        pgp_default_payment_method_id: str,
-        payer_id: MixedUuidStrType,
-        payer_id_type: Optional[str] = None,
-    ) -> RawPayer:
-        # update stripe_customer with new default_payment_method
-        if raw_payer.stripe_customer_entity:
-            raw_payer.stripe_customer_entity = await self.payer_repo.update_stripe_customer(
-                UpdateStripeCustomerSetInput(
-                    default_source=pgp_default_payment_method_id
-                ),
-                UpdateStripeCustomerWhereInput(id=raw_payer.stripe_customer_entity.id),
-            )
-            self.log.info(
-                "[update_payer_default_payment_method] stripe_customer update default_payment_method completed.",
-                payer_id=payer_id,
-                payer_id_type=payer_id_type,
-                pgp_default_payment_method_id=pgp_default_payment_method_id,
-            )
-        return raw_payer

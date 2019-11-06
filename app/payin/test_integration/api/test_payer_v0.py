@@ -255,7 +255,7 @@ class TestPayersV0:
             request=UpdatePayerV0Request(
                 dd_stripe_card_id=payment_method["dd_stripe_card_id"],
                 country="US",
-                payer_type="marketplace",
+                payer_type="store",
             ),
         )
         assert (
@@ -264,6 +264,11 @@ class TestPayersV0:
             ]
             == payment_method["payment_gateway_provider_details"]["payment_method_id"]
         )
+        assert update_payer["default_payment_method_id"] == payment_method["id"]
+        assert (
+            update_payer["default_dd_stripe_card_id"]
+            == payment_method["dd_stripe_card_id"]
+        )
 
         # delete payment_method
         delete_payment_methods_v0(
@@ -271,6 +276,24 @@ class TestPayersV0:
             payment_method_id_type="dd_stripe_card_id",
             payment_method_id=payment_method["dd_stripe_card_id"],
         )
+
+        # get payer, and verify default_payment_method is gone
+        response = client.get(
+            _get_payer_url(
+                payer_id_type="dd_stripe_customer_serial_id",
+                payer_id=payer["dd_stripe_customer_id"],
+            )
+        )
+        assert response.status_code == 200
+        get_payer: dict = response.json()
+        assert (
+            get_payer["payment_gateway_provider_customers"][0][
+                "default_payment_method_id"
+            ]
+            is None
+        )
+        assert get_payer["default_payment_method_id"] is None
+        assert get_payer["default_dd_stripe_card_id"] is None
 
     def test_update_drive_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
@@ -320,6 +343,11 @@ class TestPayersV0:
             ]
             == payment_method["payment_gateway_provider_details"]["payment_method_id"]
         )
+        assert update_payer["default_payment_method_id"] == payment_method["id"]
+        assert (
+            update_payer["default_dd_stripe_card_id"]
+            == payment_method["dd_stripe_card_id"]
+        )
 
         # delete payment_method
         delete_payment_methods_v0(
@@ -343,3 +371,5 @@ class TestPayersV0:
             ]
             is None
         )
+        assert get_payer["default_payment_method_id"] is None
+        assert get_payer["default_dd_stripe_card_id"] is None

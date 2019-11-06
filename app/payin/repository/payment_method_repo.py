@@ -68,12 +68,11 @@ class DeletePgpPaymentMethodByIdWhereInput(DBRequestModel):
 ###########################################################
 # StripeCard DBEntity and CRUD operations                 #
 ###########################################################
-class StripeCardDbEntity(DBEntity):
+class InsertStripeCardDbEntity(DBEntity):
     """
     The variable name must be consistent with DB table column name
     """
 
-    id: Optional[int] = None  # DB incremental id
     stripe_id: str
     fingerprint: str
     last4: str
@@ -97,7 +96,15 @@ class StripeCardDbEntity(DBEntity):
     validation_card_id: Optional[int] = None
 
 
-class InsertStripeCardInput(StripeCardDbEntity):
+class StripeCardDbEntity(InsertStripeCardDbEntity):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: int
+
+
+class InsertStripeCardInput(InsertStripeCardDbEntity):
     pass
 
 

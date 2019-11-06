@@ -1549,7 +1549,7 @@ class CartPaymentInterface:
 
         result_legacy_payment = LegacyPayment(
             dd_consumer_id=raw_payer.payer_entity.dd_payer_id,
-            dd_stripe_card_id=raw_payment_method.legacy_dd_stripe_card_id(),
+            dd_stripe_card_id=str(raw_payment_method.legacy_dd_stripe_card_id),
             dd_country_id=legacy_country_id,
         )
         self.req_context.log.debug(

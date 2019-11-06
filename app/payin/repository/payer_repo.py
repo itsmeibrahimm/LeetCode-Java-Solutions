@@ -31,6 +31,8 @@ class PayerDbEntity(DBEntity):
     balance: Optional[int] = None
     description: Optional[str] = None
     dd_payer_id: Optional[str] = None
+    default_payment_method_id: Optional[UUID] = None
+    legacy_default_dd_stripe_card_id: Optional[int] = None
     metadata: Optional[dict] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -72,6 +74,24 @@ class GetPayerByDDPayerIdAndTypeInput(DBRequestModel):
 
     dd_payer_id: str
     payer_type: str
+
+
+class UpdatePayerSetInput(BaseModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    updated_at: datetime
+    legacy_default_dd_stripe_card_id: Optional[int]
+    default_payment_method_id: Optional[UUID]
+
+
+class UpdatePayerWhereInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
 
 
 ###########################################################
@@ -247,6 +267,12 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def update_payer_by_id(
+        self, request_set: UpdatePayerSetInput, request_where: UpdatePayerWhereInput
+    ) -> PayerDbEntity:
+        ...
+
+    @abstractmethod
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput
     ) -> PgpCustomerDbEntity:
@@ -399,6 +425,18 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 pgp_customers._extract_columns_from_row_record(row)
             ),
         )
+
+    async def update_payer_by_id(
+        self, request_set: UpdatePayerSetInput, request_where: UpdatePayerWhereInput
+    ) -> PayerDbEntity:
+        stmt = (
+            payers.table.update()
+            .where(payers.id == request_where.id)
+            .values(request_set.dict(skip_defaults=True))
+            .returning(*payers.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return PayerDbEntity.from_row(row) if row else None
 
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput

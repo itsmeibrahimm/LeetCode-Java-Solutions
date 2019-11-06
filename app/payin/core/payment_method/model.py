@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from typing_extensions import final
 
 from app.commons.types import PgpCode
-from app.payin.core.exceptions import PayinErrorCode, PaymentMethodReadError
 from app.payin.core.payment_method.types import WalletType
 from app.payin.core.types import PgpPaymentMethodResourceId
 from app.payin.repository.payment_method_repo import (
@@ -72,28 +71,27 @@ class PaymentMethodList(BaseModel):
     data: List[PaymentMethod]
 
 
+class PaymentMethodIds(BaseModel):
+    pgp_payment_method_resource_id: PgpPaymentMethodResourceId
+    dd_stripe_card_id: int
+    payment_method_id: Optional[
+        UUID
+    ]  # Optional for existing objects without backfilled yet
+
+
 class RawPaymentMethod:
     def __init__(
         self,
+        stripe_card_entity: StripeCardDbEntity,
         pgp_payment_method_entity: Optional[PgpPaymentMethodDbEntity] = None,
-        stripe_card_entity: Optional[StripeCardDbEntity] = None,
     ):
-        self.pgp_payment_method_entity = pgp_payment_method_entity
         self.stripe_card_entity = stripe_card_entity
+        self.pgp_payment_method_entity = pgp_payment_method_entity
 
     def to_payment_method(self) -> PaymentMethod:
         """
         Build PaymentMethod object.
-
-        :param pgp_payment_method_entity: pgp_payment_method_entity returned from pgp_payment_method. It could
-               be None if the payment_method was not created through payin APIs.
-        :param stripe_card_entity:
-        :return: PaymentMethod object
         """
-        if not self.stripe_card_entity:
-            raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
-            )
 
         wallet: Optional[Wallet] = None
         if self.stripe_card_entity.tokenization_method:
@@ -162,13 +160,20 @@ class RawPaymentMethod:
             return PgpPaymentMethodResourceId(
                 self.pgp_payment_method_entity.pgp_resource_id
             )
-        elif self.stripe_card_entity:
-            return PgpPaymentMethodResourceId(self.stripe_card_entity.stripe_id)
 
-        raise Exception("RawPaymentMethod doesn't have pgp_payment_method_id")
+        return PgpPaymentMethodResourceId(self.stripe_card_entity.stripe_id)
 
-    def legacy_dd_stripe_card_id(self) -> Optional[str]:
-        return str(self.stripe_card_entity.id) if self.stripe_card_entity else None
+    @property
+    def legacy_dd_stripe_card_id(self) -> int:
+        return self.stripe_card_entity.id
+
+    @property
+    def payment_method_id(self) -> Optional[UUID]:
+        return (
+            self.pgp_payment_method_entity.id
+            if self.pgp_payment_method_entity
+            else None
+        )
 
     def payer_id(self) -> Optional[UUID]:
         return (

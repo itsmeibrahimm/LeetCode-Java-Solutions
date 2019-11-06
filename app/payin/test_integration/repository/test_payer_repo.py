@@ -1,5 +1,5 @@
 from datetime import datetime
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 import pytest
 from pytz import timezone
@@ -14,6 +14,8 @@ from app.payin.repository.payer_repo import (
     GetPgpCustomerInput,
     UpdatePgpCustomerSetInput,
     UpdatePgpCustomerWhereInput,
+    UpdatePayerSetInput,
+    UpdatePayerWhereInput,
 )
 
 
@@ -92,3 +94,65 @@ class TestPayerRepository:
             GetPgpCustomerInput(payer_id=payer.id)
         )
         assert updated_pgp_customer == get_pgp_customer
+
+    async def test_payer_default_payment_method(
+        self, payer_repository: PayerRepository
+    ):
+        payer_id: UUID = uuid4()
+        default_payment_method_id: UUID = uuid4()
+        legacy_default_dd_stripe_card_id: int = 1
+        insert_payer_input = InsertPayerInput(
+            id=payer_id,
+            payer_type=PayerType.STORE,
+            country=CountryCode.US,
+            default_payment_method_id=default_payment_method_id,
+            legacy_default_dd_stripe_card_id=legacy_default_dd_stripe_card_id,
+        )
+        payer = await payer_repository.insert_payer(request=insert_payer_input)
+        assert (
+            payer.legacy_default_dd_stripe_card_id == legacy_default_dd_stripe_card_id
+        )
+        assert payer.default_payment_method_id == default_payment_method_id
+
+        update_payer = await payer_repository.update_payer_by_id(
+            request_set=UpdatePayerSetInput(
+                default_payment_method_id=None,
+                legacy_default_dd_stripe_card_id=None,
+                updated_at=datetime.now(timezone("UTC")),
+            ),
+            request_where=UpdatePayerWhereInput(id=payer_id),
+        )
+        assert update_payer.legacy_default_dd_stripe_card_id is None
+        assert update_payer.default_payment_method_id is None
+
+        # reset default payment method
+        new_default_payment_method_id: UUID = uuid4()
+        new_legacy_default_dd_stripe_card_id: int = 2
+        update_payer = await payer_repository.update_payer_by_id(
+            request_set=UpdatePayerSetInput(
+                default_payment_method_id=new_default_payment_method_id,
+                legacy_default_dd_stripe_card_id=new_legacy_default_dd_stripe_card_id,
+                updated_at=datetime.now(timezone("UTC")),
+            ),
+            request_where=UpdatePayerWhereInput(id=payer_id),
+        )
+        assert (
+            update_payer.legacy_default_dd_stripe_card_id
+            == new_legacy_default_dd_stripe_card_id
+        )
+        assert update_payer.default_payment_method_id == new_default_payment_method_id
+
+        # partial update
+        new_legacy_default_dd_stripe_card_id = 3
+        update_payer = await payer_repository.update_payer_by_id(
+            request_set=UpdatePayerSetInput(
+                legacy_default_dd_stripe_card_id=new_legacy_default_dd_stripe_card_id,
+                updated_at=datetime.now(timezone("UTC")),
+            ),
+            request_where=UpdatePayerWhereInput(id=payer_id),
+        )
+        assert (
+            update_payer.legacy_default_dd_stripe_card_id
+            == new_legacy_default_dd_stripe_card_id
+        )
+        assert update_payer.default_payment_method_id == new_default_payment_method_id

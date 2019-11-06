@@ -10,7 +10,7 @@ from app.commons.types import CountryCode, PgpCode
 from app.payin.core.exceptions import PayerReadError, PayinErrorCode
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
-from app.payin.core.payment_method.model import RawPaymentMethod
+from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethodIds
 from app.payin.core.types import PaymentMethodIdType, MixedUuidStrType, PayerIdType
 
 
@@ -182,7 +182,11 @@ class PayerProcessorV1:
         # step 4: update default_payment_method in pgp_customers/stripe_customer table
         updated_raw_payer: RawPayer = await self.payer_client.update_default_payment_method(
             raw_payer=raw_payer,
-            pgp_payment_method_resource_id=raw_pm.pgp_payment_method_resource_id,
+            payment_method_ids=PaymentMethodIds(
+                pgp_payment_method_resource_id=raw_pm.pgp_payment_method_resource_id,
+                dd_stripe_card_id=raw_pm.legacy_dd_stripe_card_id,
+                payment_method_id=raw_pm.payment_method_id,
+            ),
             payer_id=payer_id,
         )
 

@@ -318,7 +318,7 @@ class TestPayersV1:
             ),
         )
 
-    def test_default_payment_method(
+    def test_update_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
         random_dd_payer_id: str = str(random.randint(1, 100000))
@@ -360,6 +360,11 @@ class TestPayersV1:
             ]
             == payment_method["payment_gateway_provider_details"]["payment_method_id"]
         )
+        assert update_payer["default_payment_method_id"] == payment_method["id"]
+        assert (
+            update_payer["default_dd_stripe_card_id"]
+            == payment_method["dd_stripe_card_id"]
+        )
 
         # delete payment_method
         delete_payment_methods_v1(client=client, payment_method_id=payment_method["id"])
@@ -374,6 +379,8 @@ class TestPayersV1:
             ]
             is None
         )
+        assert get_payer["default_payment_method_id"] is None
+        assert get_payer["default_dd_stripe_card_id"] is None
 
     def test_add_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
@@ -392,7 +399,7 @@ class TestPayersV1:
             ),
         )
 
-        # create payment_method
+        # create payment_method and set to default
         payment_method = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
@@ -414,4 +421,9 @@ class TestPayersV1:
                 "default_payment_method_id"
             ]
             == payment_method["payment_gateway_provider_details"]["payment_method_id"]
+        )
+        assert get_payer["default_payment_method_id"] == payment_method["id"]
+        assert (
+            get_payer["default_dd_stripe_card_id"]
+            == payment_method["dd_stripe_card_id"]
         )

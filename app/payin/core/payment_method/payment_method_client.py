@@ -290,7 +290,7 @@ class PaymentMethodClient:
         self, pgp_payment_method_id: str, raw_payment_method: RawPaymentMethod
     ) -> RawPaymentMethod:
         updated_pm_entity: Optional[PgpPaymentMethodDbEntity] = None
-        updated_sc_entity: Optional[StripeCardDbEntity] = None
+        updated_sc_entity: StripeCardDbEntity
         try:
             now = datetime.utcnow()
             if raw_payment_method.pgp_payment_method_entity:

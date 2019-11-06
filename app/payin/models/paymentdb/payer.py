@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import Column, DateTime, Text, BigInteger, JSON
+from sqlalchemy import Column, DateTime, Text, BigInteger, JSON, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
@@ -25,3 +25,9 @@ class PayerTable(TableDefinition):
     created_at: Column = no_init_field(Column("created_at", DateTime(True)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))
     deleted_at: Column = no_init_field(Column("deleted_at", DateTime(True)))
+    default_payment_method_id: Column = no_init_field(
+        Column("default_payment_method_id", UUID(as_uuid=True))
+    )
+    legacy_default_dd_stripe_card_id: Column = no_init_field(
+        Column("legacy_default_dd_stripe_card_id", Integer)
+    )

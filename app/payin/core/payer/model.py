@@ -31,6 +31,8 @@ class Payer(BaseModel):
     country: Optional[str] = None
     dd_payer_id: Optional[str] = None
     dd_stripe_customer_id: Optional[str] = None
+    default_payment_method_id: Optional[UUID] = None
+    default_dd_stripe_card_id: Optional[int] = None
     description: Optional[str] = None
     payment_gateway_provider_customers: Optional[
         List[PaymentGatewayProviderCustomer]
@@ -126,6 +128,8 @@ class RawPayer:
                 country=self.payer_entity.country,
                 dd_payer_id=self.payer_entity.dd_payer_id,
                 dd_stripe_customer_id=dd_stripe_customer_id,
+                default_payment_method_id=self.payer_entity.default_payment_method_id,
+                default_dd_stripe_card_id=self.payer_entity.legacy_default_dd_stripe_card_id,
                 description=self.payer_entity.description,
                 created_at=self.payer_entity.created_at,
                 updated_at=updated_at,
