@@ -7,20 +7,20 @@ from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
 from doordash_python_stats.ddstats import doorstats_global
 from fastapi import Depends
 from stripe.error import InvalidRequestError, StripeError
-from stripe.util import convert_to_stripe_object
 from structlog.stdlib import BoundLogger
 
 from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import (
-    ReqContext,
     get_context_from_req,
     get_logger_from_req,
     get_stripe_async_client_from_req,
+    ReqContext,
 )
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.constants import STRIPE_PLATFORM_ACCOUNT_IDS
+from app.commons.providers.stripe.errors import StripeErrorCode, StripeErrorParser
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     ClonePaymentMethodRequest,
@@ -896,26 +896,26 @@ class CartPaymentInterface:
                 stripe_error_code=e.code,
                 exception=str(e),
             )
+
+            parser = StripeErrorParser(e)
             error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR
-            if e.code == "card_declined":
+            if parser.code == StripeErrorCode.card_declined:
                 error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR
-            elif e.code == "expired_card":
+            elif parser.code == StripeErrorCode.expired_card:
                 error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR
-            elif e.code == "processing_error":
+            elif parser.code == StripeErrorCode.processing_error:
                 error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR
-            elif e.code == "incorrect_number":
+            elif parser.code == StripeErrorCode.incorrect_number:
                 error_code = (
                     PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR
                 )
-            json_body = e.json_body if e.json_body else {}
-            error_details = json_body.get("error", {})
             raise CartPaymentCreateError(
                 error_code=error_code,
                 retryable=False,
-                provider_charge_id=error_details.get("charge", None),
-                provider_error_code=error_details.get("code", None),
-                provider_decline_code=error_details.get("decline_code", None),
-                has_provider_error_details=True if json_body else False,
+                provider_charge_id=parser.charge_id,
+                provider_error_code=parser.code,
+                provider_decline_code=parser.decline_code,
+                has_provider_error_details=parser.has_details,
             ) from e
         except StripeCommandoError as e:
             if await self._is_card_verified(pgp_payment_method=pgp_payment_method):
@@ -1033,13 +1033,12 @@ class CartPaymentInterface:
                 idempotency_key=idempotency_key,
             )
         except InvalidRequestError as e:
-            provider_intent = convert_to_stripe_object(
-                e.json_body["error"]["payment_intent"]
-            )
-
-            if e.code == "payment_intent_unexpected_state":
+            parser = StripeErrorParser(e)
+            if parser.code == StripeErrorCode.payment_intent_unexpected_state:
                 raise ProviderPaymentIntentUnexpectedStatusError(
-                    provider_payment_intent_status=provider_intent.status,
+                    provider_payment_intent_status=parser.payment_intent_data.get(
+                        "status", None
+                    ),
                     pgp_payment_intent_status=pgp_payment_intent.status,
                     original_error=e,
                 ) from e
