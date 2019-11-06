@@ -47,7 +47,7 @@ class ListTransactions(
         request: ListTransactionsRequest,
         *,
         transaction_repo: TransactionRepositoryInterface,
-        logger: BoundLogger = None
+        logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
         self.request = request
@@ -55,7 +55,7 @@ class ListTransactions(
 
     async def _execute(self) -> TransactionListInternal:
         # validate the request
-        ListTransactions.validate_list_transactions_request(self.request)
+        self.validate_list_transactions_request(self.request)
 
         transactions: List[TransactionDBEntity] = []
         if self.request.transaction_ids:
@@ -124,42 +124,49 @@ class ListTransactions(
     ) -> Union[PaymentException, TransactionListInternal]:
         raise DEFAULT_INTERNAL_EXCEPTION
 
-    @staticmethod
-    def validate_list_transactions_request(request: ListTransactionsRequest):
-        # maximum length of transaction_ids we support is DEFAULT_PAGE_SIZE
-        if request.transaction_ids and len(request.transaction_ids) > DEFAULT_PAGE_SIZE:
-            raise transaction_bad_query_parameters(
-                "The length of transaction_ids is too long, please send a shorter list (<= 100)."
-            )
-        # support only transfer_id or payout_id
-        if request.transfer_id and request.payout_id:
-            raise transaction_bad_query_parameters(
-                "You can only fetch transactions by transfer_id or payout_id, "
-                "filtering by both transfer_id and payout_id is not supported."
-            )
-        # no query parameter is provided; time_range is not supported alone
-        if (
-            not request.transaction_ids
-            and not request.target_ids
-            and not request.target_type
-            and not request.transfer_id
-            and not request.payout_id
-            and not request.payout_account_id
-            and not request.time_range
-        ):
-            raise transaction_bad_query_parameters(
-                "Your search range is too broad, please pass in at least one query "
-                "parameter to fetch a list of transactions."
-            )
-        # target_type has to be provided as well if target_id_list is provided
-        if request.target_ids and not request.target_type:
-            raise transaction_bad_query_parameters(
-                "Missed required parameter for target_type if fetching by "
-                "target_id_list {}".format(request.target_ids)
-            )
-        # target_type is not supported alone
-        if request.target_type and not request.target_ids:
-            raise transaction_bad_query_parameters(
-                "Fetching a list of transactions by target_type is not supported, "
-                "please pass in a list of target_id for this type of retrieval."
-            )
+    def validate_list_transactions_request(self, request: ListTransactionsRequest):
+        # TODO: this should be moved to @root_validator at ListTransactionsRequest obj once we upgrade Pydantic to 1.0.0
+
+        # the exclude fields will be allowed to restrict the query always
+        raw_request = request.dict(
+            skip_defaults=True, exclude={"offset", "limit", "unpaid", "time_range"}
+        )
+        raw_request_fields_set = {k: v for k, v in raw_request.items() if v is not None}
+        raw_request_fields_name = set(raw_request_fields_set.keys())
+
+        # case 1:
+        # query by transaction ids only
+        if {"transaction_ids"} == raw_request_fields_name:
+            transaction_ids = raw_request.get("transaction_ids", [])
+            # we do not allow size param yet, now, its always DEFAULT_PAGE_SIZE
+            if len(transaction_ids) <= DEFAULT_PAGE_SIZE:
+                return
+
+        # case 2:
+        # query by target_ids and target_type
+        if {"target_ids", "target_type"} == raw_request_fields_name:
+            return
+
+        # case 3:
+        # query by transfer_id OR payout_id
+        if {"transfer_id"} == raw_request_fields_name or {
+            "payout_id"
+        } == raw_request_fields_name:
+            return
+
+        # case 4:
+        # query by payment_account_id
+        if {"payout_account_id"} == raw_request_fields_name:
+            return
+
+        self.logger.info(
+            "[ListTransactions] request validation failed", extra=raw_request
+        )
+
+        raise transaction_bad_query_parameters(
+            "Bad query parameters, supported query patterns: "
+            f"  1. transaction ids (size<{DEFAULT_PAGE_SIZE})"
+            "  2. target_ids and target_type"
+            "  3. transfer_id or payout_id"
+            "  4. payment_account_id"
+        )
