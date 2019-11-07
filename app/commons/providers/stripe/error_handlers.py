@@ -2,33 +2,12 @@ import asyncio
 from functools import wraps
 import stripe.error as stripe_error
 
-from app.commons.core.errors import (
-    PGPApiError,
-    PGPConnectionError,
-    PGPRateLimitError,
-    PGPAuthenticationError,
-    PGPAuthorizationError,
-    PGPIdempotencyError,
-    PGPInvalidRequestError,
-    PGPResourceNotFoundError,
+from app.commons.core.errors import PGPApiError, PGPConnectionError, PGPRateLimitError
+from app.commons.providers.stripe.errors import (
+    StripeErrorParser,
+    StripeErrorCode,
+    StripeErrorType,
 )
-
-PGPInvalidRequestErrorStripeErrorCode = [
-    "parameters_exclusive",
-    "parameter_unknown",
-    "parameter_missing",
-    "parameter_invalid_string_empty",
-    "parameter_invalid_string_blank",
-    "parameter_invalid_integer",
-    "parameter_invalid_empty",
-    "lock_timeout",
-    "livemode_mismatch",
-    "api_key_expired",
-    "url_invalid",
-    "tls_version_unsupported",
-    "secret_key_required",
-    "platform_api_key_expired",
-]
 
 
 def translate_stripe_error(func):
@@ -40,8 +19,6 @@ def translate_stripe_error(func):
 
     We should only handle know errors. For unknown errors, should let it bubble up.
 
-    Details stripe error mapping can be found at,
-    https://github.com/doordash/money-uml/blob/master/payout/puml-png/processor_layer_errors.png.
     """
 
     @wraps(func)
@@ -53,26 +30,28 @@ def translate_stripe_error(func):
         try:
             result = func(*args, **kwargs)
             return result
-        # Handle general stripe error
+        # Handle APIConnectionError(fail to connect to stripe)
+        # Sample error: https://sentry.io/organizations/doordash/issues/910873408/?project=180553&referrer=slack
         except stripe_error.APIConnectionError as e:
             raise PGPConnectionError from e
-        except stripe_error.APIError as e:
-            raise PGPApiError from e
-        except stripe_error.RateLimitError as e:
-            raise PGPRateLimitError from e
-        except stripe_error.AuthenticationError as e:
-            raise PGPAuthenticationError from e
-        except stripe_error.PermissionError as e:
-            raise PGPAuthorizationError from e
-        except stripe_error.IdempotencyError as e:
-            raise PGPIdempotencyError from e
-        except stripe_error.InvalidRequestError as e:
-            # Handle general stripe invalid request error
-            if e.code in PGPInvalidRequestErrorStripeErrorCode:
-                raise PGPInvalidRequestError(e.user_message) from e
-            # Handle 404 resource_missing error
-            if e.http_status == 404 and e.code == "resource_missing":
-                raise PGPResourceNotFoundError from e
-            # todo: Leon & Kevin, add more models specific errors mapping
+        except stripe_error.StripeError as e:
+            stripe_error_parser = StripeErrorParser(e)
+            # Handle stripe rate limit error
+            # Sample error: https://sentry.io/organizations/doordash/issues/933580084/?project=180553&referrer=slack
+            if stripe_error_parser.code == StripeErrorCode.rate_limit:
+                raise PGPRateLimitError from e
+            # Handle stripe api error
+            # Sample error: https://sentry.io/organizations/doordash/issues/1252146500/?project=180553&referrer=slack
+            if stripe_error_parser.type == StripeErrorType.api_error:
+                raise PGPApiError from e
+            # Handle stripe instant payout card decline error
+            # Sample error: https://sentry.io/organizations/doordash/issues/1245226384/?project=180553&referrer=slack
+            if (
+                stripe_error_parser.type == StripeErrorType.invalid_request_error
+                and "unable to perform an instant payout to this card"
+                in stripe_error_parser.message
+            ):
+                # Replace with Instant Payout Error after PR merged
+                raise
 
     return wrapper

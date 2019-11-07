@@ -2,17 +2,9 @@ from unittest import mock
 
 import pytest
 from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe.errors import StripeErrorType
 from app.commons.providers.stripe.stripe_client import StripeClient
-from app.commons.core.errors import (
-    PGPConnectionError,
-    PGPApiError,
-    PGPRateLimitError,
-    PGPAuthenticationError,
-    PGPAuthorizationError,
-    PGPIdempotencyError,
-    PGPInvalidRequestError,
-    PGPResourceNotFoundError,
-)
+from app.commons.core.errors import PGPConnectionError, PGPApiError, PGPRateLimitError
 from app.commons.providers.stripe.stripe_models import RetrieveAccountRequest
 import stripe.error as stripe_error
 
@@ -61,68 +53,39 @@ class TestStripeClient:
                 request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
             )
 
-        # Should return PGPApiError when stripe return APIError
-        mock_retrieve_stripe_account.side_effect = stripe_error.APIError
+        # Should return PGPApiError when StripeError type is api_error
+        json_body = {
+            "error": {
+                "type": StripeErrorType.api_error,
+                "message": "Sorry! There was an error while talking to one of our backends. We have already been "
+                "notified of the problem, but please contact support@stripe.com with any questions "
+                "you may have.",
+            }
+        }
+        mock_retrieve_stripe_account.side_effect = stripe_error.StripeError(
+            json_body=json_body, message=json_body["error"]["message"]
+        )
 
         with pytest.raises(PGPApiError):
             self.stripe_client.retrieve_stripe_account(
                 request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
             )
 
-        # Should return PGPRateLimitError when stripe return RateLimitError
-        mock_retrieve_stripe_account.side_effect = stripe_error.RateLimitError
+        # Should return PGPRateLimitError when StripeError code is api_error
+        json_body = {
+            "error": {
+                "code": "rate_limit",
+                "doc_url": "https://stripe.com/docs/error-codes/rate-limit",
+                "message": "Request rate limit exceeded. You can learn more about rate limits here "
+                "https://stripe.com/docs/rate-limits.",
+                "type": "invalid_request_error",
+            }
+        }
+        mock_retrieve_stripe_account.side_effect = stripe_error.StripeError(
+            json_body=json_body, message=json_body["error"]["message"]
+        )
 
         with pytest.raises(PGPRateLimitError):
-            self.stripe_client.retrieve_stripe_account(
-                request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
-            )
-
-        # Should return PGPAuthenticationError when stripe return AuthenticationError
-        mock_retrieve_stripe_account.side_effect = stripe_error.AuthenticationError
-
-        with pytest.raises(PGPAuthenticationError):
-            self.stripe_client.retrieve_stripe_account(
-                request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
-            )
-
-        # Should return PGPAuthorizationError when stripe return PermissionError
-        mock_retrieve_stripe_account.side_effect = stripe_error.PermissionError
-
-        with pytest.raises(PGPAuthorizationError):
-            self.stripe_client.retrieve_stripe_account(
-                request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
-            )
-
-        # Should return PGPIdempotencyError when stripe return IdempotencyError
-        mock_retrieve_stripe_account.side_effect = stripe_error.IdempotencyError
-
-        with pytest.raises(PGPIdempotencyError):
-            self.stripe_client.retrieve_stripe_account(
-                request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
-            )
-
-        # Should return PGPInvalidRequestError if stripe return InvalidRequestError and
-        # error_code in PGPInvalidRequestErrorStripeErrorCode
-        mock_retrieve_stripe_account.side_effect = stripe_error.InvalidRequestError(
-            message="invalid request", param="some param", code="api_key_expired"
-        )
-
-        with pytest.raises(PGPInvalidRequestError) as e:
-            self.stripe_client.retrieve_stripe_account(
-                request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
-            )
-            assert e.user_message == "invalid_message"
-
-        # Should return PGPResourceNotFoundError if stripe return InvalidRequestError and
-        # error_code is resource_missing and status code is 404
-        mock_retrieve_stripe_account.side_effect = stripe_error.InvalidRequestError(
-            message="invalid request",
-            param="some param",
-            code="resource_missing",
-            http_status=404,
-        )
-
-        with pytest.raises(PGPResourceNotFoundError):
             self.stripe_client.retrieve_stripe_account(
                 request=RetrieveAccountRequest(country="US", account_id="acct_xxx")
             )

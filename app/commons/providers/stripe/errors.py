@@ -12,6 +12,22 @@ __all__ = ["StripeErrorCode", "StripeDeclineCode", "StripeErrorParser"]
 log: BoundLogger = get_logger(__name__)
 
 
+class StripeErrorType(str, Enum):
+    """
+    A collection of stripe error types.
+    https://stripe.com/docs/api/errors
+    """
+
+    api_connection_error = "api_connection_error"
+    api_error = "api_error"
+    authentication_error = "authentication_error"
+    card_error = "card_error"
+    idempotency_error = "idempotency_error"
+    invalid_request_error = "invalid_request_error"
+    rate_limit_error = "rate_limit_error"
+    validation_error = "validation_error"
+
+
 class StripeErrorCode(str, Enum):
     """
     A strong typed Stripe Error Codes.
