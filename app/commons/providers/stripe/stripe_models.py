@@ -10,8 +10,8 @@ from app.commons.types import CountryCode
 # global stripe settings
 # hard code this because we'll need code changes anyway to support newer versions
 from app.payout.constants import (
-    CREATE_STRIPE_ACCOUNT_TYPE,
     CREATE_STRIPE_ACCOUNT_REQUESTED_CAPABILITIES,
+    CREATE_STRIPE_ACCOUNT_TYPE,
 )
 from app.payout.models import (
     PayoutMethodExternalAccountToken,
@@ -162,6 +162,10 @@ class StripeCancelPaymentIntentRequest(StripeBaseModel):
 
     sid: PaymentIntentId
     cancellation_reason: str
+
+
+class StripeRetrievePaymentIntentRequest(StripeBaseModel):
+    id: PaymentIntentId
 
 
 class StripeRefundChargeRequest(StripeBaseModel):
@@ -392,10 +396,10 @@ class PaymentMethodOptions(StripeBaseModel):
 
 class Outcome(StripeBaseModel):
     network_status: str
-    reason: str
+    reason: Optional[str]
     risk_level: str
     risk_score: int
-    rule: str
+    rule: Optional[str]
     seller_message: str
     type: str
 
@@ -536,15 +540,15 @@ class Charge(StripeBaseModel):
     amount: int
     amount_refunded: int
     # amount_updates - preview feature
-    application: str
-    application_fee: str
-    application_fee_amount: int
+    application: Optional[str]
+    application_fee: Optional[str]
+    application_fee_amount: Optional[int]
     balance_transaction: str
     billing_details: Optional[BillingDetails]
     captured: bool
     created: datetime
     currency: str
-    customer: str
+    customer: Optional[str]
     description: Optional[str]
     dispute: Optional[str]
     failure_code: Optional[str]
@@ -620,20 +624,20 @@ class PaymentIntent(StripeBaseModel):
     charges: Charges
     created: datetime
     currency: str
-    customer: str
+    customer: Optional[str]
     description: Optional[str]
     invoice: Optional[str]
     last_payment_error: Optional[LastPaymentError]
     livemode: bool
     metadata: Optional[dict]
     next_action: Optional[NextAction]
-    on_behalf_of: str
+    on_behalf_of: Optional[str]
     payment_method: str
     payment_method_options: Optional[PaymentMethodOptions]
     payment_method_types: List[str]
-    receipt_email: str
-    review: str
-    setup_future_usage: str
+    receipt_email: Optional[str]
+    review: Optional[str]
+    setup_future_usage: Optional[str]
     shipping: Optional[Shipping]
     statement_descriptor: Optional[str]
     status: str

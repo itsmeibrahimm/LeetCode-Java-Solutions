@@ -11,8 +11,8 @@ from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
     LegacyConsumerCharge,
-    LegacyStripeCharge,
     LegacyPayment,
+    LegacyStripeCharge,
     PaymentIntent,
     PgpPaymentIntent,
 )
@@ -195,7 +195,7 @@ class CartPaymentTestBase(ABC):
         cart_payment_repository: CartPaymentRepository,
         payer: Payer,
         payment_method: PaymentMethod,
-    ):
+    ) -> CartPayment:
         # 1. Prepare and verify initial CartPayment:
         init_cart_payment_state = cart_payment_states[0]
         init_cart_payment = await self._prepare_cart_payment(
@@ -238,6 +238,12 @@ class CartPaymentTestBase(ABC):
                 raise AssertionError(
                     f"Failed cart payment state change: {new_cart_payment_state}, exception {e}"
                 ) from e
+
+        latest_cart_payment, _ = await cart_payment_repository.get_cart_payment_by_id(
+            init_cart_payment.id
+        )
+        assert latest_cart_payment
+        return latest_cart_payment
 
     async def _update_and_verify_cart_payment_states(
         self,

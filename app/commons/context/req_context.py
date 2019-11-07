@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, cast, List
+from typing import Any, cast, List, Optional
 from uuid import UUID, uuid4
 
 from starlette.requests import Request
@@ -7,18 +7,18 @@ from starlette.responses import Response
 from structlog.stdlib import BoundLogger
 
 from app.commons.constants import (
-    PAYMENT_REQUEST_ID_HEADER,
     EXTERNAL_CORRELATION_ID_HEADER,
+    PAYMENT_REQUEST_ID_HEADER,
 )
 from app.commons.context.app_context import AppContext, get_context_from_app
+from app.commons.context.logger import set_request_id
 from app.commons.operational_flags import (
-    STRIPE_COMMANDO_MODE_BOOLEAN,
     STRIPE_COMMANDO_LEGACY_CART_PAYMENT_WHITELIST_ARRAY,
+    STRIPE_COMMANDO_MODE_BOOLEAN,
     VERIFY_CARD_IN_COMMANDO_MODE,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.runtime import runtime
-from app.commons.context.logger import set_request_id
 
 
 @dataclass(frozen=True)
@@ -87,7 +87,6 @@ def build_req_context(app_context: AppContext, **additional_req_log_kwargs):
     verify_card_in_commando_mode = runtime.get_boolean(
         VERIFY_CARD_IN_COMMANDO_MODE, False
     )
-
     # Request specific Stripe Client, this allows us to inject request specific flags to control behavior on a
     # per request level
     stripe_async_client = StripeAsyncClient(

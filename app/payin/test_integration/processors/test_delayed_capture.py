@@ -1147,6 +1147,89 @@ create_and_partial_refund_and_partial_refund_test_data = [
     ),
 ]
 
+
+create_and_partial_refund_and_small_amount_to_capture_test_data = [
+    CartPaymentState(
+        description="create cart payment with 1000 amount",
+        initial_amount=1000,
+        amount_delta_update=None,
+        expected_amount=1000,
+        capture_intents=False,
+        delay_capture=True,
+        payment_intent_states=[
+            PaymentIntentState(
+                amount=1000,
+                status=IntentStatus.REQUIRES_CAPTURE,
+                pgp_payment_intent_state=PgpPaymentIntentState(
+                    amount=1000,
+                    amount_capturable=1000,
+                    amount_received=0,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                ),
+                stripe_charge_state=StripeChargeState(
+                    amount=1000,
+                    amount_refunded=0,
+                    status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
+                ),
+            )
+        ],
+    ),
+    CartPaymentState(
+        description="[partial refund] adjust cart payment with -999 amount",
+        initial_amount=1000,
+        amount_delta_update=-999,
+        expected_amount=1,
+        capture_intents=False,
+        delay_capture=True,
+        payment_intent_states=[
+            PaymentIntentState(
+                amount=1,
+                status=IntentStatus.REQUIRES_CAPTURE,
+                pgp_payment_intent_state=PgpPaymentIntentState(
+                    amount=1000,
+                    amount_capturable=1000,
+                    amount_received=0,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                ),
+                stripe_charge_state=StripeChargeState(
+                    amount=1000,
+                    amount_refunded=999,
+                    status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
+                ),
+            )
+        ],
+    ),
+    CartPaymentState(
+        description="capture cart payment",
+        initial_amount=1000,
+        amount_delta_update=None,
+        expected_amount=1,
+        capture_intents=True,
+        delay_capture=True,
+        payment_intent_states=[
+            PaymentIntentState(
+                amount=1,
+                status=IntentStatus.SUCCEEDED,
+                pgp_payment_intent_state=PgpPaymentIntentState(
+                    amount=1000,
+                    amount_capturable=0,
+                    amount_received=1000,
+                    status=IntentStatus.SUCCEEDED,
+                ),
+                stripe_charge_state=StripeChargeState(
+                    amount=1000,
+                    amount_refunded=999,
+                    status=LegacyStripeChargeStatus.SUCCEEDED,
+                    error_reason="",
+                ),
+            )
+        ],
+    ),
+]
+
+
 cart_payment_delay_capture_state_transit_tests = [
     pytest.param(create_no_adjust_test_data, id="create_no_adjust"),
     pytest.param(create_and_partial_refund_test_data, id="create_and_partial_refund"),
@@ -1178,6 +1261,10 @@ cart_payment_delay_capture_state_transit_tests = [
     pytest.param(
         create_and_adjust_to_exceed_original_and_full_refund_test_data,
         id="create_and_adjust_to_exceed_original_and_full_refund",
+    ),
+    pytest.param(
+        create_and_partial_refund_and_small_amount_to_capture_test_data,
+        id="create_and_partial_refund_and_small_amount_to_capture",
     ),
 ]
 

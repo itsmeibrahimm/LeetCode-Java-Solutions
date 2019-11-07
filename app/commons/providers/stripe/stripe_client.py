@@ -474,6 +474,17 @@ class StripeClient(StripeClientInterface):
         )
         return payment_intent
 
+    @tracing.track_breadcrumb(resource="paymentintent", action="retrieve")
+    def retrieve_payment_intent(
+        self,
+        country: models.CountryCode,
+        request: models.StripeRetrievePaymentIntentRequest,
+    ) -> models.PaymentIntent:
+        payment_intent = stripe.PaymentIntent.retrieve(
+            **self.settings_for(country=country), **request.dict(skip_defaults=True)
+        )
+        return payment_intent
+
     @tracing.track_breadcrumb(resource="paymentintent", action="cancel")
     def cancel_payment_intent(
         self,
@@ -890,6 +901,16 @@ class StripeAsyncClient:
             country=country,
             request=request,
             idempotency_key=idempotency_key,
+        )
+
+    async def retrieve_payment_intent(
+        self,
+        *,
+        country: CountryCode,
+        request: models.StripeRetrievePaymentIntentRequest,
+    ) -> models.PaymentIntent:
+        return await self.executor_pool.submit(
+            self.stripe_client.retrieve_payment_intent, country=country, request=request
         )
 
     async def refund_charge(

@@ -2,7 +2,7 @@ import uuid
 from asyncio import gather
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
+from typing import Any, Callable, Coroutine, Dict, List, NewType, Optional, Tuple, Union
 
 from doordash_python_stats.ddstats import doorstats_global
 from fastapi import Depends
@@ -17,6 +17,7 @@ from app.commons.context.req_context import (
     get_stripe_async_client_from_req,
     ReqContext,
 )
+from app.commons.operational_flags import ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.constants import STRIPE_PLATFORM_ACCOUNT_IDS
@@ -34,7 +35,9 @@ from app.commons.providers.stripe.stripe_models import (
     StripeCreatePaymentIntentRequest,
     StripeRefundChargeRequest,
     TransferData,
+    StripeRetrievePaymentIntentRequest,
 )
+from app.commons.runtime import runtime
 from app.commons.timing import track_func
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
@@ -387,6 +390,7 @@ class IdempotencyKeyAction(Enum):
 @tracing.track_breadcrumb(processor_name="cart_payment_interface", only_trackable=False)
 class CartPaymentInterface:
     ENABLE_NEW_CHARGE_TABLES = False
+    PAYMENT_INTENT_SMALL_AMOUNT_THRESHOLD = 50
 
     def __init__(
         self,
@@ -1029,28 +1033,41 @@ class CartPaymentInterface:
     async def submit_capture_to_provider(
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
     ) -> ProviderPaymentIntent:
-        # Call to stripe payment intent API
-        try:
-            intent_request = StripeCapturePaymentIntentRequest(
-                sid=pgp_payment_intent.resource_id,
+
+        # Assemble corresponding submit operations depending on amount_to_capture whether below small amount thresdhold
+        submit_op: Coroutine[Any, Any, ProviderPaymentIntent]
+        capture_idempotency_key = str(uuid.uuid4())
+
+        should_capture_then_refund_small_amount_intent = (
+            payment_intent.amount < self.PAYMENT_INTENT_SMALL_AMOUNT_THRESHOLD
+            and runtime.get_boolean(ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND, True)
+        )
+
+        if should_capture_then_refund_small_amount_intent:
+            submit_op = self._capture_small_amount_provider_payment_intent(
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                capture_idempotency_key=capture_idempotency_key,
+            )
+        else:
+            submit_op = self._capture_provider_payment_intent(
                 amount_to_capture=payment_intent.amount,
+                pgp_payment_intent=pgp_payment_intent,
+                country=CountryCode(payment_intent.country),
+                capture_idempotency_key=capture_idempotency_key,
             )
 
-            idempotency_key = str(uuid.uuid4())
+        try:
             self.req_context.log.info(
                 "[submit_capture_to_provider] Capturing payment intent",
                 country=payment_intent.country,
-                idempotency_key=idempotency_key,
+                idempotency_key=capture_idempotency_key,
                 amount_to_capture=payment_intent.amount,
                 pgp_payment_intent_id=pgp_payment_intent.resource_id,
             )
             # Make call to Stripe.  The idempotency key used here is generated each time, as we expect retries from a particular request
             # to be triggered through scheduled jobs.
-            provider_intent = await self.stripe_async_client.capture_payment_intent(
-                country=CountryCode(payment_intent.country),
-                request=intent_request,
-                idempotency_key=idempotency_key,
-            )
+            provider_intent = await submit_op  # actually execute the submit action
         except InvalidRequestError as e:
             parser = StripeErrorParser(e)
             if parser.code == StripeErrorCode.payment_intent_unexpected_state:
@@ -1099,6 +1116,115 @@ class CartPaymentInterface:
             raise e
 
         return provider_intent
+
+    async def _capture_provider_payment_intent(
+        self,
+        amount_to_capture: int,
+        pgp_payment_intent: PgpPaymentIntent,
+        country: CountryCode,
+        capture_idempotency_key: str,
+    ) -> ProviderPaymentIntent:
+        capture_request = StripeCapturePaymentIntentRequest(
+            sid=pgp_payment_intent.resource_id, amount_to_capture=amount_to_capture
+        )
+        provider_intent_data = await self.stripe_async_client.capture_payment_intent(
+            country=country,
+            request=capture_request,
+            idempotency_key=capture_idempotency_key,
+        )
+        return provider_intent_data
+
+    async def _capture_small_amount_provider_payment_intent(
+        self,
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
+        capture_idempotency_key: str,
+    ) -> ProviderPaymentIntent:
+        """
+        Attempt to capture a payment intent with amount_to_capture lower than what provider allows to.
+        Trick here is:
+        1. Capture the total amount initially authorized (payment_intent.amount_inited)
+        2. Refund additional amount we captured in above step (payment_intent.amount_inited - payment_intent.amount)
+
+        Failure scenario analysis:
+        a. #1 eventually failed to capture: same as regular capture attempt,
+            payment_intent status will eventually flip to [capture_failed] for further manual triage
+        b. #1 went through, but we were not able to start refund step due to interim error
+        c. #1 and #2 when through but we were not able to update our control object
+            to reflect successful capture record
+        d. #2 eventually didn't went through on stripe end.
+            payment_intent status will eventually flip to [capture_failed] for further manual triage
+        """
+
+        self.req_context.log.info(
+            "[_capture_small_amount_provider_payment_intent] "
+            "Capturing small amount provider payment intent",
+            payment_intent_id=payment_intent.id,
+            pgp_payment_intent_id=pgp_payment_intent.id,
+            net_amount_to_capture=payment_intent.amount,
+            init_amount_authorized=payment_intent.amount_initiated,
+        )
+
+        amount_to_capture = payment_intent.amount_initiated
+        amount_to_refund = payment_intent.amount_initiated - payment_intent.amount
+        country_code = CountryCode(payment_intent.country)
+
+        try:
+            # for failure scenario (a), same payment intent can only be captured once on stripe end.
+            # no need to worry duplicate capture
+            await self._capture_provider_payment_intent(
+                amount_to_capture=amount_to_capture,
+                pgp_payment_intent=pgp_payment_intent,
+                country=country_code,
+                capture_idempotency_key=capture_idempotency_key,
+            )
+        except InvalidRequestError as e:
+            # Only handle and accept "payment_intent_unexpected_state" error with actual provider
+            # payment intent status == succeeded. In this case, we simply assemble a ProviderPaymentIntent object
+            # from error body and use it as-if we successfully captured this payment intent
+            # and move on with life (with next refund step)
+            error_parser = StripeErrorParser(e)
+            previous_capture_succeeded = (
+                error_parser.code == StripeErrorCode.payment_intent_unexpected_state
+                and error_parser.payment_intent_data.get("status", None) == "succeeded"
+            )
+            if not previous_capture_succeeded:
+                # Ok, this intent was not succeeded before but fall into some other weird state
+                # Let caller handle this error
+                raise
+
+        # This refund is unique for a small amount provider payment intent in terms of combination:
+        # pgp_payment_intent.idempotency_key (client specified idempotency key when creating cart payment or pi)
+        # amount_to_refund
+        # action.REFUND
+        refund_idempotency_key = self.get_idempotency_key_for_provider_call(
+            f"{pgp_payment_intent.idempotency_key}-{amount_to_refund}-small_amount_capture",
+            IdempotencyKeyAction.REFUND,
+        )
+
+        # for happy case or failure scenario (b), we just continue from where we left to call stripe
+        # for failure scenario (c) (d) we got idempotency key to avoid duplicate refund.
+        refund_request = StripeRefundChargeRequest(
+            charge=pgp_payment_intent.charge_resource_id,
+            amount=amount_to_refund,
+            reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
+        )
+
+        # todo @Arjun please consumer this refund object and populate it to our control objects
+        await self.stripe_async_client.refund_charge(
+            country=country_code,
+            request=refund_request,
+            idempotency_key=refund_idempotency_key,
+        )
+
+        # we will retrieve latest payment_intent from stripe to maintain integrity
+        # for underlying payment intent, charge and refund data
+        return await self.stripe_async_client.retrieve_payment_intent(
+            country=CountryCode(payment_intent.country),
+            request=StripeRetrievePaymentIntentRequest(
+                id=pgp_payment_intent.resource_id
+            ),
+        )
 
     async def update_payment_and_pgp_intent_status_only(
         self,
