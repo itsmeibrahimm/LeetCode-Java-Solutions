@@ -352,3 +352,9 @@ class TestPayoutAccount:
                 request=payout_method_request,
                 accounts_api=accounts_api,
             )
+
+    def test_common_workflow(
+        self, versioned_client_pkg, versioned_accounts_api: AccountsV1Api
+    ):
+        # any workflow that should not be broken for all versions
+        assert versioned_client_pkg.__version__ in ["0.0.8", "0.0.9"]
