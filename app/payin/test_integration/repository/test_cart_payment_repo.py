@@ -38,6 +38,7 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePaymentIntentStatusSetInput,
     UpdatePgpPaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
+    UpdateCartPaymentPostCancellationInput,
 )
 from app.payin.repository.payer_repo import (
     PayerRepository,
@@ -1226,6 +1227,35 @@ class TestCartPayment:
         expected_cart_payment.client_description = new_description
         expected_cart_payment.updated_at = result.updated_at  # Generated
         assert result == expected_cart_payment
+
+    @pytest.mark.asyncio
+    async def test_cancel_cart_payment(
+        self, cart_payment_repository: CartPaymentRepository, payer: PayerDbEntity
+    ):
+        cart_payment = await cart_payment_repository.insert_cart_payment(
+            id=uuid4(),
+            payer_id=UUID(str(payer.id)),
+            amount_original=99,
+            amount_total=100,
+            client_description="Test description",
+            reference_id="99",
+            reference_type="88",
+            delay_capture=True,
+            metadata=None,
+            legacy_consumer_id=1,
+            legacy_stripe_card_id=1,
+            legacy_provider_customer_id="stripe_customer_id",
+            legacy_provider_card_id="stripe_card_id",
+        )
+        now = datetime.now(timezone.utc)
+        cancelled_cart_payment = await cart_payment_repository.update_cart_payment_post_cancellation(
+            update_cart_payment_post_cancellation_input=UpdateCartPaymentPostCancellationInput(
+                id=cart_payment.id, updated_at=now, deleted_at=now
+            )
+        )
+        assert cancelled_cart_payment.deleted_at is not None
+        assert isinstance(cancelled_cart_payment.deleted_at, datetime)
+        assert cancelled_cart_payment.deleted_at == cancelled_cart_payment.updated_at
 
 
 class TestRefunds:

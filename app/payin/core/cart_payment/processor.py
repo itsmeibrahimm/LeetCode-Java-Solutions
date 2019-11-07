@@ -96,6 +96,7 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePaymentIntentStatusSetInput,
     UpdatePgpPaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
+    UpdateCartPaymentPostCancellationInput,
 )
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
@@ -1873,6 +1874,15 @@ class CartPaymentInterface:
 
         return (updated_payment_intent, updated_pgp_payment_intent)
 
+    async def update_cart_payment_post_cancellation(self, id: uuid.UUID):
+        now = datetime.now(timezone.utc)
+        cancelled_cart_payment = await self.payment_repo.update_cart_payment_post_cancellation(
+            update_cart_payment_post_cancellation_input=UpdateCartPaymentPostCancellationInput(
+                id=id, updated_at=now, deleted_at=now
+            )
+        )
+        return cancelled_cart_payment
+
 
 @tracing.track_breadcrumb(processor_name="cart_payment_processor", only_trackable=True)
 class CartPaymentProcessor:
@@ -2687,10 +2697,13 @@ class CartPaymentProcessor:
         if len(intent_operations) > 0:
             await gather(*intent_operations)
 
+        cancelled_cart_payment = await self.cart_payment_interface.update_cart_payment_post_cancellation(
+            id=cart_payment_id
+        )
         self.log.info(
             "[cancel_payment] Cancelled cart_payment", cart_payment_id=cart_payment_id
         )
-        return cart_payment
+        return cancelled_cart_payment
 
     @track_func
     @tracing.trackable

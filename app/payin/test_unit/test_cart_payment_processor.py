@@ -713,6 +713,8 @@ class TestCartPaymentProcessor:
         result = await cart_payment_processor.cancel_payment(request_cart_payment.id)
         assert result
         assert type(result) == CartPayment
+        assert result.deleted_at is not None
+        assert result.deleted_at == result.updated_at
 
     @pytest.mark.asyncio
     async def test_cancel_payment_fake_cart_payment(self, cart_payment_processor):
@@ -804,6 +806,8 @@ class TestCartPaymentProcessor:
         )
         assert result
         assert type(result) == CartPayment
+        assert result.deleted_at is not None
+        assert result.updated_at == result.deleted_at
 
     @pytest.mark.asyncio
     async def test_cancel_payment_for_legacy_charge_fake_cart_payment(

@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime
 
 from payin_v0_client import ApiException
 
@@ -341,6 +342,7 @@ def test_update_legacy_cart_payment_lower_with_delay_capture():
     assert updated_cart_payment[1] == 200
     assert updated_cart_payment[0].amount == updated_amount + CART_AMOUNT
     assert updated_cart_payment[0].delay_capture is True
+    assert updated_cart_payment[0].deleted_at is None
 
 
 def test_update_legacy_cart_payment_with_cart_payment_not_found():
@@ -397,6 +399,9 @@ def test_cancel_legacy_cart_payment_without_delay_capture():
         dd_charge_id=cart_payment[0].dd_charge_id, body={}
     )
     assert deleted_cart_payment[1] == 200
+    assert deleted_cart_payment[0].deleted_at is not None
+    assert isinstance(deleted_cart_payment[0].deleted_at, datetime)
+    assert deleted_cart_payment[0].deleted_at == deleted_cart_payment[0].updated_at
 
 
 def test_cancel_legacy_cart_payment_with_delay_capture():
@@ -435,6 +440,9 @@ def test_cancel_legacy_cart_payment_with_delay_capture():
         dd_charge_id=cart_payment[0].dd_charge_id, body={}
     )
     assert deleted_cart_payment[1] == 200
+    assert deleted_cart_payment[0].deleted_at is not None
+    assert isinstance(deleted_cart_payment[0].deleted_at, datetime)
+    assert deleted_cart_payment[0].deleted_at == deleted_cart_payment[0].updated_at
 
 
 def test_cancel_legacy_cart_payment_with_cart_payment_not_found():

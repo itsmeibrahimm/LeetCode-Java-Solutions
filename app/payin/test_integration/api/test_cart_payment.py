@@ -414,6 +414,8 @@ class TestCartPayment:
         assert response.status_code == 200
         cart_payment = response.json()
         assert cart_payment["id"]
+        assert cart_payment["deleted_at"] is not None
+        assert cart_payment["updated_at"] == cart_payment["deleted_at"]
 
     def _test_cancel_cart_payment(
         self, client: TestClient, cart_payment: Dict[str, Any]
@@ -432,6 +434,8 @@ class TestCartPayment:
         assert response.status_code == 200
         cart_payment = response.json()
         assert cart_payment["id"]
+        assert cart_payment["deleted_at"] is not None
+        assert cart_payment["deleted_at"] == cart_payment["updated_at"]
 
     def _test_cancel_cart_payment_error(
         self,
@@ -675,6 +679,7 @@ class TestCartPayment:
         )
 
         # Now cancel
+        self._test_cancel_cart_payment(client=client, cart_payment=cart_payment)
         self._test_cancel_cart_payment(client=client, cart_payment=cart_payment)
 
     def test_cart_payment_multiple_adjustments_up_then_down(

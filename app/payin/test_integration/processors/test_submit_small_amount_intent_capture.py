@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from asynctest import mock
@@ -8,7 +8,11 @@ from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
 from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.model import PaymentMethod
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.cart_payment_repo import (
+    CartPaymentRepository,
+    UpdatePaymentIntentStatusSetInput,
+    UpdatePaymentIntentStatusWhereInput,
+)
 from app.payin.test_integration.processors.cart_payment_test_base import (
     CartPaymentLegacyTest,
     CartPaymentState,
@@ -33,11 +37,15 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
         dirty_payment_intents = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
             cutoff=datetime(year=3000, month=12, day=1)
         )
+        now = datetime.now(timezone.utc)
         async for intent in dirty_payment_intents:
             await cart_payment_repository.update_payment_intent_status(
-                id=intent.id,
-                previous_status=intent.status,
-                new_status=IntentStatus.FAILED,
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=intent.id, previous_status=intent.status
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=IntentStatus.FAILED, updated_at=now
+                ),
             )
 
         # 1 Setup initial cart payment with delay capture
@@ -168,10 +176,14 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
             assert updated_payment_intent.status == IntentStatus.CAPTURING
 
         # 4 flip back payment intent status
+        now = datetime.now(timezone.utc)
         flipped_payment_intent = await cart_payment_repository.update_payment_intent_status(
-            id=updated_payment_intent.id,
-            new_status=IntentStatus.REQUIRES_CAPTURE,
-            previous_status=IntentStatus.CAPTURING,
+            update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                id=updated_payment_intent.id, previous_status=IntentStatus.CAPTURING
+            ),
+            update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                status=IntentStatus.REQUIRES_CAPTURE, updated_at=now
+            ),
         )
         assert flipped_payment_intent.status == IntentStatus.REQUIRES_CAPTURE
         with mock.patch.object(

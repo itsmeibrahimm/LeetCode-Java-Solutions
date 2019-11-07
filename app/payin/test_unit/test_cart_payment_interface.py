@@ -1762,6 +1762,18 @@ class TestCartPaymentInterface:
         assert result.amount == 100
         assert result.client_description is None
 
+    @pytest.mark.asyncio
+    async def test_update_cart_payment_post_deletion(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        cancelled_cart_payment = await cart_payment_interface.update_cart_payment_post_cancellation(
+            id=cart_payment.id
+        )
+        assert cancelled_cart_payment
+        assert cancelled_cart_payment.deleted_at is not None
+        assert cancelled_cart_payment.updated_at is not None
+        assert isinstance(cancelled_cart_payment.updated_at, datetime)
+        assert isinstance(cancelled_cart_payment.deleted_at, datetime)
+
 
 class TestCapturePayment:
     @pytest.mark.asyncio

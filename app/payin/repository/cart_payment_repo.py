@@ -73,6 +73,12 @@ class UpdatePaymentIntentStatusSetInput(DBRequestModel):
     cancelled_at: Optional[datetime] = None
 
 
+class UpdateCartPaymentPostCancellationInput(DBRequestModel):
+    id: UUID
+    updated_at: datetime
+    deleted_at: datetime
+
+
 @final
 @tracing.track_breadcrumb(repository_name="cart_payment")
 @dataclass
@@ -134,6 +140,7 @@ class CartPaymentRepository(PayinDBRepository):
             created_at=row[cart_payments.created_at],
             updated_at=row[cart_payments.updated_at],
             delay_capture=row[cart_payments.delay_capture],
+            deleted_at=row[cart_payments.deleted_at],
         )
 
     def to_legacy_payment(self, row: Any) -> LegacyPayment:
@@ -1321,3 +1328,20 @@ class CartPaymentRepository(PayinDBRepository):
 
         row = await self.payment_database.master().fetch_one(statement)
         return self.to_pgp_refund(row)
+
+    async def update_cart_payment_post_cancellation(
+        self,
+        update_cart_payment_post_cancellation_input: UpdateCartPaymentPostCancellationInput,
+    ) -> CartPayment:
+        statement = (
+            cart_payments.table.update()
+            .where(cart_payments.id == update_cart_payment_post_cancellation_input.id)
+            .values(
+                updated_at=update_cart_payment_post_cancellation_input.updated_at,
+                deleted_at=update_cart_payment_post_cancellation_input.deleted_at,
+            )
+            .returning(*cart_payments.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return self.to_cart_payment(row)

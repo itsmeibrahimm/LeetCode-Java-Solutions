@@ -42,6 +42,7 @@ from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
 from app.payin.repository.cart_payment_repo import (
     UpdatePgpPaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
+    UpdateCartPaymentPostCancellationInput,
 )
 from app.payin.tests import utils
 from app.payin.tests.utils import FunctionMock, ContextMock, generate_payer
@@ -87,6 +88,16 @@ class MockedPaymentRepo:
         cart_payment.id = cart_payment_id
         cart_payment.amount = amount
         cart_payment.client_description = client_description
+        return cart_payment
+
+    async def update_cart_payment_post_cancellation(
+        self,
+        update_cart_payment_post_cancellation_input: UpdateCartPaymentPostCancellationInput,
+    ) -> CartPayment:
+        cart_payment = utils.generate_cart_payment()
+        cart_payment.id = update_cart_payment_post_cancellation_input.id
+        cart_payment.updated_at = update_cart_payment_post_cancellation_input.updated_at
+        cart_payment.deleted_at = update_cart_payment_post_cancellation_input.deleted_at
         return cart_payment
 
     async def get_cart_payment_by_id(
@@ -689,6 +700,10 @@ def cart_payment_repo():
     payment_repo.insert_pgp_refund = mocked_repo.insert_pgp_refund
     payment_repo.get_pgp_refund_by_refund_id = mocked_repo.get_pgp_refund_by_refund_id
     payment_repo.update_pgp_refund = mocked_repo.update_pgp_refund
+
+    payment_repo.update_cart_payment_post_cancellation = (
+        mocked_repo.update_cart_payment_post_cancellation
+    )
 
     # Transaction function
     payment_repo.payment_database_transaction = ContextMock()
