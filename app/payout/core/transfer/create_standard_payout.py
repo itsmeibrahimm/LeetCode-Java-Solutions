@@ -557,7 +557,10 @@ class CreateStandardPayout(
                 retryable=False,
             )
         create_payout_request = StripeCreatePayoutRequest(
-            statement_descriptor=statement_descriptor,
+            statement_descriptor=statement_descriptor.replace(">", "")
+            .replace("<", "")
+            .replace("'", "")
+            .replace('"', ""),
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
                 payment_account=payment_account,
