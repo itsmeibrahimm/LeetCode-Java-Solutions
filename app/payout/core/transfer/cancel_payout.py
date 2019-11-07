@@ -26,7 +26,7 @@ from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
 from app.commons.providers.stripe import stripe_models as models
-from app.payout.models import PayoutAccountId
+from app.payout.models import PayoutAccountId, TransferId
 
 
 class CancelPayoutResponse(OperationResponse):
@@ -34,7 +34,7 @@ class CancelPayoutResponse(OperationResponse):
 
 
 class CancelPayoutRequest(OperationRequest):
-    transfer_id: models.TransferId
+    transfer_id: TransferId
     payout_account_id: PayoutAccountId
 
 

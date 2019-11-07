@@ -41,7 +41,6 @@ Destination = NewType("Destination", str)
 StatementDescriptor = NewType("StatementDescriptor", str)
 StripeAccountId = NewType("StripeAccountId", str)
 Metadata = NewType("Metadata", dict)
-TransferId = NewType("TransferId", str)
 
 
 class StripeBaseModel(pydantic.BaseModel):

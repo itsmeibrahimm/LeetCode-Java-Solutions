@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, Body, Path
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST
-from app.commons.providers.stripe.stripe_models import TransferId
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.account.v1 import models as account_models
 from app.payout.api.transfer.v1 import models as transfer_models
 from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.core.transfer.processors.create_transfer import CreateTransferRequest
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
+from app.payout.models import TransferId
 from app.payout.service import create_transfer_processors
 
 

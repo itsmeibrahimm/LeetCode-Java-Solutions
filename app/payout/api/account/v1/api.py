@@ -1,4 +1,3 @@
-from fastapi import APIRouter, Depends
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -9,7 +8,6 @@ from structlog.stdlib import BoundLogger
 from typing import Optional
 from fastapi import APIRouter, Depends, Body, Path, Query
 
-from app.commons.providers.stripe.stripe_models import TransferId
 from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.api.streams import decode_stream_cursor, encode_stream_cursor
@@ -41,7 +39,12 @@ from app.payout.core.account.processors.verify_account import VerifyPayoutAccoun
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.service import create_payout_account_processors
-from app.payout.models import PayoutType, PayoutTargetType, PayoutExternalAccountType
+from app.payout.models import (
+    PayoutType,
+    PayoutTargetType,
+    PayoutExternalAccountType,
+    TransferId,
+)
 
 api_tags = ["AccountsV1"]
 router = APIRouter()

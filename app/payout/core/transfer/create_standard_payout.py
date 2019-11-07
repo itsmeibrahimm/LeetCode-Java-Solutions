@@ -58,6 +58,7 @@ from app.payout.models import (
     StripeErrorCode,
     UNKNOWN_ERROR_STR,
     STRIPE_TRANSFER_FAILED_STATUS,
+    TransferId,
 )
 
 
@@ -69,7 +70,7 @@ class CreateStandardPayoutRequest(OperationRequest):
     payout_account_id: PayoutAccountId
     amount: PayoutAmountType
     payout_type: PayoutType = PayoutType.STANDARD
-    transfer_id: models.TransferId
+    transfer_id: TransferId
     statement_descriptor: str
     target_id: Optional[str] = None
     target_type: Optional[PayoutTargetType] = None
@@ -106,12 +107,12 @@ class CreateStandardPayout(
         self.stripe = stripe
 
     async def _execute(self) -> CreateStandardPayoutResponse:
+        transfer_id = self.request.transfer_id
         self.logger.info(
             "Creating a standard payout.",
-            transfer_id=self.request.transfer_id,
+            transfer_id=transfer_id,
             payment_account_id=self.request.payout_account_id,
         )
-        transfer_id = int(self.request.transfer_id)
         payment_account = await self.payment_account_repo.get_payment_account_by_id(
             payment_account_id=self.request.payout_account_id
         )
