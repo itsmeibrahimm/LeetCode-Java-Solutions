@@ -5,6 +5,10 @@ from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
     CreateTransfer,
 )
+from app.payout.core.transfer.processors.get_transfer_by_id import (
+    GetTransferByIdRequest,
+    GetTransferById,
+)
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
     SubmitTransfer,
@@ -122,3 +126,9 @@ class TransferProcessors:
             stripe=self.stripe,
         )
         return await submit_unsubmitted_transfers_op.execute()
+
+    async def get_transfer_by_id(self, request: GetTransferByIdRequest):
+        get_transfer_by_id_op = GetTransferById(
+            request=request, transfer_repo=self.transfer_repo
+        )
+        return await get_transfer_by_id_op.execute()

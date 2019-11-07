@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, Body, Path
-from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST
+from starlette.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
+)
 from app.commons.api.models import PaymentErrorResponseBody
-from app.payout.api.account.v1 import models as account_models
 from app.payout.api.transfer.v1 import models as transfer_models
 from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.core.transfer.processors.create_transfer import CreateTransferRequest
+from app.payout.core.transfer.processors.get_transfer_by_id import (
+    GetTransferByIdRequest,
+)
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
 from app.payout.models import TransferId
 from app.payout.service import create_transfer_processors
@@ -41,7 +48,7 @@ async def create_transfer(
     create_transfer_response = await transfer_processors.create_transfer(
         create_transfer_request
     )
-    return transfer_models.Transfer(**create_transfer_response.dict())
+    return transfer_models.Transfer(**create_transfer_response.transfer.dict())
 
 
 @router.post(
@@ -70,4 +77,22 @@ async def submit_transfer(
     submit_transfer_response = await transfer_processors.submit_transfer(
         submit_transfer_request
     )
-    return account_models.Payout(**submit_transfer_response.dict())
+    return transfer_models.SubmitTransferResponse(**submit_transfer_response.dict())
+
+
+@router.get(
+    "/{transfer_id}",
+    operation_id="GetTransferById",
+    status_code=HTTP_200_OK,
+    responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def get_transfer_by_id(
+    transfer_id: TransferId = Path(..., description="Transfer ID"),
+    transfer_processors: TransferProcessors = Depends(create_transfer_processors),
+):
+    get_transfer_by_id_request = GetTransferByIdRequest(transfer_id=transfer_id)
+    get_transfer_by_id_response = await transfer_processors.get_transfer_by_id(
+        get_transfer_by_id_request
+    )
+    return transfer_models.Transfer(**get_transfer_by_id_response.dict())

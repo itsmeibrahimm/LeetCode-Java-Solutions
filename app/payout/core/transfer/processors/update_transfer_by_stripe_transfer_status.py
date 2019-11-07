@@ -13,7 +13,7 @@ from app.commons.providers.stripe.stripe_models import StripeRetrievePayoutReque
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
 )
-from app.payout.models import TransferStatusCodeType
+from app.payout.models import TransferStatusCodeType, TransferId
 from app.payout.repository.maindb.model.stripe_transfer import (
     StripeTransfer,
     StripeTransferUpdate,
@@ -35,7 +35,7 @@ class UpdateTransferByStripeTransferStatusResponse(OperationResponse):
 
 
 class UpdateTransferByStripeTransferStatusRequest(OperationRequest):
-    transfer_id: int
+    transfer_id: TransferId
 
 
 class UpdateTransferByStripeTransferStatus(

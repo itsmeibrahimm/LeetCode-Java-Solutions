@@ -39,7 +39,7 @@ from app.payout.test_integration.utils import (
 from app.payout.models import PayoutDay
 
 
-class TestCreateTransfer:
+class TestWeeklyCreateTransfer:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture(autouse=True)

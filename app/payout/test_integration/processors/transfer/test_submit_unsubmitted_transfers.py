@@ -31,7 +31,7 @@ from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import prepare_and_insert_transfer
 
 
-class TestSubmitTransfer:
+class TestSubmitUnsubmittedTransfer:
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture(autouse=True)
