@@ -32,7 +32,13 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
 from app.payin.core.payer.types import PayerType
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.cart_payment_repo import (
+    CartPaymentRepository,
+    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentStatusSetInput,
+    UpdatePgpPaymentIntentWhereInput,
+    UpdatePgpPaymentIntentSetInput,
+)
 from app.payin.repository.payer_repo import (
     PayerRepository,
     InsertPayerInput,
@@ -588,15 +594,26 @@ class TestPgpPaymentIntent:
     ):
         charge_resource_id = f"{pgp_payment_intent.charge_resource_id}-updated"
         resource_id = f"{pgp_payment_intent.resource_id}-updated"
-        result = await cart_payment_repository.update_pgp_payment_intent(
-            id=pgp_payment_intent.id,
+        update_pgp_payment_intent_where_request = UpdatePgpPaymentIntentWhereInput(
+            id=pgp_payment_intent.id
+        )
+        update_pgp_payment_intent_set_request = UpdatePgpPaymentIntentSetInput(
             status=IntentStatus.FAILED,
             charge_resource_id=charge_resource_id,
             resource_id=resource_id,
             amount_capturable=0,
             amount_received=500,
+            updated_at=datetime.now(timezone.utc),
         )
-        assert result
+        updated_pgp_payment_intent = await cart_payment_repository.update_pgp_payment_intent(
+            update_pgp_payment_intent_where_input=update_pgp_payment_intent_where_request,
+            update_pgp_payment_intent_set_input=update_pgp_payment_intent_set_request,
+        )
+        assert updated_pgp_payment_intent
+        assert (
+            updated_pgp_payment_intent.updated_at
+            == update_pgp_payment_intent_set_request.updated_at
+        )
 
         expected_intent = PgpPaymentIntent(
             id=pgp_payment_intent.id,
@@ -617,10 +634,84 @@ class TestPgpPaymentIntent:
             payout_account_id=pgp_payment_intent.payout_account_id,
             capture_method=pgp_payment_intent.capture_method,
             created_at=pgp_payment_intent.created_at,
-            updated_at=result.updated_at,  # Generated
+            updated_at=updated_pgp_payment_intent.updated_at,  # Generated
             captured_at=pgp_payment_intent.captured_at,
             cancelled_at=pgp_payment_intent.cancelled_at,
         )
+        assert updated_pgp_payment_intent == expected_intent
+
+        update_pgp_payment_intent_where_request = UpdatePgpPaymentIntentWhereInput(
+            id=pgp_payment_intent.id
+        )
+        update_pgp_payment_intent_set_request = UpdatePgpPaymentIntentSetInput(
+            status=IntentStatus.FAILED,
+            charge_resource_id=charge_resource_id,
+            resource_id=resource_id,
+            amount_capturable=0,
+            amount_received=500,
+            cancelled_at=datetime.now(timezone.utc),
+        )
+        cancelled_payment_intent = await cart_payment_repository.update_pgp_payment_intent(
+            update_pgp_payment_intent_where_input=update_pgp_payment_intent_where_request,
+            update_pgp_payment_intent_set_input=update_pgp_payment_intent_set_request,
+        )
+        assert cancelled_payment_intent
+        assert (
+            cancelled_payment_intent.updated_at == updated_pgp_payment_intent.updated_at
+        )
+
+    @pytest.mark.asyncio
+    async def test_cancel_pgp_payment_intent(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        pgp_payment_intent: PgpPaymentIntent,
+    ):
+        charge_resource_id = f"{pgp_payment_intent.charge_resource_id}-updated"
+        resource_id = f"{pgp_payment_intent.resource_id}-updated"
+        updated_and_cancel_time = datetime.now(timezone.utc)
+        cancel_payment_intent_where_request = UpdatePgpPaymentIntentWhereInput(
+            id=pgp_payment_intent.id
+        )
+        cancel_payment_intent_set_request = UpdatePgpPaymentIntentSetInput(
+            status=IntentStatus.CANCELLED,
+            charge_resource_id=charge_resource_id,
+            resource_id=resource_id,
+            amount_capturable=0,
+            amount_received=500,
+            updated_at=updated_and_cancel_time,
+            cancelled_at=updated_and_cancel_time,
+        )
+        result = await cart_payment_repository.update_pgp_payment_intent(
+            update_pgp_payment_intent_where_input=cancel_payment_intent_where_request,
+            update_pgp_payment_intent_set_input=cancel_payment_intent_set_request,
+        )
+        assert result
+        assert result.updated_at == updated_and_cancel_time
+        assert result.cancelled_at == updated_and_cancel_time
+        expected_intent = PgpPaymentIntent(
+            id=pgp_payment_intent.id,
+            payment_intent_id=pgp_payment_intent.payment_intent_id,
+            idempotency_key=pgp_payment_intent.idempotency_key,
+            pgp_code=pgp_payment_intent.pgp_code,
+            resource_id=resource_id,  # Updated
+            status=IntentStatus.CANCELLED,  # Updated
+            invoice_resource_id=pgp_payment_intent.invoice_resource_id,
+            charge_resource_id=charge_resource_id,  # Updated
+            payment_method_resource_id=pgp_payment_intent.payment_method_resource_id,
+            customer_resource_id=pgp_payment_intent.customer_resource_id,
+            currency=pgp_payment_intent.currency,
+            amount=pgp_payment_intent.amount,
+            amount_capturable=0,  # Updated
+            amount_received=500,  # Updated
+            application_fee_amount=pgp_payment_intent.application_fee_amount,
+            payout_account_id=pgp_payment_intent.payout_account_id,
+            capture_method=pgp_payment_intent.capture_method,
+            created_at=pgp_payment_intent.created_at,
+            updated_at=result.updated_at,  # Updated
+            captured_at=pgp_payment_intent.captured_at,
+            cancelled_at=result.cancelled_at,  # Updated
+        )
+        assert result.status == IntentStatus.CANCELLED
         assert result == expected_intent
 
 
@@ -919,12 +1010,104 @@ class TestUpdatePaymentIntentStatus:
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
+        update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+            id=payment_intent.id, previous_status=IntentStatus.REQUIRES_CAPTURE.value
+        )
+        update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+            status=IntentStatus.CAPTURING.value, updated_at=datetime.now(timezone.utc)
+        )
         payment_intent = await cart_payment_repository.update_payment_intent_status(
-            payment_intent.id,
-            IntentStatus.CAPTURING.value,
-            IntentStatus.REQUIRES_CAPTURE.value,
+            update_payment_intent_status_where_input=update_payment_intent_status_where_input,
+            update_payment_intent_status_set_input=update_payment_intent_status_set_input,
         )
         assert payment_intent.status == IntentStatus.CAPTURING.value
+        assert (
+            payment_intent.updated_at
+            == update_payment_intent_status_set_input.updated_at
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_payment_intent_success_returns_row(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+            id=payment_intent.id, previous_status=IntentStatus.REQUIRES_CAPTURE.value
+        )
+        now = datetime.now(timezone.utc)
+        update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+            status=IntentStatus.CAPTURING.value, updated_at=now
+        )
+        updated_payment_intent = await cart_payment_repository.update_payment_intent_status(
+            update_payment_intent_status_where_input=update_payment_intent_status_where_input,
+            update_payment_intent_status_set_input=update_payment_intent_status_set_input,
+        )
+        assert updated_payment_intent.status == IntentStatus.CAPTURING.value
+        assert (
+            updated_payment_intent.updated_at
+            == update_payment_intent_status_set_input.updated_at
+        )
+        assert (
+            updated_payment_intent.cancelled_at is None
+        )  # cancelled_at is not updated
+        assert updated_payment_intent.amount == payment_intent.amount  # No change
+        assert (
+            updated_payment_intent.application_fee_amount
+            == payment_intent.application_fee_amount
+        )  # No change
+
+        now = datetime.now(timezone.utc)
+        cancel_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+            id=payment_intent.id, previous_status=IntentStatus.CAPTURING.value
+        )
+        cancel_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+            status=IntentStatus.CANCELLED.value, cancelled_at=now
+        )
+        cancelled_payment_intent = await cart_payment_repository.update_payment_intent_status(
+            update_payment_intent_status_where_input=cancel_payment_intent_status_where_input,
+            update_payment_intent_status_set_input=cancel_payment_intent_status_set_input,
+        )
+        assert cancelled_payment_intent
+        assert (
+            cancelled_payment_intent.cancelled_at
+            == cancel_payment_intent_status_set_input.cancelled_at
+        )
+        assert (
+            cancelled_payment_intent.updated_at == updated_payment_intent.updated_at
+        )  # updated_at is un-changed
+
+    @pytest.mark.asyncio
+    async def test_cancel_payment_intent_success_returns_row(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        payment_intent: PaymentIntent,
+    ):
+        update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+            id=payment_intent.id, previous_status=IntentStatus.REQUIRES_CAPTURE.value
+        )
+        now = datetime.now(timezone.utc)
+        update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+            status=IntentStatus.CANCELLED.value, updated_at=now, cancelled_at=now
+        )
+        cancelled_payment_intent = await cart_payment_repository.update_payment_intent_status(
+            update_payment_intent_status_where_input=update_payment_intent_status_where_input,
+            update_payment_intent_status_set_input=update_payment_intent_status_set_input,
+        )
+        assert cancelled_payment_intent.status == IntentStatus.CANCELLED.value
+        assert (
+            cancelled_payment_intent.updated_at
+            == update_payment_intent_status_set_input.updated_at
+        )
+        assert (
+            cancelled_payment_intent.cancelled_at
+            == update_payment_intent_status_set_input.cancelled_at
+        )
+        assert cancelled_payment_intent.amount == payment_intent.amount  # No change
+        assert (
+            cancelled_payment_intent.application_fee_amount
+            == payment_intent.application_fee_amount
+        )  # No change
 
     @pytest.mark.asyncio
     async def test_failure_returns_nothing(
@@ -934,7 +1117,13 @@ class TestUpdatePaymentIntentStatus:
     ):
         with pytest.raises(PaymentIntentCouldNotBeUpdatedError):
             await cart_payment_repository.update_payment_intent_status(
-                payment_intent.id, IntentStatus.CAPTURING.value, IntentStatus.INIT.value
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=payment_intent.id, previous_status=IntentStatus.INIT.value
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=IntentStatus.CAPTURING.value,
+                    updated_at=datetime.now(timezone.utc),
+                ),
             )
 
 

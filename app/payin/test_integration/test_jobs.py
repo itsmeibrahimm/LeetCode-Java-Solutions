@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from asynctest import create_autospec, patch
 
@@ -10,7 +12,10 @@ from app.payin.jobs import (
     CaptureUncapturedPaymentIntents,
     ResolveCapturingPaymentIntents,
 )
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.cart_payment_repo import (
+    CartPaymentRepository,
+    UpdatePaymentIntentStatusWhereInput,
+)
 
 
 @pytest.fixture
@@ -97,8 +102,25 @@ class TestResolveCapturingPaymentIntents:
             app_context=app_context, job_pool=stripe_pool
         )
         await job_instance.run()
-        mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once_with(  # type: ignore
-            id=payment_intent.id,
-            new_status=IntentStatus.REQUIRES_CAPTURE.value,
-            previous_status=IntentStatus.CAPTURING.value,
+
+        mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once()  # type: ignore
+        args, kwargs = (
+            mock_cart_payment_repository.return_value.update_payment_intent_status.call_args  # type: ignore
+        )
+        update_payment_intent_status_where_input = kwargs[
+            "update_payment_intent_status_where_input"
+        ]
+        update_payment_intent_status_where_request = UpdatePaymentIntentStatusWhereInput(
+            id=payment_intent.id, previous_status=IntentStatus.CAPTURING.value
+        )
+        assert (
+            update_payment_intent_status_where_input
+            == update_payment_intent_status_where_request
+        )
+        assert (
+            IntentStatus.REQUIRES_CAPTURE.value
+            == kwargs["update_payment_intent_status_set_input"].status
+        )
+        assert isinstance(
+            kwargs["update_payment_intent_status_set_input"].updated_at, datetime
         )

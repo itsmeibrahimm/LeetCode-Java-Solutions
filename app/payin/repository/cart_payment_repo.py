@@ -8,6 +8,7 @@ from sqlalchemy.sql.functions import now
 from typing_extensions import final
 
 from app.commons import tracing
+from app.commons.database.model import DBRequestModel
 from app.commons.database.query import paged_query
 from app.commons.types import PgpCode, CountryCode, Currency
 from app.payin.core.cart_payment.model import (
@@ -45,6 +46,31 @@ from app.payin.models.paymentdb import (
 )
 from app.payin.repository.base import PayinDBRepository
 from app.payin.repository.payment_method_repo import StripeCardDbEntity
+
+
+class UpdatePgpPaymentIntentWhereInput(DBRequestModel):
+    id: UUID
+
+
+class UpdatePgpPaymentIntentSetInput(DBRequestModel):
+    status: str
+    resource_id: str
+    charge_resource_id: str
+    amount_capturable: int
+    amount_received: int
+    updated_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+
+
+class UpdatePaymentIntentStatusWhereInput(DBRequestModel):
+    id: UUID
+    previous_status: str
+
+
+class UpdatePaymentIntentStatusSetInput(DBRequestModel):
+    status: str
+    updated_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
 
 
 @final
@@ -308,25 +334,30 @@ class CartPaymentRepository(PayinDBRepository):
         )
 
     async def update_payment_intent_status(
-        self, id: UUID, new_status: str, previous_status: str
+        self,
+        update_payment_intent_status_where_input: UpdatePaymentIntentStatusWhereInput,
+        update_payment_intent_status_set_input: UpdatePaymentIntentStatusSetInput,
     ) -> PaymentIntent:
         """
         Updates a payment intent's status taking into account the previous status to prevent
         race conditions
 
-        :param id:
-        :param new_status:
-        :param previous_status: the status from which the intent is transitioning
+        :param update_payment_intent_status_where_input
+        :param update_payment_intent_status_set_input
         :return:
         """
         statement = (
             payment_intents.table.update()
             .where(
                 and_(
-                    payment_intents.id == id, payment_intents.status == previous_status
+                    payment_intents.id == update_payment_intent_status_where_input.id,
+                    payment_intents.status
+                    == update_payment_intent_status_where_input.previous_status,
                 )
             )
-            .values(status=new_status, updated_at=datetime.now(timezone.utc))
+            .values(
+                update_payment_intent_status_set_input.dict(skip_defaults=True)
+            )  # skip_defaults does not updates any non-required parameters with None type value
             .returning(*payment_intents.table.columns.values())
         )
 
@@ -464,24 +495,15 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def update_pgp_payment_intent(
         self,
-        id: UUID,
-        status: str,
-        resource_id: str,
-        charge_resource_id: str,
-        amount_capturable: int,
-        amount_received: int,
+        update_pgp_payment_intent_where_input: UpdatePgpPaymentIntentWhereInput,
+        update_pgp_payment_intent_set_input: UpdatePgpPaymentIntentSetInput,
     ) -> PgpPaymentIntent:
         statement = (
             pgp_payment_intents.table.update()
-            .where(pgp_payment_intents.id == id)
+            .where(pgp_payment_intents.id == update_pgp_payment_intent_where_input.id)
             .values(
-                status=status,
-                resource_id=resource_id,
-                charge_resource_id=charge_resource_id,
-                amount_capturable=amount_capturable,
-                amount_received=amount_received,
-                updated_at=datetime.now(timezone.utc),
-            )
+                update_pgp_payment_intent_set_input.dict(skip_defaults=True)
+            )  # skip_defaults does not updates any non-required parameters with None type value
             .returning(*pgp_payment_intents.table.columns.values())
         )
 

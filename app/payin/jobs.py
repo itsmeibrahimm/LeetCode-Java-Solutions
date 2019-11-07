@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
@@ -18,7 +18,11 @@ from app.payin.core.cart_payment.processor import (
 from app.payin.core.cart_payment.types import IntentStatus
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.cart_payment_repo import (
+    CartPaymentRepository,
+    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentStatusSetInput,
+)
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -268,11 +272,16 @@ class ResolveCapturingPaymentIntents(Job):
                 payment_intent_capture_after=payment_intent.capture_after,
                 payment_intent_created_at=payment_intent.created_at,
             )
+            update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+                id=payment_intent.id, previous_status=payment_intent.status
+            )
+            update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+                status=new_status, updated_at=datetime.now(timezone.utc)
+            )
             await job_instance_cxt.job_pool.spawn(
                 cart_payment_repo.update_payment_intent_status(
-                    payment_intent.id,
-                    new_status=new_status,
-                    previous_status=payment_intent.status,
+                    update_payment_intent_status_where_input=update_payment_intent_status_where_input,
+                    update_payment_intent_status_set_input=update_payment_intent_status_set_input,
                 )
             )
         job_instance_cxt.log.info("payment_intent summary", payment_intent_count=count)

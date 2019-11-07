@@ -1,25 +1,13 @@
-import pytest
-
 from datetime import datetime
 from typing import Optional, List, Tuple, Dict, Any
 from unittest.mock import MagicMock
 from uuid import UUID
 
+import pytest
 from asynctest import create_autospec
 
 from app.commons.types import PgpCode, CountryCode, Currency
 from app.payin.capture.service import CaptureService
-from app.payin.core.cart_payment.processor import (
-    CartPaymentInterface,
-    LegacyPaymentInterface,
-    CartPaymentProcessor,
-)
-from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
-from app.payin.core.payer.model import RawPayer
-from app.payin.core.payer.payer_client import PayerClient
-from app.payin.core.payment_method.types import PgpPaymentMethod
-from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
-from app.payin.tests.utils import FunctionMock, ContextMock, generate_payer
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
@@ -34,6 +22,11 @@ from app.payin.core.cart_payment.model import (
     Refund,
     PgpRefund,
 )
+from app.payin.core.cart_payment.processor import (
+    CartPaymentInterface,
+    LegacyPaymentInterface,
+    CartPaymentProcessor,
+)
 from app.payin.core.cart_payment.types import (
     IntentStatus,
     ChargeStatus,
@@ -41,7 +34,17 @@ from app.payin.core.cart_payment.types import (
     LegacyStripeChargeStatus,
     RefundStatus,
 )
+from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
+from app.payin.core.payer.model import RawPayer
+from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payment_method.types import PgpPaymentMethod
+from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
+from app.payin.repository.cart_payment_repo import (
+    UpdatePgpPaymentIntentWhereInput,
+    UpdatePgpPaymentIntentSetInput,
+)
 from app.payin.tests import utils
+from app.payin.tests.utils import FunctionMock, ContextMock, generate_payer
 
 
 class MockedPaymentRepo:
@@ -142,9 +145,14 @@ class MockedPaymentRepo:
         )
 
     async def update_payment_intent_status(
-        self, id: UUID, new_status: str, previous_status: str
+        self,
+        update_payment_intent_status_where_input,
+        update_payment_intent_status_set_input,
     ) -> PaymentIntent:
-        return utils.generate_payment_intent(id=id, status=new_status)
+        return utils.generate_payment_intent(
+            id=update_payment_intent_status_where_input.id,
+            status=update_payment_intent_status_set_input.status,
+        )
 
     async def update_payment_intent_amount(
         self, id: UUID, amount: int
@@ -213,20 +221,16 @@ class MockedPaymentRepo:
 
     async def update_pgp_payment_intent(
         self,
-        id: UUID,
-        status: str,
-        resource_id: str,
-        charge_resource_id: str,
-        amount_capturable: int,
-        amount_received: int,
+        update_pgp_payment_intent_where_input: UpdatePgpPaymentIntentWhereInput,
+        update_pgp_payment_intent_set_input: UpdatePgpPaymentIntentSetInput,
     ) -> PgpPaymentIntent:
         return utils.generate_pgp_payment_intent(
-            id=id,
-            status=status,
-            resource_id=resource_id,
-            charge_resource_id=charge_resource_id,
-            amount_capturable=amount_capturable,
-            amount_received=amount_received,
+            id=update_pgp_payment_intent_where_input.id,
+            status=update_pgp_payment_intent_set_input.status,
+            resource_id=update_pgp_payment_intent_set_input.resource_id,
+            charge_resource_id=update_pgp_payment_intent_set_input.charge_resource_id,
+            amount_capturable=update_pgp_payment_intent_set_input.amount_capturable,
+            amount_received=update_pgp_payment_intent_set_input.amount_received,
         )
 
     async def find_pgp_payment_intents(

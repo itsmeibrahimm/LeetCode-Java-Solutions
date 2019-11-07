@@ -87,7 +87,13 @@ from app.payin.core.types import (
     PgpPayerResourceId,
     PgpPaymentMethodResourceId,
 )
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
+from app.payin.repository.cart_payment_repo import (
+    CartPaymentRepository,
+    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentStatusSetInput,
+    UpdatePgpPaymentIntentWhereInput,
+    UpdatePgpPaymentIntentSetInput,
+)
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
 
@@ -974,17 +980,27 @@ class CartPaymentInterface:
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
             updated_intent = await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id,
-                new_status=target_intent_status,
-                previous_status=payment_intent.status,
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=payment_intent.id, previous_status=payment_intent.status
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=target_intent_status, updated_at=datetime.now(timezone.utc)
+                ),
             )
-            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
-                id=pgp_payment_intent.id,
+            update_pgp_payment_intent_where_input = UpdatePgpPaymentIntentWhereInput(
+                id=pgp_payment_intent.id
+            )
+            update_pgp_payment_intent_set_input = UpdatePgpPaymentIntentSetInput(
                 status=target_intent_status,
                 resource_id=provider_payment_intent.id,
                 charge_resource_id=provider_payment_intent.charges.data[0].id,
                 amount_capturable=provider_payment_intent.amount_capturable,
                 amount_received=provider_payment_intent.amount_received,
+                updated_at=datetime.now(timezone.utc),
+            )
+            updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
+                update_pgp_payment_intent_where_input=update_pgp_payment_intent_where_input,
+                update_pgp_payment_intent_set_input=update_pgp_payment_intent_set_input,
             )
             if self.ENABLE_NEW_CHARGE_TABLES:
                 await self._create_new_charge_pair(
@@ -1002,9 +1018,12 @@ class CartPaymentInterface:
         # Throws exception if current state is not same as intent, meaning another request/process has already transitioned
         # intent to a different state.
         return await self.payment_repo.update_payment_intent_status(
-            id=payment_intent.id,
-            new_status=IntentStatus.CAPTURING,
-            previous_status=payment_intent.status,
+            update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                id=payment_intent.id, previous_status=payment_intent.status
+            ),
+            update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                status=IntentStatus.CAPTURING, updated_at=datetime.now(timezone.utc)
+            ),
         )
 
     async def submit_capture_to_provider(
@@ -1048,9 +1067,13 @@ class CartPaymentInterface:
             # All other Stripe errors (ie. not InvalidRequestError) can be considered retryable errors
             # Re-setting the state back to REQUIRES_CAPTURE allows it to be picked up again by the regular cron
             await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id,
-                new_status=IntentStatus.REQUIRES_CAPTURE,
-                previous_status=payment_intent.status,
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=payment_intent.id, previous_status=payment_intent.status
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    updated_at=datetime.now(timezone.utc),
+                ),
             )
             self.req_context.log.warning(
                 "Provider error during capture",
@@ -1061,9 +1084,13 @@ class CartPaymentInterface:
             raise ProviderError(e)
         except Exception as e:
             await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id,
-                new_status=IntentStatus.CAPTURE_FAILED,
-                previous_status=payment_intent.status,
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=payment_intent.id, previous_status=payment_intent.status
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=IntentStatus.CAPTURE_FAILED,
+                    updated_at=datetime.now(timezone.utc),
+                ),
             )
             self.req_context.log.exception(
                 "Unknown error capturing intent with provider",
@@ -1130,12 +1157,17 @@ class CartPaymentInterface:
                 captured_at=datetime.now(timezone.utc),
             )
             updated_pgp_payment_intent = await self.payment_repo.update_pgp_payment_intent(
-                id=pgp_payment_intent.id,
-                status=new_intent_status,
-                resource_id=provider_payment_intent.id,
-                charge_resource_id=provider_payment_intent.charges.data[0].id,
-                amount_capturable=provider_payment_intent.amount_capturable,
-                amount_received=provider_payment_intent.amount_received,
+                update_pgp_payment_intent_where_input=UpdatePgpPaymentIntentWhereInput(
+                    id=pgp_payment_intent.id
+                ),
+                update_pgp_payment_intent_set_input=UpdatePgpPaymentIntentSetInput(
+                    status=new_intent_status,
+                    resource_id=str(provider_payment_intent.id),
+                    charge_resource_id=str(provider_payment_intent.charges.data[0].id),
+                    amount_capturable=provider_payment_intent.amount_capturable,
+                    amount_received=provider_payment_intent.amount_received,
+                    updated_at=datetime.now(timezone.utc),
+                ),
             )
 
             if self.ENABLE_NEW_CHARGE_TABLES:
@@ -1322,19 +1354,29 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         provider_payment_intent: ProviderPaymentIntent,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+        now = datetime.now(timezone.utc)
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id,
-                new_status=IntentStatus.CANCELLED,
-                previous_status=payment_intent.status,
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=payment_intent.id, previous_status=payment_intent.status
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=IntentStatus.CANCELLED, updated_at=now, cancelled_at=now
+                ),
             )
             updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent(
-                id=pgp_payment_intent.id,
-                status=IntentStatus.CANCELLED,
-                resource_id=provider_payment_intent.id,
-                charge_resource_id=provider_payment_intent.charges.data[0].id,
-                amount_capturable=provider_payment_intent.amount_capturable,
-                amount_received=provider_payment_intent.amount_received,
+                update_pgp_payment_intent_where_input=UpdatePgpPaymentIntentWhereInput(
+                    id=pgp_payment_intent.id
+                ),
+                update_pgp_payment_intent_set_input=UpdatePgpPaymentIntentSetInput(
+                    status=IntentStatus.CANCELLED,
+                    resource_id=provider_payment_intent.id,
+                    charge_resource_id=provider_payment_intent.charges.data[0].id,
+                    amount_capturable=provider_payment_intent.amount_capturable,
+                    amount_received=provider_payment_intent.amount_received,
+                    updated_at=now,
+                    cancelled_at=now,
+                ),
             )
             if self.ENABLE_NEW_CHARGE_TABLES:
                 await self._update_charge_pair_after_cancel(
@@ -1628,9 +1670,12 @@ class CartPaymentInterface:
         )
         async with self.payment_repo.payment_database_transaction():
             updated_intent = await self.payment_repo.update_payment_intent_status(
-                id=payment_intent.id,
-                new_status=IntentStatus.FAILED,
-                previous_status=payment_intent.status,
+                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+                    id=payment_intent.id, previous_status=payment_intent.status
+                ),
+                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                    status=IntentStatus.FAILED, updated_at=datetime.now(timezone.utc)
+                ),
             )
             updated_pgp_intent = await self.payment_repo.update_pgp_payment_intent_status(
                 id=pgp_payment_intent.id, status=IntentStatus.FAILED
