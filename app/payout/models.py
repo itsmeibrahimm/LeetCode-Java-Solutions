@@ -67,6 +67,7 @@ class PayoutMethodType(str, Enum):
 
 class PayoutExternalAccountType(str, Enum):
     CARD = "card"
+    BANK_ACCOUNT = "bank_account"
 
 
 # Payouts
@@ -185,3 +186,13 @@ class TransactionState(str, Enum):
     PENDING = "pending"
     ACTIVE = "active"
     CANCELLED = "cancelled"
+
+
+# PaymentAccountEditHistory
+UserId = int
+BankUpdateHistoryOwnerId = int
+
+
+class BankUpdateHistoryOwnerType(str, Enum):
+    DASHER = "dasher"
+    STORE = "store"

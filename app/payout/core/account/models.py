@@ -76,6 +76,7 @@ class PayoutAccountInternal(OperationResponse):
 
 
 class PayoutMethodInternal(OperationResponse):
+    # Leave this for Optional until we save bank account in the db
     id: Optional[int]
     token: Optional[UUID]
     created_at: Optional[datetime]
@@ -98,6 +99,15 @@ class PayoutCardInternal(PayoutMethodInternal):
     fingerprint: str
     created_at: datetime
     updated_at: datetime
+
+
+class PayoutBankAccountInternal(PayoutMethodInternal):
+    payout_account_id: int
+    currency: Currency
+    country: CountryCode
+    bank_last4: str
+    bank_name: str
+    fingerprint: str
 
 
 class PayoutCardListInternal(OperationResponse):

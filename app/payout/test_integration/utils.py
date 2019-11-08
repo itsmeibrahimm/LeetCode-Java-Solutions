@@ -415,7 +415,7 @@ async def prepare_and_insert_stripe_managed_account(
     stripe_id="stripe_id",
     country_shortname="US",
     bank_account_last_updated_at=datetime.now(timezone.utc),
-):
+) -> StripeManagedAccount:
     data = StripeManagedAccountCreate(
         stripe_id=stripe_id,
         country_shortname=country_shortname,
@@ -678,6 +678,26 @@ def mock_stripe_card() -> models.StripeCard:
         metadata={},
         name=None,
         tokenization_method=None,
+    )
+
+
+def mock_stripe_bank_account() -> models.StripeBankAccount:
+    return models.StripeBankAccount(
+        id=str(uuid.uuid4()),
+        object="bank_account",
+        account="ct_test_account_payment",
+        account_holder_name=None,
+        account_holder_type=None,
+        bank_name="DoorDash Bank",
+        country=CountryCode.US,
+        currency=Currency.USD,
+        customer=None,
+        default_for_currency=True,
+        fingerprint="test_fingerprint",
+        last4="1234",
+        metadata=None,
+        routing_number=None,
+        status=models.StripeBankAccount.BankAccountStatus.NEW,
     )
 
 

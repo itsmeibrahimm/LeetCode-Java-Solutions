@@ -862,6 +862,37 @@ class StripeCard(StripeBaseModel):
     tokenization_method: Optional[str]
 
 
+class StripeBankAccount(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/external_accounts
+    """
+
+    _STRIPE_OBJECT_NAME: str = "bank_account"
+
+    class BankAccountStatus(str, Enum):
+        NEW = "new"
+        VALIDATED = "validated"
+        VERIFIED = "verified"
+        VERIFICATION_FAILED = "verification_failed"
+        ERRORED = "errored"
+
+    id: str
+    object: str
+    account: PgpExternalAccountId
+    account_holder_name: Optional[str]
+    account_holder_type: Optional[str]
+    bank_name: Optional[str]
+    country: CountryCode
+    currency: Currency
+    customer: Optional[str]
+    default_for_currency: Optional[bool]
+    fingerprint: str
+    last4: str
+    metadata: Optional[dict]
+    routing_number: Optional[str]
+    status: Optional[BankAccountStatus]
+
+
 class CardToken(Token):
     """
     See: https://stripe.com/docs/api/tokens/object

@@ -5,14 +5,17 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
-from typing import Optional
+from typing import Optional, Union
 from fastapi import APIRouter, Depends, Body, Path, Query
 
 from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.api.streams import decode_stream_cursor, encode_stream_cursor
 from app.commons.context.req_context import get_logger_from_req
-from app.payout.api.account.utils import to_external_payout_account
+from app.payout.api.account.utils import (
+    to_external_payout_account,
+    to_external_payout_method,
+)
 from app.payout.api.account.v1 import models
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.transfer.cancel_payout import CancelPayoutRequest
@@ -223,7 +226,7 @@ async def verify_payout_account_to_be_implemented(
     "/{payout_account_id}/payout_methods",
     status_code=HTTP_201_CREATED,
     operation_id="CreatePayoutMethod",
-    response_model=models.PayoutMethodCard,
+    response_model=Union[models.PayoutMethodCard, models.PayoutMethodBankAccount],
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
@@ -244,9 +247,7 @@ async def create_payout_method(
     internal_response = await payout_account_processors.create_payout_method(
         internal_request
     )
-    return models.PayoutMethodCard(
-        **internal_response.dict(), type=PayoutExternalAccountType.CARD
-    )
+    return to_external_payout_method(internal_response)
 
 
 @router.get(

@@ -11,6 +11,7 @@ from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import payment_account_edit_history
 from app.payout.repository.bankdb.model.payment_account_edit_history import (
     PaymentAccountEditHistory,
+    PaymentAccountEditHistoryCreate,
 )
 
 
@@ -25,6 +26,12 @@ class PaymentAccountEditHistoryRepositoryInterface(ABC):
     async def get_bank_updates_for_store_with_payment_account_and_time_range(
         self, payment_account_id: int, start_time: datetime, end_time: datetime
     ) -> List[PaymentAccountEditHistory]:
+        pass
+
+    @abstractmethod
+    async def record_bank_update(
+        self, data: PaymentAccountEditHistoryCreate
+    ) -> PaymentAccountEditHistory:
         pass
 
 
@@ -71,3 +78,16 @@ class PaymentAccountEditHistoryRepository(
             return [PaymentAccountEditHistory.from_row(row) for row in rows]
         else:
             return []
+
+    async def record_bank_update(
+        self, data: PaymentAccountEditHistoryCreate
+    ) -> PaymentAccountEditHistory:
+        ts_now = datetime.utcnow()
+        stmt = (
+            payment_account_edit_history.table.insert()
+            .values(data.dict(skip_defaults=True), timestamp=ts_now)
+            .returning(*payment_account_edit_history.table.columns.values())
+        )
+        row = await self._database.master().fetch_one(stmt)
+        assert row is not None
+        return PaymentAccountEditHistory.from_row(row)

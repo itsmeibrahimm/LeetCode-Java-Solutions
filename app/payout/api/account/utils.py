@@ -1,3 +1,5 @@
+from typing import Union
+
 from app.payout.api.account.v1 import models as account_api_models
 from app.payout.core.account import models as account_models
 from app.payout.models import PayoutExternalAccountType
@@ -18,7 +20,16 @@ def to_external_payout_account(internal_response: account_models.PayoutAccountIn
     )
 
 
-def to_external_payout_method(internal_response: account_models.PayoutCardInternal):
-    return account_api_models.PayoutMethodCard(
-        **internal_response.dict(), type=PayoutExternalAccountType.CARD
-    )
+def to_external_payout_method(
+    internal_response: Union[
+        account_models.PayoutCardInternal, account_models.PayoutBankAccountInternal
+    ]
+):
+    if isinstance(internal_response, account_models.PayoutCardInternal):
+        return account_api_models.PayoutMethodCard(
+            **internal_response.dict(), type=PayoutExternalAccountType.CARD
+        )
+    elif isinstance(internal_response, account_models.PayoutBankAccountInternal):
+        return account_api_models.PayoutMethodBankAccount(
+            **internal_response.dict(), type=PayoutExternalAccountType.BANK_ACCOUNT
+        )

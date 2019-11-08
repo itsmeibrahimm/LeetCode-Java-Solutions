@@ -1,3 +1,5 @@
+from typing import Union
+
 from structlog.stdlib import BoundLogger
 
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
@@ -47,6 +49,9 @@ from app.payout.core.account.processors.list_payout_methods import (
     ListPayoutMethod,
 )
 import app.payout.core.account.models as account_models
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepositoryInterface,
+)
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
 from app.payout.repository.bankdb.payout_method_miscellaneous import (
@@ -85,6 +90,7 @@ from app.payout.models import PayoutTargetType
 class PayoutAccountProcessors:
     logger: BoundLogger
     payment_account_repo: PaymentAccountRepositoryInterface
+    payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
     payout_card_repo: PayoutCardRepositoryInterface
     payout_method_repo: PayoutMethodRepositoryInterface
     payout_method_miscellaneous_repo: PayoutMethodMiscellaneousRepository
@@ -96,6 +102,7 @@ class PayoutAccountProcessors:
         self,
         logger: BoundLogger,
         payment_account_repo: PaymentAccountRepositoryInterface,
+        payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         payout_card_repo: PayoutCardRepositoryInterface,
         payout_method_repo: PayoutMethodRepositoryInterface,
         payout_method_miscellaneous_repo: PayoutMethodMiscellaneousRepository,
@@ -107,6 +114,7 @@ class PayoutAccountProcessors:
     ):
         self.logger = logger
         self.payment_account_repo = payment_account_repo
+        self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.payout_card_repo = payout_card_repo
         self.payout_method_repo = payout_method_repo
         self.payout_method_miscellaneous_repo = payout_method_miscellaneous_repo
@@ -182,10 +190,13 @@ class PayoutAccountProcessors:
 
     async def create_payout_method(
         self, request: CreatePayoutMethodRequest
-    ) -> account_models.PayoutCardInternal:
+    ) -> Union[
+        account_models.PayoutCardInternal, account_models.PayoutBankAccountInternal
+    ]:
         create_payout_method_op = CreatePayoutMethod(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             payout_method_miscellaneous_repo=self.payout_method_miscellaneous_repo,
             request=request,
             stripe=self.stripe,

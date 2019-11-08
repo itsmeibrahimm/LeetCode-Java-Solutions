@@ -223,6 +223,7 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
     return PayoutAccountProcessors(
         logger=payout_service.log,
         payment_account_repo=payout_service.payment_accounts,
+        payment_account_edit_history_repo=payout_service.payment_account_edit_history,
         payout_card_repo=payout_service.payout_cards,
         payout_method_repo=payout_service.payout_methods,
         payout_method_miscellaneous_repo=payout_service.payout_method_miscellaneous,

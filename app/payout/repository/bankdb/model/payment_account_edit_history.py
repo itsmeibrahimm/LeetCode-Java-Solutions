@@ -7,6 +7,7 @@ from typing_extensions import final
 
 from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
+from app.payout import models
 
 
 @final
@@ -67,3 +68,31 @@ class PaymentAccountEditHistory(_PaymentAccountEditHistory):
     new_bank_name: str
     new_bank_last4: str
     new_fingerprint: str
+    payment_account_id: Optional[models.PayoutAccountId]
+    owner_type: Optional[models.BankUpdateHistoryOwnerType]
+    owner_id: Optional[models.BankUpdateHistoryOwnerId]
+    old_bank_name: Optional[str]
+    old_bank_last4: Optional[str]
+    old_fingerprint: Optional[str]
+    login_as_user_id: Optional[models.UserId]
+    user_id: Optional[models.UserId]
+    device_id: Optional[str]
+    ip: Optional[str]
+
+
+class PaymentAccountEditHistoryCreate(_PaymentAccountEditHistory):
+    account_type: models.AccountType
+    account_id: models.PgpAccountId
+    new_bank_name: str
+    new_bank_last4: str
+    new_fingerprint: str
+    payment_account_id: Optional[models.PayoutAccountId]
+    owner_type: Optional[models.BankUpdateHistoryOwnerType]
+    owner_id: Optional[models.BankUpdateHistoryOwnerId]
+    old_bank_name: Optional[str]
+    old_bank_last4: Optional[str]
+    old_fingerprint: Optional[str]
+    login_as_user_id: Optional[models.UserId]
+    user_id: Optional[models.UserId]
+    device_id: Optional[str]
+    ip: Optional[str]

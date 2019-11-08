@@ -55,6 +55,7 @@ payout_error_message_maps = {
     "payout_method_4": "Cannot find a payout method with the given id.",
     "payout_method_5": "Cannot find a payout card with the given id.",
     "payout_method_6": "The payout_account id for the payout_method is not matching with the one is given.",
+    "payout_method_7": "The payout_method update failed due to some error.",
     # transaction errors
     "transaction_1": "The transaction is not valid for reverse",
 }
@@ -104,6 +105,7 @@ class PayoutErrorCode(str, Enum):
     PAYOUT_METHOD_NOT_FOUND = "payout_method_4"
     PAYOUT_CARD_NOT_FOUND = "payout_method_5"
     PAYOUT_ACCOUNT_NOT_MATCH = "payout_method_6"
+    PAYOUT_METHOD_UPDATE_FAILED = "payout_method_7"
 
     # transaction error code
     TRANSACTION_BAD_QUERY_PARAMETER = "transaction_0"
@@ -277,6 +279,19 @@ def payout_account_not_match_error() -> PayoutError:
             PayoutErrorCode.PAYOUT_ACCOUNT_NOT_MATCH.value
         ],
         error_code=PayoutErrorCode.PAYOUT_ACCOUNT_NOT_MATCH,
+        retryable=False,
+    )
+
+
+def payout_method_update_error(error_message: str) -> PayoutError:
+    return PayoutError(
+        http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        error_message=error_message
+        if error_message
+        else payout_error_message_maps[
+            PayoutErrorCode.PAYOUT_METHOD_UPDATE_FAILED.value
+        ],
+        error_code=PayoutErrorCode.PAYOUT_METHOD_UPDATE_FAILED,
         retryable=False,
     )
 

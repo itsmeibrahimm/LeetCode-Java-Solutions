@@ -23,7 +23,10 @@ from app.commons.providers.stripe.stripe_models import (
     TokenId,
     RetrieveAccountRequest,
 )
-from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
+from app.commons.test_integration.constants import (
+    VISA_DEBIT_CARD_TOKEN,
+    BANK_ACCOUNT_TOKEN,
+)
 from app.commons.test_integration.utils import (
     prepare_and_validate_stripe_account,
     prepare_and_validate_stripe_account_token,
@@ -418,7 +421,7 @@ class TestStripeClient:
         if mode == "mock":
             pytest.skip()
         account = prepare_and_validate_stripe_account(stripe_test)
-        card = stripe_test.create_external_account_card(
+        card = stripe_test.create_external_account(
             request=models.CreateExternalAccountRequest(
                 country=CountryCode.US,
                 type=PayoutExternalAccountType.CARD.value,
@@ -429,6 +432,25 @@ class TestStripeClient:
         assert card
         assert card.object == "card"
         assert card.id.startswith("card_")
+
+    def test_create_external_account_bank_account(
+        self, mode: str, stripe_test: StripeTestClient
+    ):
+        if mode == "mock":
+            pytest.skip()
+        account = prepare_and_validate_stripe_account(stripe_test)
+        print("here account.id = {account_id}".format(account_id=account.id))
+        bank_account = stripe_test.create_external_account(
+            request=models.CreateExternalAccountRequest(
+                country=CountryCode.US,
+                type=PayoutExternalAccountType.BANK_ACCOUNT.value,
+                stripe_account_id=account.id,
+                external_account_token=BANK_ACCOUNT_TOKEN,
+            )
+        )
+        assert bank_account
+        assert bank_account.object == "bank_account"
+        assert bank_account.id.startswith("ba_")
 
     def test_retrieve_account_token(self, mode: str, stripe: StripeClient):
         if mode == "mock":

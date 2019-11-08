@@ -1,6 +1,6 @@
 import abc
 import asyncio
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import stripe
 from stripe.http_client import HTTPClient
@@ -289,9 +289,9 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def create_external_account_card(
+    def create_external_account(
         self, request: models.CreateExternalAccountRequest
-    ) -> models.StripeCard:
+    ) -> Union[models.StripeCard, models.StripeBankAccount]:
         """
         Create an external account card
         https://stripe.com/docs/api/external_account_cards/create
@@ -696,15 +696,15 @@ class StripeClient(StripeClientInterface):
         return account
 
     @tracing.track_breadcrumb(resource="payoutmethod", action="create")
-    def create_external_account_card(
+    def create_external_account(
         self, request: models.CreateExternalAccountRequest
-    ) -> models.StripeCard:
-        card = stripe.Account.create_external_account(
+    ) -> Union[models.StripeCard, models.StripeBankAccount]:
+        external_account = stripe.Account.create_external_account(
             request.stripe_account_id,
             external_account=request.external_account_token,
             **self.settings_for(request.country),
         )
-        return card
+        return external_account
 
     @tracing.track_breadcrumb(resource="paymentmethod", action="clone")
     def clone_payment_method(
@@ -1099,11 +1099,11 @@ class StripeAsyncClient:
             self.stripe_client.update_account, request=request
         )
 
-    async def create_external_account_card(
+    async def create_external_account(
         self, *, request: models.CreateExternalAccountRequest
-    ) -> models.StripeCard:
+    ) -> Union[models.StripeCard, models.StripeBankAccount]:
         return await self.executor_pool.submit(
-            self.stripe_client.create_external_account_card, request=request
+            self.stripe_client.create_external_account, request=request
         )
 
     async def clone_payment_method(
