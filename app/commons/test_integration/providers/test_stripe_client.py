@@ -1,5 +1,8 @@
 import pytest
+import requests
+from requests.adapters import HTTPAdapter
 from stripe.error import InvalidRequestError
+from stripe.http_client import RequestsClient
 
 from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe import stripe_models as models
@@ -450,6 +453,8 @@ class TestStripePool:
         pytest.mark.asyncio
     ]
 
+    POOL_SIZE = 5
+
     @pytest.fixture
     def stripe_async_client(self, request, stripe_api, app_config: AppConfig):
         # allow external tests to directly call stripe
@@ -466,7 +471,7 @@ class TestStripePool:
                     api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
                 )
             ],
-            http_client=TimedRequestsClient(),
+            http_client=TimedRequestsClient(max_connection_pool_size=self.POOL_SIZE),
         )
 
         stripe_thread_pool = ThreadPoolHelper(
@@ -478,6 +483,7 @@ class TestStripePool:
         )
 
         yield stripe_async_client
+
         stripe_thread_pool.shutdown()
 
     async def test_customer(self, mode: str, stripe_async_client: StripeAsyncClient):
@@ -488,3 +494,12 @@ class TestStripePool:
             ),
         )
         assert customer
+        httpClient = stripe_async_client.stripe_client.http_client
+        assert isinstance(httpClient, RequestsClient)
+        session: requests.Session = httpClient._session
+        http_adapter: HTTPAdapter = session.adapters.get("http://", None)
+        https_adapter: HTTPAdapter = session.adapters.get("https://", None)
+        assert http_adapter and getattr(http_adapter, "_pool_maxsize") == self.POOL_SIZE
+        assert (
+            https_adapter and getattr(https_adapter, "_pool_maxsize") == self.POOL_SIZE
+        )

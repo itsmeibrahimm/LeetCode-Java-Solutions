@@ -2,6 +2,9 @@ import stripe
 import requests
 
 from typing import Optional
+
+from requests.adapters import HTTPAdapter
+
 from app.commons.timing import http_client as http_client_timing
 from stripe.http_client import HTTPClient, RequestsClient
 
@@ -21,8 +24,32 @@ class TimedSession(requests.Session):
 
 
 class TimedRequestsClient(RequestsClient):
+
+    # See https://urllib3.readthedocs.io/en/latest/advanced-usage.html#customizing-pool-behavior
+    # and https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
+    # to understand urllib3 connection pooling mechanism
+    _max_connection_pool_size: int = 10
+
+    def __init__(
+        self,
+        timeout=80,  # super class default value
+        session=None,
+        max_connection_pool_size: Optional[int] = None,
+        **kwargs
+    ):
+        super().__init__(timeout, session, **kwargs)
+        self._max_connection_pool_size = (
+            max_connection_pool_size or self._max_connection_pool_size
+        )
+
     def request(self, method, url, headers, post_data=None):
         if not self._session:
             self._session = TimedSession()
+            self._session.mount(
+                "https://", HTTPAdapter(pool_maxsize=self._max_connection_pool_size)
+            )
+            self._session.mount(
+                "http://", HTTPAdapter(pool_maxsize=self._max_connection_pool_size)
+            )
 
         return super().request(method, url, headers, post_data=post_data)

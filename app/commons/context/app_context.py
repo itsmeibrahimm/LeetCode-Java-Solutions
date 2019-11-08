@@ -199,7 +199,10 @@ async def create_app_context(config: AppConfig) -> AppContext:
                 api_key=config.STRIPE_CA_SECRET_KEY.value, country=CountryCode.CA
             ),
         ],
-        http_client=TimedRequestsClient(),
+        # make connection pool size == stripe client thread pool size
+        http_client=TimedRequestsClient(
+            max_connection_pool_size=config.STRIPE_MAX_WORKERS
+        ),
     )
 
     stripe_thread_pool = ThreadPoolHelper(
