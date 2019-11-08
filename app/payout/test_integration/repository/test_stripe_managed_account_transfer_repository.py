@@ -1,6 +1,5 @@
 import pytest
 
-from app.commons.database.infra import DB
 from app.payout.repository.bankdb.stripe_managed_account_transfer import (
     StripeManagedAccountTransferRepository,
 )
@@ -13,16 +12,6 @@ from app.payout.test_integration.utils import (
 
 class TestTransferRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def stripe_managed_account_transfer_repo(
-        self, payout_bankdb: DB
-    ) -> StripeManagedAccountTransferRepository:
-        return StripeManagedAccountTransferRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_create_stripe_managed_account_transfer_success(
         self,

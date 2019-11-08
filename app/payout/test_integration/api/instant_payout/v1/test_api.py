@@ -2,11 +2,14 @@ import random
 
 from asynctest import ANY
 from starlette.testclient import TestClient
-from app.commons.api.errors import InvalidRequestErrorCode, payment_error_message_maps
+from app.commons.api.errors import BadRequestErrorCode, payment_error_message_maps
 from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
 from app.commons.types import CountryCode, Currency
+from app.payout.api.instant_payout.v1 import models as instant_payout_models
+from app.payout.api.transaction.v1 import models as transaction_models
+from app.payout.core.errors import InstantPayoutErrorCode
 from app.payout.core.instant_payout.models import (
     PaymentEligibilityReasons,
     InstantPayoutFees,
@@ -16,6 +19,7 @@ from app.payout.core.instant_payout.models import (
 from app.commons.providers.stripe import stripe_models
 import pytest
 import app.payout.api.account.v1.models as account_models
+from app.payout.core.instant_payout.utils import create_idempotency_key
 from app.payout.models import (
     PayoutAccountTargetType,
     StripeAccountToken,
@@ -28,6 +32,7 @@ from app.payout.test_integration.api import (
 )
 
 INSTANT_PAYOUT_ENDPOINT = "/payout/api/v1/instant_payouts/"
+TRANSACTION_ENDPOINT = "/payout/api/v1/transactions/"
 
 
 class TestCheckInstantPayoutEligibility:
@@ -172,12 +177,11 @@ class TestCheckInstantPayoutEligibility:
         # Should return 400 bad request error
         assert response.status_code == 400
         assert (
-            response.json().get("error_code")
-            == InvalidRequestErrorCode.INVALID_VALUE_ERROR
+            response.json().get("error_code") == BadRequestErrorCode.INVALID_VALUE_ERROR
         )
         assert (
             response.json().get("error_message")
-            == payment_error_message_maps[InvalidRequestErrorCode.INVALID_VALUE_ERROR]
+            == payment_error_message_maps[BadRequestErrorCode.INVALID_VALUE_ERROR]
         )
 
     def test_not_eligible_due_to_pgp_account_not_setup(
@@ -247,3 +251,103 @@ class TestCheckInstantPayoutEligibility:
             fee=InstantPayoutFees.STANDARD_FEE,
         ).dict()
         assert response.json() == expected
+
+
+class TestSubmitInstantPayout:
+    @pytest.fixture(autouse=True)
+    def setup(self, verified_payout_account_with_payout_card: dict):
+        self.payout_account_id = verified_payout_account_with_payout_card["id"]
+        self.stripe_card_id = verified_payout_account_with_payout_card["stripe_card_id"]
+
+    def test_successful_submit_instant_payout_when_specify_card(
+        self, verified_payout_account_with_payout_card: dict, client: TestClient
+    ):
+        # Create one transactions
+        transaction_amount = 1100
+        test_idempotency_key = create_idempotency_key(prefix="test-create-transaction")
+        tx_creation_req = transaction_models.TransactionCreate(
+            amount=transaction_amount,
+            payment_account_id=self.payout_account_id,
+            idempotency_key=test_idempotency_key,
+            target_id=1,
+            target_type="dasher_job",
+            currency="usd",
+        )
+        response = client.post(TRANSACTION_ENDPOINT, json=tx_creation_req.dict())
+        assert response.status_code == 201
+        instant_payout_create = instant_payout_models.InstantPayoutCreate(
+            payout_account_id=self.payout_account_id,
+            amount=transaction_amount,
+            currency="usd",
+            card=self.stripe_card_id,
+        )
+        response = client.post(
+            INSTANT_PAYOUT_ENDPOINT, json=instant_payout_create.dict()
+        )
+        assert response.status_code == 200
+        response_data = response.json()
+
+        assert isinstance(response_data.get("payout_id"), int)
+        assert (
+            response_data.get("amount")
+            == transaction_amount - InstantPayoutFees.STANDARD_FEE
+        )
+        assert response_data.get("currency") == "usd"
+        assert response_data.get("fee") == InstantPayoutFees.STANDARD_FEE
+        assert response_data.get("card") == self.stripe_card_id
+        assert response_data.get("created_at") is not None
+
+    def test_successful_submit_instant_payout_when_not_specify_card(
+        self, verified_payout_account_with_payout_card: dict, client: TestClient
+    ):
+        # Create one transactions
+        transaction_amount = 3000
+        test_idempotency_key = create_idempotency_key(prefix="test-create-transaction")
+        tx_creation_req = transaction_models.TransactionCreate(
+            amount=transaction_amount,
+            payment_account_id=self.payout_account_id,
+            idempotency_key=test_idempotency_key,
+            target_id=1,
+            target_type="dasher_job",
+            currency="usd",
+        )
+        response = client.post(TRANSACTION_ENDPOINT, json=tx_creation_req.dict())
+        assert response.status_code == 201
+        instant_payout_create = instant_payout_models.InstantPayoutCreate(
+            payout_account_id=self.payout_account_id,
+            amount=transaction_amount,
+            currency="usd",
+        )
+        response = client.post(
+            INSTANT_PAYOUT_ENDPOINT, json=instant_payout_create.dict()
+        )
+        assert response.status_code == 200
+        response_data = response.json()
+
+        assert isinstance(response_data.get("payout_id"), int)
+        assert (
+            response_data.get("amount")
+            == transaction_amount - InstantPayoutFees.STANDARD_FEE
+        )
+        assert response_data.get("currency") == "usd"
+        assert response_data.get("fee") == InstantPayoutFees.STANDARD_FEE
+        assert response_data.get("card") == self.stripe_card_id
+        assert response_data.get("created_at") is not None
+
+    def test_get_bad_request_error_when_no_payout_account_found(
+        self, client: TestClient
+    ):
+        payout_account_id = random.randint(1, 2147483647)
+        instant_payout_create = instant_payout_models.InstantPayoutCreate(
+            payout_account_id=payout_account_id, amount=200, currency="usd"
+        )
+        response = client.post(
+            INSTANT_PAYOUT_ENDPOINT, json=instant_payout_create.dict()
+        )
+        # Should raise 400 BadRequestError with error message of Payout Account not exist
+        assert response.status_code == 400
+        assert response.json()["error_code"] == InstantPayoutErrorCode.INVALID_REQUEST
+        assert (
+            response.json()["error_message"]
+            == PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+        )

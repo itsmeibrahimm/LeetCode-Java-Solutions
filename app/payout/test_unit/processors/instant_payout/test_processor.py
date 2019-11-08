@@ -37,6 +37,7 @@ class TestInstantPayoutProcessors:
             payout_card_repo=MagicMock(),
             payout_method_repo=MagicMock(),
             payout_repo=MagicMock(),
+            stripe_managed_account_transfer_repo=MagicMock(),
             stripe_payout_request_repo=MagicMock(),
             transaction_repo=MagicMock(),
             stripe=MagicMock(),

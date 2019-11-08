@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 
 import pytest
-from asynctest import mock, CoroutineMock
+from asynctest import CoroutineMock
 
 from app.commons.core.errors import DBConnectionError, DBIntegrityError
 from app.commons.types import CountryCode, Currency
@@ -385,43 +385,3 @@ class TestCheckInstantPayoutDailyLimit:
         )
         with pytest.raises(DBIntegrityError):
             await self.instant_payout_daily_limit_check.execute()
-
-
-@pytest.fixture
-def mock_payout_account_repo():
-    with mock.patch(
-        "app.payout.repository.maindb.payment_account.PaymentAccountRepository"
-    ) as mock_payout_account_repo:
-        yield mock_payout_account_repo
-
-
-@pytest.fixture
-def mock_payout_method_repo():
-    with mock.patch(
-        "app.payout.repository.bankdb.payout_method.PayoutMethodRepository"
-    ) as mock_payout_method_repo:
-        yield mock_payout_method_repo
-
-
-@pytest.fixture
-def mock_payout_card_repo():
-    with mock.patch(
-        "app.payout.repository.bankdb.payout_card.PayoutCardRepository"
-    ) as mock_payout_card_repo:
-        yield mock_payout_card_repo
-
-
-@pytest.fixture
-def mock_transaction_repo():
-    with mock.patch(
-        "app.payout.repository.bankdb.transaction.TransactionRepository"
-    ) as mock_transaction_repo:
-        yield mock_transaction_repo
-
-
-@pytest.fixture
-def mock_payout_repo():
-    with mock.patch(
-        "app.payout.repository.bankdb.payout.PayoutRepository"
-    ) as mock_payout_repo:
-        yield mock_payout_repo

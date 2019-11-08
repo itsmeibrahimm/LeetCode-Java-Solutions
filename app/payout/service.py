@@ -270,4 +270,5 @@ def create_instant_payout_processors(payout_service: PayoutService = Depends()):
         transaction_repo=payout_service.transactions,
         stripe=payout_service.stripe,
         payment_lock_manager=payout_service.redis_lock_manager,
+        stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
     )

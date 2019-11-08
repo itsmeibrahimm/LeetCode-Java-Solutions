@@ -3,10 +3,13 @@ from datetime import datetime
 from starlette.status import HTTP_200_OK
 from fastapi import APIRouter, Body, Path, Depends, Query
 
-from app.commons.api.errors import InvalidRequestErrorCode
-from app.commons.api.models import InvalidRequestError
+from app.commons.api.errors import BadRequestErrorCode, payment_error_message_maps
+from app.commons.api.models import BadRequestError
 from app.payout.api.instant_payout.v1 import models
-from app.payout.core.instant_payout.models import EligibilityCheckRequest
+from app.payout.core.instant_payout.models import (
+    EligibilityCheckRequest,
+    CreateAndSubmitInstantPayoutRequest,
+)
 from app.payout.core.instant_payout.processor import InstantPayoutProcessors
 from app.payout.models import PayoutAccountId
 from app.payout.service import create_instant_payout_processors
@@ -19,11 +22,25 @@ router = APIRouter()
     "/",
     status_code=HTTP_200_OK,
     operation_id="SubmitInstantPayout",
-    # responses_model=models.InstantPayout,
+    response_model=models.InstantPayout,
     tags=api_tags,
 )
-async def submit_instant_payout(body: models.InstantPayoutCreate = Body(...),):
-    ...
+async def submit_instant_payout(
+    body: models.InstantPayoutCreate = Body(...),
+    instant_payout_processors: InstantPayoutProcessors = Depends(
+        create_instant_payout_processors
+    ),
+):
+    internal_request = CreateAndSubmitInstantPayoutRequest(
+        payout_account_id=body.payout_account_id,
+        amount=body.amount,
+        currency=body.currency,
+        card=body.card,
+    )
+    internal_instant_payout_response = await instant_payout_processors.create_and_submit_instant_payout(
+        request=internal_request
+    )
+    return models.InstantPayout(**internal_instant_payout_response.dict())
 
 
 @router.get(
@@ -48,8 +65,11 @@ async def check_instant_payout_eligibility(
     try:
         created_after = datetime.fromtimestamp(local_start_of_day / 1.0)
     except OverflowError as e:
-        raise InvalidRequestError(
-            error_code=InvalidRequestErrorCode.INVALID_VALUE_ERROR
+        raise BadRequestError(
+            error_code=BadRequestErrorCode.INVALID_VALUE_ERROR,
+            err_message=payment_error_message_maps[
+                BadRequestErrorCode.INVALID_VALUE_ERROR
+            ],
         ) from e
 
     internal_request = EligibilityCheckRequest(

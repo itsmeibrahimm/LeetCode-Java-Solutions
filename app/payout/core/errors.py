@@ -12,7 +12,7 @@ class PayoutError(PaymentError):
 
 
 ###########################################################
-# PayoutAccount Errors                                    #
+# PayoutAccount Errors
 ###########################################################
 class PayoutAccountErrorCode(str, Enum):
     TOKEN_INVALID = "token_invalid"
@@ -306,4 +306,88 @@ class TransferError(PayoutError):
     def __init__(self, error_code: str, error_message: str, retryable: bool):
         super().__init__(
             error_code=error_code, error_message=error_message, retryable=retryable
+        )
+
+
+###########################################################
+# InstantPayoutErrors
+#   - InstantPayoutBadRequestError
+###########################################################
+class InstantPayoutErrorCode(str, Enum):
+    INVALID_REQUEST = "invalid_request"
+    PAYOUT_CARD_NOT_EXIST = "payout_card_not_exist"
+    PAYOUT_ACCOUNT_NOT_EXIST = "payout_account_not_exist"
+    PGP_ACCOUNT_NOT_SETUP = "pgp_account_not_setup"
+    NO_DEFAULT_PAYOUT_CARD = "no_default_payout_card"
+    AMOUNT_LESS_THAN_FEE = "amount_less_than_fee"
+    TRANSACTIONS_NOT_ALL_PAYABLE = "transaction_not_all_payable"
+    TRANSACTIONS_TRANSFER_ID_NOT_EMPTY = "transactions_transfer_id_not_empty"
+    TRANSACTIONS_PAYOUT_ID_NOT_EMPTY = "transactions_payout_id_not_empty"
+    AMOUNT_BALANCE_MISMATCH = "amount_balance_mismatch"
+    CREATE_PAYOUT_ERROR = "create_payout_error"
+    CARD_DECLINE_ERROR = "card_decline_error"
+
+
+instant_payout_error_message_maps: Dict[str, str] = {
+    InstantPayoutErrorCode.PAYOUT_CARD_NOT_EXIST: "The input card does not exist.",
+    InstantPayoutErrorCode.PAYOUT_ACCOUNT_NOT_EXIST: "Payout account does not exist.",
+    InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP: "PGP account does not setup.",
+    InstantPayoutErrorCode.NO_DEFAULT_PAYOUT_CARD: "There is no default payout card for this payout account.",
+    InstantPayoutErrorCode.AMOUNT_LESS_THAN_FEE: "Payout amount is less than fee.",
+    InstantPayoutErrorCode.TRANSACTIONS_NOT_ALL_PAYABLE: "Transactions of the payout account are not all payable.",
+    InstantPayoutErrorCode.TRANSACTIONS_TRANSFER_ID_NOT_EMPTY: "Transactions can not be part of ongoing Transfer.",
+    InstantPayoutErrorCode.TRANSACTIONS_PAYOUT_ID_NOT_EMPTY: "Transactions can not be part of ongoing Instant Payout.",
+    InstantPayoutErrorCode.AMOUNT_BALANCE_MISMATCH: "Payout amount does not match available balance.",
+    InstantPayoutErrorCode.CARD_DECLINE_ERROR: "Can not deposit instant payout due to card decline.",
+}
+
+
+class InstantPayoutError(PayoutError):
+    """Base class for all instant payout related errors."""
+
+    def __init__(self, error_code: str, error_message: str, retryable: bool):
+        super().__init__(
+            error_code=error_code, error_message=error_message, retryable=retryable
+        )
+
+
+class InstantPayoutBadRequestError(InstantPayoutError):
+    """Instant Payout Bad Request Error.
+
+    Raised when service can not process client requests.
+    """
+
+    def __init__(self, error_code: str, error_message: str):
+        super().__init__(
+            error_code=error_code, error_message=error_message, retryable=False
+        )
+
+
+class InstantPayoutCreatePayoutError(InstantPayoutError):
+    """Instant Payout Create Payout Error.
+
+    Raised when failed to create payout, fee transaction & update transaction with payout id.
+    """
+
+    def __init__(self, error_message: str):
+        super().__init__(
+            error_code=InstantPayoutErrorCode.CREATE_PAYOUT_ERROR,
+            error_message=error_message,
+            retryable=False,
+        )
+
+
+class InstantPayoutCardDeclineError(InstantPayoutError):
+    """Instant Payout Card Declined Error.
+
+    Raised when failed to perform instant payout because of card declined.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=InstantPayoutErrorCode.CARD_DECLINE_ERROR,
+            error_message=instant_payout_error_message_maps[
+                InstantPayoutErrorCode.CARD_DECLINE_ERROR
+            ],
+            retryable=False,
         )

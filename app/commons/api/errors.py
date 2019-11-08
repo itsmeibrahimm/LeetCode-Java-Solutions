@@ -10,7 +10,7 @@ class PaymentErrorCode(str, Enum):
     UNKNOWN_INTERNAL_ERROR = "unknown_payment_internal_error"
 
 
-class InvalidRequestErrorCode(str, Enum):
+class BadRequestErrorCode(str, Enum):
     # Following 3 Error codes for InvalidRequestError
     TYPE_ERROR = "type_error"
     NOT_NULL_ERROR = "not_null_error"
@@ -18,9 +18,9 @@ class InvalidRequestErrorCode(str, Enum):
 
 
 payment_error_message_maps = {
-    InvalidRequestErrorCode.TYPE_ERROR: "Invalid type.",
-    InvalidRequestErrorCode.NOT_NULL_ERROR: "Field can't be null.",
-    InvalidRequestErrorCode.INVALID_VALUE_ERROR: "Field value is invalid.",
+    BadRequestErrorCode.TYPE_ERROR: "Invalid type.",
+    BadRequestErrorCode.NOT_NULL_ERROR: "Field can't be null.",
+    BadRequestErrorCode.INVALID_VALUE_ERROR: "Field value is invalid.",
     PaymentErrorCode.NOT_FOUND_ERROR: "Record can't be found.",
     PaymentErrorCode.RATE_LIMIT_ERROR: "Too many requests.",
     PaymentErrorCode.AUTHENTICATION_ERROR: "No valid api token provided.",

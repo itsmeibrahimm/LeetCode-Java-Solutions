@@ -3,7 +3,6 @@ import json
 from datetime import datetime
 
 from app.commons.core.errors import DBIntegrityUniqueViolationError
-from app.commons.database.infra import DB
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestUpdate,
 )
@@ -19,16 +18,6 @@ from app.payout.test_integration.utils import (
 
 class TestPayoutRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def stripe_payout_request_repo(
-        self, payout_bankdb: DB
-    ) -> StripePayoutRequestRepository:
-        return StripePayoutRequestRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_repo(self, payout_bankdb: DB) -> PayoutRepository:
-        return PayoutRepository(database=payout_bankdb)
 
     async def test_create_stripe_payout_request(
         self,

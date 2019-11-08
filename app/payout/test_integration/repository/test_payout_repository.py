@@ -4,7 +4,6 @@ import uuid
 import pytest
 from datetime import datetime, timedelta
 
-from app.commons.database.infra import DB
 from app.payout.core.instant_payout.models import (
     InstantPayoutStatusType,
     InstantPayoutDailyLimitCheckStatuses,
@@ -16,10 +15,6 @@ from app.payout.test_integration.utils import prepare_and_insert_payout
 
 class TestPayoutRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payout_repo(self, payout_bankdb: DB) -> PayoutRepository:
-        return PayoutRepository(database=payout_bankdb)
 
     async def test_create_payout(self, payout_repo: PayoutRepository):
         # prepare and insert payout, then validate

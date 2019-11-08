@@ -13,11 +13,7 @@ from starlette.status import (
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
-from app.commons.api.errors import (
-    InvalidRequestErrorCode,
-    PaymentErrorCode,
-    payment_error_message_maps,
-)
+from app.commons.api.errors import PaymentErrorCode, payment_error_message_maps
 
 
 class PaymentRequest(BaseModel, ABC):
@@ -114,22 +110,27 @@ class PaymentErrorResponseBody(BaseModel):
     )
 
 
+###########################################
+# API/Router Exception Definition:
+# PaymentException
+#   - BadRequestError
+#   - NotFoundError
+#   - RateLimitError
+#   - AuthenticationError
+#   - AuthorizationError
+#   - InternalServerError
+###########################################
 class BadRequestError(PaymentException):
+    """Bad Request Error.
+
+    Raised when can not perform client's request.
+    """
+
     def __init__(self, error_code, err_message):
         super().__init__(
             http_status_code=HTTP_400_BAD_REQUEST,
             error_code=error_code,
             error_message=err_message,
-            retryable=True,
-        )
-
-
-class InvalidRequestError(PaymentException):
-    def __init__(self, error_code: InvalidRequestErrorCode):
-        super().__init__(
-            http_status_code=HTTP_400_BAD_REQUEST,
-            error_code=error_code,
-            error_message=payment_error_message_maps[error_code],
             retryable=False,
         )
 

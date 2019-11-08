@@ -2,7 +2,6 @@ from typing import List
 
 import pytest
 
-from app.commons.database.infra import DB
 from app.commons.test_integration.constants import TEST_DEFAULT_PAGE_SIZE
 from app.payout.repository.bankdb.model.transaction import (
     TransactionUpdateDBEntity,
@@ -29,22 +28,6 @@ from app.payout.models import PayoutAccountTargetType, TransactionState
 
 class TestTransactionRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payout_repo(self, payout_bankdb: DB) -> PayoutRepository:
-        return PayoutRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
 
     @pytest.fixture
     async def payout_account_id(
@@ -118,6 +101,15 @@ class TestTransactionRepository:
         assert len(updated_rows) == 2, "both rows updated"
         for row in updated_rows:
             assert row.payout_id == new_payout_id, "payout id updated"
+
+        # Test set payout id to None
+        updated_rows = await transaction_repo.set_transaction_payout_id_by_ids(
+            transaction_ids, payout_id=None
+        )
+        assert updated_rows, "updated"
+        assert len(updated_rows) == 2, "both rows updated"
+        for row in updated_rows:
+            assert row.payout_id is None, "payout id updated"
 
     async def test_get_transaction_by_ids(
         self,

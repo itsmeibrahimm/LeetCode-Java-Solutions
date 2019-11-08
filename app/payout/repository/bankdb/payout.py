@@ -2,15 +2,28 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, List
 
+import pytz
 from sqlalchemy import and_, desc
 from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.infra import DB
-from app.payout.core.instant_payout.models import InstantPayoutStatusType
+from app.payout.core.errors import InstantPayoutCreatePayoutError
+from app.payout.core.instant_payout.models import (
+    InstantPayoutStatusType,
+    CreatePayoutsRequest,
+    CreatePayoutsResponse,
+)
+from app.payout.core.instant_payout.utils import _gen_token
+from app.payout.models import TransactionTargetType, PayoutType
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model.payout import Payout, PayoutCreate, PayoutUpdate
-from app.payout.repository.bankdb.model import payouts
+from app.payout.repository.bankdb.model import payouts, transactions
+from app.payout.repository.bankdb.model.transaction import (
+    TransactionCreateDBEntity,
+    TransactionUpdateDBEntity,
+    TransactionDBEntity,
+)
 
 
 class PayoutRepositoryInterface(ABC):
@@ -38,6 +51,12 @@ class PayoutRepositoryInterface(ABC):
         end_time: Optional[datetime] = None,
         limit: Optional[int] = 10,
     ) -> List[Payout]:
+        pass
+
+    @abstractmethod
+    async def create_payout_and_attach_to_transactions(
+        self, request: CreatePayoutsRequest
+    ) -> CreatePayoutsResponse:
         pass
 
 
@@ -108,3 +127,95 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
             return [Payout.from_row(row) for row in rows]
         else:
             return []
+
+    async def create_payout_and_attach_to_transactions(
+        self, request: CreatePayoutsRequest
+    ) -> CreatePayoutsResponse:
+        async with self._database.master().transaction():
+            # Create fee transaction
+            transaction_create = TransactionCreateDBEntity(
+                amount=-request.fee,
+                # Put amount_paid as 0 to pass Pydantic validation
+                amount_paid=0,
+                currency=request.currency.upper(),
+                payment_account_id=request.payout_account_id,
+                target_type=TransactionTargetType.PAYOUT_FEE,
+                target_id=None,
+                idempotency_key="instant-payout-fee-{}".format(request.idempotency_key),
+            )
+
+            # Create fee transaction
+            ts_now = datetime.utcnow()
+            stmt = (
+                transactions.table.insert()
+                .values(
+                    transaction_create.dict(skip_defaults=True),
+                    created_at=ts_now,
+                    updated_at=ts_now,
+                )
+                .returning(*transactions.table.columns.values())
+            )
+            row = await self._database.master().fetch_one(stmt)
+            assert row is not None
+            fee_transaction = TransactionDBEntity.from_row(row)
+
+            # Create payout
+            payout_create = PayoutCreate(
+                amount=request.amount - request.fee,
+                payment_account_id=request.payout_account_id,
+                status=InstantPayoutStatusType.NEW,
+                currency=request.currency.upper(),
+                fee=request.fee,
+                type=PayoutType.INSTANT,
+                idempotency_key=request.idempotency_key,
+                payout_method_id=request.payout_method_id,
+                transaction_ids=request.transaction_ids,
+                token=_gen_token(),
+                fee_transaction_id=fee_transaction.id,
+            )
+
+            payout = await self.create_payout(payout_create)
+
+            data = TransactionUpdateDBEntity(payout_id=payout.id)
+            all_transaction_ids = request.transaction_ids + [fee_transaction.id]
+            stmt = (
+                transactions.table.update()
+                .where(
+                    and_(
+                        transactions.id.in_(all_transaction_ids),
+                        transactions.payout_id.is_(None),
+                    )
+                )
+                .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
+                .returning(*transactions.table.columns.values())
+            )
+            rows = await self._database.master().fetch_all(stmt)
+            all_transactions = (
+                [TransactionDBEntity.from_row(row) for row in rows] if rows else []
+            )
+
+            # Verify updated number of transactions matches number of input transaction
+            try:
+                assert len(all_transactions) == len(all_transaction_ids)
+            except AssertionError as e:
+                raise InstantPayoutCreatePayoutError(
+                    error_message="Updated transaction count not match."
+                ) from e
+
+            # Verify sum of transaction amount matches payout amount
+            try:
+                assert (
+                    sum([transaction.amount for transaction in all_transactions])
+                    == payout.amount
+                )
+            except AssertionError as e:
+                raise InstantPayoutCreatePayoutError(
+                    error_message="Updated transaction amount not match payout amount."
+                ) from e
+
+            return CreatePayoutsResponse(
+                payout_id=payout.id,
+                amount=payout.amount,
+                fee=payout.fee,
+                created_at=payout.created_at.replace(tzinfo=pytz.UTC),
+            )

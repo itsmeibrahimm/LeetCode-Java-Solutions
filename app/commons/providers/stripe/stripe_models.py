@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, NewType, Optional
@@ -705,6 +706,14 @@ class Payout(StripeBaseModel):
     statement_descriptor: str
     status: str
     type: str
+
+    def __str__(self):
+        return json.dumps(self.__dict__, default=self._default)
+
+    def _default(self, ob):
+        if isinstance(ob, datetime):
+            return str(datetime)
+        raise TypeError(type(ob))
 
 
 class SourceTypes(StripeBaseModel):

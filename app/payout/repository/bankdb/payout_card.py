@@ -21,6 +21,12 @@ class PayoutCardRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_payout_card_by_stripe_id(
+        self, stripe_card_id: str
+    ) -> Optional[PayoutCard]:
+        pass
+
+    @abstractmethod
     async def list_payout_cards_by_ids(
         self, payout_card_id_list: List[int]
     ) -> List[PayoutCard]:
@@ -45,6 +51,16 @@ class PayoutCardRepository(PayoutBankDBRepository, PayoutCardRepositoryInterface
 
     async def get_payout_card_by_id(self, payout_card_id: int) -> Optional[PayoutCard]:
         stmt = payout_card.table.select().where(payout_card.id == payout_card_id)
+        row = await self._database.replica().fetch_one(stmt)
+        return PayoutCard.from_row(row) if row else None
+
+    async def get_payout_card_by_stripe_id(
+        self, stripe_card_id: str
+    ) -> Optional[PayoutCard]:
+        # There is an index on stripe_card_id
+        stmt = payout_card.table.select().where(
+            payout_card.stripe_card_id == stripe_card_id
+        )
         row = await self._database.replica().fetch_one(stmt)
         return PayoutCard.from_row(row) if row else None
 

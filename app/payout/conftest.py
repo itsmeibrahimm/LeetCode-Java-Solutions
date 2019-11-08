@@ -1,8 +1,10 @@
 import pytest
+from asynctest import mock
 
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
+from app.commons.database.infra import DB
 from app.commons.providers.stripe import stripe_models
 from app.commons.providers.stripe.stripe_client import (
     StripeTestClient,
@@ -20,6 +22,16 @@ from app.payout.models import (
     PayoutAccountTargetType,
     PayoutExternalAccountType,
 )
+from app.payout.repository.bankdb.payout import PayoutRepository
+from app.payout.repository.bankdb.stripe_managed_account_transfer import (
+    StripeManagedAccountTransferRepository,
+)
+from app.payout.repository.bankdb.stripe_payout_request import (
+    StripePayoutRequestRepository,
+)
+from app.payout.repository.bankdb.transaction import TransactionRepository
+from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.api import (
     create_account_url,
     verify_account_url,
@@ -27,6 +39,103 @@ from app.payout.test_integration.api import (
 )
 
 
+#####################
+# DB Fixtures
+#####################
+@pytest.fixture
+def stripe_managed_account_transfer_repo(
+    payout_bankdb: DB
+) -> StripeManagedAccountTransferRepository:
+    return StripeManagedAccountTransferRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def payment_account_repo(payout_maindb: DB) -> PaymentAccountRepository:
+    return PaymentAccountRepository(database=payout_maindb)
+
+
+@pytest.fixture
+def payout_repo(payout_bankdb: DB) -> PayoutRepository:
+    return PayoutRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def transfer_repo(payout_maindb: DB) -> TransferRepository:
+    return TransferRepository(database=payout_maindb)
+
+
+@pytest.fixture
+def stripe_payout_request_repo(payout_bankdb: DB) -> StripePayoutRequestRepository:
+    return StripePayoutRequestRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def transaction_repo(payout_bankdb: DB) -> TransactionRepository:
+    return TransactionRepository(database=payout_bankdb)
+
+
+#####################
+# Mock DB Repo Fixtures
+#####################
+@pytest.fixture
+def mock_payout_account_repo():
+    with mock.patch(
+        "app.payout.repository.maindb.payment_account.PaymentAccountRepository"
+    ) as mock_payout_account_repo:
+        yield mock_payout_account_repo
+
+
+@pytest.fixture
+def mock_payout_method_repo():
+    with mock.patch(
+        "app.payout.repository.bankdb.payout_method.PayoutMethodRepository"
+    ) as mock_payout_method_repo:
+        yield mock_payout_method_repo
+
+
+@pytest.fixture
+def mock_payout_card_repo():
+    with mock.patch(
+        "app.payout.repository.bankdb.payout_card.PayoutCardRepository"
+    ) as mock_payout_card_repo:
+        yield mock_payout_card_repo
+
+
+@pytest.fixture
+def mock_transaction_repo():
+    with mock.patch(
+        "app.payout.repository.bankdb.transaction.TransactionRepository"
+    ) as mock_transaction_repo:
+        yield mock_transaction_repo
+
+
+@pytest.fixture
+def mock_payout_repo():
+    with mock.patch(
+        "app.payout.repository.bankdb.payout.PayoutRepository"
+    ) as mock_payout_repo:
+        yield mock_payout_repo
+
+
+@pytest.fixture
+def mock_stripe_payout_request_repo():
+    with mock.patch(
+        "app.payout.repository.bankdb.payout.StripePayoutRequestRepository"
+    ) as mock_stripe_payout_request_repo:
+        yield mock_stripe_payout_request_repo
+
+
+@pytest.fixture
+def mock_stripe_managed_account_transfer_repo():
+    with mock.patch(
+        "app.payout.repository.bankdb.payout.StripeManagedAccountTransferRepository"
+    ) as mock_stripe_managed_account_transfer_repo:
+        yield mock_stripe_managed_account_transfer_repo
+
+
+#####################
+# Stripe Fixtures
+#####################
 @pytest.fixture
 def stripe_async_client(stripe_api, app_config: AppConfig):
     stripe_api.enable_outbound()

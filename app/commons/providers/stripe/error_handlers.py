@@ -8,6 +8,7 @@ from app.commons.providers.stripe.errors import (
     StripeErrorCode,
     StripeErrorType,
 )
+from app.payout.core.errors import InstantPayoutCardDeclineError
 
 
 def translate_stripe_error(func):
@@ -51,7 +52,6 @@ def translate_stripe_error(func):
                 and "unable to perform an instant payout to this card"
                 in stripe_error_parser.message
             ):
-                # Replace with Instant Payout Error after PR merged
-                raise
+                raise InstantPayoutCardDeclineError from e
 
     return wrapper

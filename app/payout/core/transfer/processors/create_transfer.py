@@ -23,6 +23,7 @@ from app.payout.core.account.utils import (
     get_country_shortname,
     COUNTRY_TO_CURRENCY_CODE,
 )
+from app.payout.core.instant_payout.utils import get_payout_account_lock_name
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
 )
@@ -266,7 +267,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         start_time: Optional[datetime],
     ) -> Tuple[Optional[Transfer], List[int]]:
         # lock_name should be the same as the one for instant payout
-        lock_name = "create_transfer_for_payment_account:{}".format(payment_account_id)
+        lock_name = get_payout_account_lock_name(payment_account_id)
         # todo: PAYOUT-411: add retry when exception raised
         async with PaymentLock(lock_name, self.payment_lock_manager):
             transfer, transaction_ids = await self.create_with_redis_lock(
