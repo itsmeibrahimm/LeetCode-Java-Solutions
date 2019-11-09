@@ -83,7 +83,7 @@ monitor_transfers_with_incorrect_status = MonitorTransfersWithIncorrectStatus(
 scheduler.add_job(
     func=monitor_transfers_with_incorrect_status.run,
     name=monitor_transfers_with_incorrect_status.job_name,
-    trigger=CronTrigger(hour="23"),
+    trigger=CronTrigger(hour="7"),
 )
 
 scheduler.add_job(

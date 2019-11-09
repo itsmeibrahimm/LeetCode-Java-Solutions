@@ -80,12 +80,18 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     async def get_transfers_by_submitted_at_and_method(
         self, start_time: datetime
     ) -> List[int]:
+        override_stmt_timeout_in_ms = 10000
         query = and_(
             transfers.submitted_at.__ge__(start_time),
             transfers.method == TransferMethodType.STRIPE,
         )
-        stmt = transfers.table.select().where(query)
-        rows = await self._database.replica().fetch_all(stmt)
+        get_transfers_stmt = transfers.table.select().where(query)
+        override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
+            override_stmt_timeout_in_ms
+        )
+        async with self._database.replica().transaction() as transaction:
+            await transaction.connection().execute(override_stmt_timeout_stmt)
+            rows = await transaction.connection().fetch_all(get_transfers_stmt)
 
         if rows:
             results = [Transfer.from_row(row) for row in rows]
