@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import pytest
@@ -15,12 +16,12 @@ from app.payout.core.instant_payout.models import (
     InstantPayoutFees,
     PaymentEligibilityReasons,
     InstantPayoutCardChangeBlockTimeInDays,
+    payment_eligibility_reason_details,
 )
 from app.payout.core.instant_payout.processor import InstantPayoutProcessors
 
 
 class TestInstantPayoutProcessors:
-
     pytestmark = [pytest.mark.asyncio]
 
     @pytest.fixture(autouse=True)
@@ -57,19 +58,27 @@ class TestInstantPayoutProcessors:
         currency = Currency.USD
         balance = 300
         mock_check_payout_account.return_value = PayoutAccountEligibility(
-            eligible=True, currency=currency, fee=InstantPayoutFees.STANDARD_FEE
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            currency=currency,
+            fee=InstantPayoutFees.STANDARD_FEE,
         )
-        mock_check_payout_card.return_value = PayoutCardEligibility(eligible=True)
+        mock_check_payout_card.return_value = PayoutCardEligibility(
+            payout_account_id=self.request.payout_account_id, eligible=True
+        )
         mock_check_balance.return_value = BalanceEligibility(
-            eligible=True, balance=balance
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            balance=balance,
         )
         mock_check_daily_limit.return_value = InstantPayoutDailyLimitEligibility(
-            eligible=True
+            payout_account_id=self.request.payout_account_id, eligible=True
         )
 
         assert await self.instant_payout_processor.check_instant_payout_eligibility(
             self.request
         ) == InternalPaymentEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=True,
             currency=currency,
             balance=balance,
@@ -80,29 +89,47 @@ class TestInstantPayoutProcessors:
         self, mock_check_payout_account
     ):
         mock_check_payout_account.return_value = PayoutAccountEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            payout_account_id=self.request.payout_account_id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            ],
         )
 
         assert await self.instant_payout_processor.check_instant_payout_eligibility(
             self.request
         ) == InternalPaymentEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            payout_account_id=self.request.payout_account_id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            ],
         )
 
     async def test_check_instant_payout_not_eligible_due_to_payout_pgp_account_not_setup(
         self, mock_check_payout_account
     ):
         mock_check_payout_account.return_value = PayoutAccountEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
         assert await self.instant_payout_processor.check_instant_payout_eligibility(
             self.request
         ) == InternalPaymentEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -110,47 +137,65 @@ class TestInstantPayoutProcessors:
         self, mock_check_payout_account, mock_check_payout_card
     ):
         mock_check_payout_account.return_value = PayoutAccountEligibility(
-            eligible=True, fee=InstantPayoutFees.STANDARD_FEE, currency=Currency.USD
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            fee=InstantPayoutFees.STANDARD_FEE,
+            currency=Currency.USD,
         )
         details = {
             "num_days_blocked": InstantPayoutCardChangeBlockTimeInDays,
             "cards_changed": [{}],
         }
         mock_check_payout_card.return_value = PayoutCardEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_CARD_CHANGED_RECENTLY,
-            details=details,
+            details=json.dumps(details, default=str),
         )
 
         assert await self.instant_payout_processor.check_instant_payout_eligibility(
             self.request
         ) == InternalPaymentEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_CARD_CHANGED_RECENTLY,
             fee=InstantPayoutFees.STANDARD_FEE,
-            details=details,
+            details=json.dumps(details, default=str),
         )
 
     async def test_check_instant_payout_not_eligible_due_to_balance(
         self, mock_check_payout_account, mock_check_payout_card, mock_check_balance
     ):
         mock_check_payout_account.return_value = PayoutAccountEligibility(
-            eligible=True, fee=InstantPayoutFees.STANDARD_FEE, currency=Currency.USD
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            fee=InstantPayoutFees.STANDARD_FEE,
+            currency=Currency.USD,
         )
-        mock_check_payout_card.return_value = PayoutCardEligibility(eligible=True)
+        mock_check_payout_card.return_value = PayoutCardEligibility(
+            payout_account_id=self.request.payout_account_id, eligible=True
+        )
 
         balance = 100
         mock_check_balance.return_value = BalanceEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.INSUFFICIENT_BALANCE,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.INSUFFICIENT_BALANCE
+            ],
             balance=balance,
         )
 
         assert await self.instant_payout_processor.check_instant_payout_eligibility(
             self.request
         ) == InternalPaymentEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.INSUFFICIENT_BALANCE,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.INSUFFICIENT_BALANCE
+            ],
             balance=balance,
             currency=Currency.USD,
             fee=InstantPayoutFees.STANDARD_FEE,
@@ -164,24 +209,40 @@ class TestInstantPayoutProcessors:
         mock_check_daily_limit,
     ):
         mock_check_payout_account.return_value = PayoutAccountEligibility(
-            eligible=True, fee=InstantPayoutFees.STANDARD_FEE, currency=Currency.USD
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            fee=InstantPayoutFees.STANDARD_FEE,
+            currency=Currency.USD,
         )
-        mock_check_payout_card.return_value = PayoutCardEligibility(eligible=True)
+        mock_check_payout_card.return_value = PayoutCardEligibility(
+            payout_account_id=self.request.payout_account_id, eligible=True
+        )
 
         balance = 100
         mock_check_balance.return_value = BalanceEligibility(
-            eligible=True, balance=balance
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            balance=balance,
         )
 
         mock_check_daily_limit.return_value = InstantPayoutDailyLimitEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+            payout_account_id=self.request.payout_account_id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+            ],
         )
 
         assert await self.instant_payout_processor.check_instant_payout_eligibility(
             self.request
         ) == InternalPaymentEligibility(
+            payout_account_id=self.request.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+            ],
             balance=balance,
             currency=Currency.USD,
             fee=InstantPayoutFees.STANDARD_FEE,

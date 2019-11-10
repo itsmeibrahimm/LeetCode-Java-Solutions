@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timedelta
 
@@ -15,6 +16,7 @@ from app.payout.core.instant_payout.models import (
     InstantPayoutDailyLimitEligibility,
     InstantPayoutFees,
     InstantPayoutCardChangeBlockTimeInDays,
+    payment_eligibility_reason_details,
 )
 from app.payout.core.instant_payout.processors.check_eligibility import (
     CheckPayoutAccount,
@@ -65,7 +67,10 @@ class TestCheckPayoutAccount:
             self.pgp_account
         )
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
-            eligible=True, currency=Currency.USD, fee=InstantPayoutFees.STANDARD_FEE
+            payout_account_id=self.payout_account.id,
+            eligible=True,
+            currency=Currency.USD,
+            fee=InstantPayoutFees.STANDARD_FEE,
         )
 
     async def test_not_eligible_due_to_payout_account_not_exist(
@@ -74,7 +79,12 @@ class TestCheckPayoutAccount:
         mock_payout_account_repo.get_payment_account_by_id.return_value = None
         # PayoutAccountEligibility should not have fee
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            payout_account_id=self.payout_account.id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            ],
         )
 
     async def test_not_eligible_due_to_payout_account_entity_not_supported(
@@ -85,8 +95,12 @@ class TestCheckPayoutAccount:
         )
 
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
+            payout_account_id=self.payout_account.id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -99,8 +113,12 @@ class TestCheckPayoutAccount:
         )
 
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
+            payout_account_id=self.payout_account.id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -109,8 +127,12 @@ class TestCheckPayoutAccount:
             deep=True, update={"account_type": "unknown types"}
         )
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
+            payout_account_id=self.payout_account.id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -122,8 +144,12 @@ class TestCheckPayoutAccount:
         )
         mock_payout_account_repo.get_stripe_managed_account_by_id.return_value = None
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
+            payout_account_id=self.payout_account.id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_EXIST,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_EXIST
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -137,8 +163,12 @@ class TestCheckPayoutAccount:
             deep=True, update={"country_shortname": CountryCode.CA}
         )
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
+            payout_account_id=self.payout_account.id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -152,8 +182,12 @@ class TestCheckPayoutAccount:
             deep=True, update={"verification_disabled_reason": "some reason"}
         )
         assert await self.payout_account_check.execute() == PayoutAccountEligibility(
+            payout_account_id=self.payout_account.id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_VERIFIED,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_VERIFIED
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         )
 
@@ -211,8 +245,9 @@ class TestCheckPayoutCard:
             CoroutineMock()
         )
         mock_payout_card_repo.list_payout_cards_by_ids = CoroutineMock()
+        self.payout_account_id = 123
         self.payout_card_check = CheckPayoutCard(
-            EligibilityCheckRequest(payout_account_id=123),
+            EligibilityCheckRequest(payout_account_id=self.payout_account_id),
             mock_payout_method_repo,
             mock_payout_card_repo,
         )
@@ -223,7 +258,7 @@ class TestCheckPayoutCard:
         ]
         mock_payout_card_repo.list_payout_cards_by_ids.return_value = [self.payout_card]
         assert await self.payout_card_check.execute() == PayoutCardEligibility(
-            eligible=True
+            payout_account_id=self.payout_account_id, eligible=True
         )
 
     async def test_not_eligible_due_to_payout_card_not_exist(
@@ -234,7 +269,12 @@ class TestCheckPayoutCard:
         ]
         mock_payout_card_repo.list_payout_cards_by_ids.return_value = []
         assert await self.payout_card_check.execute() == PayoutCardEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP
+            payout_account_id=self.payout_account_id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP
+            ],
         )
 
     async def test_not_eligible_due_to_recently_changed_card(
@@ -249,12 +289,16 @@ class TestCheckPayoutCard:
         mock_payout_card_repo.list_payout_cards_by_ids.return_value = [payout_card_copy]
 
         assert await self.payout_card_check.execute() == PayoutCardEligibility(
+            payout_account_id=self.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_CARD_CHANGED_RECENTLY,
-            details={
-                "num_days_blocked": InstantPayoutCardChangeBlockTimeInDays,
-                "cards_changed": [payout_card_copy],
-            },
+            details=json.dumps(
+                {
+                    "num_days_blocked": InstantPayoutCardChangeBlockTimeInDays,
+                    "cards_changed": [payout_card_copy.dict()],
+                },
+                default=str,
+            ),
         )
 
     async def test_raise_db_error_when_get_payout_method_error(
@@ -303,8 +347,10 @@ class TestCheckPayoutAccountBalance:
         mock_transaction_repo.get_unpaid_transaction_by_payout_account_id_without_limit = (
             CoroutineMock()
         )
+        self.payout_account_id = 123
         self.payout_account_balance_check = CheckPayoutAccountBalance(
-            EligibilityCheckRequest(payout_account_id=123), mock_transaction_repo
+            EligibilityCheckRequest(payout_account_id=self.payout_account_id),
+            mock_transaction_repo,
         )
 
     async def test_eligible(self, mock_transaction_repo):
@@ -314,7 +360,7 @@ class TestCheckPayoutAccountBalance:
         ]
         balance = self.transaction_1.amount + self.transaction_2.amount
         assert await self.payout_account_balance_check.execute() == BalanceEligibility(
-            eligible=True, balance=balance
+            payout_account_id=self.payout_account_id, eligible=True, balance=balance
         )
 
     async def test_not_eligible_due_to_insufficient_balance(
@@ -325,8 +371,12 @@ class TestCheckPayoutAccountBalance:
         ]
         balance = self.transaction_1.amount
         assert await self.payout_account_balance_check.execute() == BalanceEligibility(
+            payout_account_id=self.payout_account_id,
             eligible=False,
             reason=PaymentEligibilityReasons.INSUFFICIENT_BALANCE,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.INSUFFICIENT_BALANCE
+            ],
             balance=balance,
         )
 
@@ -362,21 +412,29 @@ class TestCheckInstantPayoutDailyLimit:
         )
         mock_payout_repo.list_payout_by_payout_account_id = CoroutineMock()
         created_after = datetime.utcnow() - timedelta(days=1)
+        self.payout_account_id = 123
         self.instant_payout_daily_limit_check = CheckInstantPayoutDailyLimit(
-            EligibilityCheckRequest(payout_account_id=123, created_after=created_after),
+            EligibilityCheckRequest(
+                payout_account_id=self.payout_account_id, created_after=created_after
+            ),
             mock_payout_repo,
         )
 
     async def test_eligible(self, mock_payout_repo):
         mock_payout_repo.list_payout_by_payout_account_id.return_value = []
         assert await self.instant_payout_daily_limit_check.execute() == InstantPayoutDailyLimitEligibility(
-            eligible=True
+            payout_account_id=self.payout_account_id, eligible=True
         )
 
     async def test_not_eligible_due_to_already_paid_out(self, mock_payout_repo):
         mock_payout_repo.list_payout_by_payout_account_id.return_value = [self.payout]
         assert await self.instant_payout_daily_limit_check.execute() == InstantPayoutDailyLimitEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+            payout_account_id=self.payout_account_id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+            ],
         )
 
     async def test_raise_db_error_when_list_payout_error(self, mock_payout_repo):

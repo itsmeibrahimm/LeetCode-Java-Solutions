@@ -66,13 +66,16 @@ class InstantPayout(PaymentResponse):
 
 
 class PaymentEligibility(PaymentResponse):
+    payout_account_id: PayoutAccountId = Schema(
+        default=..., description="The payment account id."
+    )
     eligible: bool = Schema(
         default=..., description="Eligible status for instant payout."
     )
     reason: Optional[PaymentEligibilityReasons] = Schema(
         default=..., description="The reason when instant payout is ineligible."
     )
-    details: Optional[dict] = Schema(
+    details: Optional[str] = Schema(
         default=..., description="Detailed info if instant payout is ineligible."
     )
     balance: Optional[int] = Schema(

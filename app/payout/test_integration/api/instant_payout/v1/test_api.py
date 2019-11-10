@@ -1,6 +1,6 @@
+import json
 import random
 
-from asynctest import ANY
 from starlette.testclient import TestClient
 from app.commons.api.errors import BadRequestErrorCode, payment_error_message_maps
 from app.commons.config.app_config import AppConfig
@@ -15,6 +15,7 @@ from app.payout.core.instant_payout.models import (
     InstantPayoutFees,
     InstantPayoutCardChangeBlockTimeInDays,
     InternalPaymentEligibility,
+    payment_eligibility_reason_details,
 )
 from app.commons.providers.stripe import stripe_models
 import pytest
@@ -165,7 +166,12 @@ class TestCheckInstantPayoutEligibility:
         response = client.get(url, params={"local_start_of_day": 11111})
         assert response.status_code == 200
         expected = InternalPaymentEligibility(
-            eligible=False, reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            payout_account_id=payout_account_id,
+            eligible=False,
+            reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+            ],
         ).dict()
         assert response.json() == expected
 
@@ -193,8 +199,12 @@ class TestCheckInstantPayoutEligibility:
         response = client.get(url, params={"local_start_of_day": 11111})
         assert response.status_code == 200
         expected = InternalPaymentEligibility(
+            payout_account_id=payout_account_dx.get("id"),
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         ).dict()
         assert response.json() == expected
@@ -208,8 +218,12 @@ class TestCheckInstantPayoutEligibility:
         response = client.get(url, params={"local_start_of_day": 11111})
         assert response.status_code == 200
         expected = InternalPaymentEligibility(
+            payout_account_id=payout_account_mx.get("id"),
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         ).dict()
         assert response.json() == expected
@@ -225,8 +239,12 @@ class TestCheckInstantPayoutEligibility:
         response = client.get(url, params={"local_start_of_day": 11111})
         assert response.status_code == 200
         expected = InternalPaymentEligibility(
+            payout_account_id=verified_payout_account.get("id"),
             eligible=False,
             reason=PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP,
+            details=payment_eligibility_reason_details[
+                PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP
+            ],
             fee=InstantPayoutFees.STANDARD_FEE,
         ).dict()
         assert response.json() == expected
@@ -241,16 +259,21 @@ class TestCheckInstantPayoutEligibility:
         )
         response = client.get(url, params={"local_start_of_day": 11111})
         assert response.status_code == 200
-        expected = InternalPaymentEligibility(
-            eligible=False,
-            reason=PaymentEligibilityReasons.PAYOUT_CARD_CHANGED_RECENTLY,
-            details={
-                "num_days_blocked": InstantPayoutCardChangeBlockTimeInDays,
-                "cards_changed": [ANY],
-            },
-            fee=InstantPayoutFees.STANDARD_FEE,
-        ).dict()
-        assert response.json() == expected
+        eligibility = response.json()
+        assert eligibility.get(
+            "payout_account_id"
+        ) == verified_payout_account_with_payout_card.get("id")
+        assert eligibility.get("eligible") is False
+        assert (
+            eligibility.get("reason")
+            == PaymentEligibilityReasons.PAYOUT_CARD_CHANGED_RECENTLY
+        )
+        assert eligibility.get("fee") == InstantPayoutFees.STANDARD_FEE
+        details = json.loads(eligibility.get("details"))
+        assert details.get("num_days_blocked") == InstantPayoutCardChangeBlockTimeInDays
+        assert len(details.get("cards_changed")) > 0
+        assert type(details.get("cards_changed")) == list
+        assert type(details.get("cards_changed")[0]) == dict
 
 
 class TestSubmitInstantPayout:

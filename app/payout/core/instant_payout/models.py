@@ -59,16 +59,29 @@ InstantPayoutDefaultDescription = "Doordash, Inc. FastPay"
 
 
 class PaymentEligibilityReasons(str, Enum):
-    PAYOUT_ACCOUNT_NOT_EXIST = "Payout account does not exist."
-    PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED = "Payout account type not supported."
-    PAYOUT_PGP_ACCOUNT_NOT_SETUP = "Payout PGP account not setup."
-    PAYOUT_PGP_ACCOUNT_NOT_EXIST = "Payout PGP account not exist."
-    PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED = "Payout country not supported."
-    PAYOUT_PGP_ACCOUNT_NOT_VERIFIED = "Payout pgp account not verified."
-    PAYOUT_CARD_NOT_SETUP = "Payout card not setup."
-    PAYOUT_CARD_CHANGED_RECENTLY = "Payout card changed recently."
-    INSUFFICIENT_BALANCE = "Balance insufficient"
-    ALREADY_PAID_OUT_TODAY = "Already paid out today."
+    PAYOUT_ACCOUNT_NOT_EXIST = "payout_account_not_exist"
+    PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED = "payout_account_type_not_supported"
+    PAYOUT_PGP_ACCOUNT_NOT_SETUP = "payout_pgp_account_not_setup"
+    PAYOUT_PGP_ACCOUNT_NOT_EXIST = "payout_pgp_account_not_exist"
+    PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED = "payout_account_country_not_supported"
+    PAYOUT_PGP_ACCOUNT_NOT_VERIFIED = "payout_pgp_account_not_verified"
+    PAYOUT_CARD_NOT_SETUP = "payout_card_not_setup"
+    PAYOUT_CARD_CHANGED_RECENTLY = "payout_card_changed_recently"
+    INSUFFICIENT_BALANCE = "balance_insufficient"
+    ALREADY_PAID_OUT_TODAY = "already_paid_out_today"
+
+
+payment_eligibility_reason_details = {
+    PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST: "The payout account id passed in does not exist.",
+    PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED: "Instant Payout currently only supports Dasher.",
+    PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP: "The payment external service provider account not setup.",
+    PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_EXIST: "The payment external service provider account not exist.",
+    PaymentEligibilityReasons.PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED: "Instant Payout currently only supports US account.",
+    PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_VERIFIED: "The payment external service provider account not verified.",
+    PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP: "The payout card is not added yet.",
+    PaymentEligibilityReasons.INSUFFICIENT_BALANCE: "The balance is not sufficient to perform instant payout.",
+    PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY: "This payout account has already instant paid today.",
+}
 
 
 class EligibilityCheckRequest(OperationRequest):
@@ -77,9 +90,10 @@ class EligibilityCheckRequest(OperationRequest):
 
 
 class InternalPaymentEligibility(OperationResponse):
+    payout_account_id: int
     eligible: bool
     reason: Optional[str]
-    details: Optional[dict]
+    details: Optional[str]
     balance: Optional[int]
     currency: Optional[Currency]
     fee: Optional[InstantPayoutFees]

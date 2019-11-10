@@ -1,3 +1,4 @@
+import json
 from typing import Union
 
 import pytz
@@ -19,6 +20,7 @@ from app.payout.core.instant_payout.models import (
     InstantPayoutDailyLimitCheckStatuses,
     EligibilityCheckRequest,
     InstantPayoutSupportedPGPAccountTypes,
+    payment_eligibility_reason_details,
 )
 from app.payout.repository.bankdb.payout import PayoutRepositoryInterface
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
@@ -60,13 +62,21 @@ class CheckPayoutAccount(
         )
         if payout_account is None:
             return PayoutAccountEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
+                ],
             )
         if payout_account.entity not in InstantPayoutSupportedEntities:
             return PayoutAccountEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_ACCOUNT_TYPE_NOT_SUPPORTED
+                ],
                 fee=InstantPayoutFees.STANDARD_FEE,
             )
         # Check PGP account id existence
@@ -74,8 +84,12 @@ class CheckPayoutAccount(
             payout_account.account_type not in InstantPayoutSupportedPGPAccountTypes
         ):
             return PayoutAccountEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_SETUP
+                ],
                 fee=InstantPayoutFees.STANDARD_FEE,
             )
 
@@ -85,8 +99,12 @@ class CheckPayoutAccount(
         )
         if pgp_account is None:
             return PayoutAccountEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_EXIST,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_EXIST
+                ],
                 fee=InstantPayoutFees.STANDARD_FEE,
             )
 
@@ -97,8 +115,12 @@ class CheckPayoutAccount(
             not in InstantPayoutSupportedCountries
         ):
             return PayoutAccountEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_ACCOUNT_COUNTRY_NOT_SUPPORTED
+                ],
                 fee=InstantPayoutFees.STANDARD_FEE,
             )
 
@@ -107,13 +129,20 @@ class CheckPayoutAccount(
         # Check PGP account is verified or not
         if pgp_account.verification_disabled_reason:
             return PayoutAccountEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_VERIFIED,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_PGP_ACCOUNT_NOT_VERIFIED
+                ],
                 fee=InstantPayoutFees.STANDARD_FEE,
             )
 
         return PayoutAccountEligibility(
-            eligible=True, currency=currency, fee=InstantPayoutFees.STANDARD_FEE
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            currency=currency,
+            fee=InstantPayoutFees.STANDARD_FEE,
         )
 
     def _handle_exception(
@@ -156,7 +185,12 @@ class CheckPayoutCard(AsyncOperation[EligibilityCheckRequest, PayoutCardEligibil
 
         if not payout_cards:
             return PayoutCardEligibility(
-                eligible=False, reason=PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP
+                payout_account_id=self.request.payout_account_id,
+                eligible=False,
+                reason=PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.PAYOUT_CARD_NOT_SETUP
+                ],
             )
         # sort payout cards by created_at
         payout_cards.sort(key=lambda payout_card: payout_card.created_at, reverse=True)
@@ -169,15 +203,18 @@ class CheckPayoutCard(AsyncOperation[EligibilityCheckRequest, PayoutCardEligibil
             # populate details to response to be compatible with DSJ
             details = {
                 "num_days_blocked": InstantPayoutCardChangeBlockTimeInDays,
-                "cards_changed": [latest_payout_card],
+                "cards_changed": [latest_payout_card.dict()],
             }
 
             return PayoutCardEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.PAYOUT_CARD_CHANGED_RECENTLY,
-                details=details,
+                details=json.dumps(details, default=str),
             )
-        return PayoutCardEligibility(eligible=True)
+        return PayoutCardEligibility(
+            payout_account_id=self.request.payout_account_id, eligible=True
+        )
 
     def _handle_exception(
         self, internal_exec: Exception
@@ -212,12 +249,20 @@ class CheckPayoutAccountBalance(
 
         if balance < InstantPayoutFees.STANDARD_FEE:
             return BalanceEligibility(
+                payout_account_id=self.request.payout_account_id,
                 eligible=False,
                 reason=PaymentEligibilityReasons.INSUFFICIENT_BALANCE,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.INSUFFICIENT_BALANCE
+                ],
                 balance=balance,
             )
 
-        return BalanceEligibility(eligible=True, balance=balance)
+        return BalanceEligibility(
+            payout_account_id=self.request.payout_account_id,
+            eligible=True,
+            balance=balance,
+        )
 
     def _handle_exception(
         self, internal_exec: Exception
@@ -255,9 +300,16 @@ class CheckInstantPayoutDailyLimit(
 
         if instant_payouts:
             return InstantPayoutDailyLimitEligibility(
-                eligible=False, reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+                payout_account_id=self.request.payout_account_id,
+                eligible=False,
+                reason=PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY,
+                details=payment_eligibility_reason_details[
+                    PaymentEligibilityReasons.ALREADY_PAID_OUT_TODAY
+                ],
             )
-        return InstantPayoutDailyLimitEligibility(eligible=True)
+        return InstantPayoutDailyLimitEligibility(
+            payout_account_id=self.request.payout_account_id, eligible=True
+        )
 
     def _handle_exception(
         self, internal_exec: Exception

@@ -269,7 +269,11 @@ class InstantPayoutProcessors:
         # Check payout account status
         if payout_account_eligibility.eligible is False:
             return InternalPaymentEligibility(
-                eligible=False, reason=payout_account_eligibility.reason, fee=fee
+                payout_account_id=request.payout_account_id,
+                eligible=False,
+                reason=payout_account_eligibility.reason,
+                details=payout_account_eligibility.details,
+                fee=fee,
             )
 
         currency = payout_account_eligibility.currency
@@ -281,6 +285,7 @@ class InstantPayoutProcessors:
         payout_card_eligibility = await check_payout_card_op.execute()
         if payout_card_eligibility.eligible is False:
             return InternalPaymentEligibility(
+                payout_account_id=request.payout_account_id,
                 eligible=False,
                 reason=payout_card_eligibility.reason,
                 details=payout_card_eligibility.details,
@@ -296,8 +301,10 @@ class InstantPayoutProcessors:
 
         if balance_eligibility.eligible is False:
             return InternalPaymentEligibility(
+                payout_account_id=request.payout_account_id,
                 eligible=False,
                 reason=balance_eligibility.reason,
+                details=balance_eligibility.details,
                 balance=balance,
                 currency=currency,
                 fee=fee,
@@ -310,13 +317,19 @@ class InstantPayoutProcessors:
         daily_limit_eligibility = await daily_limit_op.execute()
         if daily_limit_eligibility.eligible is False:
             return InternalPaymentEligibility(
+                payout_account_id=request.payout_account_id,
                 eligible=False,
                 reason=daily_limit_eligibility.reason,
+                details=daily_limit_eligibility.details,
                 balance=balance,
                 currency=currency,
                 fee=fee,
             )
 
         return InternalPaymentEligibility(
-            eligible=True, balance=balance, currency=currency, fee=fee
+            payout_account_id=request.payout_account_id,
+            eligible=True,
+            balance=balance,
+            currency=currency,
+            fee=fee,
         )
