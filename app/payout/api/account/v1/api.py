@@ -99,9 +99,7 @@ async def get_payout_account_stream(
     tags=api_tags,
 )
 async def create_payout_account(
-    body: models.CreatePayoutAccount = Body(
-        ..., description="Request body for creating a payout account"
-    ),
+    body: models.CreatePayoutAccount = Body(...),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -154,9 +152,7 @@ async def update_payout_account_statement_descriptor(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
-    body: models.UpdatePayoutAccountStatementDescriptor = Body(
-        ..., description="Statement descriptor for payouts"
-    ),
+    body: models.UpdatePayoutAccountStatementDescriptor = Body(...),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -184,9 +180,7 @@ async def verify_payout_account_legacy(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
-    verification_details: models.VerificationDetailsWithToken = Body(
-        ..., description="Verification details with token, country and currency"
-    ),
+    verification_details: models.VerificationDetailsWithToken = Body(...),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -234,7 +228,7 @@ async def create_payout_method(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
-    payout_method: models.CreatePayoutMethod = Body(..., description="Payout Method"),
+    payout_method: models.CreatePayoutMethod = Body(...),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
@@ -335,9 +329,7 @@ async def initiate_payout(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
-    body: models.InitiatePayoutRequest = Body(
-        ..., description="Initiate a payout request body"
-    ),
+    body: models.InitiatePayoutRequest = Body(...),
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),

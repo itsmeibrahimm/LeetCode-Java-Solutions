@@ -45,6 +45,10 @@ __all__ = [
 
 
 class UpdatePayoutAccountStatementDescriptor(PaymentRequest):
+    """
+    Statement descriptor for payouts
+    """
+
     statement_descriptor: str
 
 
@@ -121,7 +125,7 @@ class VerificationDetails(PaymentRequest):
 
 class VerificationDetailsWithToken(PaymentRequest):
     """
-    Request model for account verification info
+    Request model for account verification info with token, country and currency
     """
 
     account_token: StripeAccountToken = Schema(
