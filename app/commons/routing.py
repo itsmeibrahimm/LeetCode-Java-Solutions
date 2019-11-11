@@ -32,6 +32,10 @@ def reset_breadcrumbs(scope: Scope) -> Breadcrumbs:
     return scope[BREADCRUMB_SCOPE_KEY]
 
 
+def get_endpoint_breadcrumbs(scope: Scope) -> Optional[Breadcrumbs]:
+    return scope.get(BREADCRUMB_SCOPE_KEY, None)
+
+
 def add_breadcrumb(scope: Scope, crumb: str):
     """
     Used in routers to append crumbs to the breadcrumbs list.

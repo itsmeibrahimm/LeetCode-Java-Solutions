@@ -489,6 +489,7 @@ class TestCartPayment:
         charge_id: int,
         amount: int,
         original_amount: int,
+        payin_error_code: str = "payin_61",
     ) -> None:
         request_body = self._get_legacy_cart_payment_update_request(
             cart_payment=cart_payment,
@@ -500,7 +501,7 @@ class TestCartPayment:
             f"/payin/api/v0/cart_payments/{str(charge_id)}/adjust",
             request_body,
             404,
-            "payin_61",
+            payin_error_code,
             False,
         )
 
@@ -1421,6 +1422,7 @@ class TestCartPayment:
             charge_id=self._get_random_charge_id(cart_payment["dd_charge_id"]),
             amount=2500,
             original_amount=1000,
+            payin_error_code="payin_65",
         )
 
         # Cancel

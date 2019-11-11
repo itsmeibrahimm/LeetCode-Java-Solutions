@@ -1992,6 +1992,15 @@ class CartPaymentProcessor:
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         # For the specified intent, either (a) cancel with provider if not captured, or (b) refund full amount if previously captured.
         # If intent was already refunded, it will not be re-processed (please see cart_payment_interface.can_payment_intent_be_refunded).
+
+        self.log.info(
+            "[_cancel_payment_intent]",
+            cart_payment_id=cart_payment.id,
+            payment_intent_id=payment_intent.id,
+            delay_capture=cart_payment.delay_capture,
+            payment_intent_status=payment_intent.status,
+        )
+
         can_intent_be_cancelled = self.cart_payment_interface.can_payment_intent_be_cancelled(
             payment_intent
         )
@@ -2069,6 +2078,15 @@ class CartPaymentProcessor:
         description: Optional[str],
         split_payment: Optional[SplitPayment],
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+
+        self.log.info(
+            "[_update_payment_with_higher_amount]",
+            cart_payment_id=cart_payment.id,
+            delay_capture=cart_payment.delay_capture,
+            amount=amount,
+            idempotency_key=idempotency_key,
+        )
+
         payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
             cart_payment
         )
@@ -2108,6 +2126,8 @@ class CartPaymentProcessor:
                     idempotency_key=idempotency_key,
                     cart_payment_id=cart_payment.id,
                     payment_intent_id=existing_payment_intent.id,
+                    payment_intent_status=existing_payment_intent.status,
+                    payment_intent_capture_method=existing_payment_intent.capture_method,
                     pgp_payment_intent_id=pgp_payment_intent.id,
                 )
                 pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
@@ -2145,7 +2165,9 @@ class CartPaymentProcessor:
                 "[_update_payment_with_higher_amount] Process existing intents for amount increase request",
                 idempotency_key=idempotency_key,
                 cart_payment_id=cart_payment.id,
-                payment_intent_id=payment_intent.id,
+                payment_intent_id=existing_payment_intent.id,
+                payment_intent_status=existing_payment_intent.status,
+                payment_intent_capture_method=existing_payment_intent.capture_method,
                 pgp_payment_intent_id=pgp_payment_intent.id,
             )
         else:
@@ -2219,6 +2241,7 @@ class CartPaymentProcessor:
     async def _update_payment_with_lower_amount(
         self, cart_payment: CartPayment, new_amount: int, idempotency_key: str
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
+
         payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
             cart_payment
         )
@@ -2231,6 +2254,17 @@ class CartPaymentProcessor:
         refundable_intents = self.cart_payment_interface.get_refundable_payment_intents(
             payment_intents
         )
+
+        self.log.info(
+            "[_update_payment_with_lower_amount]",
+            cart_payment_id=cart_payment.id,
+            delay_capture=cart_payment.delay_capture,
+            payment_intents_capturable=bool(capturable_intents),
+            payment_intents_refundable=bool(refundable_intents),
+            amount=new_amount,
+            idempotency_key=idempotency_key,
+        )
+
         if not capturable_intents and not refundable_intents:
             self.log.warn(
                 "[_update_payment_with_lower_amount] no payment_intent for adjustment with lower amount.",
@@ -2378,11 +2412,12 @@ class CartPaymentProcessor:
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             amount {int} -- Delta amount to add to the cart payment amount.  May be negative to reduce amount.
             client_description {Optional[str]} -- New client description to use for cart payment.
-            dd_additional_payment_info: {Optional[Dict[str, Any]]} -- Optional legacy payment additional_payment_info to use for legacy charge writes.
+            dd_additional_payment_info: {Optional[Dict[str, Any]]} -- Optional legacy payment additional_payment_info
+                                        to use for legacy charge writes.
             split_payment: {Optional[SplitPayment]} -- Optional new split payment to use for payment.
 
         Raises:
-            CartPaymentReadError: If there is no cart paymetn associated with the provided dd_charge_id.
+            CartPaymentReadError: If there is no cart payment associated with the provided dd_charge_id.
             PaymentIntentConcurrentAccessError: If another request or process has modified the associated intent state.
 
         Returns:
@@ -2407,7 +2442,8 @@ class CartPaymentProcessor:
                 dd_charge_id=dd_charge_id,
             )
             raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID,
+                retryable=False,
             )
 
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
@@ -2560,6 +2596,13 @@ class CartPaymentProcessor:
             CartPayment -- An updated CartPayment instance, reflecting changes requested by the client.
         """
         # Ensure the caller can access the cart payment being modified
+
+        self.log.info(
+            "[_update_payment] Updating cart_payment",
+            cart_payment_id=cart_payment.id,
+            delay_capture=cart_payment.delay_capture,
+        )
+
         if not self.cart_payment_interface.is_accessible(
             cart_payment=cart_payment, request_payer_id=payer_id, credential_owner=""
         ):
@@ -2828,6 +2871,7 @@ class CartPaymentProcessor:
             payer_country=payer_country,
             payment_country=payment_country,
             stripe_customer_id=legacy_payment.stripe_customer_id,
+            delay_capture=request_cart_payment.delay_capture,
         )
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=legacy_payment

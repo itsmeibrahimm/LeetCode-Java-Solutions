@@ -31,7 +31,7 @@ pytest-aiohttp = "==0.2.0"
 black = "==19.3b0"  # You have to lock pre-releases
 pre-commit = "==1.17.0"
 pytest-asyncio = "==0.10.0"
-pydevd-pycharm = "~=192.5728.105"
+pydevd-pycharm = "~=192.7142.42"
 psutil = "==5.6.3"
 pexpect = "==4.7.0"
 freezegun = "==0.3.12"

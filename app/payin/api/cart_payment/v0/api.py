@@ -142,7 +142,10 @@ async def update_cart_payment(
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
         ]:
             http_status_code = HTTP_400_BAD_REQUEST
-        elif payment_error.error_code == PayinErrorCode.CART_PAYMENT_NOT_FOUND:
+        elif payment_error.error_code in (
+            PayinErrorCode.CART_PAYMENT_NOT_FOUND,
+            PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID,
+        ):
             http_status_code = HTTP_404_NOT_FOUND
         elif payment_error.error_code in [
             PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,

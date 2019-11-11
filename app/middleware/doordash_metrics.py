@@ -6,11 +6,12 @@ from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 from starlette.exceptions import ExceptionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
+from starlette.types import Scope
 
 from app.commons import tracing
 from app.commons.config.app_config import StatsDConfig
 from app.commons.context.req_context import get_context_from_req
-from app.commons.routing import reset_breadcrumbs
+from app.commons.routing import reset_breadcrumbs, get_endpoint_breadcrumbs
 from app.commons.stats import (
     create_statsd_client_from_config,
     set_service_stats_client,
@@ -22,6 +23,11 @@ NORMALIZATION_TABLE = str.maketrans("/", "|", "{}")
 
 def normalize_path(path: str):
     return path.translate(NORMALIZATION_TABLE)
+
+
+def get_endpoint_from_scope(scope: Scope) -> str:
+    bread_crumbs = get_endpoint_breadcrumbs(scope)
+    return normalize_path("".join(bread_crumbs)) if bread_crumbs else ""
 
 
 class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
@@ -43,7 +49,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
     async def dispatch_func(
         self: Any, request: Request, call_next: RequestResponseEndpoint
     ):
-        breadcrumbs = reset_breadcrumbs(request.scope)
+        reset_breadcrumbs(request.scope)
 
         context = get_context_from_req(request)
 
@@ -67,7 +73,7 @@ class DoorDashMetricsMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
 
         # breadcrumbs are available after
-        endpoint = normalize_path("".join(breadcrumbs))
+        endpoint = get_endpoint_from_scope(request.scope)
 
         # latency
         latency_ms = (time.perf_counter() - start_time) * 1000

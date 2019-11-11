@@ -16,6 +16,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import get_logger_from_req, response_with_req_id
+from app.middleware.doordash_metrics import get_endpoint_from_scope
 
 
 def create_payment_error_response_blob(
@@ -67,7 +68,7 @@ async def payment_http_exception_handler(
     :return: Handled Http exception response
     """
     logger: BoundLogger = get_logger_from_req(request)
-
+    endpoint = get_endpoint_from_scope(request.scope)
     exception_response = None
     if isinstance(exception, PaymentException):
         # we wrapped the error, provide some additional info
@@ -76,16 +77,25 @@ async def payment_http_exception_handler(
             error_message=exception.error_message,
             retryable=exception.retryable,
         )
-        logger.info(
-            "payment error", status_code=exception.status_code, error=error.json()
+        logger.error(
+            "api exception handler",
+            type="payment error",
+            endpoint=endpoint,
+            status_code=exception.status_code,
+            error=error.dict(),
+            retryable=exception.retryable,
         )
         exception_response = JSONResponse(
             status_code=exception.status_code, content=jsonable_encoder(error)
         )
     else:
         # default HTTP exception handling from the framework (eg. 404)
-        logger.debug(
-            "http error", status_code=exception.status_code, exc_info=exception
+        logger.error(
+            "api exception handler",
+            type="http error",
+            endpoint=endpoint,
+            status_code=exception.status_code,
+            exc_info=exception,
         )
         exception_response = await http_exception_handler(request, exception)
 
@@ -97,7 +107,15 @@ async def payment_internal_error_handler(
 ) -> Response:
     logger: BoundLogger = get_logger_from_req(request)
     # unhandled error, report this in sentry and newrelic
-    logger.error("unknown internal error", exc_info=exception)
+
+    endpoint = get_endpoint_from_scope(request.scope)
+
+    logger.error(
+        "api exception handler",
+        type="internal error",
+        endpoint=endpoint,
+        exc_info=exception,
+    )
 
     return response_with_req_id(
         request,

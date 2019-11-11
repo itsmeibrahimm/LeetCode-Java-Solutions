@@ -769,7 +769,7 @@ class TestCartPaymentProcessor:
             )
         assert (
             payment_error.value.error_code
-            == PayinErrorCode.CART_PAYMENT_NOT_FOUND.value
+            == PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID.value
         )
 
     @pytest.mark.asyncio
