@@ -261,12 +261,30 @@ class InstantPayoutProcessors:
     async def check_instant_payout_eligibility(
         self, request: EligibilityCheckRequest
     ) -> InternalPaymentEligibility:
+        """Check Instant Payout Payment Eligibility Status.
+
+        Eligibility Checks include:
+            - PayoutAccount Eligibility
+            - PayoutCard Eligibility
+            - Balance Eligibility
+            - Daily Limit Eligibility
+
+        :param request: Eligibility check request
+        :type request: EligibilityCheckRequest
+        :return: eligibility: eligibility status
+        :rtype: eligibility: InternalPaymentEligibility
+        """
+        self.logger.info("[Checking Payment Eligibility]", request=request.dict())
         check_payout_account_op = CheckPayoutAccount(
             request, self.payout_account_repo, self.logger
         )
         payout_account_eligibility = await check_payout_account_op.execute()
         # If payout account record does not exist, fee will be None. Otherwise, fee wil be populated into response.
         fee = payout_account_eligibility.fee
+        self.logger.info(
+            "[Payout Account Eligibility]",
+            eligibility=payout_account_eligibility.dict(),
+        )
         # Check payout account status
         if payout_account_eligibility.eligible is False:
             return InternalPaymentEligibility(
@@ -284,6 +302,9 @@ class InstantPayoutProcessors:
             request, self.payout_method_repo, self.payout_card_repo, self.logger
         )
         payout_card_eligibility = await check_payout_card_op.execute()
+        self.logger.info(
+            "[Payout Card Eligibility]", eligibility=payout_card_eligibility.dict()
+        )
         if payout_card_eligibility.eligible is False:
             return InternalPaymentEligibility(
                 payout_account_id=request.payout_account_id,
@@ -299,7 +320,9 @@ class InstantPayoutProcessors:
         )
         balance_eligibility = await check_balance_op.execute()
         balance = balance_eligibility.balance
-
+        self.logger.info(
+            "[Balance Eligibility]", eligibility=balance_eligibility.dict()
+        )
         if balance_eligibility.eligible is False:
             return InternalPaymentEligibility(
                 payout_account_id=request.payout_account_id,
@@ -316,6 +339,9 @@ class InstantPayoutProcessors:
             request, self.payout_repo, self.logger
         )
         daily_limit_eligibility = await daily_limit_op.execute()
+        self.logger.info(
+            "[Daily Limit Eligibility]", eligibility=daily_limit_eligibility.dict()
+        )
         if daily_limit_eligibility.eligible is False:
             return InternalPaymentEligibility(
                 payout_account_id=request.payout_account_id,

@@ -42,6 +42,11 @@ class CheckPayoutAccount(
         - payout pgp account existence
         - payout pgp account country eligible status
         - payout pgp account verification status
+
+    :param request: PayoutAccount Eligibility check request
+    :type request: EligibilityCheckRequest
+    :return: eligibility: Payout account eligibility status
+    :rtype: eligibility: PayoutAccountEligibility
     """
 
     def __init__(
@@ -157,6 +162,11 @@ class CheckPayoutCard(AsyncOperation[EligibilityCheckRequest, PayoutCardEligibil
     Check payout card status, including
         - Payout card setup status,
         - Recently changed payout card status (fraud control)
+
+    :param request: PayoutCard Eligibility check request
+    :type request: EligibilityCheckRequest
+    :return: eligibility: Payout card eligibility status
+    :rtype: eligibility: PayoutCardEligibility
     """
 
     def __init__(
@@ -227,7 +237,12 @@ class CheckPayoutAccountBalance(
 ):
     """Instant Payout Balance Eligibility Check.
 
-    Check available balance status
+    Check available balance status.
+
+    :param request: Balance Eligibility check request
+    :type request: EligibilityCheckRequest
+    :return: eligibility: Balance eligibility status
+    :rtype: eligibility: BalanceEligibility
     """
 
     def __init__(
@@ -277,6 +292,11 @@ class CheckInstantPayoutDailyLimit(
 
     Check if there is already instant payout initiated. The time to query is based on Dx/Mx's own timezone. An initiated
     instant payout status includes new, pending, paid, failed. Error status instant payout is not included.
+
+    :param request: Daily Limit Eligibility check request
+    :type request: EligibilityCheckRequest
+    :return: eligibility: Daily Limit eligibility status
+    :rtype: eligibility: InstantPayoutDailyLimitEligibility
     """
 
     def __init__(
