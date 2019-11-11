@@ -23,7 +23,7 @@ from app.payout.models import (
     StripeFileHandle,
 )
 
-STRIPE_API_VERSION = "2019-10-17"
+STRIPE_API_VERSION = "2019-11-05"
 
 
 IdempotencyKey = Optional[str]
