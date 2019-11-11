@@ -100,6 +100,8 @@ async def create_cart_payment(
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT,
         ]:
             http_status_code = HTTP_400_BAD_REQUEST
         elif (
@@ -165,6 +167,8 @@ async def update_cart_payment(
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
             PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR,
+            PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT,
         ]:
             http_status_code = HTTP_400_BAD_REQUEST
         elif payment_error.error_code in [

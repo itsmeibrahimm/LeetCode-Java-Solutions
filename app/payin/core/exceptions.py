@@ -36,6 +36,8 @@ payin_error_message_maps = {
     "payin_45": "Cannot create payment.  Payment card cannot be processed.",
     "payin_46": "Cannot create payment.  Payment card number incorrect.",
     "payin_47": "An error occurred attempting your payment request.  Please try again later.",
+    "payin_48": "Invalid split payment payout account.  This is account is not configured correctly for payment use.",
+    "payin_49": "Cannot create payment.  Payment card cvc incorrect.",
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
@@ -86,6 +88,8 @@ class PayinErrorCode(str, Enum):
     PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR = "payin_45"
     PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR = "payin_46"
     PAYMENT_INTENT_CREATE_ERROR = "payin_47"
+    PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT = "payin_48"
+    PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR = "payin_49"
     PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
     PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
     PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"

@@ -1311,6 +1311,16 @@ class TestCartPayment:
             client, request_body, 400, "payin_45", False
         )
 
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_chargeDeclinedIncorrectCvc",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 400, "payin_49", False
+        )
+
     def test_legacy_payment_client_description(
         self,
         stripe_api: StripeAPISettings,

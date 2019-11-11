@@ -912,13 +912,21 @@ class CartPaymentInterface:
             error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR
             if parser.code == StripeErrorCode.card_declined:
                 error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR
+            elif parser.code == StripeErrorCode.incorrect_number:
+                error_code = (
+                    PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR
+                )
+            elif parser.code == StripeErrorCode.testmode_charges_only:
+                error_code = (
+                    PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT
+                )
             elif parser.code == StripeErrorCode.expired_card:
                 error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR
             elif parser.code == StripeErrorCode.processing_error:
                 error_code = PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR
-            elif parser.code == StripeErrorCode.incorrect_number:
+            elif parser.code == StripeErrorCode.incorrect_cvc:
                 error_code = (
-                    PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR
+                    PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR
                 )
             raise CartPaymentCreateError(
                 error_code=error_code,
