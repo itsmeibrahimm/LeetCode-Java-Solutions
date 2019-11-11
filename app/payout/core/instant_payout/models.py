@@ -186,6 +186,7 @@ class CreateAndSubmitInstantPayoutRequest(OperationRequest):
 
 
 class CreateAndSubmitInstantPayoutResponse(OperationResponse):
+    payout_account_id: int
     payout_id: int
     amount: Amount
     currency: Currency

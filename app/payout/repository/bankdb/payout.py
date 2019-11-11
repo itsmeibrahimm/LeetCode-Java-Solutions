@@ -106,33 +106,52 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
         end_time: Optional[datetime] = None,
         limit: Optional[int] = 10,
     ):
-        conditions = [payouts.payment_account_id == payout_account_id]
-
-        if statuses:
-            conditions.append(payouts.status.in_(statuses))
-        if start_time:
-            conditions.append(payouts.created_at.__ge__(start_time))
-        if end_time:
-            conditions.append(payouts.created_at.__le__(end_time))
-
-        stmt = (
-            payouts.table.select()
-            .where(and_(*conditions))
-            .order_by(desc(payouts.id))
-            .offset(offset)
-            .limit(limit)
+        override_stmt_timeout_in_ms = 10000
+        override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
+            override_stmt_timeout_in_ms
         )
-        rows = await self._database.replica().fetch_all(stmt)
-        if rows:
-            return [Payout.from_row(row) for row in rows]
-        else:
-            return []
+        async with self._database.master().transaction() as tx:
+            connection = tx.connection()
+
+            # 1. overwrite timeout
+            await connection.execute(override_stmt_timeout_stmt)
+
+            # 2. Query payout
+            conditions = [payouts.payment_account_id == payout_account_id]
+            if statuses:
+                conditions.append(payouts.status.in_(statuses))
+            if start_time:
+                conditions.append(payouts.created_at.__ge__(start_time))
+            if end_time:
+                conditions.append(payouts.created_at.__le__(end_time))
+
+            stmt = (
+                payouts.table.select()
+                .where(and_(*conditions))
+                .order_by(desc(payouts.id))
+                .offset(offset)
+                .limit(limit)
+            )
+            rows = await connection.fetch_all(stmt)
+            if rows:
+                return [Payout.from_row(row) for row in rows]
+            else:
+                return []
 
     async def create_payout_and_attach_to_transactions(
         self, request: CreatePayoutsRequest
     ) -> CreatePayoutsResponse:
-        async with self._database.master().transaction():
-            # Create fee transaction
+        override_stmt_timeout_in_ms = 10000
+        override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
+            override_stmt_timeout_in_ms
+        )
+        ts_now = datetime.utcnow()
+        async with self._database.master().transaction() as tx:
+            connection = tx.connection()
+            # 1. overwrite timeout
+            await connection.execute(override_stmt_timeout_stmt)
+
+            # 2. Create fee transaction
             transaction_create = TransactionCreateDBEntity(
                 amount=-request.fee,
                 # Put amount_paid as 0 to pass Pydantic validation
@@ -143,10 +162,7 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
                 target_id=None,
                 idempotency_key="instant-payout-fee-{}".format(request.idempotency_key),
             )
-
-            # Create fee transaction
-            ts_now = datetime.utcnow()
-            stmt = (
+            create_fee_transaction_stmt = (
                 transactions.table.insert()
                 .values(
                     transaction_create.dict(skip_defaults=True),
@@ -155,11 +171,11 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
                 )
                 .returning(*transactions.table.columns.values())
             )
-            row = await self._database.master().fetch_one(stmt)
+            row = await connection.fetch_one(create_fee_transaction_stmt)
             assert row is not None
             fee_transaction = TransactionDBEntity.from_row(row)
 
-            # Create payout
+            # 3. Create Payout
             payout_create = PayoutCreate(
                 amount=request.amount - request.fee,
                 payment_account_id=request.payout_account_id,
@@ -173,9 +189,20 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
                 token=_gen_token(),
                 fee_transaction_id=fee_transaction.id,
             )
+            create_payout_stmt = (
+                payouts.table.insert()
+                .values(
+                    payout_create.dict(skip_defaults=True),
+                    created_at=ts_now,
+                    updated_at=ts_now,
+                )
+                .returning(*payouts.table.columns.values())
+            )
+            row = await connection.fetch_one(create_payout_stmt)
+            assert row is not None
+            payout = Payout.from_row(row)
 
-            payout = await self.create_payout(payout_create)
-
+            # 4. Update transaction payout ids
             data = TransactionUpdateDBEntity(payout_id=payout.id)
             all_transaction_ids = request.transaction_ids + [fee_transaction.id]
             stmt = (
@@ -189,12 +216,12 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
                 .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
                 .returning(*transactions.table.columns.values())
             )
-            rows = await self._database.master().fetch_all(stmt)
+            rows = await connection.fetch_all(stmt)
             all_transactions = (
                 [TransactionDBEntity.from_row(row) for row in rows] if rows else []
             )
 
-            # Verify updated number of transactions matches number of input transaction
+            # 5. Verify updated number of transactions matches number of input transaction
             try:
                 assert len(all_transactions) == len(all_transaction_ids)
             except AssertionError as e:
@@ -202,7 +229,7 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
                     error_message="Updated transaction count not match."
                 ) from e
 
-            # Verify sum of transaction amount matches payout amount
+            # 6. Verify sum of transaction amount matches payout amount
             try:
                 assert (
                     sum([transaction.amount for transaction in all_transactions])

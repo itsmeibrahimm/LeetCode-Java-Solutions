@@ -310,6 +310,7 @@ class TestSubmitInstantPayout:
         assert response.status_code == 200
         response_data = response.json()
 
+        assert response_data.get("payout_account_id") == self.payout_account_id
         assert isinstance(response_data.get("payout_id"), int)
         assert (
             response_data.get("amount")
@@ -347,6 +348,7 @@ class TestSubmitInstantPayout:
         assert response.status_code == 200
         response_data = response.json()
 
+        assert response_data.get("payout_account_id") == self.payout_account_id
         assert isinstance(response_data.get("payout_id"), int)
         assert (
             response_data.get("amount")

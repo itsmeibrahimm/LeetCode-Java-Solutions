@@ -46,6 +46,9 @@ class InstantPayoutCreate(PaymentRequest):
 
 
 class InstantPayout(PaymentResponse):
+    payout_account_id: PayoutAccountId = Schema(
+        default=..., description="The payment account id."
+    )
     payout_id: int = Schema(default=..., description="Instant Payout Id.")
     amount: int = Schema(default=..., description="The amount of the Instant Payout.")
     currency: Currency = Schema(
