@@ -77,7 +77,7 @@ async def payment_http_exception_handler(
             error_message=exception.error_message,
             retryable=exception.retryable,
         )
-        logger.error(
+        logger.info(
             "api exception handler",
             type="payment error",
             endpoint=endpoint,
@@ -90,7 +90,7 @@ async def payment_http_exception_handler(
         )
     else:
         # default HTTP exception handling from the framework (eg. 404)
-        logger.error(
+        logger.info(
             "api exception handler",
             type="http error",
             endpoint=endpoint,
