@@ -25,13 +25,13 @@ module "payment-service-web" {
   service_container_port                    = "80"
   service_hpa_enable                        = "true"
   service_hpa_min_replicas                  = "8"
-  service_hpa_max_replicas                  = "15"
+  service_hpa_max_replicas                  = "16"
   service_hpa_cpu_target_avg_util           = "50"
 
   service_resource_requests_memory          = "4Gi"
   service_resource_limits_memory            = "4Gi"
-  service_resource_requests_cpu             = "1024m"
-  service_resource_limits_cpu               = "1024m"
+  service_resource_requests_cpu             = "2048m"
+  service_resource_limits_cpu               = "2048m"
 
   service_readiness_probe_path              = "/health"
   service_readiness_probe_init_delay        = 30

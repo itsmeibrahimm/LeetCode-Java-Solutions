@@ -26,8 +26,8 @@ module "payment-service-web" {
 
   service_resource_requests_memory          = "4Gi"
   service_resource_limits_memory            = "4Gi"
-  service_resource_requests_cpu             = "1024m"
-  service_resource_limits_cpu               = "1024m"
+  service_resource_requests_cpu             = "2048m"
+  service_resource_limits_cpu               = "2048m"
 
   service_readiness_probe_path              = "/health"
   service_readiness_probe_init_delay        = 30
