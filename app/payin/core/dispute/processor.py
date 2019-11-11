@@ -13,7 +13,7 @@ from app.payin.core.dispute.model import (
     DisputeChargeMetadata,
     Evidence,
 )
-from app.payin.core.dispute.types import DisputeIdType
+from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 
 
@@ -84,12 +84,12 @@ class DisputeProcessor:
 
     async def list_disputes(
         self,
+        reasons: List[ReasonType],
         dd_payment_method_id: str = None,
         stripe_payment_method_id: str = None,
         dd_stripe_card_id: int = None,
         dd_consumer_id: int = None,
         start_time: datetime = None,
-        reasons: List[str] = None,
         distinct: bool = False,
     ) -> DisputeList:
         """

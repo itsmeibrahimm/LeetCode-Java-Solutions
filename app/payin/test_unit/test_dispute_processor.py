@@ -1,7 +1,7 @@
 import pytest
 
 from app.payin.core.dispute.model import DisputeList
-from app.payin.core.dispute.types import DisputeIdType
+from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.tests.utils import (
     generate_dispute,
@@ -58,10 +58,25 @@ class TestDisputeProcessor:
             dd_stripe_card_id=None,
             dd_consumer_id=None,
             start_time=None,
-            reasons=None,
+            reasons=[dispute_list[0].reason],
             distinct=None,
         )
         assert result == dispute_list_object
+
+        general_reason_dispute = generate_dispute()
+        general_reason_dispute.reason = ReasonType.GENERAL
+        dispute_list.append(general_reason_dispute)
+        result = await dispute_processor.list_disputes(
+            dd_payment_method_id=1,
+            stripe_payment_method_id=None,
+            dd_stripe_card_id=None,
+            dd_consumer_id=None,
+            start_time=None,
+            reasons=[dispute_list[0].reason],
+            distinct=None,
+        )
+        assert result != dispute_list
+        assert general_reason_dispute not in result
 
     @pytest.mark.asyncio
     async def test_list_disputes_by_no_id(self, dispute_processor):
@@ -72,7 +87,7 @@ class TestDisputeProcessor:
                 dd_stripe_card_id=None,
                 dd_consumer_id=None,
                 start_time=None,
-                reasons=None,
+                reasons=[key.value for key in ReasonType],
                 distinct=None,
             )
         assert (

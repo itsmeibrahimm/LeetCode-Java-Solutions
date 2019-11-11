@@ -147,12 +147,12 @@ class DisputeClient:
 
     async def get_raw_disputes_list(
         self,
+        reasons: List[ReasonType],
         dd_payment_method_id: str = None,
         stripe_payment_method_id: str = None,
         dd_stripe_card_id: int = None,
         dd_consumer_id: int = None,
         start_time: datetime = None,
-        reasons: List[str] = None,
     ) -> List[Dispute]:
         # FIXME: code refactory needed here.
         if not (
@@ -167,10 +167,6 @@ class DisputeClient:
             )
         # Setting defaults
         dispute_db_entities: List[StripeDisputeDbEntity] = []
-        if reasons:
-            self.validate_reasons(reasons)
-        else:
-            reasons = self.VALID_REASONS
         if start_time is None:
             start_time = datetime(1970, 1, 1)  # Defaulting to epoch time
         # Business logic to get disputes list

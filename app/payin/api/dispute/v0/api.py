@@ -12,12 +12,12 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.types import CountryCode
-from app.payin.core.dispute.model import Evidence, DisputeChargeMetadata
 from app.commons.core.errors import PaymentError
+from app.commons.types import CountryCode
 from app.payin.core.dispute.model import Dispute, DisputeList
+from app.payin.core.dispute.model import Evidence, DisputeChargeMetadata
 from app.payin.core.dispute.processor import DisputeProcessor
-from app.payin.core.dispute.types import DisputeIdType
+from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import PayinErrorCode
 
 api_tags = ["DisputeV0"]
@@ -119,7 +119,7 @@ async def list_disputes(
     dd_stripe_card_id: int = None,
     dd_consumer_id: int = None,
     start_time: datetime = None,
-    reasons: List[str] = Query(None),
+    reasons: List[ReasonType] = Query([key.value for key in ReasonType]),
     distinct: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     dispute_processor: DisputeProcessor = Depends(DisputeProcessor),
@@ -131,7 +131,7 @@ async def list_disputes(
     - **dd_stripe_card_id**: [int] Primary key in Stripe Card table
     - **dd_consumer_id**: [int]: Primary key in Consumer table
     - **start_time**: [datetime] Start date for disputes.Default will be the epoch time
-    - **reasons**: List[str] List of reasons for dispute. Default value considers all the reasons mentioned
+    - **reasons**: List[ReasonType] List of reasons for dispute. Default value considers all the reasons mentioned
                     on https://stripe.com/docs/api/disputes/object#dispute_object-reason
     - **distinct**: [bool] Gives count of distinct disputes according to charge id. Default to False
     """

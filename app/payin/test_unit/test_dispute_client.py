@@ -3,7 +3,7 @@ from asynctest import MagicMock
 
 from app.commons.types import PgpCode
 from app.commons.utils.uuid import generate_object_uuid
-from app.payin.core.dispute.types import DisputeIdType
+from app.payin.core.dispute.types import DisputeIdType, ReasonType
 from app.payin.core.exceptions import DisputeReadError, PayinErrorCode
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.repository.payment_method_repo import (
@@ -95,7 +95,7 @@ class TestDisputeClient:
             dd_stripe_card_id=None,
             dd_consumer_id=None,
             start_time=None,
-            reasons=None,
+            reasons=[key.value for key in ReasonType],
         )
         assert [
             dispute_entity.to_stripe_dispute() for dispute_entity in dispute_entity_list
