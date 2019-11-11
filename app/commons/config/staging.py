@@ -44,7 +44,12 @@ def create_app_config() -> AppConfig:
         PURCHASECARD_MAINDB_MASTER_URL=Secret(name="purchasecard_maindb_url"),
         PURCHASECARD_MAINDB_REPLICA_URL=Secret(name="purchasecard_maindb_replica_url"),
         DEFAULT_DB_CONFIG=DBConfig(
-            replica_pool_max_size=5, master_pool_max_size=5, debug=False
+            replica_pool_max_size=5,
+            master_pool_max_size=5,
+            debug=False,
+            # set to 10 sec to avoid thrashing DB server on client side
+            # highest p99 latency from payment service around 10sec: https://metrics.wavefront.com/u/YWSfZCttKN
+            statement_timeout_sec=10,
         ),
         AVAILABLE_MAINDB_REPLICAS=[],
         STRIPE_US_SECRET_KEY=Secret(
