@@ -67,7 +67,7 @@ async def check_instant_payout_eligibility(
     except OverflowError as e:
         raise BadRequestError(
             error_code=BadRequestErrorCode.INVALID_VALUE_ERROR,
-            err_message=payment_error_message_maps[
+            error_message=payment_error_message_maps[
                 BadRequestErrorCode.INVALID_VALUE_ERROR
             ],
         ) from e

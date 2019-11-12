@@ -64,6 +64,11 @@ class SubmitInstantPayout(
         self.logger = logger
 
     async def _execute(self) -> SubmitInstantPayoutResponse:
+        self.logger.info(
+            "[Instant Payout Submit]: Submitting Instant Payout",
+            request=self.request.dict(),
+        )
+
         # Create StripePayoutRequest record
         request_field = {
             "country": self.request.country,
@@ -115,6 +120,10 @@ class SubmitInstantPayout(
         except (PGPConnectionError, PGPApiError, PGPRateLimitError) as e:
             # Handle PGPConnectionError, PGPApiError and mark payout as error to avoid daily limit
             # And detach transactions
+            self.logger.warn(
+                "[Instant Payout Submit]: fail to submit Instant Payout due to  PGP issue, detaching transactions",
+                request=self.request.dict(),
+            )
             status_to_update = InstantPayoutStatusType.ERROR
             error = json.dumps(e.error_message)
             received_at = utc_now
@@ -125,7 +134,11 @@ class SubmitInstantPayout(
         except InstantPayoutCardDeclineError as e:
             # Handle InstantPayoutCardDeclineError, and mark payout status as failed to limit retry
             # And detach transactions
-            status_to_update = InstantPayoutStatusType.ERROR
+            self.logger.warn(
+                "[Instant Payout Submit]: fail to submit Instant Payout due to card decline, detaching transactions",
+                request=self.request.dict(),
+            )
+            status_to_update = InstantPayoutStatusType.FAILED
             error = json.dumps(e.error_message)
             received_at = utc_now
             await self.transaction_repo.set_transaction_payout_id_by_ids(

@@ -1,5 +1,6 @@
 import uuid
 import pytest
+from asynctest import Mock
 
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import Amount, Destination, Currency
@@ -84,7 +85,7 @@ class TestSubmitInstantPayout:
             stripe_managed_account_id=self.connected_account_id, country=CountryCode.US
         )
         sma_balance_check_op = CheckSMABalance(
-            sma_balance_check_request, stripe_async_client
+            sma_balance_check_request, stripe_async_client, logger=Mock()
         )
         assert await sma_balance_check_op.execute() == SMABalance(balance=0)
 
@@ -104,6 +105,7 @@ class TestSubmitInstantPayout:
             stripe_async_client,
             payout_repo,
             transaction_repo,
+            logger=Mock(),
         )
         stripe_transfer = await submit_sma_transfer_op.execute()
         assert stripe_transfer.stripe_transfer_id.startswith("tr_")
@@ -136,6 +138,7 @@ class TestSubmitInstantPayout:
             stripe_payout_request_repo=stripe_payout_request_repo,
             payout_repo=payout_repo,
             transaction_repo=transaction_repo,
+            logger=Mock(),
         )
         stripe_payout = await submit_instant_payout_op.execute()
         assert stripe_payout.stripe_payout_id.startswith("po_")

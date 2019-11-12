@@ -326,6 +326,7 @@ class InstantPayoutErrorCode(str, Enum):
     AMOUNT_BALANCE_MISMATCH = "amount_balance_mismatch"
     CREATE_PAYOUT_ERROR = "create_payout_error"
     CARD_DECLINE_ERROR = "card_decline_error"
+    CURRENCY_MISMATCH = "currency_mismatch"
 
 
 instant_payout_error_message_maps: Dict[str, str] = {
@@ -339,6 +340,7 @@ instant_payout_error_message_maps: Dict[str, str] = {
     InstantPayoutErrorCode.TRANSACTIONS_PAYOUT_ID_NOT_EMPTY: "Transactions can not be part of ongoing Instant Payout.",
     InstantPayoutErrorCode.AMOUNT_BALANCE_MISMATCH: "Payout amount does not match available balance.",
     InstantPayoutErrorCode.CARD_DECLINE_ERROR: "Can not deposit instant payout due to card decline.",
+    InstantPayoutErrorCode.CURRENCY_MISMATCH: "The input currency does not match PGP provider currency.",
 }
 
 

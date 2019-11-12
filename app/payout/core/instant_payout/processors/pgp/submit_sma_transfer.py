@@ -56,6 +56,10 @@ class SubmitSMATransfer(AsyncOperation[SMATransferRequest, SMATransferResponse])
         self.logger = logger
 
     async def _execute(self) -> SMATransferResponse:
+        self.logger.info(
+            "[Instant Payout Submit]: Submitting SMA transfer",
+            request=self.request.dict(),
+        )
         # Create StripeManagedAccountTransfer record
         data = StripeManagedAccountTransferCreate(
             amount=self.request.amount,
@@ -87,6 +91,11 @@ class SubmitSMATransfer(AsyncOperation[SMATransferRequest, SMATransferResponse])
         except (PGPConnectionError, PGPApiError, PGPRateLimitError) as e:
             # Handle PGPConnectionError, PGPApiError and mark payout as error to avoid daily limit
             # And detach transactions
+            self.logger.info(
+                "[Instant Payout Submit]: fail to submit SMA transfer, detaching transactions",
+                request=self.request.dict(),
+                error=str(e),
+            )
             payout_update = PayoutUpdate(
                 status=InstantPayoutStatusType.ERROR, error=json.dumps(e.error_message)
             )

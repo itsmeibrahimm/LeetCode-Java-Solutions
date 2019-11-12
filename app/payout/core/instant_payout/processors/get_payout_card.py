@@ -41,6 +41,10 @@ class GetPayoutCard(AsyncOperation[GetPayoutCardRequest, PayoutCardResponse]):
                 stripe_card_id=self.stripe_card_id
             )
             if payout_card is None:
+                self.logger.warn(
+                    "[Instant Payout Submit]: fail to get payout card by stripe id",
+                    request=self.request.dict(),
+                )
                 raise InstantPayoutBadRequestError(
                     InstantPayoutErrorCode.PAYOUT_CARD_NOT_EXIST,
                     error_message=instant_payout_error_message_maps[
@@ -66,6 +70,10 @@ class GetPayoutCard(AsyncOperation[GetPayoutCardRequest, PayoutCardResponse]):
         payout_card = payout_cards[0] if payout_cards else None
 
         if not payout_card:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to no default payout card",
+                request=self.request.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.NO_DEFAULT_PAYOUT_CARD,
                 error_message=instant_payout_error_message_maps[

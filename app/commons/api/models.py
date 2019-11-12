@@ -126,11 +126,11 @@ class BadRequestError(PaymentException):
     Raised when can not perform client's request.
     """
 
-    def __init__(self, error_code, err_message):
+    def __init__(self, error_code, error_message):
         super().__init__(
             http_status_code=HTTP_400_BAD_REQUEST,
             error_code=error_code,
-            error_message=err_message,
+            error_message=error_message,
             retryable=False,
         )
 

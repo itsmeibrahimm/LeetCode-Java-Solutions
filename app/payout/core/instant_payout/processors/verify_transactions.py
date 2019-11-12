@@ -43,6 +43,10 @@ class VerifyTransactions(
             transaction.state in PAYABLE_TRANSACTION_STATES
             for transaction in transactions
         ):
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to not all transactions are payable",
+                request=self.request.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.TRANSACTIONS_NOT_ALL_PAYABLE,
                 error_message=instant_payout_error_message_maps[
@@ -51,6 +55,10 @@ class VerifyTransactions(
             )
         # All transactions' transfer_id must be None
         if not all(transaction.transfer_id is None for transaction in transactions):
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to not all transactions transfer id is null",
+                request=self.request.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.TRANSACTIONS_TRANSFER_ID_NOT_EMPTY,
                 error_message=instant_payout_error_message_maps[
@@ -59,6 +67,10 @@ class VerifyTransactions(
             )
         # All transactions' payout_id must be None
         if not all(transaction.payout_id is None for transaction in transactions):
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to not all transactions payout id is null",
+                request=self.request.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.TRANSACTIONS_PAYOUT_ID_NOT_EMPTY,
                 error_message=instant_payout_error_message_maps[
@@ -67,6 +79,10 @@ class VerifyTransactions(
             )
         # Sum of transaction must match amount
         if not sum([transaction.amount for transaction in transactions]) == self.amount:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to transactions amount not match input amount",
+                request=self.request.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.AMOUNT_BALANCE_MISMATCH,
                 error_message=instant_payout_error_message_maps[

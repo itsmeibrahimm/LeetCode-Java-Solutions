@@ -1,7 +1,10 @@
 from aioredlock import Aioredlock
 from structlog import BoundLogger
 
+from app.commons.lock.locks import PaymentLock
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.payout.constants import PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT
+from app.payout.core.account.utils import COUNTRY_TO_CURRENCY_CODE
 from app.payout.core.errors import (
     InstantPayoutBadRequestError,
     InstantPayoutErrorCode,
@@ -39,7 +42,10 @@ from app.payout.core.instant_payout.processors.pgp.submit_sma_transfer import (
 from app.payout.core.instant_payout.processors.verify_transactions import (
     VerifyTransactions,
 )
-from app.payout.core.instant_payout.utils import create_idempotency_key
+from app.payout.core.instant_payout.utils import (
+    create_idempotency_key,
+    get_payout_account_lock_name,
+)
 from app.payout.repository.bankdb.payout import PayoutRepositoryInterface
 from app.payout.repository.bankdb.payout_card import PayoutCardRepositoryInterface
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepositoryInterface
@@ -94,7 +100,12 @@ class InstantPayoutProcessors:
         self, request: CreateAndSubmitInstantPayoutRequest
     ) -> CreateAndSubmitInstantPayoutResponse:
 
-        # Check Payout Account status, it's required to perform an instant payout
+        self.logger.info(
+            "[Instant Payout Submit]: Creating and submitting instant payout",
+            request=request.dict(),
+        )
+
+        # 1. Check Payout Account status, it's required to perform an instant payout
         check_request = EligibilityCheckRequest(
             payout_account_id=request.payout_account_id
         )
@@ -103,12 +114,16 @@ class InstantPayoutProcessors:
         )
         result = await check_payout_account_op.execute()
         if result.eligible is False:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to payout account ineligible",
+                eligibility=result.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.INVALID_REQUEST,
                 error_message=str(result.reason),
             )
 
-        # Get Payout Card. If stripe card id provided, check its existence; else retrieve default payout card
+        # 2. Get Payout Card. If stripe card id provided, check its existence; else retrieve default payout card
         get_payout_card_request = GetPayoutCardRequest(
             payout_account_id=request.payout_account_id, stripe_card_id=request.card
         )
@@ -122,8 +137,12 @@ class InstantPayoutProcessors:
         payout_method_id = payout_card_response.payout_card_id
         payout_card_stripe_id = payout_card_response.stripe_card_id
 
-        # raise error if amount is less than fee
+        # 3. Check input amount, raise error if amount is less than fee
         if request.amount < InstantPayoutFees.STANDARD_FEE:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to amount less than fee",
+                request=request.dict(),
+            )
             raise InstantPayoutBadRequestError(
                 error_code=InstantPayoutErrorCode.AMOUNT_LESS_THAN_FEE,
                 error_message=instant_payout_error_message_maps[
@@ -131,7 +150,68 @@ class InstantPayoutProcessors:
                 ],
             )
 
-        # verify transactions and get all unpaid transaction ids
+        # 4. Get stripe_id of StripeManagedAccount, it's required to submit sma transfer
+        payout_account = await self.payout_account_repo.get_payment_account_by_id(
+            payment_account_id=request.payout_account_id
+        )
+
+        if not payout_account:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to payout account not exist",
+                request=request.dict(),
+            )
+            raise InstantPayoutBadRequestError(
+                error_code=InstantPayoutErrorCode.PAYOUT_ACCOUNT_NOT_EXIST,
+                error_message=instant_payout_error_message_maps[
+                    InstantPayoutErrorCode.PAYOUT_ACCOUNT_NOT_EXIST
+                ],
+            )
+
+        if not payout_account.account_id:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to pgp account id not exist",
+                request=request.dict(),
+            )
+            raise InstantPayoutBadRequestError(
+                error_code=InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP,
+                error_message=instant_payout_error_message_maps[
+                    InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP
+                ],
+            )
+
+        stripe_managed_account = await self.payout_account_repo.get_stripe_managed_account_by_id(
+            payout_account.account_id
+        )
+        if not stripe_managed_account:
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to pgp account not exist",
+                request=request.dict(),
+            )
+            raise InstantPayoutBadRequestError(
+                error_code=InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP,
+                error_message=instant_payout_error_message_maps[
+                    InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP
+                ],
+            )
+
+        if (
+            COUNTRY_TO_CURRENCY_CODE.get(
+                stripe_managed_account.country_shortname.upper(), None
+            )
+            != request.currency.upper()
+        ):
+            self.logger.warn(
+                "[Instant Payout Submit]: fail due to currency mismatch",
+                request=request.dict(),
+            )
+            raise InstantPayoutBadRequestError(
+                error_code=InstantPayoutErrorCode.CURRENCY_MISMATCH,
+                error_message=instant_payout_error_message_maps[
+                    InstantPayoutErrorCode.CURRENCY_MISMATCH
+                ],
+            )
+
+        # 5. verify transactions and get all unpaid transaction ids
         verify_transactions_request = VerifyTransactionsRequest(
             payout_account_id=request.payout_account_id, amount=request.amount
         )
@@ -145,7 +225,12 @@ class InstantPayoutProcessors:
         transaction_ids = verify_transactions_response.transaction_ids
         idempotency_key = create_idempotency_key(prefix=None)
 
-        # Atomically create payout, fee transaction & attach payout_id to transactions
+        self.logger.info(
+            "[Instant Payout Submit]: Get all transactions",
+            transaction_ids=transaction_ids,
+        )
+
+        # 6. Atomically create payout, fee transaction & attach payout_id to transactions
         create_payout_request = CreatePayoutsRequest(
             payout_account_id=request.payout_account_id,
             amount=request.amount,
@@ -155,43 +240,23 @@ class InstantPayoutProcessors:
             transaction_ids=transaction_ids,
             fee=InstantPayoutFees.STANDARD_FEE,
         )
-        create_payout_response = await self.payout_repo.create_payout_and_attach_to_transactions(
-            request=create_payout_request
+        lock_name = get_payout_account_lock_name(request.payout_account_id)
+
+        async with PaymentLock(
+            lock_name,
+            self.payment_lock_manager,
+            lock_timeout=PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT,
+        ):
+            create_payout_response = await self.payout_repo.create_payout_and_attach_to_transactions(
+                request=create_payout_request
+            )
+        self.logger.info(
+            "[Instant Payout Submit]: Created Instant Payout",
+            create_payout_request=create_payout_request.dict(),
+            create_payout_response=create_payout_response.dict(),
         )
 
-        # Get stripe_id of StripeManagedAccount
-        payout_account = await self.payout_account_repo.get_payment_account_by_id(
-            payment_account_id=request.payout_account_id
-        )
-
-        if not payout_account:
-            raise InstantPayoutBadRequestError(
-                error_code=InstantPayoutErrorCode.PAYOUT_ACCOUNT_NOT_EXIST,
-                error_message=instant_payout_error_message_maps[
-                    InstantPayoutErrorCode.PAYOUT_ACCOUNT_NOT_EXIST
-                ],
-            )
-
-        if not payout_account.account_id:
-            raise InstantPayoutBadRequestError(
-                error_code=InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP,
-                error_message=instant_payout_error_message_maps[
-                    InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP
-                ],
-            )
-
-        stripe_managed_account = await self.payout_account_repo.get_stripe_managed_account_by_id(
-            payout_account.account_id
-        )
-        if not stripe_managed_account:
-            raise InstantPayoutBadRequestError(
-                error_code=InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP,
-                error_message=instant_payout_error_message_maps[
-                    InstantPayoutErrorCode.PGP_ACCOUNT_NOT_SETUP
-                ],
-            )
-
-        # Check Stripe Connected Account Balance
+        # 7. Check Stripe Connected Account Balance
         check_sma_balance_request = CheckSMABalanceRequest(
             stripe_managed_account_id=stripe_managed_account.stripe_id,
             country=stripe_managed_account.country_shortname,
@@ -202,8 +267,9 @@ class InstantPayoutProcessors:
             logger=self.logger,
         )
         sma_balance = await check_sma_balance_op.execute()
+
+        # 8. Submit SMA Transfer if needed
         if sma_balance.balance < create_payout_response.amount:
-            # Submit SMA Transfer
             amount_needed = create_payout_response.amount - sma_balance.balance
             sma_transfer_request = SMATransferRequest(
                 payout_id=create_payout_response.payout_id,
@@ -224,7 +290,7 @@ class InstantPayoutProcessors:
             )
             await submit_sma_transfer_op.execute()
 
-        # Submit Instant Payout
+        # 9. Submit Instant Payout
         submit_instant_payout_request = SubmitInstantPayoutRequest(
             payout_id=create_payout_response.payout_id,
             transaction_ids=transaction_ids,
@@ -246,6 +312,11 @@ class InstantPayoutProcessors:
             logger=self.logger,
         )
         submit_instant_payout_response = await submit_instant_payout_op.execute()
+
+        self.logger.info(
+            "[Instant Payout Submit]: Succeed to submit Instant Payout",
+            response=submit_instant_payout_response.dict(),
+        )
 
         return CreateAndSubmitInstantPayoutResponse(
             payout_account_id=request.payout_account_id,
