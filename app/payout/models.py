@@ -193,5 +193,5 @@ BankUpdateHistoryOwnerId = int
 
 
 class BankUpdateHistoryOwnerType(str, Enum):
-    DASHER = "dasher"
-    STORE = "store"
+    DASHER = "Dasher"
+    STORE = "Store"
