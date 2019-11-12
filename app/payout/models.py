@@ -129,7 +129,6 @@ class TransferMethodType(object):
     )  # transfer method type for merchants whose payment type is cash_on_delivery
 
 
-# todo: why this does not have a 1:1 with TransferMethodType??
 TRANSFER_METHOD_CHOICES = (
     (TransferMethodType.STRIPE, "Stripe"),
     (TransferMethodType.CHECK, "Check"),

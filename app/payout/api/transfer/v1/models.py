@@ -58,6 +58,18 @@ class CreateTransfer(PaymentRequest):
     )
 
 
+class ListTransfers(PaymentRequest):
+    """
+    Request model for listing transfers with given criteria
+    """
+
+    payout_account_ids: Optional[str] = Schema(
+        default=None, description="Comma separated payout_account ids"
+    )
+    offset: Optional[int] = Schema(default=None, description="Offset of the request")
+    limit: Optional[int] = Schema(default=None, description="Limit of the request")
+
+
 class SubmitTransferResponse(PaymentResponse):
     pass
 
@@ -116,3 +128,8 @@ class Transfer(PaymentResponse):
     submitted_by_id: Optional[int] = Schema(
         default=None, description="User id that submitted the transfer"
     )
+
+
+class TransferList(PaymentResponse):
+    count: int = Schema(default=..., description="Number of results")
+    transfer_list: List[Transfer] = Schema(default=..., description="List of transfers")

@@ -4,9 +4,13 @@ import pytest
 
 from app.commons.database.infra import DB
 from app.payout.repository.maindb.model.transfer import TransferUpdate, TransferStatus
+from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
-from app.payout.test_integration.utils import prepare_and_insert_transfer
+from app.payout.test_integration.utils import (
+    prepare_and_insert_transfer,
+    prepare_and_insert_payment_account,
+)
 from app.testcase_utils import validate_expected_items_in_dict
 
 
@@ -16,6 +20,10 @@ class TestTransferRepository:
     @pytest.fixture
     def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
         return TransferRepository(database=payout_maindb)
+
+    @pytest.fixture
+    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
+        return PaymentAccountRepository(database=payout_maindb)
 
     @pytest.fixture
     def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
@@ -83,6 +91,46 @@ class TestTransferRepository:
         assert len(new_transfer_ids) - len(original_transfer_ids) == 1
         diff = list(set(new_transfer_ids) - set(original_transfer_ids))
         assert diff[0] == transfer.id
+
+    async def test_get_transfers_by_payment_account_ids_and_count_not_found(
+        self, transfer_repo
+    ):
+        transfers, count = await transfer_repo.get_transfers_by_payment_account_ids_and_count(
+            payment_account_ids=[], offset=0, limit=10
+        )
+        assert len(transfers) == 0
+        assert count == 0
+
+    async def test_get_transfers_by_payment_account_ids_success(
+        self, transfer_repo, payment_account_repo
+    ):
+        payment_account_a = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+        payment_account_b = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+
+        transfer_a = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_a.id
+        )
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_a.id
+        )
+        transfer_c = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, payment_account_id=payment_account_b.id
+        )
+        transfers, count = await transfer_repo.get_transfers_by_payment_account_ids_and_count(
+            payment_account_ids=[payment_account_a.id], offset=0, limit=1
+        )
+        # due to limit, the return transfers list length should be 1
+        # while the total number of transfers meet the requirements before limit should be 2
+        # since the result is sorted by transfer id desc, the transfer inserted later should be returned
+        assert len(transfers) == 1
+        assert count == 2
+        assert transfer_b in transfers
+        assert transfer_a not in transfers
+        assert transfer_c not in transfers
 
     async def test_get_unsubmitted_transfer_ids_not_found(self, transfer_repo):
         timestamp = datetime.now(timezone.utc) + timedelta(days=1)

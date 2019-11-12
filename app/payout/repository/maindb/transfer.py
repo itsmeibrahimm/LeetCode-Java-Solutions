@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
-from sqlalchemy import and_
+from sqlalchemy import and_, desc
 from typing_extensions import final
 
 from app.commons import tracing
@@ -45,6 +45,12 @@ class TransferRepositoryInterface(ABC):
 
     @abstractmethod
     async def get_unsubmitted_transfer_ids(self, created_before: datetime) -> List[int]:
+        pass
+
+    @abstractmethod
+    async def get_transfers_by_payment_account_ids_and_count(
+        self, payment_account_ids: List[int], offset: int, limit: int
+    ) -> Tuple[List[Transfer], int]:
         pass
 
 
@@ -98,6 +104,30 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
             return [transfer.id for transfer in results]
         else:
             return []
+
+    async def get_transfers_by_payment_account_ids_and_count(
+        self, payment_account_ids: List[int], offset: int, limit: int
+    ) -> Tuple[List[Transfer], int]:
+        query = and_(
+            transfers.payment_account_id.isnot(None),
+            transfers.payment_account_id.in_(payment_account_ids),
+        )
+        get_transfers_stmt = (
+            transfers.table.select()
+            .where(query)
+            .order_by(desc(transfers.id))
+            .offset(offset)
+            .limit(limit)
+        )
+        rows = await self._database.replica().fetch_all(get_transfers_stmt)
+        results = [Transfer.from_row(row) for row in rows] if rows else []
+
+        count_stmt = transfers.table.count().where(query)
+        count = 0
+        count_fetched = await self._database.replica().fetch_value(count_stmt)
+        if count_fetched:
+            count = count_fetched
+        return results, int(count)
 
     async def get_unsubmitted_transfer_ids(self, created_before: datetime) -> List[int]:
         query = and_(

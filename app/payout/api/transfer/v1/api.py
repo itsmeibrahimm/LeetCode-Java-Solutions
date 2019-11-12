@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Body, Path
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
 )
+
+from fastapi import APIRouter, Depends, Body, Path
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.transfer.v1 import models as transfer_models
 from app.payout.core.transfer.processor import TransferProcessors
@@ -12,6 +13,7 @@ from app.payout.core.transfer.processors.create_transfer import CreateTransferRe
 from app.payout.core.transfer.processors.get_transfer_by_id import (
     GetTransferByIdRequest,
 )
+from app.payout.core.transfer.processors.list_transfers import ListTransfersRequest
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
 from app.payout.models import TransferId
 from app.payout.service import create_transfer_processors
@@ -96,3 +98,37 @@ async def get_transfer_by_id(
         get_transfer_by_id_request
     )
     return transfer_models.Transfer(**get_transfer_by_id_response.dict())
+
+
+@router.get(
+    "/",
+    operation_id="ListTransfers",
+    status_code=HTTP_200_OK,
+    responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def list_transfers(
+    body: transfer_models.ListTransfers = Body(
+        ..., description="Request body for listing transfers"
+    ),
+    transfer_processors: TransferProcessors = Depends(create_transfer_processors),
+):
+    payout_account_id_list = None
+    if body.payout_account_ids:
+        payout_account_id_list = list(set(body.payout_account_ids.split(",")))
+
+    offset = 0
+    limit = 50
+    if body.offset:
+        offset = body.offset
+
+    if body.limit:
+        limit = body.limit
+
+    list_transfers_request = ListTransfersRequest(
+        payment_account_ids=payout_account_id_list, offset=offset, limit=limit
+    )
+    list_transfers_response = await transfer_processors.list_transfers(
+        list_transfers_request
+    )
+    return transfer_models.TransferList(**list_transfers_response.transfers.dict())

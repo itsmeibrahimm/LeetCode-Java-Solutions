@@ -9,6 +9,10 @@ from app.payout.core.transfer.processors.get_transfer_by_id import (
     GetTransferByIdRequest,
     GetTransferById,
 )
+from app.payout.core.transfer.processors.list_transfers import (
+    ListTransfersRequest,
+    ListTransfers,
+)
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
     SubmitTransfer,
@@ -132,3 +136,9 @@ class TransferProcessors:
             request=request, transfer_repo=self.transfer_repo
         )
         return await get_transfer_by_id_op.execute()
+
+    async def list_transfers(self, request: ListTransfersRequest):
+        list_transfers_op = ListTransfers(
+            request=request, transfer_repo=self.transfer_repo
+        )
+        return await list_transfers_op.execute()
