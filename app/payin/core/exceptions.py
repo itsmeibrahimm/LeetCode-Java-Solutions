@@ -4,7 +4,7 @@ from typing import Optional
 from app.commons.core.errors import PaymentError
 from app.payin.core.cart_payment.types import IntentStatus
 
-payin_error_message_maps = {
+_payin_error_message_maps = {
     "payin_1": "Invalid data types. Please verify your input again!",
     "payin_2": "Error returned from Payment Provider.",
     "payin_3": "Payer already exists.",
@@ -61,6 +61,10 @@ payin_error_message_maps = {
 
 
 class PayinErrorCode(str, Enum):
+    """
+    Enumeration of all Pay-In Service pre-defined error codes.
+    """
+
     CART_PAYMENT_CREATE_INVALID_DATA = "payin_60"
     CART_PAYMENT_NOT_FOUND = "payin_61"
     CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID = "payin_65"
@@ -114,11 +118,27 @@ class PayinErrorCode(str, Enum):
     DISPUTE_UPDATE_DB_ERROR = "payin_111"
     COMMANDO_DISABLED_ENDPOINT = "payin_800"
 
+    def __new__(cls, value):
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        # Update class level docstring per each enum item's message
+        cls.__doc__ = f"{cls.__doc__}\n\n[{obj.value}]: {obj.message}"
+        return obj
 
-# TODO Enhance errors to allow us to declare here the response codes they should map to
-# (e.g. if it is permission related and should result in 403, or data existence related
-# and should map to 404, etc).
-class PayinError(PaymentError):
+    @property
+    def message(self) -> str:
+        """
+        Descriptive message for each error code.
+        Whenever new error code added, need to add corresponding entry in the message map.
+        """
+        return _payin_error_message_maps[self.value]
+
+    @classmethod
+    def known_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
+
+
+class PayinError(PaymentError[PayinErrorCode]):
     """
     Base exception class for payin. This is base class that can be inherited by
     each business operation layer with corresponding sub error class and
@@ -134,7 +154,7 @@ class PayinError(PaymentError):
         :param retryable: identify if the error is retryable or not.
         """
         super(PayinError, self).__init__(
-            error_code.value, payin_error_message_maps[error_code.value], retryable
+            error_code.value, error_code.message, retryable
         )
 
 

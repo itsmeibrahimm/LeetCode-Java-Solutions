@@ -112,19 +112,26 @@ class ApiRouterBuilder:
     3. include grouped router into a FastApi app
     """
 
-    _routers: Dict[str, fastapi_routing.APIRouter]
+    _prefix_to_router: Dict[str, fastapi_routing.APIRouter]
+    _routers: List[fastapi_routing.APIRouter]
     _common_dependencies: List[Depends]
     _common_responses: Dict[Union[int, str], Dict[str, Any]]
 
     def __init__(self):
-        self._routers = {}
+        self._prefix_to_router = {}
+        self._routers = []
         self._common_dependencies = []
         self._common_responses = {}
 
-    def add_sub_routers(
+    def add_sub_routers_with_prefix(
         self, prefix_to_router: Dict[str, fastapi_routing.APIRouter]
     ) -> "ApiRouterBuilder":
-        self._routers.update(prefix_to_router)
+        self._prefix_to_router.update(prefix_to_router)
+
+        return self
+
+    def add_sub_routers(self, *routers: fastapi_routing.APIRouter):
+        self._routers.extend(routers)
         return self
 
     def add_common_dependencies(self, *deps: Callable) -> "ApiRouterBuilder":
@@ -148,8 +155,10 @@ class ApiRouterBuilder:
 
     def as_router(self) -> APIRouter:
         root_router: APIRouter = APIRouter()
-        for prefix, router in self._routers.items():
+        for prefix, router in self._prefix_to_router.items():
             root_router.include_router(router, prefix=prefix)
+        for router in self._routers:
+            root_router.include_router(router)
         return root_router
 
 

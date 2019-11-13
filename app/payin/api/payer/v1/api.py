@@ -1,24 +1,22 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from structlog.stdlib import BoundLogger
-
-from app.commons.context.req_context import get_logger_from_req
-from app.commons.core.errors import PaymentError
-from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequestV1
-from app.payin.core.exceptions import PayinErrorCode, payin_error_message_maps
-from app.payin.core.payer.model import Payer
-
 from starlette.status import (
+    HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_200_OK,
     HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_500_INTERNAL_SERVER_ERROR,
 )
+from structlog.stdlib import BoundLogger
 
+from app.commons.api.models import PaymentErrorResponseBody, PaymentException
+from app.commons.context.req_context import get_logger_from_req
+from app.commons.core.errors import PaymentError
+from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerRequestV1
+from app.payin.core.exceptions import PayinErrorCode
+from app.payin.core.payer.model import Payer
 from app.payin.core.payer.v1.processor import PayerProcessorV1
 
 api_tags = ["PayerV1"]
@@ -68,9 +66,7 @@ async def create_payer(
             raise PaymentException(
                 http_status_code=HTTP_422_UNPROCESSABLE_ENTITY,
                 error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
-                error_message=payin_error_message_maps[
-                    PayinErrorCode.PAYER_CREATE_INVALID_DATA.value
-                ],
+                error_message=PayinErrorCode.PAYER_CREATE_INVALID_DATA.message,
                 retryable=False,
             )
 
@@ -203,8 +199,6 @@ def _verify_payment_method_id(request: UpdatePayerRequestV1):
         raise PaymentException(
             http_status_code=HTTP_400_BAD_REQUEST,
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-            error_message=payin_error_message_maps[
-                PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE
-            ],
+            error_message=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE.message,
             retryable=False,
         )

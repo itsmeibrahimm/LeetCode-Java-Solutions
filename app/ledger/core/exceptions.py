@@ -38,7 +38,7 @@ class LedgerErrorCode(str, Enum):
     MX_TXN_OPERATIONAL_ERROR = "ledger_21"
 
 
-class LedgerError(PaymentError):
+class LedgerError(PaymentError[LedgerErrorCode]):
     """
     Base exception class for ledger. This is base class that can be inherited by
     each business operation layer with corresponding sub error class and

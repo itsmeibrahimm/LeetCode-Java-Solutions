@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.commons.api.exceptions import register_payment_exception_handler
+from app.commons.api.exceptions import register_base_payment_exception_handler
 from app.commons.auth.service_auth import ApiSecretRouteAuthorizer
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
@@ -27,10 +27,12 @@ def make_purchasecard_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Mount routers
     default_payment_router_builder().add_common_dependencies(
         ApiSecretRouteAuthorizer(config.PURCHASECARD_SERVICE_ID)
-    ).add_sub_routers({"/user": user.v0.router, "/card": card.v0.router}).attach_to_app(
+    ).add_sub_routers_with_prefix(
+        {"/user": user.v0.router, "/card": card.v0.router}
+    ).attach_to_app(
         app_v0
     )
 
-    register_payment_exception_handler(app_v0)
+    register_base_payment_exception_handler(app_v0)
 
     return app_v0

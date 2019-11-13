@@ -4,7 +4,7 @@ from app.commons.core.errors import PaymentError
 from enum import Enum
 
 
-class PayoutError(PaymentError):
+class PayoutError(PaymentError[str]):
     def __init__(self, error_code: str, error_message: str, retryable: bool):
         super().__init__(
             error_code=error_code, error_message=error_message, retryable=retryable

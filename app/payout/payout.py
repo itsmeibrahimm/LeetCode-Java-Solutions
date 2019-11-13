@@ -5,7 +5,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from structlog import BoundLogger
 
-from app.commons.api.exceptions import register_payment_exception_handler
+from app.commons.api.exceptions import register_base_payment_exception_handler
 from app.commons.api.models import (
     BadRequestError,
     PaymentErrorResponseBody,
@@ -47,7 +47,7 @@ def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
     # Mount routers
     default_payment_router_builder().add_common_dependencies(
         ApiSecretRouteAuthorizer(config.PAYOUT_SERVICE_ID)
-    ).add_sub_routers(
+    ).add_sub_routers_with_prefix(
         {
             "/accounts": account.v0.router,
             # "/transfers": transfer.v0.router, # Disable v0 transfer, since it's not used.
@@ -57,7 +57,7 @@ def create_payout_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
         app_v0
     )
 
-    register_payment_exception_handler(app_v0)
+    register_base_payment_exception_handler(app_v0)
 
     return app_v0
 
@@ -80,7 +80,7 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
     )
 
     # Mount routers
-    default_payment_router_builder().add_sub_routers(
+    default_payment_router_builder().add_sub_routers_with_prefix(
         {
             "/accounts": account.v1.router,
             "/transactions": transaction.v1.router,
@@ -93,7 +93,7 @@ def create_payout_v1_app(context: AppContext, config: AppConfig) -> FastAPI:
         app_v1
     )
 
-    register_payment_exception_handler(app_v1)
+    register_base_payment_exception_handler(app_v1)
     app_v1.add_exception_handler(PaymentError, payment_errors_handle)
     return app_v1
 

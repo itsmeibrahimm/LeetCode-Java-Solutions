@@ -6,7 +6,7 @@ from app.commons.operational_flags import STRIPE_COMMANDO_MODE_BOOLEAN
 from starlette.testclient import TestClient
 
 from app.conftest import RuntimeSetter
-from app.payin.core.exceptions import payin_error_message_maps
+from app.payin.core.exceptions import _payin_error_message_maps
 
 
 class TestCommando:
@@ -21,7 +21,7 @@ class TestCommando:
         response: Response = client.post(url, json={})
         json_resp = response.json()
         assert json_resp["error_code"] == "payin_800"
-        assert json_resp["error_message"] == payin_error_message_maps["payin_800"]
+        assert json_resp["error_message"] == _payin_error_message_maps["payin_800"]
         assert json_resp["retryable"] is False
 
         cart_payment_id = uuid.uuid4()
@@ -31,7 +31,7 @@ class TestCommando:
         response = client.post(url, json={})
         json_resp = response.json()
         assert json_resp["error_code"] == "payin_800"
-        assert json_resp["error_message"] == payin_error_message_maps["payin_800"]
+        assert json_resp["error_message"] == _payin_error_message_maps["payin_800"]
         assert json_resp["retryable"] is False
 
         runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, False)
@@ -42,5 +42,5 @@ class TestCommando:
 
         json_resp = response.json()
         assert json_resp["error_code"] == "payin_100"
-        assert json_resp["error_message"] == payin_error_message_maps["payin_100"]
+        assert json_resp["error_message"] == _payin_error_message_maps["payin_100"]
         assert json_resp["retryable"] is False

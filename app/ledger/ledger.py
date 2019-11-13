@@ -5,7 +5,7 @@ from app.commons.auth.service_auth import ApiSecretRouteAuthorizer
 from app.commons.config.app_config import AppConfig
 
 from app.commons.context.app_context import AppContext, set_context_for_app
-from app.commons.api.exceptions import register_payment_exception_handler
+from app.commons.api.exceptions import register_base_payment_exception_handler
 from app.commons.routing import group_routers
 from app.ledger.api import mx_transaction, mx_ledger
 from app.ledger.repository.mx_ledger_repository import MxLedgerRepository
@@ -39,6 +39,6 @@ def create_ledger_app(context: AppContext, config: AppConfig) -> FastAPI:
 
     app.include_router(grouped_routers, dependencies=[Depends(route_authorizer)])
 
-    register_payment_exception_handler(app)
+    register_base_payment_exception_handler(app)
 
     return app

@@ -14,7 +14,7 @@ from app.commons.context.app_context import (
     set_context_for_app,
 )
 from app.commons.context.logger import init_logger as init_log, root_logger
-from app.commons.api.exceptions import register_payment_exception_handler
+from app.commons.api.exceptions import register_base_payment_exception_handler
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.example_v1.app import example_v1
 from app.ledger.ledger import create_ledger_app
@@ -46,7 +46,7 @@ app.add_middleware(ReqContextMiddleware)
 if config.SENTRY_CONFIG:
     sentry.init_sentry_sdk(config.SENTRY_CONFIG)
     app.add_middleware(SentryAsgiMiddleware)
-register_payment_exception_handler(app)
+register_base_payment_exception_handler(app)
 
 
 @app.get(

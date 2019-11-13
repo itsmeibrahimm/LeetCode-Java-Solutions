@@ -1,14 +1,19 @@
 from enum import Enum
+from typing import TypeVar, Generic
+
+ErrorCodeT = TypeVar("ErrorCodeT", bound=str)
 
 
-class PaymentError(Exception):
+class PaymentError(Generic[ErrorCodeT], Exception):
     """
     Base class for all payment internal exceptions. This is base class that can be inherited by
     each business operation layer with corresponding sub error class and
     raise to application layers.
     """
 
-    def __init__(self, error_code: str, error_message: str, retryable: bool):
+    error_code: ErrorCodeT
+
+    def __init__(self, error_code: ErrorCodeT, error_message: str, retryable: bool):
         """
         Base exception class.
 
@@ -52,8 +57,10 @@ database_error_message_maps = {
 }
 
 
-class DatabaseError(PaymentError):
-    def __init__(self, error_code: str, error_message: str, retryable: bool):
+class DatabaseError(PaymentError[DatabaseErrorCode]):
+    def __init__(
+        self, error_code: DatabaseErrorCode, error_message: str, retryable: bool
+    ):
         super().__init__(error_code, error_message, retryable)
 
 
@@ -223,13 +230,13 @@ pgp_error_message_maps = {
 }
 
 
-class PGPError(PaymentError):
+class PGPError(PaymentError[PGPErrorCode]):
     """PGP general errors.
 
     This is the base class for all PGP related errors.
     """
 
-    def __init__(self, error_code: str, error_message: str, retryable: bool):
+    def __init__(self, error_code: PGPErrorCode, error_message: str, retryable: bool):
         super().__init__(error_code, error_message, retryable)
 
 
@@ -367,10 +374,12 @@ payment_lock_error_message_maps = {
 }
 
 
-class PaymentLockError(PaymentError):
+class PaymentLockError(PaymentError[PaymentLockErrorCode]):
     """Payment Lock Base Error."""
 
-    def __init__(self, error_code: str, error_message: str, retryable: bool):
+    def __init__(
+        self, error_code: PaymentLockErrorCode, error_message: str, retryable: bool
+    ):
         super().__init__(error_code, error_message, retryable)
 
 
@@ -422,7 +431,7 @@ marqeta_error_message_maps = {
 }
 
 
-class MarqetaResourceAlreadyCreatedError(PaymentError):
+class MarqetaResourceAlreadyCreatedError(PaymentError[MarqetaErrorCode]):
     def __init__(self):
         super().__init__(
             error_code=MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR,
@@ -433,7 +442,7 @@ class MarqetaResourceAlreadyCreatedError(PaymentError):
         )
 
 
-class MarqetaCreateUserError(PaymentError):
+class MarqetaCreateUserError(PaymentError[MarqetaErrorCode]):
     def __init__(self):
         super().__init__(
             error_code=MarqetaErrorCode.MARQETA_CREATE_USER_ERROR,

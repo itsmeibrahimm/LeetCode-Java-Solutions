@@ -176,7 +176,7 @@ async def payment_request_validation_exception_handler(
     )
 
 
-def register_payment_exception_handler(app: FastAPI):
+def register_base_payment_exception_handler(app: FastAPI):
     app.add_exception_handler(StarletteHTTPException, payment_http_exception_handler)
     app.add_exception_handler(
         RequestValidationError, payment_request_validation_exception_handler

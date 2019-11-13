@@ -34,8 +34,8 @@ from app.commons.providers.stripe.stripe_models import (
     StripeCapturePaymentIntentRequest,
     StripeCreatePaymentIntentRequest,
     StripeRefundChargeRequest,
-    TransferData,
     StripeRetrievePaymentIntentRequest,
+    TransferData,
 )
 from app.commons.runtime import runtime
 from app.commons.timing import track_func
@@ -92,11 +92,11 @@ from app.payin.core.types import (
 )
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusWhereInput,
-    UpdatePaymentIntentStatusSetInput,
-    UpdatePgpPaymentIntentWhereInput,
-    UpdatePgpPaymentIntentSetInput,
     UpdateCartPaymentPostCancellationInput,
+    UpdatePaymentIntentStatusSetInput,
+    UpdatePaymentIntentStatusWhereInput,
+    UpdatePgpPaymentIntentSetInput,
+    UpdatePgpPaymentIntentWhereInput,
 )
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])

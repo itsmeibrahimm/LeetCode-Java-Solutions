@@ -8,13 +8,13 @@ from app.commons.api.exceptions import _build_request_validation_error_display
 
 
 class TestRequestValidationExceptionMessage:
-    class TestModel(BaseModel):
+    class Model(BaseModel):
         positive_int: PositiveInt
         str_list: List[str]
 
     def test_one_validation_error(self):
         with pytest.raises(ValidationError) as e:
-            TestRequestValidationExceptionMessage.TestModel(
+            TestRequestValidationExceptionMessage.Model(
                 positive_int=0, str_list=["something"]
             )  # type: ignore
 
@@ -26,7 +26,7 @@ class TestRequestValidationExceptionMessage:
 
     def test_mutiple_validation_error(self):
         with pytest.raises(ValidationError) as e:
-            TestRequestValidationExceptionMessage.TestModel(
+            TestRequestValidationExceptionMessage.Model(
                 positive_int=0, str_list={"a": 123}
             )  # type: ignore
 
