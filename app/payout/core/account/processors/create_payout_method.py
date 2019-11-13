@@ -167,9 +167,12 @@ class CreatePayoutMethod(
             )
         )
         self.logger.info(
-            "Created default payout_method for payout account.",
-            token=self.request.token,
+            "Added a new default card for payout account.",
             payout_account_id=self.request.payout_account_id,
+            card_token=self.request.token,
+            brand=payout_card.brand,
+            last4=payout_card.last4,
+            fingerprint=payout_card.fingerprint,
         )
 
         return account_models.PayoutCardInternal(
@@ -232,6 +235,18 @@ class CreatePayoutMethod(
             # Since stripe_managed_account and payment_account_edit_history are not in the same database for now
             # so we can't do atomic update here
             # We should make update stripe_managed_account and payment_account_edit_history atomic after db migration
+            self.logger.info(
+                "Added a new bank account for payment account.",
+                payment_account_id=self.request.payout_account_id,
+                bank_account_token=self.request.token,
+                stripe_managed_account_id=stripe_managed_account.id,
+                old_bank_name=old_bank_name,
+                old_bank_last4=old_bank_last4,
+                old_fingerprint=old_fingerprint,
+                new_bank_name=new_bank_name,
+                new_bank_last4=new_bank_last4,
+                new_fingerprint=new_fingerprint,
+            )
             payment_account_edit_history_record = await self.payment_account_edit_history_repo.record_bank_update(
                 data=PaymentAccountEditHistoryCreate(
                     account_type=models.AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
