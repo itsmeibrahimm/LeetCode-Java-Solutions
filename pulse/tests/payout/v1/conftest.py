@@ -7,8 +7,8 @@ from tests.utils import reload_pkg_version
 #######################
 SERVICE_URI = os.getenv("SERVICE_URI", "http://localhost:8182")
 API_KEY = os.getenv("API_KEY_PAYMENT_SERVICE", "dummy-key")
-BASE_CLIENT_VERSION = "0.0.6"
-EXTRA_CLIENT_VERSIONS = ["0.0.8", "0.0.9"]
+BASE_CLIENT_VERSION = "0.0.11"
+EXTRA_CLIENT_VERSIONS = []
 
 
 @pytest.fixture(scope="session")

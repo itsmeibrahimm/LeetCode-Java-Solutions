@@ -8,6 +8,7 @@ from payout_v1_client import (
     VerificationDetailsWithToken,
     CreatePayoutMethod,
     PayoutMethodList,
+    UpdatePayoutAccountStatementDescriptor,
 )
 from tests.utils import decorate_api_call
 
@@ -37,9 +38,12 @@ def update_payout_account_statement_descriptor(
     accounts_api: payout_v1_client.AccountsV1Api,
     **kwargs,
 ) -> Tuple[PayoutAccount, int, Mapping]:
+    update_statement_descriptor = UpdatePayoutAccountStatementDescriptor(
+        statement_descriptor=statement_descriptor
+    )
     return accounts_api.update_payout_account_statement_descriptor_with_http_info(
         payout_account_id=payout_account_id,
-        statement_descriptor=statement_descriptor,
+        update_payout_account_statement_descriptor=update_statement_descriptor,
         **kwargs,
     )
 

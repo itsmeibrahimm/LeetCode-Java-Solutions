@@ -27,17 +27,16 @@ STRIPE_US_PUBLIC_API_KEY = "pk_test_VCKL0VKIMMPzuUB8ZbuXdKkA"
 
 
 class TestPayoutAccount:
-    base_account_create_request = CreatePayoutAccount(
-        target_id=12345,
-        target_type="store",
-        country="US",
-        currency="usd",
-        statement_descriptor="pulse-test-statement-descriptor",
-    )
+    def setup(self):
+        self.base_account_create_request = CreatePayoutAccount(
+            target_id=12345,
+            target_type="store",
+            country="US",
+            currency="usd",
+            statement_descriptor="pulse-test-statement-descriptor",
+        )
 
-    async def test_create_payout_account_success(
-        self, accounts_api: AccountsV1Api
-    ) -> int:
+    def test_create_payout_account_success(self, accounts_api: AccountsV1Api) -> int:
         # Test with creating payout account successfully
         created_payout_account, status, _ = create_payout_account(
             request=self.base_account_create_request, accounts_api=accounts_api
@@ -53,9 +52,9 @@ class TestPayoutAccount:
         assert status == 201
         return created_payout_account.id
 
-    async def test_retrieve_payout_account_success(self, accounts_api: AccountsV1Api):
+    def test_retrieve_payout_account_success(self, accounts_api: AccountsV1Api):
         # Test with retrieving payout account by id successfully
-        payout_account_id = await self.test_create_payout_account_success(
+        payout_account_id = self.test_create_payout_account_success(
             accounts_api=accounts_api
         )
         retrieved_payout_account, status, _ = get_payout_account(
@@ -65,11 +64,11 @@ class TestPayoutAccount:
         assert isinstance(retrieved_payout_account, PayoutAccount)
         assert retrieved_payout_account.id == payout_account_id
 
-    async def test_update_payout_account_statement_descriptor_success(
+    def test_update_payout_account_statement_descriptor_success(
         self, accounts_api: AccountsV1Api
     ):
         # Test with updating payout account statement descriptor by id successfully
-        payout_account_id = await self.test_create_payout_account_success(
+        payout_account_id = self.test_create_payout_account_success(
             accounts_api=accounts_api
         )
         updated_payout_account, status, _ = update_payout_account_statement_descriptor(
@@ -84,11 +83,11 @@ class TestPayoutAccount:
         )
         assert updated_payout_account.id == payout_account_id
 
-    async def test_verify_and_update_payout_account_success(
+    def test_verify_and_update_payout_account_success(
         self, accounts_api: AccountsV1Api
     ) -> int:
         # Test with verifying payout account with account token
-        payout_account_id = await self.test_create_payout_account_success(
+        payout_account_id = self.test_create_payout_account_success(
             accounts_api=accounts_api
         )
         stripe.api_key = STRIPE_US_PUBLIC_API_KEY
@@ -137,11 +136,12 @@ class TestPayoutAccount:
 
         return updated_payout_account.id
 
-    async def test_create_and_retrieve_payout_method_success(
+    @pytest.mark.skip("Need to change endpoint and bump client version.")
+    def test_create_and_retrieve_payout_method_success(
         self, accounts_api: AccountsV1Api
     ):
         # Test with creating payout method with payout account id
-        payout_account_id = await self.test_verify_and_update_payout_account_success(
+        payout_account_id = self.test_verify_and_update_payout_account_success(
             accounts_api
         )
         payout_method_request = CreatePayoutMethod(token="tok_visa_debit", type="card")
