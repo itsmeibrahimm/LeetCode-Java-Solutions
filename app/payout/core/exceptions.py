@@ -41,6 +41,8 @@ payout_error_message_maps = {
     "payout_23": "transfer_permission_error",
     "payout_24": "Transfer amount exceeds limit.",
     "payout_25": "Cannot make a negative transfer.",
+    "payout_26": "Invalid input, please validate.",
+    "payout_27": "Unsupported use case, please validate input parameters.",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     "account_1": "PGP account has not set up, please verify your payout account.",
@@ -89,6 +91,8 @@ class PayoutErrorCode(str, Enum):
     TRANSFER_PERMISSION_ERROR = "payout_23"
     TRANSFER_AMOUNT_OVER_LIMIT = "payout_24"
     TRANSFER_AMOUNT_NEGATIVE = "payout_25"
+    INVALID_INPUT = "payout_26"
+    UNSUPPORTED_USECASE = "payout_27"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"

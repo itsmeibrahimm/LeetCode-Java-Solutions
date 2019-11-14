@@ -1,11 +1,21 @@
+from datetime import datetime, timedelta
+
 import pytest
 import pytest_mock
+from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.commons.database.infra import DB
+from app.payout.core.exceptions import (
+    PayoutError,
+    PayoutErrorCode,
+    payout_error_message_maps,
+)
 from app.payout.core.transfer.processors.list_transfers import (
     ListTransfers,
     ListTransfersRequest,
 )
+from app.payout.models import TimeRange
+from app.payout.repository.maindb.model.transfer import TransferStatus
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import (
@@ -36,13 +46,55 @@ class TestListTransfers:
     def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
         return PaymentAccountRepository(database=payout_maindb)
 
-    def _construct_list_transfers_op(self, payment_account_ids=None):
+    def _construct_list_transfers_op(
+        self,
+        has_positive_amount=None,
+        time_range=None,
+        is_submitted=None,
+        status=None,
+        payment_account_ids=None,
+        offset=0,
+        limit=50,
+    ):
         return ListTransfers(
             transfer_repo=self.transfer_repo,
             logger=self.mocker.Mock(),
             request=ListTransfersRequest(
-                payment_account_ids=payment_account_ids, offset=0, limit=50
+                payment_account_ids=payment_account_ids,
+                has_positive_amount=has_positive_amount,
+                time_range=time_range,
+                is_submitted=is_submitted,
+                status=status,
+                offset=offset,
+                limit=limit,
             ),
+        )
+
+    async def test_execute_list_transfers_with_payment_account_ids_invalid_input(self):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        with pytest.raises(PayoutError) as e:
+            await self._construct_list_transfers_op(
+                payment_account_ids=[payment_account.id], offset=-1
+            )._execute()
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
+        assert e.value.error_code == PayoutErrorCode.INVALID_INPUT
+        assert (
+            e.value.error_message
+            == payout_error_message_maps[PayoutErrorCode.INVALID_INPUT.value]
+        )
+
+    async def test_execute_list_transfers_with_payment_account_ids_unsupported_use_cases(
+        self
+    ):
+        with pytest.raises(PayoutError) as e:
+            await self._construct_list_transfers_op()._execute()
+        assert e.value.status_code == HTTP_400_BAD_REQUEST
+        assert e.value.error_code == PayoutErrorCode.UNSUPPORTED_USECASE
+        assert (
+            e.value.error_message
+            == payout_error_message_maps[PayoutErrorCode.UNSUPPORTED_USECASE.value]
         )
 
     async def test_execute_list_transfers_with_payment_account_ids_not_found(self):
@@ -79,3 +131,92 @@ class TestListTransfers:
         assert transfer_b in response.transfers
         assert transfer_c not in response.transfers
         assert response.count == 2
+
+    async def test_execute_list_positive_amount_transfers_with_status_and_time_range_success(
+        self
+    ):
+        # test negative amount transfer/ wrong time_range and wrong status transfer and will not be listed out
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            has_positive_amount=True,
+            status=TransferStatus.PENDING,
+        )._execute()
+
+        transfer_a = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING
+        )
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.FAILED
+        )
+
+        end_time = datetime.utcnow()
+        new_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            has_positive_amount=True,
+            status=TransferStatus.PENDING,
+        )._execute()
+
+        assert new_response.count - original_response.count == 1
+        assert transfer_a in new_response.transfers
+        assert transfer_a not in original_response.transfers
+        assert transfer_b not in new_response.transfers
+        assert transfer_b not in original_response.transfers
+        assert transfer_c not in new_response.transfers
+        assert transfer_c not in original_response.transfers
+
+        transfer_d = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING
+        )
+        response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            has_positive_amount=True,
+            status=TransferStatus.PENDING,
+        )._execute()
+        assert transfer_d not in response
+
+    async def test_execute_list_transfers_with_status_and_time_range_success(self):
+        # test wrong time_range and wrong status transfer and will not be listed out, negative amount transfer will be listed
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            status=TransferStatus.PENDING,
+        )._execute()
+
+        transfer_a = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING
+        )
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.FAILED
+        )
+
+        end_time = datetime.utcnow()
+        new_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            status=TransferStatus.PENDING,
+        )._execute()
+
+        assert new_response.count - original_response.count == 2
+        assert transfer_a in new_response.transfers
+        assert transfer_a not in original_response.transfers
+        assert transfer_b in new_response.transfers
+        assert transfer_b not in original_response.transfers
+        assert transfer_c not in new_response.transfers
+        assert transfer_c not in original_response.transfers
+
+        transfer_d = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING
+        )
+        response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            status=TransferStatus.PENDING,
+        )._execute()
+        assert transfer_d not in response

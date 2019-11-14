@@ -9,6 +9,7 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
+from app.payout.models import TimeRange
 from app.payout.repository.maindb.model.transfer import Transfer
 from app.payout.repository.maindb.transfer import TransferRepositoryInterface
 
@@ -22,6 +23,10 @@ class ListTransfersRequest(OperationRequest):
     offset: int
     limit: int
     payment_account_ids: Optional[List[int]]
+    has_positive_amount: Optional[bool]
+    time_range: Optional[TimeRange]
+    is_submitted: Optional[bool]
+    status: Optional[str]
 
 
 class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse]):
@@ -50,7 +55,7 @@ class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse])
         if offset < 0 or limit < 0:
             raise PayoutError(
                 http_status_code=HTTP_400_BAD_REQUEST,
-                error_code=PayoutErrorCode.INVALID_STRIPE_ACCOUNT,
+                error_code=PayoutErrorCode.INVALID_INPUT,
                 retryable=False,
             )
         if self.request.payment_account_ids:
@@ -58,6 +63,31 @@ class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse])
                 payment_account_ids=self.request.payment_account_ids,
                 offset=offset,
                 limit=limit,
+            )
+        elif self.request.status:
+            has_positive_amount = False
+            if self.request.has_positive_amount:
+                has_positive_amount = self.request.has_positive_amount
+            transfers, count = await self.transfer_repo.get_transfers_and_count_by_status_and_time_range(
+                status=self.request.status,
+                has_positive_amount=has_positive_amount,
+                offset=offset,
+                limit=limit,
+                start_time=self.request.time_range.start_time
+                if self.request.time_range
+                else None,
+                end_time=self.request.time_range.end_time
+                if self.request.time_range
+                else None,
+            )
+        elif self.request.has_positive_amount:
+            # todo: filter with stripe_transfer is null, amount check and time_range
+            pass
+        else:
+            raise PayoutError(
+                http_status_code=HTTP_400_BAD_REQUEST,
+                error_code=PayoutErrorCode.UNSUPPORTED_USECASE,
+                retryable=False,
             )
         return ListTransfersResponse(count=count, transfers=transfers)
 

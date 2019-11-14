@@ -1,6 +1,3 @@
-from datetime import datetime
-
-from pydantic import BaseModel
 from structlog.stdlib import BoundLogger
 from typing import Optional, Union, List
 
@@ -10,14 +7,10 @@ from app.payout.constants import DEFAULT_PAGE_SIZE
 from app.payout.core.exceptions import transaction_bad_query_parameters
 from app.payout.core.transaction.models import TransactionListInternal
 from app.payout.core.transaction.utils import get_transaction_internal_from_db_entity
+from app.payout.models import TimeRange
 from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
 from app.payout import models
-
-
-class TimeRange(BaseModel):
-    start_time: Optional[datetime]
-    end_time: Optional[datetime]
 
 
 class ListTransactionsRequest(OperationRequest):

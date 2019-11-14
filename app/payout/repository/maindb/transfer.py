@@ -53,6 +53,18 @@ class TransferRepositoryInterface(ABC):
     ) -> Tuple[List[Transfer], int]:
         pass
 
+    @abstractmethod
+    async def get_transfers_and_count_by_status_and_time_range(
+        self,
+        has_positive_amount: bool,
+        offset: int,
+        limit: int,
+        status: str,
+        start_time: Optional[datetime],
+        end_time: Optional[datetime],
+    ) -> Tuple[List[Transfer], int]:
+        pass
+
 
 @final
 @tracing.track_breadcrumb(repository_name="transfer")
@@ -79,7 +91,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
 
     async def get_transfers_by_ids(self, transfer_ids: List[int]) -> List[Transfer]:
         stmt = transfers.table.select().where(transfers.id.in_(transfer_ids))
-        rows = await self._database.master().fetch_all(stmt)
+        rows = await self._database.replica().fetch_all(stmt)
         results = [Transfer.from_row(row) for row in rows] if rows else []
         return results
 
@@ -143,6 +155,40 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
             return [transfer.id for transfer in results]
         else:
             return []
+
+    async def get_transfers_and_count_by_status_and_time_range(
+        self,
+        has_positive_amount: bool,
+        offset: int,
+        limit: int,
+        status: str,
+        start_time: Optional[datetime],
+        end_time: Optional[datetime],
+    ) -> Tuple[List[Transfer], int]:
+        query = and_(transfers.status.isnot(None), transfers.status == status)
+        if has_positive_amount:
+            query.clauses.append(transfers.amount.__gt__(0))
+        if start_time:
+            query.clauses.append(transfers.created_at.__gt__(start_time))
+        if end_time:
+            query.clauses.append(transfers.created_at.__lt__(end_time))
+
+        get_transfers_stmt = (
+            transfers.table.select()
+            .where(query)
+            .order_by(desc(transfers.id))
+            .offset(offset)
+            .limit(limit)
+        )
+        rows = await self._database.replica().fetch_all(get_transfers_stmt)
+        results = [Transfer.from_row(row) for row in rows] if rows else []
+
+        count_stmt = transfers.table.count().where(query)
+        count = 0
+        count_fetched = await self._database.replica().fetch_value(count_stmt)
+        if count_fetched:
+            count = count_fetched
+        return results, int(count)
 
     async def update_transfer_by_id(
         self, transfer_id: int, data: TransferUpdate

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Schema
+from pydantic import Schema
 
 from app.commons.api.models import PaymentResponse, PaymentRequest
 from app.commons.types import Currency
@@ -136,8 +136,3 @@ class TransactionList(PaymentResponse):
 ##################
 # Aux Data Model #
 ##################
-
-
-class TimeRange(BaseModel):
-    start_time: datetime
-    end_time: datetime

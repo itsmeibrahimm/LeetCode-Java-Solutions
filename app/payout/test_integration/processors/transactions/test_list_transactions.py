@@ -9,7 +9,6 @@ from app.commons.types import Currency
 from app.payout.core.transaction.processors.list_transactions import (
     ListTransactionsRequest,
     ListTransactions,
-    TimeRange,
 )
 from app.payout.core.transaction.models import (
     TransactionListInternal,
@@ -544,7 +543,9 @@ class TestListTransactions:
         )
         request_by_payout_account_id_with_time_range = ListTransactionsRequest(
             payout_account_id=payout_account.id,
-            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            time_range=payout_models.TimeRange(
+                start_time=start_time, end_time=end_time
+            ),
             offset=offset,
             limit=TEST_DEFAULT_PAGE_SIZE,
         )
@@ -581,7 +582,7 @@ class TestListTransactions:
         )
         request_by_payout_account_id_with_start_time = ListTransactionsRequest(
             payout_account_id=payout_account.id,
-            time_range=TimeRange(start_time=start_time, end_time=None),
+            time_range=payout_models.TimeRange(start_time=start_time, end_time=None),
             offset=offset,
             limit=TEST_DEFAULT_PAGE_SIZE,
         )

@@ -14,7 +14,6 @@ import app.payout.models as payout_models
 from app.payout.core.transaction.processor import TransactionProcessors
 from app.payout.core.transaction.processors.list_transactions import (
     ListTransactionsRequest,
-    TimeRange,
 )
 from app.payout.core.transaction.processors.create_transaction import (
     CreateTransactionRequest,
@@ -89,7 +88,7 @@ async def list_transactions(
     if ts_end:
         end_time = datetime.fromtimestamp(ts_end)
 
-    time_range = TimeRange(start_time=start_time, end_time=end_time)
+    time_range = payout_models.TimeRange(start_time=start_time, end_time=end_time)
 
     # construct biz layer data model
     list_transactions_request = ListTransactionsRequest(

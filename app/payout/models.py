@@ -1,6 +1,11 @@
+from datetime import datetime
 from enum import Enum
 
 # Payout Accounts
+from typing import Optional
+
+from pydantic import BaseModel
+
 from app.payout.core.exceptions import PayoutErrorCode
 
 PayoutAccountId = int  # NewType("PayoutAccountId", int)
@@ -195,3 +200,8 @@ BankUpdateHistoryOwnerId = int
 class BankUpdateHistoryOwnerType(str, Enum):
     DASHER = "Dasher"
     STORE = "Store"
+
+
+class TimeRange(BaseModel):
+    start_time: Optional[datetime]
+    end_time: Optional[datetime]

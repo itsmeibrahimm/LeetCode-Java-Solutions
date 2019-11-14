@@ -158,6 +158,120 @@ class TestTransferRepository:
             list(set(new_transfer_ids) - set(original_transfer_ids))[0] == transfer.id
         )
 
+    async def test_get_positive_transfers_and_count_by_status_and_time_range(
+        self, transfer_repo
+    ):
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_transfers, original_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+            status=TransferStatus.PENDING,
+            offset=0,
+            limit=50,
+            has_positive_amount=True,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        transfer_a = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.PENDING
+        )
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.PENDING, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.FAILED
+        )
+
+        end_time = datetime.utcnow()
+        new_transfers, new_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+            status=TransferStatus.PENDING,
+            offset=0,
+            limit=50,
+            has_positive_amount=True,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert new_count - original_count == 1
+        assert transfer_a not in original_transfers
+        assert transfer_a in new_transfers
+        assert transfer_b not in original_transfers
+        assert transfer_b not in new_transfers
+        assert transfer_c not in original_transfers
+        assert transfer_c not in new_transfers
+
+        transfer_d = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.PENDING
+        )
+
+        transfers, count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+            status=TransferStatus.PENDING,
+            offset=0,
+            limit=50,
+            has_positive_amount=True,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert count - original_count == 1
+        assert transfer_d not in original_transfers
+        assert transfer_d not in transfers
+
+    async def test_get_transfers_and_count_by_status_and_time_range(
+        self, transfer_repo
+    ):
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_transfers, original_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+            status=TransferStatus.PENDING,
+            offset=0,
+            limit=50,
+            has_positive_amount=False,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        transfer_a = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.PENDING
+        )
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.PENDING, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.FAILED
+        )
+
+        end_time = datetime.utcnow()
+        new_transfers, new_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+            status=TransferStatus.PENDING,
+            offset=0,
+            limit=50,
+            has_positive_amount=False,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert new_count - original_count == 2
+        assert transfer_a not in original_transfers
+        assert transfer_a in new_transfers
+        assert transfer_b not in original_transfers
+        assert transfer_b in new_transfers
+        assert transfer_c not in original_transfers
+        assert transfer_c not in new_transfers
+
+        transfer_d = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, status=TransferStatus.PENDING
+        )
+
+        transfers, count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+            status=TransferStatus.PENDING,
+            offset=0,
+            limit=50,
+            has_positive_amount=False,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        assert count - original_count == 2
+        assert transfer_d not in original_transfers
+        assert transfer_d not in transfers
+
     async def test_update_transfer_by_id_not_found(self, transfer_repo):
         assert not await transfer_repo.update_transfer_by_id(
             transfer_id=-1, data=TransferUpdate(subtotal=100)

@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -5,7 +8,7 @@ from starlette.status import (
     HTTP_404_NOT_FOUND,
 )
 
-from fastapi import APIRouter, Depends, Body, Path
+from fastapi import APIRouter, Depends, Body, Path, Query
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.transfer.v1 import models as transfer_models
 from app.payout.core.transfer.processor import TransferProcessors
@@ -15,7 +18,7 @@ from app.payout.core.transfer.processors.get_transfer_by_id import (
 )
 from app.payout.core.transfer.processors.list_transfers import ListTransfersRequest
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
-from app.payout.models import TransferId
+from app.payout.models import TransferId, TimeRange
 from app.payout.service import create_transfer_processors
 
 
@@ -108,25 +111,55 @@ async def get_transfer_by_id(
     tags=api_tags,
 )
 async def list_transfers(
-    body: transfer_models.ListTransfers = Body(
-        ..., description="Request body for listing transfers"
+    payout_account_ids: Optional[str] = Query(
+        default=None, description="Comma separated payout_account ids"
+    ),
+    status: Optional[str] = Query(default=None, description="Transfer status"),
+    ts_start: Optional[int] = Query(
+        default=None, description="Start timestamp epoch seconds (inclusive)"
+    ),
+    ts_end: Optional[int] = Query(
+        default=None, description="End timestamp epoch seconds (inclusive)"
+    ),
+    has_positive_amount: Optional[bool] = Query(
+        default=None, description="Boolean flag to filter transfer with positive amount"
+    ),
+    offset: Optional[int] = Query(
+        default=None, description="Offset of the returned transfers"
+    ),
+    limit: Optional[int] = Query(
+        default=None, description="Limit of the returned transfers"
     ),
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     payout_account_id_list = None
-    if body.payout_account_ids:
-        payout_account_id_list = list(set(body.payout_account_ids.split(",")))
+    if payout_account_ids:
+        payout_account_id_list = list(set(payout_account_ids.split(",")))
 
-    offset = 0
-    limit = 50
-    if body.offset:
-        offset = body.offset
+    offset_to_query = 0
+    limit_to_query = 50
+    if offset:
+        offset_to_query = offset
+    if limit:
+        limit_to_query = limit
 
-    if body.limit:
-        limit = body.limit
+    start_time = None
+    if ts_start:
+        start_time = datetime.fromtimestamp(ts_start)
+
+    end_time = None
+    if ts_end:
+        end_time = datetime.fromtimestamp(ts_end)
+
+    time_range = TimeRange(start_time=start_time, end_time=end_time)
 
     list_transfers_request = ListTransfersRequest(
-        payment_account_ids=payout_account_id_list, offset=offset, limit=limit
+        payment_account_ids=payout_account_id_list,
+        offset=offset_to_query,
+        limit=limit_to_query,
+        time_range=time_range,
+        status=status,
+        has_positive_amount=has_positive_amount,
     )
     list_transfers_response = await transfer_processors.list_transfers(
         list_transfers_request
