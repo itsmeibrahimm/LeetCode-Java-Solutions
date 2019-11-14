@@ -1,4 +1,3 @@
-from copy import deepcopy
 import pytest
 import uuid
 import stripe
@@ -191,22 +190,34 @@ class TestPayoutAccount:
 
     def test_create_payout_account_malformed(self, accounts_api: AccountsV1Api):
         # Test with invalid country
-        request = deepcopy(self.base_account_create_request)
         with pytest.raises(ValueError):
-            request.country = "something"
-            create_payout_account(request=request, accounts_api=accounts_api)
+            CreatePayoutAccount(
+                target_id=12345,
+                target_type="store",
+                country="something",
+                currency="usd",
+                statement_descriptor="pulse-test-statement-descriptor",
+            )
 
         # Test with invalid currency
-        request = deepcopy(self.base_account_create_request)
         with pytest.raises(ValueError):
-            request.currency = "something"
-            create_payout_account(request=request, accounts_api=accounts_api)
+            CreatePayoutAccount(
+                target_id=12345,
+                target_type="store",
+                country="us",
+                currency="something",
+                statement_descriptor="pulse-test-statement-descriptor",
+            )
 
         # Test with invalid target type
-        request = deepcopy(self.base_account_create_request)
         with pytest.raises(ValueError):
-            request.target_type = "something"
-            create_payout_account(request=request, accounts_api=accounts_api)
+            CreatePayoutAccount(
+                target_id=12345,
+                target_type="something",
+                country="us",
+                currency="usd",
+                statement_descriptor="pulse-test-statement-descriptor",
+            )
 
     def test_get_payout_account_malformed(self, accounts_api: AccountsV1Api):
         payout_account_id = 123456789
