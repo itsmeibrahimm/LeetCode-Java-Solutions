@@ -35,6 +35,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_and_insert_transaction,
     prepare_and_insert_stripe_managed_account,
+    prepare_and_insert_payment_account_edit_history,
 )
 from app.payout.models import PayoutDay
 
@@ -169,12 +170,16 @@ class TestWeeklyCreateTransfer:
         original_payment_account_ids = (
             await self.weekly_create_transfer_operation.get_payment_account_ids_blocked_by_ato()
         )
-
         sma = await prepare_and_insert_stripe_managed_account(
             payment_account_repo=self.payment_account_repo
         )
         payment_account = await prepare_and_insert_payment_account(
             payment_account_repo=self.payment_account_repo, account_id=sma.id
+        )
+        await prepare_and_insert_payment_account_edit_history(
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            payment_account_id=payment_account.id,
+            sma_id=sma.id,
         )
         new_payment_account_ids = (
             await self.weekly_create_transfer_operation.get_payment_account_ids_blocked_by_ato()

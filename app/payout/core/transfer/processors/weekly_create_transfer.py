@@ -219,10 +219,7 @@ class WeeklyCreateTransfer(
         last_bank_account_update_allowed_at = datetime.utcnow() - timedelta(
             hours=payout_blocks_in_hours
         )
-        recently_updated_managed_account_ids = await self.payment_account_repo.get_recently_updated_stripe_managed_account_ids(
+        recently_updated_payment_account_ids = await self.payment_account_edit_history_repo.get_recent_bank_update_payment_account_ids(
             last_bank_account_update_allowed_at=last_bank_account_update_allowed_at
-        )
-        recently_updated_payment_account_ids = await self.payment_account_repo.get_payment_account_ids_by_sma_ids(
-            stripe_managed_account_ids=recently_updated_managed_account_ids
         )
         return recently_updated_payment_account_ids

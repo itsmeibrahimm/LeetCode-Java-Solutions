@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, desc, asc, not_
+from sqlalchemy import and_, desc, asc
 from typing_extensions import final
 
 from app.commons import tracing
@@ -253,9 +253,7 @@ class PaymentAccountRepository(
             .with_only_columns([stripe_managed_accounts.id])
             .where(
                 and_(
-                    not_(
-                        stripe_managed_accounts.bank_account_last_updated_at.is_(None)
-                    ),
+                    stripe_managed_accounts.bank_account_last_updated_at.isnot(None),
                     stripe_managed_accounts.bank_account_last_updated_at.__ge__(
                         last_bank_account_update_allowed_at
                     ),

@@ -6,6 +6,9 @@ from app.commons.types import CountryCode, Currency
 from stripe.error import StripeError
 
 from app.payout.constants import CREATE_STRIPE_ACCOUNT_TYPE
+from app.payout.repository.bankdb.model.payment_account_edit_history import (
+    PaymentAccountEditHistoryCreate,
+)
 from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.payout_card import PayoutCardCreate, PayoutCard
 from app.payout.repository.bankdb.model.payout_method import (
@@ -21,6 +24,9 @@ from app.payout.repository.bankdb.model.stripe_managed_account_transfer import (
 from app.payout.repository.bankdb.model.transaction import (
     TransactionCreateDBEntity,
     TransactionDBEntity,
+)
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepository,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
@@ -576,6 +582,42 @@ async def prepare_payout_method_list(
         )
         payout_method_list.insert(0, payout_method)
     return payout_method_list
+
+
+async def prepare_and_insert_payment_account_edit_history(
+    payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
+    sma_id=1,
+    payment_account_id=1,
+    owner_type=None,
+):
+    data = PaymentAccountEditHistoryCreate(
+        account_type=payout_models.AccountType.ACCOUNT_TYPE_STRIPE_MANAGED_ACCOUNT,
+        account_id=sma_id,
+        new_bank_name="new_bank_name",
+        new_bank_last4="new_bank_last4",
+        new_fingerprint="new_fingerprint",
+        payment_account_id=payment_account_id,
+        owner_type=owner_type,
+        owner_id=None,
+        old_bank_name="old_bank_name",
+        old_bank_last4="old_bank_last4",
+        old_fingerprint="old_fingerprint",
+        login_as_user_id=None,
+        user_id=None,
+        device_id=None,
+        ip=None,
+    )
+    created_record = await payment_account_edit_history_repo.record_bank_update(
+        data=data
+    )
+    assert (
+        created_record.id
+    ), "payment account edit history record is created, assigned an ID"
+
+    validate_expected_items_in_dict(
+        expected=data.dict(skip_defaults=True), actual=created_record.dict()
+    )
+    return created_record
 
 
 def mock_transfer() -> models.Transfer:

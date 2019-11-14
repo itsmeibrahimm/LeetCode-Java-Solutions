@@ -7,6 +7,7 @@ from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.infra import DB
+from app.payout.models import BankUpdateHistoryOwnerType
 from app.payout.repository.bankdb.base import PayoutBankDBRepository
 from app.payout.repository.bankdb.model import payment_account_edit_history
 from app.payout.repository.bankdb.model.payment_account_edit_history import (
@@ -26,6 +27,12 @@ class PaymentAccountEditHistoryRepositoryInterface(ABC):
     async def get_bank_updates_for_store_with_payment_account_and_time_range(
         self, payment_account_id: int, start_time: datetime, end_time: datetime
     ) -> List[PaymentAccountEditHistory]:
+        pass
+
+    @abstractmethod
+    async def get_recent_bank_update_payment_account_ids(
+        self, last_bank_account_update_allowed_at: datetime
+    ) -> List[int]:
         pass
 
     @abstractmethod
@@ -63,12 +70,30 @@ class PaymentAccountEditHistoryRepository(
         row = await self._database.replica().fetch_one(stmt)
         return PaymentAccountEditHistory.from_row(row) if row else None
 
+    async def get_recent_bank_update_payment_account_ids(
+        self, last_bank_account_update_allowed_at: datetime
+    ) -> List[int]:
+        stmt = (
+            payment_account_edit_history.table.select()
+            .distinct(payment_account_edit_history.payment_account_id)
+            .where(
+                payment_account_edit_history.timestamp.__ge__(
+                    last_bank_account_update_allowed_at
+                )
+            )
+        )
+        rows = await self._database.replica().execute(stmt)
+        result: List[int] = []
+        for row in rows:
+            result.append(row.get("payment_account_id"))
+        return result
+
     async def get_bank_updates_for_store_with_payment_account_and_time_range(
         self, payment_account_id: int, start_time: datetime, end_time: datetime
     ) -> List[PaymentAccountEditHistory]:
         query = and_(
             payment_account_edit_history.payment_account_id == payment_account_id,
-            payment_account_edit_history.owner_type == "Store",
+            payment_account_edit_history.owner_type == BankUpdateHistoryOwnerType.STORE,
             payment_account_edit_history.timestamp.__ge__(start_time),
             payment_account_edit_history.timestamp.__le__(end_time),
         )
