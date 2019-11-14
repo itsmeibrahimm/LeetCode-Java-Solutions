@@ -556,6 +556,9 @@ class CreateStandardPayout(
                 error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
                 retryable=False,
             )
+        target_type_value = None
+        if target_type:
+            target_type_value = target_type.value
         create_payout_request = StripeCreatePayoutRequest(
             statement_descriptor=statement_descriptor.replace(">", "")
             .replace("<", "")
@@ -564,7 +567,7 @@ class CreateStandardPayout(
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
                 payment_account=payment_account,
-                target_type=target_type,
+                target_type=target_type_value,
                 target_id=target_id,
             ),
         )
