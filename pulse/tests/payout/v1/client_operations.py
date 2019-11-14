@@ -9,6 +9,9 @@ from payout_v1_client import (
     CreatePayoutMethod,
     PayoutMethodList,
     UpdatePayoutAccountStatementDescriptor,
+    PaymentEligibility,
+    InstantPayoutCreate,
+    InstantPayout,
 )
 from tests.utils import decorate_api_call
 
@@ -92,4 +95,29 @@ def list_payout_method(
 ) -> Tuple[PayoutMethodList, int, Mapping]:
     return accounts_api.list_payout_method_with_http_info(
         payout_account_id=payout_account_id, **kwargs
+    )
+
+
+@decorate_api_call
+def check_instant_payout_eligibility(
+    payout_account_id: int,
+    local_start_of_day: int,
+    instant_payout_api: payout_v1_client.InstantPayoutsV1Api,
+    **kwargs,
+) -> Tuple[PaymentEligibility, int, Mapping]:
+    return instant_payout_api.check_instant_payout_eligibility_with_http_info(
+        payout_account_id=payout_account_id,
+        local_start_of_day=local_start_of_day,
+        **kwargs,
+    )
+
+
+@decorate_api_call
+def submit_instant_payout(
+    instant_payout_create: InstantPayoutCreate,
+    instant_payout_api: payout_v1_client.InstantPayoutsV1Api,
+    **kwargs,
+) -> Tuple[InstantPayout, int, Mapping]:
+    return instant_payout_api.submit_instant_payout_with_http_info(
+        instant_payout_create=instant_payout_create, **kwargs
     )

@@ -52,3 +52,18 @@ def versioned_client(versioned_client_pkg):
     client = versioned_client_pkg.ApiClient(client_config)
     client.set_default_header("x-api-key", API_KEY)
     yield client
+
+
+@pytest.fixture(scope="session")
+def accounts_api(base_client_pkg, client):
+    return base_client_pkg.AccountsV1Api(client)
+
+
+@pytest.fixture(scope="session")
+def instant_payouts_api(base_client_pkg, client):
+    return base_client_pkg.InstantPayoutsV1Api(client)
+
+
+@pytest.fixture(scope="session")
+def transactions_api(base_client_pkg, client):
+    return base_client_pkg.TransactionsV1Api(client)
