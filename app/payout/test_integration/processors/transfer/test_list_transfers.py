@@ -17,10 +17,12 @@ from app.payout.core.transfer.processors.list_transfers import (
 from app.payout.models import TimeRange
 from app.payout.repository.maindb.model.transfer import TransferStatus
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_transfer,
     prepare_and_insert_payment_account,
+    prepare_and_insert_stripe_transfer,
 )
 
 
@@ -33,9 +35,11 @@ class TestListTransfers:
         mocker: pytest_mock.MockFixture,
         transfer_repo: TransferRepository,
         payment_account_repo: PaymentAccountRepository,
+        stripe_transfer_repo: StripeTransferRepository,
     ):
         self.transfer_repo = transfer_repo
         self.payment_account_repo = payment_account_repo
+        self.stripe_transfer_repo = stripe_transfer_repo
         self.mocker = mocker
 
     @pytest.fixture
@@ -45,6 +49,10 @@ class TestListTransfers:
     @pytest.fixture
     def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
         return PaymentAccountRepository(database=payout_maindb)
+
+    @pytest.fixture
+    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
+        return StripeTransferRepository(database=payout_maindb)
 
     def _construct_list_transfers_op(
         self,
@@ -177,7 +185,7 @@ class TestListTransfers:
             has_positive_amount=True,
             status=TransferStatus.PENDING,
         )._execute()
-        assert transfer_d not in response
+        assert transfer_d not in response.transfers
 
     async def test_execute_list_transfers_with_status_and_time_range_success(self):
         # test wrong time_range and wrong status transfer and will not be listed out, negative amount transfer will be listed
@@ -219,4 +227,90 @@ class TestListTransfers:
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             status=TransferStatus.PENDING,
         )._execute()
-        assert transfer_d not in response
+        assert transfer_d not in response.transfers
+
+    async def test_execute_list_positive_amount_transfers_with_stripe_transfer(self):
+        # test negative amount transfer/ wrong time_range transfer and will not be listed out
+        # test with is_submitted flag off
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            is_submitted=False,
+            has_positive_amount=True,
+        )._execute()
+        transfer_a = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
+        await prepare_and_insert_stripe_transfer(
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer_c.id
+        )
+        end_time = datetime.utcnow()
+        new_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            is_submitted=False,
+            has_positive_amount=True,
+        )._execute()
+
+        assert new_response.count - original_response.count == 2
+        assert transfer_a in new_response.transfers
+        assert transfer_a not in original_response.transfers
+        assert transfer_b not in new_response.transfers
+        assert transfer_b not in original_response.transfers
+        assert transfer_c in new_response.transfers
+        assert transfer_c not in original_response.transfers
+
+        transfer_d = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING
+        )
+        response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            is_submitted=False,
+            has_positive_amount=True,
+        )._execute()
+        assert transfer_d not in response.transfers
+
+    async def test_execute_list_positive_amount_transfers_without_stripe_transfer(self):
+        # test negative amount transfer/ wrong time_range transfer and will not be listed out
+        # test with is_submitted flag on
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            is_submitted=True,
+            has_positive_amount=True,
+        )._execute()
+        transfer_a = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
+        await prepare_and_insert_stripe_transfer(
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer_c.id
+        )
+        end_time = datetime.utcnow()
+        new_response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            is_submitted=True,
+            has_positive_amount=True,
+        )._execute()
+
+        assert new_response.count - original_response.count == 1
+        assert transfer_a not in new_response.transfers
+        assert transfer_a not in original_response.transfers
+        assert transfer_b not in new_response.transfers
+        assert transfer_b not in original_response.transfers
+        assert transfer_c in new_response.transfers
+        assert transfer_c not in original_response.transfers
+
+        transfer_d = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo, status=TransferStatus.PENDING
+        )
+        response = await self._construct_list_transfers_op(
+            time_range=TimeRange(start_time=start_time, end_time=end_time),
+            is_submitted=False,
+            has_positive_amount=True,
+        )._execute()
+        assert transfer_d not in response.transfers

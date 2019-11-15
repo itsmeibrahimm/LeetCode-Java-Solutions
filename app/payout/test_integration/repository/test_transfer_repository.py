@@ -10,6 +10,7 @@ from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_transfer,
     prepare_and_insert_payment_account,
+    prepare_and_insert_stripe_transfer,
 )
 from app.testcase_utils import validate_expected_items_in_dict
 
@@ -271,6 +272,88 @@ class TestTransferRepository:
         assert count - original_count == 2
         assert transfer_d not in original_transfers
         assert transfer_d not in transfers
+
+    async def test_get_positive_amount_transfers_and_count_by_time_range_not_submitted(
+        self, transfer_repo, stripe_transfer_repo
+    ):
+        # negative amount transfers will not be filtered out
+        # transfers with or without related stripe_transfers will be found while is_submitted flag is off
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_transfers, original_count = await transfer_repo.get_positive_amount_transfers_and_count_by_time_range(
+            offset=0,
+            limit=50,
+            is_submitted=False,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        transfer_a = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        await prepare_and_insert_stripe_transfer(
+            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer_c.id
+        )
+
+        end_time = datetime.utcnow()
+        new_transfers, new_count = await transfer_repo.get_positive_amount_transfers_and_count_by_time_range(
+            offset=0,
+            limit=50,
+            is_submitted=False,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        assert new_count - original_count == 2
+        assert transfer_a not in original_transfers
+        assert transfer_a in new_transfers
+        assert transfer_b not in original_transfers
+        assert transfer_b not in new_transfers
+        assert transfer_c not in original_transfers
+        assert transfer_c in new_transfers
+
+    async def test_get_positive_amount_transfers_and_count_by_time_range_transfer_submitted(
+        self, transfer_repo, stripe_transfer_repo
+    ):
+        # negative amount transfers will not be filtered out
+        # only transfers with corresponding stripe_transfers will be found while is_submitted flag is on
+        start_time = datetime.utcnow() - timedelta(days=1)
+        end_time = datetime.utcnow()
+        original_transfers, original_count = await transfer_repo.get_positive_amount_transfers_and_count_by_time_range(
+            offset=0,
+            limit=50,
+            is_submitted=True,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        transfer_a = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer_b = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo, amount=-1
+        )
+        transfer_c = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        await prepare_and_insert_stripe_transfer(
+            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer_c.id
+        )
+
+        end_time = datetime.utcnow()
+        new_transfers, new_count = await transfer_repo.get_positive_amount_transfers_and_count_by_time_range(
+            offset=0,
+            limit=50,
+            is_submitted=True,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        assert new_count - original_count == 1
+        assert transfer_a not in original_transfers
+        assert transfer_a not in new_transfers
+        assert transfer_b not in original_transfers
+        assert transfer_b not in new_transfers
+        assert transfer_c not in original_transfers
+        assert transfer_c in new_transfers
 
     async def test_update_transfer_by_id_not_found(self, transfer_repo):
         assert not await transfer_repo.update_transfer_by_id(

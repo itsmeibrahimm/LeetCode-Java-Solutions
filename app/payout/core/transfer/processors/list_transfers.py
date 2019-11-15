@@ -48,8 +48,6 @@ class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse])
         self.transfer_repo = transfer_repo
 
     async def _execute(self) -> ListTransfersResponse:
-        transfers: List[Transfer] = []
-        count = 0
         offset = self.request.offset
         limit = self.request.limit
         if offset < 0 or limit < 0:
@@ -81,8 +79,20 @@ class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse])
                 else None,
             )
         elif self.request.has_positive_amount:
-            # todo: filter with stripe_transfer is null, amount check and time_range
-            pass
+            is_submitted = False
+            if self.request.is_submitted:
+                is_submitted = self.request.is_submitted
+            transfers, count = await self.transfer_repo.get_positive_amount_transfers_and_count_by_time_range(
+                is_submitted=is_submitted,
+                offset=offset,
+                limit=limit,
+                start_time=self.request.time_range.start_time
+                if self.request.time_range
+                else None,
+                end_time=self.request.time_range.end_time
+                if self.request.time_range
+                else None,
+            )
         else:
             raise PayoutError(
                 http_status_code=HTTP_400_BAD_REQUEST,
