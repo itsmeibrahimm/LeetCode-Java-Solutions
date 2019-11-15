@@ -1,21 +1,20 @@
-from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from datetime import datetime
+from typing import Any, Dict, Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 from typing_extensions import final
 
-from app.commons.types import PgpCode, CountryCode, Currency
+from app.commons.types import CountryCode, Currency, PgpCode
 from app.payin.core.cart_payment.types import (
-    IntentStatus,
     ChargeStatus,
+    IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
     RefundStatus,
 )
-from uuid import UUID
-
-from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
+from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 
 
 @final
@@ -80,6 +79,26 @@ class PaymentIntent(BaseModel):
     cancelled_at: Optional[datetime]
     capture_after: Optional[datetime]
 
+    @property
+    def summary(self) -> Dict[str, Any]:
+        """
+        A brief version of payment intent used for general logging purpose
+        """
+        return self.dict(
+            include={
+                "id",
+                "cart_payment_id",
+                "idempotency_key",
+                "amount_initiated",
+                "amount",
+                "capture_method",
+                "status",
+                "legacy_consumer_charge_id",
+                "updated_at",
+                "capture_after",
+            }
+        )
+
 
 @final
 @dataclass(frozen=True)
@@ -105,6 +124,25 @@ class PgpPaymentIntent:
     updated_at: datetime
     captured_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+
+    @property
+    def summary(self) -> Dict[str, Any]:
+        """
+        A brief version of pgp payment intent used for general logging purpose
+        """
+        return {
+            "id": self.id,
+            "payment_intent_id": self.payment_intent_id,
+            "idempotency_key": self.idempotency_key,
+            "resource_id": self.resource_id,
+            "status": self.status,
+            "charge_resource_id": self.charge_resource_id,
+            "amount": self.amount,
+            "amount_capturable": self.amount_capturable,
+            "amount_received": self.amount_received,
+            "capture_method": self.capture_method,
+            "updated_at": self.updated_at,
+        }
 
 
 @final

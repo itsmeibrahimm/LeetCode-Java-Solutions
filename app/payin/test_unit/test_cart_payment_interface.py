@@ -1792,7 +1792,8 @@ class TestCapturePayment:
     @pytest.mark.asyncio
     async def test_success(self, cart_payment_processor):
         payment_intent = PaymentIntentFactory(
-            status=IntentStatus.REQUIRES_CAPTURE
+            status=IntentStatus.REQUIRES_CAPTURE,
+            capture_after=datetime.now() - timedelta(seconds=1),
         )  # type: PaymentIntent
         cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent = (  # type: ignore
             asynctest.CoroutineMock()

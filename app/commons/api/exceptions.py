@@ -16,7 +16,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import get_logger_from_req, response_with_req_id
-from app.middleware.doordash_metrics import get_endpoint_from_scope
+from app.commons.routing import get_endpoint_from_scope
 
 
 def create_payment_error_response_blob(

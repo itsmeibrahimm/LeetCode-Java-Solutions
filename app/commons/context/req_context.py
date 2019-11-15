@@ -38,7 +38,9 @@ def set_context_for_req(request: Request) -> ReqContext:
 
     req_id = uuid4()
     set_request_id(req_id)
+
     correlation_id = request.headers.get(EXTERNAL_CORRELATION_ID_HEADER, None)
+
     log = app_context.log.bind(req_id=req_id, correlation_id=correlation_id)
     commando_mode = runtime.get_bool(STRIPE_COMMANDO_MODE_BOOLEAN, False)
     commando_legacy_payment_white_list = runtime.get_json(

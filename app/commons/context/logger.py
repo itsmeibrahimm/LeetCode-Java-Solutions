@@ -1,14 +1,16 @@
-import logging
 import datetime
+import logging
 import os
 import platform
 import sys
+import uuid
+from contextvars import ContextVar
 from typing import Callable, Dict, Optional
 
 import structlog
-from contextvars import ContextVar
-import uuid
 from pythonjsonlogger import jsonlogger
+
+from app.commons.routing import ENDPOINT
 
 REQUEST_ID: ContextVar[Optional[uuid.UUID]] = ContextVar("REQUEST_ID")
 
@@ -29,6 +31,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         logger_add_app_info(log_record, record, message_dict)
         logger_add_thread(log_record, record, message_dict)
         logger_add_request_id(log_record, record, message_dict)
+        logger_add_route_path(log_record, record, message_dict)
 
 
 _handler = logging.StreamHandler(sys.stdout)
@@ -94,6 +97,15 @@ def logger_add_request_id(
         req_id = REQUEST_ID.get(None)
         if req_id:
             log_record["req_id"] = str(req_id)
+
+
+def logger_add_route_path(
+    log_record: Dict, record: logging.LogRecord, message_dict: Dict
+):
+    if "route_path" not in log_record:
+        route_path = ENDPOINT.get(None)
+        if route_path:
+            log_record["route_path"] = route_path
 
 
 def add_log_level(

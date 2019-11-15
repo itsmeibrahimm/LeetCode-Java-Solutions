@@ -147,8 +147,7 @@ class CaptureUncapturedPaymentIntents(Job):
                 # TODO: [PAYIN-120] this is a dirty fix to avoid spamming stripe by capture expired intents.
                 job_instance_cxt.log.warn(
                     f"skipping payment_intent created more than {expire_cutoff_days} days",
-                    payment_intent_id=payment_intent.id,
-                    payment_intent_created_at=payment_intent.created_at,
+                    payment_intent=payment_intent.summary,
                 )
                 payment_intent_skipped_count += 1
             else:
@@ -265,12 +264,8 @@ class ResolveCapturingPaymentIntents(Job):
             job_instance_cxt.log.info(
                 "flip capturing intent to requires_capture",
                 job="resolve_capturing_payment_intents",
-                payment_intent_id=payment_intent.id,
-                payment_intent_prev_status=payment_intent.status,
+                payment_intent=payment_intent.summary,
                 payment_intent_new_status=new_status,
-                payment_intent_last_updated_at=payment_intent.updated_at,
-                payment_intent_capture_after=payment_intent.capture_after,
-                payment_intent_created_at=payment_intent.created_at,
             )
             update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
                 id=payment_intent.id, previous_status=payment_intent.status

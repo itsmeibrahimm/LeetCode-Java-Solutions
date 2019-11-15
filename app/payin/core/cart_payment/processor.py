@@ -826,6 +826,11 @@ class CartPaymentInterface:
         # method needs to be converted into a payment method that can be used in the pgp account for that country as
         # payment methods are pgp account-specific
         #
+        self.req_context.log.info(
+            "[submit_payment_to_provider][start]",
+            payment_intent=payment_intent.summary,
+            pgp_payment_intent=pgp_payment_intent.summary,
+        )
         pgp_payment_method_resource_id: PaymentMethodId = PaymentMethodId(
             pgp_payment_method.pgp_payment_method_resource_id
         )
@@ -1042,6 +1047,11 @@ class CartPaymentInterface:
     async def submit_capture_to_provider(
         self, payment_intent: PaymentIntent, pgp_payment_intent: PgpPaymentIntent
     ) -> ProviderPaymentIntent:
+        self.req_context.log.info(
+            "[submit_capture_to_provider][start]",
+            payment_intent=payment_intent.summary,
+            pgp_payment_intent=pgp_payment_intent.summary,
+        )
 
         # Assemble corresponding submit operations depending on amount_to_capture whether below small amount thresdhold
         submit_op: Coroutine[Any, Any, ProviderPaymentIntent]
@@ -1166,8 +1176,7 @@ class CartPaymentInterface:
         """
 
         self.req_context.log.info(
-            "[_capture_small_amount_provider_payment_intent] "
-            "Capturing small amount provider payment intent",
+            "[_capture_small_amount_provider_payment_intent][start]",
             payment_intent_id=payment_intent.id,
             pgp_payment_intent_id=pgp_payment_intent.id,
             net_amount_to_capture=payment_intent.amount,
@@ -1333,15 +1342,14 @@ class CartPaymentInterface:
         pgp_payment_intent: PgpPaymentIntent,
         reason,
     ) -> ProviderPaymentIntent:
+        self.req_context.log.info(
+            "[cancel_provider_payment_charge][start]",
+            payment_intent=payment_intent.summary,
+            pgp_payment_intent=pgp_payment_intent.summary,
+        )
         try:
             intent_request = StripeCancelPaymentIntentRequest(
                 sid=pgp_payment_intent.resource_id, cancellation_reason=reason
-            )
-
-            self.req_context.log.info(
-                "[cancel_provider_payment_charge] Cancelling payment intent",
-                payment_intent_id=payment_intent.id,
-                idempotency_key=pgp_payment_intent.idempotency_key,
             )
             return await self.stripe_async_client.cancel_payment_intent(
                 country=CountryCode(payment_intent.country),
@@ -1379,6 +1387,12 @@ class CartPaymentInterface:
         reason: str,
         refund_amount: int,
     ) -> ProviderRefund:
+
+        self.req_context.log.info(
+            "[refund_provider_payment][start]",
+            payment_intent=payment_intent.summary,
+            pgp_payment_intent=pgp_payment_intent.summary,
+        )
         try:
             refund_request = StripeRefundChargeRequest(
                 charge=pgp_payment_intent.charge_resource_id,
@@ -1389,13 +1403,6 @@ class CartPaymentInterface:
             if payment_intent.application_fee_amount:
                 refund_request.refund_application_fee = True
                 refund_request.reverse_transfer = True
-
-            self.req_context.log.info(
-                "[refund_provider_payment] Refunding charge",
-                charge_resource_id=pgp_payment_intent.charge_resource_id,
-                payment_intent_id=payment_intent.id,
-                pgp_payment_intent_id=pgp_payment_intent.id,
-            )
             response = await self.stripe_async_client.refund_charge(
                 country=CountryCode(payment_intent.country),
                 request=refund_request,
@@ -2772,8 +2779,7 @@ class CartPaymentProcessor:
         """
         self.log.info(
             "[capture_payment] Capturing payment_intent",
-            payment_intent_id=payment_intent.id,
-            amount=payment_intent.amount,
+            payment_intent=payment_intent.summary,
         )
 
         try:

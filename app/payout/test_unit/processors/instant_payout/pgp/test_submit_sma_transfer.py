@@ -82,9 +82,7 @@ class TestSubmitSMATransfer:
             destination=stripe_transfer.destination,
         )
 
-    async def test_should_raise_exception_when_stripe_return_stripe_return_exception(
-        self
-    ):
+    async def test_should_raise_exception_when_stripe_return_exception(self):
         self.stripe_async_client.create_transfer_with_stripe_error_translation.side_effect = (
             PGPConnectionError
         )

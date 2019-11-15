@@ -5,14 +5,13 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.testclient import TestClient
 from fastapi.applications import FastAPI
-from app.commons.routing import APIRouter
+from app.commons.routing import APIRouter, normalize_path
 from typing import List
 from app.commons.utils.testing import Stat
 from app.commons.config.app_config import StatsDConfig
 from app.middleware.doordash_metrics import (
     DoorDashMetricsMiddleware,
     ServiceMetricsMiddleware,
-    normalize_path,
 )
 
 

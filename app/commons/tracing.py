@@ -4,31 +4,26 @@ import functools
 import inspect
 import time
 from collections import deque
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager, ExitStack
 from contextvars import ContextVar
-import pydantic
-
 from types import TracebackType
 from typing import (
-    TypeVar,
-    Generic,
     Any,
-    List,
     Callable,
+    cast,
     ContextManager,
     Deque,
-    Optional,
     Dict,
+    Generic,
+    List,
+    Optional,
     Type,
-    cast,
+    TypeVar,
 )
 
 import pydantic
-from typing_extensions import Literal
-from collections import deque
-from contextlib import ExitStack, contextmanager
-from contextvars import ContextVar
 from pydantic.fields import Field
+from typing_extensions import Literal
 
 from app.commons.context.logger import root_logger as default_logger
 

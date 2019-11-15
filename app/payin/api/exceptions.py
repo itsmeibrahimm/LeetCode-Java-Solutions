@@ -7,7 +7,7 @@ from structlog import BoundLogger
 from app.commons.api.exceptions import payment_http_exception_handler
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import response_with_req_id, get_logger_from_req
-from app.middleware.doordash_metrics import get_endpoint_from_scope
+from app.commons.routing import get_endpoint_from_scope
 from app.payin.core.exceptions import PayinErrorCode
 
 __all__ = ["PayinErrorResponse", "payin_error_handler"]

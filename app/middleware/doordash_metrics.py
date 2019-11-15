@@ -6,28 +6,16 @@ from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 from starlette.exceptions import ExceptionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.types import Scope
 
 from app.commons import tracing
 from app.commons.config.app_config import StatsDConfig
 from app.commons.context.req_context import get_context_from_req
-from app.commons.routing import reset_breadcrumbs, get_endpoint_breadcrumbs
+from app.commons.routing import get_endpoint_from_scope, reset_breadcrumbs
 from app.commons.stats import (
     create_statsd_client_from_config,
-    set_service_stats_client,
     set_request_logger,
+    set_service_stats_client,
 )
-
-NORMALIZATION_TABLE = str.maketrans("/", "|", "{}")
-
-
-def normalize_path(path: str):
-    return path.translate(NORMALIZATION_TABLE)
-
-
-def get_endpoint_from_scope(scope: Scope) -> str:
-    bread_crumbs = get_endpoint_breadcrumbs(scope)
-    return normalize_path("".join(bread_crumbs)) if bread_crumbs else ""
 
 
 class DoorDashMetricsMiddleware(BaseHTTPMiddleware):

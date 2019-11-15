@@ -1,10 +1,10 @@
-from typing import Any, Dict, Type, Union, Optional
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Type, Union
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, params, routing as fastapi_routing
 from fastapi.params import Depends
 from pydantic import BaseModel
-from fastapi import routing as fastapi_routing, params
-from typing import Callable, List, Mapping, Sequence
 from starlette import routing as starlette_routing
 from starlette.status import (
     HTTP_422_UNPROCESSABLE_ENTITY,
@@ -22,6 +22,20 @@ of routes in the request path.
 Breadcrumbs = List[str]
 BREADCRUMB_SCOPE_KEY = "routing_breadcrumbs"
 RESOLVED_ROUTE_KEY = "routing_resolved_route"
+PATH_NORMALIZATION_TABLE = str.maketrans("/", "|", "{}")
+
+ENDPOINT: ContextVar[Optional[str]] = ContextVar("ENDPOINT")
+
+
+@contextmanager
+def set_endpoint_as_ctxt_manager(endpoint: Optional[str]):
+    token = None
+    try:
+        token = ENDPOINT.set(endpoint)
+        yield
+    finally:
+        if token:
+            ENDPOINT.reset(token)
 
 
 def reset_breadcrumbs(scope: Scope) -> Breadcrumbs:
@@ -54,6 +68,15 @@ def get_resolved_route(
     scope: Scope, default: Optional["APIRoute"] = None
 ) -> Optional["APIRoute"]:
     return scope.get(RESOLVED_ROUTE_KEY, default)
+
+
+def normalize_path(path: str):
+    return path.translate(PATH_NORMALIZATION_TABLE)
+
+
+def get_endpoint_from_scope(scope: Scope) -> str:
+    bread_crumbs = get_endpoint_breadcrumbs(scope)
+    return normalize_path("".join(bread_crumbs)) if bread_crumbs else ""
 
 
 def group_routers(
@@ -94,14 +117,20 @@ class APIRoute(fastapi_routing.APIRoute):
         # for routers (included nested routers), they get merged together
         add_breadcrumb(scope, f"/{self.name}")
         set_resolved_route(scope, self)
-        await super().__call__(scope, receive, send)
+
+        # Incrementally set routing endpoint breadcrumb to contextvar
+        with set_endpoint_as_ctxt_manager(get_endpoint_from_scope(scope)):
+            await super().__call__(scope, receive, send)
 
 
 class Mount(starlette_routing.Mount):
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         # for mounted applications, include the mount path in breadcrumbs
         add_breadcrumb(scope, self.path)
-        await super().__call__(scope, receive, send)
+
+        # Incrementally set routing endpoint breadcrumb to contextvar
+        with set_endpoint_as_ctxt_manager(get_endpoint_from_scope(scope)):
+            await super().__call__(scope, receive, send)
 
 
 class ApiRouterBuilder:
