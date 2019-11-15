@@ -87,7 +87,7 @@ class TestCartPaymentApi:
         )
 
         with pytest.raises(PaymentException) as e:
-            await v0_api.create_cart_payment_for_legacy_client(
+            await v0_api.create_cart_payment(
                 cart_payment_request=request,
                 log=create_autospec(BoundLogger),
                 cart_payment_processor=cart_payment_processor,

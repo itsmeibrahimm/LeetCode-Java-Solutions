@@ -12,7 +12,6 @@ from structlog.stdlib import BoundLogger
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
-from app.payin.api.cart_payment.base.request import CancelCartPaymentRequest
 from app.payin.api.cart_payment.v0.helper import legacy_create_request_to_model
 from app.payin.api.cart_payment.v0.request import (
     CreateCartPaymentLegacyRequest,
@@ -45,7 +44,7 @@ router = APIRouter()
     },
     tags=api_tags,
 )
-async def create_cart_payment_for_legacy_client(
+async def create_cart_payment(
     cart_payment_request: CreateCartPaymentLegacyRequest = Depends(
         override_commando_mode_legacy_cart_payment
     ),
@@ -186,7 +185,6 @@ async def update_cart_payment(
 )
 async def cancel_cart_payment(
     dd_charge_id: int,
-    cart_payment_request: CancelCartPaymentRequest,
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):

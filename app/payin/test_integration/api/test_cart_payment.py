@@ -204,7 +204,6 @@ class TestCartPayment:
     ) -> Dict[str, Any]:
         request_body = {
             "amount": amount,
-            "payer_id": cart_payment["payer_id"],
             "client_description": client_description,
             "legacy_payment": {
                 "stripe_customer_id": "cus_9a8ds9",

@@ -24,4 +24,4 @@ class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
 
 
 class UpdateCartPaymentRequest(UpdateCartPaymentBaseRequest):
-    payer_id: UUID
+    pass

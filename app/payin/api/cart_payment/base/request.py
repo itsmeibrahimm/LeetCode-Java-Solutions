@@ -53,7 +53,3 @@ class UpdateCartPaymentBaseRequest(BaseModel):
     amount: UpdateAmount
     client_description: Optional[str] = None
     split_payment: Optional[SplitPayment] = None
-
-
-class CancelCartPaymentRequest(BaseModel):
-    pass

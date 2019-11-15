@@ -2530,10 +2530,10 @@ class CartPaymentProcessor:
         self,
         idempotency_key: str,
         cart_payment_id: uuid.UUID,
-        payer_id: Optional[uuid.UUID],
         amount: int,
         client_description: Optional[str],
         split_payment: Optional[SplitPayment],
+        payer_id: Optional[uuid.UUID] = None,
     ) -> CartPayment:
         self.log.info(
             "[update_payment] updating cart_payment",
