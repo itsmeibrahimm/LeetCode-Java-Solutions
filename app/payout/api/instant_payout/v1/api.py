@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import pytz
 from starlette.status import HTTP_200_OK
 from fastapi import APIRouter, Body, Path, Depends, Query
 
@@ -63,8 +64,8 @@ async def check_instant_payout_eligibility(
     # raise invalid request error if converting local_start_of_day overflows
     # todo: Leon, replace with processor layer error when refactoring errors.
     try:
-        created_after = datetime.fromtimestamp(local_start_of_day / 1.0)
-    except OverflowError as e:
+        created_after = datetime.fromtimestamp(local_start_of_day / 1.0, tz=pytz.UTC)
+    except (OverflowError, OSError) as e:
         raise BadRequestError(
             error_code=BadRequestErrorCode.INVALID_VALUE_ERROR,
             error_message=payment_error_message_maps[
