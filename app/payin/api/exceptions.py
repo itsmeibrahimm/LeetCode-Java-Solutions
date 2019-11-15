@@ -62,4 +62,4 @@ async def payin_error_handler(request: Request, payment_exception: PaymentExcept
         # todo: this is for backward compatibility,
         # in next revision, will remove the need to handle payment exception and update to directly
         # handle payment error, then we don't need this if condition
-        return payment_http_exception_handler(request, payment_exception)
+        return await payment_http_exception_handler(request, payment_exception)
