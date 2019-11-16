@@ -235,6 +235,9 @@ class TestCheckInstantPayout:
         assert body.get("error_code") == "invalid_request"
         assert body.get("error_message") == "payout_account_type_not_supported"
 
+    @pytest.mark.skip(
+        "PaymentAccount and PaymentMethods rollback difference in staging would cause this test flaky."
+    )
     def test_not_eligible_due_to_no_payout_card(
         self, verified_dx_us_payout_account, instant_payouts_api: InstantPayoutsV1Api
     ):

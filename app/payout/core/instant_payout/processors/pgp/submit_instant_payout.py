@@ -125,7 +125,7 @@ class SubmitInstantPayout(
                 request=self.request.dict(),
             )
             status_to_update = InstantPayoutStatusType.ERROR
-            error = json.dumps(e.error_message)
+            error = json.dumps(e.__dict__)
             received_at = utc_now
             await self.transaction_repo.set_transaction_payout_id_by_ids(
                 transaction_ids=self.request.transaction_ids, payout_id=None
@@ -139,7 +139,7 @@ class SubmitInstantPayout(
                 request=self.request.dict(),
             )
             status_to_update = InstantPayoutStatusType.FAILED
-            error = json.dumps(e.error_message)
+            error = json.dumps(e.__dict__)
             received_at = utc_now
             await self.transaction_repo.set_transaction_payout_id_by_ids(
                 transaction_ids=self.request.transaction_ids, payout_id=None

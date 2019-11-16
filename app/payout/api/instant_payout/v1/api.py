@@ -74,7 +74,7 @@ async def check_instant_payout_eligibility(
         ) from e
 
     internal_request = EligibilityCheckRequest(
-        payout_account_id=payout_account_id, created_afer=created_after
+        payout_account_id=payout_account_id, created_after=created_after
     )
     internal_response = await instant_payout_processors.check_instant_payout_eligibility(
         internal_request

@@ -97,7 +97,7 @@ class SubmitSMATransfer(AsyncOperation[SMATransferRequest, SMATransferResponse])
                 error=str(e),
             )
             payout_update = PayoutUpdate(
-                status=InstantPayoutStatusType.ERROR, error=json.dumps(e.error_message)
+                status=InstantPayoutStatusType.ERROR, error=json.dumps(e.__dict__)
             )
             await self.payout_repo.update_payout_by_id(
                 payout_id=self.request.payout_id, data=payout_update
