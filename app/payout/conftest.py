@@ -35,7 +35,7 @@ from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.api import (
     create_account_url,
     verify_account_url,
-    create_payout_method_url,
+    create_payout_method_url_card,
 )
 
 
@@ -261,7 +261,8 @@ def verified_payout_account_with_payout_card(
         token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
     )
     response = client.post(
-        create_payout_method_url(verified_payout_account["id"]), json=request.dict()
+        create_payout_method_url_card(verified_payout_account["id"]),
+        json=request.dict(),
     )
     assert response.status_code == 201
     verified_payout_account["stripe_card_id"] = response.json()["stripe_card_id"]

@@ -216,11 +216,12 @@ class PayoutAccountProcessors:
 
     async def list_payout_method(
         self, request: ListPayoutMethodRequest
-    ) -> account_models.PayoutCardListInternal:
+    ) -> account_models.PayoutMethodListInternal:
         list_payout_method_op = ListPayoutMethod(
             logger=self.logger,
             payout_card_repo=self.payout_card_repo,
             payout_method_repo=self.payout_method_repo,
+            payment_account_repo=self.payment_account_repo,
             request=request,
         )
         return await list_payout_method_op.execute()

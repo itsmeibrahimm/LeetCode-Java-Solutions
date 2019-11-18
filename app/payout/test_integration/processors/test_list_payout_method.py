@@ -4,17 +4,20 @@ import pytest
 import pytest_mock
 
 from app.commons.database.infra import DB
+from app.commons.types import Currency, CountryCode
 from app.payout.core.account.processors.list_payout_methods import (
     ListPayoutMethod,
     ListPayoutMethodRequest,
 )
 import app.payout.core.account.models as account_models
+from app.payout.models import PayoutExternalAccountType
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_payout_card_list,
+    prepare_and_insert_stripe_managed_account,
 )
 
 
@@ -40,7 +43,16 @@ class TestListPayoutMethod:
         payout_method_repo: PayoutMethodRepository,
         payment_account_repo: PaymentAccountRepository,
     ):
-        payout_account = await prepare_and_insert_payment_account(payment_account_repo)
+        # insert a stripe_managed_account
+        stripe_managed_account = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo
+        )
+        assert stripe_managed_account
+
+        payout_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo,
+            account_id=stripe_managed_account.id,
+        )
         payout_card_list = await prepare_payout_card_list(
             payout_method_repo, payout_card_repo, payout_account.id
         )
@@ -52,6 +64,7 @@ class TestListPayoutMethod:
             logger=mocker.Mock(),
             payout_card_repo=payout_card_repo,
             payout_method_repo=payout_method_repo,
+            payment_account_repo=payment_account_repo,
             request=request,
         )
         expected_card_list: List[account_models.PayoutCardInternal] = []
@@ -79,9 +92,37 @@ class TestListPayoutMethod:
                     deleted_at=payout_method.deleted_at,
                 )
             )
+        expected_bank_account_internal = account_models.PayoutBankAccountInternal(
+            payout_account_id=payout_account.id,
+            currency=Currency.USD,
+            country=CountryCode.US,
+            bank_last4=stripe_managed_account.default_bank_last_four,
+            bank_name=stripe_managed_account.default_bank_name,
+            fingerprint=stripe_managed_account.fingerprint,
+        )
 
-        payout_card_list_internal = await list_payout_method_op._execute()
-        assert expected_card_list == payout_card_list_internal.data
+        payout_method_list_internal = await list_payout_method_op._execute()
+        assert expected_card_list == payout_method_list_internal.card_list
+        assert payout_method_list_internal.bank_account_list == []
+
+        # search for bank account only
+
+        request_bank = ListPayoutMethodRequest(
+            payout_account_id=payout_account.id,
+            payout_method_type=PayoutExternalAccountType.BANK_ACCOUNT,
+        )
+        list_payout_method_bank_op = ListPayoutMethod(
+            logger=mocker.Mock(),
+            payout_card_repo=payout_card_repo,
+            payout_method_repo=payout_method_repo,
+            payment_account_repo=payment_account_repo,
+            request=request_bank,
+        )
+        payout_method_list_bank_internal = await list_payout_method_bank_op._execute()
+        assert payout_method_list_bank_internal.card_list == []
+        assert [
+            expected_bank_account_internal
+        ] == payout_method_list_bank_internal.bank_account_list
 
     async def test_list_payout_method_with_limit(
         self,
@@ -105,6 +146,7 @@ class TestListPayoutMethod:
             logger=mocker.Mock(),
             payout_card_repo=payout_card_repo,
             payout_method_repo=payout_method_repo,
+            payment_account_repo=payment_account_repo,
             request=request,
         )
         expected_card_list: List[account_models.PayoutCardInternal] = []
@@ -136,8 +178,8 @@ class TestListPayoutMethod:
             )
 
         payout_card_list_internal = await list_payout_method_op._execute()
-        assert len(payout_card_list_internal.data) == limit
-        assert expected_card_list == payout_card_list_internal.data
+        assert len(payout_card_list_internal.card_list) == limit
+        assert expected_card_list == payout_card_list_internal.card_list
 
     async def test_list_payout_method_not_found(
         self,
@@ -154,10 +196,11 @@ class TestListPayoutMethod:
             logger=mocker.Mock(),
             payout_card_repo=payout_card_repo,
             payout_method_repo=payout_method_repo,
+            payment_account_repo=payment_account_repo,
             request=request,
         )
 
         payout_card_list_internal = (
             await list_payout_method_op_raise_no_payout_method._execute()
         )
-        assert payout_card_list_internal.data == []
+        assert payout_card_list_internal.card_list == []

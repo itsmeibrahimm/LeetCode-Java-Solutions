@@ -29,7 +29,7 @@ from app.payout.models import (
 from app.payout.test_integration.api import (
     create_account_url,
     verify_account_url,
-    create_payout_method_url,
+    create_payout_method_url_card,
 )
 
 INSTANT_PAYOUT_ENDPOINT = "/payout/api/v1/instant_payouts/"
@@ -155,7 +155,8 @@ class TestCheckInstantPayoutEligibility:
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
-            create_payout_method_url(verified_payout_account["id"]), json=request.dict()
+            create_payout_method_url_card(verified_payout_account["id"]),
+            json=request.dict(),
         )
         assert response.status_code == 201
         return verified_payout_account

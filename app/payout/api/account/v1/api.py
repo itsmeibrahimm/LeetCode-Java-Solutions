@@ -5,17 +5,14 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
 )
 from structlog.stdlib import BoundLogger
-from typing import Optional, Union
+from typing import Optional
 from fastapi import APIRouter, Depends, Body, Path, Query
 
 from app.commons.types import CountryCode
 from app.commons.api.models import PaymentErrorResponseBody
 from app.commons.api.streams import decode_stream_cursor, encode_stream_cursor
 from app.commons.context.req_context import get_logger_from_req
-from app.payout.api.account.utils import (
-    to_external_payout_account,
-    to_external_payout_method,
-)
+from app.payout.api.account.utils import to_external_payout_account
 from app.payout.api.account.v1 import models
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.transfer.cancel_payout import CancelPayoutRequest
@@ -217,14 +214,14 @@ async def verify_payout_account_to_be_implemented(
 
 
 @router.post(
-    "/{payout_account_id}/payout_methods",
+    "/{payout_account_id}/payout_methods/bank",
     status_code=HTTP_201_CREATED,
-    operation_id="CreatePayoutMethod",
-    response_model=Union[models.PayoutMethodCard, models.PayoutMethodBankAccount],
+    operation_id="CreatePayoutMethodBank",
+    response_model=models.PayoutMethodBankAccount,
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
-async def create_payout_method(
+async def create_payout_method_bank(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
@@ -241,18 +238,50 @@ async def create_payout_method(
     internal_response = await payout_account_processors.create_payout_method(
         internal_request
     )
-    return to_external_payout_method(internal_response)
+    return models.PayoutMethodBankAccount(
+        **internal_response.dict(), type=PayoutExternalAccountType.BANK_ACCOUNT
+    )
 
 
-@router.get(
-    "/{payout_account_id}/payout_methods/{payout_method_id}",
-    status_code=HTTP_200_OK,
-    operation_id="GetPayoutMethod",
+@router.post(
+    "/{payout_account_id}/payout_methods/card",
+    status_code=HTTP_201_CREATED,
+    operation_id="CreatePayoutMethodCard",
     response_model=models.PayoutMethodCard,
     responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
-async def get_payout_method(
+async def create_payout_method_card(
+    payout_account_id: models.PayoutAccountId = Path(
+        ..., description="Payout Account ID"
+    ),
+    payout_method: models.CreatePayoutMethod = Body(...),
+    payout_account_processors: PayoutAccountProcessors = Depends(
+        create_payout_account_processors
+    ),
+):
+    internal_request = CreatePayoutMethodRequest(
+        payout_account_id=payout_account_id,
+        token=payout_method.token,
+        type=payout_method.type,
+    )
+    internal_response = await payout_account_processors.create_payout_method(
+        internal_request
+    )
+    return models.PayoutMethodCard(
+        **internal_response.dict(), type=PayoutExternalAccountType.CARD
+    )
+
+
+@router.get(
+    "/{payout_account_id}/payout_cards/{payout_method_id}",
+    status_code=HTTP_200_OK,
+    operation_id="GetPayoutCard",
+    response_model=models.PayoutMethodCard,
+    responses={HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def get_payout_card(
     payout_account_id: models.PayoutAccountId = Path(
         ..., description="Payout Account ID"
     ),
@@ -285,7 +314,7 @@ async def list_payout_method(
         ..., description="Payout Account ID"
     ),
     payout_method_type: models.PayoutExternalAccountType = Query(
-        default=PayoutExternalAccountType.CARD, description="Payout method type"
+        PayoutExternalAccountType.CARD, description="Payout method type"
     ),
     limit: int = Query(default=50, description="Default limit of returned results"),
     payout_account_processors: PayoutAccountProcessors = Depends(
@@ -301,16 +330,25 @@ async def list_payout_method(
         internal_request
     )
 
-    # TODO: need to merge card and bank payout methods
     payout_method_card_list = []
-    for card_internal in internal_response.data:
+    payout_method_bank_account_list = []
+    for card_internal in internal_response.card_list:
         payout_method_card_list.append(
             models.PayoutMethodCard(
                 **card_internal.dict(), type=PayoutExternalAccountType.CARD
             )
         )
+    for bank_account_internal in internal_response.bank_account_list:
+        payout_method_bank_account_list.append(
+            models.PayoutMethodBankAccount(
+                **bank_account_internal.dict(),
+                type=PayoutExternalAccountType.BANK_ACCOUNT
+            )
+        )
     return models.PayoutMethodList(
-        card_list=payout_method_card_list, count=len(payout_method_card_list)
+        card_list=payout_method_card_list,
+        bank_account_list=payout_method_bank_account_list,
+        count=len(payout_method_card_list) + len(payout_method_bank_account_list),
     )
 
 

@@ -110,8 +110,9 @@ class PayoutBankAccountInternal(PayoutMethodInternal):
     fingerprint: str
 
 
-class PayoutCardListInternal(OperationResponse):
-    data: List[PayoutCardInternal]
+class PayoutMethodListInternal(OperationResponse):
+    card_list: List[PayoutCardInternal] = []
+    bank_account_list: List[PayoutBankAccountInternal] = []
 
 
 class VerificationRequirementsOnboarding(OperationResponse):

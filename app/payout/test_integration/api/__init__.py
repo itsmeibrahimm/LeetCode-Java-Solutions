@@ -30,12 +30,16 @@ def verify_account_url(account_id: int):
     return f"{ACCOUNT_ENDPOINT}/{account_id}/verify/legacy"
 
 
-def create_payout_method_url(account_id: int):
-    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods"
+def create_payout_method_url_card(account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods/card"
+
+
+def create_payout_method_url_bank(account_id: int):
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods/bank"
 
 
 def get_payout_method_url(account_id: int, payout_method_id: int):
-    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_methods/{payout_method_id}"
+    return f"{ACCOUNT_ENDPOINT}/{account_id}/payout_cards/{payout_method_id}"
 
 
 def list_payout_method_url(account_id: int, limit: int = 50):

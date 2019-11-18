@@ -222,13 +222,9 @@ class CreatePayoutMethod(
         new_bank_last4 = stripe_managed_account.default_bank_last_four
         new_fingerprint = stripe_managed_account.fingerprint
         if old_fingerprint == new_fingerprint:
-            self.logger.error(
-                "Added a new bank account, the new bank info has not been updated on SMA.",
+            self.logger.warn(
+                "Added a new bank account, the new fingerprint is the same as the old one.",
                 stripe_managed_account_id=stripe_managed_account.id,
-            )
-            # SMA update failed, raise
-            raise payout_method_update_error(
-                "Failed to update SMA after stripe external account has been updated."
             )
         else:
             # Save a record to payment_account_edit_history table only if SMA has been updated
@@ -273,11 +269,11 @@ class CreatePayoutMethod(
                     stripe_managed_account_id=stripe_managed_account.id,
                 )
 
-            return account_models.PayoutBankAccountInternal(
-                payout_account_id=self.request.payout_account_id,
-                currency=bank_account.currency,
-                country=bank_account.country,
-                bank_last4=new_bank_last4,
-                bank_name=new_bank_name,
-                fingerprint=new_fingerprint,
-            )
+        return account_models.PayoutBankAccountInternal(
+            payout_account_id=self.request.payout_account_id,
+            currency=bank_account.currency,
+            country=bank_account.country,
+            bank_last4=new_bank_last4,
+            bank_name=new_bank_name,
+            fingerprint=new_fingerprint,
+        )

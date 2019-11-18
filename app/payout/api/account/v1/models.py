@@ -154,7 +154,8 @@ class PayoutMethod(PaymentResponse):
     Response model of generic payout method
     """
 
-    id: PayoutMethodId = Schema(default=..., description="Payout method ID")
+    # We don't store bank account in the payout_methods table now therefore no ID
+    id: Optional[PayoutMethodId] = Schema(default=..., description="Payout method ID")
     type: PayoutExternalAccountType = Schema(
         default=..., description="Payout method type"
     )
@@ -163,8 +164,12 @@ class PayoutMethod(PaymentResponse):
     )
     country: CountryCode = Schema(default=..., description="Country Code")
     currency: Currency = Schema(default=..., description="Currency Code")
-    created_at: datetime = Schema(default=..., description="Created at timestamp")
-    updated_at: datetime = Schema(default=..., description="Updated at timestamp")
+    created_at: Optional[datetime] = Schema(
+        default=..., description="Created at timestamp"
+    )
+    updated_at: Optional[datetime] = Schema(
+        default=..., description="Updated at timestamp"
+    )
     deleted_at: Optional[datetime] = Schema(
         default=None, description="Deleted at timestamp"
     )
@@ -192,7 +197,7 @@ class PayoutMethodBankAccount(PayoutMethod):
     """
 
     bank_name: str = Schema(default=..., description="Bank name")
-    bank_last_4: str = Schema(default=..., description="Bank last 4 digits")
+    bank_last4: str = Schema(default=..., description="Bank last 4 digits")
     fingerprint: str = Schema(default=..., description="Bank account fingerprint")
 
 
@@ -244,4 +249,9 @@ class PayoutMethodList(PaymentResponse):
     """
 
     count: int = Schema(default=..., description="Number of results returned")
-    card_list: List[PayoutMethodCard] = Schema(default=..., description="List of cards")
+    card_list: Optional[List[PayoutMethodCard]] = Schema(
+        default=..., description="List of cards"
+    )
+    bank_account_list: Optional[List[PayoutMethodBankAccount]] = Schema(
+        default=..., description="List of bank accounts"
+    )

@@ -7,6 +7,7 @@ from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.test_integration.constants import (
     VISA_DEBIT_CARD_TOKEN,
     MASTER_CARD_DEBIT_CARD_TOKEN,
+    BANK_ACCOUNT_TOKEN,
 )
 from app.commons.test_integration.utils import prepare_and_validate_stripe_account_token
 from app.commons.types import CountryCode, Currency
@@ -16,11 +17,12 @@ from app.payout.test_integration.api import (
     verify_account_url,
     get_account_by_id_url,
     update_account_statement_descriptor,
-    create_payout_method_url,
     get_payout_method_url,
     list_payout_method_url,
     get_onboarding_requirements_by_stages_url,
     get_initiate_payout_url,
+    create_payout_method_url_card,
+    create_payout_method_url_bank,
 )
 from app.payout.core.transfer.create_instant_payout import CreateInstantPayoutResponse
 
@@ -91,23 +93,43 @@ class TestAccountV1:
             == verified_payout_account["pgp_external_account_id"]
         )
 
-    def test_add_payout_method(self, client: TestClient, verified_payout_account: dict):
+    def test_add_payout_method_card(
+        self, client: TestClient, verified_payout_account: dict
+    ):
         request = account_models.CreatePayoutMethod(
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
-            create_payout_method_url(verified_payout_account["id"]), json=request.dict()
+            create_payout_method_url_card(verified_payout_account["id"]),
+            json=request.dict(),
         )
         assert response.status_code == 201
         payout_card_internal: dict = response.json()
         assert payout_card_internal["stripe_card_id"]
+        assert payout_card_internal["type"] == PayoutExternalAccountType.CARD
+
+    def test_add_payout_method_bank(
+        self, client: TestClient, verified_payout_account: dict
+    ):
+        request = account_models.CreatePayoutMethod(
+            token=BANK_ACCOUNT_TOKEN, type=PayoutExternalAccountType.BANK_ACCOUNT
+        )
+        response = client.post(
+            create_payout_method_url_bank(verified_payout_account["id"]),
+            json=request.dict(),
+        )
+        assert response.status_code == 201
+        payout_card_internal: dict = response.json()
+        assert payout_card_internal["bank_name"]
+        assert payout_card_internal["type"] == PayoutExternalAccountType.BANK_ACCOUNT
 
     def test_get_payout_method(self, client: TestClient, verified_payout_account: dict):
         request = account_models.CreatePayoutMethod(
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response = client.post(
-            create_payout_method_url(verified_payout_account["id"]), json=request.dict()
+            create_payout_method_url_card(verified_payout_account["id"]),
+            json=request.dict(),
         )
         assert response.status_code == 201
         created_payout_card: dict = response.json()
@@ -131,7 +153,7 @@ class TestAccountV1:
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response_visa = client.post(
-            create_payout_method_url(verified_payout_account["id"]),
+            create_payout_method_url_card(verified_payout_account["id"]),
             json=request_visa.dict(),
         )
         assert response_visa.status_code == 201
@@ -145,7 +167,7 @@ class TestAccountV1:
             token=MASTER_CARD_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
         response_mastercard = client.post(
-            create_payout_method_url(verified_payout_account["id"]),
+            create_payout_method_url_card(verified_payout_account["id"]),
             json=request_mastercard.dict(),
         )
         assert response_mastercard.status_code == 201
@@ -153,16 +175,47 @@ class TestAccountV1:
         assert created_payout_card_mastercard["stripe_card_id"]
         expected_card_list.insert(0, created_payout_card_mastercard)
 
-        # get all
+        # create a bank account
+        expected_bank_account_list: List[dict] = []
+        request_bank = account_models.CreatePayoutMethod(
+            token=BANK_ACCOUNT_TOKEN, type=PayoutExternalAccountType.BANK_ACCOUNT
+        )
+        response_bank = client.post(
+            create_payout_method_url_bank(verified_payout_account["id"]),
+            json=request_bank.dict(),
+        )
+        assert response_bank.status_code == 201
+        created_payout_bank_account: dict = response_bank.json()
+        assert created_payout_bank_account["bank_last4"]
+        expected_bank_account_list.insert(0, created_payout_bank_account)
+
+        # get bank account only
+        get_bank_account_response = client.get(
+            list_payout_method_url(account_id=verified_payout_account["id"]),
+            params={"payout_method_type": "bank_account"},
+        )
+        assert get_bank_account_response.status_code == 200
+        get_payout_method_list_bank_account: dict = get_bank_account_response.json()
+        actual_card_list = get_payout_method_list_bank_account["card_list"]
+        assert len(actual_card_list) == 0
+        actual_bank_account_list = get_payout_method_list_bank_account[
+            "bank_account_list"
+        ]
+        assert len(actual_bank_account_list) == len(expected_bank_account_list)
+        assert actual_bank_account_list == expected_bank_account_list
+
+        # get card
         get_response = client.get(
             list_payout_method_url(account_id=verified_payout_account["id"])
         )
         assert get_response.status_code == 200
-        get_payout_card_list: dict = get_response.json()
-        actual_list = get_payout_card_list["card_list"]
-        assert len(actual_list) == len(expected_card_list)
-        assert get_payout_card_list["count"] == len(actual_list)
-        assert actual_list == expected_card_list
+        get_payout_method_list: dict = get_response.json()
+        actual_card_list = get_payout_method_list["card_list"]
+        actual_bank_account_list = get_payout_method_list["bank_account_list"]
+        assert len(actual_card_list) == len(expected_card_list)
+        assert len(actual_bank_account_list) == 0
+        assert get_payout_method_list["count"] == len(actual_card_list)
+        assert actual_card_list == expected_card_list
 
         # get with limit
         get_response_with_limit = client.get(
