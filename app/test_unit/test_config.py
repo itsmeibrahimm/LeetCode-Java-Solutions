@@ -1,9 +1,11 @@
+import dataclasses
 from datetime import datetime
 
 from pytz import timezone
 
 from app.commons.config.app_config import AppConfig
 from app.commons.config.prod import create_app_config
+from app.commons.config.utils import init_app_config_for_web
 
 
 def test_cron_trigger_config():
@@ -25,3 +27,16 @@ def test_cron_trigger_config():
         else:
             assert cron_trigger.get_next_fire_time(last_triggered_hour, now) == now
             last_triggered_hour = now
+
+
+def test_appconfig_copy_override():
+    # test dataclasses.replace actually works for override appconfig object
+    web_config = init_app_config_for_web()
+    updated_config = dataclasses.replace(
+        web_config, STRIPE_MAX_WORKERS=web_config.STRIPE_MAX_WORKERS + 1
+    )
+    assert updated_config.STRIPE_MAX_WORKERS == web_config.STRIPE_MAX_WORKERS + 1
+    assert web_config != updated_config
+    assert web_config == dataclasses.replace(
+        updated_config, STRIPE_MAX_WORKERS=web_config.STRIPE_MAX_WORKERS
+    )

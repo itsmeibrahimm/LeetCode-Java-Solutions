@@ -140,9 +140,9 @@ def reset_mock_statsd_events(mock_statsd_client: Mock) -> Callable[[], None]:
 
 @pytest.fixture
 def app_config():
-    from app.commons.config.utils import init_app_config
+    from app.commons.config.utils import init_app_config_for_web
 
-    return init_app_config()
+    return init_app_config_for_web()
 
 
 @pytest.fixture

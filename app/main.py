@@ -5,7 +5,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from app.commons.applications import FastAPI
-from app.commons.config.utils import init_app_config
+from app.commons.config.utils import init_app_config_for_web
 from app.commons.context.app_context import (
     app_context_exists,
     create_app_context,
@@ -31,7 +31,7 @@ if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
 
     debug.bootstrap_debugger()
 
-config = init_app_config()
+config = init_app_config_for_web()
 app = FastAPI(title="Payment Service", debug=config.DEBUG)
 
 # middleware needs to be added in reverse order due to:

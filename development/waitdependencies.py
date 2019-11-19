@@ -4,7 +4,7 @@ from asyncio import wait_for
 from typing import Optional
 
 from app.commons.config.app_config import AppConfig
-from app.commons.config.utils import init_app_config
+from app.commons.config.utils import init_app_config_for_web
 from app.commons.context.app_context import AppContext, create_app_context
 from development.update_db_schemas import update_test_db_schema
 
@@ -16,7 +16,7 @@ async def check_dependency(config: AppConfig) -> AppContext:
 
 
 async def main():
-    app_config = init_app_config()
+    app_config = init_app_config_for_web()
 
     retries = 20
     interval_sec = 5.0

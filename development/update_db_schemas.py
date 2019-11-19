@@ -2,7 +2,7 @@ import asyncio
 from asyncio import create_subprocess_exec
 
 from app.commons.config.app_config import AppConfig
-from app.commons.config.utils import init_app_config
+from app.commons.config.utils import init_app_config_for_web
 
 
 async def run_alembic_command(db_url, config_name):
@@ -57,7 +57,7 @@ async def update_test_db_schema(app_config: AppConfig):
 
 
 async def main():
-    app_config = init_app_config()
+    app_config = init_app_config_for_web()
     await update_test_db_schema(app_config)
 
 

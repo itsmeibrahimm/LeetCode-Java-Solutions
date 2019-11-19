@@ -1,3 +1,4 @@
+import dataclasses
 import os
 
 import pytz
@@ -92,3 +93,8 @@ def create_app_config() -> AppConfig:
             ("prod-default-d.mhazzc.ng.0001.usw2.cache.amazonaws.com", 6379)
         ],
     )
+
+
+def create_app_config_for_payin_cron() -> AppConfig:
+    web_appconfig = create_app_config()
+    return dataclasses.replace(web_appconfig, STRIPE_MAX_WORKERS=50)

@@ -97,3 +97,7 @@ def create_app_config() -> AppConfig:
         # better to switch to payment's own redis instance after instant payout/transfer migration
         REDIS_INSTANCES=[("staging0.trwaqb.0001.usw2.cache.amazonaws.com", 6379)],
     )
+
+
+def create_app_config_for_payin_cron() -> AppConfig:
+    return create_app_config()

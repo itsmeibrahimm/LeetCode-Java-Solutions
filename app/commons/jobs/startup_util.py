@@ -2,7 +2,7 @@ import asyncio
 from typing import Tuple
 
 from app.commons.config.app_config import AppConfig
-from app.commons.config.utils import init_app_config
+from app.commons.config.utils import init_app_config_for_payin_cron
 from app.commons.context.app_context import AppContext, create_app_context
 from app.commons.instrumentation import sentry
 from app.commons.jobs.pool import JobPool
@@ -18,7 +18,7 @@ def init_worker_resources(
     tasks
     """
 
-    app_config = init_app_config()
+    app_config = init_app_config_for_payin_cron()
 
     if app_config.SENTRY_CONFIG:
         sentry.init_sentry_sdk(app_config.SENTRY_CONFIG)
