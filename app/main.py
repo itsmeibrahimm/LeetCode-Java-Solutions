@@ -24,7 +24,7 @@ from app.middleware.req_context import ReqContextMiddleware
 from app.middleware.newrelic_metrics import NewRelicMetricsMiddleware
 from app.payin.payin import create_payin_v0_app, create_payin_v1_app
 from app.payout.payout import create_payout_v0_app, create_payout_v1_app
-from app.purchasecard.purchasecard import make_purchasecard_v0_app
+from app.purchasecard.purchasecard import make_purchasecard_v0_marqeta_app
 
 if os.getenv("DEBUGGER", "disabled").lower() == "enabled":
     from development import debug
@@ -122,7 +122,7 @@ async def startup():
         init_log.info("mounted", app="ledger")
 
     if "purchasecard" in config.INCLUDED_APPS:
-        purchasecard_app = make_purchasecard_v0_app(context, config)
+        purchasecard_app = make_purchasecard_v0_marqeta_app(context, config)
         app.mount(purchasecard_app.openapi_prefix, purchasecard_app)
         init_log.info("mounted", app="purchasecard")
 

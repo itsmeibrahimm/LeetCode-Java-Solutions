@@ -29,7 +29,7 @@ class TestCreateMarqetaUser:
             email="jasmine-tea@doordash.com",
         )
         response = client.post(
-            "/purchasecard/api/v0/user/create_marqeta", json=request_body
+            "/purchasecard/api/v0/marqeta/user/create_marqeta", json=request_body
         )
 
         assert response.status_code == HTTP_201_CREATED
