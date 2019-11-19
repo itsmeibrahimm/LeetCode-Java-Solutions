@@ -1,3 +1,4 @@
+import dataclasses
 import os
 
 from app.commons.config.app_config import (
@@ -100,4 +101,5 @@ def create_app_config() -> AppConfig:
 
 
 def create_app_config_for_payin_cron() -> AppConfig:
-    return create_app_config()
+    web_appconfig = create_app_config()
+    return dataclasses.replace(web_appconfig, STRIPE_MAX_WORKERS=50)
