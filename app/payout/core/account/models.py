@@ -46,14 +46,12 @@ class VerificationRequirements(BaseModel):
         """
 
         currently_due: List[str] = Schema(
-            default=..., description="Currently required fields"
+            default=[], description="Currently required fields"
         )
         eventually_due: List[str] = Schema(
-            default=..., description="Eventually required fields"
+            default=[], description="Eventually required fields"
         )
-        past_due: List[str] = Schema(
-            default=..., description="Past due required fields"
-        )
+        past_due: List[str] = Schema(default=[], description="Past due required fields")
 
     verification_status: Optional[VerificationStatus] = Schema(
         default=None, description="Current account verification status"
@@ -61,11 +59,15 @@ class VerificationRequirements(BaseModel):
     due_by: Optional[datetime] = Schema(
         default=None, description="Due time for the required info"
     )
+    # always a json str? if so, we can do better validations
     additional_error_info: Optional[str] = Schema(
         default=None, description="Additional error info"
     )
-    required_fields: Optional[RequiredFields] = Schema(
-        default=None, description="Required fields"
+    required_fields: Optional[List] = Schema(
+        default=None, description="Required fields v0 List"
+    )
+    required_fields_v1: Optional[RequiredFields] = Schema(
+        default=None, description="Required fields v1 JSON"
     )
 
 

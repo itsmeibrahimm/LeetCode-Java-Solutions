@@ -1,3 +1,8 @@
+from structlog import BoundLogger, get_logger
+
+logger: BoundLogger = get_logger()
+
+
 class VerificationErrorCode:
     MORE_FIELDS_NEEDED = "more_fields_needed"
     REVIEW_WATCHLIST = "review_watchlist"
@@ -11,6 +16,7 @@ class VerificationErrorCode:
     COUNTRY_ID_NOT_SUPPORTED = "id_not_supported_by_country"
     ID_NAME_MISMATCH = "id_name_mismatch"
     VERIFICATION_FAILED_OTHER = "verification_failed_other"
+    DOCUMENT_INFO_MISMATCH = "document_info_mismatch"
     UNKNOWN = "unknown"
 
 
@@ -20,7 +26,7 @@ class VerificationErrorAction:
     ACTION_BY_SUPPORT = "action_by_support"
 
 
-def verification_error_mapping(pgp_error_code: str) -> str:
+def get_verification_error_from_pgp_code(pgp_error_code) -> str:
     pgp_error_code = pgp_error_code.lower()
     verification_error_code_from_pgp_error = {
         "requirements.past_due": VerificationErrorCode.MORE_FIELDS_NEEDED,
@@ -33,7 +39,13 @@ def verification_error_mapping(pgp_error_code: str) -> str:
         "under_review": VerificationErrorCode.UNDER_REVIEW,
         "other": VerificationErrorCode.DISABLED_OTHER,
     }
-    # If UNKNOWN is returned, can log the actual pgp_error_code in the calling func.
+
+    if pgp_error_code not in verification_error_code_from_pgp_error.keys():
+        logger.warn(
+            "[get_verification_error_from_pgp_code] unknown pgp code",
+            code=pgp_error_code,
+        )
+
     return verification_error_code_from_pgp_error.get(
         pgp_error_code, VerificationErrorCode.UNKNOWN
     )
@@ -56,7 +68,7 @@ def error_to_action_mapping(error_code: str) -> str:
     return VerificationErrorAction.NO_ACTION
 
 
-def document_error_mapping(details_code: str) -> str:
+def document_error_mapping(details_code) -> str:
     if details_code in [
         "scan_corrupt",
         "scan_failed_greyscale",
@@ -74,7 +86,16 @@ def document_error_mapping(details_code: str) -> str:
         return VerificationErrorCode.ID_NAME_MISMATCH
     if details_code in ["failed_other", "scan_failed_other"]:
         return VerificationErrorCode.VERIFICATION_FAILED_OTHER
-    # If UNKNOWN is returned, can log the actual pgp_error_code in the calling func.
+    if details_code in [
+        "document_address_mismatch",
+        "document_dob_mismatch",
+        "document_duplicate_type",
+        "document_id_number_mismatch",
+        "document_nationality_mismatch",
+    ]:
+        return VerificationErrorCode.DOCUMENT_INFO_MISMATCH
+
+    logger.warn("[document_error_mapping] unknown code", code=details_code)
     return VerificationErrorCode.UNKNOWN
 
 

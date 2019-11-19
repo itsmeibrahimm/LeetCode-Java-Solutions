@@ -452,7 +452,7 @@ class TestStripeClient:
         assert bank_account.object == "bank_account"
         assert bank_account.id.startswith("ba_")
 
-    def test_retrieve_account_token(self, mode: str, stripe: StripeClient):
+    def test_retrieve_account(self, mode: str, stripe: StripeClient):
         if mode == "mock":
             pytest.skip()
         # Creating test account first - to make sure they always exist

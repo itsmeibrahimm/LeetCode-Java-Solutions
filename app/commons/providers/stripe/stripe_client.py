@@ -730,7 +730,7 @@ class StripeClient(StripeClientInterface):
     @tracing.track_breadcrumb(resource="account", action="retrieve")
     def retrieve_stripe_account(
         self, *, request: models.RetrieveAccountRequest
-    ) -> models.Account:
+    ) -> stripe.api_resources.Account:
         account = stripe.Account.retrieve(
             id=request.account_id, **self.settings_for(request.country)
         )

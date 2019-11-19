@@ -1,5 +1,6 @@
 import os
 import pytest
+from typing import List
 from tests.utils import reload_pkg_version
 
 #######################
@@ -8,7 +9,7 @@ from tests.utils import reload_pkg_version
 SERVICE_URI = os.getenv("SERVICE_URI", "http://localhost:8182")
 API_KEY = os.getenv("API_KEY_PAYMENT_SERVICE", "dummy-key")
 BASE_CLIENT_VERSION = "0.0.11"
-EXTRA_CLIENT_VERSIONS = []
+EXTRA_CLIENT_VERSIONS: List[str] = []
 
 
 @pytest.fixture(scope="session")

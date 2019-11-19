@@ -51,6 +51,9 @@ class StripeManagedAccountTable(TableDefinition):
     verification_error_info: Column = no_init_field(
         Column("verification_error_info", Text)
     )
+    verification_fields_needed_v1: Column = no_init_field(
+        Column("verification_fields_needed_v1", Text)
+    )
 
 
 class _StripeManagedAccountPartial(DBEntity):
@@ -66,6 +69,7 @@ class _StripeManagedAccountPartial(DBEntity):
     stripe_id: Optional[str]
     verification_status: Optional[str]
     verification_error_info: Optional[str]
+    verification_fields_needed_v1: Optional[str]
 
 
 class StripeManagedAccount(_StripeManagedAccountPartial):
