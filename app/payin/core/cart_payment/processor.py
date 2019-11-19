@@ -2790,6 +2790,13 @@ class CartPaymentProcessor:
             doorstats_global.gauge(
                 "capture-payment.capture-delay-sec", create_to_capture_time.seconds
             )
+        except PaymentIntentConcurrentAccessError:
+            doorstats_global.incr("capture-payment.invalid.concurrent-access")
+            self.log.info(
+                "[capture_payment] Unable to capture payment intent due to concurrent access",
+                payment_intent_id=payment_intent.id,
+            )
+            raise
         except Exception:
             doorstats_global.incr("capture-payment.failed")
             self.log.exception(
