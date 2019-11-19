@@ -376,7 +376,6 @@ class TestLegacyPaymentInterface:
         # Use provider decline code if it is provided
         exception = CartPaymentCreateError(
             error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
-            retryable=False,
             provider_charge_id=str(uuid.uuid4()),
             provider_error_code="card_declined",
             provider_decline_code="generic_decline",
@@ -390,7 +389,6 @@ class TestLegacyPaymentInterface:
         # If no decline code, use provider error code
         exception = CartPaymentCreateError(
             error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
-            retryable=False,
             provider_charge_id=str(uuid.uuid4()),
             provider_error_code="card_declined",
             provider_decline_code=None,
@@ -404,7 +402,6 @@ class TestLegacyPaymentInterface:
         # Error details exist but not specific fields like error_code, and error happened from calling provider
         exception = CartPaymentCreateError(
             error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-            retryable=False,
             provider_charge_id=None,
             provider_error_code=None,
             provider_decline_code=None,
@@ -418,7 +415,6 @@ class TestLegacyPaymentInterface:
         # No error details, but error from calling provider
         exception = CartPaymentCreateError(
             error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-            retryable=False,
             provider_charge_id=None,
             provider_error_code=None,
             provider_decline_code=None,
@@ -432,7 +428,6 @@ class TestLegacyPaymentInterface:
         # Error but not from calling provider
         exception = CartPaymentCreateError(
             error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
-            retryable=False,
             provider_charge_id=None,
             provider_error_code=None,
             provider_decline_code=None,
@@ -452,7 +447,6 @@ class TestLegacyPaymentInterface:
             stripe_charge=legacy_stripe_charge,
             creation_exception=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -473,7 +467,6 @@ class TestLegacyPaymentInterface:
             stripe_charge=legacy_stripe_charge,
             creation_exception=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
                 provider_charge_id=stripe_id,
                 provider_error_code="card declined",
                 provider_decline_code=None,
@@ -493,7 +486,6 @@ class TestLegacyPaymentInterface:
             stripe_charge=legacy_stripe_charge,
             creation_exception=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code="card_declined",
                 provider_decline_code="generic_decline",
@@ -513,7 +505,6 @@ class TestLegacyPaymentInterface:
             stripe_charge=legacy_stripe_charge,
             creation_exception=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -533,7 +524,6 @@ class TestLegacyPaymentInterface:
             stripe_charge=legacy_stripe_charge,
             creation_exception=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,

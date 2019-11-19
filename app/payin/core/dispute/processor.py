@@ -112,9 +112,7 @@ class DisputeProcessor:
             or dd_consumer_id
         ):
             self.log.warn("[list_disputes] No parameters provided")
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS)
 
         disputes_list: List[Dispute] = await self.dispute_client.get_raw_disputes_list(
             dd_payment_method_id=dd_payment_method_id,

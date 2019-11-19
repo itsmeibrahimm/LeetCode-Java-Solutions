@@ -76,6 +76,7 @@ from app.payin.core.exceptions import (
     PaymentIntentCouldNotBeUpdatedError,
     PaymentIntentNotInRequiresCaptureState,
     PaymentIntentRefundError,
+    PaymentMethodReadError,
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
 )
@@ -935,7 +936,6 @@ class CartPaymentInterface:
                 )
             raise CartPaymentCreateError(
                 error_code=error_code,
-                retryable=False,
                 provider_charge_id=parser.charge_id,
                 provider_error_code=parser.code,
                 provider_decline_code=parser.decline_code,
@@ -954,7 +954,6 @@ class CartPaymentInterface:
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
-                retryable=True,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -967,7 +966,6 @@ class CartPaymentInterface:
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
-                retryable=True,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -1345,17 +1343,16 @@ class CartPaymentInterface:
                 exception=str(e),
             )
             raise PaymentChargeRefundError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
             )
         except Exception:
             self.req_context.log.exception(
                 "[cancel_provider_payment_charge] Error attempting payment cancellation with provider",
                 payment_intent_id=payment_intent.id,
             )
+            # todo was retryable, need refine
             raise PaymentChargeRefundError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
-                retryable=True,
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
             )
 
     async def refund_provider_payment(
@@ -1399,8 +1396,7 @@ class CartPaymentInterface:
                 exception=str(e),
             )
             raise PaymentIntentCancelError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
             )
         except Exception:
             self.req_context.log.exception(
@@ -1408,9 +1404,9 @@ class CartPaymentInterface:
                 payment_intent_id=payment_intent.id,
                 refund_id=refund.id,
             )
+            # todo was retryable need refine
             raise PaymentIntentCancelError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
-                retryable=True,
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
             )
 
     async def _update_pgp_charge_from_provider(
@@ -1702,7 +1698,6 @@ class CartPaymentInterface:
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -1752,7 +1747,6 @@ class CartPaymentInterface:
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -1765,7 +1759,6 @@ class CartPaymentInterface:
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -2090,11 +2083,20 @@ class CartPaymentProcessor:
 
         if cart_payment.payer_id:
             assert payment_intents[0].payment_method_id
-            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
-                payer_id=cart_payment.payer_id,
-                payment_method_id=payment_intents[0].payment_method_id,
-                legacy_country_id=get_country_id_by_code(payment_intents[0].country),
-            )
+            try:
+                pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
+                    payer_id=cart_payment.payer_id,
+                    payment_method_id=payment_intents[0].payment_method_id,
+                    legacy_country_id=get_country_id_by_code(
+                        payment_intents[0].country
+                    ),
+                )
+            except PaymentMethodReadError as e:
+                if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
+                    raise CartPaymentUpdateError(
+                        error_code=PayinErrorCode.CART_PAYMENT_PAYMENT_METHOD_NOT_FOUND
+                    ) from e
+                raise
         else:  # legacy case
             pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
                 legacy_payment=legacy_payment
@@ -2152,7 +2154,7 @@ class CartPaymentProcessor:
                     pgp_payment_intent_id=pgp_payment_intent.id,
                 )
                 raise CartPaymentUpdateError(
-                    error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID, retryable=False
+                    error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID
                 )
 
             self.log.info(
@@ -2265,8 +2267,7 @@ class CartPaymentProcessor:
                 payment_intents=payment_intents,
             )
             raise PaymentIntentRefundError(
-                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
             )
 
         if capturable_intents:
@@ -2300,8 +2301,7 @@ class CartPaymentProcessor:
                     pgp_payment_intent_id=capturable_pgp_payment_intent.id,
                 )
                 raise PaymentIntentRefundError(
-                    error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR,
-                    retryable=False,
+                    error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
                 )
             amount_refunded = capturable_intent.amount - new_amount
             await self.legacy_payment_interface.lower_amount_for_uncaptured_payment(
@@ -2436,8 +2436,7 @@ class CartPaymentProcessor:
                 dd_charge_id=dd_charge_id,
             )
             raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID,
-                retryable=False,
+                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID
             )
 
         cart_payment, legacy_payment = await self.cart_payment_interface.get_cart_payment(
@@ -2445,9 +2444,7 @@ class CartPaymentProcessor:
         )
 
         if not cart_payment or not legacy_payment:
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
-            )
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
 
         legacy_consumer_charge, _ = await self.legacy_payment_interface.find_existing_payment_charge(
             charge_id=dd_charge_id, idempotency_key=idempotency_key
@@ -2457,9 +2454,7 @@ class CartPaymentProcessor:
                 "[update_payment_for_legacy_charge] Failed to find legacy consumer charge for charge id",
                 dd_charge_id=dd_charge_id,
             )
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
-            )
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
 
         payer_country_code = get_country_code_by_id(legacy_consumer_charge.country_id)
 
@@ -2477,7 +2472,7 @@ class CartPaymentProcessor:
                 dd_charge_id=dd_charge_id,
             )
             raise CartPaymentUpdateError(
-                error_code=PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID, retryable=False
+                error_code=PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID
             )
 
         # Client description cannot exceed 1000: truncated if needed
@@ -2526,9 +2521,7 @@ class CartPaymentProcessor:
         )
 
         if not cart_payment or not legacy_payment:
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
-            )
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
 
         if not cart_payment.payer_id:
             self.log.error(
@@ -2536,7 +2529,7 @@ class CartPaymentProcessor:
                 cart_payment_id=cart_payment.id,
             )
             raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
+                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH
             )
         payer = await self.get_payer_by_id(cart_payment.payer_id)
 
@@ -2601,7 +2594,7 @@ class CartPaymentProcessor:
             cart_payment=cart_payment, request_payer_id=payer_id, credential_owner=""
         ):
             raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
+                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH
             )
 
         # TODO Move idempotency key based checks up to here (from inside _update_payment_with_higher_amount,
@@ -2679,9 +2672,7 @@ class CartPaymentProcessor:
             dd_charge_id
         )
         if not cart_payment_id:
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
-            )
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
 
         cancelled_payment = await self.cancel_payment(cart_payment_id)
         self.log.info(
@@ -2708,16 +2699,14 @@ class CartPaymentProcessor:
             cart_payment_id
         )
         if not cart_payment or not legacy_payment:
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND, retryable=False
-            )
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
 
         # Ensure the caller can access the cart payment being modified
         if not self.cart_payment_interface.is_accessible(
             cart_payment=cart_payment, request_payer_id=None, credential_owner=""
         ):
             raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, retryable=False
+                error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH
             )
 
         # Cancel old intents
@@ -2950,11 +2939,20 @@ class CartPaymentProcessor:
         )
         assert request_cart_payment.payer_id
         assert request_cart_payment.payment_method_id
-        pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
-            payer_id=request_cart_payment.payer_id,
-            payment_method_id=request_cart_payment.payment_method_id,
-            legacy_country_id=get_country_id_by_code(payment_country),
-        )
+
+        try:
+            pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
+                payer_id=request_cart_payment.payer_id,
+                payment_method_id=request_cart_payment.payment_method_id,
+                legacy_country_id=get_country_id_by_code(payment_country),
+            )
+        except PaymentMethodReadError as e:
+            if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
+                raise CartPaymentCreateError(
+                    error_code=PayinErrorCode.CART_PAYMENT_PAYMENT_METHOD_NOT_FOUND
+                ) from e
+            raise
+
         payer = await self.get_payer_by_id(payer_id=request_cart_payment.payer_id)
         cart_payment, _ = await self._create_payment(
             request_cart_payment=request_cart_payment,
@@ -3067,7 +3065,6 @@ class CartPaymentProcessor:
                 )
                 raise CartPaymentCreateError(
                     error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID,
-                    retryable=False,
                     provider_charge_id=None,
                     provider_error_code=None,
                     provider_decline_code=None,

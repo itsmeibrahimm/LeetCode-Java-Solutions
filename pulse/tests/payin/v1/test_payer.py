@@ -31,8 +31,8 @@ def test_create_and_get_payer_with_non_numeric_id():
         logger.log(msg=str(e), level=logging.INFO)
         error_code_non_numeric_id = e.status
         error_message_non_numeric_id = e.reason
-    assert error_code_non_numeric_id == 422
-    assert error_message_non_numeric_id == "Unprocessable Entity"
+    assert error_code_non_numeric_id == 400
+    assert error_message_non_numeric_id == "Bad Request"
 
 
 def test_create_two_payers_with_same_id():

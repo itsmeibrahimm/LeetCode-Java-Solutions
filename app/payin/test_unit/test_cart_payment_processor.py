@@ -105,7 +105,7 @@ class TestCartPaymentProcessor:
     ):
         mocked_method_fetch = FunctionMock()
         mocked_method_fetch.side_effect = PaymentMethodReadError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND
         )
         payment_method_client.get_raw_payment_method = mocked_method_fetch
 
@@ -127,7 +127,7 @@ class TestCartPaymentProcessor:
             legacy_payment_interface=legacy_payment_interface,
         )
 
-        with pytest.raises(PaymentMethodReadError) as payment_error:
+        with pytest.raises(CartPaymentCreateError) as payment_error:
             await cart_payment_processor.create_payment(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
@@ -136,7 +136,7 @@ class TestCartPaymentProcessor:
             )
         assert (
             payment_error.value.error_code
-            == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value
+            == PayinErrorCode.CART_PAYMENT_PAYMENT_METHOD_NOT_FOUND.value
         )
 
     @pytest.mark.asyncio
@@ -149,8 +149,7 @@ class TestCartPaymentProcessor:
     ):
         mocked_method_fetch = FunctionMock()
         mocked_method_fetch.side_effect = PaymentMethodReadError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-            retryable=False,
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
         )
         payment_method_client.get_raw_payment_method = mocked_method_fetch
 
@@ -216,7 +215,6 @@ class TestCartPaymentProcessor:
         cart_payment_processor.cart_payment_interface.submit_payment_to_provider = FunctionMock(
             side_effect=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,
@@ -604,7 +602,6 @@ class TestCartPaymentProcessor:
         result_intent, result_pgp_intent, result_stripe_charge = await cart_payment_processor._update_state_after_provider_error(
             creation_exception=CartPaymentCreateError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
-                retryable=False,
                 provider_charge_id=None,
                 provider_error_code=None,
                 provider_decline_code=None,

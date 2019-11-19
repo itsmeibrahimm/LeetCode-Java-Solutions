@@ -2,7 +2,6 @@ from fastapi import Depends
 from starlette import status
 
 from app.commons.api.exceptions import register_base_payment_exception_handler
-from app.commons.api.models import PaymentException
 from app.commons.applications import FastAPI
 from app.commons.auth.service_auth import ApiSecretRouteAuthorizer
 from app.commons.config.app_config import AppConfig
@@ -16,6 +15,7 @@ from app.middleware.doordash_metrics import ServiceMetricsMiddleware
 from app.payin.api import cart_payment, dispute, payer, payment_method, webhook
 from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.api.exceptions import payin_error_handler, PayinErrorResponse
+from app.payin.core.exceptions import PayinError
 
 
 def create_payin_v0_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -79,6 +79,7 @@ def payin_router_builder(config: AppConfig) -> ApiRouterBuilder:
                 status.HTTP_400_BAD_REQUEST: PayinErrorResponse,
                 status.HTTP_403_FORBIDDEN: PayinErrorResponse,
                 status.HTTP_404_NOT_FOUND: PayinErrorResponse,
+                status.HTTP_500_INTERNAL_SERVER_ERROR: PayinErrorResponse,
             }
         )
         .add_common_dependencies(ApiSecretRouteAuthorizer(config.PAYIN_SERVICE_ID))
@@ -87,4 +88,4 @@ def payin_router_builder(config: AppConfig) -> ApiRouterBuilder:
 
 def register_payin_exception_handler(app: FastAPI):
     register_base_payment_exception_handler(app)
-    app.add_exception_handler(PaymentException, payin_error_handler)
+    app.add_exception_handler(PayinError, payin_error_handler)

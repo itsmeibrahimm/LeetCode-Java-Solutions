@@ -2,13 +2,12 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from app.commons.core.errors import PaymentError
 from app.payin.api.cart_payment.v1.request import (
-    CreateCartPaymentRequest,
     CorrelationIds,
+    CreateCartPaymentRequest,
 )
 from app.payin.core.cart_payment.model import CartPayment
-from app.payin.core.exceptions import PayinErrorCode
+from app.payin.core.exceptions import PayinError, PayinErrorCode
 
 
 def create_request_to_model(
@@ -30,8 +29,6 @@ def create_request_to_model(
             updated_at=None,
         )
     except ValidationError as validation_error:
-        raise PaymentError(
-            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-            error_message=str(validation_error),
-            retryable=False,
-        )
+        raise PayinError(
+            error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA
+        ) from validation_error

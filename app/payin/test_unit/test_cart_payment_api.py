@@ -4,12 +4,6 @@ import pytest
 from asynctest import create_autospec
 from structlog.stdlib import BoundLogger
 
-from app.commons.api.models import PaymentException
-from app.payin.core.exceptions import (
-    CartPaymentCreateError,
-    CartPaymentUpdateError,
-    PayinErrorCode,
-)
 from app.payin.api.cart_payment.v0 import api as v0_api
 from app.payin.api.cart_payment.v0.request import (
     CreateCartPaymentLegacyRequest,
@@ -20,6 +14,12 @@ from app.payin.api.cart_payment.v1.request import (
     CorrelationIds,
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
+)
+from app.payin.core.exceptions import (
+    CartPaymentCreateError,
+    CartPaymentUpdateError,
+    PayinError,
+    PayinErrorCode,
 )
 from app.payin.core.types import LegacyPaymentInfo
 from app.payin.tests.utils import FunctionMock
@@ -32,21 +32,21 @@ class TestCartPaymentApi:
     """
 
     create_error_states = [
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT, 400),
-        (PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, 400),
-        (PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH, 403),
-        (PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR, 500),
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT,
+        PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
+        PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
+        PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
     ]
 
     @pytest.mark.parametrize(
         "expected_error_state",
         create_error_states,
-        ids=[error_state[0] for error_state in create_error_states],
+        ids=[error_state for error_state in create_error_states],
     )
     @pytest.mark.asyncio
     async def test_v0_creation_errors(
@@ -73,12 +73,10 @@ class TestCartPaymentApi:
             ),
         )
 
-        payin_error_code = expected_error_state[0]
-        http_status_code = expected_error_state[1]
+        payin_error_code = expected_error_state
         cart_payment_processor.legacy_create_payment = FunctionMock(
             side_effect=CartPaymentCreateError(
                 error_code=payin_error_code,
-                retryable=False,
                 provider_charge_id="test_charge",
                 provider_decline_code="test_decline_code",
                 provider_error_code="test_error_code",
@@ -86,18 +84,18 @@ class TestCartPaymentApi:
             )
         )
 
-        with pytest.raises(PaymentException) as e:
+        with pytest.raises(PayinError) as e:
             await v0_api.create_cart_payment(
                 cart_payment_request=request,
                 log=create_autospec(BoundLogger),
                 cart_payment_processor=cart_payment_processor,
             )
-        assert e.value.status_code == http_status_code
+        assert e.value.error_code == expected_error_state
 
     @pytest.mark.parametrize(
         "expected_error_state",
         create_error_states,
-        ids=[error_state[0] for error_state in create_error_states],
+        ids=[error_state for error_state in create_error_states],
     )
     async def test_v1_creation_errors(
         self, cart_payment_processor, expected_error_state
@@ -115,12 +113,10 @@ class TestCartPaymentApi:
             correlation_ids=CorrelationIds(reference_id="1", reference_type="1"),
         )
 
-        payin_error_code = expected_error_state[0]
-        http_status_code = expected_error_state[1]
+        payin_error_code = expected_error_state
         cart_payment_processor.create_payment = FunctionMock(
             side_effect=CartPaymentCreateError(
                 error_code=payin_error_code,
-                retryable=False,
                 provider_charge_id="test_charge",
                 provider_decline_code="test_decline_code",
                 provider_error_code="test_error_code",
@@ -128,30 +124,30 @@ class TestCartPaymentApi:
             )
         )
 
-        with pytest.raises(PaymentException) as e:
+        with pytest.raises(PayinError) as e:
             await v1_api.create_cart_payment(
                 cart_payment_request=request,
                 log=create_autospec(BoundLogger),
                 cart_payment_processor=cart_payment_processor,
             )
-        assert e.value.status_code == http_status_code
+        assert e.value.error_code == expected_error_state
 
     update_error_states = [
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR, 400),
-        (PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT, 400),
-        (PayinErrorCode.CART_PAYMENT_NOT_FOUND, 404),
-        (PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH, 403),
-        (PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH, 403),
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT,
+        PayinErrorCode.CART_PAYMENT_NOT_FOUND,
+        PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH,
+        PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
     ]
 
     @pytest.mark.parametrize(
         "expected_error_state",
         update_error_states,
-        ids=[error_state[0] for error_state in update_error_states],
+        ids=[error_state for error_state in update_error_states],
     )
     @pytest.mark.asyncio
     async def test_v0_update_errors(self, cart_payment_processor, expected_error_state):
@@ -159,22 +155,19 @@ class TestCartPaymentApi:
             amount=500, dd_additional_payment_info=None, idempotency_key=str(uuid4())
         )
 
-        payin_error_code = expected_error_state[0]
-        http_status_code = expected_error_state[1]
+        payin_error_code = expected_error_state
         cart_payment_processor.update_payment_for_legacy_charge = FunctionMock(
-            side_effect=CartPaymentUpdateError(
-                error_code=payin_error_code, retryable=False
-            )
+            side_effect=CartPaymentUpdateError(error_code=payin_error_code)
         )
 
-        with pytest.raises(PaymentException) as e:
+        with pytest.raises(PayinError) as e:
             await v0_api.update_cart_payment(
                 dd_charge_id=1,
                 cart_payment_request=request,
                 log=create_autospec(BoundLogger),
                 cart_payment_processor=cart_payment_processor,
             )
-        assert e.value.status_code == http_status_code
+        assert e.value.error_code == expected_error_state
 
     @pytest.mark.parametrize(
         "expected_error_state",
@@ -187,19 +180,16 @@ class TestCartPaymentApi:
             amount=500, payer_id=uuid4(), idempotency_key=str(uuid4())
         )
 
-        payin_error_code = expected_error_state[0]
-        http_status_code = expected_error_state[1]
+        payin_error_code = expected_error_state
         cart_payment_processor.update_payment = FunctionMock(
-            side_effect=CartPaymentUpdateError(
-                error_code=payin_error_code, retryable=False
-            )
+            side_effect=CartPaymentUpdateError(error_code=payin_error_code)
         )
 
-        with pytest.raises(PaymentException) as e:
+        with pytest.raises(PayinError) as e:
             await v1_api.update_cart_payment(
                 cart_payment_id=uuid4(),
                 cart_payment_request=request,
                 log=create_autospec(BoundLogger),
                 cart_payment_processor=cart_payment_processor,
             )
-        assert e.value.status_code == http_status_code
+        assert e.value.error_code == expected_error_state

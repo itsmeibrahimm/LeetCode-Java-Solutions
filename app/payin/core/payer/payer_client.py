@@ -111,9 +111,7 @@ class PayerClient:
                 "[has_existing_payer] DBDataError when reading from payers table.",
                 dd_payer_id=dd_payer_id,
             )
-            raise PayerCreationError(
-                error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=True
-            )
+            raise PayerCreationError(error_code=PayinErrorCode.PAYER_READ_DB_ERROR)
 
     async def create_raw_payer(
         self,
@@ -303,9 +301,7 @@ class PayerClient:
             self.log.exception(
                 "[force_update_payer] DBDataError when reading data from db"
             )
-            raise PayerUpdateError(
-                error_code=PayinErrorCode.PAYER_UPDATE_DB_ERROR, retryable=True
-            )
+            raise PayerUpdateError(error_code=PayinErrorCode.PAYER_UPDATE_DB_ERROR)
         return raw_payer
 
     async def update_default_payment_method(
@@ -402,7 +398,7 @@ class PayerClient:
                 "[pgp_create_customer] error while creating stripe customer."
             )
             raise PayerCreationError(
-                error_code=PayinErrorCode.PAYER_CREATE_STRIPE_ERROR, retryable=False
+                error_code=PayinErrorCode.PAYER_CREATE_STRIPE_ERROR
             )
         return stripe_cus.id
 
@@ -422,12 +418,9 @@ class PayerClient:
             )
             if e.http_status == 404:
                 raise PayerReadError(
-                    error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND,
-                    retryable=False,
+                    error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND
                 )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR)
         return stripe_customer
 
     async def pgp_update_customer_default_payment_method(
@@ -447,15 +440,15 @@ class PayerClient:
             stripe_customer = await self.stripe_async_client.update_customer(
                 country=input_country, request=update_cus_req
             )
-        except Exception:
+        except Exception as e:
             self.log.exception(
                 "[pgp_update_customer_default_payment_method] Error while updating stripe customer",
                 pgp_customer_resource_id=pgp_customer_resource_id,
                 pgp_payment_method_resource_id=pgp_payment_method_resource_id,
             )
             raise PayerUpdateError(
-                error_code=PayinErrorCode.PAYER_UPDATE_STRIPE_ERROR, retryable=False
-            )
+                error_code=PayinErrorCode.PAYER_UPDATE_STRIPE_ERROR
+            ) from e
         return stripe_customer
 
     def _is_legacy(self, payer_id_type: Optional[PayerIdType] = None):
@@ -591,7 +584,7 @@ class PayerOps(PayerOpsInterface):
                 pgp_code=pgp_code,
             )
             raise PayerCreationError(
-                error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA, retryable=True
+                error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA
             )
         return RawPayer(
             payer_entity=payer_entity, pgp_customer_entity=pgp_customer_entity
@@ -633,18 +626,14 @@ class PayerOps(PayerOpsInterface):
             self.log.exception(
                 "[get_payer_raw_objects] DBDataError when reading data from db."
             )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_DB_ERROR)
         if not is_found:
             self.log.error(
                 "[get_payer_raw_objects] payer not found.",
                 payer_id=payer_id,
                 payer_id_type=payer_id_type,
             )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_NOT_FOUND)
         return RawPayer(
             payer_entity=payer_entity,
             pgp_customer_entity=pgp_cus_entity,
@@ -695,8 +684,7 @@ class LegacyPayerOps(PayerOpsInterface):
                         dd_payer_id=dd_payer_id,
                     )
                     raise PayerCreationError(
-                        error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA,
-                        retryable=False,
+                        error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA
                     )
                 stripe_customer_entity = await self.payer_repo.insert_stripe_customer(
                     request=InsertStripeCustomerInput(
@@ -714,7 +702,7 @@ class LegacyPayerOps(PayerOpsInterface):
         except DBDataError:
             self.log.exception("[create_payer_impl] DBDataError when writing into db.")
             raise PayerCreationError(
-                error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA, retryable=True
+                error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA
             )
         return RawPayer(
             payer_entity=payer_entity, stripe_customer_entity=stripe_customer_entity
@@ -771,18 +759,14 @@ class LegacyPayerOps(PayerOpsInterface):
             self.log.exception(
                 "[get_payer_raw_objects] DBDataError when reading data from db."
             )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_DB_ERROR, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_DB_ERROR)
         if not is_found:
             self.log.error(
                 "[get_payer_raw_objects] payer not found.",
                 payer_id=payer_id,
                 payer_id_type=payer_id_type,
             )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_NOT_FOUND)
         return RawPayer(
             payer_entity=payer_entity,
             pgp_customer_entity=pgp_cus_entity,

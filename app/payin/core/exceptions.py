@@ -1,9 +1,11 @@
 from enum import Enum
-from typing import Optional
+from typing import NewType, Optional
 
 from app.commons.core.errors import PaymentError
+from app.commons.utils import validation
 from app.payin.core.cart_payment.types import IntentStatus
 
+# Kept here for testing and backward compatibility, will be removed soon.
 _payin_error_message_maps = {
     "payin_1": "Invalid data types. Please verify your input again!",
     "payin_2": "Error returned from Payment Provider.",
@@ -43,7 +45,9 @@ _payin_error_message_maps = {
     "payin_62": "Cart Payment not accessible by caller.",
     "payin_63": "Cart Payment data is invalid.",
     "payin_64": "The provided amount is not valid.",
-    "payin_65": "Cart Payment not found for given dd_charge_id. Likely the charge was created in DSJ the update was requested against Payment Service",
+    "payin_65": "Cart Payment not found for given dd_charge_id. Likely the charge "
+    "was created in DSJ the update was requested against Payment Service",
+    "payin_66": "Payment method used to create cart payment was not found",
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
@@ -60,69 +64,285 @@ _payin_error_message_maps = {
 }
 
 
+_Retryable = NewType("_Retryable", bool)
+SHOULD_RETRY = _Retryable(True)
+NO_RETRY = _Retryable(False)
+
+
 class PayinErrorCode(str, Enum):
     """
     Enumeration of all Pay-In Service pre-defined error codes.
     """
 
-    CART_PAYMENT_CREATE_INVALID_DATA = "payin_60"
-    CART_PAYMENT_NOT_FOUND = "payin_61"
-    CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID = "payin_65"
-    CART_PAYMENT_OWNER_MISMATCH = "payin_62"
-    CART_PAYMENT_DATA_INVALID = "payin_63"
-    CART_PAYMENT_AMOUNT_INVALID = "payin_64"
-    PAYER_CREATE_INVALID_DATA = "payin_1"
-    PAYER_CREATE_STRIPE_ERROR = "payin_2"
-    PAYER_CREATE_PAYER_ALREADY_EXIST = "payin_3"
-    PAYER_READ_INVALID_DATA = "payin_4"
-    PAYER_READ_NOT_FOUND = "payin_5"
-    PAYER_READ_DB_ERROR = "payin_6"
-    PAYER_UPDATE_NOT_FOUND = "payin_7"
-    PAYER_UPDATE_DB_ERROR_INVALID_DATA = "payin_8"
-    PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_9"
-    PAYER_UPDATE_STRIPE_ERROR = "payin_10"
-    PAYER_UPDATE_DB_ERROR = "payin_11"
-    PAYER_READ_STRIPE_ERROR = "payin_12"
-    PAYER_READ_STRIPE_ERROR_NOT_FOUND = "payin_13"
-    PAYMENT_INTENT_CREATE_STRIPE_ERROR = "payin_40"
-    PAYMENT_INTENT_CAPTURE_STRIPE_ERROR = "payin_41"
-    PAYMENT_INTENT_ADJUST_REFUND_ERROR = "payin_42"
-    PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR = "payin_43"
-    PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR = "payin_44"
-    PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR = "payin_45"
-    PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR = "payin_46"
-    PAYMENT_INTENT_CREATE_ERROR = "payin_47"
-    PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT = "payin_48"
-    PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR = "payin_49"
-    PAYMENT_METHOD_CREATE_INVALID_DATA = "payin_20"
-    PAYMENT_METHOD_CREATE_DB_ERROR = "payin_21"
-    PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = "payin_22"
-    PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH = "payin_23"
-    PAYMENT_METHOD_GET_NOT_FOUND = "payin_24"
-    PAYMENT_METHOD_GET_DB_ERROR = "payin_25"
-    PAYMENT_METHOD_CREATE_STRIPE_ERROR = "payin_26"
-    PAYMENT_METHOD_CREATE_INVALID_INPUT = "payin_27"
-    PAYMENT_METHOD_DELETE_STRIPE_ERROR = "payin_28"
-    PAYMENT_METHOD_DELETE_DB_ERROR = "payin_29"
-    DISPUTE_NOT_FOUND = "payin_100"
-    DISPUTE_READ_DB_ERROR = "payin_101"
-    DISPUTE_READ_INVALID_DATA = "payin_102"
-    DISPUTE_LIST_NO_PARAMETERS = "payin_103"
-    DISPUTE_NO_PAYER_FOR_PAYER_ID = "payin_104"
-    DISPUTE_NO_STRIPE_CARD_FOR_PAYMENT_METHOD_ID = "payin_105"
-    DISPUTE_LIST_NO_ID_PARAMETERS = "payin_106"
-    DISPUTE_LIST_MORE_THAN_ID_ONE_PARAMETER = "payin_107"
-    DISPUTE_UPDATE_STRIPE_ERROR = "payin_108"
-    DISPUTE_NO_STRIPE_CARD_FOR_STRIPE_ID = "payin_109"
-    DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE = "payin_110"
-    DISPUTE_UPDATE_DB_ERROR = "payin_111"
-    COMMANDO_DISABLED_ENDPOINT = "payin_800"
+    _message: str
+    _retryable: bool
 
-    def __new__(cls, value):
-        obj = str.__new__(cls, value)
+    CART_PAYMENT_CREATE_INVALID_DATA = (
+        "payin_60",
+        NO_RETRY,
+        "Invalid data provided. Please verify parameters.",
+    )
+    CART_PAYMENT_NOT_FOUND = (
+        "payin_61",
+        NO_RETRY,
+        "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
+    )
+    CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID = (
+        "payin_65",
+        NO_RETRY,
+        "Cart Payment not found for given dd_charge_id. Likely the charge "
+        "was created in DSJ the update was requested against Payment Service",
+    )
+    CART_PAYMENT_OWNER_MISMATCH = (
+        "payin_62",
+        NO_RETRY,
+        "Cart Payment not accessible by caller.",
+    )
+    CART_PAYMENT_DATA_INVALID = ("payin_63", NO_RETRY, "Cart Payment data is invalid.")
+    CART_PAYMENT_AMOUNT_INVALID = (
+        "payin_64",
+        NO_RETRY,
+        "The provided amount is not valid.",
+    )
+    CART_PAYMENT_PAYMENT_METHOD_NOT_FOUND = (
+        "payin_66",
+        NO_RETRY,
+        "Payment method used to create cart payment was not found",
+    )
+    PAYER_CREATE_INVALID_DATA = (
+        "payin_1",
+        NO_RETRY,
+        "Invalid data types. Please verify your input again!",
+    )
+    PAYER_CREATE_STRIPE_ERROR = (
+        "payin_2",
+        NO_RETRY,
+        "Error returned from Payment Provider.",
+    )
+    PAYER_CREATE_PAYER_ALREADY_EXIST = "payin_3", NO_RETRY, "Payer already exists."
+    PAYER_READ_INVALID_DATA = (
+        "payin_4",
+        NO_RETRY,
+        "Invalid data types. Please verify your input again!",
+    )
+    PAYER_READ_NOT_FOUND = (
+        "payin_5",
+        NO_RETRY,
+        "Payer not found. Please ensure your payer_id is correct",
+    )
+    PAYER_READ_DB_ERROR = "payin_6", SHOULD_RETRY, "Data I/O error. Please retry again!"
+    PAYER_UPDATE_NOT_FOUND = (
+        "payin_7",
+        NO_RETRY,
+        "Payer not found. Please ensure your payer_id is correct",
+    )
+    PAYER_UPDATE_DB_ERROR_INVALID_DATA = (
+        "payin_8",
+        NO_RETRY,
+        "Invalid data types. Please verify your input again!",
+    )
+    PAYER_UPDATE_INVALID_PAYER_TYPE = "payin_9", NO_RETRY, "Invalid payer type"
+    PAYER_UPDATE_STRIPE_ERROR = (
+        "payin_10",
+        NO_RETRY,
+        "Error returned from Payment Provider.",
+    )
+    PAYER_UPDATE_DB_ERROR = (
+        "payin_11",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
+    PAYER_READ_STRIPE_ERROR = (
+        "payin_12",
+        NO_RETRY,
+        "Error returned from Payment Provider.",
+    )
+    PAYER_READ_STRIPE_ERROR_NOT_FOUND = "payin_13", NO_RETRY, "No such customer"
+    PAYMENT_INTENT_CREATE_STRIPE_ERROR = (
+        "payin_40",
+        NO_RETRY,
+        "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
+    )
+    PAYMENT_INTENT_CAPTURE_STRIPE_ERROR = (
+        "payin_41",
+        NO_RETRY,
+        "Error returned from Payment Provider. Please verify parameters of capture.",
+    )
+    PAYMENT_INTENT_ADJUST_REFUND_ERROR = (
+        "payin_42",
+        NO_RETRY,
+        "Cannot refund previous charge for amount increase.",
+    )
+    PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR = (
+        "payin_43",
+        NO_RETRY,
+        "Cannot create payment.  Payment card declined.",
+    )
+    PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR = (
+        "payin_44",
+        NO_RETRY,
+        "Cannot create payment.  Payment card expired.",
+    )
+    PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR = (
+        "payin_45",
+        NO_RETRY,
+        "Cannot create payment.  Payment card cannot be processed.",
+    )
+    PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR = (
+        "payin_46",
+        NO_RETRY,
+        "Cannot create payment.  Payment card number incorrect.",
+    )
+    PAYMENT_INTENT_CREATE_ERROR = (
+        "payin_47",
+        SHOULD_RETRY,
+        "An error occurred attempting your payment request.  Please try again later.",
+    )
+    PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT = (
+        "payin_48",
+        NO_RETRY,
+        "Invalid split payment payout account.  This is account is not configured correctly for payment use.",
+    )
+    PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR = (
+        "payin_49",
+        NO_RETRY,
+        "Cannot create payment.  Payment card cvc incorrect.",
+    )
+    PAYMENT_METHOD_CREATE_INVALID_DATA = (
+        "payin_20",
+        NO_RETRY,
+        "Invalid data types. Please verify your input again!",
+    )
+    PAYMENT_METHOD_CREATE_DB_ERROR = (
+        "payin_21",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
+    PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE = (
+        "payin_22",
+        NO_RETRY,
+        "Invalid input payment method type!",
+    )
+    PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH = (
+        "payin_23",
+        NO_RETRY,
+        "payer_id and payment_method_id mismatch! Please ensure payer owns the payment_method!!",
+    )
+    PAYMENT_METHOD_GET_NOT_FOUND = (
+        "payin_24",
+        NO_RETRY,
+        "Payment method not found. Please ensure your payment_method_id is correct",
+    )
+    PAYMENT_METHOD_GET_DB_ERROR = (
+        "payin_25",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
+    PAYMENT_METHOD_CREATE_STRIPE_ERROR = (
+        "payin_26",
+        NO_RETRY,
+        "Error returned from Payment Provider. Please make sure your token is correct!",
+    )
+    PAYMENT_METHOD_CREATE_INVALID_INPUT = (
+        "payin_27",
+        NO_RETRY,
+        "Invalid input. Please ensure valid id is provided!",
+    )
+    PAYMENT_METHOD_DELETE_STRIPE_ERROR = (
+        "payin_28",
+        NO_RETRY,
+        "Error returned from Payment Provider. Please make sure your payment_method_id is correct!",
+    )
+    PAYMENT_METHOD_DELETE_DB_ERROR = (
+        "payin_29",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
+    DISPUTE_NOT_FOUND = (
+        "payin_100",
+        NO_RETRY,
+        "Dispute not found. Please ensure your dispute_id is correct",
+    )
+    DISPUTE_READ_DB_ERROR = "payin_101", NO_RETRY, "Data I/O error. Please retry again!"
+    DISPUTE_READ_INVALID_DATA = (
+        "payin_102",
+        NO_RETRY,
+        "Invalid data types. Please verify your input again!",
+    )
+    DISPUTE_LIST_NO_PARAMETERS = (
+        "payin_103",
+        NO_RETRY,
+        "No parameters provides. Provide verify your input",
+    )
+    DISPUTE_NO_PAYER_FOR_PAYER_ID = (
+        "payin_104",
+        NO_RETRY,
+        "The given payer_id does not have a payer associated to it",
+    )
+    DISPUTE_NO_STRIPE_CARD_FOR_PAYMENT_METHOD_ID = (
+        "payin_105",
+        NO_RETRY,
+        "The given payment_method_id does not have a payment_method associated to it",
+    )
+    DISPUTE_LIST_NO_ID_PARAMETERS = (
+        "payin_106",
+        NO_RETRY,
+        "No id parameters provides. Please verify your input",
+    )
+    DISPUTE_LIST_MORE_THAN_ID_ONE_PARAMETER = (
+        "payin_107",
+        NO_RETRY,
+        "More than 1 id parameter provided. Please verify your input",
+    )
+    DISPUTE_UPDATE_STRIPE_ERROR = (
+        "payin_108",
+        NO_RETRY,
+        "Error returned from Payment Provider.",
+    )
+    DISPUTE_NO_STRIPE_CARD_FOR_STRIPE_ID = (
+        "payin_109",
+        NO_RETRY,
+        "The given dispute_id does not have a stripe_card associated to it",
+    )
+    DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE = (
+        "payin_110",
+        NO_RETRY,
+        "The given dispute_id does not have a consumer_charge associated to it's stripe charge",
+    )
+    DISPUTE_UPDATE_DB_ERROR = (
+        "payin_111",
+        SHOULD_RETRY,
+        "Error. Empty data returned from DB after update",
+    )
+    COMMANDO_DISABLED_ENDPOINT = (
+        "payin_800",
+        NO_RETRY,
+        "API not accessible/usable in commando mode",
+    )
+
+    def __new__(
+        cls,
+        value: str,
+        retryable: Optional[bool] = None,  # make optional for typing check
+        message: Optional[str] = None,  # make optional for typing check
+    ):
+        """
+        Override __new__ function for StrEnum here to provide additional handles of error code attribute
+        But still maintain the StrEnum behavior
+        Args:
+            value: enum value of the error code
+            retryable: whether client can retry when seeing this error code
+            message: descriptive message of this error code
+
+        """
+        obj = str.__new__(cls, value)  # type: ignore
         obj._value_ = value
+        obj._message = validation.not_none(message)
+        obj._retryable = validation.not_none(retryable)
         # Update class level docstring per each enum item's message
-        cls.__doc__ = f"{cls.__doc__}\n\n[{obj.value}]: {obj.message}"
+        cls.__doc__ = (
+            f"{cls.__doc__}\n\n[{obj.value}]: (retryable={obj.retryable}) {obj.message}"
+        )
         return obj
 
     @property
@@ -131,11 +351,11 @@ class PayinErrorCode(str, Enum):
         Descriptive message for each error code.
         Whenever new error code added, need to add corresponding entry in the message map.
         """
-        return _payin_error_message_maps[self.value]
+        return self._message
 
-    @classmethod
-    def known_value(cls, value: str) -> bool:
-        return value in cls._value2member_map_
+    @property
+    def retryable(self) -> bool:
+        return self._retryable
 
 
 class PayinError(PaymentError[PayinErrorCode]):
@@ -146,15 +366,14 @@ class PayinError(PaymentError[PayinErrorCode]):
     based on provided code.
     """
 
-    def __init__(self, error_code: PayinErrorCode, retryable: bool):
+    def __init__(self, error_code: PayinErrorCode):
         """
         Base Payin exception class.
 
         :param error_code: payin service predefined client-facing error codes.
-        :param retryable: identify if the error is retryable or not.
         """
         super(PayinError, self).__init__(
-            error_code.value, error_code.message, retryable
+            error_code.value, error_code.message, error_code.retryable
         )
 
 
@@ -199,15 +418,12 @@ class CartPaymentCreateError(PayinError):
     def __init__(
         self,
         error_code: PayinErrorCode,
-        retryable: bool,
-        provider_charge_id: Optional[str],
-        provider_error_code: Optional[str],
-        provider_decline_code: Optional[str],
-        has_provider_error_details: bool,
+        provider_charge_id: Optional[str] = None,
+        provider_error_code: Optional[str] = None,
+        provider_decline_code: Optional[str] = None,
+        has_provider_error_details: bool = False,
     ):
-        super(CartPaymentCreateError, self).__init__(
-            error_code=error_code, retryable=retryable
-        )
+        super(CartPaymentCreateError, self).__init__(error_code=error_code)
         self.provider_error_code = provider_error_code
         self.provider_decline_code = provider_decline_code
         self.provider_charge_id = provider_charge_id

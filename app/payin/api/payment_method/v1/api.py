@@ -1,22 +1,11 @@
 from fastapi import APIRouter, Depends
+from starlette.requests import Request
+from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
-from app.commons.api.models import PaymentException, PaymentErrorResponseBody
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
-
-from starlette.requests import Request
-
-from starlette.status import (
-    HTTP_201_CREATED,
-    HTTP_200_OK,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_404_NOT_FOUND,
-    HTTP_400_BAD_REQUEST,
-)
-
-from app.payin.core.exceptions import PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import SortKey
@@ -30,15 +19,9 @@ router = APIRouter()
     response_model=PaymentMethod,
     status_code=HTTP_201_CREATED,
     operation_id="CreatePaymentMethod",
-    responses={
-        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
 )
 async def create_payment_method(
-    request: Request,
     req_body: CreatePaymentMethodRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
@@ -66,22 +49,9 @@ async def create_payment_method(
             is_active=req_body.is_active,
         )
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
-    except PaymentError as e:
-        log.exception(
-            "[create_payment_method] PaymentError.", payer_id=req_body.payer_id
-        )
-        if e.error_code == PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT.value:
-            http_status = HTTP_400_BAD_REQUEST
-        elif e.error_code == PayinErrorCode.PAYER_READ_NOT_FOUND.value:
-            http_status = HTTP_404_NOT_FOUND
-        else:
-            http_status = HTTP_500_INTERNAL_SERVER_ERROR
-        raise PaymentException(
-            http_status_code=http_status,
-            error_code=e.error_code,
-            error_message=e.error_message,
-            retryable=e.retryable,
-        )
+    except PaymentError:
+        log.warn("[create_payment_method] PaymentError.", payer_id=req_body.payer_id)
+        raise
     return payment_method
 
 
@@ -90,14 +60,9 @@ async def create_payment_method(
     response_model=PaymentMethod,
     status_code=HTTP_200_OK,
     operation_id="GetPaymentMethod",
-    responses={
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
 )
 async def get_payment_method(
-    request: Request,
     payment_method_id: str,
     force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
@@ -119,18 +84,12 @@ async def get_payment_method(
         payment_method: PaymentMethod = await payment_method_processor.get_payment_method(
             payment_method_id=payment_method_id, force_update=force_update
         )
-    except PaymentError as e:
+    except PaymentError:
         log.warn(
             "[get_payment_method] PaymentMethodReadError.",
             payment_method_id=payment_method_id,
-            exc_info=e,
         )
-        raise PaymentException(
-            http_status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            error_code=e.error_code,
-            error_message=e.error_message,
-            retryable=e.retryable,
-        )
+        raise
     return payment_method
 
 
@@ -139,10 +98,6 @@ async def get_payment_method(
     response_model=PaymentMethodList,
     status_code=HTTP_200_OK,
     operation_id="ListPaymentMethods",
-    responses={
-        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
 )
 async def list_payment_methods(
@@ -168,8 +123,9 @@ async def list_payment_methods(
             sort_by=sort_by,
             force_update=force_update,
         )
-    except PaymentError as e:
-        log.warn("[list_payment_methods] PaymentError", exc_info=e)
+    except PaymentError:
+        log.warn("[list_payment_methods] PaymentError")
+        raise
 
     return payment_methods_list
 
@@ -179,11 +135,6 @@ async def list_payment_methods(
     response_model=PaymentMethod,
     status_code=HTTP_200_OK,
     operation_id="DeletePaymentMethod",
-    responses={
-        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
 )
 async def delete_payment_method(
@@ -205,25 +156,11 @@ async def delete_payment_method(
         payment_method: PaymentMethod = await payment_method_processor.delete_payment_method(
             payment_method_id=payment_method_id
         )
-    except PaymentError as e:
+    except PaymentError:
         log.exception(
             "[delete_payment_method] PaymentMethodReadError.",
             payment_method_id=payment_method_id,
         )
-        if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND.value:
-            http_status = HTTP_404_NOT_FOUND
-        elif e.error_code in (
-            PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-            PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-        ):
-            http_status = HTTP_400_BAD_REQUEST
-        else:
-            http_status = HTTP_500_INTERNAL_SERVER_ERROR
-        raise PaymentException(
-            http_status_code=http_status,
-            error_code=e.error_code,
-            error_message=e.error_message,
-            retryable=e.retryable,
-        )
+        raise
 
     return payment_method

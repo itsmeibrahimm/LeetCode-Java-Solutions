@@ -1,19 +1,10 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from starlette.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
-    HTTP_404_NOT_FOUND,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-)
+from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
-from app.commons.api.models import PaymentErrorResponseBody, PaymentException
 from app.commons.context.req_context import get_logger_from_req
-from app.commons.core.errors import PaymentError
 from app.payin.api.cart_payment.v1.helper import create_request_to_model
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
@@ -22,7 +13,6 @@ from app.payin.api.cart_payment.v1.request import (
 from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.core.cart_payment.model import CartPayment
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
-from app.payin.core.exceptions import PayinErrorCode
 
 api_tags = ["CartPaymentV1"]
 router = APIRouter()
@@ -33,11 +23,6 @@ router = APIRouter()
     response_model=CartPayment,
     status_code=HTTP_201_CREATED,
     operation_id="CreateCartPayment",
-    responses={
-        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
-        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
 )
 async def create_cart_payment(
@@ -70,51 +55,23 @@ async def create_cart_payment(
 
     log.info("Creating cart_payment for payer", payer_id=cart_payment_request.payer_id)
 
-    try:
-        cart_payment = await cart_payment_processor.create_payment(
-            # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
-            request_cart_payment=create_request_to_model(
-                cart_payment_request,
-                correlation_ids=cart_payment_request.correlation_ids,
-            ),
-            idempotency_key=cart_payment_request.idempotency_key,
-            payment_country=cart_payment_request.payment_country,
-            currency=cart_payment_request.currency,
-        )
+    cart_payment = await cart_payment_processor.create_payment(
+        # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
+        request_cart_payment=create_request_to_model(
+            cart_payment_request, correlation_ids=cart_payment_request.correlation_ids
+        ),
+        idempotency_key=cart_payment_request.idempotency_key,
+        payment_country=cart_payment_request.payment_country,
+        currency=cart_payment_request.currency,
+    )
 
-        log.info(
-            "Created cart_payment",
-            cart_payment_id=cart_payment.id,
-            payer_id=cart_payment.payer_id,
-        )
-        # Legacy info not returned for new V1 API
-        return cart_payment
-    except PaymentError as payment_error:
-        log.info("Exception from create_cart_payment()", exc_info=payment_error)
-        http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        if payment_error.error_code in [
-            PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
-            PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT,
-        ]:
-            http_status_code = HTTP_400_BAD_REQUEST
-        elif (
-            payment_error.error_code
-            == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
-        ):
-            http_status_code = HTTP_403_FORBIDDEN
-
-        raise PaymentException(
-            http_status_code=http_status_code,
-            error_code=payment_error.error_code,
-            error_message=payment_error.error_message,
-            retryable=payment_error.retryable,
-        )
+    log.info(
+        "Created cart_payment",
+        cart_payment_id=cart_payment.id,
+        payer_id=cart_payment.payer_id,
+    )
+    # Legacy info not returned for new V1 API
+    return cart_payment
 
 
 @router.post(
@@ -122,12 +79,6 @@ async def create_cart_payment(
     response_model=CartPayment,
     status_code=HTTP_200_OK,
     operation_id="AdjustCartPayment",
-    responses={
-        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
-        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
     dependencies=[Depends(commando_route_dependency)],
 )
@@ -149,39 +100,13 @@ async def update_cart_payment(
     - **split_payment** [json object] Optional, new split payment to use for the payment
     """
     log.info("Updating cart_payment", cart_payment_id=cart_payment_id)
-    try:
-        cart_payment = await cart_payment_processor.update_payment(
-            idempotency_key=cart_payment_request.idempotency_key,
-            cart_payment_id=cart_payment_id,
-            amount=cart_payment_request.amount,
-            client_description=cart_payment_request.client_description,
-            split_payment=cart_payment_request.split_payment,
-        )
-    except PaymentError as payment_error:
-        http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        if payment_error.error_code in [
-            PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_DECLINED_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_EXPIRED_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_PROCESSING_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_NUMBER_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR,
-            PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_SPLIT_PAYMENT_ACCOUNT,
-        ]:
-            http_status_code = HTTP_400_BAD_REQUEST
-        elif payment_error.error_code in [
-            PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-            PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH,
-        ]:
-            http_status_code = HTTP_403_FORBIDDEN
-        elif payment_error.error_code == PayinErrorCode.CART_PAYMENT_NOT_FOUND:
-            http_status_code = HTTP_404_NOT_FOUND
-        raise PaymentException(
-            http_status_code=http_status_code,
-            error_code=payment_error.error_code,
-            error_message=payment_error.error_message,
-            retryable=payment_error.retryable,
-        )
+    cart_payment = await cart_payment_processor.update_payment(
+        idempotency_key=cart_payment_request.idempotency_key,
+        cart_payment_id=cart_payment_id,
+        amount=cart_payment_request.amount,
+        client_description=cart_payment_request.client_description,
+        split_payment=cart_payment_request.split_payment,
+    )
     log.info(
         "Updated cart_payment",
         cart_payment_id=cart_payment.id,
@@ -195,11 +120,6 @@ async def update_cart_payment(
     response_model=CartPayment,
     status_code=HTTP_200_OK,
     operation_id="CancelCartPayment",
-    responses={
-        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
-        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
-    },
     tags=api_tags,
     dependencies=[Depends(commando_route_dependency)],
 )
@@ -215,26 +135,8 @@ async def cancel_cart_payment(
     - **cart_payment_id**: ID of cart payment to cancel.
     """
     log.info("Cancelling cart_payment", cart_payment_id=cart_payment_id)
-    try:
-        cart_payment = await cart_payment_processor.cancel_payment(
-            cart_payment_id=cart_payment_id
-        )
-    except PaymentError as payment_error:
-        http_status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        if payment_error.error_code == PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA:
-            http_status_code = HTTP_400_BAD_REQUEST
-        elif (
-            payment_error.error_code
-            == PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
-        ):
-            http_status_code = HTTP_403_FORBIDDEN
-        elif payment_error.error_code == PayinErrorCode.CART_PAYMENT_NOT_FOUND:
-            http_status_code = HTTP_404_NOT_FOUND
-        raise PaymentException(
-            http_status_code=http_status_code,
-            error_code=payment_error.error_code,
-            error_message=payment_error.error_message,
-            retryable=payment_error.retryable,
-        )
+    cart_payment = await cart_payment_processor.cancel_payment(
+        cart_payment_id=cart_payment_id
+    )
     log.info("Cancelled cart_payment", cart_payment_id=cart_payment_id)
     return cart_payment

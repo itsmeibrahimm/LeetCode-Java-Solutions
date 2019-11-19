@@ -12,11 +12,13 @@ from starlette.status import (
     HTTP_422_UNPROCESSABLE_ENTITY,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
-from structlog.stdlib import BoundLogger
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
-from app.commons.context.req_context import get_logger_from_req, response_with_req_id
-from app.commons.routing import get_endpoint_from_scope
+from app.commons.context.logger import get_logger
+from app.commons.context.req_context import response_with_req_id
+
+# used for customized FastAPI exception translator
+api_error_translator_log = get_logger("api_error_translator")
 
 
 def create_payment_error_response_blob(
@@ -67,8 +69,6 @@ async def payment_http_exception_handler(
     :param exception: starlette.exceptions.HTTPException
     :return: Handled Http exception response
     """
-    logger: BoundLogger = get_logger_from_req(request)
-    endpoint = get_endpoint_from_scope(request.scope)
     exception_response = None
     if isinstance(exception, PaymentException):
         # we wrapped the error, provide some additional info
@@ -77,23 +77,19 @@ async def payment_http_exception_handler(
             error_message=exception.error_message,
             retryable=exception.retryable,
         )
-        logger.info(
-            "api exception handler",
-            type="payment error",
-            endpoint=endpoint,
+        api_error_translator_log.info(
+            exception.__class__.__name__,
             status_code=exception.status_code,
             error=error.dict(),
-            retryable=exception.retryable,
         )
         exception_response = JSONResponse(
             status_code=exception.status_code, content=jsonable_encoder(error)
         )
     else:
         # default HTTP exception handling from the framework (eg. 404)
-        logger.info(
-            "api exception handler",
-            type="http error",
-            endpoint=endpoint,
+        # report un modeled http exception to sentry with error log level
+        api_error_translator_log.error(
+            exception.__class__.__name__,
             status_code=exception.status_code,
             exc_info=exception,
         )
@@ -105,17 +101,9 @@ async def payment_http_exception_handler(
 async def payment_internal_error_handler(
     request: Request, exception: Exception
 ) -> Response:
-    logger: BoundLogger = get_logger_from_req(request)
+
     # unhandled error, report this in sentry and newrelic
-
-    endpoint = get_endpoint_from_scope(request.scope)
-
-    logger.error(
-        "api exception handler",
-        type="internal error",
-        endpoint=endpoint,
-        exc_info=exception,
-    )
+    api_error_translator_log.error(exception.__class__.__name__, exc_info=exception)
 
     return response_with_req_id(
         request,
@@ -157,9 +145,11 @@ def _build_request_validation_error_display(validation_error: ValidationError) -
 async def payment_request_validation_exception_handler(
     request: Request, exception: RequestValidationError
 ) -> JSONResponse:
-    logger: BoundLogger = get_logger_from_req(request)
     # log the details of the validation error
-    logger.info("request validation error", validation_errors=exception.errors())
+
+    api_error_translator_log.info(
+        exception.__class__.__name__, validation_errors=exception.errors()
+    )
 
     return response_with_req_id(
         request,

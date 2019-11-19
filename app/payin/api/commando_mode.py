@@ -17,7 +17,7 @@ def commando_route_dependency(request: Request):
         http_status_code = HTTP_503_SERVICE_UNAVAILABLE
 
         internal_error = CommandoModeShortCircuit(
-            error_code=PayinErrorCode.COMMANDO_DISABLED_ENDPOINT, retryable=False
+            error_code=PayinErrorCode.COMMANDO_DISABLED_ENDPOINT
         )
 
         raise PaymentException(

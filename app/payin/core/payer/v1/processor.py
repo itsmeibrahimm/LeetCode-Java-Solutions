@@ -107,9 +107,7 @@ class PayerProcessorV1:
             # ensure DB record is update-to-date
             country: Optional[CountryCode] = CountryCode(raw_payer.country())
             if not country:
-                raise PayerReadError(
-                    error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
-                )
+                raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_NOT_FOUND)
             raw_payer = await self.payer_client.force_update_payer(
                 raw_payer=raw_payer, country=country
             )
@@ -142,9 +140,7 @@ class PayerProcessorV1:
             self.log.error(
                 "[update_default_payment_method] null payment_method_id and null dd_stripe_card_id."
             )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_INVALID_DATA, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_INVALID_DATA)
 
         # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
@@ -152,9 +148,7 @@ class PayerProcessorV1:
         )
         pgp_country: Optional[str] = raw_payer.country()
         if not pgp_country:
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_NOT_FOUND, retryable=False
-            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_NOT_FOUND)
 
         # step 2: find PaymentMethod object to get pgp_resource_id.
         raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(

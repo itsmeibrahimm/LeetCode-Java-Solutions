@@ -139,7 +139,7 @@ class PaymentMethodClient:
                 payer_id=payer_id,
             )
             raise PaymentMethodCreateError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_DB_ERROR, retryable=True
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_DB_ERROR
             )
         return RawPaymentMethod(
             pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
@@ -188,8 +188,7 @@ class PaymentMethodClient:
                 payment_method_id_type=payment_method_id_type,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE
             )
 
         raw_payment_method: RawPaymentMethod = await pm_interface.get_payment_method_raw_objects(
@@ -263,8 +262,7 @@ class PaymentMethodClient:
             )
             if not sc_entity:
                 raise PaymentMethodReadError(
-                    error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
-                    retryable=False,
+                    error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND
                 )
 
             # get pgp_payment_method object
@@ -277,14 +275,14 @@ class PaymentMethodClient:
             return RawPaymentMethod(
                 pgp_payment_method_entity=pm_entity, stripe_card_entity=sc_entity
             )
-        except DBDataError:
+        except DBDataError as e:
             self.log.exception(
                 "[get_duplicate_payment_method] DBDataError when read db.",
                 stripe_payment_method_id=stripe_payment_method.id,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR
+            ) from e
 
     async def detach_raw_payment_method(
         self, pgp_payment_method_id: str, raw_payment_method: RawPaymentMethod
@@ -312,14 +310,14 @@ class PaymentMethodClient:
                         id=raw_payment_method.stripe_card_entity.id
                     ),
                 )
-        except DBDataError:
+        except DBDataError as e:
             self.log.exception(
                 "[detach_payment_method] DBDataError when read db.",
                 pgp_payment_method_id=pgp_payment_method_id,
             )
             raise PaymentMethodDeleteError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR, retryable=True
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_DB_ERROR
+            ) from e
         return RawPaymentMethod(
             pgp_payment_method_entity=updated_pm_entity,
             stripe_card_entity=updated_sc_entity,
@@ -341,14 +339,13 @@ class PaymentMethodClient:
                 "[pgp_create_and_attach_payment_method] create payment_method completed.",
                 pgp_payment_method_res_id=stripe_payment_method.id,
             )
-        except Exception:
+        except Exception as e:
             self.log.exception(
                 "[create_payment_method_impl] error while creating stripe payment method."
             )
             raise PaymentMethodCreateError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
-                retryable=False,
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR
+            ) from e
         return stripe_payment_method
 
     async def pgp_attach_payment_method(
@@ -366,15 +363,14 @@ class PaymentMethodClient:
                 pgp_customer_id=pgp_customer_id,
                 response_customer_id=attach_payment_method.customer,
             )
-        except Exception:
+        except Exception as e:
             self.log.exception(
                 "[create_payment_method_impl] error while creating stripe payment method.",
                 pgp_customer_id=pgp_customer_id,
             )
             raise PaymentMethodCreateError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
-                retryable=False,
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR
+            ) from e
         return attach_payment_method
 
     async def pgp_detach_payment_method(
@@ -391,15 +387,14 @@ class PaymentMethodClient:
                 "[pgp_detach_payment_method] detach payment method completed. customer in stripe response blob:",
                 pgp_payment_method_id=pgp_payment_method_id,
             )
-        except Exception:
+        except Exception as e:
             self.log.exception(
                 "[pgp_detach_payment_method] error while detaching stripe payment method",
                 pgp_payment_method_id=pgp_payment_method_id,
             )
             raise PaymentMethodDeleteError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR,
-                retryable=False,
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_DELETE_STRIPE_ERROR
+            ) from e
         return stripe_payment_method
 
     async def get_dd_stripe_card_ids_by_stripe_customer_id(
@@ -411,14 +406,14 @@ class PaymentMethodClient:
                     stripe_customer_id=stripe_customer_id
                 )
             )
-        except DBDataError:
+        except DBDataError as e:
             self.log.exception(
                 "[get_dd_stripe_card_ids_by_stripe_customer_id] DBDataError when read db.",
                 stripe_customer_id=stripe_customer_id,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR
+            ) from e
         stripe_card_ids = [entity.id for entity in stripe_customer_db_entities]
         return stripe_card_ids
 
@@ -465,15 +460,15 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
                 sc_entity = await self.payment_method_repo.get_stripe_card_by_stripe_id(
                     GetStripeCardByStripeIdInput(stripe_id=pm_entity.pgp_resource_id)
                 )
-        except DBDataError:
+        except DBDataError as e:
             self.log.exception(
                 "[get_payment_method_raw_objects] DBDataError when read db",
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR
+            ) from e
 
         if not (pm_entity and sc_entity):
             self.log.error(
@@ -481,7 +476,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
                 payment_method_id=payment_method_id,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND
             )
 
         is_owner: bool = False
@@ -503,8 +498,7 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
                 payment_method_id_type=payment_method_id_type,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
             )
 
         self.log.info(
@@ -560,18 +554,17 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                     payment_method_id_type=payment_method_id_type,
                 )
                 raise PaymentMethodReadError(
-                    error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
-                    retryable=False,
+                    error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE
                 )
-        except DBDataError:
+        except DBDataError as e:
             self.log.exception(
                 "[get_payment_method_raw_objects] DBDataError when read db.",
                 payer_id=payer_id,
                 payment_method_id=payment_method_id,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR, retryable=True
-            )
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_DB_ERROR
+            ) from e
 
         if not sc_entity:
             self.log.error(
@@ -579,7 +572,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                 payment_method_id=payment_method_id,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND, retryable=False
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND
             )
 
         is_owner: bool = False
@@ -600,8 +593,7 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
                 payer_id_type=payer_id_type,
             )
             raise PaymentMethodReadError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
             )
 
         self.log.info(

@@ -253,7 +253,7 @@ def test_update_legacy_cart_payment_lower_with_invalid_amount():
         )
     except ApiException as e:
         error_code = e.status
-    assert error_code == 500
+    assert error_code == 400
 
 
 def test_update_legacy_cart_payment_higher_with_delay_capture():
@@ -455,5 +455,5 @@ def test_cancel_legacy_cart_payment_with_cart_payment_not_found():
         logger.log(msg=str(e), level=logging.INFO)
         error_code = e.status
     assert (
-        error_code == 500
+        error_code == 404
     )  # Todo: Add cart payment not found error handling for v0 cancel API

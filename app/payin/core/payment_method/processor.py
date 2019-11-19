@@ -133,8 +133,7 @@ class PaymentMethodProcessor:
         else:
             self.log.error("[create_payment_method] invalid input. must provide id")
             raise PaymentMethodCreateError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT
             )
 
         if not pgp_customer_res_id:
@@ -143,8 +142,7 @@ class PaymentMethodProcessor:
                 payer_id=payer_id,
             )
             raise PaymentMethodCreateError(
-                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
-                retryable=False,
+                error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT
             )
 
         # TODO: perform Payer's lazy creation
@@ -312,7 +310,7 @@ class PaymentMethodProcessor:
                 )
             except PayerReadError as e:
                 if e.error_code != PayinErrorCode.PAYER_READ_NOT_FOUND:
-                    raise e
+                    raise
                 else:
                     # existing DSJ consumers, continue to detach the payment method.
                     self.log.warn(

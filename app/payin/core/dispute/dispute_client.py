@@ -77,14 +77,10 @@ class DisputeClient:
             self.log.exception(
                 "[get_raw_dispute] DBDataError while reading db.", dispute_id=dispute_id
             )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR)
         if dispute_entity is None:
             self.log.error("[get_raw_dispute] Dispute not found", dispute_id=dispute_id)
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_NOT_FOUND)
         return dispute_entity.to_stripe_dispute()
 
     async def pgp_submit_dispute_evidence(
@@ -98,7 +94,7 @@ class DisputeClient:
         except StripeError:
             self.log.exception("Error updating the stripe dispute")
             raise DisputeUpdateError(
-                error_code=PayinErrorCode.DISPUTE_UPDATE_STRIPE_ERROR, retryable=False
+                error_code=PayinErrorCode.DISPUTE_UPDATE_STRIPE_ERROR
             )
         return response
 
@@ -118,17 +114,13 @@ class DisputeClient:
                 "[update_raw_dispute_submitted_time] DBDataError while reading db.",
                 dd_stripe_dispute_id=dd_stripe_dispute_id,
             )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR, retryable=True
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR)
         if not updated_dispute_db_entity:
             self.log.warn(
                 "[update_raw_dispute_submitted_time] empty data returned from DB after update submitted_at",
                 dd_stripe_dispute_id=dd_stripe_dispute_id,
             )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR, retryable=True
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_UPDATE_DB_ERROR)
         return updated_dispute_db_entity.to_stripe_dispute()
 
     def validate_reasons(self, reasons):
@@ -141,9 +133,7 @@ class DisputeClient:
                 dd_stripe_dispute_id=id,
                 invalid_reasons=invalid_reasons,
             )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_READ_INVALID_DATA, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_READ_INVALID_DATA)
 
     async def get_raw_disputes_list(
         self,
@@ -162,9 +152,7 @@ class DisputeClient:
             or dd_consumer_id
         ):
             self.log.warn("[list_disputes] No parameters provided")
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS)
         # Setting defaults
         dispute_db_entities: List[StripeDisputeDbEntity] = []
         if start_time is None:
@@ -203,9 +191,7 @@ class DisputeClient:
                 )
             except DBDataError:
                 self.log.error("[get_cumulative_count] DBDataError while reading db.")
-                raise DisputeReadError(
-                    error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
-                )
+                raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR)
         elif dd_consumer_id:
             try:
                 stripe_card_ids = await self.payment_method_client.get_stripe_card_ids_for_consumer_id(
@@ -220,9 +206,7 @@ class DisputeClient:
                 self.log.exception(
                     "[get_cumulative_amount] DBDataError while reading db."
                 )
-                raise DisputeReadError(
-                    error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
-                )
+                raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR)
         disputes = [
             dispute_db_entity.to_stripe_dispute()
             for dispute_db_entity in dispute_db_entities
@@ -244,25 +228,20 @@ class DisputeClient:
             self.log.exception(
                 "[get_disputes_charge_metadata] DBDataError while reading db."
             )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_READ_DB_ERROR)
         if stripe_dispute_entity is None:
             self.log.error(
                 "[get_dispute_charge_metadata_object] Dispute not found",
                 dispute_id=dispute_id,
             )
-            raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_NOT_FOUND, retryable=False
-            )
+            raise DisputeReadError(error_code=PayinErrorCode.DISPUTE_NOT_FOUND)
         if consumer_charge_entity is None:
             self.log.error(
                 "[get_dispute_charge_metadata_object] Dispute not found",
                 dispute_id=dispute_id,
             )
             raise DisputeReadError(
-                error_code=PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE,
-                retryable=False,
+                error_code=PayinErrorCode.DISPUTE_NO_CONSUMER_CHARGE_FOR_STRIPE_DISPUTE
             )
         raw_pm: RawPaymentMethod = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
             payment_method_id=str(stripe_dispute_entity.stripe_card_id),

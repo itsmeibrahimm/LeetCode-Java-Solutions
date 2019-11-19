@@ -135,7 +135,7 @@ class TestPayersV1:
                 email=(random_dd_payer_id + "@dd.com"),
             ),
             error=PayinError(
-                http_status_code=422, error_code="payin_1", retryable=False
+                http_status_code=400, error_code="payin_1", retryable=False
             ),
         )
 
