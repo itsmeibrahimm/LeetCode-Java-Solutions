@@ -182,14 +182,14 @@ make local-server
 ### Running server in docker-compose
 
 ```bash
-make local-docker-server
+make start-local-docker-server
 ```
 
 - Similarly as `local-server`, ./app directory is binded as a volume under web docker container.
   Therefore live reload is also available here.
 - Confirming server is up running in docker:
   ```bash
-  curl localhost:5000/health/ # docker port mapping defined in docker-compose.yml web container
+  curl localhost:8001/health # docker port mapping defined in docker-compose.yml web container
   ```
 
 ### Testing
