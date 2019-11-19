@@ -23,7 +23,14 @@ def mkdir_path(path):
         os.mkdir(path)
 
 
-supported_apps = ["payout_v0", "payout_v1", "payin_v0", "payin_v1", "ledger"]
+supported_apps = [
+    "payout_v0",
+    "payout_v1",
+    "payin_v0",
+    "payin_v1",
+    "ledger",
+    "purchasecard_v0",
+]
 
 parser = argparse.ArgumentParser(
     description="Generate Python Client for Payment Service"
@@ -31,7 +38,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-a",
     "--app",
-    help="payment service app name, should be payin_v0, payin_v1, payout_v0, payout_v1, or ledger",
+    help="payment service app name, should be payin_v0, payin_v1, payout_v0, payout_v1, or purchasecard_v0, ledger",
     required=True,
 )
 
@@ -50,6 +57,8 @@ if app in ["payout_v0", "payout_v1", "payin_v0", "payin_v1"]:
     service_spec_url = "http://localhost:8001/{name}/api/{version}/openapi.json".format(
         name=app_name, version=app_version
     )
+elif app == "purchasecard_v0":
+    service_spec_url = "http://localhost:8001/purchasecard/api/v0/marqeta/openapi.json"
 else:
     service_spec_url = "http://localhost:8001/{}/openapi.json".format(app)
 
