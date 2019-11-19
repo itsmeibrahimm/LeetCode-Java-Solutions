@@ -704,13 +704,6 @@ class TestCartPaymentInterface:
         intent = generate_payment_intent(status=IntentStatus.SUCCEEDED, amount=0)
         assert cart_payment_interface.can_payment_intent_be_refunded(intent) is False
 
-    def test_does_intent_require_capture(self, cart_payment_interface):
-        intent = generate_payment_intent(status="init")
-        assert cart_payment_interface.does_intent_require_capture(intent) is False
-
-        intent = generate_payment_intent(status="requires_capture")
-        assert cart_payment_interface.does_intent_require_capture(intent) is True
-
     def test_get_intent_status_from_provider_status(self, cart_payment_interface):
         intent_status = cart_payment_interface._get_intent_status_from_provider_status(
             "requires_capture"

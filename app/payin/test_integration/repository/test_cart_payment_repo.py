@@ -1,32 +1,32 @@
-from datetime import datetime, timedelta, timezone, date
+from datetime import date, datetime, timedelta, timezone
 from typing import cast, Optional, Tuple
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 import pytest
 from IPython.utils.tz import utcnow
 
-from app.commons.types import CountryCode, LegacyCountryId, Currency, PgpCode
-from app.commons.utils.validation import self_or_fail_if_none
+from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
+from app.commons.utils.validation import not_none
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
-    LegacyPayment,
     LegacyConsumerCharge,
+    LegacyPayment,
     LegacyStripeCharge,
+    PaymentCharge,
     PaymentIntent,
     PaymentIntentAdjustmentHistory,
-    PgpPaymentIntent,
-    PaymentCharge,
     PgpPaymentCharge,
-    Refund,
+    PgpPaymentIntent,
     PgpRefund,
+    Refund,
 )
 from app.payin.core.cart_payment.types import (
-    IntentStatus,
     CaptureMethod,
     ChargeStatus,
-    LegacyStripeChargeStatus,
+    IntentStatus,
     LegacyConsumerChargeId,
+    LegacyStripeChargeStatus,
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
@@ -34,24 +34,24 @@ from app.payin.core.payer.types import PayerType
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusWhereInput,
-    UpdatePaymentIntentStatusSetInput,
-    UpdatePgpPaymentIntentWhereInput,
-    UpdatePgpPaymentIntentSetInput,
     UpdateCartPaymentPostCancellationInput,
+    UpdatePaymentIntentStatusSetInput,
+    UpdatePaymentIntentStatusWhereInput,
+    UpdatePgpPaymentIntentSetInput,
+    UpdatePgpPaymentIntentWhereInput,
 )
 from app.payin.repository.payer_repo import (
-    PayerRepository,
     InsertPayerInput,
     PayerDbEntity,
+    PayerRepository,
 )
 from app.payin.repository.payment_method_repo import (
-    PaymentMethodRepository,
+    GetStripeCardByStripeIdInput,
     InsertPgpPaymentMethodInput,
     InsertStripeCardInput,
+    PaymentMethodRepository,
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
-    GetStripeCardByStripeIdInput,
 )
 
 
@@ -97,8 +97,7 @@ async def stripe_card(
     payment_method: PgpPaymentMethodDbEntity,
     payment_method_repository: PaymentMethodRepository,
 ) -> StripeCardDbEntity:
-
-    return self_or_fail_if_none(
+    return not_none(
         await payment_method_repository.get_stripe_card_by_stripe_id(
             input=GetStripeCardByStripeIdInput(stripe_id=payment_method.pgp_resource_id)
         )
@@ -139,7 +138,7 @@ async def stripe_card_expired(
     payment_method_expired: PgpPaymentMethodDbEntity,
     payment_method_repository: PaymentMethodRepository,
 ) -> StripeCardDbEntity:
-    return self_or_fail_if_none(
+    return not_none(
         await payment_method_repository.get_stripe_card_by_stripe_id(
             input=GetStripeCardByStripeIdInput(
                 stripe_id=payment_method_expired.pgp_resource_id
@@ -174,6 +173,7 @@ async def create_payment_intent(
     payer: PayerDbEntity,
     payment_method: PgpPaymentMethodDbEntity,
     payment_intent__capture_after,
+    intent_status: IntentStatus = IntentStatus.REQUIRES_CAPTURE,
 ) -> PaymentIntent:
     cart_payment_id = uuid4()
     await cart_payment_repository.insert_cart_payment(
@@ -202,7 +202,7 @@ async def create_payment_intent(
         country=CountryCode.US,
         currency="USD",
         capture_method=CaptureMethod.MANUAL,
-        status=IntentStatus.REQUIRES_CAPTURE,
+        status=intent_status,
         statement_descriptor=None,
         capture_after=payment_intent__capture_after,
         payment_method_id=payment_method.id,
@@ -217,7 +217,7 @@ def payment_intent__capture_after() -> datetime:
     Use to override the capture_after of payment_intent
     :return:
     """
-    return datetime(2019, 1, 1)
+    return datetime(2019, 1, 1, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -1654,47 +1654,153 @@ class TestLegacyCharges:
 
 
 class TestFindPaymentIntentsThatRequireCapture:
+    test_data = [
+        # capturable_before_offset_sec, earliest_capture_after_offset_sec
+        pytest.param(
+            0,
+            0,
+            True,
+            id="[found], intent.capture_after=capturable_before, intent.capture_after=earliest_capture_after",
+        ),
+        pytest.param(
+            0,
+            1,
+            False,
+            id="[excluded], intent.capture_after=capturable_before, intent.capture_after<earliest_capture_after",
+        ),
+        pytest.param(
+            0,
+            -1,
+            True,
+            id="[found], intent.capture_after=capturable_before, intent.capture_after>earliest_capture_after",
+        ),
+        pytest.param(
+            1,
+            0,
+            True,
+            id="[found], intent.capture_after<capturable_before, intent.capture_after=earliest_capture_after",
+        ),
+        pytest.param(
+            1,
+            1,
+            False,
+            id="[excluded], intent.capture_after<capturable_before, intent.capture_after<earliest_capture_after",
+        ),
+        pytest.param(
+            1,
+            -1,
+            True,
+            id="[found], intent.capture_after<capturable_before, intent.capture_after>earliest_capture_after",
+        ),
+        pytest.param(
+            -1,
+            0,
+            False,
+            id="[excluded], intent.capture_after>capturable_before, intent.capture_after=earliest_capture_after",
+        ),
+        pytest.param(
+            -1,
+            1,
+            False,
+            id="[excluded], intent.capture_after>capturable_before, intent.capture_after<earliest_capture_after",
+        ),
+        pytest.param(
+            -1,
+            -1,
+            False,
+            id="[excluded], intent.capture_after>capturable_before, intent.capture_after>earliest_capture_after",
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        "capturable_before_offset_sec, earliest_capture_after_offset_sec, should_found",
+        test_data,
+    )
     @pytest.mark.asyncio
-    async def test_intent_need_capture_right_on_cutoff_is_included(
+    async def test_find_payment_intents_that_require_capture(
         self,
+        capturable_before_offset_sec: int,
+        earliest_capture_after_offset_sec: int,
+        should_found: bool,
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
         assert payment_intent.capture_after
-        results = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
-            cutoff=payment_intent.capture_after
+        results = cart_payment_repository.find_payment_intents_that_require_capture(
+            capturable_before=payment_intent.capture_after
+            + timedelta(seconds=capturable_before_offset_sec),
+            earliest_capture_after=payment_intent.capture_after
+            + timedelta(seconds=earliest_capture_after_offset_sec),
         )
         ids = [i.id async for i in results]
-        assert payment_intent.id in ids
+        if should_found:
+            assert (
+                payment_intent.id in ids
+            ), f"expected included payment_intent={payment_intent}"
+        else:
+            assert (
+                payment_intent.id not in ids
+            ), f"expected excluded payment_intent={payment_intent}"
 
-    @pytest.mark.asyncio
-    async def test_intent_need_capture_after_cutoff_is_NOT_included(
+
+class TestFindPaymentIntentsInCapturingState:
+    @pytest.fixture
+    async def payment_intent_in_capturing(
         self,
         cart_payment_repository: CartPaymentRepository,
-        payment_intent: PaymentIntent,
-    ):
-        assert payment_intent.capture_after
-        results = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
-            cutoff=payment_intent.capture_after - timedelta(seconds=1)
+        payer: PayerDbEntity,
+        payment_method: PgpPaymentMethodDbEntity,
+        payment_intent__capture_after: datetime,
+    ) -> PaymentIntent:
+        return await create_payment_intent(
+            cart_payment_repository=cart_payment_repository,
+            payer=payer,
+            payment_method=payment_method,
+            payment_intent__capture_after=payment_intent__capture_after,
+            intent_status=IntentStatus.CAPTURING,
         )
-        ids = [i.id async for i in results]
-        assert payment_intent.id not in ids
 
+    test_data = [
+        # update_before_offset_sec, earliest_capture_after_offset_sec
+        pytest.param(
+            0, True, id="[found], intent.capture_after=earliest_capture_after"
+        ),
+        pytest.param(
+            1, False, id="[excluded], intent.capture_after<earliest_capture_after"
+        ),
+        pytest.param(
+            -1, True, id="[found], intent.capture_after>earliest_capture_after"
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        "earliest_capture_after_offset_sec, should_found", test_data
+    )
     @pytest.mark.asyncio
-    async def test_intent_need_capture_before_cutoff_is_included(
+    async def test_find_payment_intents_that_require_capture(
         self,
+        earliest_capture_after_offset_sec: int,
+        should_found: bool,
         cart_payment_repository: CartPaymentRepository,
-        payment_intent: PaymentIntent,
+        payment_intent_in_capturing: PaymentIntent,
     ):
-        assert payment_intent.capture_after
-        results = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
-            cutoff=payment_intent.capture_after + timedelta(seconds=1)
+        assert payment_intent_in_capturing.capture_after
+        results = await cart_payment_repository.find_payment_intents_in_capturing(
+            earliest_capture_after=payment_intent_in_capturing.capture_after
+            + timedelta(seconds=earliest_capture_after_offset_sec)
         )
-        ids = [i.id async for i in results]
-        assert payment_intent.id in ids
+        ids = [i.id for i in results]
+        if should_found:
+            assert (
+                payment_intent_in_capturing.id in ids
+            ), f"expected included payment_intent={payment_intent_in_capturing}"
+        else:
+            assert (
+                payment_intent_in_capturing.id not in ids
+            ), f"expected excluded payment_intent={payment_intent_in_capturing}"
 
 
-class TestCountPaymentIntentsThatRequireCapture:
+class TestCountPaymentIntentsInProblematicStates:
     @pytest.mark.asyncio
     async def test_success(
         self,
@@ -1706,21 +1812,61 @@ class TestCountPaymentIntentsThatRequireCapture:
     ):
         # Our databases are not data-less for each test run, so we need to count the payment intents before and after
         # to write this test. This is so dirty!
-        result_before = await cart_payment_repository.count_payment_intents_that_require_capture(
+        result_before = await cart_payment_repository.count_payment_intents_in_problematic_states(
             problematic_threshold=timedelta(days=2)
+        )
+
+        # Following 3 intents are not problematic
+        await create_payment_intent(
+            cart_payment_repository,
+            payment_method=payment_method,
+            payer=payer,
+            payment_intent__capture_after=utcnow() - timedelta(days=3),
+            intent_status=IntentStatus.FAILED,
         )
         await create_payment_intent(
             cart_payment_repository,
             payment_method=payment_method,
             payer=payer,
             payment_intent__capture_after=utcnow() - timedelta(days=3),
+            intent_status=IntentStatus.SUCCEEDED,
         )
-        result_after = await cart_payment_repository.count_payment_intents_that_require_capture(
+        await create_payment_intent(
+            cart_payment_repository,
+            payment_method=payment_method,
+            payer=payer,
+            payment_intent__capture_after=utcnow() - timedelta(days=3),
+            intent_status=IntentStatus.CANCELLED,
+        )
+
+        # Following 3 intents are problematic
+        await create_payment_intent(
+            cart_payment_repository,
+            payment_method=payment_method,
+            payer=payer,
+            payment_intent__capture_after=utcnow() - timedelta(days=3),
+            intent_status=IntentStatus.CAPTURE_FAILED,
+        )
+        await create_payment_intent(
+            cart_payment_repository,
+            payment_method=payment_method,
+            payer=payer,
+            payment_intent__capture_after=utcnow() - timedelta(days=3),
+            intent_status=IntentStatus.REQUIRES_CAPTURE,
+        )
+        await create_payment_intent(
+            cart_payment_repository,
+            payment_method=payment_method,
+            payer=payer,
+            payment_intent__capture_after=utcnow() - timedelta(days=3),
+            intent_status=IntentStatus.CAPTURING,
+        )
+        result_after = await cart_payment_repository.count_payment_intents_in_problematic_states(
             problematic_threshold=timedelta(days=2)
         )
         assert (
             result_after - result_before
-        ) == 1, "there should be one payment intent matched"
+        ) == 3, "there should be 3 payment intents matched"
 
 
 class TestUpdatePaymentAndPgpPaymentIntentStatus:

@@ -795,6 +795,8 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     # Stripe functions
     cart_payment_interface.app_context.stripe = stripe_interface
 
+    cart_payment_interface.log = MagicMock()
+
     return cart_payment_interface
 
 

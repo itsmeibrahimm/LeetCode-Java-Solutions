@@ -10,8 +10,8 @@ from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusSetInput,
     UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentStatusSetInput,
 )
 from app.payin.test_integration.processors.cart_payment_test_base import (
     CartPaymentLegacyTest,
@@ -34,8 +34,9 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
     ):
 
         # clean up all dirty payment intents from other tests
-        dirty_payment_intents = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
-            cutoff=datetime(year=3000, month=12, day=1)
+        dirty_payment_intents = cart_payment_repository.find_payment_intents_that_require_capture(
+            capturable_before=datetime(year=3000, month=12, day=1),
+            earliest_capture_after=datetime(year=1972, month=1, day=1),
         )
         now = datetime.now(timezone.utc)
         async for intent in dirty_payment_intents:

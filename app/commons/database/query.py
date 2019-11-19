@@ -1,7 +1,11 @@
+from sqlalchemy import desc
+
 from app.commons.database.client.interface import DBEngine
 
 
-async def paged_query(engine: DBEngine, query, pk_attr, batch_size=500):
+async def paged_query(
+    engine: DBEngine, query, pk_attr, desc_order: bool = False, batch_size=500
+):
     """
 
     Given an engine and query, will page through results with an iterator.
@@ -18,10 +22,15 @@ async def paged_query(engine: DBEngine, query, pk_attr, batch_size=500):
     while True:
         q = query
         if first_id is not None:
-            q = query.where(pk_attr > first_id)
+            q = (
+                query.where(pk_attr < first_id)
+                if desc_order
+                else query.where(pk_attr > first_id)
+            )
         rec = None
         # grab one more than the batch_size as a test to see if there is another page
-        results = await engine.fetch_all(q.order_by(pk_attr).limit(batch_size + 1))
+        ordered_query = q.order_by(desc(pk_attr)) if desc_order else q.order_by(pk_attr)
+        results = await engine.fetch_all(ordered_query.limit(batch_size + 1))
         if not results:
             break
         more_results = len(results) > batch_size

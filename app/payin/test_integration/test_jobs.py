@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 import pytest
 from asynctest import create_autospec, patch
@@ -42,10 +43,12 @@ class TestCaptureUncapturedPaymentIntents:
         stripe_pool: JobPool,
     ):
         job_instance = CaptureUncapturedPaymentIntents(
-            app_context=app_context, job_pool=stripe_pool
+            app_context=app_context,
+            job_pool=stripe_pool,
+            problematic_capture_delay=timedelta(days=1),
         )
         await job_instance.run()
-        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture_before_cutoff.assert_called_once()  # type: ignore
+        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture.assert_called_once()  # type: ignore
 
     @pytest.mark.asyncio
     @patch(
@@ -66,14 +69,16 @@ class TestCaptureUncapturedPaymentIntents:
         payment_intent = PaymentIntentFactory()
 
         # this is super ugly. can we accomplish the same thing with asynctest?
-        async def mock_find_payment_intents_that_require_capture(*args):
+        async def mock_find_payment_intents_that_require_capture(*args, **kwargs):
             yield payment_intent
 
-        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture_before_cutoff = (  # type: ignore
+        mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture = (  # type: ignore
             mock_find_payment_intents_that_require_capture
         )
         job_instance = CaptureUncapturedPaymentIntents(
-            app_context=app_context, job_pool=stripe_pool
+            app_context=app_context,
+            job_pool=stripe_pool,
+            problematic_capture_delay=timedelta(days=1),
         )
         await job_instance.run()
         await stripe_pool.join()
@@ -88,21 +93,91 @@ class TestResolveCapturingPaymentIntents:
         "app.payin.jobs.CartPaymentRepository",
         return_value=create_autospec(CartPaymentRepository),
     )
-    async def test_capture_uncaptured_payment_intents_when_none_exist(
+    async def test_resolve_payment_intent_to_requires_capture(
         self,
         mock_cart_payment_repository: CartPaymentRepository,
         app_context: AppContext,
         stripe_pool: JobPool,
     ):
-        payment_intent = PaymentIntentFactory(status=IntentStatus.CAPTURING)
+        payment_intent = PaymentIntentFactory(
+            status=IntentStatus.CAPTURING,
+            updated_at=datetime.now(timezone.utc) - timedelta(hours=5),
+            capture_after=datetime.now(timezone.utc) - timedelta(hours=5),
+        )
+
+        payment_intent_right_on_capture = PaymentIntentFactory(
+            status=IntentStatus.CAPTURING,
+            capture_after=datetime.now(timezone.utc) - timedelta(minutes=30),
+            updated_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        )
+
         mock_cart_payment_repository.return_value.find_payment_intents_in_capturing.return_value = [  # type: ignore
-            payment_intent
+            payment_intent,
+            payment_intent_right_on_capture,
         ]
+
         job_instance = ResolveCapturingPaymentIntents(
-            app_context=app_context, job_pool=stripe_pool
+            app_context=app_context,
+            job_pool=stripe_pool,
+            problematic_capture_delay=timedelta(days=1),
+            statsd_client=MagicMock(),
         )
         await job_instance.run()
+        await stripe_pool.join()
+        mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once()  # type: ignore
+        args, kwargs = (
+            mock_cart_payment_repository.return_value.update_payment_intent_status.call_args  # type: ignore
+        )
+        assert "update_payment_intent_status_where_input" in kwargs
+        assert (
+            kwargs["update_payment_intent_status_where_input"].previous_status
+            == IntentStatus.CAPTURING
+        )
+        assert (
+            kwargs["update_payment_intent_status_where_input"].id == payment_intent.id
+        )
+        assert "update_payment_intent_status_set_input" in kwargs
+        assert (
+            kwargs["update_payment_intent_status_set_input"].status
+            == IntentStatus.REQUIRES_CAPTURE
+        )
 
+    @pytest.mark.asyncio
+    @patch(
+        "app.payin.jobs.CartPaymentRepository",
+        return_value=create_autospec(CartPaymentRepository),
+    )
+    async def test_resolve_payment_intent_to_capture_failed(
+        self,
+        mock_cart_payment_repository: CartPaymentRepository,
+        app_context: AppContext,
+        stripe_pool: JobPool,
+    ):
+        payment_intent = PaymentIntentFactory(
+            status=IntentStatus.CAPTURING,
+            capture_after=datetime.now(timezone.utc) - timedelta(days=5),
+            updated_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        )
+
+        payment_intent_right_on_capture = PaymentIntentFactory(
+            status=IntentStatus.CAPTURING,
+            capture_after=datetime.now(timezone.utc) - timedelta(minutes=30),
+            updated_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        )
+
+        mock_cart_payment_repository.return_value.find_payment_intents_in_capturing.return_value = [  # type: ignore
+            payment_intent,
+            payment_intent_right_on_capture,
+        ]
+
+        job_instance = ResolveCapturingPaymentIntents(
+            app_context=app_context,
+            job_pool=stripe_pool,
+            problematic_capture_delay=timedelta(days=1),
+            statsd_client=MagicMock(),
+        )
+        await job_instance.run()
+        await stripe_pool.join()
         mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once()  # type: ignore
         args, kwargs = (
             mock_cart_payment_repository.return_value.update_payment_intent_status.call_args  # type: ignore
@@ -118,7 +193,7 @@ class TestResolveCapturingPaymentIntents:
             == update_payment_intent_status_where_request
         )
         assert (
-            IntentStatus.REQUIRES_CAPTURE.value
+            IntentStatus.CAPTURE_FAILED.value
             == kwargs["update_payment_intent_status_set_input"].status
         )
         assert isinstance(

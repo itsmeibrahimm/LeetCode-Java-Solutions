@@ -15,7 +15,7 @@ from app.commons.operational_flags import (
 )
 from app.commons.providers.stripe.stripe_models import Customer as StripeCustomer
 from app.commons.types import CountryCode
-from app.commons.utils.validation import self_or_fail_if_none
+from app.commons.utils.validation import not_none
 from app.conftest import RuntimeContextManager, RuntimeSetter, StripeAPISettings
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
@@ -1006,7 +1006,7 @@ class TestCartPayment:
 
         payment_method_repository = PaymentMethodRepository(app_context)
 
-        stripe_card: StripeCardDbEntity = self_or_fail_if_none(
+        stripe_card: StripeCardDbEntity = not_none(
             event_loop.run_until_complete(
                 payment_method_repository.get_stripe_card_by_stripe_id(
                     input=GetStripeCardByStripeIdInput(stripe_id=provider_card_id)

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import NewType
+from typing import List, NewType
 
 LegacyConsumerChargeId = NewType("LegacyConsumerChargeId", int)
 
@@ -33,6 +33,18 @@ class IntentStatus(str, Enum):
         if value in ["canceled", "cancelled"]:
             return cls("cancelled")
         return cls(value)
+
+    @classmethod
+    def transiting_status(cls) -> List["IntentStatus"]:
+        """
+        :return: intent statuses that are expected to be moved to next status in state machine
+        """
+        return [
+            st
+            for st in IntentStatus
+            if st
+            not in [IntentStatus.CANCELLED, IntentStatus.FAILED, IntentStatus.SUCCEEDED]
+        ]
 
 
 class RefundStatus(str, Enum):

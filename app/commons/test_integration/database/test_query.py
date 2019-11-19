@@ -35,15 +35,30 @@ async def test_paging_query(
         await payin_maindb.master().execute(query)
 
     query = test_table.select(test_table)
-    ids = [
+    desc_ids = [
+        result["id"]
+        async for result in paged_query(
+            payin_maindb.master(),
+            query,
+            pk_attr=column("id"),
+            batch_size=2,
+            desc_order=True,
+        )
+    ]
+
+    assert desc_ids == [4, 3, 2, 1, 0]
+    # 5 elements, batch_size of 2
+    assert spy_fetch_all.call_count == 3  # type: ignore
+
+    asc_ids = [
         result["id"]
         async for result in paged_query(
             payin_maindb.master(), query, pk_attr=column("id"), batch_size=2
         )
     ]
-    assert ids == list(range(5))
+    assert asc_ids == [0, 1, 2, 3, 4]
     # 5 elements, batch_size of 2
-    assert spy_fetch_all.call_count == 3  # type: ignore
+    assert spy_fetch_all.call_count == 6  # type: ignore
 
 
 async def test_cross_database_connection_acquisition(payout_maindb: DB):

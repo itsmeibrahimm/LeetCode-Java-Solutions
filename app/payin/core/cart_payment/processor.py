@@ -1100,39 +1100,18 @@ class CartPaymentInterface:
             else:
                 raise InvalidProviderRequestError(e) from e
         except StripeError as e:
-            # All other Stripe errors (ie. not InvalidRequestError) can be considered retryable errors
-            # Re-setting the state back to REQUIRES_CAPTURE allows it to be picked up again by the regular cron
-            await self.payment_repo.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
-                    id=payment_intent.id, previous_status=payment_intent.status
-                ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
-                    status=IntentStatus.REQUIRES_CAPTURE,
-                    updated_at=datetime.now(timezone.utc),
-                ),
-            )
-            self.req_context.log.warning(
+            self.req_context.log.exception(
                 "Provider error during capture",
                 payment_intent_id=payment_intent.id,
                 stripe_error_code=e.code,
-                exception=str(e),
             )
-            raise ProviderError(e)
-        except Exception as e:
-            await self.payment_repo.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
-                    id=payment_intent.id, previous_status=payment_intent.status
-                ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
-                    status=IntentStatus.CAPTURE_FAILED,
-                    updated_at=datetime.now(timezone.utc),
-                ),
-            )
+            raise ProviderError(e) from e
+        except Exception:
             self.req_context.log.exception(
                 "Unknown error capturing intent with provider",
                 payment_intent_id=payment_intent.id,
             )
-            raise e
+            raise
 
         return provider_intent
 
@@ -2767,7 +2746,6 @@ class CartPaymentProcessor:
     @tracing.trackable
     async def capture_payment(self, payment_intent: PaymentIntent) -> None:
         """Capture a payment intent.
-
         Arguments:
             payment_intent {PaymentIntent} -- The PaymentIntent to capture.
 
@@ -2776,6 +2754,21 @@ class CartPaymentProcessor:
 
         Returns:
             None
+
+        PaymentIntent state transition:
+        1. Successful capture:
+            [requires_capture] -> [capturing] -> [succeeded]
+        2. PaymentIntent status out of sync with provider:
+            [requires_capture] -> [capturing] -> [succeeded] / [cancelled]
+        3. Failing capture:
+            [requires_capture] -> [capturing]
+
+        Capturing state:
+        - [capturing] state is used as an optimistic lock when attempting to capture a payment intent.
+        while capturing fails due to any reason, the intent's state will pause at this stage.
+        - "app.payin.jobs.ResolveCapturingPaymentIntents" will pickup payment intents stuck this stage
+        and reset their states to [requires_capture] or [capture_failed] depending on how low the intent
+        has been in [capturing] state
         """
         self.log.info(
             "[capture_payment] Capturing payment_intent",
@@ -2799,6 +2792,10 @@ class CartPaymentProcessor:
             )
         except Exception:
             doorstats_global.incr("capture-payment.failed")
+            self.log.exception(
+                "[capture_payment] Attempted to capture payment intent but failed",
+                payment_intent=payment_intent.summary,
+            )
             raise
 
     async def _capture_payment(self, payment_intent: PaymentIntent) -> None:
@@ -2841,6 +2838,10 @@ class CartPaymentProcessor:
                 self.log.info(
                     "[capture_payment] sync from provider payment intent status for unexpected status",
                     new_status=e.provider_payment_intent_status,
+                    stale_pgp_payment_intent_status=pgp_payment_intent.status,
+                    stale_payment_intent_status=payment_intent.status,
+                    payment_intent_id=payment_intent.id,
+                    pgp_payment_intent_id=pgp_payment_intent.id,
                 )
                 await self.cart_payment_interface.update_payment_and_pgp_intent_status_only(
                     new_status=IntentStatus.from_str(e.provider_payment_intent_status),
@@ -2885,7 +2886,6 @@ class CartPaymentProcessor:
             payer_country=payer_country,
             payment_country=payment_country,
             stripe_customer_id=legacy_payment.stripe_customer_id,
-            delay_capture=request_cart_payment.delay_capture,
         )
         pgp_payment_method = await self.cart_payment_interface.get_pgp_payment_method_by_legacy_payment(
             legacy_payment=legacy_payment

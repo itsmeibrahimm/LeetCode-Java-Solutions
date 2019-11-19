@@ -81,7 +81,9 @@ app_context.monitor.add(
 )
 
 capture_uncaptured_payment_intents = CaptureUncapturedPaymentIntents(
-    app_context=app_context, job_pool=stripe_pool
+    app_context=app_context,
+    job_pool=stripe_pool,
+    problematic_capture_delay=app_config.PROBLEMATIC_CAPTURE_DELAY,
 )
 scheduler.add_job(
     func=capture_uncaptured_payment_intents.run,
@@ -90,7 +92,10 @@ scheduler.add_job(
 )
 
 resolve_capturing_payment_intents = ResolveCapturingPaymentIntents(
-    app_context=app_context, job_pool=stripe_pool
+    app_context=app_context,
+    job_pool=stripe_pool,
+    problematic_capture_delay=app_config.PROBLEMATIC_CAPTURE_DELAY,
+    statsd_client=doorstats_global,
 )
 scheduler.add_job(
     func=resolve_capturing_payment_intents.run,
@@ -102,7 +107,7 @@ emit_problematic_capture_count = EmitProblematicCaptureCount(
     app_context=app_context,
     job_pool=stripe_pool,
     statsd_client=doorstats_global,
-    problematic_threshold=app_config.PROBLEMATIC_CAPTURE_THRESHOLD,
+    problematic_threshold=app_config.PROBLEMATIC_CAPTURE_DELAY,
 )
 scheduler.add_job(
     func=emit_problematic_capture_count.run,

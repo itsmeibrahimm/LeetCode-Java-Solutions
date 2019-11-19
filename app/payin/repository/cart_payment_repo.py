@@ -1,48 +1,48 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta, date
-from typing import Any, List, Optional, Tuple, Dict, AsyncIterator, Union
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
-from sqlalchemy import and_, select, func, not_
+from sqlalchemy import and_, func, select
 from sqlalchemy.sql.functions import now
 from typing_extensions import final
 
 from app.commons import tracing
 from app.commons.database.model import DBRequestModel
 from app.commons.database.query import paged_query
-from app.commons.types import PgpCode, CountryCode, Currency
+from app.commons.types import CountryCode, Currency, PgpCode
 from app.payin.core.cart_payment.model import (
     CartPayment,
-    PaymentIntent,
-    PgpPaymentIntent,
-    PaymentIntentAdjustmentHistory,
-    PaymentCharge,
-    PgpPaymentCharge,
-    Refund,
-    PgpRefund,
-    LegacyConsumerCharge,
-    LegacyStripeCharge,
-    LegacyPayment,
     CorrelationIds,
+    LegacyConsumerCharge,
+    LegacyPayment,
+    LegacyStripeCharge,
+    PaymentCharge,
+    PaymentIntent,
+    PaymentIntentAdjustmentHistory,
+    PgpPaymentCharge,
+    PgpPaymentIntent,
+    PgpRefund,
+    Refund,
 )
 from app.payin.core.cart_payment.types import (
-    IntentStatus,
     ChargeStatus,
+    IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
-from app.payin.models.maindb import consumer_charges, stripe_charges, stripe_cards
+from app.payin.models.maindb import consumer_charges, stripe_cards, stripe_charges
 from app.payin.models.paymentdb import (
     cart_payments,
-    payment_intents,
-    pgp_payment_intents,
-    payment_intents_adjustment_history,
     payment_charges,
+    payment_intents,
+    payment_intents_adjustment_history,
     pgp_payment_charges,
-    refunds,
+    pgp_payment_intents,
     pgp_refunds,
+    refunds,
 )
 from app.payin.repository.base import PayinDBRepository
 from app.payin.repository.payment_method_repo import StripeCardDbEntity
@@ -171,31 +171,37 @@ class CartPaymentRepository(PayinDBRepository):
         results = await self.payment_database.replica().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
-    async def find_payment_intents_that_require_capture_before_cutoff(
-        self, cutoff: datetime
+    async def find_payment_intents_that_require_capture(
+        self, capturable_before: datetime, earliest_capture_after: datetime
     ) -> AsyncIterator[PaymentIntent]:
         """
-
-        :param cutoff: The date after which capture_after should be
+        :param capturable_before: A payment intent can only be captured if its capture_after is before this datetime.
+        :param earliest_capture_after: A payment intent can only be captured if it was set to capture after this datetime.
         :return:
         """
         query = payment_intents.table.select().where(
             and_(
                 payment_intents.status == IntentStatus.REQUIRES_CAPTURE,
-                payment_intents.capture_after <= cutoff,
+                # effectively a no-op on created_at in order to use status_created_at_capture_after index
+                payment_intents.created_at <= now(),
+                payment_intents.capture_after >= earliest_capture_after,
+                payment_intents.capture_after <= capturable_before,
             )
         )
 
         async for result in paged_query(
-            self.payment_database.replica(), query, payment_intents.created_at
+            self.payment_database.replica(),
+            query,
+            payment_intents.created_at,
+            desc_order=True,
         ):
             yield self.to_payment_intent(result)
 
-    async def count_payment_intents_that_require_capture(
+    async def count_payment_intents_in_problematic_states(
         self, problematic_threshold: timedelta
     ) -> int:
         """
-        Returns count of payment intents that are not succeeded or canceled but have a capture_after > problematic_threshold
+        Returns count of payment intents that are not succeeded or canceled but have a capture_after < problematic_threshold
 
         Used by alerting system to detect any payment intents that haven't been captured and are potentially in danger
         of not being captured (which would be bad b/c the auth would drop and we would lose revenue)
@@ -207,12 +213,9 @@ class CartPaymentRepository(PayinDBRepository):
             select(columns=[func.count()])
             .where(
                 and_(
-                    # not in succeeded or cancelled state
-                    not_(
-                        payment_intents.status.in_(
-                            (IntentStatus.SUCCEEDED, IntentStatus.CANCELLED)
-                        )
-                    ),
+                    payment_intents.status.in_(IntentStatus.transiting_status()),
+                    # effectively a no-op on created_at in order to use status_created_at_capture_after index
+                    payment_intents.created_at <= now(),
                     # capture_after older than X date
                     payment_intents.capture_after <= now() - problematic_threshold,
                 )
@@ -220,22 +223,23 @@ class CartPaymentRepository(PayinDBRepository):
             .select_from(payment_intents.table)
         )
 
-        result = await self.payment_database.replica().fetch_one(query)
+        result = await self.payment_database.replica().fetch_value(query)
 
-        return result[0]  # type: ignore
+        return result  # type: ignore
 
     async def find_payment_intents_in_capturing(
-        self, older_than: datetime
+        self, *, earliest_capture_after: datetime
     ) -> List[PaymentIntent]:
         """
-
-        :param older_than: the date before which intent should have been updated
+        :param earliest_capture_after: only include payment_intents that were set to capture later than this datetime
         :return:
         """
         statement = payment_intents.table.select().where(
             and_(
                 payment_intents.status == IntentStatus.CAPTURING,
-                payment_intents.updated_at <= older_than,
+                # effectively a no-op on created_at in order to use status_created_at_capture_after index
+                payment_intents.created_at <= now(),
+                payment_intents.capture_after >= earliest_capture_after,
             )
         )
         results = await self.payment_database.replica().fetch_all(statement)

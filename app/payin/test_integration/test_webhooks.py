@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import cast
 from uuid import uuid4, UUID
 
@@ -139,7 +139,7 @@ def payment_intent__capture_after() -> datetime:
     Use to override the capture_after of payment_intent
     :return:
     """
-    return datetime(2019, 1, 1)
+    return datetime(2019, 1, 1, tzinfo=timezone.utc)
 
 
 @pytest.fixture

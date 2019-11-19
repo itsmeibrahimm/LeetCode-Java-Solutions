@@ -174,10 +174,8 @@ class AppConfig(SecretAware):
     # In local and staging, we want the capture jobs to run frequently so we can run integration tests
     # In prod, we override the schedule to run after-hours to mitigate Stripe rate-limiting
     CAPTURE_CRON_TRIGGER: CronTrigger = CronTrigger(minute="*/5")
-
     DEFAULT_CAPTURE_DELAY_IN_MINUTES: int = 1  # set the capture delay to ~1 minute
-
     # The threshold after which to consider a payment_intent might have a problem being captured (or cancelled)
-    # In other words, if a payment intent is not completed by `payment_intent.capture_after + PROBLEMATIC_CAPTURE_THRESHOLD`,
+    # In other words, if a payment intent is not completed by `payment_intent.capture_after + PROBLEMATIC_CAPTURE_DELAY`,
     # then there is likely an issue with that payment intent and should be investigated
-    PROBLEMATIC_CAPTURE_THRESHOLD: timedelta = timedelta(days=2)
+    PROBLEMATIC_CAPTURE_DELAY: timedelta = timedelta(days=1)

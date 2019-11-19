@@ -3,10 +3,11 @@ from typing import TypeVar, Optional
 T = TypeVar("T")
 
 
-def self_or_fail_if_none(value: Optional[T]) -> T:
+def not_none(value: Optional[T], err_msg: Optional[str] = None) -> T:
     """
     Return value from Optional wrapped type. Fail with ValueError if is None.
     """
     if value is None:
-        raise ValueError("expected value present")
+        msg = err_msg or "expected value present"
+        raise ValueError(msg)
     return value

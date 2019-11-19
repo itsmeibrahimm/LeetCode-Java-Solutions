@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
+from typing import Coroutine
 from uuid import uuid4
 
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
@@ -7,8 +8,9 @@ from structlog import BoundLogger
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.logger import get_logger
-from app.commons.context.req_context import ReqContext, build_req_context
+from app.commons.context.req_context import build_req_context, ReqContext
 from app.commons.jobs.pool import JobPool
+from app.commons.utils import validation
 from app.payin.core.cart_payment.model import PaymentIntent
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
@@ -20,8 +22,8 @@ from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusWhereInput,
     UpdatePaymentIntentStatusSetInput,
+    UpdatePaymentIntentStatusWhereInput,
 )
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
@@ -121,6 +123,18 @@ class CaptureUncapturedPaymentIntents(Job):
     Captures all uncaptured payment intents
     """
 
+    _problematic_capture_delay: timedelta
+
+    def __init__(
+        self,
+        *,
+        app_context: AppContext,
+        job_pool: JobPool,
+        problematic_capture_delay: timedelta,
+    ):
+        super().__init__(app_context=app_context, job_pool=job_pool)
+        self._problematic_capture_delay = problematic_capture_delay
+
     @property
     def job_name(self) -> str:
         return "CaptureUncapturedPaymentIntents"
@@ -132,39 +146,27 @@ class CaptureUncapturedPaymentIntents(Job):
             context=job_instance_cxt.app_context
         )
 
-        uncaptured_payment_intents = cart_payment_repo.find_payment_intents_that_require_capture_before_cutoff(
-            datetime.utcnow()
+        utcnow = datetime.now(timezone.utc)
+        uncaptured_payment_intents = cart_payment_repo.find_payment_intents_that_require_capture(
+            capturable_before=utcnow,
+            earliest_capture_after=utcnow - self._problematic_capture_delay,
         )
 
         payment_intent_count: int = 0
-        payment_intent_skipped_count: int = 0
-        expire_cutoff_days = 7
         async for payment_intent in uncaptured_payment_intents:
             payment_intent_count += 1
-            if payment_intent.created_at + timedelta(
-                days=expire_cutoff_days
-            ) < datetime.now(payment_intent.created_at.tzinfo):
-                # TODO: [PAYIN-120] this is a dirty fix to avoid spamming stripe by capture expired intents.
-                job_instance_cxt.log.warn(
-                    f"skipping payment_intent created more than {expire_cutoff_days} days",
-                    payment_intent=payment_intent.summary,
-                )
-                payment_intent_skipped_count += 1
-            else:
-                await job_instance_cxt.job_pool.spawn(
-                    self._capture_payment(
-                        payment_intent=payment_intent,
-                        cart_payment_repo=cart_payment_repo,
-                        payer_repo=payer_repo,
-                        payment_method_repo=payment_method_repo,
-                        job_instance_cxt=job_instance_cxt,
-                    ),
-                    cb=job_callback,
-                )
+            await job_instance_cxt.job_pool.spawn(
+                self._capture_payment(
+                    payment_intent=payment_intent,
+                    cart_payment_repo=cart_payment_repo,
+                    payer_repo=payer_repo,
+                    payment_method_repo=payment_method_repo,
+                    job_instance_cxt=job_instance_cxt,
+                ),
+                cb=job_callback,
+            )
         job_instance_cxt.log.info(
-            "payment_intent count summary",
-            payment_intent_count=payment_intent_count,
-            payment_intent_skipped_count=payment_intent_skipped_count,
+            "payment_intent count summary", payment_intent_count=payment_intent_count
         )
 
     async def _capture_payment(
@@ -237,11 +239,30 @@ class CaptureUncapturedPaymentIntents(Job):
 
 class ResolveCapturingPaymentIntents(Job):
     """
-    Payment intents that are in capturing and haven't been updated in a while likely died.
-    The capturing process idempotently handles captures, so it should be fine just to re-set
-    the state of these payment intents to requires_capture and let the regular cron just try
-    to re-capture.
+    Pick up payment intents that stuck at [capturing] state for a while and reset their states to
+    next actionable states.
+
+    Depending on how long the intent has been in [capturing] state:
+    1. If payment_intent.capture_after is earlier than "problematic_capture_delay" than we consider this capture
+        is permanently failed due to errors during capturing. Set state to [capture_failed]
+    2. If payment_intent.capture_after is within "problematic_capture_delay" than we consider this capture
+        can still be retried and set its status to [requires_capture]
     """
+
+    statsd_client: DoorStatsProxyMultiServer
+    _problematic_capture_delay: timedelta
+
+    def __init__(
+        self,
+        *,
+        app_context: AppContext,
+        job_pool: JobPool,
+        problematic_capture_delay: timedelta,
+        statsd_client: DoorStatsProxyMultiServer,
+    ):
+        super().__init__(app_context=app_context, job_pool=job_pool)
+        self._problematic_capture_delay = problematic_capture_delay
+        self.statsd_client = statsd_client
 
     @property
     def job_name(self) -> str:
@@ -249,37 +270,77 @@ class ResolveCapturingPaymentIntents(Job):
 
     async def _trigger(self, job_instance_cxt: JobInstanceContext):
         cart_payment_repo = CartPaymentRepository(job_instance_cxt.app_context)
+        utcnow = datetime.now(timezone.utc)
 
         # Look for payment intents that haven't been updated in an hour and still in capturing
         # This should be a good indication that the capturing process died
-        cutoff = datetime.utcnow() - timedelta(hours=1)
+
+        cutoff = utcnow - timedelta(hours=1)
+
+        # when we "scan" through past created payment intent, we double the oldest_capture_intents_age
+        # just in case there were intents which set to capture at boundary of this threshold cannot be picked up.
+        earliest_capture_after = utcnow - self._problematic_capture_delay * 2
+
         payment_intents = await cart_payment_repo.find_payment_intents_in_capturing(
-            cutoff
+            earliest_capture_after=earliest_capture_after
         )
 
-        count = 0
+        to_requires_capture_count = 0
+        to_capture_failed_count = 0
+        skipped_count = 0
         for payment_intent in payment_intents:
-            count += 1
-            new_status = IntentStatus.REQUIRES_CAPTURE.value
-            job_instance_cxt.log.info(
-                "flip capturing intent to requires_capture",
-                job="resolve_capturing_payment_intents",
-                payment_intent=payment_intent.summary,
-                payment_intent_new_status=new_status,
-            )
+
+            # if this payment intent was updated to capturing within cutoff
+            # we consider it is very possible this intent is BEING captured, therefore skip it.
+            if payment_intent.updated_at >= cutoff:
+                skipped_count += 1
+                continue
+
+            new_status: IntentStatus
+            task: Coroutine
+            if (
+                validation.not_none(payment_intent.capture_after)
+                >= utcnow - self._problematic_capture_delay
+            ):
+                new_status = IntentStatus.REQUIRES_CAPTURE
+                to_requires_capture_count += 1
+            else:
+                new_status = IntentStatus.CAPTURE_FAILED
+                to_capture_failed_count += 1
+
             update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
                 id=payment_intent.id, previous_status=payment_intent.status
             )
             update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
                 status=new_status, updated_at=datetime.now(timezone.utc)
             )
-            await job_instance_cxt.job_pool.spawn(
-                cart_payment_repo.update_payment_intent_status(
-                    update_payment_intent_status_where_input=update_payment_intent_status_where_input,
-                    update_payment_intent_status_set_input=update_payment_intent_status_set_input,
-                )
+            task = cart_payment_repo.update_payment_intent_status(
+                update_payment_intent_status_where_input=update_payment_intent_status_where_input,
+                update_payment_intent_status_set_input=update_payment_intent_status_set_input,
             )
-        job_instance_cxt.log.info("payment_intent summary", payment_intent_count=count)
+
+            job_instance_cxt.log.info(
+                "Resolving payment_intent status",
+                payment_intent=payment_intent.summary,
+                payment_intent_new_status=new_status,
+            )
+
+            await job_instance_cxt.job_pool.spawn(task)
+
+        job_instance_cxt.log.info(
+            "payment_intent resolving status summary",
+            to_requires_capture_count=to_requires_capture_count,
+            to_capture_failed_count=to_capture_failed_count,
+            skipped_count=skipped_count,
+        )
+        self.statsd_client.gauge(
+            f"capture-payment.resolve-to-status.{IntentStatus.CAPTURE_FAILED.value}.count",
+            to_capture_failed_count,
+        )
+        self.statsd_client.gauge(
+            f"capture-payment.resolve-to-status.{IntentStatus.REQUIRES_CAPTURE.value}.count",
+            to_requires_capture_count,
+        )
 
 
 class EmitProblematicCaptureCount(Job):
@@ -307,7 +368,12 @@ class EmitProblematicCaptureCount(Job):
 
     async def _trigger(self, job_instance_cxt: JobInstanceContext):
         cart_payment_repo = CartPaymentRepository(self.app_context)
-        count = await cart_payment_repo.count_payment_intents_that_require_capture(
+        count = await cart_payment_repo.count_payment_intents_in_problematic_states(
             problematic_threshold=self.problematic_threshold
         )
-        self.statsd_client.gauge("capture.problematic_count", count)
+        job_instance_cxt.log.info(
+            "emit problematic payment intents summary",
+            problematic_count=count,
+            problematic_threshold=self.problematic_threshold,
+        )
+        self.statsd_client.gauge("capture-payment.problematic-state.count", count)

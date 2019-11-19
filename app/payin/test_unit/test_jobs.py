@@ -11,11 +11,11 @@ from app.payin.jobs import EmitProblematicCaptureCount
 
 @pytest.mark.asyncio
 @patch(
-    "app.payin.repository.cart_payment_repo.CartPaymentRepository.count_payment_intents_that_require_capture",
+    "app.payin.repository.cart_payment_repo.CartPaymentRepository.count_payment_intents_in_problematic_states",
     return_value=5,
 )
 async def test_emit_problematic_capture_count(
-    mock_count_payment_intents_that_require_capture,
+    mock_count_payment_intents_in_problematic_states,
     service_statsd_client: DoorStatsProxyMultiServer,
     get_mock_statsd_events,
 ):
@@ -29,6 +29,9 @@ async def test_emit_problematic_capture_count(
     events: List[Stat] = get_mock_statsd_events()
     assert len(events) == 1
     stat = events[0]
-    assert stat.stat_name == "dd.pay.payment-service.capture.problematic_count"
+    assert (
+        stat.stat_name
+        == "dd.pay.payment-service.capture-payment.problematic-state.count"
+    )
     assert stat.stat_value == 5
-    mock_count_payment_intents_that_require_capture.assert_called_once()
+    mock_count_payment_intents_in_problematic_states.assert_called_once()

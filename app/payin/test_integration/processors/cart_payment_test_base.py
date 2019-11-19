@@ -377,8 +377,9 @@ class CartPaymentTestBase(ABC):
         # TODO ideally should just use "capture_uncapture_payment_intents" here to run in job pool
         # though this could occasionally cause db transaction cannot be properly closed likely due to
         # some unknown race condition. need to investigate and revise.
-        uncaptured_payment_intents = cart_payment_repository.find_payment_intents_that_require_capture_before_cutoff(
-            datetime.utcnow()
+        utcnow = datetime.now(timezone.utc)
+        uncaptured_payment_intents = cart_payment_repository.find_payment_intents_that_require_capture(
+            capturable_before=utcnow, earliest_capture_after=utcnow - timedelta(hours=1)
         )
 
         async for payment_intent in uncaptured_payment_intents:

@@ -1,4 +1,5 @@
-from datetime import datetime
+import functools
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import factory
@@ -107,8 +108,8 @@ class PaymentIntentFactory(factory.Factory):
     statement_descriptor = "Maccas"
     payment_method_id = factory.LazyAttribute(lambda o: str(uuid4()))
     legacy_consumer_charge_id = 0
-    created_at = factory.LazyFunction(datetime.utcnow)
-    updated_at = factory.LazyFunction(datetime.utcnow)
+    created_at = factory.LazyFunction(functools.partial(datetime.now, timezone.utc))
+    updated_at = factory.LazyFunction(functools.partial(datetime.now, timezone.utc))
     captured_at = None
     cancelled_at = None
 
