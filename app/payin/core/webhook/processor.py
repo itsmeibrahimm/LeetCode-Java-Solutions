@@ -85,7 +85,7 @@ class PaymentIntentCreatedHandler(BaseWebhookHandler):
         self.log = log
         self.cart_payment_repository = cart_payment_repository
 
-    def verify_payment_intent_blob(
+    def _verify_payment_intent_blob(
         self, payment_intent: PaymentIntent, payment_intent_blob
     ):
         return (
@@ -119,13 +119,13 @@ class PaymentIntentCreatedHandler(BaseWebhookHandler):
         if not payment_intent:
             self.log.error(
                 "Payment intent record not found for the incoming Stripe webhook: ",
-                str(webhook_data),
+                webhook_data=str(webhook_data),
             )
             return False
-        if not self.verify_payment_intent_blob(payment_intent, webhook_data):
+        if not self._verify_payment_intent_blob(payment_intent, webhook_data):
             self.log.error(
                 "Data mismatch for payment intent record for incoming Stripe webhook: ",
-                str(webhook_data),
+                webhook_data=str(webhook_data),
             )
             return False
         self.log.info(
@@ -136,6 +136,17 @@ class PaymentIntentCreatedHandler(BaseWebhookHandler):
 
 class PaymentIntentPaymentFailedHandler(BaseWebhookHandler):
     TYPE_NAME = "payment_intent.payment_failed"
+
+    def _verify_payment_intent_blob(
+        self, payment_intent: PaymentIntent, payment_intent_blob
+    ):
+        return (
+            payment_intent.status == payment_intent_blob.get("status", None)
+            and payment_intent.status == "cancelled"
+            and payment_intent.amount == payment_intent_blob.get("amount", None)
+            and payment_intent.application_fee_amount
+            == payment_intent_blob.get("application_fee_amount", None)
+        )
 
     def __init__(
         self,
@@ -151,6 +162,39 @@ class PaymentIntentPaymentFailedHandler(BaseWebhookHandler):
         self.log.info(
             "Handling webhook", event_type=self.TYPE_NAME, country=country_code
         )
+        if not feature_flags.stripe_payment_intent_webhook_event_enabled():
+            self.log.info("handle_stripe_payment_intent_webhook turned off.")
+            return False
+        webhook_data = event.data.object
+        stripe_id = webhook_data.get("id", None)
+        if not stripe_id:
+            self.log.info("not valid stripe_id.")
+            return False
+        payment_intent_id: UUID = webhook_data.get("metadata", {}).get(
+            "payment_intent_id", None
+        )
+        if not payment_intent_id:
+            self.log.info("payment_intent_id not found in metadata. Unable to verify")
+            return False
+        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id(
+            id=payment_intent_id
+        )
+        if not payment_intent:
+            self.log.error(
+                "Payment intent record not found for the incoming Stripe webhook: ",
+                webhook_data=str(webhook_data),
+            )
+            return False
+        if not self._verify_payment_intent_blob(payment_intent, webhook_data):
+            self.log.error(
+                "Data mismatch for payment intent record for incoming Stripe webhook: ",
+                webhook_data=str(webhook_data),
+            )
+            return False
+        self.log.info(
+            "Finished handling webhook", event_type=self.TYPE_NAME, country=country_code
+        )
+        return True
 
 
 class PaymentIntentSucceededHandler(BaseWebhookHandler):
