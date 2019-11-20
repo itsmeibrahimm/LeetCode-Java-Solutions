@@ -552,6 +552,7 @@ class PayerOps(PayerOpsInterface):
             payer_entity: PayerDbEntity
             pgp_customer_entity: PgpCustomerDbEntity
             payer_id = generate_object_uuid()
+            now = datetime.now(timezone.utc)
             payer_input = InsertPayerInput(
                 id=payer_id,
                 payer_type=payer_type,
@@ -559,8 +560,11 @@ class PayerOps(PayerOpsInterface):
                 legacy_stripe_customer_id=pgp_customer_resource_id,
                 country=country,
                 description=description,
+                created_at=now,
+                updated_at=now,
             )
             # create Payer and PgpCustomer objects
+            now = datetime.now(timezone.utc)
             pgp_customer_input = InsertPgpCustomerInput(
                 id=generate_object_uuid(),
                 payer_id=payer_id,
@@ -569,6 +573,8 @@ class PayerOps(PayerOpsInterface):
                 default_payment_method_id=pgp_payment_method_resource_id,
                 country=country,
                 is_primary=True,  # is_primary is always True for payer's first pgp_customer
+                created_at=now,
+                updated_at=now,
             )
             payer_entity, pgp_customer_entity = await self.payer_repo.insert_payer_and_pgp_customer(
                 payer_input=payer_input, pgp_customer_input=pgp_customer_input
@@ -653,6 +659,7 @@ class LegacyPayerOps(PayerOpsInterface):
         pgp_payment_method_resource_id: Optional[str] = None,
     ) -> RawPayer:
         try:
+            now = datetime.now(timezone.utc)
             payer_entity: PayerDbEntity
             stripe_customer_entity: Optional[StripeCustomerDbEntity] = None
             payer_id = generate_object_uuid()
@@ -663,6 +670,8 @@ class LegacyPayerOps(PayerOpsInterface):
                 legacy_stripe_customer_id=pgp_customer_resource_id,
                 country=country,
                 description=description,
+                created_at=now,
+                updated_at=now,
             )
             # create Payer and StripeCustomer objects
             payer_entity = await self.payer_repo.insert_payer(request=payer_input)

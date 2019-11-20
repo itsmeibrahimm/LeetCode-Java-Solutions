@@ -100,6 +100,7 @@ class CartPaymentRepository(PayinDBRepository):
         legacy_provider_customer_id: Optional[str],
         legacy_provider_card_id: Optional[str],
     ) -> CartPayment:
+        now = datetime.now(timezone.utc)
         data = {
             cart_payments.id: id,
             cart_payments.payer_id: payer_id,
@@ -114,6 +115,8 @@ class CartPaymentRepository(PayinDBRepository):
             cart_payments.legacy_stripe_card_id: legacy_stripe_card_id,
             cart_payments.legacy_provider_customer_id: legacy_provider_customer_id,
             cart_payments.legacy_provider_card_id: legacy_provider_card_id,
+            cart_payments.created_at: now,
+            cart_payments.updated_at: now,
         }
 
         statement = (
@@ -292,6 +295,7 @@ class CartPaymentRepository(PayinDBRepository):
         metadata: Optional[Dict[str, Any]],
         legacy_consumer_charge_id: LegacyConsumerChargeId,
     ) -> PaymentIntent:
+        now = datetime.now(timezone.utc)
         data = {
             payment_intents.id: id,
             payment_intents.cart_payment_id: cart_payment_id,
@@ -308,6 +312,8 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents.payment_method_id: payment_method_id,
             payment_intents.metadata: metadata,
             payment_intents.legacy_consumer_charge_id: legacy_consumer_charge_id,
+            payment_intents.created_at: now,
+            payment_intents.updated_at: now,
         }
 
         statement = (
@@ -479,6 +485,7 @@ class CartPaymentRepository(PayinDBRepository):
         status: str,
         statement_descriptor: Optional[str],
     ) -> PgpPaymentIntent:
+        now = datetime.now(timezone.utc)
         data = {
             pgp_payment_intents.id: id,
             pgp_payment_intents.payment_intent_id: payment_intent_id,
@@ -493,6 +500,8 @@ class CartPaymentRepository(PayinDBRepository):
             pgp_payment_intents.capture_method: capture_method,
             pgp_payment_intents.status: status,
             pgp_payment_intents.statement_descriptor: statement_descriptor,
+            pgp_payment_intents.created_at: now,
+            pgp_payment_intents.updated_at: now,
         }
 
         statement = (
@@ -687,6 +696,7 @@ class CartPaymentRepository(PayinDBRepository):
             payment_intents_adjustment_history.amount_delta: amount_delta,
             payment_intents_adjustment_history.currency: currency,
             payment_intents_adjustment_history.idempotency_key: idempotency_key,
+            payment_intents_adjustment_history.created_at: datetime.now(timezone.utc),
         }
 
         statement = (
@@ -726,6 +736,7 @@ class CartPaymentRepository(PayinDBRepository):
         application_fee_amount: Optional[int],
         payout_account_id: Optional[str],
     ) -> PaymentCharge:
+        now = datetime.now(timezone.utc)
         data = {
             payment_charges.id: str(id),
             payment_charges.payment_intent_id: str(payment_intent_id),
@@ -737,6 +748,8 @@ class CartPaymentRepository(PayinDBRepository):
             payment_charges.amount_refunded: amount_refunded,
             payment_charges.application_fee_amount: application_fee_amount,
             payment_charges.payout_account_id: payout_account_id,
+            payment_charges.created_at: now,
+            payment_charges.updated_at: now,
         }
 
         statement = (
@@ -829,6 +842,7 @@ class CartPaymentRepository(PayinDBRepository):
         invoice_resource_id: Optional[str],
         payment_method_resource_id: Optional[str],
     ) -> PgpPaymentCharge:
+        now = datetime.now(timezone.utc)
         data = {
             pgp_payment_charges.id: id,
             pgp_payment_charges.payment_charge_id: payment_charge_id,
@@ -844,6 +858,8 @@ class CartPaymentRepository(PayinDBRepository):
             pgp_payment_charges.intent_resource_id: intent_resource_id,
             pgp_payment_charges.invoice_resource_id: invoice_resource_id,
             pgp_payment_charges.payment_method_resource_id: payment_method_resource_id,
+            pgp_payment_charges.created_at: now,
+            pgp_payment_charges.updated_at: now,
         }
 
         statement = (
@@ -1212,6 +1228,7 @@ class CartPaymentRepository(PayinDBRepository):
         amount: int,
         reason: Optional[str],
     ) -> Refund:
+        now = datetime.now(timezone.utc)
         data = {
             refunds.id: id,
             refunds.payment_intent_id: payment_intent_id,
@@ -1219,6 +1236,8 @@ class CartPaymentRepository(PayinDBRepository):
             refunds.status: status.value,
             refunds.amount: amount,
             refunds.reason: reason,
+            refunds.created_at: now,
+            refunds.updated_at: now,
         }
 
         statement = (
@@ -1276,6 +1295,7 @@ class CartPaymentRepository(PayinDBRepository):
         amount: int,
         reason: Optional[str],
     ) -> PgpRefund:
+        now = datetime.now(timezone.utc)
         data = {
             pgp_refunds.id: id,
             pgp_refunds.refund_id: refund_id,
@@ -1284,6 +1304,8 @@ class CartPaymentRepository(PayinDBRepository):
             pgp_refunds.amount: amount,
             pgp_refunds.reason: reason,
             pgp_refunds.pgp_code: pgp_code.value,
+            pgp_refunds.created_at: now,
+            pgp_refunds.updated_at: now,
         }
 
         statement = (
