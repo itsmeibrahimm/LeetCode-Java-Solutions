@@ -4,4 +4,5 @@ payin-v0-client==0.0.10
 payin-v1-client==0.0.4
 payout-v0-client==0.0.12
 payout-v1-client==0.0.11
+purchasecard-v0-client==0.0.1
 stripe==2.32.1
