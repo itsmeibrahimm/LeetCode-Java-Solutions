@@ -1,6 +1,9 @@
 from aioredlock import Aioredlock, LockError
 
+from app.commons.context.logger import get_logger
 from app.commons.core.errors import PaymentLockAcquireError, PaymentLockReleaseError
+
+log = get_logger("application")
 
 
 class PaymentLock:
@@ -45,6 +48,7 @@ class PaymentLock:
         try:
             self._lock = await self._lock_manager.lock(self._resource)
         except LockError as e:
+            log.exception("LockError when attempting PaymentLock")
             raise PaymentLockAcquireError from e
         return self
 

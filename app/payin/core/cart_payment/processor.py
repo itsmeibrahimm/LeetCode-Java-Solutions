@@ -2583,12 +2583,14 @@ class CartPaymentProcessor:
             )
 
         # If locking is enabled, a redis based lock is used to ensure we only have one attempt to update a cart payment at a time.
+        lock_key = f"{cart_payment.id}-update"
         try:
             self.log.info(
-                "[_lock_and_update_payment] Acquiring lock for cart payment update."
+                "[_lock_and_update_payment] Acquiring lock for cart payment update.",
+                lock_key=lock_key,
             )
             async with PaymentLock(
-                f"{cart_payment.id}-update",
+                lock_key,
                 self.cart_payment_interface.app_context.payment_redis_lock_manager,
             ):
                 return await self._update_payment(
@@ -2603,6 +2605,9 @@ class CartPaymentProcessor:
                 )
         except PaymentLockAcquireError:
             # Another process currently holds the lock for updating this cart payment, so return an error to the caller.
+            self.log.exception(
+                "Failed to get lock for cart payment update", lock_key=lock_key
+            )
             raise CartPaymentReadError(
                 error_code=PayinErrorCode.CART_PAYMENT_CONCURRENT_ACCESS_ERROR
             )
