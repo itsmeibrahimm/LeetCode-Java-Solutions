@@ -2,7 +2,7 @@ from starlette.status import HTTP_404_NOT_FOUND
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
-from typing import Union, Optional
+from typing import Union
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -15,7 +15,7 @@ from app.payout.repository.maindb.transfer import TransferRepositoryInterface
 
 
 class GetTransferByIdResponse(OperationResponse):
-    transfer: Optional[Transfer]
+    transfer: Transfer
 
 
 class GetTransferByIdRequest(OperationRequest):

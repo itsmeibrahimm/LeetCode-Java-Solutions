@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import Schema
 from app.commons.api.models import PaymentRequest, PaymentResponse
-from app.commons.types import Currency
 from app.payout.models import PayoutTargetType, TransferId
 from app.payout.repository.maindb.model.transfer import TransferStatus
 
@@ -41,8 +40,8 @@ class CreateTransfer(PaymentRequest):
 
     payout_account_id: int = Schema(default=..., description="Payout account ID")
     transfer_type: str = Schema(default=..., description="Transfer type")
+    end_time: datetime = Schema(default=..., description="End timestamp, required")
     start_time: Optional[datetime] = Schema(default=None, description="Start timestamp")
-    end_time: Optional[datetime] = Schema(default=None, description="End timestamp")
     target_id: Optional[int] = Schema(default=None, description="Target ID")
     target_type: Optional[PayoutTargetType] = Schema(
         default=None, description="Target type"
@@ -74,9 +73,7 @@ class Transfer(PaymentResponse):
     recipient_id: Optional[int] = Schema(
         default=None, description="Recipient id of transfer"
     )
-    currency: Optional[Currency] = Schema(
-        default=None, description="Currency of transfer"
-    )
+    currency: Optional[str] = Schema(default=None, description="Currency of transfer")
     submitted_at: Optional[datetime] = Schema(
         default=None, description="Timestamp transfer was submitted"
     )

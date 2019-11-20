@@ -1,5 +1,6 @@
 TRANSACTION_ENDPOINT = "/payout/api/v1/transactions"
 ACCOUNT_ENDPOINT = "/payout/api/v1/accounts"
+TRANSFER_ENDPOINT = "/payout/api/v1/transfers"
 
 
 def list_transactions_url():
@@ -52,3 +53,19 @@ def get_onboarding_requirements_by_stages_url():
 
 def get_initiate_payout_url(payout_account_id: int):
     return f"{ACCOUNT_ENDPOINT}/{payout_account_id}/payouts"
+
+
+def create_transfer_url():
+    return TRANSFER_ENDPOINT + "/"
+
+
+def get_transfer_by_id_url(transfer_id: int):
+    return f"{TRANSFER_ENDPOINT}/{transfer_id}"
+
+
+def submit_transfer_url(transfer_id: int):
+    return f"{TRANSFER_ENDPOINT}/{transfer_id}/submit"
+
+
+def list_transfers_url():
+    return TRANSFER_ENDPOINT + "/"

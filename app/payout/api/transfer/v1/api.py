@@ -100,7 +100,7 @@ async def get_transfer_by_id(
     get_transfer_by_id_response = await transfer_processors.get_transfer_by_id(
         get_transfer_by_id_request
     )
-    return transfer_models.Transfer(**get_transfer_by_id_response.dict())
+    return transfer_models.Transfer(**get_transfer_by_id_response.transfer.dict())
 
 
 @router.get(
@@ -123,6 +123,9 @@ async def list_transfers(
     ),
     has_positive_amount: Optional[bool] = Query(
         default=None, description="Boolean flag to filter transfer with positive amount"
+    ),
+    is_submitted: Optional[bool] = Query(
+        default=None, description="Boolean flag to filter transfer with stripe_transfer"
     ),
     offset: Optional[int] = Query(
         default=None, description="Offset of the returned transfers"
@@ -160,8 +163,12 @@ async def list_transfers(
         time_range=time_range,
         status=status,
         has_positive_amount=has_positive_amount,
+        is_submitted=is_submitted,
     )
     list_transfers_response = await transfer_processors.list_transfers(
         list_transfers_request
     )
-    return transfer_models.TransferList(**list_transfers_response.transfers.dict())
+    return transfer_models.TransferList(
+        transfer_list=list_transfers_response.transfers,
+        count=list_transfers_response.count,
+    )

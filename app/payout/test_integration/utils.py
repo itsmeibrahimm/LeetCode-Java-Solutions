@@ -76,7 +76,7 @@ async def prepare_and_insert_transfer(
     deleted_at=None,
     submitted_at=None,
     amount=123,
-    status="status",
+    status="in_transit",
     method="stripe",
 ):
     data = TransferCreate(
@@ -84,7 +84,7 @@ async def prepare_and_insert_transfer(
         adjustments="some-adjustment",
         amount=amount,
         method=method,
-        currency="currency",
+        currency="USD",
         submitted_at=submitted_at,
         deleted_at=deleted_at,
         manual_transfer_reason="manual_transfer_reason",

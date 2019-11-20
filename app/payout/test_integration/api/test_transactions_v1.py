@@ -1,7 +1,6 @@
 from typing import List
 from uuid import uuid4
 
-import pytest
 from starlette.testclient import TestClient
 
 from app.commons.types import CountryCode, Currency
@@ -18,47 +17,6 @@ from app.payout.test_integration.api import (
 
 
 class TestTransactionV1:
-    @pytest.fixture
-    def payout_account(self, client: TestClient) -> dict:
-        create_payment_account_req = account_models.CreatePayoutAccount(
-            target_id=1,
-            target_type=PayoutAccountTargetType.DASHER,
-            country=CountryCode.US,
-            currency=Currency.USD,
-            statement_descriptor="test_statement_descriptor",
-        )
-        response = client.post(
-            create_account_url(), json=create_payment_account_req.dict()
-        )
-        assert response.status_code == 201
-        account_created: dict = response.json()
-        assert (
-            account_created["statement_descriptor"]
-            == create_payment_account_req.statement_descriptor
-        ), "created payout account's statement_descriptor matches with expected"
-        return account_created
-
-    @pytest.fixture
-    def new_transaction(self, client: TestClient, payout_account: dict) -> dict:
-        test_idempotency_key = (
-            f"test_create_then_list_transactions_{payout_account['id']}_{uuid4()}"
-        )
-        tx_creation_req = models.TransactionCreate(
-            amount=10,
-            payment_account_id=payout_account["id"],
-            idempotency_key=test_idempotency_key,
-            target_id=1,
-            target_type="dasher_job",
-            currency="usd",
-        )
-        response = client.post(create_transaction_url(), json=tx_creation_req.dict())
-        assert response.status_code == 201
-        tx_created: dict = response.json()
-        assert (
-            tx_created["idempotency_key"] == test_idempotency_key
-        ), "created tx with correct idempotency key"
-        return tx_created
-
     def test_create_then_list_transactions(
         self, client: TestClient, new_transaction: dict
     ):

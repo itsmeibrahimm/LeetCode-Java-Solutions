@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+
 import pytest
+import uuid
 from asynctest import mock
 
 from starlette.testclient import TestClient
@@ -17,10 +20,12 @@ from app.commons.test_integration.constants import VISA_DEBIT_CARD_TOKEN
 from app.commons.types import CountryCode, Currency
 from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.api.account.v1 import models as account_models
+from app.payout.api.transaction.v1 import models as transaction_models
 from app.payout.models import (
     StripeAccountToken,
     PayoutAccountTargetType,
     PayoutExternalAccountType,
+    TransferType,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.stripe_managed_account_transfer import (
@@ -36,6 +41,8 @@ from app.payout.test_integration.api import (
     create_account_url,
     verify_account_url,
     create_payout_method_url_card,
+    create_transaction_url,
+    create_transfer_url,
 )
 
 
@@ -267,3 +274,41 @@ def verified_payout_account_with_payout_card(
     assert response.status_code == 201
     verified_payout_account["stripe_card_id"] = response.json()["stripe_card_id"]
     return verified_payout_account
+
+
+@pytest.fixture
+def new_transaction(client: TestClient, payout_account: dict) -> dict:
+    test_idempotency_key = (
+        f"test_create_then_list_transactions_{payout_account['id']}_{uuid.uuid4()}"
+    )
+    tx_creation_req = transaction_models.TransactionCreate(
+        amount=10,
+        payment_account_id=payout_account["id"],
+        idempotency_key=test_idempotency_key,
+        target_id=1,
+        target_type="dasher_job",
+        currency="usd",
+    )
+    response = client.post(create_transaction_url(), json=tx_creation_req.dict())
+    assert response.status_code == 201
+    tx_created: dict = response.json()
+    assert (
+        tx_created["idempotency_key"] == test_idempotency_key
+    ), "created tx with correct idempotency key"
+    return tx_created
+
+
+@pytest.fixture
+def transfer(client: TestClient, payout_account: dict) -> dict:
+    create_transfer_req = {
+        "payout_account_id": payout_account["id"],
+        "transfer_type": TransferType.SCHEDULED.value,
+        "end_time": datetime.now(timezone.utc).isoformat(),
+    }
+    response = client.post(create_transfer_url(), json=create_transfer_req)
+    assert response.status_code == 201
+    transfer_created: dict = response.json()
+    assert (
+        transfer_created["payment_account_id"] == payout_account["id"]
+    ), "created transfer payout account id matches with expected"
+    return transfer_created
