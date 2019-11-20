@@ -48,6 +48,7 @@ _payin_error_message_maps = {
     "payin_65": "Cart Payment not found for given dd_charge_id. Likely the charge "
     "was created in DSJ the update was requested against Payment Service",
     "payin_66": "Payment method used to create cart payment was not found",
+    "payin_67": "Another process is attempting to modify the same cart payment.  Please try again later.",
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
@@ -108,6 +109,11 @@ class PayinErrorCode(str, Enum):
         "payin_66",
         NO_RETRY,
         "Payment method used to create cart payment was not found",
+    )
+    CART_PAYMENT_CONCURRENT_ACCESS_ERROR = (
+        "payin_67",
+        SHOULD_RETRY,
+        "Another process is attempting to modify the same cart payment.  Please try again later.",
     )
     PAYER_CREATE_INVALID_DATA = (
         "payin_1",

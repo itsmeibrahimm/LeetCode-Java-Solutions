@@ -17,6 +17,7 @@ from app.commons.context.req_context import (
     get_stripe_async_client_from_req,
     ReqContext,
 )
+from app.commons.lock.locks import PaymentLock, PaymentLockAcquireError
 from app.commons.operational_flags import ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
@@ -40,6 +41,7 @@ from app.commons.providers.stripe.stripe_models import (
 from app.commons.runtime import runtime
 from app.commons.timing import track_func
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
+from app.payin.core import feature_flags
 from app.payin.core.cart_payment.model import (
     CartPayment,
     CorrelationIds,
@@ -2480,7 +2482,7 @@ class CartPaymentProcessor:
             client_description
         )
 
-        updated_cart_payment = await self._update_payment(
+        updated_cart_payment = await self._lock_and_update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
@@ -2533,7 +2535,7 @@ class CartPaymentProcessor:
             )
         payer = await self.get_payer_by_id(cart_payment.payer_id)
 
-        updated_cart_payment = await self._update_payment(
+        updated_cart_payment = await self._lock_and_update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
@@ -2552,6 +2554,58 @@ class CartPaymentProcessor:
         )
 
         return updated_cart_payment
+
+    async def _lock_and_update_payment(
+        self,
+        idempotency_key: str,
+        cart_payment: CartPayment,
+        legacy_payment: LegacyPayment,
+        payer_id: Optional[uuid.UUID],
+        payer_country: CountryCode,
+        amount: int,
+        client_description: Optional[str],
+        split_payment: Optional[SplitPayment],
+    ) -> CartPayment:
+        if not feature_flags.cart_payment_update_locking_enabled():
+            # TODO: Remove this once new locking behavior is proven in production use.
+            self.log.info(
+                "[_lock_and_update_payment] Cart payment locking for update is disabled.  Updating without lock."
+            )
+            return await self._update_payment(
+                idempotency_key=idempotency_key,
+                cart_payment=cart_payment,
+                legacy_payment=legacy_payment,
+                payer_id=payer_id,
+                payer_country=payer_country,
+                amount=amount,
+                client_description=client_description,
+                split_payment=split_payment,
+            )
+
+        # If locking is enabled, a redis based lock is used to ensure we only have one attempt to update a cart payment at a time.
+        try:
+            self.log.info(
+                "[_lock_and_update_payment] Acquiring lock for cart payment update."
+            )
+            async with PaymentLock(
+                f"{cart_payment.id}-update",
+                self.cart_payment_interface.app_context.payment_redis_lock_manager,
+            ):
+                return await self._update_payment(
+                    idempotency_key=idempotency_key,
+                    cart_payment=cart_payment,
+                    legacy_payment=legacy_payment,
+                    payer_id=payer_id,
+                    payer_country=payer_country,
+                    amount=amount,
+                    client_description=client_description,
+                    split_payment=split_payment,
+                )
+        except PaymentLockAcquireError:
+            # Another process currently holds the lock for updating this cart payment, so return an error to the caller.
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_CONCURRENT_ACCESS_ERROR
+            )
 
     async def _update_payment(
         self,
@@ -2600,8 +2654,6 @@ class CartPaymentProcessor:
         # TODO Move idempotency key based checks up to here (from inside _update_payment_with_higher_amount,
         # _update_payment_with_lower_amount functions).
 
-        # Update the cart payment
-        # TODO PAY-3791 concurrency control for attempts to update the same cart payment
         if self.cart_payment_interface.is_amount_adjusted_higher(cart_payment, amount):
             payment_intent, pgp_payment_intent = await self._update_payment_with_higher_amount(
                 cart_payment=cart_payment,

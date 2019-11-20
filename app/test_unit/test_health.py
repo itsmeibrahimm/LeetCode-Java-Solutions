@@ -56,6 +56,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         marqeta_client=MagicMock(),
         marqeta_session=MagicMock(),
         redis_lock_manager=MagicMock(),
+        payment_redis_lock_manager=MagicMock(),
     )
     app.extra["context"] = cast(Any, context)
 

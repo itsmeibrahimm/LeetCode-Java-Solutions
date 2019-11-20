@@ -75,6 +75,8 @@ class AppContext:
 
     redis_lock_manager: Aioredlock
 
+    payment_redis_lock_manager: Aioredlock
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -95,6 +97,7 @@ class AppContext:
                 self.dsj_session.close(),
                 self.marqeta_session.close(),
                 self.redis_lock_manager.destroy(),
+                self.payment_redis_lock_manager.destroy(),
             )
         finally:
             # shutdown the threadpool
@@ -262,6 +265,12 @@ async def create_app_context(config: AppConfig) -> AppContext:
         retry_count=config.REDIS_LOCK_MAX_RETRY,
     )
 
+    payment_redis_lock_manager = Aioredlock(
+        redis_connections=config.PAYMENT_REDIS_INSTANCES,
+        lock_timeout=config.PAYMENT_REDIS_LOCK_DEFAULT_TIMEOUT_SECONDS,
+        retry_count=config.PAYMENT_REDIS_LOCK_MAX_RETRY,
+    )
+
     context = AppContext(
         log=root_logger,
         monitor=monitor,
@@ -282,6 +291,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         marqeta_session=marqeta_session,
         marqeta_client=marqeta_client,
         redis_lock_manager=redis_lock_manager,
+        payment_redis_lock_manager=payment_redis_lock_manager,
     )
 
     # start monitoring

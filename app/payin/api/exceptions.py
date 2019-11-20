@@ -35,6 +35,7 @@ _status_code_to_payin_error_code: Dict[int, Set[PayinErrorCode]] = {
         PayinErrorCode.CART_PAYMENT_DATA_INVALID,
         PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID,
         PayinErrorCode.CART_PAYMENT_PAYMENT_METHOD_NOT_FOUND,
+        PayinErrorCode.CART_PAYMENT_CONCURRENT_ACCESS_ERROR,
         PayinErrorCode.PAYER_CREATE_INVALID_DATA,
         PayinErrorCode.PAYER_CREATE_PAYER_ALREADY_EXIST,
         PayinErrorCode.PAYER_READ_INVALID_DATA,

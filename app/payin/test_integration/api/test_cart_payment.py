@@ -1389,13 +1389,19 @@ class TestCartPayment:
             merchant_country=CountryCode.US,
         )
 
+    @pytest.mark.parametrize("enable_cart_locking", [True, False])
     def test_legacy_payment(
         self,
         stripe_api: StripeAPISettings,
         stripe_customer: StripeCustomer,
         client: TestClient,
+        runtime_setter: RuntimeSetter,
+        enable_cart_locking: bool,
     ):
         stripe_api.enable_outbound()
+        runtime_setter.set(
+            "enable_payin_cart_payment_update_locking.bool", enable_cart_locking
+        )
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
         cart_payment = self._test_cart_payment_legacy_payment_creation(

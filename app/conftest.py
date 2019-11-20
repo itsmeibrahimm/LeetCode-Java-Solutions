@@ -230,6 +230,7 @@ def dummy_app_context(mocker: MockFixture):
         marqeta_client=mocker.Mock(),
         marqeta_session=mocker.Mock(),
         redis_lock_manager=mocker.Mock(),
+        payment_redis_lock_manager=mocker.Mock(),
     )
 
 
