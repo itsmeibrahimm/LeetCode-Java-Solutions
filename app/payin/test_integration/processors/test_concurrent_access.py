@@ -57,7 +57,9 @@ class TestConcurrentCartPayments(CartPaymentTest):
         )
 
         with RuntimeContextManager(
-            "enable_payin_cart_payment_update_locking.bool", True, runtime_setter
+            "payin/feature-flags/enable_payin_cart_payment_update_locking.bool",
+            True,
+            runtime_setter,
         ):
             results = await gather(
                 first_update_attempt, second_update_attempt, return_exceptions=True

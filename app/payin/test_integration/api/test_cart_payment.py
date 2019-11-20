@@ -1400,7 +1400,8 @@ class TestCartPayment:
     ):
         stripe_api.enable_outbound()
         runtime_setter.set(
-            "enable_payin_cart_payment_update_locking.bool", enable_cart_locking
+            "payin/feature-flags/enable_payin_cart_payment_update_locking.bool",
+            enable_cart_locking,
         )
 
         # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
