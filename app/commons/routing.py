@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Type, Union
 
@@ -27,15 +26,8 @@ PATH_NORMALIZATION_TABLE = str.maketrans("/", "|", "{}")
 ENDPOINT: ContextVar[Optional[str]] = ContextVar("ENDPOINT")
 
 
-@contextmanager
-def set_endpoint_as_ctxt_manager(endpoint: Optional[str]):
-    token = None
-    try:
-        token = ENDPOINT.set(endpoint)
-        yield
-    finally:
-        if token:
-            ENDPOINT.reset(token)
+def set_endpoint_to_ctxt_var(endpoint: Optional[str]) -> None:
+    ENDPOINT.set(endpoint)
 
 
 def reset_breadcrumbs(scope: Scope) -> Breadcrumbs:
@@ -118,9 +110,9 @@ class APIRoute(fastapi_routing.APIRoute):
         add_breadcrumb(scope, f"/{self.name}")
         set_resolved_route(scope, self)
 
-        # Incrementally set routing endpoint breadcrumb to contextvar
-        with set_endpoint_as_ctxt_manager(get_endpoint_from_scope(scope)):
-            await super().__call__(scope, receive, send)
+        # Override endpoint context var after updated with current breadcrumb
+        set_endpoint_to_ctxt_var(get_endpoint_from_scope(scope))
+        await super().__call__(scope, receive, send)
 
 
 class Mount(starlette_routing.Mount):
@@ -128,9 +120,9 @@ class Mount(starlette_routing.Mount):
         # for mounted applications, include the mount path in breadcrumbs
         add_breadcrumb(scope, self.path)
 
-        # Incrementally set routing endpoint breadcrumb to contextvar
-        with set_endpoint_as_ctxt_manager(get_endpoint_from_scope(scope)):
-            await super().__call__(scope, receive, send)
+        # Override endpoint context var after updated with current breadcrumb
+        set_endpoint_to_ctxt_var(get_endpoint_from_scope(scope))
+        await super().__call__(scope, receive, send)
 
 
 class ApiRouterBuilder:

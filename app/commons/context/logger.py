@@ -31,7 +31,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         logger_add_app_info(log_record, record, message_dict)
         logger_add_thread(log_record, record, message_dict)
         logger_add_request_id(log_record, record, message_dict)
-        logger_add_route_path(log_record, record, message_dict)
+        logger_add_endpoint(log_record, record, message_dict)
 
 
 _handler = logging.StreamHandler(sys.stdout)
@@ -99,13 +99,13 @@ def logger_add_request_id(
             log_record["req_id"] = str(req_id)
 
 
-def logger_add_route_path(
+def logger_add_endpoint(
     log_record: Dict, record: logging.LogRecord, message_dict: Dict
 ):
-    if "route_path" not in log_record:
+    if "endpoint" not in log_record:
         route_path = ENDPOINT.get(None)
         if route_path:
-            log_record["route_path"] = route_path
+            log_record["endpoint"] = route_path
 
 
 def add_log_level(
