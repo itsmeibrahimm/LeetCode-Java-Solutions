@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 from uuid import uuid4
 
@@ -129,6 +130,27 @@ class TestTransactionV1:
         ), f"retrieved {count_for_account_b} transaction"
         TestTransactionV1._validate_transaction_results(
             tx_retrieved_for_account_id["transaction_list"], transactions_for_account_b
+        )
+
+        # 5. get unpaid transaction for payout account with start_time
+        assert transactions_for_account_b[3]["created_at"]
+        start_time_str = transactions_for_account_b[3]["created_at"]
+        start_time = datetime.strptime(start_time_str, "%Y-%m-%dT%H:%M:%S.%f")
+        timestamp = int((start_time - datetime.utcfromtimestamp(0)).total_seconds())
+        unpaid_tx_list_req_by_account_id_with_start_time = {
+            "payout_account_id": account_created["id"],
+            "unpaid": True,
+            "ts_start": timestamp,
+        }
+        response = client.get(
+            list_transactions_url(),
+            params=unpaid_tx_list_req_by_account_id_with_start_time,
+        )
+        assert response.status_code == 200
+        tx_retrieved_for_account_id_with_start_time: dict = response.json()
+        TestTransactionV1._validate_transaction_results(
+            tx_retrieved_for_account_id_with_start_time["transaction_list"],
+            transactions_for_account_b,
         )
 
     def test_create_then_reverse_transactions(

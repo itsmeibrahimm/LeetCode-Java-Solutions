@@ -1,6 +1,7 @@
 from typing import Optional
 from datetime import datetime
 
+import pytz
 from fastapi import APIRouter, Depends, Query, Body, Path
 from starlette.status import (
     HTTP_200_OK,
@@ -82,11 +83,11 @@ async def list_transactions(
 
     start_time = None
     if ts_start:
-        start_time = datetime.fromtimestamp(ts_start)
+        start_time = datetime.fromtimestamp(ts_start, tz=pytz.UTC)
 
     end_time = None
     if ts_end:
-        end_time = datetime.fromtimestamp(ts_end)
+        end_time = datetime.fromtimestamp(ts_end, tz=pytz.UTC)
 
     time_range = payout_models.TimeRange(start_time=start_time, end_time=end_time)
 
