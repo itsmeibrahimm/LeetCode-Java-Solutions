@@ -43,6 +43,9 @@ payout_error_message_maps = {
     "payout_25": "Cannot make a negative transfer.",
     "payout_26": "Invalid input, please validate.",
     "payout_27": "Unsupported use case, please validate input parameters.",
+    "payout_28": "Payout country does not match",
+    "payout_29": "Payment for the account is blocked",
+    "payout_30": "No corresponding transactions found",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     "account_1": "PGP account has not set up, please verify your payout account.",
@@ -93,6 +96,9 @@ class PayoutErrorCode(str, Enum):
     TRANSFER_AMOUNT_NEGATIVE = "payout_25"
     INVALID_INPUT = "payout_26"
     UNSUPPORTED_USECASE = "payout_27"
+    PAYOUT_COUNTRY_NOT_MATCH = "payout_28"
+    PAYMENT_BLOCKED = "payout_29"
+    NO_UNPAID_TRANSACTION_FOUND = "payout_30"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"

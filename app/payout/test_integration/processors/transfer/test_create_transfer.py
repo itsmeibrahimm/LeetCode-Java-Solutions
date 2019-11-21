@@ -173,6 +173,20 @@ class TestCreateTransfer:
         assert retrieved_transaction
         assert retrieved_transaction.transfer_id == response.transfer.id
 
+    async def test_execute_create_transfer_manual_transfer_no_transactions_found(self):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        create_transfer_op = self._construct_create_transfer_op(
+            payment_account_id=payment_account.id,
+            transfer_type=TransferType.MANUAL,
+            created_by_id=6666,
+        )
+        response = await create_transfer_op._execute()
+        assert not response.transfer
+        assert len(response.transaction_ids) == 0
+        assert response.error_code == PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND
+
     async def test_execute_create_transfer_scheduled_transfer_type_invalid_country(
         self
     ):
@@ -188,6 +202,7 @@ class TestCreateTransfer:
         response = await create_transfer_op._execute()
         assert not response.transfer
         assert len(response.transaction_ids) == 0
+        assert response.error_code == PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH
 
     async def test_execute_create_transfer_scheduled_transfer_type_mx_blocked_for_payout(
         self
@@ -222,6 +237,7 @@ class TestCreateTransfer:
         response = await create_transfer_op._execute()
         assert not response.transfer
         assert len(response.transaction_ids) == 0
+        assert response.error_code == PayoutErrorCode.PAYMENT_BLOCKED
 
     async def test_execute_create_transfer_scheduled_transfer_type_success(self):
         # there is no corresponding stripe_transfer inserted, so the final status of transfer should be NEW

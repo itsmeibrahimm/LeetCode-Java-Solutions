@@ -57,6 +57,7 @@ from app.commons.runtime import runtime
 class CreateTransferResponse(OperationResponse):
     transfer: Optional[Transfer]
     transaction_ids: List[int]
+    error_code: Optional[str]
 
 
 class CreateTransferRequest(OperationRequest):
@@ -141,7 +142,11 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                         account_country=stripe_managed_account.country_shortname,
                         payout_countries=self.request.payout_countries,
                     )
-                    return CreateTransferResponse(transfer=None, transaction_ids=[])
+                    return CreateTransferResponse(
+                        transfer=None,
+                        transaction_ids=[],
+                        error_code=PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH,
+                    )
             if not await self.should_payment_account_be_auto_paid_weekly(
                 payment_account_id=payment_account.id,
                 target_type=self.request.target_type,
@@ -152,7 +157,11 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     "Payment stopped: Ignoring creating weekly transfer for account id",
                     payment_account_id=payment_account.id,
                 )
-                return CreateTransferResponse(transfer=None, transaction_ids=[])
+                return CreateTransferResponse(
+                    transfer=None,
+                    transaction_ids=[],
+                    error_code=PayoutErrorCode.PAYMENT_BLOCKED,
+                )
 
         currency = await self._get_currency(payment_account=payment_account)
         transfer, transaction_ids = await self.create_transfer_for_unpaid_transactions(
@@ -161,6 +170,14 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             start_time=self.request.start_time,
             end_time=self.request.end_time,
         )
+        # check transaction_ids instead of transfer directly to avoid typing issue
+        if not transaction_ids:
+            return CreateTransferResponse(
+                transfer=None,
+                transaction_ids=[],
+                error_code=PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND,
+            )
+
         # update transfer created_by and reason if transfer type is MANUAL
         updated_transfer = transfer
         if (
@@ -270,15 +287,12 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         lock_name = get_payout_account_lock_name(payment_account_id)
         # todo: PAYOUT-411: add retry when exception raised
         async with PaymentLock(lock_name, self.payment_lock_manager):
-            transfer, transaction_ids = await self.create_with_redis_lock(
+            return await self.create_with_redis_lock(
                 payment_account_id=payment_account_id,
                 currency=currency,
                 start_time=start_time,
                 end_time=end_time,
             )
-            if not transfer or not transaction_ids:
-                return None, []
-            return transfer, transaction_ids
 
     async def create_with_redis_lock(
         self,

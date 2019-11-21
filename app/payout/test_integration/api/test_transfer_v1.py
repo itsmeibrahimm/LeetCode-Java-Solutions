@@ -1,15 +1,46 @@
 from starlette.testclient import TestClient
 from app.payout.core.exceptions import PayoutErrorCode
-from app.payout.models import TransferMethodType
+from app.payout.models import TransferMethodType, TransferType
 from app.payout.repository.maindb.model.transfer import TransferStatus
+from datetime import datetime, timezone
 from app.payout.test_integration.api import (
     get_transfer_by_id_url,
     submit_transfer_url,
     list_transfers_url,
+    create_transfer_url,
 )
 
 
 class TestTransferV1:
+    def test_create_transfer_failed_no_matching_payout_countries(
+        self, client: TestClient, payout_account: dict, verified_payout_account: dict
+    ):
+        create_transfer_req = {
+            "payout_account_id": payout_account["id"],
+            "transfer_type": TransferType.SCHEDULED,
+            "end_time": datetime.now(timezone.utc).isoformat(),
+            "payout_countries": ["invalid_country"],
+        }
+        response = client.post(create_transfer_url(), json=create_transfer_req)
+        assert response.status_code == 400
+        error: dict = response.json()
+        assert error["error_code"] == PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH
+        assert not error["retryable"]
+
+    def test_create_transfer_failed_no_unpaid_transactions(
+        self, client: TestClient, payout_account: dict
+    ):
+        create_transfer_req = {
+            "payout_account_id": payout_account["id"],
+            "transfer_type": TransferType.MANUAL,
+            "end_time": datetime.now(timezone.utc).isoformat(),
+        }
+        response = client.post(create_transfer_url(), json=create_transfer_req)
+        assert response.status_code == 400
+        error: dict = response.json()
+        assert error["error_code"] == PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND
+        assert not error["retryable"]
+
     def test_create_then_get_transfer_by_id(
         self,
         client: TestClient,

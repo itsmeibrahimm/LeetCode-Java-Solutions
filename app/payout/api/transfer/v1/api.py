@@ -6,11 +6,13 @@ from starlette.status import (
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
     HTTP_404_NOT_FOUND,
+    HTTP_403_FORBIDDEN,
 )
 
 from fastapi import APIRouter, Depends, Body, Path, Query
 from app.commons.api.models import PaymentErrorResponseBody
 from app.payout.api.transfer.v1 import models as transfer_models
+from app.payout.core.exceptions import PayoutErrorCode, PayoutError
 from app.payout.core.transfer.processor import TransferProcessors
 from app.payout.core.transfer.processors.create_transfer import CreateTransferRequest
 from app.payout.core.transfer.processors.get_transfer_by_id import (
@@ -53,6 +55,27 @@ async def create_transfer(
     create_transfer_response = await transfer_processors.create_transfer(
         create_transfer_request
     )
+    if create_transfer_response.error_code == PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH:
+        raise PayoutError(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH,
+            retryable=False,
+        )
+    elif create_transfer_response.error_code == PayoutErrorCode.PAYMENT_BLOCKED:
+        raise PayoutError(
+            http_status_code=HTTP_403_FORBIDDEN,
+            error_code=PayoutErrorCode.PAYMENT_BLOCKED,
+            retryable=False,
+        )
+    elif (
+        create_transfer_response.error_code
+        == PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND
+    ):
+        raise PayoutError(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND,
+            retryable=False,
+        )
     return transfer_models.Transfer(**create_transfer_response.transfer.dict())
 
 
