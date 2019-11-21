@@ -9,7 +9,6 @@ services:
       - DSJ_DB_ENDPOINT=payment.dsj-postgres:5432
       - STRIPE_API_BASE=http://payment.stripe-mock:12111
       - REDIS_ENDPOINT=payment.redis:6379
-      - PAYMENT_REDIS_ENDPOINT=payment.redis:6379
     build:
       context: .
       dockerfile: Dockerfile-ci

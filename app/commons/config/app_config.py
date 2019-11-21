@@ -130,7 +130,6 @@ class AppConfig(SecretAware):
 
     # Redis Instances
     REDIS_INSTANCES: List[tuple]
-    PAYMENT_REDIS_INSTANCES: List[tuple]
 
     # DSJ client
     DSJ_API_USER_EMAIL: Secret
@@ -141,9 +140,6 @@ class AppConfig(SecretAware):
     # Redis Instance with default values
     REDIS_LOCK_DEFAULT_TIMEOUT: float = 10.0  # in seconds
     REDIS_LOCK_MAX_RETRY: int = 3
-
-    PAYMENT_REDIS_LOCK_DEFAULT_TIMEOUT_SECONDS: float = 5.0
-    PAYMENT_REDIS_LOCK_MAX_RETRY: int = 2
 
     # Stats
     STATSD_SERVER: str = "localhost"

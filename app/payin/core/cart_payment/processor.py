@@ -2590,8 +2590,7 @@ class CartPaymentProcessor:
                 lock_key=lock_key,
             )
             async with PaymentLock(
-                lock_key,
-                self.cart_payment_interface.app_context.payment_redis_lock_manager,
+                lock_key, self.cart_payment_interface.app_context.redis_lock_manager
             ):
                 return await self._update_payment(
                     idempotency_key=idempotency_key,

@@ -92,9 +92,6 @@ def create_app_config() -> AppConfig:
         REDIS_INSTANCES=[
             ("prod-default-d.mhazzc.ng.0001.usw2.cache.amazonaws.com", 6379)
         ],
-        PAYMENT_REDIS_INSTANCES=[
-            ("payment-service-cluster.mhazzc.clustercfg.usw2.cache.amazonaws.com", 6379)
-        ],
     )
 
 
