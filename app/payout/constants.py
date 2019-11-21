@@ -7,7 +7,7 @@ TRANSACTION_REVERSAL_PREFIX = "txn-void"
 
 # Pagination
 # DasherShiftListView list maximum 200 shift therefore we put 200 as the default size for fetch transactions by ids
-DEFAULT_PAGE_SIZE = 200
+DEFAULT_PAGE_SIZE_TRANSACTIONS = 1000
 
 # Transfer
 MAX_TRANSFER_AMOUNT_IN_CENTS = 100 * 25000

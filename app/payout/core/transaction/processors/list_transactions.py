@@ -3,7 +3,7 @@ from typing import Optional, Union, List
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
-from app.payout.constants import DEFAULT_PAGE_SIZE
+from app.payout.constants import DEFAULT_PAGE_SIZE_TRANSACTIONS
 from app.payout.core.exceptions import transaction_bad_query_parameters
 from app.payout.core.transaction.models import TransactionListInternal
 from app.payout.core.transaction.utils import get_transaction_internal_from_db_entity
@@ -23,7 +23,7 @@ class ListTransactionsRequest(OperationRequest):
     time_range: Optional[TimeRange]
     unpaid: Optional[bool] = False
     offset: int = 0
-    limit: int = DEFAULT_PAGE_SIZE
+    limit: int = DEFAULT_PAGE_SIZE_TRANSACTIONS
 
 
 class ListTransactions(
@@ -132,7 +132,7 @@ class ListTransactions(
         if {"transaction_ids"} == raw_request_fields_name:
             transaction_ids = raw_request.get("transaction_ids", [])
             # we do not allow size param yet, now, its always DEFAULT_PAGE_SIZE
-            if len(transaction_ids) <= DEFAULT_PAGE_SIZE:
+            if len(transaction_ids) <= DEFAULT_PAGE_SIZE_TRANSACTIONS:
                 return
 
         # case 2:
@@ -158,7 +158,7 @@ class ListTransactions(
 
         raise transaction_bad_query_parameters(
             "Bad query parameters, supported query patterns: "
-            f"  1. transaction ids (size<{DEFAULT_PAGE_SIZE})"
+            f"  1. transaction ids (size<{DEFAULT_PAGE_SIZE_TRANSACTIONS})"
             "  2. target_ids and target_type"
             "  3. transfer_id or payout_id"
             "  4. payment_account_id"
