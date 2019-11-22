@@ -78,7 +78,7 @@ def create_app_config() -> AppConfig:
         ),
         # exclude 16:00 - 18:00 pacific time 3 hourly triggers to avoid US peak hour
         CAPTURE_CRON_TRIGGER=CronTrigger(
-            hour="0-15,19-23", timezone=pytz.timezone("US/Pacific")
+            hour="0-15,19-23", minute="*/15", timezone=pytz.timezone("US/Pacific")
         ),
         DEFAULT_CAPTURE_DELAY_IN_MINUTES=180,  # 180 mins
         MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
