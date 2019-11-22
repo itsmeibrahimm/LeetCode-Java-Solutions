@@ -127,7 +127,7 @@ class RawPaymentMethod:
 
         return (
             PaymentMethod(
-                id=self.pgp_payment_method_entity.id,
+                id=self.payment_method_id,
                 payer_id=self.pgp_payment_method_entity.payer_id,
                 dd_payer_id=self.pgp_payment_method_entity.legacy_consumer_id,
                 type=self.pgp_payment_method_entity.type,
@@ -170,7 +170,7 @@ class RawPaymentMethod:
     @property
     def payment_method_id(self) -> Optional[UUID]:
         return (
-            self.pgp_payment_method_entity.id
+            self.pgp_payment_method_entity.payment_method_id
             if self.pgp_payment_method_entity
             else None
         )

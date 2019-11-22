@@ -21,6 +21,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeDetachPaymentMethodRequest,
 )
 from app.commons.types import CountryCode, PgpCode
+from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodCreateError,
@@ -36,7 +37,6 @@ from app.payin.repository.payment_method_repo import (
     DeleteStripeCardByIdSetInput,
     DeleteStripeCardByIdWhereInput,
     GetDuplicateStripeCardInput,
-    GetPgpPaymentMethodByIdInput,
     GetPgpPaymentMethodByPgpResourceIdInput,
     GetStripeCardByIdInput,
     GetStripeCardByStripeIdInput,
@@ -47,6 +47,8 @@ from app.payin.repository.payment_method_repo import (
     PaymentMethodRepository,
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
+    InsertPaymentMethodInput,
+    GetPgpPaymentMethodByPaymentMethodId,
 )
 
 
@@ -91,6 +93,15 @@ class PaymentMethodClient:
                 dynamic_last4 = stripe_payment_method.card.wallet.dynamic_last4
                 tokenization_method = stripe_payment_method.card.wallet.type
 
+            payment_method = await self.payment_method_repo.insert_payment_method(
+                pm_input=InsertPaymentMethodInput(
+                    id=generate_object_uuid(),
+                    payer_id=payer_id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+
             pm_entity = await self.payment_method_repo.insert_pgp_payment_method(
                 pm_input=InsertPgpPaymentMethodInput(
                     id=payment_method_id,
@@ -103,6 +114,7 @@ class PaymentMethodClient:
                     created_at=now,
                     updated_at=now,
                     attached_at=now,
+                    payment_method_id=payment_method.id,
                 )
             )
 
@@ -452,8 +464,8 @@ class PaymentMethodOps(PaymentMethodOpsInterface):
         pm_entity: Optional[PgpPaymentMethodDbEntity] = None
         try:
             # get pgp_payment_method object
-            pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_id(
-                input=GetPgpPaymentMethodByIdInput(id=payment_method_id)
+            pm_entity = await self.payment_method_repo.get_pgp_payment_method_by_payment_method_id(
+                input=GetPgpPaymentMethodByPaymentMethodId(id=payment_method_id)
             )
             # get stripe_card object
             if pm_entity:

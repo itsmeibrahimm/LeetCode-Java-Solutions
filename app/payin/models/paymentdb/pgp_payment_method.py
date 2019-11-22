@@ -18,6 +18,9 @@ class PgpPaymentMethodTable(TableDefinition):
     payer_id: Column = no_init_field(
         Column("payer_id", UUID(as_uuid=True), ForeignKey("payer.id"))
     )
+    payment_method_id: Column = no_init_field(
+        Column("payment_method_id", UUID(as_uuid=True))
+    )
     pgp_card_id: Column = no_init_field(Column("pgp_card_id", Text))
     legacy_consumer_id: Column = no_init_field(Column("legacy_consumer_id", Text))
     object: Column = no_init_field(Column("object", Text))

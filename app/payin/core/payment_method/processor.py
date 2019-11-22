@@ -232,7 +232,6 @@ class PaymentMethodProcessor:
                         PayerIdType.PAYER_ID if payer_id else PayerIdType.DD_CONSUMER_ID
                     ),
                 )
-
         return raw_payment_method.to_payment_method()
 
     async def get_payment_method(

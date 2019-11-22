@@ -17,7 +17,7 @@ from app.commons.database.model import DBEntity, DBRequestModel
 from app.commons.types import PgpCode
 from app.payin.core.payer.types import PayerType
 from app.payin.models.maindb import stripe_cards
-from app.payin.models.paymentdb import pgp_payment_methods
+from app.payin.models.paymentdb import pgp_payment_methods, payment_methods
 from app.payin.repository.base import PayinDBRepository
 
 log = get_logger(__name__)
@@ -41,9 +41,25 @@ class PgpPaymentMethodDbEntity(DBEntity):
     deleted_at: Optional[datetime] = None
     attached_at: Optional[datetime] = None
     detached_at: Optional[datetime] = None
+    payment_method_id: Optional[UUID] = None
+
+
+class PaymentMethodDbEntity(DBEntity):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    id: UUID
+    payer_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class InsertPgpPaymentMethodInput(PgpPaymentMethodDbEntity):
+    pass
+
+
+class InsertPaymentMethodInput(PaymentMethodDbEntity):
     pass
 
 
@@ -62,6 +78,10 @@ class DeletePgpPaymentMethodByIdSetInput(DBRequestModel):
 
 
 class DeletePgpPaymentMethodByIdWhereInput(DBRequestModel):
+    id: UUID
+
+
+class GetPgpPaymentMethodByPaymentMethodId(DBRequestModel):
     id: UUID
 
 
@@ -157,6 +177,11 @@ class PaymentMethodRepositoryInterface:
     ) -> PgpPaymentMethodDbEntity:
         ...
 
+    async def insert_payment_method(
+        self, pm_input: InsertPaymentMethodInput
+    ) -> PaymentMethodDbEntity:
+        ...
+
     @abstractmethod
     async def insert_stripe_card(
         self, sc_input: InsertStripeCardInput
@@ -172,6 +197,12 @@ class PaymentMethodRepositoryInterface:
     @abstractmethod
     async def get_pgp_payment_method_by_id(
         self, input: GetPgpPaymentMethodByIdInput
+    ) -> Optional[PgpPaymentMethodDbEntity]:
+        ...
+
+    @abstractmethod
+    async def get_pgp_payment_method_by_payment_method_id(
+        self, input: GetPgpPaymentMethodByPaymentMethodId
     ) -> Optional[PgpPaymentMethodDbEntity]:
         ...
 
@@ -216,6 +247,17 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             row = await self.payment_database.master().fetch_one(stmt)
             return PgpPaymentMethodDbEntity.from_row(row) if row else None
 
+    async def insert_payment_method(
+        self, pm_input: InsertPaymentMethodInput
+    ) -> PaymentMethodDbEntity:
+        stmt = (
+            payment_methods.table.insert()
+            .values(pm_input.dict(skip_defaults=True))
+            .returning(*payment_methods.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return PaymentMethodDbEntity.from_row(row)  # type: ignore
+
     async def insert_stripe_card(
         self, sc_input: InsertStripeCardInput
     ) -> StripeCardDbEntity:
@@ -244,6 +286,15 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
     ) -> Optional[PgpPaymentMethodDbEntity]:
         stmt = pgp_payment_methods.table.select().where(
             pgp_payment_methods.id == input.id
+        )
+        row = await self.payment_database.replica().fetch_one(stmt)
+        return PgpPaymentMethodDbEntity.from_row(row) if row else None
+
+    async def get_pgp_payment_method_by_payment_method_id(
+        self, input: GetPgpPaymentMethodByPaymentMethodId
+    ) -> Optional[PgpPaymentMethodDbEntity]:
+        stmt = pgp_payment_methods.table.select().where(
+            pgp_payment_methods.payment_method_id == input.id
         )
         row = await self.payment_database.replica().fetch_one(stmt)
         return PgpPaymentMethodDbEntity.from_row(row) if row else None

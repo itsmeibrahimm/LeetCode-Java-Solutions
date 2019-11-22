@@ -1,0 +1,195 @@
+from datetime import datetime, timezone
+from uuid import uuid4
+
+import pytest
+
+from app.commons.types import CountryCode, PgpCode
+from app.payin.core.payer.types import PayerType
+from app.payin.repository.payer_repo import (
+    PayerDbEntity,
+    PayerRepository,
+    InsertPayerInput,
+)
+from app.payin.repository.payment_method_repo import (
+    PaymentMethodRepository,
+    PaymentMethodDbEntity,
+    InsertPaymentMethodInput,
+    InsertPgpPaymentMethodInput,
+    GetPgpPaymentMethodByPgpResourceIdInput,
+    GetPgpPaymentMethodByIdInput,
+    GetPgpPaymentMethodByPaymentMethodId,
+    DeletePgpPaymentMethodByIdSetInput,
+    DeletePgpPaymentMethodByIdWhereInput,
+)
+
+
+@pytest.fixture
+async def payer(payer_repository: PayerRepository) -> PayerDbEntity:
+    insert_payer_input = InsertPayerInput(
+        id=uuid4(), payer_type=PayerType.STORE, country=CountryCode.US
+    )
+    return await payer_repository.insert_payer(insert_payer_input)
+
+
+@pytest.fixture
+async def payment_method(
+    payer: PayerDbEntity, payment_method_repository: PaymentMethodRepository
+) -> PaymentMethodDbEntity:
+    now = datetime.now()
+    insert_payment_method_input = InsertPaymentMethodInput(
+        id=uuid4(), payer_id=payer.id, created_at=now, updated_at=now
+    )
+    return await payment_method_repository.insert_payment_method(
+        pm_input=insert_payment_method_input
+    )
+
+
+class TestPaymentMethodRepository:
+    pytestmark = [pytest.mark.asyncio]
+
+    async def test_insert_pgp_payment_method(
+        self,
+        payment_method: PaymentMethodDbEntity,
+        payment_method_repository: PaymentMethodRepository,
+    ):
+        insert_pgp_payment_method_input = InsertPgpPaymentMethodInput(
+            id=uuid4(),
+            payer_id=payment_method.payer_id,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=str(uuid4()),
+            payment_method_id=payment_method.id,
+            created_at=datetime.now(timezone.utc),
+        )
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=insert_pgp_payment_method_input
+        )
+        assert pgp_payment_method is not None
+        assert pgp_payment_method.payer_id == payment_method.payer_id
+        assert pgp_payment_method.payment_method_id == payment_method.id
+        assert (
+            pgp_payment_method.pgp_resource_id
+            == insert_pgp_payment_method_input.pgp_resource_id
+        )
+
+    async def test_insert_payment_method(
+        self, payer: PayerDbEntity, payment_method_repository: PaymentMethodRepository
+    ):
+        now = datetime.now()
+        insert_payment_method_input = InsertPaymentMethodInput(
+            id=uuid4(), payer_id=payer.id, created_at=now, updated_at=now
+        )
+        payment_method = await payment_method_repository.insert_payment_method(
+            pm_input=insert_payment_method_input
+        )
+        assert payment_method is not None
+        assert payment_method.payer_id == insert_payment_method_input.payer_id
+
+    async def test_get_pgp_payment_method_by_pgp_resource_id(
+        self,
+        payment_method: PaymentMethodDbEntity,
+        payment_method_repository: PaymentMethodRepository,
+    ):
+        created_at = datetime.now(timezone.utc)
+        insert_pgp_payment_method_input = InsertPgpPaymentMethodInput(
+            id=uuid4(),
+            payer_id=payment_method.payer_id,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=str(uuid4()),
+            payment_method_id=payment_method.id,
+            created_at=created_at,
+        )
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=insert_pgp_payment_method_input
+        )
+        assert pgp_payment_method is not None
+        input = GetPgpPaymentMethodByPgpResourceIdInput(
+            pgp_resource_id=insert_pgp_payment_method_input.pgp_resource_id
+        )
+        get_pgp_payment_method = await payment_method_repository.get_pgp_payment_method_by_pgp_resource_id(
+            input=input
+        )
+        assert get_pgp_payment_method is not None
+        assert get_pgp_payment_method == pgp_payment_method
+
+    async def test_get_pgp_payment_method_by_id(
+        self,
+        payment_method: PaymentMethodDbEntity,
+        payment_method_repository: PaymentMethodRepository,
+    ):
+        created_at = datetime.now(timezone.utc)
+        insert_pgp_payment_method_input = InsertPgpPaymentMethodInput(
+            id=uuid4(),
+            payer_id=payment_method.payer_id,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=str(uuid4()),
+            payment_method_id=payment_method.id,
+            created_at=created_at,
+        )
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=insert_pgp_payment_method_input
+        )
+        assert pgp_payment_method is not None
+        input = GetPgpPaymentMethodByIdInput(id=insert_pgp_payment_method_input.id)
+        get_pgp_payment_method = await payment_method_repository.get_pgp_payment_method_by_id(
+            input=input
+        )
+        assert get_pgp_payment_method is not None
+        assert get_pgp_payment_method == pgp_payment_method
+
+    async def test_get_pgp_payment_method_by_payment_id(
+        self,
+        payment_method: PaymentMethodDbEntity,
+        payment_method_repository: PaymentMethodRepository,
+    ):
+        created_at = datetime.now(timezone.utc)
+        insert_pgp_payment_method_input = InsertPgpPaymentMethodInput(
+            id=uuid4(),
+            payer_id=payment_method.payer_id,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=str(uuid4()),
+            payment_method_id=payment_method.id,
+            created_at=created_at,
+        )
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=insert_pgp_payment_method_input
+        )
+        assert pgp_payment_method is not None
+        input = GetPgpPaymentMethodByPaymentMethodId(
+            id=insert_pgp_payment_method_input.payment_method_id
+        )
+        get_pgp_payment_method = await payment_method_repository.get_pgp_payment_method_by_payment_method_id(
+            input=input
+        )
+        assert get_pgp_payment_method is not None
+        assert get_pgp_payment_method == pgp_payment_method
+
+    async def test_delete_pgp_payment_method_by_id(
+        self,
+        payment_method: PaymentMethodDbEntity,
+        payment_method_repository: PaymentMethodRepository,
+    ):
+        created_at = datetime.now(timezone.utc)
+        insert_pgp_payment_method_input = InsertPgpPaymentMethodInput(
+            id=uuid4(),
+            payer_id=payment_method.payer_id,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=str(uuid4()),
+            payment_method_id=payment_method.id,
+            created_at=created_at,
+        )
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=insert_pgp_payment_method_input
+        )
+        assert pgp_payment_method is not None
+        now = datetime.now(timezone.utc)
+        input_set = DeletePgpPaymentMethodByIdSetInput(
+            detached_at=now, deleted_at=now, updated_at=now
+        )
+        input_where = DeletePgpPaymentMethodByIdWhereInput(id=pgp_payment_method.id)
+        deleted_pgp_payment_method = await payment_method_repository.delete_pgp_payment_method_by_id(
+            input_set=input_set, input_where=input_where
+        )
+        assert deleted_pgp_payment_method is not None
+        assert deleted_pgp_payment_method.deleted_at == now
+        assert deleted_pgp_payment_method.detached_at == now
+        assert deleted_pgp_payment_method.updated_at == now
