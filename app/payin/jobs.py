@@ -371,10 +371,15 @@ class ResolveCapturingPaymentIntents(Job):
 
             new_status: IntentStatus
             task: Coroutine
-            if (
-                validation.not_none(payment_intent.capture_after)
-                >= utcnow - self._problematic_capture_delay
-            ):
+
+            capture_after = validation.not_none(payment_intent.capture_after)
+            capture_after = (
+                capture_after
+                if capture_after.tzinfo
+                else capture_after.replace(tzinfo=timezone.utc)
+            )
+
+            if capture_after >= utcnow - self._problematic_capture_delay:
                 new_status = IntentStatus.REQUIRES_CAPTURE
                 to_requires_capture_count += 1
             else:
