@@ -27,11 +27,11 @@ async def test_emit_problematic_capture_count(
     )
     await job_instance.run()
     events: List[Stat] = get_mock_statsd_events()
-    assert len(events) == 1
-    stat = events[0]
+    assert len(events) == 3
+    stat = events[1]
     assert (
         stat.stat_name
-        == "dd.pay.payment-service.capture-payment.problematic-state.count"
+        == "dd.pay.payment-service.payment-intent-problematic-state.count"
     )
     assert stat.stat_value == 5
     mock_count_payment_intents_in_problematic_states.assert_called_once()

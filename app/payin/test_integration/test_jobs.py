@@ -46,6 +46,7 @@ class TestCaptureUncapturedPaymentIntents:
             app_context=app_context,
             job_pool=stripe_pool,
             problematic_capture_delay=timedelta(days=1),
+            statsd_client=MagicMock(),
         )
         await job_instance.run()
         mock_cart_payment_repository.return_value.find_payment_intents_that_require_capture.assert_called_once()  # type: ignore
@@ -79,6 +80,7 @@ class TestCaptureUncapturedPaymentIntents:
             app_context=app_context,
             job_pool=stripe_pool,
             problematic_capture_delay=timedelta(days=1),
+            statsd_client=MagicMock(),
         )
         await job_instance.run()
         await stripe_pool.join()

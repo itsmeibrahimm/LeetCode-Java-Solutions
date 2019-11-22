@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import Coroutine
+from typing import Coroutine, Dict, Optional, Union
 from uuid import uuid4
 
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
@@ -71,10 +71,18 @@ class Job(ABC):
 
     app_context: AppContext
     job_pool: JobPool
+    _statsd_client: DoorStatsProxyMultiServer
 
-    def __init__(self, *, app_context: AppContext, job_pool: JobPool):
+    def __init__(
+        self,
+        *,
+        app_context: AppContext,
+        job_pool: JobPool,
+        statsd_client: DoorStatsProxyMultiServer,
+    ):
         self.app_context = app_context
         self.job_pool = job_pool
+        self._statsd_client = statsd_client
 
     @property
     @abstractmethod
@@ -90,6 +98,30 @@ class Job(ABC):
         """
         raise NotImplementedError("sub class must implement this method!")
 
+    def _stats_tag(self) -> Dict[str, str]:
+        return {"job": self.job_name}
+
+    async def stats_incr(
+        self, *, metric_name: str, tags: Optional[Dict[str, str]] = None
+    ):
+        all_tags = self._stats_tag()
+        if tags:
+            all_tags.update(tags)
+
+        self._statsd_client.incr(metric_name, tags=all_tags)
+
+    async def stats_gauge(
+        self,
+        *,
+        metric_name: str,
+        value: Union[int, float],
+        tags: Optional[Dict[str, str]] = None,
+    ):
+        all_tags = self._stats_tag()
+        if tags:
+            all_tags.update(tags)
+        self._statsd_client.gauge(metric_name, value, tags=all_tags)
+
     async def run(self):
         """
         Actually trigger and run a new instance defined by this job.
@@ -104,8 +136,10 @@ class Job(ABC):
         jon_instance_cxt: JobInstanceContext = JobInstanceContext(
             app_context=self.app_context, job_pool=self.job_pool, job_name=self.job_name
         )
+        await self.stats_incr(metric_name="job-trigger-start")
         jon_instance_cxt.log.info("Triggering job instance")
         await self._trigger(jon_instance_cxt)
+        await self.stats_incr(metric_name="job-trigger-finish")
         jon_instance_cxt.log.info("Triggered job instance")
 
 
@@ -131,8 +165,11 @@ class CaptureUncapturedPaymentIntents(Job):
         app_context: AppContext,
         job_pool: JobPool,
         problematic_capture_delay: timedelta,
+        statsd_client: DoorStatsProxyMultiServer,
     ):
-        super().__init__(app_context=app_context, job_pool=job_pool)
+        super().__init__(
+            app_context=app_context, job_pool=job_pool, statsd_client=statsd_client
+        )
         self._problematic_capture_delay = problematic_capture_delay
 
     @property
@@ -147,14 +184,16 @@ class CaptureUncapturedPaymentIntents(Job):
         )
 
         utcnow = datetime.now(timezone.utc)
+        start_time = utcnow
+
         uncaptured_payment_intents = cart_payment_repo.find_payment_intents_that_require_capture(
             capturable_before=utcnow,
             earliest_capture_after=utcnow - self._problematic_capture_delay,
         )
 
-        payment_intent_count: int = 0
+        processed_payment_intent_count: int = 0
         async for payment_intent in uncaptured_payment_intents:
-            payment_intent_count += 1
+            processed_payment_intent_count += 1
             await job_instance_cxt.job_pool.spawn(
                 self._capture_payment(
                     payment_intent=payment_intent,
@@ -165,8 +204,41 @@ class CaptureUncapturedPaymentIntents(Job):
                 ),
                 cb=job_callback,
             )
+
+        # last task to emit actual finished time and count after everything in this job instance is done
+        await job_instance_cxt.job_pool.spawn(
+            self._stats_job(
+                job_instance_cxt=job_instance_cxt,
+                start_time=start_time,
+                processed_payment_intent_count=processed_payment_intent_count,
+            )
+        )
+
+    async def _stats_job(
+        self,
+        *,
+        job_instance_cxt: JobInstanceContext,
+        start_time: datetime,
+        processed_payment_intent_count: int,
+    ):
+        now = datetime.now(timezone.utc)
+        duration_sec = (now - start_time).seconds
+
+        await self.stats_incr(metric_name=f"capture-payment.completed")
+
+        await self.stats_gauge(
+            metric_name=f"capture-payment.duration", value=duration_sec
+        )
+        await self.stats_gauge(
+            metric_name=f"capture-payment.processed-payment-intent-count",
+            value=processed_payment_intent_count,
+        )
         job_instance_cxt.log.info(
-            "payment_intent count summary", payment_intent_count=payment_intent_count
+            "payment_intent count summary",
+            processed_payment_intent_count=processed_payment_intent_count,
+            started=start_time,
+            finished=now,
+            duration=duration_sec,
         )
 
     async def _capture_payment(
@@ -260,9 +332,10 @@ class ResolveCapturingPaymentIntents(Job):
         problematic_capture_delay: timedelta,
         statsd_client: DoorStatsProxyMultiServer,
     ):
-        super().__init__(app_context=app_context, job_pool=job_pool)
+        super().__init__(
+            app_context=app_context, job_pool=job_pool, statsd_client=statsd_client
+        )
         self._problematic_capture_delay = problematic_capture_delay
-        self.statsd_client = statsd_client
 
     @property
     def job_name(self) -> str:
@@ -333,13 +406,13 @@ class ResolveCapturingPaymentIntents(Job):
             to_capture_failed_count=to_capture_failed_count,
             skipped_count=skipped_count,
         )
-        self.statsd_client.gauge(
-            f"capture-payment.resolve-to-status.{IntentStatus.CAPTURE_FAILED.value}.count",
-            to_capture_failed_count,
+        await self.stats_gauge(
+            metric_name=f"resolve-payment-intent-status-to.{IntentStatus.CAPTURE_FAILED.value}.count",
+            value=to_capture_failed_count,
         )
-        self.statsd_client.gauge(
-            f"capture-payment.resolve-to-status.{IntentStatus.REQUIRES_CAPTURE.value}.count",
-            to_requires_capture_count,
+        await self.stats_gauge(
+            metric_name=f"resolve-payment-intent-status-to.{IntentStatus.REQUIRES_CAPTURE.value}.count",
+            value=to_requires_capture_count,
         )
 
 
@@ -358,7 +431,9 @@ class EmitProblematicCaptureCount(Job):
         statsd_client: DoorStatsProxyMultiServer,
         problematic_threshold: timedelta,
     ):
-        super().__init__(app_context=app_context, job_pool=job_pool)
+        super().__init__(
+            app_context=app_context, job_pool=job_pool, statsd_client=statsd_client
+        )
         self.statsd_client = statsd_client
         self.problematic_threshold = problematic_threshold
 
@@ -376,4 +451,6 @@ class EmitProblematicCaptureCount(Job):
             problematic_count=count,
             problematic_threshold=self.problematic_threshold,
         )
-        self.statsd_client.gauge("capture-payment.problematic-state.count", count)
+        await self.stats_gauge(
+            metric_name="payment-intent-problematic-state.count", value=count
+        )

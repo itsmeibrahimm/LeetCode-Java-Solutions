@@ -84,6 +84,7 @@ capture_uncaptured_payment_intents = CaptureUncapturedPaymentIntents(
     app_context=app_context,
     job_pool=stripe_pool,
     problematic_capture_delay=app_config.PROBLEMATIC_CAPTURE_DELAY,
+    statsd_client=doorstats_global,
 )
 scheduler.add_job(
     func=capture_uncaptured_payment_intents.run,
