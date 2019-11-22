@@ -11,7 +11,7 @@ service_env:
   SERVICE_URI: "http://payment-service-web.payment-service.svc.cluster.local"
   REPORT_ENABLED: true
   TEST_ENV: "staging"
-  CUSTOM_FAILURE_MSG: "<!here> Attencion!"
+  CUSTOM_FAILURE_MSG: "<!here> Attention!"
 
 secret_sources:
   - payment-service-pulse
