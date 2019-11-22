@@ -2,7 +2,6 @@ import pytest
 import json
 from datetime import datetime
 
-from app.commons.core.errors import DBIntegrityUniqueViolationError
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestUpdate,
 )
@@ -59,28 +58,6 @@ class TestPayoutRepository:
             )
         ), "retrieved stripe payout request matches"
 
-    async def test_create_thrown_unique_exception(
-        self,
-        stripe_payout_request_repo: StripePayoutRequestRepository,
-        payout_repo: PayoutRepository,
-    ):
-        # prepare payout and insert, validate data
-        payout = await prepare_and_insert_payout(payout_repo=payout_repo)
-
-        # prepare stripe_payout_request and insert, validate data
-        await prepare_and_insert_stripe_payout_request(
-            stripe_payout_request_repo=stripe_payout_request_repo, payout_id=payout.id
-        )
-
-        # insert another stripe_payout_request with same payout id
-        with pytest.raises(DBIntegrityUniqueViolationError) as e:
-            await prepare_and_insert_stripe_payout_request(
-                stripe_payout_request_repo=stripe_payout_request_repo,
-                payout_id=payout.id,
-            )
-        err_msg = str(e.value)
-        assert "unique violation error" in err_msg
-
     async def test_update_stripe_payout_request_by_id(
         self,
         stripe_payout_request_repo: StripePayoutRequestRepository,
@@ -104,3 +81,36 @@ class TestPayoutRepository:
         assert updated, "updated"
         assert updated.status == "OK", "updated correctly"
         assert updated.updated_at >= timestamp, "updated correctly"
+
+    async def test_get_stripe_payout_request_by_payout_id(
+        self,
+        stripe_payout_request_repo: StripePayoutRequestRepository,
+        payout_repo: PayoutRepository,
+    ):
+        # prepare payout and insert, validate data
+        payout = await prepare_and_insert_payout(payout_repo=payout_repo)
+
+        # prepare stripe_payout_request and insert, validate data
+        stripe_payout_request_1 = await prepare_and_insert_stripe_payout_request(
+            stripe_payout_request_repo=stripe_payout_request_repo, payout_id=payout.id
+        )
+
+        assert (
+            stripe_payout_request_1
+            == await stripe_payout_request_repo.get_stripe_payout_request_by_payout_id(
+                payout.id
+            )
+        ), "retrieved first stripe payout request matches"
+
+        # Insert another stripe_payout_request with the same payout id
+        stripe_payout_request_2 = await prepare_and_insert_stripe_payout_request(
+            stripe_payout_request_repo=stripe_payout_request_repo, payout_id=payout.id
+        )
+
+        # when retrieve stripe_payout_request by payout_id, should return stripe_payout_request_2
+        assert (
+            await stripe_payout_request_repo.get_stripe_payout_request_by_payout_id(
+                payout.id
+            )
+            == stripe_payout_request_2
+        )

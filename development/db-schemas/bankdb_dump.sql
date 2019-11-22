@@ -1326,12 +1326,10 @@ ALTER TABLE ONLY payouts
 
 
 --
--- Name: stripe_payout_requests stripe_payout_requests_payout_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: stripe_payout_requests stripe_payout_requests_stripe_payout_id; Type: INDEX; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY stripe_payout_requests
-    ADD CONSTRAINT stripe_payout_requests_payout_id_key UNIQUE (payout_id);
-
+CREATE INDEX stripe_payout_requests_stripe_payout_id ON stripe_payout_requests USING btree (payout_id);
 
 --
 -- Name: stripe_payout_requests stripe_payout_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
+
+from sqlalchemy import desc
 from typing_extensions import final
 
 from app.commons import tracing
@@ -64,13 +66,13 @@ class StripePayoutRequestRepository(
     async def get_stripe_payout_request_by_payout_id(
         self, payout_id: int
     ) -> Optional[StripePayoutRequest]:
-        stmt = stripe_payout_requests.table.select().where(
-            stripe_payout_requests.payout_id == payout_id
-        )
+        stmt = (
+            stripe_payout_requests.table.select()
+            .where(stripe_payout_requests.payout_id == payout_id)
+            .order_by(desc(stripe_payout_requests.id))
+        )  # order by id desc to get the latest one
         rows = await self._database.replica().fetch_all(stmt)
         if rows:
-            # since we have one-to-one mapping to payout
-            assert len(rows) == 1
             return StripePayoutRequest.from_row(rows[0])
 
         return None
