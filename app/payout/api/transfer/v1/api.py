@@ -32,7 +32,10 @@ router = APIRouter()
     "/",
     operation_id="CreateTransfer",
     status_code=HTTP_201_CREATED,
-    responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
+    responses={
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
+    },
     tags=api_tags,
 )
 async def create_transfer(

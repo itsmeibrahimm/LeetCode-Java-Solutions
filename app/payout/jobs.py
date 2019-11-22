@@ -7,7 +7,13 @@ from app.commons.context.app_context import AppContext
 from app.commons.context.logger import get_logger
 from app.commons.context.req_context import ReqContext, build_req_context
 from app.commons.jobs.pool import JobPool
+from app.payout.core.transfer.processors.update_transfer_by_stripe_transfer_status import (
+    UpdateTransferByStripeTransferStatus,
+    UpdateTransferByStripeTransferStatusRequest,
+)
+from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.commons.runtime import runtime
 
 logger = get_logger("jobs")
 
@@ -105,22 +111,42 @@ class MonitorTransfersWithIncorrectStatus(Job):
         return "MonitorTransfersWithIncorrectStatus"
 
     async def _trigger(self, job_instance_cxt: JobInstanceContext):
-        # Create a window of the last 7 days
-        start = self._start_of_the_week(date=datetime.utcnow()) - timedelta(weeks=1)
+        if runtime.get_bool(
+            "enable_payment_service_monitor_transfer_with_incorrect_status", False
+        ):
+            # Create a window of the last 7 days
+            start = self._start_of_the_week(date=datetime.utcnow()) - timedelta(weeks=1)
+            stripe_transfer_repo = StripeTransferRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            transfer_repo = TransferRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            transfer_ids = await transfer_repo.get_transfers_by_submitted_at_and_method(
+                start_time=start
+            )
 
-        transfer_repo = TransferRepository(
-            database=job_instance_cxt.app_context.payout_maindb
-        )
-        transfer_ids = await transfer_repo.get_transfers_by_submitted_at_and_method(
-            start_time=start
-        )
+            job_instance_cxt.log.info(
+                "[monitor_transfers_with_incorrect_status] Starting execution",
+                start_time=start,
+                transfers_total_number=len(transfer_ids),
+            )
+            req_context = job_instance_cxt.build_req_context()
 
-        job_instance_cxt.log.info(
-            "[monitor_transfers_with_incorrect_status] Starting execution",
-            start_time=start,
-            transfers_total_number=len(transfer_ids),
-        )
-        # todo: complete logic after the processor is updated
+            for transfer_id in transfer_ids:
+                update_transfer_req = UpdateTransferByStripeTransferStatusRequest(
+                    transfer_id=transfer_id
+                )
+                update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
+                    transfer_repo=transfer_repo,
+                    stripe_transfer_repo=stripe_transfer_repo,
+                    stripe=req_context.stripe_async_client,
+                    request=update_transfer_req,
+                )
+                await job_instance_cxt.job_pool.spawn(
+                    update_transfer_by_stripe_transfer_status_op.execute(),
+                    cb=job_callback,
+                )
 
     def _start_of_the_week(self, date: datetime) -> datetime:
         return date - timedelta(days=date.weekday())
