@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, cast
+from typing import Dict, cast, Optional
 from uuid import UUID
 
 from fastapi import Depends
@@ -262,13 +262,14 @@ class WebhookHandlerContainer:
         self.internal_container = self.internal_container or {}
         self.internal_container[type] = handler
 
-    def provide_handler(self, type: str) -> BaseWebhookHandler:
+    def provide_handler(self, type: str) -> Optional[BaseWebhookHandler]:
         try:
             return self.internal_container[type]
         except KeyError:
-            raise UnknownTypeException(
+            self.log.info(
                 f"WebhookHandlerContainer does not have a valid handler for requests type {type}"
             )
+            return None
 
 
 class WebhookProcessor:
@@ -281,4 +282,5 @@ class WebhookProcessor:
         self, country_code: str, stripe_webhook_event: StripeWebHookEvent
     ):
         handler = self.container.provide_handler(stripe_webhook_event.type)
-        await handler(cast(StripeWebHookEvent, stripe_webhook_event), country_code)
+        if handler:
+            await handler(cast(StripeWebHookEvent, stripe_webhook_event), country_code)
