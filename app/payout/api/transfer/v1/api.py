@@ -49,7 +49,6 @@ async def create_transfer(
         transfer_type=body.transfer_type,
         start_time=body.start_time,
         end_time=body.end_time,
-        target_id=body.target_id,
         target_type=body.target_type,
         target_business_id=body.target_business_id,
         payout_countries=body.payout_countries,

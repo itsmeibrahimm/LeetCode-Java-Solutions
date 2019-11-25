@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import re
+from doordash_python_stats.ddstats import doorstats_global
 
 from starlette.status import HTTP_400_BAD_REQUEST
 from stripe.error import StripeError
@@ -23,6 +24,11 @@ from app.payout.constants import (
     FF_CHECK_FOR_RECENT_BANK_CHANGE,
     DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK,
     DEFAULT_USER_EMAIL_FOR_SUPERPOWERS,
+    ATTEMPTED_COUNT_STAT,
+    ATTEMPTED_AMOUNT_STAT,
+    transfer_submission_monitoring_stat_name,
+    SUCCEEDED_COUNT_STAT,
+    SUCCEEDED_AMOUNT_STAT,
 )
 from app.payout.core.account.utils import (
     get_country_shortname,
@@ -580,8 +586,14 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             update_request = TransferUpdate(
                 status_code=None, should_retry_on_failure=False, method=method
             )
-            await self.transfer_repo.update_transfer_by_id(
+            updated_transfer = await self.transfer_repo.update_transfer_by_id(
                 transfer_id=transfer_id, data=update_request
+            )
+            assert updated_transfer, "updated should success and transfer must exist"
+            await self.record_transfer_submission_monitoring_stat(
+                transfer=updated_transfer,
+                count_stat_name=ATTEMPTED_COUNT_STAT,
+                amount_stat_name=ATTEMPTED_AMOUNT_STAT,
             )
             if submit_function_name == TRANSFER_METHOD_TO_SUBMIT_FUNCTION.get(
                 TransferMethodType.CHECK
@@ -612,9 +624,21 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     submitted_at=datetime.now(timezone.utc),
                     submitted_by_id=submitted_by,
                 )
-                await self.transfer_repo.update_transfer_by_id(
+                updated_succeed_transfer = await self.transfer_repo.update_transfer_by_id(
                     transfer_id=transfer_id, data=update_request
                 )
+                assert (
+                    updated_succeed_transfer
+                ), "update should succeed and transfer must exist"
+                if (
+                    updated_succeed_transfer.status
+                    not in TransferStatus.failed_statuses()
+                ):
+                    await self.record_transfer_submission_monitoring_stat(
+                        transfer=updated_succeed_transfer,
+                        count_stat_name=SUCCEEDED_COUNT_STAT,
+                        amount_stat_name=SUCCEEDED_AMOUNT_STAT,
+                    )
             except PayoutError as e:
                 retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
                     transfer_id=transfer_id
@@ -667,6 +691,34 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     transfer_id=transfer_id, data=update_request
                 )
                 raise e
+
+    async def record_transfer_submission_monitoring_stat(
+        self, transfer: Transfer, count_stat_name: str, amount_stat_name: str
+    ):
+        """
+        Stat of transfer submission
+        :param transfer: transfer, either to be submitted or already submitted
+        :param count_stat_name: string, stat name for count metric
+        :param amount_stat_name: string, stat name for amount metric
+        :return:
+        """
+        if transfer.payment_account_id:
+            payment_account = await self.payment_account_repo.get_payment_account_by_id(
+                payment_account_id=transfer.payment_account_id
+            )
+            if not payment_account or not payment_account.entity:
+                entity = "without-payment-account"
+            else:
+                entity = payment_account.entity
+
+            submission_metric = transfer_submission_monitoring_stat_name(
+                entity=entity, stat_name=count_stat_name
+            )
+            amount_metric = transfer_submission_monitoring_stat_name(
+                entity=entity, stat_name=amount_stat_name
+            )
+            doorstats_global.incr(submission_metric)
+            doorstats_global.incr(amount_metric, transfer.amount)
 
     async def _submit_stripe_transfer(
         self,

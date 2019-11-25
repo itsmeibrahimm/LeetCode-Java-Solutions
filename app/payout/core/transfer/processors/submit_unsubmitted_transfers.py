@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from doordash_python_stats.ddstats import doorstats_global
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
@@ -86,11 +87,14 @@ class SubmitUnsubmittedTransfers(
         transfer_ids = await self.transfer_repo.get_unsubmitted_transfer_ids(
             created_before=created_before
         )
-        # todo: investigate how to use doorstats.gauge here
+        transfer_ids_count = len(transfer_ids)
+        doorstats_global.gauge(
+            "payment-service.backfill.unsubmitted_payouts", transfer_ids_count
+        )
 
         self.logger.info(
             "[weekly_submit_transfers]: submitting unsubmitted transfers",
-            unsubmitted_transfer_count=len(transfer_ids),
+            unsubmitted_transfer_count=transfer_ids_count,
         )
         for transfer_id in transfer_ids:
             # todo: put submit_transfer into queue

@@ -400,7 +400,6 @@ async def initiate_payout(
             payout_card_method = await payout_account_processors.get_default_payout_card(
                 retrieve_method_request
             )
-            # todo: remove this after id of payout_card_method updated to required
             assert payout_card_method.id, "payout_card_method id is required"
         except Exception:
             raise PayoutError(

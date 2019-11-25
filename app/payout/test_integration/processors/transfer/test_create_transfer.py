@@ -350,7 +350,6 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(),
             payment_account_id=123,
             target_type=None,
-            target_id=None,
             target_biz_id=None,
         )
 
@@ -361,7 +360,6 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(),
             payment_account_id=123,
             target_type=PayoutTargetType.DASHER,
-            target_id=None,
             target_biz_id=None,
         )
 
@@ -376,7 +374,6 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(),
             payment_account_id=123,
             target_type=PayoutTargetType.STORE,
-            target_id=None,
             target_biz_id=123,
         )
 
@@ -391,7 +388,6 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(),
             payment_account_id=123,
             target_type=PayoutTargetType.STORE,
-            target_id=None,
             target_biz_id=123,
         )
 
@@ -409,7 +405,6 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(),
             payment_account_id=payment_account.id,
             target_type=PayoutTargetType.STORE,
-            target_id=None,
             target_biz_id=123,
         )
 
@@ -436,7 +431,6 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(),
             payment_account_id=payment_account.id,
             target_type=PayoutTargetType.STORE,
-            target_id=None,
             target_biz_id=123,
         )
 

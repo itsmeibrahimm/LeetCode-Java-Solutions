@@ -1,3 +1,4 @@
+from doordash_python_stats.ddstats import doorstats_global
 from stripe.error import StripeError
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
@@ -10,6 +11,7 @@ from app.commons.core.processor import (
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import StripeRetrievePayoutRequest
+from app.payout.constants import UPDATED_INCORRECT_STRIPE_TRANSFER_STATUS
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
 )
@@ -100,12 +102,12 @@ class UpdateTransferByStripeTransferStatus(
                 await self.update_transfer_status_from_latest_submission(
                     transfer=transfer
                 )
+                doorstats_global.incr(UPDATED_INCORRECT_STRIPE_TRANSFER_STATUS)
         except Exception:
             self.logger.exception(
                 "[monitor_stripe_transfer_status_for_transfer_id_v1] Error checking stripe status for transfer",
                 transfer_id=transfer.id,
             )
-        # todo: investigate on how to do doorstats.incr here
         self.logger.info(
             "[monitor_stripe_transfer_status_for_transfer_id_v1] Completed checking chunk"
         )

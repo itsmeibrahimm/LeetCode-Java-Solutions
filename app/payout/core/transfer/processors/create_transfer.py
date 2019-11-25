@@ -11,6 +11,7 @@ from app.commons.core.processor import (
     OperationRequest,
     OperationResponse,
 )
+from doordash_python_stats.ddstats import doorstats_global
 from app.commons.lock.locks import PaymentLock
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
@@ -18,6 +19,7 @@ from app.payout.constants import (
     FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE,
     DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME,
     DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME,
+    FRAUD_MX_AUTO_PAYMENT_DELAYED_RECENT_BANK_CHANGE,
 )
 from app.payout.core.account.utils import (
     get_country_shortname,
@@ -65,7 +67,6 @@ class CreateTransferRequest(OperationRequest):
     transfer_type: str
     end_time: datetime
     start_time: Optional[datetime]
-    target_id: Optional[int]
     target_type: Optional[payout_models.PayoutTargetType]
     target_business_id: Optional[int]
     payout_countries: Optional[List[str]]
@@ -150,7 +151,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             if not await self.should_payment_account_be_auto_paid_weekly(
                 payment_account_id=payment_account.id,
                 target_type=self.request.target_type,
-                target_id=self.request.target_id,
                 target_biz_id=self.request.target_business_id,
             ):
                 self.logger.info(
@@ -204,7 +204,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self,
         payment_account_id: int,
         target_type: Optional[payout_models.PayoutTargetType],
-        target_id: Optional[int],
         target_biz_id: Optional[int],
     ) -> bool:
         #  Check for potential mx banking fraud
@@ -212,7 +211,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             payment_account_id=payment_account_id,
             payout_date_time=datetime.utcnow(),
             target_type=target_type,
-            target_id=target_id,
             target_biz_id=target_biz_id,
         ):
             return False
@@ -234,7 +232,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         payout_date_time: datetime,
         payment_account_id: int,
         target_type: Optional[payout_models.PayoutTargetType],
-        target_id: Optional[int],
         target_biz_id: Optional[int],
     ) -> bool:
         if runtime.get_bool(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False):
@@ -260,7 +257,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                         end_time=payout_date_time,
                     )
                     if len(bank_info_recently_changed) > 0:
-                        # todo: need to investigate how doorstats_global.incr and segment_merchant.track work
+                        doorstats_global.incr(
+                            FRAUD_MX_AUTO_PAYMENT_DELAYED_RECENT_BANK_CHANGE
+                        )
                         return True
             except Exception as e:
                 self.logger.exception("Exception in should_block_mx_payout", error=e)
