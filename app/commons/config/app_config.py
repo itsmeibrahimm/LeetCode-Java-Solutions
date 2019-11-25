@@ -127,6 +127,7 @@ class AppConfig(SecretAware):
     MARQETA_JIT_USERNAME: Secret
     MARQETA_JIT_PASSWORD: Secret
     MARQETA_PROGRAM_FUND_TOKEN: Secret
+    MARQETA_CARD_TOKEN_PREFIX_CUTOVER_ID: Secret
 
     # Redis Instances
     REDIS_INSTANCES: List[tuple]

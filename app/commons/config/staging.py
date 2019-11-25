@@ -94,6 +94,9 @@ def create_app_config() -> AppConfig:
             value="a6e2bbe7-4f28-43b4-980d-6416f35fe33e",
         ),
         CAPTURE_CRON_TRIGGER=CronTrigger(hour="0-23", minute="*/15"),
+        MARQETA_CARD_TOKEN_PREFIX_CUTOVER_ID=Secret(
+            name="marqeta_card_token_prefix_cutover_id", value="73617"
+        ),
         # currently using merchant_datastore redis instance, which is the same as the one used for payment in DSJ
         # better to switch to payment's own redis instance after instant payout/transfer migration
         REDIS_INSTANCES=[("staging0.trwaqb.0001.usw2.cache.amazonaws.com", 6379)],

@@ -141,5 +141,8 @@ def create_app_config() -> AppConfig:
             name="marqeta_program_fund_token",
             value="a6e2bbe7-4f28-43b4-980d-6416f35fe33e",
         ),
+        MARQETA_CARD_TOKEN_PREFIX_CUTOVER_ID=Secret(
+            name="marqeta_card_token_prefix_cutover_id", value="73617"
+        ),
         REDIS_INSTANCES=[("localhost", 6380)],
     )
