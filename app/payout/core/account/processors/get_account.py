@@ -44,12 +44,18 @@ class GetPayoutAccount(
             self.request.payout_account_id
         )
         if not payment_account:
+            self.logger.error(
+                "[Payout Account] get_payment_account_by_id failed",
+                extra={"payout_account_id": self.request.payout_account_id},
+            )
             raise payout_account_not_found_error()
+
         stripe_managed_account: Optional[StripeManagedAccount] = None
-        if payment_account and payment_account.account_id:
+        if payment_account.account_id:
             stripe_managed_account = await self.payment_account_repo.get_stripe_managed_account_by_id(
                 payment_account.account_id
             )
+
         verification_requirements = None
         if stripe_managed_account and include_verification_requirements_get_account():
             verification_requirements = account_models.VerificationRequirements(

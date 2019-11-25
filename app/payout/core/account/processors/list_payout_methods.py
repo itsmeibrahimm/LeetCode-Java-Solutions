@@ -76,8 +76,8 @@ class ListPayoutMethod(
             for payout_method in payout_method_list:
                 card = payout_card_map.get(payout_method.id, None)
                 if not card:
-                    self.logger.warning(
-                        "payout_card does not exist for payout_method",
+                    self.logger.error(
+                        "[Payout Account] payout_card does not exist for payout_method",
                         payout_method_id=payout_method.id,
                     )
                 else:
@@ -109,14 +109,26 @@ class ListPayoutMethod(
                 self.request.payout_account_id
             )
             if not payout_account:
+                self.logger.error(
+                    "[Payout Account] get_payment_account_by_id failed",
+                    extra={"payout_account_id": self.request.payout_account_id},
+                )
                 raise payout_account_not_found_error()
             if not payout_account.account_id:
+                self.logger.error(
+                    "[Payout Account] no pgp account exist",
+                    extra={"payout_account_id": self.request.payout_account_id},
+                )
                 raise pgp_account_not_found_error()
 
             stripe_managed_account = await self.payment_account_repo.get_stripe_managed_account_by_id(
                 payout_account.account_id
             )
             if not stripe_managed_account:
+                self.logger.error(
+                    "[Payout Account] no pgp account exist",
+                    extra={"payout_account_id": self.request.payout_account_id},
+                )
                 raise pgp_account_not_found_error()
             payout_bank_account_internal_list = [
                 account_models.PayoutBankAccountInternal(

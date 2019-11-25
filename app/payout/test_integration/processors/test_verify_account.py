@@ -148,7 +148,7 @@ class TestVerifyPayoutAccount:
             await verify_account_op._execute()
         assert mock_create_account.called
         assert e.value.status_code == HTTP_400_BAD_REQUEST
-        assert e.value.error_code == PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND
+        assert e.value.error_code == PayoutErrorCode.PGP_ACCOUNT_CREATE_INVALID_REQUEST
         assert e.value.error_message == "test StripeError"
 
     async def test_verify_payout_account_update(

@@ -3,6 +3,7 @@ from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from app.commons.core.processor import AsyncOperation, OperationRequest
+from app.payout.constants import DEFAULT_STATEMENT_DESCRIPTOR
 from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.model.payment_account import PaymentAccountCreate
 from app.payout.repository.maindb.payment_account import (
@@ -13,7 +14,7 @@ from app.payout.models import PayoutAccountTargetType
 
 class CreatePayoutAccountRequest(OperationRequest):
     entity: PayoutAccountTargetType
-    statement_descriptor: str = "DoorDash, Inc."
+    statement_descriptor: str = DEFAULT_STATEMENT_DESCRIPTOR
 
 
 class CreatePayoutAccount(
@@ -41,7 +42,13 @@ class CreatePayoutAccount(
         payment_account = await self.payment_account_repo.create_payment_account(
             payment_account_create
         )
-        # todo: PAY-3566 implement the verification_requirements
+        self.logger.info(
+            "[Payout Account] created",
+            extra={
+                "payout_account_id": payment_account.id,
+                "entity": self.request.entity.value,
+            },
+        )
         return account_models.PayoutAccountInternal(payment_account=payment_account)
 
     def _handle_exception(

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from structlog.stdlib import BoundLogger
 from typing import Union
 
@@ -18,6 +20,7 @@ from app.payout.core.exceptions import (
 )
 from app.payout.repository.maindb.model.stripe_managed_account import (
     StripeManagedAccountCreateAndPaymentAccountUpdate,
+    StripeManagedAccountUpdate,
 )
 from app.payout.repository.maindb.payment_account import (
     PaymentAccountRepositoryInterface,
@@ -61,6 +64,10 @@ class VerifyPayoutAccount(
             self.request.payout_account_id
         )
         if not payment_account:
+            self.logger.error(
+                "[Account Verify] get_payment_account_by_id error",
+                extra={"payout_account_id": self.request.payout_account_id},
+            )
             raise payout_account_not_found_error()
 
         # get sma if payment_account.account_id is not null
@@ -69,36 +76,56 @@ class VerifyPayoutAccount(
             stripe_managed_account = await self.payment_account_repo.get_stripe_managed_account_by_id(
                 payment_account.account_id
             )
-            self.logger.info(
-                "pgp_account_id exists for payout account but no external account exists",
-                pgp_account_id=payment_account.account_id,
-                payment_account_id=payment_account.id,
-            )
 
         # create new stripe account if no sma
         if not stripe_managed_account:
             # create stripe account
+            self.logger.info(
+                "[Account Verify] creating stripe account",
+                extra={"payment_account_id": payment_account.id},
+            )
             create_account = CreateAccountRequest(
                 country=self.request.country, account_token=self.request.account_token
             )
-            # add more error handling
+            # call stripe to create an account
             try:
                 stripe_account = await self.stripe_client.create_account(
                     request=create_account
                 )
-            # TODO: more comprehensive error handling in PAY-3793
             except stripe_error.InvalidRequestError as e:
-                # raise BAD_REQUEST_ERROR
                 error_info = e.json_body.get("error", {})
                 stripe_error_message = error_info.get("message")
+                self.logger.error(
+                    "[Account Verify] create stripe account failed due to invalid request error",
+                    extra={
+                        "payment_account_id": payment_account.id,
+                        "account_token": self.request.account_token,
+                        "error": stripe_error_message,
+                    },
+                )
                 raise pgp_account_create_invalid_request(
                     error_message=stripe_error_message
                 )
             except stripe_error.StripeError as e:
                 error_info = e.json_body.get("error", {})
                 stripe_error_message = error_info.get("message")
+                self.logger.error(
+                    "[Account Verify] create stripe account error",
+                    extra={
+                        "payment_account_id": payment_account.id,
+                        "account_token": self.request.account_token,
+                        "error": stripe_error_message,
+                    },
+                )
                 raise pgp_account_create_error(stripe_error_message)
             except Exception:
+                self.logger.error(
+                    "[Account Verify] create stripe account failed due to other error",
+                    extra={
+                        "payment_account_id": payment_account.id,
+                        "account_token": self.request.account_token,
+                    },
+                )
                 raise pgp_account_create_error()
 
             # create stripe_managed_account and update the linked payment_account
@@ -109,8 +136,20 @@ class VerifyPayoutAccount(
                     payment_account_id=payment_account.id,
                 )
             )
+            self.logger.info(
+                "[Account Verify] create stripe account, sma and update payment_account succeed",
+                extra={
+                    "payment_account_id": payment_account.id,
+                    "stripe_account_id": stripe_account.id,
+                    "country": self.request.country.value,
+                },
+            )
         else:
             # update stripe account
+            self.logger.info(
+                "[Account Verify] updating stripe account",
+                extra={"payment_account_id": payment_account.id},
+            )
             update_account = UpdateAccountRequest(
                 id=stripe_managed_account.stripe_id,
                 country=self.request.country,
@@ -123,7 +162,36 @@ class VerifyPayoutAccount(
             except stripe_error.StripeError as e:
                 error_info = e.json_body.get("error", {})
                 stripe_error_message = error_info.get("message")
+                self.logger.error(
+                    "[Account Verify] updating stripe account error",
+                    extra={
+                        "payment_account_id": payment_account.id,
+                        "account_token": self.request.account_token,
+                        "error": stripe_error_message,
+                    },
+                )
                 raise pgp_account_update_error(stripe_error_message)
+            except Exception:
+                self.logger.error(
+                    "[Account Verify] update stripe account failed due to other error",
+                    extra={
+                        "payment_account_id": payment_account.id,
+                        "account_token": self.request.account_token,
+                    },
+                )
+                raise pgp_account_update_error()
+
+            # update sma
+            await self.payment_account_repo.update_stripe_managed_account_by_id(
+                stripe_managed_account_id=stripe_managed_account.id,
+                data=StripeManagedAccountUpdate(
+                    stripe_last_updated_at=datetime.utcnow()
+                ),
+            )
+            self.logger.info(
+                "[Account Verify] updating stripe account and sma succeed",
+                extra={"payment_account_id": payment_account.id},
+            )
 
         return models.PayoutAccountInternal(
             payment_account=payment_account, pgp_external_account_id=stripe_account.id

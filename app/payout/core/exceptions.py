@@ -185,8 +185,10 @@ def pgp_account_create_invalid_request(error_message: str = None) -> PayoutError
         http_status_code=HTTP_400_BAD_REQUEST,
         error_message=error_message
         if error_message
-        else payout_error_message_maps[PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND.value],
-        error_code=PayoutErrorCode.PGP_ACCOUNT_NOT_FOUND,
+        else payout_error_message_maps[
+            PayoutErrorCode.PGP_ACCOUNT_CREATE_INVALID_REQUEST.value
+        ],
+        error_code=PayoutErrorCode.PGP_ACCOUNT_CREATE_INVALID_REQUEST,
         retryable=False,
     )
 

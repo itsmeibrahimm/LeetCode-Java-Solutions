@@ -90,6 +90,10 @@ class CreatePayoutMethod(
             self.request.payout_account_id
         )
         if not payout_account:
+            self.logger.error(
+                "[Payout Method] get_payment_account_by_id error",
+                extra={"payout_account_id": self.request.payout_account_id},
+            )
             raise payout_account_not_found_error()
 
         stripe_managed_account = await get_stripe_managed_account_by_payout_account_id(
@@ -98,13 +102,19 @@ class CreatePayoutMethod(
         )
         if not stripe_managed_account or not stripe_managed_account.stripe_id:
             # no payment gateway provider account for this account
+            self.logger.error(
+                "[Payout Method] no pgp account exist error",
+                extra={"payout_account_id": self.request.payout_account_id},
+            )
             raise pgp_account_not_found_error()
 
         self.logger.info(
-            "Creating a new external account.",
-            type=self.request.type,
-            token=self.request.token,
-            payout_account_id=self.request.payout_account_id,
+            "[Payout Method] creating a new external account.",
+            extra={
+                "type": self.request.type,
+                "token": self.request.token,
+                "payout_account_id": self.request.payout_account_id,
+            },
         )
         country = CountryCode(stripe_managed_account.country_shortname)
         stripe_account_id = stripe_managed_account.stripe_id
@@ -119,27 +129,30 @@ class CreatePayoutMethod(
                 )
             )
             self.logger.info(
-                "A new external account has been added to stripe account for payout account.",
-                type=self.request.type,
-                token=self.request.token,
-                payout_account_id=self.request.payout_account_id,
+                "[Payout Method] a new external account has been added to stripe account for payout account.",
+                extra={
+                    "type": self.request.type,
+                    "token": self.request.token,
+                    "payout_account_id": self.request.payout_account_id,
+                },
             )
         except StripeError:
             self.logger.error(
-                "Failed to add a new external account on Stripe.",
+                "[Payout Method] Failed to add a new external account on Stripe error.",
                 type=self.request.type,
                 token=self.request.token,
                 payout_account_id=self.request.payout_account_id,
             )
-            # add more error handling, raise internal error for now
             raise payout_method_create_error()
 
         if not external_account:
             # Failed to create a stripe external account
             self.logger.error(
-                "Failed to add a new external account for payout account.",
-                payout_account_id=self.request.payout_account_id,
-                card_token=self.request.token,
+                "[Payout Method] failed to add a new external account for payout account error.",
+                extra={
+                    "payout_account_id": self.request.payout_account_id,
+                    "token": self.request.token,
+                },
             )
             raise payout_method_create_error()
 
@@ -167,12 +180,14 @@ class CreatePayoutMethod(
             )
         )
         self.logger.info(
-            "Added a new default card for payout account.",
-            payout_account_id=self.request.payout_account_id,
-            card_token=self.request.token,
-            brand=payout_card.brand,
-            last4=payout_card.last4,
-            fingerprint=payout_card.fingerprint,
+            "[Payout Method Create Card] added a new default card for payout account",
+            extra={
+                "payout_account_id": self.request.payout_account_id,
+                "card_token": self.request.token,
+                "brand": payout_card.brand,
+                "last4": payout_card.last4,
+                "fingerprint": payout_card.fingerprint,
+            },
         )
 
         return account_models.PayoutCardInternal(
@@ -211,7 +226,7 @@ class CreatePayoutMethod(
         )
         if not stripe_managed_account:
             self.logger.error(
-                "Added a new bank account, updating bank info on SMA failed.",
+                "[Payout Method Create Bank] added a new bank account, updating bank info on SMA error.",
                 stripe_managed_account_id=stripe_managed_account.id,
             )
             # SMA update failed, raise
@@ -223,7 +238,7 @@ class CreatePayoutMethod(
         new_fingerprint = stripe_managed_account.fingerprint
         if old_fingerprint == new_fingerprint:
             self.logger.warn(
-                "Added a new bank account, the new fingerprint is the same as the old one.",
+                "[Payout Method Create Bank] added a new bank account, the new fingerprint is the same as the old one.",
                 stripe_managed_account_id=stripe_managed_account.id,
             )
         else:
@@ -232,16 +247,18 @@ class CreatePayoutMethod(
             # so we can't do atomic update here
             # We should make update stripe_managed_account and payment_account_edit_history atomic after db migration
             self.logger.info(
-                "Added a new bank account for payment account.",
-                payment_account_id=self.request.payout_account_id,
-                bank_account_token=self.request.token,
-                stripe_managed_account_id=stripe_managed_account.id,
-                old_bank_name=old_bank_name,
-                old_bank_last4=old_bank_last4,
-                old_fingerprint=old_fingerprint,
-                new_bank_name=new_bank_name,
-                new_bank_last4=new_bank_last4,
-                new_fingerprint=new_fingerprint,
+                "[Payout Method Create Bank] added a new bank account for payment account",
+                extra={
+                    "payment_account_id": self.request.payout_account_id,
+                    "bank_account_token": self.request.token,
+                    "stripe_managed_account_id": stripe_managed_account.id,
+                    "old_bank_name": old_bank_name,
+                    "old_bank_last4": old_bank_last4,
+                    "old_fingerprint": old_fingerprint,
+                    "new_bank_name": new_bank_name,
+                    "new_bank_last4": new_bank_last4,
+                    "new_fingerprint": new_fingerprint,
+                },
             )
             payment_account_edit_history_record = await self.payment_account_edit_history_repo.record_bank_update(
                 data=PaymentAccountEditHistoryCreate(
@@ -264,7 +281,7 @@ class CreatePayoutMethod(
             )
             if payment_account_edit_history_record.new_fingerprint != new_fingerprint:
                 self.logger.error(
-                    "Added a new bank account, the new bank info has not been recorded in "
+                    "[Payout Method Create Bank] added a new bank account, the new bank info has not been recorded in "
                     "PaymentAccountEditHistory.",
                     stripe_managed_account_id=stripe_managed_account.id,
                 )

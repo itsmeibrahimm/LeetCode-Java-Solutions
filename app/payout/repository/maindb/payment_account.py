@@ -308,7 +308,9 @@ class PaymentAccountRepository(
     ) -> Tuple[StripeManagedAccount, PaymentAccount]:
         async with db_connection.transaction():
             stripe_managed_account_create = StripeManagedAccountCreate(
-                country_shortname=data.country_shortname, stripe_id=data.stripe_id
+                country_shortname=data.country_shortname,
+                stripe_id=data.stripe_id,
+                stripe_last_updated_at=datetime.now(timezone.utc),
             )
             stmt = (
                 stripe_managed_accounts.table.insert()

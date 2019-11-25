@@ -47,13 +47,17 @@ class GetPayoutMethod(
             payout_method_id=self.request.payout_method_id
         )
         if not payout_method:
-            self.logger.warning(
-                "No payout method existing for the given id",
+            self.logger.error(
+                "[Payout Account] no payout method existing for the given id",
                 payout_method_id=self.request.payout_method_id,
             )
             raise payout_method_not_found_error()
 
         if payout_method.payment_account_id != self.request.payout_account_id:
+            self.logger.error(
+                "[Payout Account] payment account for the payout method does not match with the one passed in",
+                payout_method_id=self.request.payout_method_id,
+            )
             raise payout_account_not_match_error()
 
         payout_card = await self.payout_card_repo.get_payout_card_by_id(
@@ -61,7 +65,7 @@ class GetPayoutMethod(
         )
         if not payout_card:
             self.logger.warning(
-                "No payout card existing for payout account while there's matching payout_method",
+                "[Payout Account] no payout card existing for payout account while there's matching payout_method",
                 payout_account_id=self.request.payout_account_id,
                 payout_method_id=payout_method.id,
             )

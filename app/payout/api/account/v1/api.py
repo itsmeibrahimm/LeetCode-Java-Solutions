@@ -102,7 +102,7 @@ async def create_payout_account(
     ),
     log: BoundLogger = Depends(get_logger_from_req),
 ):
-    log.debug("creating payment_account", extra=dict(body=body))
+    log.info("[Account Create] creating", extra=dict(body=body))
     internal_request = CreatePayoutAccountRequest(
         entity=body.target_type, statement_descriptor=body.statement_descriptor
     )
@@ -153,7 +153,12 @@ async def update_payout_account_statement_descriptor(
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
+    log: BoundLogger = Depends(get_logger_from_req),
 ):
+    log.info(
+        "[Account Update Statement Descriptor] updating",
+        extra={"payment_account_id": payout_account_id},
+    )
     internal_request = UpdatePayoutAccountStatementDescriptorRequest(
         payout_account_id=payout_account_id,
         statement_descriptor=body.dict().get("statement_descriptor"),
@@ -181,7 +186,9 @@ async def verify_payout_account_legacy(
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
+    log: BoundLogger = Depends(get_logger_from_req),
 ):
+    log.info("[Account Verify] verifying", extra=verification_details.dict())
     internal_request = VerifyPayoutAccountRequest(
         payout_account_id=payout_account_id,
         country=verification_details.country,
@@ -229,7 +236,9 @@ async def create_payout_method_bank(
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
+    log: BoundLogger = Depends(get_logger_from_req),
 ):
+    log.info("[Payout Method Create Bank] creating")
     internal_request = CreatePayoutMethodRequest(
         payout_account_id=payout_account_id,
         token=payout_method.token,
@@ -259,7 +268,9 @@ async def create_payout_method_card(
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
+    log: BoundLogger = Depends(get_logger_from_req),
 ):
+    log.info("[Payout Method Create Card] creating")
     internal_request = CreatePayoutMethodRequest(
         payout_account_id=payout_account_id,
         token=payout_method.token,

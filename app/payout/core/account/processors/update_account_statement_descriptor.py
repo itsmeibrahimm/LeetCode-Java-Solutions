@@ -40,11 +40,19 @@ class UpdatePayoutAccountStatementDescriptor(
         self.payment_account_repo = payment_account_repo
 
     async def _execute(self) -> account_models.PayoutAccountInternal:
+        self.logger.info(
+            "[Account Update Statement Descriptor] updating account statement_descriptor",
+            extra={"payment_account_id": self.request.payout_account_id},
+        )
         payment_account = await self.payment_account_repo.update_payment_account_by_id(
             payment_account_id=self.request.payout_account_id,
             data=PaymentAccountUpdate(
                 statement_descriptor=self.request.statement_descriptor
             ),
+        )
+        self.logger.info(
+            "[Account Update Statement Descriptor] updated account statement_descriptor",
+            extra={"payment_account_id": self.request.payout_account_id},
         )
         return account_models.PayoutAccountInternal(payment_account=payment_account)
 
