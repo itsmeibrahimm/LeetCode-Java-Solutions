@@ -21,8 +21,9 @@ while getopts ":e:p:" opt; do
 done
 
 export ENVIRONMENT=${environment}
+export WEB_PORT=${webport}
 
 python -m development.waitdependencies
 
-# start local server
-uvicorn app.main:app --reload --lifespan on --host 0.0.0.0 --port ${webport}
+# start local server with gunicorn -> uvicorn -> fastapi app
+gunicorn -k app.uvicorn_worker.UvicornWorker -c ./_infra/web/gunicorn_conf_local.py app.main:app

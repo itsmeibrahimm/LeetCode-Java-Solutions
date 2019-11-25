@@ -10,6 +10,7 @@ def monkey_patch_uvicorn_server():
 
     """
     from uvicorn.main import Server
+    from uvicorn.main import logger as uvicorn_logger
 
     # If need more custom signal handling need to add a map structure of {signal: handler}
     additional_signals = {signal.SIGABRT}
@@ -32,7 +33,7 @@ def monkey_patch_uvicorn_server():
             for sig in additional_signals:
                 signal.signal(sig, self.handle_exit)
 
-        self.logger.info(
+        uvicorn_logger.info(
             f"[UvicornServer] installed additional handlers={additional_signals}"
         )
 
@@ -51,34 +52,20 @@ class UvicornWorker(DefaultUvicornWorker):
         "loop": "uvloop",
         "http": "httptools",
         "lifespan": "on",
+        # Disable uvicorn access log for now, since newer version use INFO level log print out api-key in header...
+        "access_log": False,
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._configure_worker_max_requests()
+
         self.log.info(
-            f"[UvicornWorker] worker initialized with config={self.config.__dict__}"
-        )
-
-    def _configure_worker_max_requests(self):
-        """
-        configure maximum number of requests handled by single worker before shut down and re-spawn a new one.
-
-        Gunicorn `max_requests` and `max_requests_jitter` were not wired into default uvicorn worker.
-        Instead Uvicorn worker uses `limit_max_requests` to set maximum number of requests a single worker
-        process can handle before being recycled to prevent memory leak effect
-
-        The base class - `gunicorn.workers.base.Worker` will init `max_requests` from gunicorn configured
-        `max_requests` and `max_requets_jitter` see: http://docs.gunicorn.org/en/stable/settings.html#max-requests
-
-        Correspondingly, we directly use Worker::max_requests to set UvicornWorker.limit_max_requests without a separate
-        configuration. see: https://www.uvicorn.org/settings/#resource-limits
-        """
-        self.config.limit_max_requests = self.max_requests
-        self.log.info(
-            f"configure uvicorn worker limit_max_requests={self.config.limit_max_requests} "
+            f"[UvicornWorker] configure uvicorn worker limit_max_requests={self.config.limit_max_requests} "
             f"based on gunicorn configured max_requests={self.cfg.max_requests} "
             f"and max_requests_jitter={self.cfg.max_requests_jitter}"
+        )
+        self.log.info(
+            f"[UvicornWorker] worker initialized with config={self.config.__dict__}"
         )
 
     async def callback_notify(self):

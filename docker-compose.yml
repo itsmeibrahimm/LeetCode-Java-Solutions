@@ -12,6 +12,7 @@ services:
     volumes:
       - $PWD/app:/home/app
       - $PWD/development:/home/development
+      - $PWD/_infra/web/gunicorn_conf_local.py:/home/_infra/web/gunicorn_conf_local.py
     ports:
       - ${WEB_PORT:?Please specify WEB_PORT}:${WEB_PORT}
     environment:

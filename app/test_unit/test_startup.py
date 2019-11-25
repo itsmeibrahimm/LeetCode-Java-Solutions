@@ -116,12 +116,20 @@ class TestStartup:
         )
         gunicorn.logfile = sys.stdout  # log to stdout
         workers: List[Process] = []
+
         try:
             # gunicorn startup, try to capture our own log line defined in app/uvicorn_worker.py
-            gunicorn.expect(
-                [f"configure uvicorn worker limit_max_requests="],
-                timeout=self.TIMEOUT_SECONDS,
-            )
+
+            # because of jitter, actual result max_requests can be within [max_request-jitter ... max_request+jitter]
+            expected_max_requests = [
+                max_requests + delta
+                for delta in range(-max_requests_jitter, max_requests_jitter + 1)
+            ]
+            expected_log_lines = [
+                f"\[UvicornWorker\] configure uvicorn worker limit_max_requests={expected_max_request}"
+                for expected_max_request in expected_max_requests
+            ]
+            gunicorn.expect(expected_log_lines, timeout=self.TIMEOUT_SECONDS)
 
             # see https://github.com/benoitc/gunicorn/blob/f38f717539b1b7296720805b8ae3969c3509b9c1/gunicorn/arbiter.py#L583
             gunicorn.expect(["Started server process"], timeout=self.TIMEOUT_SECONDS)
