@@ -12,8 +12,10 @@ from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
+__all__ = ["run_recoup"]
 
-def build_commando_processor(app_context: AppContext) -> CommandoProcessor:
+
+def _build_commando_processor(app_context: AppContext) -> CommandoProcessor:
     req_context = build_req_context(app_context)
     payment_method_repo = PaymentMethodRepository(context=app_context)
     payer_repo = PayerRepository(context=app_context)
@@ -59,11 +61,19 @@ def build_commando_processor(app_context: AppContext) -> CommandoProcessor:
     return commando_processor
 
 
-async def recoup(app_context: AppContext):
-    commando_processor = build_commando_processor(app_context)
+async def _recoup(app_context: AppContext):
+    commando_processor = _build_commando_processor(app_context)
     await commando_processor.recoup(limit=10000, chunk_size=100)
 
 
 def run_recoup(app_context: AppContext):
+    """
+    Recoup all payment intents that are created under stripe commando mode
+    Args:
+        app_context: app_context
+
+    Returns: None
+
+    """
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(recoup(app_context))
+    loop.run_until_complete(_recoup(app_context))

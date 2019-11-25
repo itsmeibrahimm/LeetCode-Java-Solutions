@@ -54,6 +54,7 @@ RUN apt-get clean && \
 COPY _infra/web/gunicorn_conf.py /home/
 COPY _infra/infra.mk /home/_infra/infra.mk
 COPY app /home/app
+COPY scripts /home/scripts
 COPY development /home/development
 COPY migrations /home/migrations
 COPY pulse /home/pulse
