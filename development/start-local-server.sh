@@ -26,4 +26,4 @@ export WEB_PORT=${webport}
 python -m development.waitdependencies
 
 # start local server with gunicorn -> uvicorn -> fastapi app
-gunicorn -k app.uvicorn_worker.UvicornWorker -c ./_infra/web/gunicorn_conf_local.py app.main:app
+gunicorn -k app.uvicorn_worker.UvicornWorker -c ./development/gunicorn_conf_local.py app.main:app
