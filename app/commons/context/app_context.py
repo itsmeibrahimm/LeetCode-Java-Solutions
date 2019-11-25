@@ -186,6 +186,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
     if "ledger" in config.INCLUDED_APPS:
         await asyncio.gather(ledger_maindb.connect(), ledger_paymentdb.connect())
 
+    if "purchasecard" in config.INCLUDED_APPS:
+        await asyncio.gather(purchasecard_maindb.connect())
+
     stripe_client = StripeClient(
         settings_list=[
             # TODO: add CA/AU
