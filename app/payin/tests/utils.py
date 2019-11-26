@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import MagicMock
 
@@ -63,6 +63,8 @@ def generate_payment_intent(
     captured_at: Optional[datetime] = None,
     legacy_consumer_charge_id: LegacyConsumerChargeId = LegacyConsumerChargeId(1),
     application_fee_amount: int = 0,
+    created_at: datetime = datetime.now(timezone.utc),
+    capture_after: Optional[datetime] = None,
 ):
     return PaymentIntent(
         id=id if id else uuid.uuid4(),
@@ -78,10 +80,11 @@ def generate_payment_intent(
         statement_descriptor="descriptor",
         payment_method_id=uuid.uuid4(),
         legacy_consumer_charge_id=legacy_consumer_charge_id,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=created_at,
+        updated_at=datetime.now(timezone.utc),
         captured_at=captured_at,
         cancelled_at=None,
+        capture_after=capture_after,
     )
 
 
@@ -96,6 +99,7 @@ def generate_pgp_payment_intent(
     resource_id: str = None,
     charge_resource_id: str = "charge_resource_id",
     payout_account_id: str = None,
+    created_at: datetime = datetime.now(timezone.utc),
 ) -> PgpPaymentIntent:
     return PgpPaymentIntent(
         id=id if id else uuid.uuid4(),
@@ -115,8 +119,8 @@ def generate_pgp_payment_intent(
         application_fee_amount=0,
         payout_account_id=payout_account_id,
         capture_method=capture_method,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=created_at,
+        updated_at=datetime.now(timezone.utc),
         captured_at=None,
         cancelled_at=None,
     )

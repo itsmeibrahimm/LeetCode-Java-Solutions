@@ -1,6 +1,6 @@
 import uuid
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import asynctest
@@ -989,7 +989,6 @@ class TestCartPaymentInterface:
             updated_at=result_payment_intent.updated_at,  # Generated field
             captured_at=None,
             cancelled_at=None,
-            capture_after=result_payment_intent.capture_after,
             legacy_consumer_charge_id=LegacyConsumerChargeId(9999),
         )
         assert result_payment_intent
@@ -997,12 +996,7 @@ class TestCartPaymentInterface:
         assert result_payment_intent.id
         assert result_payment_intent.created_at
         assert result_payment_intent.updated_at
-        assert result_payment_intent.capture_after == (
-            datetime(2011, 1, 1)
-            + timedelta(
-                minutes=cart_payment_interface.capture_service.default_capture_delay_in_minutes
-            )
-        )
+        assert not result_payment_intent.capture_after
 
         # TODO check pgp_payment_intent as well
 
@@ -1077,7 +1071,6 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_create_new_intent_pair(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
-        capture_after = datetime.utcnow()
         result_intent, result_pgp_intent = await cart_payment_interface._create_new_intent_pair(
             cart_payment_id=cart_payment.id,
             idempotency_key="idempotency_key",
@@ -1090,7 +1083,6 @@ class TestCartPaymentInterface:
             currency="USD",
             split_payment=cart_payment.split_payment,
             capture_method=CaptureMethod.MANUAL,
-            capture_after=capture_after,
             payer_statement_description=None,
             legacy_consumer_charge_id=LegacyConsumerChargeId(560),
         )
@@ -1112,7 +1104,6 @@ class TestCartPaymentInterface:
             legacy_consumer_charge_id=LegacyConsumerChargeId(560),
             created_at=result_intent.created_at,  # Generated field
             updated_at=result_intent.updated_at,  # Generated field
-            capture_after=capture_after,
             captured_at=None,
             cancelled_at=None,
         )
@@ -1154,6 +1145,7 @@ class TestCartPaymentInterface:
         assert result_intent.id
         assert result_intent.created_at
         assert result_intent.updated_at
+        assert not result_intent.capture_after
 
     @pytest.mark.asyncio
     async def test_submit_payment_to_provider(self, cart_payment_interface):
@@ -1304,11 +1296,14 @@ class TestCartPaymentInterface:
         )
 
     @pytest.mark.asyncio
-    async def test_update_payment_after_submission_to_provider(
+    async def test_update_payment_after_submission_to_provider_from_init_to_requires_capture(
         self, cart_payment_interface
     ):
-        intent = generate_payment_intent(status="requires_capture")
-        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        now = datetime.utcnow()
+        created_at = now.astimezone(timezone.utc) - timedelta(days=5)
+
+        intent = generate_payment_intent(status="init", created_at=created_at)
+        pgp_intent = generate_pgp_payment_intent(status="init", created_at=created_at)
         pgp_payment_method = PgpPaymentMethod(
             pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
@@ -1323,11 +1318,17 @@ class TestCartPaymentInterface:
             provider_description="test_description",
         )
 
-        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_submission_to_provider(
-            intent, pgp_intent, provider_intent
-        )
+        assert intent.status != IntentStatus.REQUIRES_CAPTURE
+        assert not intent.capture_after
+        with freeze_time(now):  # freeze time to make updated capture_after predictable
+            result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_submission_to_provider(
+                intent, pgp_intent, provider_intent
+            )
 
         assert result_intent.status == IntentStatus.REQUIRES_CAPTURE
+        assert result_intent.capture_after == now + timedelta(
+            minutes=cart_payment_interface.capture_service.default_capture_delay_in_minutes
+        )
         assert result_pgp_intent.status == IntentStatus.REQUIRES_CAPTURE
 
     @pytest.mark.asyncio
@@ -1762,10 +1763,10 @@ class TestCapturePayment:
     @pytest.mark.asyncio
     async def test_cannot_acquire_lock(self, cart_payment_processor):
         payment_intent = PaymentIntentFactory(status=IntentStatus.REQUIRES_CAPTURE)
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status = (  # type: ignore
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent = (  # type: ignore
             MagicMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status.side_effect = (
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent.side_effect = (
             # type: ignore
             PaymentIntentCouldNotBeUpdatedError()
         )
@@ -1781,10 +1782,10 @@ class TestCapturePayment:
         cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent = (  # type: ignore
             asynctest.CoroutineMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status = (  # type: ignore
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent = (  # type: ignore
             asynctest.CoroutineMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status.return_value = (
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent.return_value = (
             # type: ignore
             payment_intent
         )

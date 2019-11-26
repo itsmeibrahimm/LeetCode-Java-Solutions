@@ -351,7 +351,7 @@ class TestCartPaymentProcessor:
         cart_payment_processor.cart_payment_interface.get_cart_payment_intents = FunctionMock(
             return_value=intents_for_cart_payment
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent_status = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.update_payment_intent = FunctionMock(
             return_value=generate_payment_intent(
                 id=intents_for_cart_payment[0].id,
                 amount=new_amount,

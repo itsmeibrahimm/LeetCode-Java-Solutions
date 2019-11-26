@@ -62,13 +62,14 @@ class UpdatePgpPaymentIntentSetInput(DBRequestModel):
     cancelled_at: Optional[datetime] = None
 
 
-class UpdatePaymentIntentStatusWhereInput(DBRequestModel):
+class UpdatePaymentIntentWhereInput(DBRequestModel):
     id: UUID
     previous_status: str
 
 
-class UpdatePaymentIntentStatusSetInput(DBRequestModel):
+class UpdatePaymentIntentSetInput(DBRequestModel):
     status: str
+    capture_after: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
 
@@ -279,6 +280,7 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def insert_payment_intent(
         self,
+        *,
         id: UUID,
         cart_payment_id: UUID,
         idempotency_key: str,
@@ -350,10 +352,10 @@ class CartPaymentRepository(PayinDBRepository):
             capture_after=row[payment_intents.capture_after],
         )
 
-    async def update_payment_intent_status(
+    async def update_payment_intent(
         self,
-        update_payment_intent_status_where_input: UpdatePaymentIntentStatusWhereInput,
-        update_payment_intent_status_set_input: UpdatePaymentIntentStatusSetInput,
+        update_payment_intent_status_where_input: UpdatePaymentIntentWhereInput,
+        update_payment_intent_status_set_input: UpdatePaymentIntentSetInput,
     ) -> PaymentIntent:
         """
         Updates a payment intent's status taking into account the previous status to prevent

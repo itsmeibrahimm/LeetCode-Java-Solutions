@@ -35,8 +35,8 @@ from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
     UpdateCartPaymentPostCancellationInput,
-    UpdatePaymentIntentStatusSetInput,
-    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentSetInput,
+    UpdatePaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
 )
@@ -1011,13 +1011,13 @@ class TestUpdatePaymentIntentStatus:
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
-        update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+        update_payment_intent_status_where_input = UpdatePaymentIntentWhereInput(
             id=payment_intent.id, previous_status=IntentStatus.REQUIRES_CAPTURE.value
         )
-        update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+        update_payment_intent_status_set_input = UpdatePaymentIntentSetInput(
             status=IntentStatus.CAPTURING.value, updated_at=datetime.now(timezone.utc)
         )
-        payment_intent = await cart_payment_repository.update_payment_intent_status(
+        payment_intent = await cart_payment_repository.update_payment_intent(
             update_payment_intent_status_where_input=update_payment_intent_status_where_input,
             update_payment_intent_status_set_input=update_payment_intent_status_set_input,
         )
@@ -1033,14 +1033,14 @@ class TestUpdatePaymentIntentStatus:
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
-        update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+        update_payment_intent_status_where_input = UpdatePaymentIntentWhereInput(
             id=payment_intent.id, previous_status=IntentStatus.REQUIRES_CAPTURE.value
         )
         now = datetime.now(timezone.utc)
-        update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+        update_payment_intent_status_set_input = UpdatePaymentIntentSetInput(
             status=IntentStatus.CAPTURING.value, updated_at=now
         )
-        updated_payment_intent = await cart_payment_repository.update_payment_intent_status(
+        updated_payment_intent = await cart_payment_repository.update_payment_intent(
             update_payment_intent_status_where_input=update_payment_intent_status_where_input,
             update_payment_intent_status_set_input=update_payment_intent_status_set_input,
         )
@@ -1050,6 +1050,9 @@ class TestUpdatePaymentIntentStatus:
             == update_payment_intent_status_set_input.updated_at
         )
         assert (
+            updated_payment_intent.capture_after == payment_intent.capture_after
+        ), "capture_after shouldn't change when not specified in update input"
+        assert (
             updated_payment_intent.cancelled_at is None
         )  # cancelled_at is not updated
         assert updated_payment_intent.amount == payment_intent.amount  # No change
@@ -1058,14 +1061,30 @@ class TestUpdatePaymentIntentStatus:
             == payment_intent.application_fee_amount
         )  # No change
 
-        now = datetime.now(timezone.utc)
-        cancel_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+        update_payment_intent_status_where_input = UpdatePaymentIntentWhereInput(
             id=payment_intent.id, previous_status=IntentStatus.CAPTURING.value
         )
-        cancel_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+        now = datetime.now(timezone.utc)
+        new_capture_after = datetime.utcnow() + timedelta(days=100)
+        update_payment_intent_status_set_input = UpdatePaymentIntentSetInput(
+            status=IntentStatus.CAPTURING.value,
+            updated_at=now,
+            capture_after=new_capture_after,
+        )
+        updated_payment_intent = await cart_payment_repository.update_payment_intent(
+            update_payment_intent_status_where_input=update_payment_intent_status_where_input,
+            update_payment_intent_status_set_input=update_payment_intent_status_set_input,
+        )
+        assert updated_payment_intent.capture_after == new_capture_after
+
+        now = datetime.now(timezone.utc)
+        cancel_payment_intent_status_where_input = UpdatePaymentIntentWhereInput(
+            id=payment_intent.id, previous_status=IntentStatus.CAPTURING.value
+        )
+        cancel_payment_intent_status_set_input = UpdatePaymentIntentSetInput(
             status=IntentStatus.CANCELLED.value, cancelled_at=now
         )
-        cancelled_payment_intent = await cart_payment_repository.update_payment_intent_status(
+        cancelled_payment_intent = await cart_payment_repository.update_payment_intent(
             update_payment_intent_status_where_input=cancel_payment_intent_status_where_input,
             update_payment_intent_status_set_input=cancel_payment_intent_status_set_input,
         )
@@ -1084,14 +1103,14 @@ class TestUpdatePaymentIntentStatus:
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
-        update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+        update_payment_intent_status_where_input = UpdatePaymentIntentWhereInput(
             id=payment_intent.id, previous_status=IntentStatus.REQUIRES_CAPTURE.value
         )
         now = datetime.now(timezone.utc)
-        update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+        update_payment_intent_status_set_input = UpdatePaymentIntentSetInput(
             status=IntentStatus.CANCELLED.value, updated_at=now, cancelled_at=now
         )
-        cancelled_payment_intent = await cart_payment_repository.update_payment_intent_status(
+        cancelled_payment_intent = await cart_payment_repository.update_payment_intent(
             update_payment_intent_status_where_input=update_payment_intent_status_where_input,
             update_payment_intent_status_set_input=update_payment_intent_status_set_input,
         )
@@ -1117,11 +1136,11 @@ class TestUpdatePaymentIntentStatus:
         payment_intent: PaymentIntent,
     ):
         with pytest.raises(PaymentIntentCouldNotBeUpdatedError):
-            await cart_payment_repository.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+            await cart_payment_repository.update_payment_intent(
+                update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                     id=payment_intent.id, previous_status=IntentStatus.INIT.value
                 ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
                     status=IntentStatus.CAPTURING.value,
                     updated_at=datetime.now(timezone.utc),
                 ),

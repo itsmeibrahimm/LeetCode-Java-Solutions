@@ -10,8 +10,8 @@ from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusWhereInput,
-    UpdatePaymentIntentStatusSetInput,
+    UpdatePaymentIntentWhereInput,
+    UpdatePaymentIntentSetInput,
 )
 from app.payin.test_integration.processors.cart_payment_test_base import (
     CartPaymentLegacyTest,
@@ -40,11 +40,11 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
         )
         now = datetime.now(timezone.utc)
         async for intent in dirty_payment_intents:
-            await cart_payment_repository.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+            await cart_payment_repository.update_payment_intent(
+                update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                     id=intent.id, previous_status=intent.status
                 ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
                     status=IntentStatus.FAILED, updated_at=now
                 ),
             )
@@ -178,11 +178,11 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
 
         # 4 flip back payment intent status
         now = datetime.now(timezone.utc)
-        flipped_payment_intent = await cart_payment_repository.update_payment_intent_status(
-            update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+        flipped_payment_intent = await cart_payment_repository.update_payment_intent(
+            update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                 id=updated_payment_intent.id, previous_status=IntentStatus.CAPTURING
             ),
-            update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+            update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
                 status=IntentStatus.REQUIRES_CAPTURE, updated_at=now
             ),
         )

@@ -96,8 +96,8 @@ from app.payin.core.types import (
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
     UpdateCartPaymentPostCancellationInput,
-    UpdatePaymentIntentStatusSetInput,
-    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentSetInput,
+    UpdatePaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
 )
@@ -646,13 +646,6 @@ class CartPaymentInterface:
             amount=request_cart_payment.amount,
         )
 
-        # Capture after
-        capture_after = None
-        if request_cart_payment.delay_capture:
-            capture_after = datetime.utcnow() + timedelta(
-                minutes=self.capture_service.default_capture_delay_in_minutes
-            )
-
         # Capture Method
         capture_method = (
             CaptureMethod.MANUAL
@@ -696,7 +689,6 @@ class CartPaymentInterface:
                 split_payment=request_cart_payment.split_payment,
                 capture_method=capture_method,
                 payer_statement_description=request_cart_payment.payer_statement_description,
-                capture_after=capture_after,
             )
 
         self.req_context.log.debug(
@@ -768,7 +760,6 @@ class CartPaymentInterface:
         currency: str,
         split_payment: Optional[SplitPayment],
         capture_method: str,
-        capture_after: Optional[datetime],
         payer_statement_description: Optional[str] = None,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         # Create PaymentIntent
@@ -786,10 +777,10 @@ class CartPaymentInterface:
             capture_method=capture_method,
             status=IntentStatus.INIT,
             statement_descriptor=payer_statement_description,
-            capture_after=capture_after,
             payment_method_id=payment_method_id,
             metadata=provider_metadata,
             legacy_consumer_charge_id=legacy_consumer_charge_id,
+            capture_after=None,
         )
 
         # Create PgpPaymentIntent
@@ -994,15 +985,28 @@ class CartPaymentInterface:
         target_intent_status = self._get_intent_status_from_provider_status(
             provider_payment_intent.status
         )
+
+        # Only update capture_after if payment_intent.status before != requires_capture and after == requires_capture
+        capture_after: Optional[datetime] = None
+        if (
+            payment_intent.status != target_intent_status
+            and target_intent_status == IntentStatus.REQUIRES_CAPTURE
+        ):
+            capture_after = datetime.utcnow() + timedelta(
+                minutes=self.capture_service.default_capture_delay_in_minutes
+            )
+
         async with self.payment_repo.payment_database_transaction():
             # Update the records we created to reflect that the provider has been invoked.
             # Cannot gather calls here because of shared connection/transaction
-            updated_intent = await self.payment_repo.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+            updated_intent = await self.payment_repo.update_payment_intent(
+                update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                     id=payment_intent.id, previous_status=payment_intent.status
                 ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
-                    status=target_intent_status, updated_at=datetime.now(timezone.utc)
+                update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
+                    status=target_intent_status,
+                    updated_at=datetime.now(timezone.utc),
+                    capture_after=capture_after,
                 ),
             )
             update_pgp_payment_intent_where_input = UpdatePgpPaymentIntentWhereInput(
@@ -1035,11 +1039,11 @@ class CartPaymentInterface:
     async def acquire_for_capture(self, payment_intent: PaymentIntent):
         # Throws exception if current state is not same as intent, meaning another request/process has already transitioned
         # intent to a different state.
-        return await self.payment_repo.update_payment_intent_status(
-            update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+        return await self.payment_repo.update_payment_intent(
+            update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                 id=payment_intent.id, previous_status=payment_intent.status
             ),
-            update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+            update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
                 status=IntentStatus.CAPTURING, updated_at=datetime.now(timezone.utc)
             ),
         )
@@ -1475,11 +1479,11 @@ class CartPaymentInterface:
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
         now = datetime.now(timezone.utc)
         async with self.payment_repo.payment_database_transaction():
-            updated_intent = await self.payment_repo.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+            updated_intent = await self.payment_repo.update_payment_intent(
+                update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                     id=payment_intent.id, previous_status=payment_intent.status
                 ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
                     status=IntentStatus.CANCELLED, updated_at=now, cancelled_at=now
                 ),
             )
@@ -1622,7 +1626,6 @@ class CartPaymentInterface:
                 split_payment=split_payment,
                 capture_method=most_recent_intent.capture_method,
                 payer_statement_description=most_recent_intent.statement_descriptor,
-                capture_after=most_recent_intent.capture_after,
             )
 
             # Insert adjustment history record
@@ -1785,11 +1788,11 @@ class CartPaymentInterface:
             pgp_payment_intent_id=pgp_payment_intent.id,
         )
         async with self.payment_repo.payment_database_transaction():
-            updated_intent = await self.payment_repo.update_payment_intent_status(
-                update_payment_intent_status_where_input=UpdatePaymentIntentStatusWhereInput(
+            updated_intent = await self.payment_repo.update_payment_intent(
+                update_payment_intent_status_where_input=UpdatePaymentIntentWhereInput(
                     id=payment_intent.id, previous_status=payment_intent.status
                 ),
-                update_payment_intent_status_set_input=UpdatePaymentIntentStatusSetInput(
+                update_payment_intent_status_set_input=UpdatePaymentIntentSetInput(
                     status=IntentStatus.FAILED, updated_at=datetime.now(timezone.utc)
                 ),
             )

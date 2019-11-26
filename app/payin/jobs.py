@@ -22,8 +22,8 @@ from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusSetInput,
-    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentSetInput,
+    UpdatePaymentIntentWhereInput,
 )
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
@@ -386,13 +386,13 @@ class ResolveCapturingPaymentIntents(Job):
                 new_status = IntentStatus.CAPTURE_FAILED
                 to_capture_failed_count += 1
 
-            update_payment_intent_status_where_input = UpdatePaymentIntentStatusWhereInput(
+            update_payment_intent_status_where_input = UpdatePaymentIntentWhereInput(
                 id=payment_intent.id, previous_status=payment_intent.status
             )
-            update_payment_intent_status_set_input = UpdatePaymentIntentStatusSetInput(
+            update_payment_intent_status_set_input = UpdatePaymentIntentSetInput(
                 status=new_status, updated_at=datetime.now(timezone.utc)
             )
-            task = cart_payment_repo.update_payment_intent_status(
+            task = cart_payment_repo.update_payment_intent(
                 update_payment_intent_status_where_input=update_payment_intent_status_where_input,
                 update_payment_intent_status_set_input=update_payment_intent_status_set_input,
             )

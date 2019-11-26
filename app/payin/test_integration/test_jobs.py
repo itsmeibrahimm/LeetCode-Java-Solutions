@@ -15,7 +15,7 @@ from app.payin.jobs import (
 )
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
-    UpdatePaymentIntentStatusWhereInput,
+    UpdatePaymentIntentWhereInput,
 )
 
 
@@ -126,9 +126,9 @@ class TestResolveCapturingPaymentIntents:
         )
         await job_instance.run()
         await stripe_pool.join()
-        mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once()  # type: ignore
+        mock_cart_payment_repository.return_value.update_payment_intent.assert_called_once()  # type: ignore
         args, kwargs = (
-            mock_cart_payment_repository.return_value.update_payment_intent_status.call_args  # type: ignore
+            mock_cart_payment_repository.return_value.update_payment_intent.call_args  # type: ignore
         )
         assert "update_payment_intent_status_where_input" in kwargs
         assert (
@@ -180,14 +180,14 @@ class TestResolveCapturingPaymentIntents:
         )
         await job_instance.run()
         await stripe_pool.join()
-        mock_cart_payment_repository.return_value.update_payment_intent_status.assert_called_once()  # type: ignore
+        mock_cart_payment_repository.return_value.update_payment_intent.assert_called_once()  # type: ignore
         args, kwargs = (
-            mock_cart_payment_repository.return_value.update_payment_intent_status.call_args  # type: ignore
+            mock_cart_payment_repository.return_value.update_payment_intent.call_args  # type: ignore
         )
         update_payment_intent_status_where_input = kwargs[
             "update_payment_intent_status_where_input"
         ]
-        update_payment_intent_status_where_request = UpdatePaymentIntentStatusWhereInput(
+        update_payment_intent_status_where_request = UpdatePaymentIntentWhereInput(
             id=payment_intent.id, previous_status=IntentStatus.CAPTURING.value
         )
         assert (
