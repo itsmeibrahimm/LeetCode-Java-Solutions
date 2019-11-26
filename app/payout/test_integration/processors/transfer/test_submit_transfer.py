@@ -494,6 +494,17 @@ class TestSubmitTransfer:
             side_effect=mock_create_payout,
         )
 
+        mocked_balance = mock_balance()  # amount = 20
+
+        @asyncio.coroutine
+        def mock_retrieve_balance(*args, **kwargs):
+            return mocked_balance
+
+        mocker.patch(
+            "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_balance",
+            side_effect=mock_retrieve_balance,
+        )
+
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
             payment_account_repo=payment_account_repo

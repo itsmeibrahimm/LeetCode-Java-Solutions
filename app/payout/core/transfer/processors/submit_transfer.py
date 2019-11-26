@@ -74,7 +74,6 @@ from app.payout.models import (
     TransferMethodType,
     TRANSFER_METHOD_CHOICES,
     AccountType,
-    PayoutAccountTargetType,
     PayoutTargetType,
     StripeTransferSubmissionStatus,
     STRIPE_TRANSFER_FAILED_STATUS,
@@ -455,20 +454,17 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         :param transfer_id: transfer_id, int
         :param amount: amount of the transfer
         """
-        if payment_account.entity == PayoutAccountTargetType.DASHER:
-            amount_still_needed = amount
-        else:
-            stripe_managed_account = (
-                await self.payment_account_repo.get_stripe_managed_account_by_id(
-                    payment_account.account_id
-                )
-                if payment_account.account_id
-                else None
+        stripe_managed_account = (
+            await self.payment_account_repo.get_stripe_managed_account_by_id(
+                payment_account.account_id
             )
-            account_balance = await get_account_balance(
-                stripe_managed_account=stripe_managed_account, stripe=self.stripe
-            )
-            amount_still_needed = amount - account_balance
+            if payment_account.account_id
+            else None
+        )
+        account_balance = await get_account_balance(
+            stripe_managed_account=stripe_managed_account, stripe=self.stripe
+        )
+        amount_still_needed = amount - account_balance
         managed_account_transfer = await self.managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
             transfer_id=transfer_id
         )
