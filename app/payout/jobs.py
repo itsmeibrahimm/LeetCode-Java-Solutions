@@ -192,7 +192,10 @@ class RetryInstantPayoutInNew(Job):
         Get all instant payouts in new status from [current_time - 3 hours, current_time - 0.5 hour], and retry. The
         cron is controlled through feature flag.
         """
-        if not runtime.get_bool("enable_payment_service_instant_pay_cron_job", False):
+        if not runtime.get_bool(
+            "payout/feature-flags/enable_payment_service_instant_pay_cron_job.bool",
+            False,
+        ):
             return
 
         req_context = job_instance_cxt.build_req_context()
