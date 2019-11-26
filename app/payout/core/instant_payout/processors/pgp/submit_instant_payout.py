@@ -97,7 +97,8 @@ class SubmitInstantPayout(
             metadata=InstantPayoutDefaultMetaData,
             method=InstantPayoutDefaultMethod,
             statement_descriptor=InstantPayoutDefaultStatementDescriptor,
-            idempotency_key=self.request.idempotency_key,
+            # use idempotency_key from request_field to be consistent with the key in DSJ
+            idempotency_key=request_field["idempotency_key"],
         )
 
         utc_now = datetime.utcnow().replace(tzinfo=pytz.utc)

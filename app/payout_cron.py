@@ -9,7 +9,7 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
 from app.commons.context.logger import get_logger
-from app.payout.jobs import MonitorTransfersWithIncorrectStatus
+from app.payout.jobs import MonitorTransfersWithIncorrectStatus, RetryInstantPayoutInNew
 
 init_newrelic_agent()
 
@@ -85,6 +85,19 @@ scheduler.add_job(
     name=monitor_transfers_with_incorrect_status.job_name,
     trigger=CronTrigger(hour="7"),
 )
+
+retry_instant_pay_in_new = RetryInstantPayoutInNew(
+    app_context=app_context, job_pool=stripe_pool
+)
+
+# Only run retry_instant_pay_in_new cron on prod
+if app_config.ENVIRONMENT == "prod":
+    scheduler.add_job(
+        func=retry_instant_pay_in_new.run,
+        name=retry_instant_pay_in_new.job_name,
+        trigger=CronTrigger(minute="*/30"),
+    )
+
 
 scheduler.add_job(
     scheduler_heartbeat,

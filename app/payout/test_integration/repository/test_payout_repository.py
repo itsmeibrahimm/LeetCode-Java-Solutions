@@ -4,6 +4,8 @@ import uuid
 import pytest
 from datetime import datetime, timedelta
 
+import pytz
+
 from app.payout.core.instant_payout.models import (
     InstantPayoutStatusType,
     InstantPayoutDailyLimitCheckStatuses,
@@ -141,3 +143,20 @@ class TestPayoutRepository:
         )
         results.sort(key=lambda payout: payout.id, reverse=True)
         assert retrieved_payouts == results[1:3]
+
+    async def test_list_payout_in_new_status(self, payout_repo: PayoutRepository):
+        # Prepare and insert payout with all statuses
+        payout_account_id = random.randint(1, 2147483647)
+        inserted_payout = await prepare_and_insert_payout(
+            payout_repo=payout_repo,
+            ide_key="instant-payout-" + str(uuid.uuid4()),
+            payout_account_id=payout_account_id,
+            status=InstantPayoutStatusType.NEW.value,
+        )
+        current_time = datetime.utcnow().replace(tzinfo=pytz.utc)
+        all_in_new = await payout_repo.list_payout_in_new_status(end_time=current_time)
+        assert inserted_payout in all_in_new
+
+        new_time = current_time - timedelta(hours=2)
+        all_in_new = await payout_repo.list_payout_in_new_status(end_time=new_time)
+        assert inserted_payout not in all_in_new

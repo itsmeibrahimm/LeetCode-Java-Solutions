@@ -59,6 +59,12 @@ class PayoutRepositoryInterface(ABC):
     ) -> CreatePayoutsResponse:
         pass
 
+    @abstractmethod
+    async def list_payout_in_new_status(
+        self, end_time: datetime, start_time: Optional[datetime] = None
+    ) -> List[Payout]:
+        pass
+
 
 @final
 @tracing.track_breadcrumb(repository_name="payout")
@@ -246,3 +252,23 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
                 fee=payout.fee,
                 created_at=payout.created_at.replace(tzinfo=pytz.UTC),
             )
+
+    async def list_payout_in_new_status(
+        self, end_time: datetime, start_time: Optional[datetime] = None
+    ) -> List[Payout]:
+        # There is index on (status, created_at)
+        # Usually new status payout is very few, so start_time is optional here
+        conditions = [
+            payouts.created_at.__le__(end_time),
+            payouts.status == InstantPayoutStatusType.NEW.value,
+        ]
+        if start_time:
+            conditions.append(payouts.created_at.__ge__(start_time))
+        stmt = (
+            payouts.table.select().where(and_(*conditions)).order_by(desc(payouts.id))
+        )
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            return [Payout.from_row(row) for row in rows]
+        else:
+            return []
