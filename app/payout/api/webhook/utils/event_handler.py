@@ -3,11 +3,13 @@ from datetime import datetime
 import json
 from structlog.stdlib import BoundLogger
 
+from app.payout.core.instant_payout.models import InstantPayoutStatusType
 from app.payout.service import (
     PayoutRepositoryInterface,
     StripePayoutRequestRepositoryInterface,
     TransferRepositoryInterface,
     StripeTransferRepositoryInterface,
+    TransactionRepositoryInterface,
 )
 from app.payout.repository.bankdb.model.payout import PayoutUpdate, Payout
 from app.payout.repository.bankdb.model.stripe_payout_request import (
@@ -120,8 +122,10 @@ async def _syncing_events_to_db(
     stripe_payout_request: StripePayoutRequest,
     new_event: Dict[str, Any],
     i_payouts: PayoutRepositoryInterface,
+    i_transactions: TransactionRepositoryInterface,
     i_stripe_payout_requests: StripePayoutRequestRepositoryInterface,
     dsj_client: DSJClient,
+    log: BoundLogger = root_logger,
 ):
     #
     # Getting the latest events (events may arrive and be processed out of order)
@@ -156,6 +160,20 @@ async def _syncing_events_to_db(
                 stripe_payout_request.id, stripe_payout_request_update_data
             )
 
+            if status in {
+                InstantPayoutStatusType.FAILED.value,
+                InstantPayoutStatusType.CANCELLED.value,
+            }:
+                log.info(
+                    "[Payment Service Webhook] detaching transactions due to failed payout by webhook",
+                    payout_id=payout.id,
+                    event_id=event_id,
+                )
+                # transaction_ids not include fee_transaction id
+                await i_transactions.set_transaction_payout_id_by_ids(
+                    transaction_ids=payout.transaction_ids, payout_id=None
+                )
+
             # TODO: check status mapping
             return await dsj_client.post(
                 f"/v1/payouts/{payout.id}/status_update/", {"status": status}
@@ -166,6 +184,7 @@ async def _handle_stripe_instant_transfer_event(
     event: Dict[str, Any],
     country_code: str,
     i_payouts: PayoutRepositoryInterface,
+    i_transactions: TransactionRepositoryInterface,
     i_stripe_payout_requests: StripePayoutRequestRepositoryInterface,
     dsj_client: DSJClient,
 ) -> Any:
@@ -182,6 +201,7 @@ async def _handle_stripe_instant_transfer_event(
                     stripe_payout_request=stripe_payout_request,
                     new_event=event,
                     i_payouts=i_payouts,
+                    i_transactions=i_transactions,
                     i_stripe_payout_requests=i_stripe_payout_requests,
                     dsj_client=dsj_client,
                 )
@@ -214,6 +234,7 @@ async def handle_stripe_webhook_transfer_event(
                 event=event,
                 country_code=country_code,
                 i_payouts=payout_service.payouts,
+                i_transactions=payout_service.transactions,
                 i_stripe_payout_requests=payout_service.stripe_payout_requests,
                 dsj_client=payout_service.dsj_client,
             )
