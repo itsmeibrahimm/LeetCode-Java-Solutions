@@ -92,7 +92,7 @@ class SubmitSMATransfer(AsyncOperation[SMATransferRequest, SMATransferResponse])
             # Handle PGPConnectionError, PGPApiError and mark payout as error to avoid daily limit
             # And detach transactions
             self.logger.info(
-                "[Instant Payout Submit]: fail to submit SMA transfer, detaching transactions",
+                "[Instant Payout Submit]: fail to submit SMA transfer due to PGPError, detaching transactions",
                 request=self.request.dict(),
                 error=str(e),
             )
