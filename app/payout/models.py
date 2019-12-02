@@ -4,6 +4,7 @@ from enum import Enum
 # Payout Accounts
 from typing import Optional
 
+import pytz
 from pydantic import BaseModel
 
 from app.payout.core.exceptions import PayoutErrorCode
@@ -166,6 +167,17 @@ class TransferType(str, Enum):
     SCHEDULED = "scheduled"
     MICRO_DEPOSIT = "micro_deposit"
     MANUAL = "manual"
+
+
+class PayoutCountry(str, Enum):
+    AUSTRALIA = "AU"
+    CANADA = "CA"
+    UNITED_STATES = "US"
+
+
+class Timezones(str):
+    AUSTRALIA_MELBOURNE = pytz.timezone("Australia/Melbourne")
+    US_PACIFIC = pytz.timezone("US/Pacific")
 
 
 # Transactions

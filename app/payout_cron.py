@@ -9,7 +9,12 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
 from app.commons.context.logger import get_logger
-from app.payout.jobs import MonitorTransfersWithIncorrectStatus, RetryInstantPayoutInNew
+from app.payout.jobs import (
+    MonitorTransfersWithIncorrectStatus,
+    RetryInstantPayoutInNew,
+    WeeklyCreateTransferJob,
+)
+from app.payout.models import PayoutCountry, PayoutDay
 
 init_newrelic_agent()
 
@@ -98,6 +103,23 @@ if app_config.ENVIRONMENT == "prod":
         trigger=CronTrigger(minute="*/30"),
     )
 
+weekly_create_transfer_monday = WeeklyCreateTransferJob(
+    app_context=app_context,
+    job_pool=stripe_pool,
+    payout_countries=[PayoutCountry.UNITED_STATES, PayoutCountry.CANADA],
+    payout_country_timezone=pytz.timezone("US/Pacific"),
+    payout_day=PayoutDay.MONDAY,
+)
+scheduler.add_job(
+    func=weekly_create_transfer_monday.run,
+    name=weekly_create_transfer_monday.job_name,
+    trigger=CronTrigger(
+        day_of_week="mon",
+        hour="1, 4",
+        minute="30",
+        timezone=pytz.timezone("US/Pacific"),
+    ),
+)
 
 scheduler.add_job(
     scheduler_heartbeat,

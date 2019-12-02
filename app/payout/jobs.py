@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
+from typing import List
 from uuid import uuid4
 
 import pytz
@@ -12,6 +13,18 @@ from app.commons.jobs.pool import JobPool
 from app.payout.core.transfer.processors.update_transfer_by_stripe_transfer_status import (
     UpdateTransferByStripeTransferStatus,
     UpdateTransferByStripeTransferStatusRequest,
+)
+from app.payout.core.transfer.processors.weekly_create_transfer import (
+    WeeklyCreateTransfer,
+    WeeklyCreateTransferRequest,
+)
+from app.payout.core.transfer.utils import get_last_week
+from app.payout.models import PayoutDay, PayoutCountry, PayoutTargetType
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepository,
+)
+from app.payout.repository.maindb.managed_account_transfer import (
+    ManagedAccountTransferRepository,
 )
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
@@ -170,6 +183,7 @@ class MonitorTransfersWithIncorrectStatus(Job):
                     transfer_repo=transfer_repo,
                     stripe_transfer_repo=stripe_transfer_repo,
                     stripe=req_context.stripe_async_client,
+                    logger=logger,
                     request=update_transfer_req,
                 )
                 await job_instance_cxt.job_pool.spawn(
@@ -381,3 +395,83 @@ async def retry_instant_payout(
             payout_account_id=payout.payment_account_id,
             error=str(e),
         )
+
+
+class WeeklyCreateTransferJob(Job):
+    payout_country_timezone: tzinfo
+    payout_day: PayoutDay
+    payout_countries: List[PayoutCountry]
+
+    def __init__(
+        self,
+        *,
+        app_context: AppContext,
+        job_pool: JobPool,
+        payout_countries: List[PayoutCountry],
+        payout_country_timezone: tzinfo,
+        payout_day: PayoutDay
+    ):
+        self.app_context = app_context
+        self.job_pool = job_pool
+        self.payout_countries = payout_countries
+        self.payout_country_timezone = payout_country_timezone
+        self.payout_day = payout_day
+        super().__init__(app_context=app_context, job_pool=job_pool)
+
+    @property
+    def job_name(self) -> str:
+        return "WeeklyCreateTransfer"
+
+    async def _trigger(self, job_instance_cxt: JobInstanceContext):
+        weekly_create_transfers_list = runtime.get_json(
+            "enable_payment_service_weekly_create_transfers_list", []
+        )
+        if weekly_create_transfers_list:
+            start_time, end_time = get_last_week(
+                timezone_info=self.payout_country_timezone, inclusive_end=True
+            )
+            # todo: update target_id here
+            weekly_create_transfer_req = WeeklyCreateTransferRequest(
+                payout_day=self.payout_day,
+                payout_countries=self.payout_countries,
+                end_time=end_time,
+                unpaid_txn_start_time=start_time,
+                exclude_recently_updated_accounts=True,
+                whitelist_payment_account_ids=weekly_create_transfers_list,
+                target_type=PayoutTargetType.STORE,
+            )
+            transfer_repo = TransferRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            transaction_repo = TransactionRepository(
+                database=job_instance_cxt.app_context.payout_bankdb
+            )
+            payment_account_repo = PaymentAccountRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            payment_account_edit_history_repo = PaymentAccountEditHistoryRepository(
+                database=job_instance_cxt.app_context.payout_bankdb
+            )
+            stripe_transfer_repo = StripeTransferRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            managed_account_transfer_repo = ManagedAccountTransferRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            req_context = job_instance_cxt.build_req_context()
+
+            weekly_create_transfer_op = WeeklyCreateTransfer(
+                transfer_repo=transfer_repo,
+                transaction_repo=transaction_repo,
+                payment_account_repo=payment_account_repo,
+                payment_account_edit_history_repo=payment_account_edit_history_repo,
+                stripe_transfer_repo=stripe_transfer_repo,
+                managed_account_transfer_repo=managed_account_transfer_repo,
+                stripe=req_context.stripe_async_client,
+                payment_lock_manager=job_instance_cxt.app_context.redis_lock_manager,
+                logger=logger,
+                request=weekly_create_transfer_req,
+            )
+            await job_instance_cxt.job_pool.spawn(
+                weekly_create_transfer_op.execute(), cb=job_callback
+            )

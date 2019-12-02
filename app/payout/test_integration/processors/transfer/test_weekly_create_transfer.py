@@ -72,6 +72,7 @@ class TestWeeklyCreateTransfer:
                 unpaid_txn_start_time=datetime.now(timezone.utc),
                 end_time=datetime.now(timezone.utc),
                 statement_descriptor="random descriptor",
+                whitelist_payment_account_ids=[],
             ),
         )
         self.transfer_repo = transfer_repo
@@ -142,6 +143,7 @@ class TestWeeklyCreateTransfer:
             exclude_recently_updated_accounts=False,
             statement_descriptor="statement_descriptor",
             submit_after_creation=submit_after_creation,
+            whitelist_payment_account_ids=[],
         )
         weekly_create_transfer_op = WeeklyCreateTransfer(
             payment_account_repo=self.payment_account_repo,

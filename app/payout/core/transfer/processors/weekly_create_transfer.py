@@ -54,6 +54,7 @@ class WeeklyCreateTransferRequest(OperationRequest):
     end_time: datetime
     unpaid_txn_start_time: datetime
     statement_descriptor: str
+    whitelist_payment_account_ids: List[int]
     exclude_recently_updated_accounts: Optional[bool] = False
     submit_after_creation: Optional[bool] = False
     method: Optional[str] = TransferMethodType.STRIPE
@@ -108,7 +109,6 @@ class WeeklyCreateTransfer(
         exclude_recently_updated_accounts = (
             self.request.exclude_recently_updated_accounts
         )
-
         self.logger.info(
             "Executing weekly_create_transfers",
             payout_day=payout_day,
@@ -116,27 +116,30 @@ class WeeklyCreateTransfer(
             unpaid_txn_start_time=unpaid_txn_start_time,
             exclude_recently_updated_accounts=exclude_recently_updated_accounts,
         )
-        unpaid_payment_account_ids = await self.transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit(
-            start_time=unpaid_txn_start_time, end_time=end_time
-        )
-        payment_account_ids = unpaid_payment_account_ids
-        self.logger.info(
-            "[Weekly Create Transfers] total unpaid_payment_account_ids count",
-            total_number=len(payment_account_ids),
-        )
-
-        # ATO prevention: exclude payment account ids that should be blocked because of ATO and only apply this to dx
-        if exclude_recently_updated_accounts:
-            ids_blocked_by_ato = await self.get_payment_account_ids_blocked_by_ato()
-            payment_account_ids = list(
-                set(unpaid_payment_account_ids) - set(ids_blocked_by_ato)
+        if self.request.whitelist_payment_account_ids:
+            payment_account_ids = self.request.whitelist_payment_account_ids
+        else:
+            unpaid_payment_account_ids = await self.transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit(
+                start_time=unpaid_txn_start_time, end_time=end_time
             )
+            payment_account_ids = unpaid_payment_account_ids
             self.logger.info(
-                "Executing weekly_create_transfers with accounts blocked by ATO excluded",
-                total_ato_accounts=len(unpaid_payment_account_ids)
-                - len(payment_account_ids),
-                total_unpaid_accounts=len(unpaid_payment_account_ids),
+                "[Weekly Create Transfers] total unpaid_payment_account_ids count",
+                total_number=len(payment_account_ids),
             )
+
+            # ATO prevention: exclude payment account ids that should be blocked because of ATO and only apply this to dx
+            if exclude_recently_updated_accounts:
+                ids_blocked_by_ato = await self.get_payment_account_ids_blocked_by_ato()
+                payment_account_ids = list(
+                    set(unpaid_payment_account_ids) - set(ids_blocked_by_ato)
+                )
+                self.logger.info(
+                    "Executing weekly_create_transfers with accounts blocked by ATO excluded",
+                    total_ato_accounts=len(unpaid_payment_account_ids)
+                    - len(payment_account_ids),
+                    total_unpaid_accounts=len(unpaid_payment_account_ids),
+                )
 
         # randomize the account ids so they're not processed in any specific order and spread out
         # the accounts that may have more transactions or slower task execution
