@@ -37,7 +37,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_stripe_managed_account,
     prepare_and_insert_payment_account_edit_history,
 )
-from app.payout.models import PayoutDay
+from app.payout.models import PayoutDay, PayoutTargetType
 
 
 class TestWeeklyCreateTransfer:
@@ -285,12 +285,13 @@ class TestWeeklyCreateTransfer:
         )
         assert retrieved_transaction
 
+        # todo: update here once the target_id usage is settled
         mocked_init_submit_transfer.assert_called_once_with(
             method="stripe",
             retry=False,
             statement_descriptor="statement_descriptor",
             submitted_by=None,
-            target_id=None,
-            target_type=None,
+            target_id=12345,
+            target_type=PayoutTargetType.STORE,
             transfer_id=retrieved_transaction.transfer_id,
         )

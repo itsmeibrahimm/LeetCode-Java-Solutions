@@ -56,8 +56,6 @@ class WeeklyCreateTransferRequest(OperationRequest):
     statement_descriptor: str
     exclude_recently_updated_accounts: Optional[bool] = False
     submit_after_creation: Optional[bool] = False
-    target_id: Optional[str] = None
-    target_type: Optional[PayoutTargetType] = None
     method: Optional[str] = TransferMethodType.STRIPE
     retry: Optional[bool] = False
 
@@ -167,13 +165,13 @@ class WeeklyCreateTransfer(
             )
             response = await create_transfer_op.execute()
             transfer_count += 1
-
+            # todo: replace with real store_id from upstream teams
             if self.request.submit_after_creation and response.transfer:
                 submit_transfer_request = SubmitTransferRequest(
                     transfer_id=response.transfer.id,
                     statement_descriptor=self.request.statement_descriptor,
-                    target_id=self.request.target_id,
-                    target_type=self.request.target_type,
+                    target_id=12345,
+                    target_type=PayoutTargetType.STORE,
                     method=self.request.method,
                     retry=self.request.retry,
                     submitted_by=None,
