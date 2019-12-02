@@ -116,7 +116,7 @@ class PayoutRepository(PayoutBankDBRepository, PayoutRepositoryInterface):
         override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
             override_stmt_timeout_in_ms
         )
-        async with self._database.master().transaction() as tx:
+        async with self._database.replica().transaction() as tx:
             connection = tx.connection()
 
             # 1. overwrite timeout

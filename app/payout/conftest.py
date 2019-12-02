@@ -1,7 +1,11 @@
+import random
 from datetime import datetime, timezone
+from typing import Dict
 
 import pytest
 import uuid
+
+import pytz
 from asynctest import mock
 
 from starlette.testclient import TestClient
@@ -26,6 +30,10 @@ from app.payout.models import (
     PayoutAccountTargetType,
     PayoutExternalAccountType,
     TransferType,
+)
+from app.payout.repository.bankdb.model.payout import PayoutCreate
+from app.payout.repository.bankdb.model.stripe_payout_request import (
+    StripePayoutRequestCreate,
 )
 from app.payout.repository.bankdb.payout import PayoutRepository
 from app.payout.repository.bankdb.stripe_managed_account_transfer import (
@@ -312,3 +320,58 @@ def transfer(client: TestClient, payout_account: dict) -> dict:
         transfer_created["payment_account_id"] == payout_account["id"]
     ), "created transfer payout account id matches with expected"
     return transfer_created
+
+
+@pytest.fixture
+async def prepared_payouts_and_stripe_payout_requests_data(
+    payout_repo: PayoutRepository,
+    stripe_payout_request_repo: StripePayoutRequestRepository,
+) -> dict:
+    payout_account_id = random.randint(1, 2147483647)
+
+    # Create payout records and stripe payout request records
+    ts_utc = datetime.now(timezone.utc)
+    payout_data = PayoutCreate(
+        amount=1000,
+        payment_account_id=payout_account_id,
+        status="new",
+        currency="USD",
+        fee=199,
+        type="instant",
+        created_at=ts_utc,
+        updated_at=ts_utc,
+        idempotency_key="payout-idempotency-key-001",
+        payout_method_id=1,
+        transaction_ids=[1, 2, 3],
+        token="payout-test-token",
+        fee_transaction_id=9,
+        error=None,
+    )
+    result: Dict = {"payout_account_id": payout_account_id, "items": []}
+    for i in range(5):
+        payout_obj = await payout_repo.create_payout(payout_data)
+        stripe_payout_request_data = StripePayoutRequestCreate(
+            payout_id=payout_obj.id,
+            idempotency_key=f"stripe-payout-request-idempotency-key-{payout_obj.id}",
+            payout_method_id=1,
+            created_at=ts_utc,
+            updated_at=ts_utc,
+            status="new",
+            stripe_payout_id=f"po_00000000000000_{payout_obj.id}",
+            stripe_account_id="acct_xxx",
+        )
+        stripe_payout_request = await stripe_payout_request_repo.create_stripe_payout_request(
+            stripe_payout_request_data
+        )
+        item = {
+            "payout_account_id": payout_account_id,
+            "payout_id": payout_obj.id,
+            "amount": payout_obj.amount,
+            "currency": payout_obj.currency.lower(),
+            "fee": payout_obj.fee,
+            "status": payout_obj.status,
+            "pgp_payout_id": stripe_payout_request.stripe_payout_id,
+            "created_at": payout_obj.created_at.replace(tzinfo=pytz.utc).isoformat(),
+        }
+        result["items"].append(item)
+    return result

@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from app.commons.core.processor import OperationResponse, OperationRequest
 from app.commons.providers.stripe.stripe_models import (
@@ -239,3 +239,29 @@ class CreatePayoutsResponse(OperationResponse):
     amount: Amount
     fee: Amount
     created_at: datetime
+
+
+############################################
+# Gey Instant Payout Stream Request
+############################################
+class GetPayoutStreamRequest(OperationRequest):
+    payout_account_id: int
+    limit: int
+    offset: int
+
+
+class PayoutStreamItem(OperationResponse):
+    payout_account_id: int
+    payout_id: int
+    amount: Amount
+    currency: Currency
+    fee: Amount
+    status: InstantPayoutStatusType
+    pgp_payout_id: Optional[str]
+    created_at: datetime
+
+
+class GetPayoutStreamResponse(OperationResponse):
+    count: int
+    offset: Optional[str]  # new offset
+    instant_payouts: List[PayoutStreamItem]

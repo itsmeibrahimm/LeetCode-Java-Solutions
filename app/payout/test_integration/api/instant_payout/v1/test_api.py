@@ -377,3 +377,51 @@ class TestSubmitInstantPayout:
             response.json()["error_message"]
             == PaymentEligibilityReasons.PAYOUT_ACCOUNT_NOT_EXIST
         )
+
+
+class TestGetInstantPayoutByPayoutAccountId:
+    def test_get_instant_payouts(
+        self, prepared_payouts_and_stripe_payout_requests_data: dict, client: TestClient
+    ):
+        payout_account_id = prepared_payouts_and_stripe_payout_requests_data.get(
+            "payout_account_id"
+        )
+        prepared_records = prepared_payouts_and_stripe_payout_requests_data.get(
+            "items", []
+        )
+
+        # Get latest 2 payouts
+        url = INSTANT_PAYOUT_ENDPOINT + str(payout_account_id) + "/payouts"
+        response = client.get(url, params={"limit": 2})
+        assert response.status_code == 200
+        response_json = response.json()
+        assert response_json["count"] == 2
+        assert response_json["cursor"] is not None
+        # retrieved payouts should be the latest 2
+        assert response_json.get("instant_payouts", []) == [
+            prepared_records[-1],
+            prepared_records[-2],
+        ]
+
+        # Use the new cursor to retrieve another 2
+        new_cursor = response_json["cursor"]
+        response = client.get(url, params={"limit": 2, "cursor": new_cursor})
+        assert response.status_code == 200
+        response_json = response.json()
+        assert response_json["count"] == 2
+        assert response_json["cursor"] is not None
+        # retrieved payouts should be the next 2
+        assert response_json["instant_payouts"] == [
+            prepared_records[-3],
+            prepared_records[-4],
+        ]
+
+        # Use the new cursor to retrieve last one
+        new_cursor = response_json["cursor"]
+        response = client.get(url, params={"limit": 3, "cursor": new_cursor})
+        assert response.status_code == 200
+        response_json = response.json()
+        assert response_json["count"] == 1
+        assert response_json["cursor"] is None  # cursor should be None now
+        # retrieved payouts should be the next 2
+        assert response_json["instant_payouts"] == [prepared_records[-5]]

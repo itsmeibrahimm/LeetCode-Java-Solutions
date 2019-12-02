@@ -1,10 +1,12 @@
 #  type: ignore
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from app.commons.api.models import PaymentResponse, PaymentRequest
 from pydantic import Schema
+
+from app.commons.providers.stripe.stripe_models import Amount
 from app.payout.core.instant_payout.models import (
     InstantPayoutStatusType,
     InstantPayoutFees,
@@ -14,7 +16,13 @@ from app.commons.types import Currency
 from app.payout.models import PayoutAccountId
 
 
-__all__ = ["InstantPayoutCreate", "InstantPayout", "PaymentEligibility"]
+__all__ = [
+    "InstantPayoutCreate",
+    "InstantPayout",
+    "PaymentEligibility",
+    "InstantPayoutStreamItem",
+    "InstantPayoutStream",
+]
 
 ################################
 # Data Model for API requests  #
@@ -66,6 +74,23 @@ class InstantPayout(PaymentResponse):
     created_at: datetime = Schema(
         default=..., description="Created time of the Instant Payout."
     )
+
+
+class InstantPayoutStreamItem(PaymentResponse):
+    payout_account_id: int
+    payout_id: int
+    amount: Amount
+    currency: Currency
+    fee: Amount
+    status: InstantPayoutStatusType
+    pgp_payout_id: Optional[str]
+    created_at: datetime
+
+
+class InstantPayoutStream(PaymentResponse):
+    count: int
+    cursor: Optional[str]
+    instant_payouts: List[InstantPayoutStreamItem]
 
 
 class PaymentEligibility(PaymentResponse):

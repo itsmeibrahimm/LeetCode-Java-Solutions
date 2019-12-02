@@ -114,3 +114,56 @@ class TestPayoutRepository:
             )
             == stripe_payout_request_2
         )
+
+    async def test_list_stripe_payout_requests_by_payout_ids(
+        self,
+        stripe_payout_request_repo: StripePayoutRequestRepository,
+        payout_repo: PayoutRepository,
+    ):
+        inserted_payout_ids = []
+        for i in range(3):
+            payout = await prepare_and_insert_payout(payout_repo)
+            inserted_payout_ids.append(payout.id)
+
+        # prepare stripe_payout_request
+        payout_ids = inserted_payout_ids + [inserted_payout_ids[0]] * 3
+        inserted_stripe_payout_requests = []
+        for payout_id in payout_ids:
+            stripe_payout_request_i = await prepare_and_insert_stripe_payout_request(
+                stripe_payout_request_repo=stripe_payout_request_repo,
+                payout_id=payout_id,
+            )
+            inserted_stripe_payout_requests.append(stripe_payout_request_i)
+
+        # retrieve all stripe payout requests, already sorted by id desc
+        retrieved_stripe_payout_requests = await stripe_payout_request_repo.list_stripe_payout_requests_by_payout_ids(
+            payout_ids=inserted_payout_ids
+        )
+        assert len(retrieved_stripe_payout_requests) == len(
+            inserted_stripe_payout_requests
+        )
+        assert retrieved_stripe_payout_requests == sorted(
+            inserted_stripe_payout_requests,
+            key=lambda stripe_payout_request: -stripe_payout_request.id,
+        )
+
+        # retrieve stripe payout request for inserted_payout_ids[0]
+        retrieved_stripe_payout_requests = await stripe_payout_request_repo.list_stripe_payout_requests_by_payout_ids(
+            payout_ids=[inserted_payout_ids[0]]
+        )
+        expected = [
+            item
+            for item in inserted_stripe_payout_requests
+            if item.payout_id == inserted_payout_ids[0]
+        ]
+        assert retrieved_stripe_payout_requests == sorted(
+            expected, key=lambda stripe_payout_request: -stripe_payout_request.id
+        )
+
+        # list none-existing payout id should return empty list
+        assert (
+            await stripe_payout_request_repo.list_stripe_payout_requests_by_payout_ids(
+                payout_ids=[-1]
+            )
+            == []
+        )

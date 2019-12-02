@@ -22,6 +22,8 @@ from app.payout.core.instant_payout.models import (
     CheckSMABalanceRequest,
     SMATransferRequest,
     SubmitInstantPayoutRequest,
+    GetPayoutStreamRequest,
+    GetPayoutStreamResponse,
 )
 from app.payout.core.instant_payout.processors.check_eligibility import (
     CheckPayoutAccount,
@@ -30,6 +32,7 @@ from app.payout.core.instant_payout.processors.check_eligibility import (
     CheckInstantPayoutDailyLimit,
 )
 from app.payout.core.instant_payout.processors.get_payout_card import GetPayoutCard
+from app.payout.core.instant_payout.processors.get_payout_stream import GetPayoutStream
 from app.payout.core.instant_payout.processors.pgp.check_sma_balance import (
     CheckSMABalance,
 )
@@ -116,6 +119,7 @@ class InstantPayoutProcessors:
         if result.eligible is False:
             self.logger.warn(
                 "[Instant Payout Submit]: fail due to payout account ineligible",
+                request=request.dict(),
                 eligibility=result.dict(),
             )
             raise InstantPayoutBadRequestError(
@@ -227,6 +231,7 @@ class InstantPayoutProcessors:
 
         self.logger.info(
             "[Instant Payout Submit]: Get all transactions",
+            request=request.dict(),
             transaction_ids=transaction_ids,
         )
 
@@ -315,6 +320,7 @@ class InstantPayoutProcessors:
 
         self.logger.info(
             "[Instant Payout Submit]: Succeed to submit Instant Payout",
+            request=request.dict(),
             response=submit_instant_payout_response.dict(),
         )
 
@@ -431,3 +437,14 @@ class InstantPayoutProcessors:
             currency=currency,
             fee=fee,
         )
+
+    async def get_instant_payout_stream_by_payout_account_id(
+        self, request: GetPayoutStreamRequest
+    ) -> GetPayoutStreamResponse:
+        get_payout_stream_op = GetPayoutStream(
+            request=request,
+            payout_repo=self.payout_repo,
+            stripe_payout_request_repo=self.stripe_payout_request_repo,
+            logger=self.logger,
+        )
+        return await get_payout_stream_op.execute()

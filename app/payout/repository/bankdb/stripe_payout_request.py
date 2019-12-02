@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import desc
 from typing_extensions import final
@@ -27,6 +27,12 @@ class StripePayoutRequestRepositoryInterface(ABC):
     async def get_stripe_payout_request_by_payout_id(
         self, payout_id: int
     ) -> Optional[StripePayoutRequest]:
+        pass
+
+    @abstractmethod
+    async def list_stripe_payout_requests_by_payout_ids(
+        self, payout_ids: List[int]
+    ) -> List[StripePayoutRequest]:
         pass
 
     @abstractmethod
@@ -76,6 +82,19 @@ class StripePayoutRequestRepository(
             return StripePayoutRequest.from_row(rows[0])
 
         return None
+
+    async def list_stripe_payout_requests_by_payout_ids(
+        self, payout_ids: List[int]
+    ) -> List[StripePayoutRequest]:
+        stmt = (
+            stripe_payout_requests.table.select()
+            .where(stripe_payout_requests.payout_id.in_(payout_ids))
+            .order_by(desc(stripe_payout_requests.id))
+        )  # order by id desc
+        rows = await self._database.replica().fetch_all(stmt)
+        if rows:
+            return [StripePayoutRequest.from_row(row) for row in rows]
+        return []
 
     async def get_stripe_payout_request_by_stripe_payout_id(
         self, stripe_payout_id: str

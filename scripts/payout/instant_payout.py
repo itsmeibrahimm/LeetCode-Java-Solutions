@@ -30,8 +30,8 @@ async def retry_instant_payout_operation(payout_id: int, app_context: AppContext
 
     Usage:
         get into payment service admin pod, and type ipython
-        >> from app.scripts.payout.instant_payout import retry_instant_payout_operation
-        >> retry_instant_payout_operation(<payout_id>, app_context)
+        >> from scripts.payout.instant_payout import retry_instant_payout_operation
+        >> await retry_instant_payout_operation(<payout_id>, app_context)
 
     :param payout_id: payout id
     :param app_context: app context
@@ -92,8 +92,8 @@ async def mark_payout_as_paid(payout_id: int, app_context: AppContext):
 
     Usage:
         get into payment service admin pod, and type ipython
-        >> from app.scripts.payout.instant_payout import mark_payout_as_paid
-        >> mark_payout_as_paid(<payout_id>, app_context)
+        >> from scripts.payout.instant_payout import mark_payout_as_paid
+        >> await mark_payout_as_paid(<payout_id>, app_context)
 
     :param payout_id: payout id
     :param app_context: app context
@@ -155,8 +155,8 @@ async def mark_payout_as_failed_and_detach_transactions(
 
     Usage:
         get into payment service admin pod, and type ipython
-        >> from app.scripts.payout.instant_payout import mark_payout_as_failed_and_detach_transactions
-        >> mark_payout_as_failed_and_detach_transactions(<payout_id>, app_context)
+        >> from scripts.payout.instant_payout import mark_payout_as_failed_and_detach_transactions
+        >> await mark_payout_as_failed_and_detach_transactions(<payout_id>, app_context)
 
     :param payout_id: payout id
     :param app_context: app context

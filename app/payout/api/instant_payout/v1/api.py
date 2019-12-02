@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 import pytz
 from starlette.status import HTTP_200_OK
@@ -6,10 +7,12 @@ from fastapi import APIRouter, Body, Path, Depends, Query
 
 from app.commons.api.errors import BadRequestErrorCode, payment_error_message_maps
 from app.commons.api.models import BadRequestError
+from app.commons.api.streams import decode_stream_cursor, encode_stream_cursor
 from app.payout.api.instant_payout.v1 import models
 from app.payout.core.instant_payout.models import (
     EligibilityCheckRequest,
     CreateAndSubmitInstantPayoutRequest,
+    GetPayoutStreamRequest,
 )
 from app.payout.core.instant_payout.processor import InstantPayoutProcessors
 from app.payout.models import PayoutAccountId
@@ -80,3 +83,43 @@ async def check_instant_payout_eligibility(
         internal_request
     )
     return models.PaymentEligibility(**internal_response.dict())
+
+
+@router.get(
+    "/{payout_account_id}/payouts",
+    operation_id="GetInstantPayoutStreamByPayoutAccountId",
+    status_code=HTTP_200_OK,
+    response_model=models.InstantPayoutStream,
+    tags=api_tags,
+)
+async def get_instant_payout_stream_by_payout_account_id(
+    payout_account_id: PayoutAccountId = Path(..., description="Payout Account ID"),
+    limit: int = Query(default=10, description="Number of instant payouts to retrieve"),
+    cursor: dict = Depends(decode_stream_cursor),
+    instant_payout_processors: InstantPayoutProcessors = Depends(
+        create_instant_payout_processors
+    ),
+):
+    offset = cursor.get("offset", 0)
+
+    internal_request = GetPayoutStreamRequest(
+        payout_account_id=payout_account_id, limit=limit, offset=offset
+    )
+
+    internal_response = await instant_payout_processors.get_instant_payout_stream_by_payout_account_id(
+        request=internal_request
+    )
+    next_cursor: Optional[dict] = None
+    if internal_response.offset:
+        next_cursor = {"offset": internal_response.offset}
+
+    external_instant_payouts = [
+        models.InstantPayoutStreamItem(**item.dict())
+        for item in internal_response.instant_payouts
+    ]
+
+    return models.InstantPayoutStream(
+        count=internal_response.count,
+        cursor=encode_stream_cursor(next_cursor),
+        instant_payouts=external_instant_payouts,
+    )
