@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_mock
@@ -144,8 +144,8 @@ class TestListTransfers:
         self
     ):
         # test negative amount transfer/ wrong time_range and wrong status transfer and will not be listed out
-        start_time = datetime.utcnow() - timedelta(days=1)
-        end_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc) - timedelta(days=1)
+        end_time = datetime.now(timezone.utc)
         original_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             has_positive_amount=True,
@@ -162,7 +162,7 @@ class TestListTransfers:
             transfer_repo=self.transfer_repo, status=TransferStatus.FAILED
         )
 
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         new_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             has_positive_amount=True,
@@ -189,8 +189,8 @@ class TestListTransfers:
 
     async def test_execute_list_transfers_with_status_and_time_range_success(self):
         # test wrong time_range and wrong status transfer and will not be listed out, negative amount transfer will be listed
-        start_time = datetime.utcnow() - timedelta(days=1)
-        end_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc) - timedelta(days=1)
+        end_time = datetime.now(timezone.utc)
         original_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             status=TransferStatus.PENDING,
@@ -206,7 +206,7 @@ class TestListTransfers:
             transfer_repo=self.transfer_repo, status=TransferStatus.FAILED
         )
 
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         new_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             status=TransferStatus.PENDING,
@@ -232,8 +232,8 @@ class TestListTransfers:
     async def test_execute_list_positive_amount_transfers_with_stripe_transfer(self):
         # test negative amount transfer/ wrong time_range transfer and will not be listed out
         # test with is_submitted flag off
-        start_time = datetime.utcnow() - timedelta(days=1)
-        end_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc) - timedelta(days=1)
+        end_time = datetime.now(timezone.utc)
         original_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             is_submitted=False,
@@ -247,7 +247,7 @@ class TestListTransfers:
         await prepare_and_insert_stripe_transfer(
             stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer_c.id
         )
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         new_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             is_submitted=False,
@@ -275,8 +275,8 @@ class TestListTransfers:
     async def test_execute_list_positive_amount_transfers_without_stripe_transfer(self):
         # test negative amount transfer/ wrong time_range transfer and will not be listed out
         # test with is_submitted flag on
-        start_time = datetime.utcnow() - timedelta(days=1)
-        end_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc) - timedelta(days=1)
+        end_time = datetime.now(timezone.utc)
         original_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             is_submitted=True,
@@ -290,7 +290,7 @@ class TestListTransfers:
         await prepare_and_insert_stripe_transfer(
             stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer_c.id
         )
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         new_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             is_submitted=True,

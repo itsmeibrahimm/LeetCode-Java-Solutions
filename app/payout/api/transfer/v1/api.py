@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+import pytz
 
 from starlette.status import (
     HTTP_200_OK,
@@ -173,11 +174,11 @@ async def list_transfers(
 
     start_time = None
     if ts_start:
-        start_time = datetime.fromtimestamp(ts_start)
+        start_time = datetime.fromtimestamp(ts_start, tz=pytz.UTC)
 
     end_time = None
     if ts_end:
-        end_time = datetime.fromtimestamp(ts_end)
+        end_time = datetime.fromtimestamp(ts_end, tz=pytz.UTC)
 
     time_range = TimeRange(start_time=start_time, end_time=end_time)
 
