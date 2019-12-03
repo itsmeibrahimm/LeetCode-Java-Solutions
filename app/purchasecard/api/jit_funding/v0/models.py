@@ -21,3 +21,13 @@ class MarqetaJITFundingResponse(PaymentResponse):
 
 
 # End JIT Funding
+
+
+class LinkStoreWithMidRequest(BaseModel):
+    store_id: str
+    mid: str
+    mname: str
+
+
+class LinkStoreWithMidResponse(PaymentResponse):
+    updated_at: str

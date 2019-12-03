@@ -4,6 +4,10 @@ from uuid import uuid4
 import requests
 
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
+from app.purchasecard.repository.store_mastercard_data import (
+    StoreMastercardDataRepository,
+)
+from app.testcase_utils import validate_expected_items_in_dict
 
 
 class FakeMarqetaEnvironment:
@@ -86,3 +90,18 @@ class FakeMarqetaEnvironment:
 
         assert response.status_code == 201
         return test_user_token
+
+
+async def prepare_and_insert_store_mastercard_data(
+    store_mastercard_data_repo: StoreMastercardDataRepository,
+    store_id: int,
+    mid: str,
+    mname: str = "",
+):
+    data = {"store_id": store_id, "mid": mid}
+    store_mastercard_data = await store_mastercard_data_repo.create_store_mastercard_data(
+        store_id=store_id, mid=mid, mname=mname
+    )
+    assert store_mastercard_data.id, "store mastercard data is created, assigned an ID"
+    validate_expected_items_in_dict(expected=data, actual=store_mastercard_data.dict())
+    return store_mastercard_data
