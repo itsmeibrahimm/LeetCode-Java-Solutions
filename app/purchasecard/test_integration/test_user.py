@@ -20,7 +20,6 @@ class TestCreateMarqetaUser:
         }
         return request_body
 
-    @pytest.mark.skip
     def test_create_user(self, client: TestClient):
         request_body = self._get_create_marqeta_user_request(
             token=self.TEST_TOKEN,

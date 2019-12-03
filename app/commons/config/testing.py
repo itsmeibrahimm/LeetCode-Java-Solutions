@@ -122,7 +122,9 @@ def create_app_config() -> AppConfig:
         MARQETA_USERNAME=Secret(
             name="marqeta_username", value="doordash_sandbox_api_consumer"
         ),
-        MARQETA_PASSWORD=Secret(name="marqeta_password", value="sTZqUU5SAvvNErqY"),
+        MARQETA_PASSWORD=Secret(
+            name="marqeta_password", value="80ffbbe4-f68c-43e8-a256-f6d14d818ef2"
+        ),
         MARQETA_JIT_USERNAME=Secret(name="marqeta_jit_username", value=""),
         MARQETA_JIT_PASSWORD=Secret(name="marqeta_jit_password", value=""),
         MARQETA_PROGRAM_FUND_TOKEN=Secret(
