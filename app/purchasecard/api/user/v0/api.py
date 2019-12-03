@@ -42,10 +42,7 @@ async def create_marqeta_user(
 
         response = CreateMarqetaUserResponse(token=marqeta_user.token)
     except PaymentError as e:
-        if (
-            e.error_code
-            == MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR.value
-        ):
+        if e.error_code == MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR:
             status = HTTP_409_CONFLICT
         else:
             status = HTTP_500_INTERNAL_SERVER_ERROR

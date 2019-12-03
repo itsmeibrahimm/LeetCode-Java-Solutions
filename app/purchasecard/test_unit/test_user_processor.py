@@ -1,6 +1,6 @@
 import pytest
 from asynctest import MagicMock
-import app.purchasecard.marqeta_external.error as marqeta_error
+import app.purchasecard.marqeta_external.errors as marqeta_error
 
 from app.purchasecard.core.user.processor import UserProcessor
 from app.purchasecard.marqeta_external.models import MarqetaProviderCreateUserResponse

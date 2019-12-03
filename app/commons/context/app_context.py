@@ -229,6 +229,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
             program_fund_token=config.MARQETA_PROGRAM_FUND_TOKEN.value,
             username=config.MARQETA_USERNAME.value,
             password=config.MARQETA_PASSWORD.value,
+            card_token_prefix_cutover_id=int(
+                str(config.MARQETA_CARD_TOKEN_PREFIX_CUTOVER_ID.value)
+            ),
         ),
         session=marqeta_session,
     )

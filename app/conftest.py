@@ -181,6 +181,20 @@ async def payout_maindb(app_config: AppConfig):
 
 
 @pytest.fixture
+async def purchasecard_maindb(app_config: AppConfig):
+    """
+    initialize the maindb connection for PurchaseCard user
+    """
+    async with DB.create(
+        db_id="purchasecard_maindb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.PURCHASECARD_MAINDB_MASTER_URL,
+        replica_url=app_config.PURCHASECARD_MAINDB_MASTER_URL,
+    ) as db:
+        yield db
+
+
+@pytest.fixture
 async def payout_bankdb(app_config: AppConfig):
     """
     initialize the bankdb connection for PayOut user

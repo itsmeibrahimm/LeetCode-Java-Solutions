@@ -419,15 +419,29 @@ class PaymentLockReleaseError(PaymentLockError):
 # Marqeta Related Errors
 #   - MarqetaResourceAlreadyCreatedError
 #   - MarqetaCreateUserError
+#   - MarqetaCannotAssignCardError
+#   - MarqetaCannotMoveCardToNewCardHolderError
+#   - MarqetaCannotActivateCardError
+#   - MarqetaCannotInactivateCardError
 ####################################
 class MarqetaErrorCode(str, Enum):
     MARQETA_RESOURCE_ALREADY_CREATED_ERROR = "marqeta_resource_already_created_error"
     MARQETA_CREATE_USER_ERROR = "create_marqeta_user_error"
+    MARQETA_CANNOT_ASSIGN_CARD_ERROR = "cannot_assign_marqeta_card_error"
+    MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR = (
+        "cannot_move_marqeta_card_to_new_cardholder_error"
+    )
+    MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR = "cannot_activate_marqeta_card_error"
+    MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR = "cannot_inactivate_marqeta_card_error"
 
 
 marqeta_error_message_maps = {
     MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR: "Marqeta resource already created.",
     MarqetaErrorCode.MARQETA_CREATE_USER_ERROR: "Error creating Marqeta user.",
+    MarqetaErrorCode.MARQETA_CANNOT_ASSIGN_CARD_ERROR: "Marqeta card cannot be assigned.",
+    MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR: "Marqeta card cannot be moved to a new cardholder.",
+    MarqetaErrorCode.MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR: "Failed to activate marqeta card.",
+    MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR: "Failed to inactivate marqeta card.",
 }
 
 
@@ -448,6 +462,50 @@ class MarqetaCreateUserError(PaymentError[MarqetaErrorCode]):
             error_code=MarqetaErrorCode.MARQETA_CREATE_USER_ERROR,
             error_message=marqeta_error_message_maps[
                 MarqetaErrorCode.MARQETA_CREATE_USER_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCannotAssignCardError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_CANNOT_ASSIGN_CARD_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_CANNOT_ASSIGN_CARD_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCannotMoveCardToNewCardHolderError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCannotActivateCardError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCannotInactivateCardError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR
             ],
             retryable=False,
         )

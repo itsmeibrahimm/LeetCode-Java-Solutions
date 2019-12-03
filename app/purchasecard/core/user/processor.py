@@ -11,7 +11,7 @@ from app.purchasecard.marqeta_external.models import (
     MarqetaProviderCreateUserResponse,
 )
 from app.purchasecard.core.user.models import InternalMarqetaUser
-import app.purchasecard.marqeta_external.error as marqeta_error
+import app.purchasecard.marqeta_external.errors as marqeta_error
 from structlog.stdlib import BoundLogger
 
 
