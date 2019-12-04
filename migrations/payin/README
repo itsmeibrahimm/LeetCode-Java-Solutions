@@ -12,3 +12,7 @@ To apply migrations locally, from root of repo, run:
   env PAYIN_PAYMENTDB_URL=postgresql://payin_user@0.0.0.0:5435/<paymentdb_test | paymentdb_dev> alembic --config migrations/alembic.ini --name payin upgrade head
 
 The above is only necessary for local testing until a migration target is added into the Makefile.
+
+To view the migration history, which shows the sequence of migrations, run:
+
+  env PAYIN_PAYMENTDB_URL=postgresql://payin_user@0.0.0.0:5435/<paymentdb_test | paymentdb_dev> alembic --config migrations/alembic.ini --name payin history
