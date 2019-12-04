@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK
 
-from app.purchasecard.api.webhook.v0.models import MarqetaWebhookRequest
+from app.purchasecard.api.webhook.v0.models import (
+    MarqetaWebhookRequest,
+    WebhookResponse,
+)
 from app.purchasecard.container import PurchaseCardContainer
-from . import models
 
 api_tags = ["WebhookV0"]
 router = APIRouter()
@@ -13,13 +15,18 @@ router = APIRouter()
     "",
     status_code=HTTP_200_OK,
     operation_id="MarqetaWebhook",
-    response_model=models.WebhookResponse,
+    response_model=WebhookResponse,
     tags=api_tags,
 )
-def marqeta_webhook(
+async def marqeta_webhook(
     request: MarqetaWebhookRequest,
     dependency_container: PurchaseCardContainer = Depends(PurchaseCardContainer),
 ):
     logger = dependency_container.logger
-    logger.info("Rcvd marqeta webhook request", request=request)
-    return models.WebhookResponse()
+    logger.debug("Rcvd marqeta webhook request", request=request)
+    if not request.transactions:
+        return WebhookResponse()
+
+    return await dependency_container.webhook_processor.process_webhook_transactions(
+        request.transactions
+    )

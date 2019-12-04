@@ -1,19 +1,27 @@
+from asynctest import CoroutineMock
 from starlette.status import HTTP_200_OK
 from starlette.testclient import TestClient
 
 from app.purchasecard.api.webhook.v0.models import MarqetaWebhookRequest
+from app.commons.context.app_context import AppContext
 
 
 class TestMarqetaWebhook:
-    def test_webhook_route(self, client: TestClient):
+    def test_webhook_route(self, mocker, client: TestClient, app_context: AppContext):
         request_body = MarqetaWebhookRequest(transactions=[])
+        # mock dsj client until we can do something
+        mock = mocker.patch(
+            "app.purchasecard.container.PurchaseCardContainer.dsj_client"
+        )
+        mock.post = CoroutineMock()
         response = client.post(
             "/purchasecard/api/v0/marqeta/webhook", json=request_body.dict()
         )
-
         assert response.status_code == HTTP_200_OK
 
-    def test_empty_webhook_with_unneeded_fields(self, client: TestClient):
+    def test_empty_webhook_with_unneeded_fields(
+        self, mocker, client: TestClient, app_context: AppContext
+    ):
         request_body = {
             "transactions": [
                 {
@@ -115,10 +123,7 @@ class TestMarqetaWebhook:
                     "issuer_interchange_amount": 0,
                     "currency_code": "USD",
                     "approval_code": "761515",
-                    "response": {
-                        "code": "0000",
-                        "memo": "Approved or completed successfully",
-                    },
+                    "response": {"code": "1111", "memo": "memo"},
                     "network": "VISA",
                     "subnetwork": "VISANET",
                     "acquirer_fee_amount": 0,
@@ -172,6 +177,12 @@ class TestMarqetaWebhook:
             ],
             "businesstransitions": [],
         }
+        # mock dsj client until we can do something
+        mock = mocker.patch(
+            "app.purchasecard.container.PurchaseCardContainer.dsj_client"
+        )
+        mock.post = CoroutineMock()
+
         response = client.post(
             "/purchasecard/api/v0/marqeta/webhook", json=request_body
         )

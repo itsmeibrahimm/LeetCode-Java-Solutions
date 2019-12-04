@@ -4,18 +4,21 @@ from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
 from app.purchasecard.core.card.processor import CardProcessor
 from app.purchasecard.core.user.processor import UserProcessor
+from app.purchasecard.core.webhook.processor import WebhookProcessor
 from app.purchasecard.marqeta_external.marqeta_provider_client import (
     MarqetaProviderClient,
 )
 from structlog.stdlib import BoundLogger
 
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
+from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 from app.purchasecard.repository.marqeta_card_ownership import (
     MarqetaCardOwnershipRepository,
 )
 from app.purchasecard.repository.marqeta_card_transition import (
     MarqetaCardTransitionRepository,
 )
+from app.commons.providers.dsj_client import DSJClient
 
 
 class PurchaseCardContainer:
@@ -40,6 +43,10 @@ class PurchaseCardContainer:
         return self.req_context.log
 
     @property
+    def dsj_client(self) -> DSJClient:
+        return self.app_context.dsj_client
+
+    @property
     def user_processor(self) -> UserProcessor:
         return UserProcessor(marqeta_client=self.marqeta_client, logger=self.logger)
 
@@ -51,6 +58,20 @@ class PurchaseCardContainer:
             card_ownership_repo=self.marqeta_card_ownership_repository,
             card_transition_repo=self.marqeta_card_transition_repository,
             logger=self.logger,
+        )
+
+    @property
+    def webhook_processor(self) -> WebhookProcessor:
+        return WebhookProcessor(
+            logger=self.logger,
+            repository=self.marqeta_transaction_repository,
+            dsj_client=self.dsj_client,
+        )
+
+    @property
+    def marqeta_transaction_repository(self) -> MarqetaTransactionRepository:
+        return MarqetaTransactionRepository(
+            database=self.app_context.purchasecard_maindb
         )
 
     @property

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-
+from datetime import datetime
+from typing import Optional
 from sqlalchemy import Column, Integer, DateTime, Text, Boolean
 from typing_extensions import final
 
-from app.commons.database.model import TableDefinition
+from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -22,3 +23,15 @@ class MarqetaTransactionTable(TableDefinition):
     shift_delivery_assignment_id: Column = no_init_field(
         Column("shift_delivery_assignment_id", Integer)
     )
+
+
+class MarqetaTransactionDBEntity(DBEntity):
+    id: int
+    token: str
+    amount: int
+    swiped_at: datetime
+    delivery_id: int
+    card_acceptor: str
+    currency: Optional[str]
+    timed_out: Optional[bool]
+    shift_delivery_assignment_id: Optional[int]
