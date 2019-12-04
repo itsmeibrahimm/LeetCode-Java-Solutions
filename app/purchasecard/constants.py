@@ -11,6 +11,6 @@ class MarqetaResponseCodes(str, Enum):
 class TransactionWebhookProcessType(str, Enum):
     SUCCESS = "success"
     TIMEOUT = "timeout"
-    LEGIT_JIT_FAILURE = "legit_git_failure"
+    LEGIT_JIT_FAILURE = "legit_jit_failure"
     TERMINAL_FAILURE = "terminal_failure"
     OTHER = "other"
