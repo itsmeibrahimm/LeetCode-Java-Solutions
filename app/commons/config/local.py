@@ -147,4 +147,5 @@ def create_app_config() -> AppConfig:
             name="marqeta_card_token_prefix_cutover_id", value="73617"
         ),
         REDIS_INSTANCES=[("localhost", 6380)],
+        KAFKA_URL="localhost:9092",
     )

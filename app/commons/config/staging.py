@@ -102,6 +102,8 @@ def create_app_config() -> AppConfig:
         # currently using merchant_datastore redis instance, which is the same as the one used for payment in DSJ
         # better to switch to payment's own redis instance after instant payout/transfer migration
         REDIS_INSTANCES=[("staging0.trwaqb.0001.usw2.cache.amazonaws.com", 6379)],
+        # todo: Get Kafka staging URL
+        KAFKA_URL="localhost:9092",
     )
 
 

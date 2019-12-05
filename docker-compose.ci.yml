@@ -9,6 +9,7 @@ services:
       - DSJ_DB_ENDPOINT=payment.dsj-postgres:5432
       - STRIPE_API_BASE=http://payment.stripe-mock:12111
       - REDIS_ENDPOINT=payment.redis:6379
+      - KAFKA_ENDPOINT=payment.kafka:9092
     build:
       context: .
       dockerfile: Dockerfile-ci
@@ -27,3 +28,4 @@ services:
       - payment.dsj-postgres
       - payment.stripe-mock
       - payment.redis
+      - payment.kafka

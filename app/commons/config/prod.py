@@ -95,6 +95,8 @@ def create_app_config() -> AppConfig:
         REDIS_INSTANCES=[
             ("prod-default-d.mhazzc.ng.0001.usw2.cache.amazonaws.com", 6379)
         ],
+        # todo: Get Kafka prod URL
+        KAFKA_URL="localhost:9092",
     )
 
 

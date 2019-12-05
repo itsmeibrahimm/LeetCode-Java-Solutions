@@ -20,6 +20,7 @@ run-ci-container: build-ci-container
 	CI_IMAGE_NAME="$(SERVICE_NAME):$(CI_TAG)" \
 	CI_BASE_IMAGE="$(CI_BASE_IMAGE)" \
 	CI_CONTAINER_NAME="$(CI_CONTAINER_NAME)" \
+	KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://payment.kafka:9092" \
 	docker-compose -f docker-compose.ci.yml -f docker-compose.nodeploy.yml up -d --force-recreate --renew-anon-volumes
 
 .PHONY: sync-pipenv
@@ -61,9 +62,13 @@ endif
 local-server: local-dependency
 	./development/start-local-server.sh -e local -p $(WEB_PORT)
 
+.PHONY: local-worker
+local-worker: local-dependency
+	./development/start-local-worker.sh -e local -t ${TOPIC_NAME} -p ${PROCESSOR} -c ${NUM_CONSUMERS}
+
 .PHONY: local-dependency
 local-dependency:
-	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock payment.redis
+	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock payment.redis payment.kafka
 
 .PHONY: apply-migrations
 apply-migrations:

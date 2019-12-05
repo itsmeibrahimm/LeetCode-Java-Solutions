@@ -132,6 +132,9 @@ class AppConfig(SecretAware):
     # Redis Instances
     REDIS_INSTANCES: List[tuple]
 
+    # Kafka Url
+    KAFKA_URL: str
+
     # DSJ client
     DSJ_API_USER_EMAIL: Secret
     DSJ_API_USER_PASSWORD: Secret
