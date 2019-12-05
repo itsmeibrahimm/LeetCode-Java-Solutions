@@ -32,6 +32,9 @@ class TransactionProcessResult(BaseModel):
     transaction_token: str
     user_token: str
     process_type: str
+    delivery_id: Optional[int]
+    amount: Optional[int]
+    card_acceptor: Optional[str]
 
 
 class TransactionProcessResults(BaseModel):

@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from asynctest import MagicMock, CoroutineMock
 from app.purchasecard.constants import (
     MarqetaResponseCodes,
@@ -11,6 +12,9 @@ from app.purchasecard.core.webhook.models import (
     GpaOrder,
     Transaction,
 )
+from app.purchasecard.models.maindb.marqeta_transaction import (
+    MarqetaTransactionDBEntity,
+)
 from app.purchasecard.core.webhook.processor import WebhookProcessor
 
 
@@ -20,8 +24,15 @@ class TestWebhookProcessor:
     @pytest.fixture(autouse=True)
     def setup(self):
         marqeta_transaction_repo = MagicMock()
-        marqeta_transaction_repo.update_marqeta_transaction_timeout_by_token = (
-            CoroutineMock()
+        marqeta_transaction_repo.update_marqeta_transaction_timeout_by_token = CoroutineMock(
+            return_value=MarqetaTransactionDBEntity(
+                token="token",
+                id=1,
+                amount=2,
+                delivery_id=3,
+                card_acceptor="acceptor",
+                swiped_at=datetime.now(),
+            )
         )
         self.webhook_processor = WebhookProcessor(
             logger=MagicMock(),
@@ -84,22 +95,30 @@ class TestWebhookProcessor:
             fake_transactions
         )
         assert len(results.processed_results) == 5
+
         assert (
             results.processed_results[0].process_type
             == TransactionWebhookProcessType.SUCCESS.value
         )
+        assert results.processed_results[0].amount == 2
+        assert results.processed_results[0].delivery_id == 3
+        assert results.processed_results[0].card_acceptor == "acceptor"
+
         assert (
             results.processed_results[1].process_type
             == TransactionWebhookProcessType.TIMEOUT.value
         )
+
         assert (
             results.processed_results[2].process_type
             == TransactionWebhookProcessType.LEGIT_JIT_FAILURE.value
         )
+
         assert (
             results.processed_results[3].process_type
             == TransactionWebhookProcessType.TERMINAL_FAILURE.value
         )
+
         assert (
             results.processed_results[4].process_type
             == TransactionWebhookProcessType.OTHER.value

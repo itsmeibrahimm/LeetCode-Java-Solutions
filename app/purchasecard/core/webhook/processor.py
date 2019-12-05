@@ -71,7 +71,7 @@ class WebhookProcessor:
             )
             user_token: str = transaction.user_token
             if self.is_transaction_successful(transaction):
-                await self.repository.update_marqeta_transaction_timeout_by_token(
+                updated_tx = await self.repository.update_marqeta_transaction_timeout_by_token(
                     transaction_token=transaction_token, timed_out=False
                 )
                 results.append(
@@ -79,6 +79,9 @@ class WebhookProcessor:
                         transaction_token=transaction_token,
                         process_type=TransactionWebhookProcessType.SUCCESS.value,
                         user_token=user_token,
+                        delivery_id=updated_tx.delivery_id,
+                        amount=updated_tx.amount,
+                        card_acceptor=updated_tx.card_acceptor,
                     )
                 )
             elif self.is_jit_failure_due_to_timeout(transaction):
