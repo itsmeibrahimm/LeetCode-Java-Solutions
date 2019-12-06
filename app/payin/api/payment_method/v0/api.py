@@ -1,15 +1,17 @@
 from fastapi import APIRouter, Depends
-from starlette.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_501_NOT_IMPLEMENTED
+from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
-from app.commons.api.models import PaymentException
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.types import CountryCode, PgpCode
 from app.payin.api.payment_method.v0.request import CreatePaymentMethodRequestV0
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
-from app.payin.core.payment_method.types import LegacyPaymentMethodInfo, SortKey
+from app.payin.core.payment_method.types import (
+    LegacyPaymentMethodInfo,
+    PaymentMethodSortKey,
+)
 from app.payin.core.types import PaymentMethodIdType
 
 api_tags = ["PaymentMethodV0"]
@@ -135,29 +137,35 @@ async def get_payment_method(
 )
 async def list_payment_methods(
     dd_consumer_id: str = None,
-    stripe_cusotmer_id: str = None,
+    stripe_customer_id: str = None,
     country: CountryCode = CountryCode.US,
     active_only: bool = False,
-    sort_by: SortKey = SortKey.CREATED_AT,
-    force_update: bool = None,
+    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
+    force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     log.info(
         "[list_payment_method] receive request",
         dd_consumer_id=dd_consumer_id,
-        stripe_cusotmer_id=stripe_cusotmer_id,
+        stripe_customer_id=stripe_customer_id,
         country=country,
         active_only=active_only,
-        orce_update=force_update,
+        force_update=force_update,
     )
-
-    raise PaymentException(
-        http_status_code=HTTP_501_NOT_IMPLEMENTED,
-        error_code="not implemented",
-        error_message="not implemented",
-        retryable=False,
-    )
+    try:
+        payment_method_list: PaymentMethodList = await payment_method_processor.list_payment_methods_legacy(
+            dd_consumer_id=dd_consumer_id,
+            stripe_customer_id=stripe_customer_id,
+            country=country,
+            active_only=active_only,
+            sort_by=sort_by,
+            force_update=force_update,
+        )
+    except PaymentError:
+        log.warn("[list_payment_methods] PaymentError")
+        raise
+    return payment_method_list
 
 
 @router.delete(

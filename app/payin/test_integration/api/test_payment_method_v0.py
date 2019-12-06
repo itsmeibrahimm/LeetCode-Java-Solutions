@@ -4,12 +4,15 @@ from typing import Any, Dict
 from starlette.testclient import TestClient
 
 from app.commons.providers.stripe.stripe_client import StripeTestClient
+from app.commons.types import CountryCode
+from app.payin.core.payment_method.types import PaymentMethodSortKey
 from app.payin.test_integration.integration_utils import (
     create_payer_v1,
     CreatePayerV1Request,
     CreatePaymentMethodV0Request,
     create_payment_method_v0,
     delete_payment_methods_v0,
+    list_payment_method_v0,
 )
 
 V0_PAYMENT_METHODS_ENDPOINT = "/payin/api/v0/payment_methods"
@@ -90,3 +93,83 @@ class TestPaymentMethodsV0:
             payment_method_id_type="dd_stripe_card_id",
             payment_method_id=payment_method["dd_stripe_card_id"],
         )
+
+    def test_list_payment_method_by_stripe_customer_id(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        # create payer
+        random_dd_payer_id: str = str(random.randint(1, 100000))
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                dd_payer_id=random_dd_payer_id,
+                country="US",
+                description="Integration Test test_create_get_delete_payment_method()",
+                payer_type="store",
+                email=(random_dd_payer_id + "@dd.com"),
+            ),
+        )
+
+        # create two payment_methods
+        payment_method_one = create_payment_method_v0(
+            client=client,
+            request=CreatePaymentMethodV0Request(
+                stripe_customer_id=payer["payment_gateway_provider_customers"][0][
+                    "payment_provider_customer_id"
+                ],
+                country="US",
+                token="tok_visa",
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
+                dd_stripe_customer_id=payer["dd_stripe_customer_id"],
+            ),
+        )
+        payment_method_two = create_payment_method_v0(
+            client=client,
+            request=CreatePaymentMethodV0Request(
+                stripe_customer_id=payer["payment_gateway_provider_customers"][0][
+                    "payment_provider_customer_id"
+                ],
+                country="US",
+                token="tok_mastercard",
+                set_default=False,
+                is_scanned=False,
+                is_active=False,
+                dd_stripe_customer_id=payer["dd_stripe_customer_id"],
+            ),
+        )
+
+        # Get all payment methods
+        payment_method_list = list_payment_method_v0(
+            client=client,
+            dd_consumer_id=None,
+            stripe_customer_id=payer["payment_gateway_provider_customers"][0][
+                "payment_provider_customer_id"
+            ],
+            country=CountryCode.US,
+            active_only=False,
+            sort_by=PaymentMethodSortKey.CREATED_AT,
+            force_update=False,
+        )
+        assert payment_method_list["count"] == 2
+        assert payment_method_list["has_more"] is False
+        assert payment_method_one in payment_method_list["data"]
+        assert payment_method_two in payment_method_list["data"]
+
+        # Get active payment methods
+        payment_method_list = list_payment_method_v0(
+            client=client,
+            dd_consumer_id=None,
+            stripe_customer_id=payer["payment_gateway_provider_customers"][0][
+                "payment_provider_customer_id"
+            ],
+            country=CountryCode.US,
+            active_only=True,
+            sort_by=PaymentMethodSortKey.CREATED_AT,
+            force_update=False,
+        )
+        assert payment_method_list["count"] == 1
+        assert payment_method_list["has_more"] is False
+        assert payment_method_one in payment_method_list["data"]
+        assert payment_method_two not in payment_method_list["data"]

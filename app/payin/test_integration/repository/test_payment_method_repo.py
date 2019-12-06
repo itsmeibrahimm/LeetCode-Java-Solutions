@@ -20,6 +20,9 @@ from app.payin.repository.payment_method_repo import (
     GetPgpPaymentMethodByPaymentMethodId,
     DeletePgpPaymentMethodByIdSetInput,
     DeletePgpPaymentMethodByIdWhereInput,
+    InsertStripeCardInput,
+    ListStripeCardDbEntitiesByStripeCustomerId,
+    ListPgpPaymentMethodByStripeCardId,
 )
 
 
@@ -193,3 +196,77 @@ class TestPaymentMethodRepository:
         assert deleted_pgp_payment_method.deleted_at == now
         assert deleted_pgp_payment_method.detached_at == now
         assert deleted_pgp_payment_method.updated_at == now
+
+    async def test_list_stripe_card_db_entities_by_stripe_customer_id(
+        self,
+        payment_method_repository: PaymentMethodRepository,
+        payment_method: PaymentMethodDbEntity,
+    ):
+        created_at = datetime.now(timezone.utc)
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=InsertPgpPaymentMethodInput(
+                id=uuid4(),
+                payer_id=payment_method.payer_id,
+                pgp_code=PgpCode.STRIPE,
+                pgp_resource_id=str(uuid4()),
+                payment_method_id=payment_method.id,
+                created_at=created_at,
+            )
+        )
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            sc_input=InsertStripeCardInput(
+                stripe_id=pgp_payment_method.pgp_resource_id,
+                fingerprint="",
+                last4="",
+                dynamic_last4="",
+                exp_month="01",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id=str(uuid4()),
+            )
+        )
+        stripe_card_entities = await payment_method_repository.list_stripe_card_db_entities_by_stripe_customer_id(
+            input=ListStripeCardDbEntitiesByStripeCustomerId(
+                stripe_customer_id=stripe_card.external_stripe_customer_id
+            )
+        )
+        assert len(stripe_card_entities) == 1
+        assert stripe_card_entities[0] == stripe_card
+
+    async def test_list_pgp_payment_method_entities_by_stripe_card_ids(
+        self,
+        payment_method_repository: PaymentMethodRepository,
+        payment_method: PaymentMethodDbEntity,
+    ):
+        created_at = datetime.now(timezone.utc)
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            pm_input=InsertPgpPaymentMethodInput(
+                id=uuid4(),
+                payer_id=payment_method.payer_id,
+                pgp_code=PgpCode.STRIPE,
+                pgp_resource_id=str(uuid4()),
+                payment_method_id=payment_method.id,
+                created_at=created_at,
+            )
+        )
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            sc_input=InsertStripeCardInput(
+                stripe_id=pgp_payment_method.pgp_resource_id,
+                fingerprint="",
+                last4="",
+                dynamic_last4="",
+                exp_month="01",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id=str(uuid4()),
+            )
+        )
+        pgp_payment_method_entities = await payment_method_repository.list_pgp_payment_method_entities_by_stripe_card_ids(
+            input=ListPgpPaymentMethodByStripeCardId(
+                stripe_id_list=[stripe_card.stripe_id]
+            )
+        )
+        assert len(pgp_payment_method_entities) == 1
+        assert pgp_payment_method_entities[0] == pgp_payment_method

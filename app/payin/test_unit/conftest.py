@@ -37,6 +37,8 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
+from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PgpPaymentMethod
 from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
 from app.payin.repository.cart_payment_repo import (
@@ -849,3 +851,26 @@ def dispute_client():
         app_ctxt=MagicMock(), log=MagicMock(), dispute_repo=dispute_repo
     )
     return dispute_client
+
+
+@pytest.fixture
+def payment_method_repo():
+    payment_method_repo = MagicMock()
+    payment_method_repo.main_database_transaction = ContextMock()
+    return payment_method_repo
+
+
+@pytest.fixture
+def payment_method_client():
+    payment_method_client = PaymentMethodClient(
+        app_ctxt=MagicMock(), log=MagicMock(), payment_method_repo=payment_method_repo
+    )
+    return payment_method_client
+
+
+@pytest.fixture
+def payment_method_processor():
+    payment_method_processor = PaymentMethodProcessor(
+        payment_method_client=MagicMock(), log=MagicMock()
+    )
+    return payment_method_processor

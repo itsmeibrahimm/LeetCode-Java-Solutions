@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from fastapi import Depends
@@ -29,7 +29,8 @@ from app.payin.core.exceptions import (
     PaymentMethodReadError,
 )
 from app.payin.core.payer.types import PayerType
-from app.payin.core.payment_method.model import RawPaymentMethod
+from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethod
+from app.payin.core.payment_method.types import PaymentMethodSortKey
 from app.payin.core.types import MixedUuidStrType, PayerIdType, PaymentMethodIdType
 from app.payin.repository.payment_method_repo import (
     DeletePgpPaymentMethodByIdSetInput,
@@ -49,6 +50,9 @@ from app.payin.repository.payment_method_repo import (
     StripeCardDbEntity,
     InsertPaymentMethodInput,
     GetPgpPaymentMethodByPaymentMethodId,
+    ListStripeCardDbEntitiesByStripeCustomerId,
+    ListPgpPaymentMethodByStripeCardId,
+    ListStripeCardDbEntitiesByConsumerId,
 )
 
 
@@ -434,6 +438,108 @@ class PaymentMethodClient:
             input=GetStripeCardsByConsumerIdInput(consumer_id=consumer_id)
         )
         return [entity.id for entity in stripe_card_db_entities]
+
+    async def get_payment_method_list_by_dd_consumer_id(
+        self,
+        dd_consumer_id: str,
+        country: CountryCode,
+        active_only: bool,
+        force_update: bool,
+        sort_by: PaymentMethodSortKey,
+    ) -> List[PaymentMethod]:
+        stripe_card_db_entities: List[
+            StripeCardDbEntity
+        ] = await self.payment_method_repo.list_stripe_card_db_entities_by_consumer_id(
+            input=ListStripeCardDbEntitiesByConsumerId(dd_consumer_id=dd_consumer_id)
+        )
+        return await self._build_payment_methods_by_stripe_cards(
+            stripe_card_db_entities=stripe_card_db_entities,
+            country=country,
+            active_only=active_only,
+            sort_by=sort_by,
+        )
+
+    async def get_payment_method_list_by_stripe_customer_id(
+        self,
+        stripe_customer_id: str,
+        country: CountryCode,
+        active_only: bool,
+        force_update: bool,
+        sort_by: PaymentMethodSortKey,
+    ) -> List[PaymentMethod]:
+        stripe_card_db_entities: List[
+            StripeCardDbEntity
+        ] = await self.payment_method_repo.list_stripe_card_db_entities_by_stripe_customer_id(
+            input=ListStripeCardDbEntitiesByStripeCustomerId(
+                stripe_customer_id=stripe_customer_id
+            )
+        )
+        return await self._build_payment_methods_by_stripe_cards(
+            stripe_card_db_entities=stripe_card_db_entities,
+            country=country,
+            active_only=active_only,
+            sort_by=sort_by,
+        )
+
+    async def _build_payment_methods_by_stripe_cards(
+        self,
+        stripe_card_db_entities: List[StripeCardDbEntity],
+        country: CountryCode,
+        active_only: bool,
+        sort_by: PaymentMethodSortKey,
+    ) -> List[PaymentMethod]:
+        stripe_card_ids: List[str] = [
+            stripe_card_db_entity.stripe_id
+            for stripe_card_db_entity in stripe_card_db_entities
+        ]
+        pgp_payment_method_db_entities: List[
+            PgpPaymentMethodDbEntity
+        ] = await self.payment_method_repo.list_pgp_payment_method_entities_by_stripe_card_ids(
+            input=ListPgpPaymentMethodByStripeCardId(stripe_id_list=stripe_card_ids)
+        )
+        payment_method_list: List[PaymentMethod] = self._build_payment_method_list(
+            pgp_payment_method_db_entities=pgp_payment_method_db_entities,
+            stripe_card_db_entities=stripe_card_db_entities,
+            country=country,
+            active_only=active_only,
+        )
+        if sort_by == PaymentMethodSortKey.CREATED_AT:
+            payment_method_list = sorted(
+                payment_method_list,
+                key=lambda payment_method: payment_method.created_at,
+            )
+        return payment_method_list
+
+    def _build_payment_method_list(
+        self,
+        pgp_payment_method_db_entities: List[PgpPaymentMethodDbEntity],
+        stripe_card_db_entities: List[StripeCardDbEntity],
+        country: CountryCode,
+        active_only: bool,
+    ) -> List[PaymentMethod]:
+        payment_method_list: List[PaymentMethod] = []
+        for sc_entity in stripe_card_db_entities:
+            if (
+                sc_entity
+                and ((active_only and sc_entity.active) or not active_only)
+                and (sc_entity.country_of_origin == country)
+            ):
+                pgp_payment_method_entity = next(
+                    (
+                        pgp_payment_method_db_entity
+                        for pgp_payment_method_db_entity in pgp_payment_method_db_entities
+                        if pgp_payment_method_db_entity.pgp_resource_id
+                        == sc_entity.stripe_id
+                    ),
+                    None,
+                )
+                payment_method_list.append(
+                    RawPaymentMethod(
+                        stripe_card_entity=sc_entity,
+                        pgp_payment_method_entity=pgp_payment_method_entity,
+                    ).to_payment_method()
+                )
+        return payment_method_list
 
 
 class PaymentMethodOpsInterface:

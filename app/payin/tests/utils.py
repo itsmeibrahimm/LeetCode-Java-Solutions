@@ -38,6 +38,10 @@ from app.payin.repository.dispute_repo import (
     ConsumerChargeDbEntity,
     StripeDisputeDbEntity,
 )
+from app.payin.repository.payment_method_repo import (
+    PgpPaymentMethodDbEntity,
+    StripeCardDbEntity,
+)
 
 
 class FunctionMock(MagicMock):
@@ -415,4 +419,32 @@ def generate_consumer_charge_entity() -> ConsumerChargeDbEntity:
         stripe_customer_id=1,
         total=100,
         original_total=100,
+    )
+
+
+def generate_pgp_payment_method() -> PgpPaymentMethodDbEntity:
+    return PgpPaymentMethodDbEntity(
+        id=uuid.uuid4(),
+        pgp_code=PgpCode.STRIPE,
+        pgp_resource_id="VALID_STRIPE_ID",
+        payer_id=uuid.uuid4(),
+        payment_method_id=uuid.uuid4(),
+        type="visa",
+    )
+
+
+def generate_stripe_card(
+    active: bool = True, stripe_id: str = "VALID_STRIPE_ID", country=CountryCode.US
+) -> StripeCardDbEntity:
+    return StripeCardDbEntity(
+        id=uuid.uuid4(),
+        stripe_id=stripe_id,
+        fingerprint="",
+        last4="",
+        dynamic_last4="",
+        exp_month="01",
+        exp_year="2020",
+        type="Visa",
+        active=active,
+        country_of_origin=country,
     )

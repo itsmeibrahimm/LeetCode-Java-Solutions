@@ -30,6 +30,7 @@ _payin_error_message_maps = {
     "payin_27": "Invalid input. Please ensure valid id is provided!",
     "payin_28": "Error returned from Payment Provider. Please make sure your payment_method_id is correct!",
     "payin_29": "Data I/O error. Please retry again!",
+    "payin_32": "Invalid payer type for list payment method",
     "payin_40": "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
     "payin_41": "Error returned from Payment Provider. Please verify parameters of capture.",
     "payin_42": "Cannot refund previous charge for amount increase.",
@@ -324,6 +325,11 @@ class PayinErrorCode(str, Enum):
         "payin_800",
         NO_RETRY,
         "API not accessible/usable in commando mode",
+    )
+    PAYMENT_METHOD_LIST_INVALID_PAYER_TYPE = (
+        "payin_32",
+        NO_RETRY,
+        "Invalid payer type for list payment method",
     )
 
     def __new__(

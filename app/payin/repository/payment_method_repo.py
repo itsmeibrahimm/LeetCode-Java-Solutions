@@ -85,6 +85,14 @@ class GetPgpPaymentMethodByPaymentMethodId(DBRequestModel):
     id: UUID
 
 
+class ListPgpPaymentMethodByStripeCustomerIdInput(DBRequestModel):
+    stripe_customer_id: str
+
+
+class ListStripeCardDbEntitiesByConsumerId(DBRequestModel):
+    dd_consumer_id: str
+
+
 ###########################################################
 # StripeCard DBEntity and CRUD operations                 #
 ###########################################################
@@ -166,6 +174,14 @@ class GetDuplicateStripeCardInput(DBRequestModel):
     stripe_customer_id: Optional[int]
 
 
+class ListStripeCardDbEntitiesByStripeCustomerId(DBRequestModel):
+    stripe_customer_id: str
+
+
+class ListPgpPaymentMethodByStripeCardId(DBRequestModel):
+    stripe_id_list: List[str]
+
+
 class PaymentMethodRepositoryInterface:
     """
     PaymentMethod repository interface class that exposes complicated CRUD operations APIs for business layer.
@@ -222,6 +238,24 @@ class PaymentMethodRepositoryInterface:
     async def get_duplicate_stripe_card(
         self, payer_type: PayerType, input: GetDuplicateStripeCardInput
     ) -> Optional[StripeCardDbEntity]:
+        ...
+
+    @abstractmethod
+    async def list_stripe_card_db_entities_by_stripe_customer_id(
+        self, input: ListStripeCardDbEntitiesByStripeCustomerId
+    ) -> List[StripeCardDbEntity]:
+        ...
+
+    @abstractmethod
+    async def list_pgp_payment_method_entities_by_stripe_card_ids(
+        self, input: ListPgpPaymentMethodByStripeCardId
+    ) -> List[PgpPaymentMethodDbEntity]:
+        ...
+
+    @abstractmethod
+    async def list_stripe_card_db_entities_by_consumer_id(
+        self, input: ListStripeCardDbEntitiesByConsumerId
+    ) -> List[StripeCardDbEntity]:
         ...
 
 
@@ -392,3 +426,41 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
             )
         row = await self.main_database.replica().fetch_one(stmt)
         return StripeCardDbEntity.from_row(row) if row else None
+
+    async def list_stripe_card_db_entities_by_stripe_customer_id(
+        self, input: ListStripeCardDbEntitiesByStripeCustomerId
+    ) -> List[StripeCardDbEntity]:
+        stmt = stripe_cards.table.select().where(
+            stripe_cards.external_stripe_customer_id == input.stripe_customer_id
+        )
+        rows = await self.main_database.replica().fetch_all(stmt)
+        stripe_card_db_entities: List[StripeCardDbEntity] = []
+        for row in rows:
+            stripe_card_db_entities.append(StripeCardDbEntity.from_row(row))
+        return stripe_card_db_entities
+
+    async def list_stripe_card_db_entities_by_consumer_id(
+        self, input: ListStripeCardDbEntitiesByConsumerId
+    ) -> List[StripeCardDbEntity]:
+        stmt = stripe_cards.table.select().where(
+            stripe_cards.consumer_id == input.dd_consumer_id
+        )
+        rows = await self.main_database.replica().fetch_all(stmt)
+        stripe_card_db_entities: List[StripeCardDbEntity] = []
+        for row in rows:
+            stripe_card_db_entities.append(StripeCardDbEntity.from_row(row))
+        return stripe_card_db_entities
+
+    async def list_pgp_payment_method_entities_by_stripe_card_ids(
+        self, input: ListPgpPaymentMethodByStripeCardId
+    ) -> List[PgpPaymentMethodDbEntity]:
+        stmt = pgp_payment_methods.table.select().where(
+            pgp_payment_methods.pgp_resource_id.in_(input.stripe_id_list)
+        )
+        rows = await self.payment_database.replica().fetch_all(stmt)
+        pgp_payment_method_db_entities: List[PgpPaymentMethodDbEntity] = []
+        for row in rows:
+            pgp_payment_method_db_entities.append(
+                PgpPaymentMethodDbEntity.from_row(row)
+            )
+        return pgp_payment_method_db_entities

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from fastapi import Depends
@@ -17,6 +17,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
     PayerReadError,
+    PaymentMethodListError,
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.types import PayerType
@@ -27,7 +28,10 @@ from app.payin.core.payment_method.model import (
     PaymentMethodIds,
 )
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
-from app.payin.core.payment_method.types import SortKey, LegacyPaymentMethodInfo
+from app.payin.core.payment_method.types import (
+    PaymentMethodSortKey,
+    LegacyPaymentMethodInfo,
+)
 from app.payin.core.types import PaymentMethodIdType, PayerIdType
 
 
@@ -267,10 +271,45 @@ class PaymentMethodProcessor:
         payer_id_type: str = None,
         country: Optional[CountryCode] = CountryCode.US,
         active_only: bool = False,
-        sort_by: SortKey = SortKey.CREATED_AT,
+        sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
         force_update: bool = None,
     ) -> PaymentMethodList:
         ...
+
+    async def list_payment_methods_legacy(
+        self,
+        country: CountryCode,
+        active_only: bool,
+        sort_by: PaymentMethodSortKey,
+        force_update: bool,
+        dd_consumer_id: str = None,
+        stripe_customer_id: str = None,
+    ) -> PaymentMethodList:
+
+        payment_method_list: List[PaymentMethod] = []
+        if dd_consumer_id:
+            payment_method_list = await self.payment_method_client.get_payment_method_list_by_dd_consumer_id(
+                dd_consumer_id=dd_consumer_id,
+                country=country,
+                active_only=active_only,
+                force_update=force_update,
+                sort_by=sort_by,
+            )
+        elif stripe_customer_id:
+            payment_method_list = await self.payment_method_client.get_payment_method_list_by_stripe_customer_id(
+                stripe_customer_id=stripe_customer_id,
+                country=country,
+                active_only=active_only,
+                force_update=force_update,
+                sort_by=sort_by,
+            )
+        else:
+            raise PaymentMethodListError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_LIST_INVALID_PAYER_TYPE
+            )
+        return PaymentMethodList(
+            count=len(payment_method_list), has_more=False, data=payment_method_list
+        )
 
     async def delete_payment_method(
         self,

@@ -8,7 +8,7 @@ from app.commons.core.errors import PaymentError
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
-from app.payin.core.payment_method.types import SortKey
+from app.payin.core.payment_method.types import PaymentMethodSortKey
 
 api_tags = ["PaymentMethodV1"]
 router = APIRouter()
@@ -104,7 +104,7 @@ async def list_payment_methods(
     request: Request,
     payer_id: str,
     active_only: bool = False,
-    sort_by: SortKey = SortKey.CREATED_AT,
+    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
     force_update: bool = None,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),

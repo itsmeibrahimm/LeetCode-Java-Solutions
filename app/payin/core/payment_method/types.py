@@ -18,7 +18,7 @@ class WalletType(str, Enum):
     APPLE_PAY = "apple_pay"
 
 
-class SortKey(str, Enum):
+class PaymentMethodSortKey(str, Enum):
     """
     Enum definition of sorting method of payment method list.
     """

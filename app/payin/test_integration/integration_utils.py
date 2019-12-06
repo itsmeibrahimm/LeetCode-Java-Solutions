@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import build_req_context
+from app.commons.types import CountryCode
 from app.payin.core.cart_payment.processor import (
     CartPaymentInterface,
     LegacyPaymentInterface,
@@ -13,6 +14,7 @@ from app.payin.core.cart_payment.processor import (
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
+from app.payin.core.payment_method.types import PaymentMethodSortKey
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
@@ -255,6 +257,43 @@ def delete_payment_methods_v1(
     payment_method: dict = response.json()
     assert payment_method["deleted_at"] is not None
     return payment_method
+
+
+def _list_payment_method_v0_url(
+    dd_consumer_id, stripe_customer_id, country, active_only, sort_by, force_update
+):
+    base_request = f"{V0_PAYMENT_METHODS_ENDPOINT}?&active_only={active_only}&sort_by={sort_by}&country={country}"
+    if dd_consumer_id:
+        base_request = base_request + f"&dd_consumer_id={dd_consumer_id}"
+    elif stripe_customer_id:
+        base_request = base_request + f"&stripe_customer_id={stripe_customer_id}"
+    if force_update:
+        base_request = base_request + f"&force_update={force_update}"
+    return base_request
+
+
+def list_payment_method_v0(
+    client: TestClient,
+    dd_consumer_id: str = None,
+    stripe_customer_id: str = None,
+    country: CountryCode = CountryCode.US,
+    active_only: bool = False,
+    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
+    force_update: bool = False,
+) -> Dict[str, Any]:
+    response = client.get(
+        _list_payment_method_v0_url(
+            dd_consumer_id=dd_consumer_id,
+            stripe_customer_id=stripe_customer_id,
+            country=country,
+            active_only=active_only,
+            sort_by=sort_by,
+            force_update=force_update,
+        )
+    )
+    assert response.status_code == 200
+    payment_method_list: dict = response.json()
+    return payment_method_list
 
 
 def build_commando_processor(app_context: AppContext) -> CommandoProcessor:
