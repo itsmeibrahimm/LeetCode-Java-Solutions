@@ -8,8 +8,12 @@ from app.commons.core.errors import (
     MarqetaCannotMoveCardToNewCardHolderError,
     MarqetaCannotActivateCardError,
     MarqetaCannotInactivateCardError,
+    MarqetaNoActiveCardOwnershipError,
 )
-from app.purchasecard.core.card.models import InternalAssociateCardResponse
+from app.purchasecard.core.card.models import (
+    InternalAssociateCardResponse,
+    InternalUnassociateCardResponse,
+)
 from app.purchasecard.marqeta_external import errors as marqeta_errors
 from app.purchasecard.marqeta_external.marqeta_provider_client import (
     MarqetaProviderClient,
@@ -67,7 +71,7 @@ class CardProcessor:
         )
 
         num_prev_owners = 0
-        card, created = await self.get_or_create(
+        card, created = await self.get_or_create_card(
             token=card_data.token, delight_number=delight_number, last4=last4
         )
 
@@ -125,7 +129,26 @@ class CardProcessor:
             old_card_relinquished=old_card_relinquished, num_prev_owners=num_prev_owners
         )
 
-    async def get_or_create(self, token: str, delight_number: int, last4: str):
+    async def unassociate_card_from_dasher(
+        self, dasher_id: int
+    ) -> InternalUnassociateCardResponse:
+        card_ownership = await self.card_ownership_repo.get_active_card_ownership_by_dasher_id(
+            dasher_id
+        )
+        if not card_ownership:
+            raise MarqetaNoActiveCardOwnershipError()
+
+        await self.transition_card(
+            card_id=card_ownership.card_id, desired_state=TransitionState.INACTIVE
+        )
+        # update card ownership end time
+        await self.card_ownership_repo.update_card_ownership_ended_at(
+            marqeta_card_ownership_id=card_ownership.id, ended_at=datetime.utcnow()
+        )
+
+        return InternalUnassociateCardResponse(token=card_ownership.card_id)
+
+    async def get_or_create_card(self, token: str, delight_number: int, last4: str):
         card = await self.card_repo.get(
             token=token, delight_number=delight_number, last4=last4
         )

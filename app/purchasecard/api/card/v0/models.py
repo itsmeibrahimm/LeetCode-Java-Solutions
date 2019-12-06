@@ -17,3 +17,11 @@ class AssociateMarqetaCardRequest(PaymentRequest):
 class AssociateMarqetaCardResponse(PaymentResponse):
     old_card_relinquished: bool
     num_prev_owners: int
+
+
+class UnassociateMarqetaCardRequest(PaymentRequest):
+    dasher_id: int
+
+
+class UnassociateMarqetaCardResponse(PaymentRequest):
+    token: str

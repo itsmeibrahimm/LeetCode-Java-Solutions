@@ -23,7 +23,7 @@ class FunctionMock(MagicMock):
 
 
 @pytest.mark.external
-class TestMarqetaCard:
+class TestAssociateMarqetaCard:
     TEST_TOKEN: int = 1234
     TEST_DELIGHT_NUMBER: int = 1234
     TEST_DASHER_ID: int = 1234

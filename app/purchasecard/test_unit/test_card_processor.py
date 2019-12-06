@@ -88,8 +88,8 @@ class TestCardProcessor:
         """
         mock DB calls
         """
-        self.card_processor.get_or_create = CoroutineMock()
-        self.card_processor.get_or_create.return_value = (
+        self.card_processor.get_or_create_card = CoroutineMock()
+        self.card_processor.get_or_create_card.return_value = (
             MarqetaCard(
                 token=self.TEST_TOKEN,
                 delight_number=self.TEST_DELIGHT_NUMBER,
@@ -175,8 +175,8 @@ class TestCardProcessor:
         """
         mock DB calls
         """
-        self.card_processor.get_or_create = CoroutineMock()
-        self.card_processor.get_or_create.return_value = (
+        self.card_processor.get_or_create_card = CoroutineMock()
+        self.card_processor.get_or_create_card.return_value = (
             MarqetaCard(
                 token=self.TEST_TOKEN,
                 delight_number=self.TEST_DELIGHT_NUMBER,

@@ -433,6 +433,9 @@ class MarqetaErrorCode(str, Enum):
     )
     MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR = "cannot_activate_marqeta_card_error"
     MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR = "cannot_inactivate_marqeta_card_error"
+    MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR = (
+        "no_active_marqeta_card_ownership_error"
+    )
 
 
 marqeta_error_message_maps = {
@@ -442,6 +445,7 @@ marqeta_error_message_maps = {
     MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR: "Marqeta card cannot be moved to a new cardholder.",
     MarqetaErrorCode.MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR: "Failed to activate marqeta card.",
     MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR: "Failed to inactivate marqeta card.",
+    MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR: "No active card ownership found for dasher id.",
 }
 
 
@@ -506,6 +510,17 @@ class MarqetaCannotInactivateCardError(PaymentError[MarqetaErrorCode]):
             error_code=MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR,
             error_message=marqeta_error_message_maps[
                 MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaNoActiveCardOwnershipError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR
             ],
             retryable=False,
         )

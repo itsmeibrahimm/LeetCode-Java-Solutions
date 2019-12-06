@@ -3,6 +3,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_404_NOT_FOUND,
 )
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
@@ -10,9 +11,14 @@ from app.commons.core.errors import PaymentError, MarqetaErrorCode
 from app.purchasecard.api.card.v0.models import (
     AssociateMarqetaCardResponse,
     AssociateMarqetaCardRequest,
+    UnassociateMarqetaCardResponse,
+    UnassociateMarqetaCardRequest,
 )
 from app.purchasecard.container import PurchaseCardContainer
-from app.purchasecard.core.card.models import InternalAssociateCardResponse
+from app.purchasecard.core.card.models import (
+    InternalAssociateCardResponse,
+    InternalUnassociateCardResponse,
+)
 
 api_tags = ["CardsV0"]
 router = APIRouter()
@@ -51,6 +57,43 @@ async def associate_marqeta_card_with_user(
             MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR,
         ):
             status = HTTP_400_BAD_REQUEST
+        else:
+            status = HTTP_500_INTERNAL_SERVER_ERROR
+        raise PaymentException(
+            http_status_code=status,
+            error_code=e.error_code,
+            error_message=e.error_message,
+            retryable=e.retryable,
+        )
+
+
+@router.post(
+    "/unassociate_marqeta",
+    status_code=HTTP_200_OK,
+    operation_id="UnassociateMarqetaCardWithUser",
+    response_model=UnassociateMarqetaCardResponse,
+    responses={
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def unassociate_marqeta_from_user(
+    request: UnassociateMarqetaCardRequest,
+    dependency_container: PurchaseCardContainer = Depends(PurchaseCardContainer),
+):
+    try:
+        response: InternalUnassociateCardResponse = await dependency_container.card_processor.unassociate_card_from_dasher(
+            dasher_id=request.dasher_id
+        )
+
+        return UnassociateMarqetaCardResponse(token=response.token)
+    except PaymentError as e:
+        if (
+            e.error_code
+            == MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR
+        ):
+            status = HTTP_404_NOT_FOUND
         else:
             status = HTTP_500_INTERNAL_SERVER_ERROR
         raise PaymentException(
