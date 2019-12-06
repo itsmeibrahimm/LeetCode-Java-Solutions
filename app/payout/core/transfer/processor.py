@@ -83,7 +83,9 @@ class TransferProcessors:
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             transaction_repo=self.transaction_repo,
             stripe_transfer_repo=self.stripe_transfer_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_lock_manager=self.payment_lock_manager,
+            stripe=self.stripe,
         )
         return await create_transfer_op.execute()
 

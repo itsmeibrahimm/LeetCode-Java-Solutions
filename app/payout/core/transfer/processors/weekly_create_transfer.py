@@ -15,16 +15,7 @@ from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
     CreateTransfer,
 )
-from app.payout.core.transfer.processors.submit_transfer import (
-    SubmitTransferRequest,
-    SubmitTransfer,
-)
-from app.payout.models import (
-    PayoutDay,
-    TransferType,
-    PayoutTargetType,
-    TransferMethodType,
-)
+from app.payout.models import PayoutDay, TransferType, TransferMethodType
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
 )
@@ -56,7 +47,6 @@ class WeeklyCreateTransferRequest(OperationRequest):
     statement_descriptor: str
     whitelist_payment_account_ids: List[int]
     exclude_recently_updated_accounts: Optional[bool] = False
-    submit_after_creation: Optional[bool] = False
     method: Optional[str] = TransferMethodType.STRIPE
     retry: Optional[bool] = False
 
@@ -65,7 +55,7 @@ class WeeklyCreateTransfer(
     AsyncOperation[WeeklyCreateTransferRequest, WeeklyCreateTransferResponse]
 ):
     """
-    Processor to create a transfer when triggered by cron job .
+    Processor to create a transfer when triggered by cron job.
     """
 
     transfer_repo: TransferRepositoryInterface
@@ -155,6 +145,10 @@ class WeeklyCreateTransfer(
                 payout_day=payout_day,
                 payout_countries=self.request.payout_countries,
                 start_time=None,
+                submit_after_creation=True,
+                statement_descriptor=self.request.statement_descriptor,
+                method=self.request.method,
+                retry=self.request.retry,
             )
             create_transfer_op = CreateTransfer(
                 logger=self.logger,
@@ -162,36 +156,14 @@ class WeeklyCreateTransfer(
                 transfer_repo=self.transfer_repo,
                 payment_account_repo=self.payment_account_repo,
                 payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+                managed_account_transfer_repo=self.managed_account_transfer_repo,
                 transaction_repo=self.transaction_repo,
                 stripe_transfer_repo=self.stripe_transfer_repo,
                 payment_lock_manager=self.payment_lock_manager,
+                stripe=self.stripe,
             )
-            response = await create_transfer_op.execute()
+            await create_transfer_op.execute()
             transfer_count += 1
-            # todo: replace with real store_id from upstream teams
-            if self.request.submit_after_creation and response.transfer:
-                submit_transfer_request = SubmitTransferRequest(
-                    transfer_id=response.transfer.id,
-                    statement_descriptor=self.request.statement_descriptor,
-                    target_id=12345,
-                    target_type=PayoutTargetType.STORE,
-                    method=self.request.method,
-                    retry=self.request.retry,
-                    submitted_by=None,
-                )
-                submit_transfer_op = SubmitTransfer(
-                    logger=self.logger,
-                    request=submit_transfer_request,
-                    transfer_repo=self.transfer_repo,
-                    payment_account_repo=self.payment_account_repo,
-                    payment_account_edit_history_repo=self.payment_account_edit_history_repo,
-                    managed_account_transfer_repo=self.managed_account_transfer_repo,
-                    transaction_repo=self.transaction_repo,
-                    stripe_transfer_repo=self.stripe_transfer_repo,
-                    stripe=self.stripe,
-                )
-                await submit_transfer_op.execute()
-
         self.logger.info(
             "Finished executing weekly_create_transfers.",
             payout_day=payout_day,

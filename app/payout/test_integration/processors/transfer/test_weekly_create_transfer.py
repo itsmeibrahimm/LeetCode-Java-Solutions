@@ -142,7 +142,6 @@ class TestWeeklyCreateTransfer:
             unpaid_txn_start_time=datetime.utcnow() - timedelta(days=1),
             exclude_recently_updated_accounts=False,
             statement_descriptor="statement_descriptor",
-            submit_after_creation=submit_after_creation,
             whitelist_payment_account_ids=[],
         )
         weekly_create_transfer_op = WeeklyCreateTransfer(
@@ -224,6 +223,18 @@ class TestWeeklyCreateTransfer:
             side_effect=mock_check_payment_account_auto_paid,
         )
 
+        @asyncio.coroutine
+        def mock_execute_submit_transfer(*args, **kwargs):
+            return SubmitTransferResponse()
+
+        self.mocker.patch(
+            "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.execute",
+            side_effect=mock_execute_submit_transfer,
+        )
+        mocked_init_submit_transfer = self.mocker.patch.object(
+            SubmitTransferRequest, "__init__", return_value=None
+        )
+
         weekly_create_transfer_op = self._construct_weekly_create_transfer_op()
         await weekly_create_transfer_op._execute()
         retrieved_transaction_a = await self.transaction_repo.get_transaction_by_id(
@@ -246,47 +257,6 @@ class TestWeeklyCreateTransfer:
             == retrieved_transaction_a.amount + retrieved_transaction_b.amount
         )
 
-    async def test_execute_weekly_create_transfer_submit_after_creation(self):
-        sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=self.payment_account_repo
-        )
-        payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=self.payment_account_repo, account_id=sma.id
-        )
-        transaction = await prepare_and_insert_transaction(
-            transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
-        )
-
-        @asyncio.coroutine
-        def mock_get_payment_account_ids(*args, **kwargs):
-            return [payment_account.id]
-
-        self.mocker.patch(
-            "app.payout.repository.bankdb.transaction.TransactionRepository.get_payout_account_ids_for_unpaid_transactions_without_limit",
-            side_effect=mock_get_payment_account_ids,
-        )
-
-        @asyncio.coroutine
-        def mock_execute_submit_transfer(*args, **kwargs):
-            return SubmitTransferResponse()
-
-        self.mocker.patch(
-            "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.execute",
-            side_effect=mock_execute_submit_transfer,
-        )
-        mocked_init_submit_transfer = self.mocker.patch.object(
-            SubmitTransferRequest, "__init__", return_value=None
-        )
-        weekly_create_transfer_op = self._construct_weekly_create_transfer_op(
-            submit_after_creation=True
-        )
-        await weekly_create_transfer_op._execute()
-
-        retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
-            transaction_id=transaction.id
-        )
-        assert retrieved_transaction
-
         # todo: update here once the target_id usage is settled
         mocked_init_submit_transfer.assert_called_once_with(
             method="stripe",
@@ -295,5 +265,5 @@ class TestWeeklyCreateTransfer:
             submitted_by=None,
             target_id=12345,
             target_type=PayoutTargetType.STORE,
-            transfer_id=retrieved_transaction.transfer_id,
+            transfer_id=transfer_id,
         )

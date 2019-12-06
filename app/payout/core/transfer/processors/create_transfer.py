@@ -13,6 +13,7 @@ from app.commons.core.processor import (
 )
 from doordash_python_stats.ddstats import doorstats_global
 from app.commons.lock.locks import PaymentLock
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
     FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE,
@@ -26,6 +27,10 @@ from app.payout.core.account.utils import (
     COUNTRY_TO_CURRENCY_CODE,
 )
 from app.payout.core.instant_payout.utils import get_payout_account_lock_name
+from app.payout.core.transfer.processors.submit_transfer import (
+    SubmitTransferRequest,
+    SubmitTransfer,
+)
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
 )
@@ -37,6 +42,9 @@ from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
 )
 from app.payout.repository.bankdb.transaction import TransactionRepositoryInterface
+from app.payout.repository.maindb.managed_account_transfer import (
+    ManagedAccountTransferRepositoryInterface,
+)
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 from app.payout.repository.maindb.model.transfer import (
     Transfer,
@@ -71,6 +79,10 @@ class CreateTransferRequest(OperationRequest):
     target_business_id: Optional[int]
     payout_countries: Optional[List[str]]
     created_by_id: Optional[int]
+    statement_descriptor: Optional[str]
+    submit_after_creation: Optional[bool] = False
+    method: Optional[str] = payout_models.TransferMethodType.STRIPE
+    retry: Optional[bool] = False
 
 
 class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferResponse]):
@@ -83,7 +95,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
     transaction_repo: TransactionRepositoryInterface
     stripe_transfer_repo: StripeTransferRepositoryInterface
+    managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
     payment_lock_manager: Aioredlock
+    stripe: StripeAsyncClient
 
     def __init__(
         self,
@@ -94,7 +108,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         transaction_repo: TransactionRepositoryInterface,
         stripe_transfer_repo: StripeTransferRepositoryInterface,
+        managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
         payment_lock_manager: Aioredlock,
+        stripe: StripeAsyncClient,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -104,7 +120,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.transaction_repo = transaction_repo
         self.stripe_transfer_repo = stripe_transfer_repo
+        self.managed_account_transfer_repo = managed_account_transfer_repo
         self.payment_lock_manager = payment_lock_manager
+        self.stripe = stripe
 
     async def _execute(self) -> CreateTransferResponse:
         self.logger.info(
@@ -191,6 +209,29 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             updated_transfer = await self.transfer_repo.update_transfer_by_id(
                 transfer_id=updated_transfer.id, data=update_transfer_request
             )
+        # todo: replace with real store_id from upstream teams
+        if self.request.submit_after_creation and updated_transfer:
+            submit_transfer_request = SubmitTransferRequest(
+                transfer_id=updated_transfer.id,
+                statement_descriptor=self.request.statement_descriptor,
+                target_id=12345,
+                target_type=payout_models.PayoutTargetType.STORE,
+                method=self.request.method,
+                retry=self.request.retry,
+                submitted_by=None,
+            )
+            submit_transfer_op = SubmitTransfer(
+                logger=self.logger,
+                request=submit_transfer_request,
+                transfer_repo=self.transfer_repo,
+                payment_account_repo=self.payment_account_repo,
+                payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+                managed_account_transfer_repo=self.managed_account_transfer_repo,
+                transaction_repo=self.transaction_repo,
+                stripe_transfer_repo=self.stripe_transfer_repo,
+                stripe=self.stripe,
+            )
+            await submit_transfer_op.execute()
         return CreateTransferResponse(
             transfer=updated_transfer, transaction_ids=transaction_ids
         )

@@ -5,13 +5,18 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
+from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext
 from aioredlock.redis import Redis
 
 from app.commons.core.errors import PaymentLockAcquireError
+from app.commons.utils.pool import ThreadPoolHelper
 from app.main import config
 from asynctest import mock
 from aioredlock import LockError
+from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
+from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.providers.stripe.stripe_models import StripeClientSettings
 
 from app.commons.database.infra import DB
 from app.payout.core.exceptions import (
@@ -24,10 +29,17 @@ from app.payout.core.transfer.processors.create_transfer import (
     CreateTransfer,
     CreateTransferRequest,
 )
+from app.payout.core.transfer.processors.submit_transfer import (
+    SubmitTransferResponse,
+    SubmitTransferRequest,
+)
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepository,
 )
 from app.payout.repository.bankdb.transaction import TransactionRepository
+from app.payout.repository.maindb.managed_account_transfer import (
+    ManagedAccountTransferRepository,
+)
 from app.payout.repository.maindb.model.transfer import TransferStatus
 
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
@@ -53,7 +65,9 @@ class TestCreateTransfer:
         transfer_repo: TransferRepository,
         transaction_repo: TransactionRepository,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
+        managed_account_transfer_repo: ManagedAccountTransferRepository,
         app_context: AppContext,
+        stripe: StripeAsyncClient,
     ):
         self.create_transfer_operation = CreateTransfer(
             transfer_repo=transfer_repo,
@@ -61,8 +75,10 @@ class TestCreateTransfer:
             payment_account_repo=payment_account_repo,
             transaction_repo=transaction_repo,
             payment_account_edit_history_repo=payment_account_edit_history_repo,
+            managed_account_transfer_repo=managed_account_transfer_repo,
             payment_lock_manager=app_context.redis_lock_manager,
             logger=mocker.Mock(),
+            stripe=stripe,
             request=CreateTransferRequest(
                 payout_account_id=123,
                 transfer_type=TransferType.SCHEDULED,
@@ -74,8 +90,10 @@ class TestCreateTransfer:
         self.payment_account_repo = payment_account_repo
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
+        self.managed_account_repo = managed_account_transfer_repo
         self.payment_lock_manager = app_context.redis_lock_manager
         self.mocker = mocker
+        self.stripe = stripe
 
     @pytest.fixture
     def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
@@ -100,6 +118,33 @@ class TestCreateTransfer:
         return PaymentAccountEditHistoryRepository(database=payout_bankdb)
 
     @pytest.fixture
+    def managed_account_transfer_repo(
+        self, payout_maindb: DB
+    ) -> ManagedAccountTransferRepository:
+        return ManagedAccountTransferRepository(database=payout_maindb)
+
+    @pytest.fixture()
+    def stripe(self, app_config: AppConfig):
+        stripe_client = StripeClient(
+            settings_list=[
+                StripeClientSettings(
+                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
+                )
+            ],
+            http_client=TimedRequestsClient(),
+        )
+
+        stripe_thread_pool = ThreadPoolHelper(
+            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
+        )
+
+        stripe_async_client = StripeAsyncClient(
+            executor_pool=stripe_thread_pool, stripe_client=stripe_client
+        )
+        yield stripe_async_client
+        stripe_thread_pool.shutdown()
+
+    @pytest.fixture
     def mock_set_lock(self):
         with mock.patch("aioredlock.redis.Redis.set_lock") as mock_set_lock:
             yield mock_set_lock
@@ -111,6 +156,7 @@ class TestCreateTransfer:
         payout_countries=None,
         target_type=None,
         created_by_id=None,
+        submit_after_creation=False,
     ):
         return CreateTransfer(
             transfer_repo=self.transfer_repo,
@@ -118,8 +164,10 @@ class TestCreateTransfer:
             payment_account_repo=self.payment_account_repo,
             transaction_repo=self.transaction_repo,
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_lock_manager=self.payment_lock_manager,
             logger=self.mocker.Mock(),
+            stripe=self.stripe,
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
                 transfer_type=transfer_type,
@@ -127,6 +175,7 @@ class TestCreateTransfer:
                 payout_countries=payout_countries,
                 target_type=target_type,
                 created_by_id=created_by_id,
+                submit_after_creation=submit_after_creation,
             ),
         )
 
@@ -274,6 +323,68 @@ class TestCreateTransfer:
         )
         assert retrieved_transaction
         assert retrieved_transaction.transfer_id == response.transfer.id
+
+    async def test_execute_create_transfer_scheduled_transfer_type_submit_after_creation_success(
+        self
+    ):
+        # there is no corresponding stripe_transfer inserted, so the final status of transfer should be NEW
+        sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=self.payment_account_repo, country_shortname="US"
+        )
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
+        )
+        transaction = await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
+        )
+        create_transfer_op = self._construct_create_transfer_op(
+            payment_account_id=payment_account.id,
+            payout_countries=["US"],
+            submit_after_creation=True,
+        )
+
+        # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
+        # mocked get_json for runtime DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME, DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME
+        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=False)
+        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
+
+        @asyncio.coroutine
+        def mock_execute_submit_transfer(*args, **kwargs):
+            return SubmitTransferResponse()
+
+        self.mocker.patch(
+            "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.execute",
+            side_effect=mock_execute_submit_transfer,
+        )
+        mocked_init_submit_transfer = self.mocker.patch.object(
+            SubmitTransferRequest, "__init__", return_value=None
+        )
+
+        response = await create_transfer_op._execute()
+        assert response.transfer
+        assert response.transfer.status == TransferStatus.NEW
+        assert response.transfer.payment_account_id == payment_account.id
+        assert response.transfer.amount == response.transfer.subtotal
+        assert response.transfer.amount == transaction.amount
+
+        assert not response.transfer.created_by_id
+        assert not response.transfer.manual_transfer_reason
+        assert transaction.id == response.transaction_ids[0]
+        retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
+            transaction_id=transaction.id
+        )
+        assert retrieved_transaction
+        assert retrieved_transaction.transfer_id == response.transfer.id
+
+        mocked_init_submit_transfer.assert_called_once_with(
+            method="stripe",
+            retry=False,
+            submitted_by=None,
+            transfer_id=response.transfer.id,
+            target_id=12345,
+            target_type=PayoutTargetType.STORE,
+            statement_descriptor=None,
+        )
 
     async def test_create_transfer_for_transactions_negative_amount(self):
         transaction = await prepare_and_insert_transaction(
@@ -452,8 +563,10 @@ class TestCreateTransfer:
             payment_account_repo=self.payment_account_repo,
             transaction_repo=self.transaction_repo,
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_lock_manager=self.payment_lock_manager,
             logger=self.mocker.Mock(),
+            stripe=self.stripe,
             request=CreateTransferRequest(
                 payout_account_id=111,
                 transfer_type=TransferType.SCHEDULED,
