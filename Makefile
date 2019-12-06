@@ -69,6 +69,7 @@ local-worker: local-dependency
 .PHONY: local-dependency
 local-dependency:
 	docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock payment.redis payment.kafka
+	REDIS_CLUSTER_IP=0.0.0.0 docker-compose -f docker-compose.nodeploy.yml up -d payment.dsj-postgres payment.stripe-mock payment.redis payment.redis-cluster
 
 .PHONY: apply-migrations
 apply-migrations:

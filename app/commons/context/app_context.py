@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import aiohttp
 from aioredlock import Aioredlock
+from aredis import StrictRedisCluster
 from starlette.requests import Request
 from structlog.stdlib import BoundLogger
 
@@ -75,6 +76,8 @@ class AppContext:
 
     redis_lock_manager: Aioredlock
 
+    redis_cluster: StrictRedisCluster
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -99,6 +102,7 @@ class AppContext:
         finally:
             # shutdown the threadpool
             self.stripe_thread_pool.shutdown(wait=False)
+            self.redis_cluster.connection_pool.disconnect()
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
@@ -268,6 +272,8 @@ async def create_app_context(config: AppConfig) -> AppContext:
         retry_count=config.REDIS_LOCK_MAX_RETRY,
     )
 
+    redis_cluster = StrictRedisCluster(startup_nodes=config.REDIS_CLUSTER_INSTANCES)
+
     context = AppContext(
         log=root_logger,
         monitor=monitor,
@@ -288,6 +294,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         marqeta_session=marqeta_session,
         marqeta_client=marqeta_client,
         redis_lock_manager=redis_lock_manager,
+        redis_cluster=redis_cluster,
     )
 
     # start monitoring

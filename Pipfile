@@ -64,6 +64,7 @@ newrelic = "==5.0.2.126"
 asyncio-pool = "==0.4.1"
 aioredlock = "==0.3.0"
 aiokafka = "==0.5.2"
+aredis = "==1.1.5"
 
 [requires]
 python_version = "3.7"

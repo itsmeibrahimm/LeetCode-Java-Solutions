@@ -10,6 +10,7 @@ services:
       - STRIPE_API_BASE=http://payment.stripe-mock:12111
       - REDIS_ENDPOINT=payment.redis:6379
       - KAFKA_ENDPOINT=payment.kafka:9092
+      - REDIS_CLUSTER_ENDPOINT=payment.redis-cluster:7000
     build:
       context: .
       dockerfile: Dockerfile-ci
@@ -29,3 +30,4 @@ services:
       - payment.stripe-mock
       - payment.redis
       - payment.kafka
+      - payment.redis-cluster

@@ -97,6 +97,12 @@ def create_app_config() -> AppConfig:
         ],
         # todo: Get Kafka prod URL
         KAFKA_URL="localhost:9092",
+        REDIS_CLUSTER_INSTANCES=[
+            {
+                "host": "payment-service-cluster.mhazzc.clustercfg.usw2.cache.amazonaws.com",
+                "port": 6379,
+            }
+        ],
     )
 
 

@@ -104,6 +104,12 @@ def create_app_config() -> AppConfig:
         REDIS_INSTANCES=[("staging0.trwaqb.0001.usw2.cache.amazonaws.com", 6379)],
         # todo: Get Kafka staging URL
         KAFKA_URL="localhost:9092",
+        REDIS_CLUSTER_INSTANCES=[
+            {
+                "host": "staging-payment-service-cluster.trwaqb.clustercfg.usw2.cache.amazonaws.com",
+                "port": 6379,
+            }
+        ],
     )
 
 

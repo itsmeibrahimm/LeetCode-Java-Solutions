@@ -131,6 +131,8 @@ class AppConfig(SecretAware):
 
     # Redis Instances
     REDIS_INSTANCES: List[tuple]
+    # Redis Cluster Instances
+    REDIS_CLUSTER_INSTANCES: List[dict]
 
     # Kafka Url
     KAFKA_URL: str

@@ -148,4 +148,5 @@ def create_app_config() -> AppConfig:
         ),
         REDIS_INSTANCES=[("localhost", 6380)],
         KAFKA_URL="localhost:9092",
+        REDIS_CLUSTER_INSTANCES=[{"host": "localhost", "port": 7000}],
     )

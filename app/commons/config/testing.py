@@ -12,6 +12,7 @@ def create_app_config() -> AppConfig:
     dsj_db_endpoint: str = os.getenv("DSJ_DB_ENDPOINT", "localhost:5435")
     redis_endpoint: str = os.getenv("REDIS_ENDPOINT", "localhost:6380")
     kafka_endpoint: str = os.getenv("KAFKA_ENDPOINT", "localhost:9092")
+    redis_cluster_endpoint: str = os.getenv("REDIS_CLUSTER_ENDPOINT", "localhost:7000")
 
     return AppConfig(
         ENVIRONMENT="testing",
@@ -138,4 +139,10 @@ def create_app_config() -> AppConfig:
         # Assume the redis_endpoint is properly set in the format of "host:port"
         REDIS_INSTANCES=[(redis_endpoint.split(":")[0], redis_endpoint.split(":")[1])],
         KAFKA_URL=kafka_endpoint,
+        REDIS_CLUSTER_INSTANCES=[
+            {
+                "host": redis_cluster_endpoint.split(":")[0],
+                "port": redis_cluster_endpoint.split(":")[1],
+            }
+        ],
     )
