@@ -19,7 +19,13 @@ class MarqetaCardRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def create(self, token: str, delight_number: int, last4: str) -> MarqetaCard:
+    async def get_by_token(self, *, token: str) -> Optional[MarqetaCard]:
+        pass
+
+    @abstractmethod
+    async def create(
+        self, *, token: str, delight_number: int, last4: str
+    ) -> MarqetaCard:
         pass
 
 
@@ -44,7 +50,14 @@ class MarqetaCardRepository(
         row = await self._database.replica().fetch_one(stmt)
         return MarqetaCard.from_row(row) if row else None
 
-    async def create(self, token: str, delight_number: int, last4: str) -> MarqetaCard:
+    async def get_by_token(self, *, token: str) -> Optional[MarqetaCard]:
+        stmt = marqeta_cards.table.select().where(marqeta_cards.token == token)
+        row = await self._database.replica().fetch_one(stmt)
+        return MarqetaCard.from_row(row) if row else None
+
+    async def create(
+        self, *, token: str, delight_number: int, last4: str
+    ) -> MarqetaCard:
         data = {"token": token, "delight_number": delight_number, "last4": last4}
         stmt = (
             marqeta_cards.table.insert()

@@ -2,7 +2,6 @@ import random
 from uuid import uuid4
 
 import pytest
-from asynctest import MagicMock
 from starlette.status import (
     HTTP_200_OK,
     HTTP_404_NOT_FOUND,
@@ -16,12 +15,7 @@ from app.purchasecard.api.card.v0.models import (
     UnassociateMarqetaCardRequest,
 )
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
-from app.purchasecard.test_integration.utils import FakeMarqetaEnvironment
-
-
-class FunctionMock(MagicMock):
-    async def __call__(self, *args, **kwargs):
-        return super(FunctionMock, self).__call__(*args, **kwargs)
+from app.purchasecard.test_integration.utils import FakeMarqetaEnvironment, FunctionMock
 
 
 @pytest.mark.external
@@ -84,6 +78,7 @@ class TestUnassociateMarqetaCard:
         assert cardresp["token"] == test_card_token
 
     def test_unassociate_marqeta_card_failure_not_found(self, client: TestClient):
+        # random test dasher ids are generated between 0~9999, hence no id=10000 should exist in db
         request_body = UnassociateMarqetaCardRequest(dasher_id=10000)
 
         response = client.post(

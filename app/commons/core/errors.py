@@ -423,6 +423,8 @@ class PaymentLockReleaseError(PaymentLockError):
 #   - MarqetaCannotMoveCardToNewCardHolderError
 #   - MarqetaCannotActivateCardError
 #   - MarqetaCannotInactivateCardError
+#   - MarqetaNoActiveCardOwnershipError
+#   - MarqetaCardNotFoundError
 ####################################
 class MarqetaErrorCode(str, Enum):
     MARQETA_RESOURCE_ALREADY_CREATED_ERROR = "marqeta_resource_already_created_error"
@@ -436,6 +438,7 @@ class MarqetaErrorCode(str, Enum):
     MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR = (
         "no_active_marqeta_card_ownership_error"
     )
+    MARQETA_NO_CARD_FOUND_FOR_TOKEN_ERROR = "no_card_found_for_token_error"
 
 
 marqeta_error_message_maps = {
@@ -446,6 +449,7 @@ marqeta_error_message_maps = {
     MarqetaErrorCode.MARQETA_FAILED_TO_ACTIVATE_CARD_ERROR: "Failed to activate marqeta card.",
     MarqetaErrorCode.MARQETA_FAILED_TO_INACTIVATE_CARD_ERROR: "Failed to inactivate marqeta card.",
     MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR: "No active card ownership found for dasher id.",
+    MarqetaErrorCode.MARQETA_NO_CARD_FOUND_FOR_TOKEN_ERROR: "No card found for token.",
 }
 
 
@@ -521,6 +525,17 @@ class MarqetaNoActiveCardOwnershipError(PaymentError[MarqetaErrorCode]):
             error_code=MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR,
             error_message=marqeta_error_message_maps[
                 MarqetaErrorCode.MARQETA_NO_ACTIVE_CARD_OWNERSHIP_DASHER_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCardNotFoundError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_NO_CARD_FOUND_FOR_TOKEN_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_NO_CARD_FOUND_FOR_TOKEN_ERROR
             ],
             retryable=False,
         )

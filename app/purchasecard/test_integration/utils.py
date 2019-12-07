@@ -2,6 +2,7 @@ import json
 from uuid import uuid4
 
 import requests
+from asynctest import MagicMock
 
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
 from app.purchasecard.repository.store_mastercard_data import (
@@ -105,3 +106,8 @@ async def prepare_and_insert_store_mastercard_data(
     assert store_mastercard_data.id, "store mastercard data is created, assigned an ID"
     validate_expected_items_in_dict(expected=data, actual=store_mastercard_data.dict())
     return store_mastercard_data
+
+
+class FunctionMock(MagicMock):
+    async def __call__(self, *args, **kwargs):
+        return super(FunctionMock, self).__call__(*args, **kwargs)

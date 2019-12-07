@@ -3,7 +3,6 @@ import random
 from uuid import uuid4
 
 import pytest
-from asynctest import MagicMock
 from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
@@ -14,12 +13,7 @@ from starlette.testclient import TestClient
 from app.commons.core.errors import MarqetaCannotActivateCardError
 from app.purchasecard.api.card.v0.models import AssociateMarqetaCardRequest
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
-from app.purchasecard.test_integration.utils import FakeMarqetaEnvironment
-
-
-class FunctionMock(MagicMock):
-    async def __call__(self, *args, **kwargs):
-        return super(FunctionMock, self).__call__(*args, **kwargs)
+from app.purchasecard.test_integration.utils import FakeMarqetaEnvironment, FunctionMock
 
 
 @pytest.mark.external

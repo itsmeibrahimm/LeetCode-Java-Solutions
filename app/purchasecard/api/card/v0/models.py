@@ -1,6 +1,7 @@
 """
 API Request/Response Models
 """
+from datetime import datetime
 from typing import Optional
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
@@ -25,3 +26,14 @@ class UnassociateMarqetaCardRequest(PaymentRequest):
 
 class UnassociateMarqetaCardResponse(PaymentRequest):
     token: str
+
+
+class GetMarqetaCardRequest(PaymentRequest):
+    dasher_id: int
+
+
+class GetMarqetaCardResponse(PaymentResponse):
+    token: str
+    delight_number: int
+    terminated_at: Optional[datetime]
+    last4: str

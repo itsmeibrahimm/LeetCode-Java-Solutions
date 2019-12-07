@@ -9,10 +9,12 @@ from app.commons.core.errors import (
     MarqetaCannotActivateCardError,
     MarqetaCannotInactivateCardError,
     MarqetaNoActiveCardOwnershipError,
+    MarqetaCardNotFoundError,
 )
 from app.purchasecard.core.card.models import (
     InternalAssociateCardResponse,
     InternalUnassociateCardResponse,
+    InternalGetMarqetaCardResponse,
 )
 from app.purchasecard.marqeta_external import errors as marqeta_errors
 from app.purchasecard.marqeta_external.marqeta_provider_client import (
@@ -147,6 +149,25 @@ class CardProcessor:
         )
 
         return InternalUnassociateCardResponse(token=card_ownership.card_id)
+
+    async def get_marqeta_card_by_dasher_id(
+        self, dasher_id
+    ) -> InternalGetMarqetaCardResponse:
+        card_ownership = await self.card_ownership_repo.get_active_card_ownership_by_dasher_id(
+            dasher_id
+        )
+        if not card_ownership:
+            raise MarqetaNoActiveCardOwnershipError()
+
+        card = await self.card_repo.get_by_token(token=card_ownership.card_id)
+        if not card:
+            raise MarqetaCardNotFoundError()
+        return InternalGetMarqetaCardResponse(
+            token=card.token,
+            delight_number=card.delight_number,
+            terminated_at=card.terminated_at,
+            last4=card.last4,
+        )
 
     async def get_or_create_card(self, token: str, delight_number: int, last4: str):
         card = await self.card_repo.get(
