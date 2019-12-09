@@ -13,8 +13,7 @@ from app.purchasecard.api.card.v0.models import (
     AssociateMarqetaCardRequest,
     UnassociateMarqetaCardResponse,
     UnassociateMarqetaCardRequest,
-    GetMarqetaCardRequest,
-    GetMarqetaCardResponse,
+    MarqetaCard,
 )
 from app.purchasecard.container import PurchaseCardContainer
 from app.purchasecard.core.card.models import (
@@ -112,6 +111,7 @@ async def unassociate_marqeta_from_user(
 
 @router.get(
     "/{dasher_id}",
+    response_model=MarqetaCard,
     status_code=HTTP_200_OK,
     operation_id="GetMarqetaCardByDasherId",
     responses={
@@ -121,15 +121,15 @@ async def unassociate_marqeta_from_user(
     tags=api_tags,
 )
 async def get_marqeta_card_by_dasher_id(
-    request: GetMarqetaCardRequest,
+    dasher_id: int,
     dependency_container: PurchaseCardContainer = Depends(PurchaseCardContainer),
 ):
     try:
         card_processor: CardProcessor = dependency_container.card_processor
         response: InternalGetMarqetaCardResponse = await card_processor.get_marqeta_card_by_dasher_id(
-            dasher_id=request.dasher_id
+            dasher_id=dasher_id
         )
-        return GetMarqetaCardResponse(
+        return MarqetaCard(
             token=response.token,
             delight_number=response.delight_number,
             terminated_at=response.terminated_at,

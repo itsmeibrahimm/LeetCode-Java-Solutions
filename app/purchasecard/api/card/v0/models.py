@@ -28,11 +28,7 @@ class UnassociateMarqetaCardResponse(PaymentRequest):
     token: str
 
 
-class GetMarqetaCardRequest(PaymentRequest):
-    dasher_id: int
-
-
-class GetMarqetaCardResponse(PaymentResponse):
+class MarqetaCard(PaymentResponse):
     token: str
     delight_number: int
     terminated_at: Optional[datetime]

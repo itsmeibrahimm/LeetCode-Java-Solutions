@@ -7,10 +7,7 @@ from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 from starlette.testclient import TestClient
 
 from app.commons.core.errors import MarqetaErrorCode
-from app.purchasecard.api.card.v0.models import (
-    AssociateMarqetaCardRequest,
-    GetMarqetaCardRequest,
-)
+from app.purchasecard.api.card.v0.models import AssociateMarqetaCardRequest
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
 from app.purchasecard.models.maindb.marqeta_card_ownership import MarqetaCardOwnership
 from app.purchasecard.test_integration.utils import FakeMarqetaEnvironment, FunctionMock
@@ -71,11 +68,8 @@ class TestGetMarqetaCard:
             mocker, client
         )
 
-        request_body = GetMarqetaCardRequest(dasher_id=test_dasher_id)
-
         response = client.get(
-            "/purchasecard/api/v0/marqeta/card/{}".format(test_dasher_id),
-            json=request_body.dict(),
+            "/purchasecard/api/v0/marqeta/card/{}".format(test_dasher_id)
         )
 
         assert response.status_code == HTTP_200_OK
@@ -85,11 +79,9 @@ class TestGetMarqetaCard:
     def test_card_failure_no_ownership(self, client: TestClient):
         # random test dasher ids are generated between 0~9999, hence no id=10000 should exist in db
         test_dasher_id = 10000
-        request_body = GetMarqetaCardRequest(dasher_id=test_dasher_id)
 
         response = client.get(
-            "/purchasecard/api/v0/marqeta/card/{}".format(test_dasher_id),
-            json=request_body.dict(),
+            "/purchasecard/api/v0/marqeta/card/{}".format(test_dasher_id)
         )
 
         assert response.status_code == HTTP_404_NOT_FOUND
@@ -111,11 +103,9 @@ class TestGetMarqetaCard:
         MarqetaCardOwnershipRepository.get_active_card_ownership_by_dasher_id = FunctionMock(  # type: ignore
             return_value=self.get_fake_card_ownership(test_dasher_id)
         )
-        request_body = GetMarqetaCardRequest(dasher_id=test_dasher_id)
 
         response = client.get(
-            "/purchasecard/api/v0/marqeta/card/{}".format(test_dasher_id),
-            json=request_body.dict(),
+            "/purchasecard/api/v0/marqeta/card/{}".format(test_dasher_id)
         )
 
         assert response.status_code == HTTP_404_NOT_FOUND
