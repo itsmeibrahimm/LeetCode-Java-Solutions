@@ -202,3 +202,28 @@ class TestPaymentIntentFailedWebhook:
             },
         )
         assert response.status_code == 200
+
+
+class TestPaymentIntentSucceededWebhook:
+    def test_handle_payment_intent_succeeded_webhook(
+        self, client: TestClient, payment_intent: PaymentIntent
+    ):
+        response = client.post(
+            "/payin/api/v1/webhook/us",
+            json={
+                "created": 1326853478,
+                "id": "evt_00000000000000",
+                "type": "payment_intent.succeeded",
+                "object": "event",
+                "api_version": "2019-05-16",
+                "data": {
+                    "object": {
+                        "id": "tr_00000000000000",
+                        "metadata": {"payment_intent_id": str(payment_intent.id)},
+                    }
+                },
+                "livemode": True,
+                "pending_webhooks": 1,
+            },
+        )
+        assert response.status_code == 200
