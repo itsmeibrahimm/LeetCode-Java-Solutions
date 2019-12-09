@@ -121,3 +121,7 @@ wait-test-dependency:
 .PHONY: local-bash
 local-bash:
 	kubectl exec -it `kubectl get pods -l service=$(SERVICE_NAME) -o jsonpath="{.items[0].metadata.name}"` --container=web bash
+
+.PHONY: docker-login
+docker-login:
+	aws --region us-west-2 ecr get-login --no-include-email | sh -
