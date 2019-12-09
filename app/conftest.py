@@ -223,6 +223,20 @@ async def ledger_paymentdb(app_config: AppConfig):
 
 
 @pytest.fixture
+async def purchasecard_paymentdb(app_config: AppConfig):
+    """
+    initialize the paymentdb connection for Ledger user
+    """
+    async with DB.create(
+        db_id="purchasecard_paymentdb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.PURCHASECARD_PAYMENTDB_MASTER_URL,
+        replica_url=app_config.PURCHASECARD_PAYMENTDB_MASTER_URL,
+    ) as db:
+        yield db
+
+
+@pytest.fixture
 def dummy_app_context(mocker: MockFixture):
     return AppContext(
         monitor=mocker.Mock(),

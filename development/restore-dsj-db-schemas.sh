@@ -22,12 +22,14 @@ paymentdb_copies=(paymentdb_dev paymentdb_test)
 payin_db_user=${PAYIN_DB_USER:-payin_user}
 payout_db_user=${PAYOUT_DB_USER:-payout_user}
 ledger_db_user=${LEDGER_DB_USER:-ledger_user}
+purchasecard_db_user=${PURCHASECARD_DB_USER:-purchase_card_user}
 
 echo "Creating payment db users"
 psql -v ON_ERROR_STOP=1 --username root --dbname base_db <<-EOSQL
     CREATE ROLE ${payin_db_user} WITH LOGIN NOSUPERUSER;
     CREATE ROLE ${payout_db_user} WITH LOGIN NOSUPERUSER;
     CREATE ROLE ${ledger_db_user} WITH LOGIN NOSUPERUSER;
+    CREATE ROLE ${purchasecard_db_user} WITH LOGIN NOSUPERUSER;
 EOSQL
 
 echo "Initializing paymentdb copies"
@@ -39,6 +41,8 @@ psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payin_db_user};
     GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${ledger_db_user};
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${ledger_db_user};
+    GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${purchasecard_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${purchasecard_db_user};
 EOSQL
 echo "Initialized ${dbname}"
 done

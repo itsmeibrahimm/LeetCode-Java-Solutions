@@ -96,6 +96,14 @@ def create_app_config() -> AppConfig:
             name="purchasecard_maindb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_dev",
         ),
+        PURCHASECARD_PAYMENTDB_MASTER_URL=Secret(
+            name="purchasecard_paymentdb_url",
+            value=f"postgresql://purchase_card_user@{dsj_db_endpoint}/paymentdb_dev",
+        ),
+        PURCHASECARD_PAYMENTDB_REPLICA_URL=Secret(
+            name="purchasecard_paymentdb_url",
+            value=f"postgresql://purchase_card_user@{dsj_db_endpoint}/paymentdb_dev",
+        ),
         DEFAULT_DB_CONFIG=DBConfig(
             replica_pool_max_size=1, master_pool_max_size=5, debug=True
         ),

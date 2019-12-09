@@ -84,6 +84,14 @@ def create_app_config() -> AppConfig:
             name="purchasecard_maindb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/maindb_test",
         ),
+        PURCHASECARD_PAYMENTDB_MASTER_URL=Secret(
+            name="purchasecard_paymentdb_url",
+            value=f"postgresql://purchase_card_user@{dsj_db_endpoint}/paymentdb_test",
+        ),
+        PURCHASECARD_PAYMENTDB_REPLICA_URL=Secret(
+            name="purchasecard_paymentdb_url",
+            value=f"postgresql://purchase_card_user@{dsj_db_endpoint}/paymentdb_test",
+        ),
         STRIPE_US_SECRET_KEY=Secret(
             name="stripe_us_secret_key", value="sk_test_NH2ez5KKOx5qPWcNcFhjdr1R"
         ),

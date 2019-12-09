@@ -27,7 +27,6 @@ async def run_alembic_command(db_url, config_name):
 
     # Status
     print("Started, pid=%s", process.pid, flush=True)
-
     # Wait for the subprocess to finish
     stdout, stderr = await process.communicate()
     print(stdout.decode().strip())
@@ -54,6 +53,11 @@ async def update_test_db_schema(app_config: AppConfig):
         app_config.PAYIN_PAYMENTDB_MASTER_URL.value
     )
     await run_alembic_command(payin_db_url, "payin")
+
+    purchasecard_db_url = "PURCHASECARD_PAYMENTDB_URL={}".format(
+        app_config.PURCHASECARD_PAYMENTDB_MASTER_URL.value
+    )
+    await run_alembic_command(purchasecard_db_url, "purchasecard")
 
 
 async def main():

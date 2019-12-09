@@ -44,6 +44,8 @@ def create_app_config() -> AppConfig:
         LEDGER_PAYMENTDB_REPLICA_URL=Secret(name="ledger_paymentdb_url"),
         PURCHASECARD_MAINDB_MASTER_URL=Secret(name="purchasecard_maindb_url"),
         PURCHASECARD_MAINDB_REPLICA_URL=Secret(name="purchasecard_maindb_replica_url"),
+        PURCHASECARD_PAYMENTDB_MASTER_URL=Secret(name="purchasecard_paymentdb_url"),
+        PURCHASECARD_PAYMENTDB_REPLICA_URL=Secret(name="purchasecard_paymentdb_url"),
         DEFAULT_DB_CONFIG=DBConfig(
             replica_pool_max_size=5,
             master_pool_max_size=5,
