@@ -69,7 +69,6 @@ class TestTransferV1:
     ):
         submitted_by = 6666
         submit_transfer_req = {
-            "statement_descriptor": "api_test_statement_descriptor",
             "method": TransferMethodType.STRIPE,
             "submitted_by": submitted_by,
         }
@@ -91,11 +90,7 @@ class TestTransferV1:
         new_transaction: dict,
         transfer: dict,
     ):
-        submit_transfer_req = {
-            "statement_descriptor": "api_test_statement_descriptor",
-            "method": TransferMethodType.STRIPE,
-            "retry": True,
-        }
+        submit_transfer_req = {"method": TransferMethodType.STRIPE, "retry": True}
         response = client.post(
             submit_transfer_url(transfer["id"]), json=submit_transfer_req
         )
@@ -121,10 +116,7 @@ class TestTransferV1:
         new_transaction: dict,
         transfer: dict,
     ):
-        submit_transfer_req = {
-            "statement_descriptor": "api_test_statement_descriptor",
-            "method": TransferMethodType.STRIPE,
-        }
+        submit_transfer_req = {"method": TransferMethodType.STRIPE}
         response = client.post(
             submit_transfer_url(transfer["id"]), json=submit_transfer_req
         )
@@ -195,10 +187,7 @@ class TestTransferV1:
         transfer: dict,
     ):
         list_transfers_req = {"has_positive_amount": True, "is_submitted": True}
-        submit_transfer_req = {
-            "statement_descriptor": "api_test_statement_descriptor",
-            "method": TransferMethodType.STRIPE,
-        }
+        submit_transfer_req = {"method": TransferMethodType.STRIPE}
         client.post(submit_transfer_url(transfer["id"]), json=submit_transfer_req)
         response = client.get(get_transfer_by_id_url(transfer["id"]))
         retrieved_transfer: dict = response.json()

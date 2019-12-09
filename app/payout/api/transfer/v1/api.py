@@ -50,8 +50,6 @@ async def create_transfer(
         transfer_type=body.transfer_type,
         start_time=body.start_time,
         end_time=body.end_time,
-        target_type=body.target_type,
-        target_business_id=body.target_business_id,
         payout_countries=body.payout_countries,
         created_by_id=body.created_by_id,
     )
@@ -100,9 +98,6 @@ async def submit_transfer(
         transfer_id=transfer_id,
         retry=body.retry,
         submitted_by=body.submitted_by,
-        statement_descriptor=body.statement_descriptor,
-        target_type=body.target_type,
-        target_id=body.target_id,
         method=body.method,
     )
     submit_transfer_response = await transfer_processors.submit_transfer(

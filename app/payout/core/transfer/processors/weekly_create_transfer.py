@@ -44,7 +44,6 @@ class WeeklyCreateTransferRequest(OperationRequest):
     payout_countries: List[str]
     end_time: datetime
     unpaid_txn_start_time: datetime
-    statement_descriptor: str
     whitelist_payment_account_ids: List[int]
     exclude_recently_updated_accounts: Optional[bool] = False
     method: Optional[str] = TransferMethodType.STRIPE
@@ -146,7 +145,6 @@ class WeeklyCreateTransfer(
                 payout_countries=self.request.payout_countries,
                 start_time=None,
                 submit_after_creation=True,
-                statement_descriptor=self.request.statement_descriptor,
                 method=self.request.method,
                 retry=self.request.retry,
             )

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import Schema
 from app.commons.api.models import PaymentRequest, PaymentResponse
-from app.payout.models import PayoutTargetType, TransferId
+from app.payout.models import TransferId
 from app.payout.repository.maindb.model.transfer import TransferStatus
 
 __all__ = ["SubmitTransfer", "CreateTransfer", "SubmitTransferResponse", "Transfer"]
@@ -15,13 +15,6 @@ class SubmitTransfer(PaymentRequest):
     Request model for submit a transfer
     """
 
-    statement_descriptor: str = Schema(
-        default=..., description="Statement descriptor for this transfer"
-    )
-    target_id: Optional[int] = Schema(default=None, description="Target ID")
-    target_type: Optional[PayoutTargetType] = Schema(
-        default=None, description="Target type"
-    )
     method: Optional[str] = Schema(
         default=None, description="Submit method (e.g., stripe, doordash_pay)"
     )
@@ -42,10 +35,6 @@ class CreateTransfer(PaymentRequest):
     transfer_type: str = Schema(default=..., description="Transfer type")
     end_time: datetime = Schema(default=..., description="End timestamp, required")
     start_time: Optional[datetime] = Schema(default=None, description="Start timestamp")
-    target_id: Optional[int] = Schema(default=None, description="Target ID")
-    target_type: Optional[PayoutTargetType] = Schema(
-        default=None, description="Target type"
-    )
     target_business_id: Optional[int] = Schema(
         default=None, description="Target business ID"
     )

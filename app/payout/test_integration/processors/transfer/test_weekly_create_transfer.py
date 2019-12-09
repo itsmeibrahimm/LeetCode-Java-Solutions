@@ -37,7 +37,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_stripe_managed_account,
     prepare_and_insert_payment_account_edit_history,
 )
-from app.payout.models import PayoutDay, PayoutTargetType
+from app.payout.models import PayoutDay
 
 
 class TestWeeklyCreateTransfer:
@@ -71,7 +71,6 @@ class TestWeeklyCreateTransfer:
                 payout_countries=[],
                 unpaid_txn_start_time=datetime.now(timezone.utc),
                 end_time=datetime.now(timezone.utc),
-                statement_descriptor="random descriptor",
                 whitelist_payment_account_ids=[],
             ),
         )
@@ -134,14 +133,13 @@ class TestWeeklyCreateTransfer:
         yield stripe_async_client
         stripe_thread_pool.shutdown()
 
-    def _construct_weekly_create_transfer_op(self, submit_after_creation=False):
+    def _construct_weekly_create_transfer_op(self):
         request = WeeklyCreateTransferRequest(
             payout_day=PayoutDay.MONDAY,
             payout_countries=[],
             end_time=datetime.utcnow(),
             unpaid_txn_start_time=datetime.utcnow() - timedelta(days=1),
             exclude_recently_updated_accounts=False,
-            statement_descriptor="statement_descriptor",
             whitelist_payment_account_ids=[],
         )
         weekly_create_transfer_op = WeeklyCreateTransfer(
@@ -257,13 +255,6 @@ class TestWeeklyCreateTransfer:
             == retrieved_transaction_a.amount + retrieved_transaction_b.amount
         )
 
-        # todo: update here once the target_id usage is settled
         mocked_init_submit_transfer.assert_called_once_with(
-            method="stripe",
-            retry=False,
-            statement_descriptor="statement_descriptor",
-            submitted_by=None,
-            target_id=12345,
-            target_type=PayoutTargetType.STORE,
-            transfer_id=transfer_id,
+            method="stripe", retry=False, submitted_by=None, transfer_id=transfer_id
         )

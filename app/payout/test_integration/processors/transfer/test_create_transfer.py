@@ -381,9 +381,6 @@ class TestCreateTransfer:
             retry=False,
             submitted_by=None,
             transfer_id=response.transfer.id,
-            target_id=12345,
-            target_type=PayoutTargetType.STORE,
-            statement_descriptor=None,
         )
 
     async def test_create_transfer_for_transactions_negative_amount(self):
@@ -458,20 +455,14 @@ class TestCreateTransfer:
         # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
         self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=False)
         assert not await self.create_transfer_operation.should_block_mx_payout(
-            payout_date_time=datetime.utcnow(),
-            payment_account_id=123,
-            target_type=None,
-            target_biz_id=None,
+            payout_date_time=datetime.utcnow(), payment_account_id=123
         )
 
     async def test_should_block_mx_payout_none_store_target(self):
         # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
         self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
         assert not await self.create_transfer_operation.should_block_mx_payout(
-            payout_date_time=datetime.utcnow(),
-            payment_account_id=123,
-            target_type=PayoutTargetType.DASHER,
-            target_biz_id=None,
+            payout_date_time=datetime.utcnow(), payment_account_id=123
         )
 
     async def test_should_block_mx_payout_target_biz_id_in_list(self):
@@ -482,10 +473,7 @@ class TestCreateTransfer:
             "app.commons.runtime.runtime.get_json", return_value={123: "yay"}
         )
         assert not await self.create_transfer_operation.should_block_mx_payout(
-            payout_date_time=datetime.utcnow(),
-            payment_account_id=123,
-            target_type=PayoutTargetType.STORE,
-            target_biz_id=123,
+            payout_date_time=datetime.utcnow(), payment_account_id=123
         )
 
     async def test_should_block_mx_payout_time_window_to_check_in_hours_is_zero(self):
@@ -496,10 +484,7 @@ class TestCreateTransfer:
         self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
         self.mocker.patch("app.commons.runtime.runtime.get_int", return_value=0)
         assert not await self.create_transfer_operation.should_block_mx_payout(
-            payout_date_time=datetime.utcnow(),
-            payment_account_id=123,
-            target_type=PayoutTargetType.STORE,
-            target_biz_id=123,
+            payout_date_time=datetime.utcnow(), payment_account_id=123
         )
 
     async def test_should_block_mx_payout_no_recent_bank_update(self):
@@ -513,10 +498,7 @@ class TestCreateTransfer:
             payment_account_repo=self.payment_account_repo
         )
         assert not await self.create_transfer_operation.should_block_mx_payout(
-            payout_date_time=datetime.utcnow(),
-            payment_account_id=payment_account.id,
-            target_type=PayoutTargetType.STORE,
-            target_biz_id=123,
+            payout_date_time=datetime.utcnow(), payment_account_id=payment_account.id
         )
 
     async def test_should_block_mx_payout_has_recent_bank_update_return_true(self):
@@ -539,10 +521,7 @@ class TestCreateTransfer:
             side_effect=mock_get_bank_update,
         )
         assert await self.create_transfer_operation.should_block_mx_payout(
-            payout_date_time=datetime.utcnow(),
-            payment_account_id=payment_account.id,
-            target_type=PayoutTargetType.STORE,
-            target_biz_id=123,
+            payout_date_time=datetime.utcnow(), payment_account_id=payment_account.id
         )
 
     async def test_create_transfer_for_unpaid_transactions_not_acquire_lock(

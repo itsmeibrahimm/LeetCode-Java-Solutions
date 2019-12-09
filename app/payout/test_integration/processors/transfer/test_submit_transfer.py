@@ -78,9 +78,7 @@ class TestSubmitTransfer:
             payment_account_edit_history_repo=payment_account_edit_history_repo,
             logger=mocker.Mock(),
             stripe=stripe,
-            request=SubmitTransferRequest(
-                transfer_id="1234", statement_descriptor="statement_descriptor"
-            ),
+            request=SubmitTransferRequest(transfer_id="1234"),
         )
         self.transfer_repo = transfer_repo
         self.stripe_transfer_repo = stripe_transfer_repo
@@ -1032,9 +1030,6 @@ class TestSubmitTransfer:
             transfer_id=transfer.id,
             payment_account=payment_account,
             amount=100,
-            statement_descriptor="statement_descriptor",
-            target_type=PayoutTargetType.DASHER,
-            target_id="target_id",
             submitted_by=123456,
             method=TransferMethodType.STRIPE,
         )
@@ -1080,9 +1075,6 @@ class TestSubmitTransfer:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
-                statement_descriptor="statement_descriptor",
-                target_type=PayoutTargetType.DASHER,
-                target_id="target_id",
                 submitted_by=123456,
                 method=TransferMethodType.CHECK,
             )
@@ -1132,9 +1124,6 @@ class TestSubmitTransfer:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
-                statement_descriptor="statement_descriptor",
-                target_type=PayoutTargetType.DASHER,
-                target_id="target_id",
                 submitted_by=123456,
                 method=TransferMethodType.STRIPE,
             )
@@ -1180,9 +1169,6 @@ class TestSubmitTransfer:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
-                statement_descriptor="statement_descriptor",
-                target_type=PayoutTargetType.DASHER,
-                target_id="target_id",
                 submitted_by=123456,
                 method=TransferMethodType.STRIPE,
             )
@@ -1247,9 +1233,6 @@ class TestSubmitTransfer:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
-                statement_descriptor="statement_descriptor",
-                target_type=PayoutTargetType.DASHER,
-                target_id="target_id",
                 submitted_by=123456,
                 method=TransferMethodType.STRIPE,
             )
@@ -1313,9 +1296,6 @@ class TestSubmitTransfer:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
-                statement_descriptor="statement_descriptor",
-                target_type=PayoutTargetType.DASHER,
-                target_id="target_id",
                 submitted_by=123456,
                 method=TransferMethodType.STRIPE,
             )
@@ -1377,9 +1357,6 @@ class TestSubmitTransfer:
                 transfer_id=transfer.id,
                 payment_account=payment_account,
                 amount=100,
-                statement_descriptor="statement_descriptor",
-                target_type=PayoutTargetType.DASHER,
-                target_id="target_id",
                 submitted_by=123456,
                 method=TransferMethodType.STRIPE,
             )
@@ -1485,7 +1462,7 @@ class TestSubmitTransfer:
             transfer_id=1234,
             payment_account=payment_account,
             target_type=PayoutTargetType.DASHER,
-            target_id="123",
+            target_id=123,
         )
         assert len(transfer_metadata) == 4
         assert transfer_metadata["transfer_id"] == 1234

@@ -33,6 +33,7 @@ from app.payout.core.transfer.processors.submit_transfer import (
 )
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
+    get_target_type_and_target_id,
 )
 from app.payout.repository.bankdb.model.transaction import (
     TransactionDBEntity,
@@ -75,11 +76,8 @@ class CreateTransferRequest(OperationRequest):
     transfer_type: str
     end_time: datetime
     start_time: Optional[datetime]
-    target_type: Optional[payout_models.PayoutTargetType]
-    target_business_id: Optional[int]
     payout_countries: Optional[List[str]]
     created_by_id: Optional[int]
-    statement_descriptor: Optional[str]
     submit_after_creation: Optional[bool] = False
     method: Optional[str] = payout_models.TransferMethodType.STRIPE
     retry: Optional[bool] = False
@@ -167,9 +165,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                         error_code=PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH,
                     )
             if not await self.should_payment_account_be_auto_paid_weekly(
-                payment_account_id=payment_account.id,
-                target_type=self.request.target_type,
-                target_biz_id=self.request.target_business_id,
+                payment_account_id=payment_account.id
             ):
                 self.logger.info(
                     "Payment stopped: Ignoring creating weekly transfer for account id",
@@ -209,13 +205,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             updated_transfer = await self.transfer_repo.update_transfer_by_id(
                 transfer_id=updated_transfer.id, data=update_transfer_request
             )
-        # todo: replace with real store_id from upstream teams
         if self.request.submit_after_creation and updated_transfer:
             submit_transfer_request = SubmitTransferRequest(
                 transfer_id=updated_transfer.id,
-                statement_descriptor=self.request.statement_descriptor,
-                target_id=12345,
-                target_type=payout_models.PayoutTargetType.STORE,
                 method=self.request.method,
                 retry=self.request.retry,
                 submitted_by=None,
@@ -242,17 +234,11 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         raise DEFAULT_INTERNAL_EXCEPTION
 
     async def should_payment_account_be_auto_paid_weekly(
-        self,
-        payment_account_id: int,
-        target_type: Optional[payout_models.PayoutTargetType],
-        target_biz_id: Optional[int],
+        self, payment_account_id: int
     ) -> bool:
         #  Check for potential mx banking fraud
         if await self.should_block_mx_payout(
-            payment_account_id=payment_account_id,
-            payout_date_time=datetime.utcnow(),
-            target_type=target_type,
-            target_biz_id=target_biz_id,
+            payment_account_id=payment_account_id, payout_date_time=datetime.utcnow()
         ):
             return False
 
@@ -269,12 +255,11 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         return payment_account_id not in account_stop_list
 
     async def should_block_mx_payout(
-        self,
-        payout_date_time: datetime,
-        payment_account_id: int,
-        target_type: Optional[payout_models.PayoutTargetType],
-        target_biz_id: Optional[int],
+        self, payout_date_time: datetime, payment_account_id: int
     ) -> bool:
+        target_type, target_id = get_target_type_and_target_id()
+        # todo: update when upstream team external api is ready
+        target_biz_id = 0
         if runtime.get_bool(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False):
             try:
                 if (

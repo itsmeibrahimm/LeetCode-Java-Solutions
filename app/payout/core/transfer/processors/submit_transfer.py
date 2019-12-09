@@ -92,9 +92,6 @@ class SubmitTransferResponse(OperationResponse):
 
 class SubmitTransferRequest(OperationRequest):
     transfer_id: TransferId
-    statement_descriptor: str
-    target_id: Optional[str] = None
-    target_type: Optional[PayoutTargetType] = None
     method: Optional[str] = TransferMethodType.STRIPE
     retry: Optional[bool] = False
     submitted_by: Optional[int] = None
@@ -282,9 +279,6 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             payment_account=payment_account,
             method=payout_method,
             amount=transfer.amount,
-            statement_descriptor=self.request.statement_descriptor,
-            target_type=self.request.target_type,
-            target_id=self.request.target_id,
             submitted_by=self.request.submitted_by,
         )
         return SubmitTransferResponse()
@@ -553,10 +547,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         transfer_id: int,
         payment_account: PaymentAccount,
         amount: int,
-        statement_descriptor: str,
         method: str,
-        target_type: Optional[PayoutTargetType],
-        target_id: Optional[str],
         submitted_by: Optional[int],
     ):
         """
@@ -564,10 +555,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         :param transfer_id: transfer_id, int
         :param payment_account: PaymentAccount
         :param amount: int, amount of the transfer
-        :param statement_descriptor: str, used to create payout
         :param method: str, transfer method type
-        :param target_type: dasher or store
-        :param target_id: dasher id or store id
         :param submitted_by: id of the user that triggered submit_transfer
         """
         submit_function_name = TRANSFER_METHOD_TO_SUBMIT_FUNCTION.get(
@@ -611,10 +599,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                     stripe_transfer=stripe_transfer,
                     payment_account=payment_account,
                     amount=amount,
-                    statement_descriptor=statement_descriptor,
                     transfer_id=transfer_id,
-                    target_type=target_type,
-                    target_id=target_id,
                 )
                 update_request = TransferUpdate(
                     submitted_at=datetime.now(timezone.utc),
@@ -722,9 +707,6 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         payment_account: PaymentAccount,
         amount: int,
         transfer_id: int,
-        statement_descriptor: str,
-        target_type: Optional[PayoutTargetType],
-        target_id: Optional[str],
     ):
         """
         Original function in dsj: submit(stripe_transfer)
@@ -752,9 +734,6 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 amount=amount,
                 transfer_id=transfer_id,
                 payment_account=payment_account,
-                statement_descriptor=statement_descriptor,
-                target_type=target_type,
-                target_id=target_id,
                 stripe_account_id=stripe_account_id,
             )
             stripe_bank_account = getattr(payout_of_stripe, "bank_account", None)
@@ -927,9 +906,6 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         transfer_id: int,
         payment_account: PaymentAccount,
         stripe_account_id: str,
-        statement_descriptor: str,
-        target_type: Optional[PayoutTargetType],
-        target_id: Optional[str],
     ) -> models.Payout:
         """
         This is the part that actually submits transfer and payout on Stripe platform
@@ -965,19 +941,14 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
                 retryable=False,
             )
-        target_type_value = None
-        if target_type:
-            target_type_value = target_type.value
+        # todo: replace statement_descriptor, target_id and target_type with testing store descriptor
         create_payout_request = StripeCreatePayoutRequest(
-            statement_descriptor=statement_descriptor.replace(">", "")
-            .replace("<", "")
-            .replace("'", "")
-            .replace('"', ""),
+            statement_descriptor="statement_descriptor",
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
                 payment_account=payment_account,
-                target_type=target_type_value,
-                target_id=target_id,
+                target_type=PayoutTargetType.STORE,
+                target_id=12345,
             ),
         )
         currency = get_currency_code(country_shortname)
@@ -1043,7 +1014,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         transfer_id: int,
         payment_account: PaymentAccount,
         target_type: Optional[PayoutTargetType],
-        target_id: Optional[str],
+        target_id: Optional[int],
     ) -> Dict:
         """
         Generate a dict that contains transfer id and payment account info as transfer metadata for stripe api calls.
@@ -1055,7 +1026,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         if target_type:
             transfer_metadata["target_type"] = target_type
         if target_id:
-            transfer_metadata["target_id"] = int(target_id)
+            transfer_metadata["target_id"] = target_id
         return transfer_metadata
 
     def extract_failure_code_from_exception_message(

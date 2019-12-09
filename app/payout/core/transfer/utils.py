@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, tzinfo
+from typing import Tuple
 
 import pytz
 from app.payout.repository.maindb.model.transfer import Transfer, TransferStatus
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
-from app.payout.models import TransferMethodType
+from app.payout.models import TransferMethodType, PayoutTargetType
 
 
 async def determine_transfer_status_from_latest_submission(
@@ -119,3 +120,8 @@ def get_start_and_end_of_week(dt: datetime, inclusive_end: bool, timezone_info: 
         sunday.year, sunday.month, sunday.day, timezone_info=timezone_info
     )
     return start_time, end_time
+
+
+def get_target_type_and_target_id() -> Tuple[PayoutTargetType, int]:
+    # todo: call upstream team external api to update logic
+    return PayoutTargetType.STORE, 12345
