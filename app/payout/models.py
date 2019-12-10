@@ -180,6 +180,12 @@ class Timezones(str):
     US_PACIFIC = pytz.timezone("US/Pacific")
 
 
+class PayoutTask(str, Enum):
+    WEEKLY_CREATE_TRANSFER = "weekly_create_transfer"
+    CREATE_TRANSFER = "create_transfer"
+    SUBMIT_TRANSFER = "submit_transfer"
+
+
 # Transactions
 TransactionId = int
 TransactionTargetId = int
