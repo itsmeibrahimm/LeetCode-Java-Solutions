@@ -35,9 +35,6 @@ class CreateTransfer(PaymentRequest):
     transfer_type: str = Schema(default=..., description="Transfer type")
     end_time: datetime = Schema(default=..., description="End timestamp, required")
     start_time: Optional[datetime] = Schema(default=None, description="Start timestamp")
-    target_business_id: Optional[int] = Schema(
-        default=None, description="Target business ID"
-    )
     payout_countries: Optional[List[str]] = Schema(
         default=None, description="Payout countries"
     )

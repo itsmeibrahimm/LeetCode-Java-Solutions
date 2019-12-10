@@ -15,7 +15,7 @@ from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
     CreateTransfer,
 )
-from app.payout.models import PayoutDay, TransferType, TransferMethodType
+from app.payout.models import PayoutDay, TransferType
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
 )
@@ -46,8 +46,6 @@ class WeeklyCreateTransferRequest(OperationRequest):
     unpaid_txn_start_time: datetime
     whitelist_payment_account_ids: List[int]
     exclude_recently_updated_accounts: Optional[bool] = False
-    method: Optional[str] = TransferMethodType.STRIPE
-    retry: Optional[bool] = False
 
 
 class WeeklyCreateTransfer(
@@ -145,8 +143,6 @@ class WeeklyCreateTransfer(
                 payout_countries=self.request.payout_countries,
                 start_time=None,
                 submit_after_creation=True,
-                method=self.request.method,
-                retry=self.request.retry,
             )
             create_transfer_op = CreateTransfer(
                 logger=self.logger,

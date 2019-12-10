@@ -79,8 +79,6 @@ class CreateTransferRequest(OperationRequest):
     payout_countries: Optional[List[str]]
     created_by_id: Optional[int]
     submit_after_creation: Optional[bool] = False
-    method: Optional[str] = payout_models.TransferMethodType.STRIPE
-    retry: Optional[bool] = False
 
 
 class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferResponse]):
@@ -208,8 +206,8 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         if self.request.submit_after_creation and updated_transfer:
             submit_transfer_request = SubmitTransferRequest(
                 transfer_id=updated_transfer.id,
-                method=self.request.method,
-                retry=self.request.retry,
+                method=payout_models.TransferMethodType.STRIPE,
+                retry=False,
                 submitted_by=None,
             )
             submit_transfer_op = SubmitTransfer(
