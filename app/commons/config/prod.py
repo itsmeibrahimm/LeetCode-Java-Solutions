@@ -18,7 +18,7 @@ def create_app_config() -> AppConfig:
     Create AppConfig for prod environment
     """
     return AppConfig(
-        INCLUDED_APPS=frozenset({"payout", "payin"}),
+        INCLUDED_APPS=frozenset({"payout", "payin", "purchasecard"}),
         ENVIRONMENT="prod",
         DEBUG=False,
         REMOTE_SECRET_ENABLED=True,
