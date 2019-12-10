@@ -539,3 +539,116 @@ class MarqetaCardNotFoundError(PaymentError[MarqetaErrorCode]):
             ],
             retryable=False,
         )
+
+
+####################################
+# PaymentCacheError
+#   - PaymentCacheGetError
+#   - PaymentCacheSetError
+#   - PaymentCacheCheckExistenceError
+#   - PaymentCacheInvalidateError
+####################################
+class PaymentCacheErrorCode(str, Enum):
+    CACHE_GET_ERROR = "cache_get_error"
+    CACHE_SET_ERROR = "cache_set_error"
+    CACHE_CHECK_EXISTENCE_ERROR = "cache_check_existence_error"
+    CACHE_INVALIDATE_ERROR = "cache_invalidate_error"
+    INVALID_CACHE_KEY_PARAMS = "invalid_cache_key_params"
+
+
+payment_cache_error_message_maps = {
+    PaymentCacheErrorCode.CACHE_GET_ERROR: "unable to get cache",
+    PaymentCacheErrorCode.CACHE_SET_ERROR: "unable to set cache",
+    PaymentCacheErrorCode.CACHE_CHECK_EXISTENCE_ERROR: "unable to check existence of a key in cache",
+    PaymentCacheErrorCode.CACHE_INVALIDATE_ERROR: "unable to invalidate cache",
+    PaymentCacheErrorCode.INVALID_CACHE_KEY_PARAMS: "invalid cache key params, should be a non-empty dict",
+}
+
+
+class PaymentCacheError(PaymentError[PaymentCacheErrorCode]):
+    """Payment Cache Base Error."""
+
+    def __init__(
+        self, error_code: PaymentCacheErrorCode, error_message: str, retryable: bool
+    ):
+        super().__init__(error_code, error_message, retryable)
+
+
+class PaymentCacheGetError(PaymentCacheError):
+    """Payment Cache Get Error.
+
+    Raised when unable to get from cache.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentCacheErrorCode.CACHE_GET_ERROR,
+            error_message=payment_cache_error_message_maps[
+                PaymentCacheErrorCode.CACHE_GET_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentCacheSetError(PaymentCacheError):
+    """Payment Cache Set Error.
+
+    Raised when unable to set cache.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentCacheErrorCode.CACHE_SET_ERROR,
+            error_message=payment_cache_error_message_maps[
+                PaymentCacheErrorCode.CACHE_SET_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentCacheCheckExistenceError(PaymentCacheError):
+    """Payment Cache Check Existence Error.
+
+    Raised when unable to check the existence in cache.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentCacheErrorCode.CACHE_CHECK_EXISTENCE_ERROR,
+            error_message=payment_cache_error_message_maps[
+                PaymentCacheErrorCode.CACHE_CHECK_EXISTENCE_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentCacheInvalidateError(PaymentCacheError):
+    """Payment Cache Invalidate Error.
+
+    Raised when unable to invalidate cache.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentCacheErrorCode.CACHE_INVALIDATE_ERROR,
+            error_message=payment_cache_error_message_maps[
+                PaymentCacheErrorCode.CACHE_INVALIDATE_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentCacheInvalidateCacheKeyParams(PaymentCacheError):
+    """Payment Cache invalid cache key params Error.
+
+    Raised when the passed in key params are not a non-empty dict
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentCacheErrorCode.INVALID_CACHE_KEY_PARAMS,
+            error_message=payment_cache_error_message_maps[
+                PaymentCacheErrorCode.INVALID_CACHE_KEY_PARAMS
+            ],
+            retryable=True,
+        )
