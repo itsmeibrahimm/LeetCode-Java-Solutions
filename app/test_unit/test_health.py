@@ -57,6 +57,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         marqeta_session=MagicMock(),
         redis_lock_manager=MagicMock(),
         redis_cluster=MagicMock(),
+        kafka_producer=MagicMock(),
     )
     app.extra["context"] = cast(Any, context)
 

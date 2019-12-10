@@ -5,6 +5,7 @@ from random import choice
 from typing import Any, cast
 
 import aiohttp
+from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from aredis import StrictRedisCluster
 from starlette.requests import Request
@@ -78,6 +79,8 @@ class AppContext:
 
     redis_cluster: StrictRedisCluster
 
+    kafka_producer: AIOKafkaProducer
+
     async def close(self):
         # stop monitoring various application resources
         self.monitor.stop()
@@ -98,6 +101,7 @@ class AppContext:
                 self.dsj_session.close(),
                 self.marqeta_session.close(),
                 self.redis_lock_manager.destroy(),
+                self.kafka_producer.stop(),
             )
         finally:
             # shutdown the threadpool
@@ -274,6 +278,15 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     redis_cluster = StrictRedisCluster(startup_nodes=config.REDIS_CLUSTER_INSTANCES)
 
+    kafka_producer = AIOKafkaProducer(
+        loop=asyncio.get_event_loop(), bootstrap_servers=config.KAFKA_URL
+    )
+    # TODO: PAYOUT-495, remove the try-except when infra is ready in staging and prod
+    try:
+        await kafka_producer.start()
+    except Exception:
+        await kafka_producer.stop()
+
     context = AppContext(
         log=root_logger,
         monitor=monitor,
@@ -295,6 +308,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         marqeta_client=marqeta_client,
         redis_lock_manager=redis_lock_manager,
         redis_cluster=redis_cluster,
+        kafka_producer=kafka_producer,
     )
 
     # start monitoring

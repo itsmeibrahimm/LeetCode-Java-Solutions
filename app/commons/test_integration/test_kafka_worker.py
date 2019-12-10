@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest_mock
-from aiokafka import AIOKafkaProducer
 import pytest
 from datetime import datetime, timedelta, timezone
 from kafka import KafkaAdminClient
@@ -62,20 +61,16 @@ class TestKafkaWorker:
             "app.payout.tasks.process_message", side_effect=mock_processor
         )
 
-        producer = AIOKafkaProducer(
-            loop=asyncio.get_event_loop(), bootstrap_servers=self.kafka_url
-        )
-        await producer.start()
-
         msg_list = []
         try:
             for i in range(10):
                 msg = f"message {i}: {datetime.timestamp(datetime.now())}"
                 msg_list.append(msg)
-                await producer.send_and_wait(self.topic_name, msg.encode())
-        finally:
-            # Wait for all pending messages to be delivered or expire.
-            await producer.stop()
+                await app_context.kafka_producer.send_and_wait(
+                    self.topic_name, msg.encode()
+                )
+        except Exception as e:
+            print(e)
 
         worker = KafkaWorker(
             app_context=app_context,
@@ -108,11 +103,6 @@ class TestKafkaWorker:
             WeeklyCreateTransferRequest, "__init__", return_value=None
         )
 
-        producer = AIOKafkaProducer(
-            loop=asyncio.get_event_loop(), bootstrap_servers=self.kafka_url
-        )
-        await producer.start()
-
         end_time = datetime.now(timezone.utc).isoformat()
         unpaid_txn_start_time = (datetime.utcnow() - timedelta(days=1)).isoformat()
         weekly_create_transfer_task = WeeklyCreateTransferTask(
@@ -126,12 +116,11 @@ class TestKafkaWorker:
 
         msg = weekly_create_transfer_task.serialize()
         try:
-            await producer.send_and_wait(
+            await app_context.kafka_producer.send_and_wait(
                 weekly_create_transfer_task.topic_name, msg.encode()
             )
-        finally:
-            # Wait for all pending messages to be delivered or expire.
-            await producer.stop()
+        except Exception as e:
+            print(e)
 
         worker = KafkaWorker(
             app_context=app_context,

@@ -259,6 +259,7 @@ def dummy_app_context(mocker: MockFixture):
         marqeta_session=mocker.Mock(),
         redis_lock_manager=mocker.Mock(),
         redis_cluster=mocker.Mock(),
+        kafka_producer=mocker.Mock(),
     )
 
 
