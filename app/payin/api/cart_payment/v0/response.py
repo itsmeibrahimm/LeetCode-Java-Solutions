@@ -4,3 +4,7 @@ from app.payin.core.cart_payment.types import LegacyConsumerChargeId
 
 class CreateCartPaymentLegacyResponse(CartPayment):
     dd_charge_id: LegacyConsumerChargeId
+
+
+class LegacyCartPayment(CreateCartPaymentLegacyResponse):
+    pass

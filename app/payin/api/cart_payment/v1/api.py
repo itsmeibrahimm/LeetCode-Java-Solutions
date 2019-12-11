@@ -140,3 +140,28 @@ async def cancel_cart_payment(
     )
     log.info("Cancelled cart_payment", cart_payment_id=cart_payment_id)
     return cart_payment
+
+
+@router.get(
+    "/cart_payments/{cart_payment_id}",
+    response_model=CartPayment,
+    status_code=HTTP_200_OK,
+    operation_id="GetCartPayment",
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def get_cart_payment(
+    cart_payment_id: UUID,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+):
+    """
+    Get an existing cart payment.
+    - **cart_payment_id**: ID of cart payment.
+    """
+    log.info("Getting cart payment", cart_payment_id=cart_payment_id)
+    cart_payment = await cart_payment_processor.get_cart_payment(
+        cart_payment_id=cart_payment_id
+    )
+    log.info("Cart payment retrieved", cart_payment_id=cart_payment_id)
+    return cart_payment

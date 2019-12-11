@@ -207,6 +207,24 @@ class TestCartPaymentProcessor:
         )
 
     @pytest.mark.asyncio
+    async def test_get_cart_payment(self, cart_payment_processor, request_cart_payment):
+        result_cart_payment = await cart_payment_processor.create_payment(
+            request_cart_payment=request_cart_payment,
+            idempotency_key=str(uuid.uuid4()),
+            payment_country=CountryCode.US,
+            currency=Currency.USD,
+        )
+        assert result_cart_payment
+        cart_payment_processor.cart_payment_interface.get_cart_payment = FunctionMock(
+            return_value=(result_cart_payment, None)
+        )
+        retrieved_cart_payment = await cart_payment_processor.get_cart_payment(
+            cart_payment_id=result_cart_payment.id
+        )
+        assert retrieved_cart_payment
+        assert retrieved_cart_payment == result_cart_payment
+
+    @pytest.mark.asyncio
     async def test_create_payment_with_exception_calling_provider(
         self, cart_payment_processor, request_cart_payment
     ):

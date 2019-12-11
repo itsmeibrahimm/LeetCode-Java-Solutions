@@ -1,3 +1,5 @@
+import typing
+
 from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
@@ -8,7 +10,10 @@ from app.payin.api.cart_payment.v0.request import (
     CreateCartPaymentLegacyRequest,
     UpdateCartPaymentLegacyRequest,
 )
-from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyResponse
+from app.payin.api.cart_payment.v0.response import (
+    LegacyCartPayment,
+    CreateCartPaymentLegacyResponse,
+)
 from app.payin.api.commando_mode import (
     commando_route_dependency,
     override_commando_mode_legacy_cart_payment,
@@ -50,7 +55,7 @@ async def create_cart_payment(
     )
 
     log.info("Created cart_payment for legacy client.", cart_payment_id=cart_payment.id)
-    return form_create_response(
+    return form_legacy_cart_payment(
         cart_payment=cart_payment, legacy_consumer_charge_id=legacy_consumer_charge_id
     )
 
@@ -96,7 +101,6 @@ async def update_cart_payment(
     status_code=HTTP_200_OK,
     operation_id="CancelCartPayment",
     tags=api_tags,
-    dependencies=[Depends(commando_route_dependency)],
 )
 async def cancel_cart_payment(
     dd_charge_id: int,
@@ -115,7 +119,35 @@ async def cancel_cart_payment(
     return cart_payment
 
 
-def form_create_response(
+@router.get(
+    "/cart_payments/get_by_charge_id",
+    response_model=LegacyCartPayment,
+    status_code=HTTP_200_OK,
+    operation_id="GetCartPayment",
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def get_cart_payment(
+    dd_charge_id: int,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+):
+    """
+    Get an existing cart payment.
+    - **dd_charge_id**: charge id for a cart payment.
+    """
+    log.info("Getting cart payment", dd_charge_id=dd_charge_id)
+    cart_payment = await cart_payment_processor.get_cart_payment(
+        dd_charge_id=dd_charge_id
+    )
+    log.info("Cart payment retrieved", dd_charge_id=dd_charge_id)
+    return form_legacy_cart_payment(
+        cart_payment=cart_payment,
+        legacy_consumer_charge_id=typing.cast(LegacyConsumerChargeId, dd_charge_id),
+    )
+
+
+def form_legacy_cart_payment(
     cart_payment: CartPayment, legacy_consumer_charge_id: LegacyConsumerChargeId
 ) -> CreateCartPaymentLegacyResponse:
     return CreateCartPaymentLegacyResponse(

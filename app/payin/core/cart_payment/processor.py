@@ -383,6 +383,15 @@ class LegacyPaymentInterface:
             error_reason=self._extract_error_reason_from_exception(creation_exception),
         )
 
+    async def get_cart_payment(self, dd_charge_id: int):
+        cart_payment_id = await self.get_associated_cart_payment_id(dd_charge_id)
+        if not cart_payment_id:
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
+        cart_payment, _ = await self.payment_repo.get_cart_payment_by_id(
+            cart_payment_id
+        )
+        return cart_payment
+
 
 class IdempotencyKeyAction(Enum):
     CREATE = "create"
@@ -3231,6 +3240,29 @@ class CartPaymentProcessor:
                 payer_id_type=PayerIdType.PAYER_ID, payer_id=payer_id
             )
         ).to_payer()
+
+    async def get_cart_payment(
+        self,
+        cart_payment_id: Optional[uuid.UUID] = None,
+        dd_charge_id: Optional[int] = None,
+    ) -> CartPayment:
+        if dd_charge_id:
+            return await self.legacy_payment_interface.get_cart_payment(
+                dd_charge_id=dd_charge_id
+            )
+        elif cart_payment_id:
+            cart_payment, _ = await self.cart_payment_interface.get_cart_payment(
+                cart_payment_id=cart_payment_id
+            )
+            if not cart_payment:
+                raise CartPaymentReadError(
+                    error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND
+                )
+            return cart_payment
+        else:
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA
+            )
 
 
 # TODO PAYIN-36 Decouple CommandoProcessor from CartPaymentProcessor

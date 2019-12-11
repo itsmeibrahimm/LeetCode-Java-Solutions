@@ -275,6 +275,18 @@ class TestCartPayment:
 
         return client.post("/payin/api/v0/cart_payments", json=request_body)
 
+    def _get_cart_payment_get_legacy_response(
+        self, client: TestClient, dd_charge_id: str
+    ) -> requests.Response:
+        return client.get(
+            f"/payin/api/v0/cart_payments/get_by_charge_id?dd_charge_id={dd_charge_id}"
+        )
+
+    def _get_cart_payment_get_response(
+        self, client: TestClient, cart_payment_id: str
+    ) -> requests.Response:
+        return client.get(f"/payin/api/v1/cart_payments/{cart_payment_id}")
+
     def _test_cart_payment_legacy_payment_creation(
         self,
         client: TestClient,
@@ -334,6 +346,38 @@ class TestCartPayment:
         assert cart_payment["dd_charge_id"]
         assert type(cart_payment["dd_charge_id"]) is int
         return cart_payment
+
+    def _test_cart_payment_legacy_payment_get(
+        self, client: TestClient, dd_charge_id: str
+    ) -> Dict[str, Any]:
+        response = self._get_cart_payment_get_legacy_response(
+            client=client, dd_charge_id=dd_charge_id
+        )
+        assert response.status_code == 200
+        cart_payment = response.json()
+        assert cart_payment
+        assert cart_payment["dd_charge_id"] == dd_charge_id
+        return cart_payment
+
+    def _test_cart_payment_get(
+        self, client: TestClient, cart_payment_id: str
+    ) -> Dict[str, Any]:
+        response = self._get_cart_payment_get_response(
+            client=client, cart_payment_id=cart_payment_id
+        )
+        assert response.status_code == 200
+        cart_payment = response.json()
+        assert cart_payment
+        assert cart_payment["id"] == cart_payment_id
+        return cart_payment
+
+    def _test_cart_payment_get_not_found(
+        self, client: TestClient, cart_payment_id: str
+    ):
+        response = self._get_cart_payment_get_response(
+            client=client, cart_payment_id=cart_payment_id
+        )
+        assert response.status_code == 404
 
     def _test_cart_payment_creation(
         self,
@@ -1458,4 +1502,53 @@ class TestCartPayment:
             split_payment=split_payment,
             amount=860,
             merchant_country=CountryCode.US,
+        )
+
+    def test_get_legacy_cart_payment(
+        self,
+        stripe_api: StripeAPISettings,
+        stripe_customer: StripeCustomer,
+        client: TestClient,
+    ):
+        stripe_api.enable_outbound()
+
+        # Client provides Stripe customer ID and Stripe customer ID, instead of payer_id and payment_method_id
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
+            client=client,
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_mastercard",
+            amount=900,
+            merchant_country=CountryCode.US,
+        )
+
+        self._test_cart_payment_legacy_payment_get(
+            client=client, dd_charge_id=cart_payment["dd_charge_id"]
+        )
+
+    def test_get_cart_payment(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        app_context: AppContext,
+    ):
+        stripe_api.enable_outbound()
+
+        cart_payment = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=500,
+            delay_capture=False,
+        )
+
+        self._test_cart_payment_get(client=client, cart_payment_id=cart_payment["id"])
+
+    def test_get_cart_payment_not_found(
+        self, stripe_api: StripeAPISettings, client: TestClient, app_context: AppContext
+    ):
+        stripe_api.enable_outbound()
+        self._test_cart_payment_get_not_found(
+            client=client, cart_payment_id=str(uuid.uuid4())
         )
