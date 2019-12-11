@@ -103,20 +103,20 @@ if app_config.ENVIRONMENT == "prod":
         trigger=CronTrigger(minute="*/30"),
     )
 
-weekly_create_transfer_monday = WeeklyCreateTransferJob(
+weekly_create_transfer_thursday = WeeklyCreateTransferJob(
     app_context=app_context,
     job_pool=stripe_pool,
     payout_countries=[PayoutCountry.UNITED_STATES, PayoutCountry.CANADA],
     payout_country_timezone=pytz.timezone("US/Pacific"),
-    payout_day=PayoutDay.MONDAY,
+    payout_day=PayoutDay.THURSDAY,
 )
 scheduler.add_job(
-    func=weekly_create_transfer_monday.run,
-    name=weekly_create_transfer_monday.job_name,
+    func=weekly_create_transfer_thursday.run,
+    name=weekly_create_transfer_thursday.job_name,
     trigger=CronTrigger(
-        day_of_week="mon",
+        day_of_week="thu",
         hour="1, 4",
-        minute="30",
+        minute="10",
         timezone=pytz.timezone("US/Pacific"),
     ),
 )

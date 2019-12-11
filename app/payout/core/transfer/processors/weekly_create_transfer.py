@@ -179,7 +179,8 @@ class WeeklyCreateTransfer(
         :rtype: list
         """
         payout_blocks_in_hours = runtime.get_int(
-            "DASHER_ATO_PREVENTION_THRESHOLD_IN_HOURS", default=0
+            "payout/feature-flags/DASHER_ATO_PREVENTION_THRESHOLD_IN_HOURS.int",
+            default=0,
         )
         if payout_blocks_in_hours == 0:
             return []

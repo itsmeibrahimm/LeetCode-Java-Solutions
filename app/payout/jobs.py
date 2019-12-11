@@ -19,7 +19,7 @@ from app.payout.core.transfer.processors.weekly_create_transfer import (
     WeeklyCreateTransferRequest,
 )
 from app.payout.core.transfer.utils import get_last_week
-from app.payout.models import PayoutDay, PayoutCountry, PayoutTargetType
+from app.payout.models import PayoutDay, PayoutCountry
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepository,
 )
@@ -154,7 +154,8 @@ class MonitorTransfersWithIncorrectStatus(Job):
 
     async def _trigger(self, job_instance_cxt: JobInstanceContext):
         if runtime.get_bool(
-            "enable_payment_service_monitor_transfer_with_incorrect_status", False
+            "payout/feature-flags/enable_payment_service_monitor_transfer_with_incorrect_status.bool",
+            False,
         ):
             # Create a window of the last 7 days
             start = self._start_of_the_week(date=datetime.utcnow()) - timedelta(weeks=1)
@@ -423,14 +424,18 @@ class WeeklyCreateTransferJob(Job):
         return "WeeklyCreateTransfer"
 
     async def _trigger(self, job_instance_cxt: JobInstanceContext):
-        weekly_create_transfers_list = runtime.get_json(
-            "enable_payment_service_weekly_create_transfers_list", []
+        weekly_create_transfers_dict_list = runtime.get_json(
+            "payout/feature-flags/enable_payment_service_weekly_create_transfers_list.json",
+            [],
         )
+        weekly_create_transfers_list: List[int] = []
+        for weekly_create_transfer_dict_obj in weekly_create_transfers_dict_list:
+            for key in weekly_create_transfer_dict_obj.keys():
+                weekly_create_transfers_list.append(key)
         if weekly_create_transfers_list:
             start_time, end_time = get_last_week(
                 timezone_info=self.payout_country_timezone, inclusive_end=True
             )
-            # todo: update target_id here
             weekly_create_transfer_req = WeeklyCreateTransferRequest(
                 payout_day=self.payout_day,
                 payout_countries=self.payout_countries,
@@ -438,7 +443,6 @@ class WeeklyCreateTransferJob(Job):
                 unpaid_txn_start_time=start_time,
                 exclude_recently_updated_accounts=True,
                 whitelist_payment_account_ids=weekly_create_transfers_list,
-                target_type=PayoutTargetType.STORE,
             )
             transfer_repo = TransferRepository(
                 database=job_instance_cxt.app_context.payout_maindb

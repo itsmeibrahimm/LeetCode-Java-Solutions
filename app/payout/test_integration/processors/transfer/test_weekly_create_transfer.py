@@ -12,6 +12,10 @@ from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsync
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
 from app.commons.utils.pool import ThreadPoolHelper
+from app.payout.core.transfer.processors.create_transfer import (
+    CreateTransferResponse,
+    CreateTransferRequest,
+)
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferResponse,
     SubmitTransferRequest,
@@ -37,7 +41,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_stripe_managed_account,
     prepare_and_insert_payment_account_edit_history,
 )
-from app.payout.models import PayoutDay
+from app.payout.models import PayoutDay, TransferType
 
 
 class TestWeeklyCreateTransfer:
@@ -137,8 +141,8 @@ class TestWeeklyCreateTransfer:
         request = WeeklyCreateTransferRequest(
             payout_day=PayoutDay.MONDAY,
             payout_countries=[],
-            end_time=datetime.utcnow(),
-            unpaid_txn_start_time=datetime.utcnow() - timedelta(days=1),
+            end_time=datetime.now(timezone.utc),
+            unpaid_txn_start_time=datetime.now(timezone.utc) - timedelta(days=1),
             exclude_recently_updated_accounts=False,
             whitelist_payment_account_ids=[],
         )
@@ -257,4 +261,51 @@ class TestWeeklyCreateTransfer:
 
         mocked_init_submit_transfer.assert_called_once_with(
             method="stripe", retry=False, submitted_by=None, transfer_id=transfer_id
+        )
+
+    async def test_execute_weekly_create_transfer_with_whitelist_payment_accounts(self):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+
+        @asyncio.coroutine
+        def mock_execute_create_transfer(*args, **kwargs):
+            return CreateTransferResponse(transaction_ids=[])
+
+        self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.execute",
+            side_effect=mock_execute_create_transfer,
+        )
+        mocked_init_create_transfer = self.mocker.patch.object(
+            CreateTransferRequest, "__init__", return_value=None
+        )
+        end_time = datetime.now(timezone.utc)
+        request = WeeklyCreateTransferRequest(
+            payout_day=PayoutDay.MONDAY,
+            payout_countries=[],
+            end_time=end_time,
+            unpaid_txn_start_time=datetime.now(timezone.utc) - timedelta(days=1),
+            exclude_recently_updated_accounts=False,
+            whitelist_payment_account_ids=[payment_account.id],
+        )
+        weekly_create_transfer_op = WeeklyCreateTransfer(
+            payment_account_repo=self.payment_account_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
+            transfer_repo=self.transfer_repo,
+            transaction_repo=self.transaction_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
+            payment_lock_manager=self.payment_lock_manager,
+            stripe=self.stripe,
+            request=request,
+        )
+        await weekly_create_transfer_op._execute()
+        mocked_init_create_transfer.assert_called_once_with(
+            payout_account_id=payment_account.id,
+            transfer_type=TransferType.SCHEDULED,
+            end_time=end_time,
+            payout_day=PayoutDay.MONDAY,
+            payout_countries=[],
+            start_time=None,
+            submit_after_creation=True,
         )

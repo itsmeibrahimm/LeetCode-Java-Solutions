@@ -20,6 +20,8 @@ from app.payout.core.exceptions import (
     PayoutErrorCode,
     payout_error_message_maps,
 )
+from app.payout.core.transfer.utils import get_target_metadata
+from app.payout.models import PayoutTargetType
 
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.test_integration.utils import (
@@ -160,3 +162,56 @@ class TestUtils:
             stripe_managed_account=None, stripe=stripe_client
         )
         assert balance == 0
+
+    async def test_get_target_metadata_json_not_found(
+        self,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repository: PaymentAccountRepository,
+    ):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repository
+        )
+        data = [
+            {
+                "123": {
+                    "target_type": PayoutTargetType.DASHER.value,
+                    "target_id": 6666,
+                    "statement_descriptor": "random_statement_descriptor",
+                }
+            }
+        ]
+        mocker.patch("app.commons.runtime.runtime.get_json", return_value=data)
+
+        target_type, target_id, statement_descriptor = get_target_metadata(
+            payment_account_id=payment_account.id
+        )
+        assert target_type == PayoutTargetType.STORE.value
+        assert target_id == 12345
+        assert statement_descriptor == "test_statement_descriptor"
+
+    async def test_get_target_metadata_success(
+        self,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repository: PaymentAccountRepository,
+    ):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repository
+        )
+        data_key = str(payment_account.id)
+        data = [
+            {
+                data_key: {
+                    "target_type": PayoutTargetType.DASHER.value,
+                    "target_id": 6666,
+                    "statement_descriptor": "random_statement_descriptor",
+                }
+            }
+        ]
+        mocker.patch("app.commons.runtime.runtime.get_json", return_value=data)
+
+        target_type, target_id, statement_descriptor = get_target_metadata(
+            payment_account_id=payment_account.id
+        )
+        assert target_type == PayoutTargetType.DASHER.value
+        assert target_id == 6666
+        assert statement_descriptor == "random_statement_descriptor"

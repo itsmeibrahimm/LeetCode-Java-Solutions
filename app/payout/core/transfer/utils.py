@@ -7,6 +7,7 @@ from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
 from app.payout.models import TransferMethodType, PayoutTargetType
+from app.commons.runtime import runtime
 
 
 async def determine_transfer_status_from_latest_submission(
@@ -82,6 +83,7 @@ def get_local_datetime(year: int, month: int, day: int, timezone_info: tzinfo):
     if timezone_info is None:
         timezone_info = pytz.timezone("US/Pacific")
     naive_local_dt = datetime(year=year, month=month, day=day, tzinfo=timezone_info)
+    # ignore typing check here since DstTzInfo is not exposed externally and tzinfo does not have normalize function
     real_local_dt = timezone_info.normalize(naive_local_dt)  # type: ignore
     if real_local_dt != naive_local_dt:
         # that means there was a DST change at some point
@@ -122,6 +124,20 @@ def get_start_and_end_of_week(dt: datetime, inclusive_end: bool, timezone_info: 
     return start_time, end_time
 
 
-def get_target_type_and_target_id() -> Tuple[PayoutTargetType, int]:
+def get_target_metadata(payment_account_id: int) -> Tuple[str, int, str]:
     # todo: call upstream team external api to update logic
-    return PayoutTargetType.STORE, 12345
+    weekly_create_transfers_dict_list = runtime.get_json(
+        "payout/feature-flags/enable_payment_service_weekly_create_transfers_list.json",
+        [],
+    )
+    target_type = PayoutTargetType.STORE.value
+    target_id = 12345
+    statement_descriptor = "test_statement_descriptor"
+    for weekly_create_transfer_dict_obj in weekly_create_transfers_dict_list:
+        value_dict = weekly_create_transfer_dict_obj.get(str(payment_account_id), None)
+        if value_dict:
+            target_type = value_dict.get("target_type")
+            target_id = value_dict.get("target_id")
+            statement_descriptor = value_dict.get("statement_descriptor")
+            break
+    return target_type, target_id, statement_descriptor

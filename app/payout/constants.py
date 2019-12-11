@@ -17,9 +17,11 @@ MAX_TRANSFER_AMOUNT_IDR = (
 )  # This is about 25,000 US dollars (which is the MAX_TRANSFER_AMOUNT_IN_CENTS)
 
 DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK = (
-    "days_for_recent_bank_change_for_large_transfers_check"
+    "payout/feature-flags/days_for_recent_bank_change_for_large_transfers_check.int"
 )
-FF_CHECK_FOR_RECENT_BANK_CHANGE = "FF_CHECK_FOR_RECENT_BANK_CHANGE"
+FF_CHECK_FOR_RECENT_BANK_CHANGE = (
+    "payout/feature-flags/FF_CHECK_FOR_RECENT_BANK_CHANGE.bool"
+)
 
 CURRENCY_TO_MAX_TRANSFER_AMOUNT_IN_BASE_UNIT = {
     "USD": MAX_TRANSFER_AMOUNT_IN_CENTS,
@@ -28,10 +30,10 @@ CURRENCY_TO_MAX_TRANSFER_AMOUNT_IN_BASE_UNIT = {
     "SGD": MAX_TRANSFER_AMOUNT_IN_CENTS,
 }
 DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME = (
-    "DISABLE_DASHER_PAYMENT_ACCOUNT_AUTO_PAYMENT_LIST"
+    "payout/feature-flags/DISABLE_DASHER_PAYMENT_ACCOUNT_AUTO_PAYMENT_LIST.json"
 )
 DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME = (
-    "DISABLE_MERCHANT_PAYMENT_ACCOUNT_AUTO_PAYMENT_LIST"
+    "payout/feature-flags/DISABLE_MERCHANT_PAYMENT_ACCOUNT_AUTO_PAYMENT_LIST.json"
 )
 
 DEFAULT_USER_EMAIL_FOR_SUPERPOWERS = "20156288"  # niket@doordash.com
@@ -61,13 +63,11 @@ UPDATED_INCORRECT_STRIPE_TRANSFER_STATUS = backfill_tasks_monitoring_stat_name(
 
 # Fraud related runtime for creating transfers
 FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE = (
-    "fraud_enable_mx_payout_delay_after_bank_change"
+    "payout/feature-flags/fraud_enable_mx_payout_delay_after_bank_change.bool"
 )
-FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE = (
-    "fraud_business_whitelist_for_payout_delay_after_bank_change"
-)
+FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE = "payout/feature-flags/fraud_business_whitelist_for_payout_delay_after_bank_change.json"
 FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE = (
-    "fraud_minimum_hours_before_mx_payout_after_bank_change"
+    "payout/feature-flags/fraud_minimum_hours_before_mx_payout_after_bank_change.int"
 )
 
 PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT = 60  # in second

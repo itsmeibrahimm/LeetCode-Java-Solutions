@@ -36,6 +36,7 @@ from app.payout.core.account.utils import (
     get_account_balance,
 )
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
+from app.payout.core.transfer.utils import get_target_metadata
 from app.payout.repository.bankdb.model.transaction import TransactionDBEntity
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
@@ -74,7 +75,6 @@ from app.payout.models import (
     TransferMethodType,
     TRANSFER_METHOD_CHOICES,
     AccountType,
-    PayoutTargetType,
     StripeTransferSubmissionStatus,
     STRIPE_TRANSFER_FAILED_STATUS,
     StripeErrorCode,
@@ -335,11 +335,11 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             transfer.currency, MAX_TRANSFER_AMOUNT_IN_CENTS  # default to USD
         )
         account_limitations = runtime.get_json(
-            "payment_account_transfer_limit_overrides", {}
+            "payout/feature-flags/payment_account_transfer_limit_overrides.json", {}
         )
         max_amount_dict = account_limitations.get(
             transfer.payment_account_id, None
-        ) or runtime.get_int("default_transfer_max", {})
+        ) or runtime.get_int("payout/feature-flags/default_transfer_max.int", {})
         max_amount = max_amount_dict.get(transfer.currency, default_max_amount)
         # check if transfer amount exceeds max amount AND there was a recent bank change
         should_error_on_large_amt = transfer.amount >= max_amount
@@ -364,7 +364,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 user_list.append(transfer.created_by_id)
             has_payment_permission = self.does_user_have_payments_superpowers(
                 user_list=user_list,
-                runtime_list_name="transfer_amount_limitation_admins",
+                runtime_list_name="payout/feature-flags/transfer_amount_limitation_admins.str",
             )
             if not has_payment_permission:
                 update_request = TransferUpdate(
@@ -864,7 +864,8 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             user_list.append(retrieved_transfer.created_by_id)
 
         has_payment_permission = self.does_user_have_payments_superpowers(
-            user_list=user_list, runtime_list_name="transfer_amount_limitation_admins"
+            user_list=user_list,
+            runtime_list_name="payout/feature-flags/transfer_amount_limitation_admins.str",
         )
         if not has_payment_permission:
             raise PayoutError(
@@ -941,14 +942,16 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
                 retryable=False,
             )
-        # todo: replace statement_descriptor, target_id and target_type with testing store descriptor
+        target_type, target_id, statement_descriptor = get_target_metadata(
+            payment_account_id=payment_account.id
+        )
         create_payout_request = StripeCreatePayoutRequest(
-            statement_descriptor="statement_descriptor",
+            statement_descriptor=statement_descriptor,
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
                 payment_account=payment_account,
-                target_type=PayoutTargetType.STORE,
-                target_id=12345,
+                target_type=target_type,
+                target_id=target_id,
             ),
         )
         currency = get_currency_code(country_shortname)
@@ -1013,7 +1016,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         self,
         transfer_id: int,
         payment_account: PaymentAccount,
-        target_type: Optional[PayoutTargetType],
+        target_type: Optional[str],
         target_id: Optional[int],
     ) -> Dict:
         """

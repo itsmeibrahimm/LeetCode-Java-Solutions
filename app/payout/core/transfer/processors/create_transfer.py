@@ -33,7 +33,7 @@ from app.payout.core.transfer.processors.submit_transfer import (
 )
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
-    get_target_type_and_target_id,
+    get_target_metadata,
 )
 from app.payout.repository.bankdb.model.transaction import (
     TransactionDBEntity,
@@ -255,7 +255,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     async def should_block_mx_payout(
         self, payout_date_time: datetime, payment_account_id: int
     ) -> bool:
-        target_type, target_id = get_target_type_and_target_id()
+        target_type, target_id, statement_descriptor = get_target_metadata(
+            payment_account_id=payment_account_id
+        )
         # todo: update when upstream team external api is ready
         target_biz_id = 0
         if runtime.get_bool(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False):
