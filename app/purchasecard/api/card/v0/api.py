@@ -34,6 +34,7 @@ router = APIRouter()
     response_model=AssociateMarqetaCardResponse,
     responses={
         HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
     },
     tags=api_tags,
@@ -61,6 +62,8 @@ async def associate_marqeta_card_with_user(
             MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR,
         ):
             status = HTTP_400_BAD_REQUEST
+        elif e.error_code == MarqetaErrorCode.MARQETA_RESOURCE_NOT_FOUND_ERROR:
+            status = HTTP_404_NOT_FOUND
         else:
             status = HTTP_500_INTERNAL_SERVER_ERROR
         raise PaymentException(

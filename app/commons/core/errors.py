@@ -418,6 +418,7 @@ class PaymentLockReleaseError(PaymentLockError):
 ####################################
 # Marqeta Related Errors
 #   - MarqetaResourceAlreadyCreatedError
+#   - MarqetaResourceNotFoundError
 #   - MarqetaCreateUserError
 #   - MarqetaCannotAssignCardError
 #   - MarqetaCannotMoveCardToNewCardHolderError
@@ -428,6 +429,7 @@ class PaymentLockReleaseError(PaymentLockError):
 ####################################
 class MarqetaErrorCode(str, Enum):
     MARQETA_RESOURCE_ALREADY_CREATED_ERROR = "marqeta_resource_already_created_error"
+    MARQETA_RESOURCE_NOT_FOUND_ERROR = "marqeta_resource_not_found_error"
     MARQETA_CREATE_USER_ERROR = "create_marqeta_user_error"
     MARQETA_CANNOT_ASSIGN_CARD_ERROR = "cannot_assign_marqeta_card_error"
     MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR = (
@@ -443,6 +445,7 @@ class MarqetaErrorCode(str, Enum):
 
 marqeta_error_message_maps = {
     MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR: "Marqeta resource already created.",
+    MarqetaErrorCode.MARQETA_RESOURCE_NOT_FOUND_ERROR: "Marqeta resource not found.",
     MarqetaErrorCode.MARQETA_CREATE_USER_ERROR: "Error creating Marqeta user.",
     MarqetaErrorCode.MARQETA_CANNOT_ASSIGN_CARD_ERROR: "Marqeta card cannot be assigned.",
     MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR: "Marqeta card cannot be moved to a new cardholder.",
@@ -459,6 +462,17 @@ class MarqetaResourceAlreadyCreatedError(PaymentError[MarqetaErrorCode]):
             error_code=MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR,
             error_message=marqeta_error_message_maps[
                 MarqetaErrorCode.MARQETA_RESOURCE_ALREADY_CREATED_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaResourceNotFoundError(PaymentError[MarqetaErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaErrorCode.MARQETA_RESOURCE_NOT_FOUND_ERROR,
+            error_message=marqeta_error_message_maps[
+                MarqetaErrorCode.MARQETA_RESOURCE_NOT_FOUND_ERROR
             ],
             retryable=False,
         )

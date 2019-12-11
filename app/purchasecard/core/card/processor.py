@@ -10,6 +10,7 @@ from app.commons.core.errors import (
     MarqetaCannotInactivateCardError,
     MarqetaNoActiveCardOwnershipError,
     MarqetaCardNotFoundError,
+    MarqetaResourceNotFoundError,
 )
 from app.purchasecard.core.card.models import (
     InternalAssociateCardResponse,
@@ -68,9 +69,12 @@ class CardProcessor:
         # Look up the card by the delight number and last4
         card_token = self._get_card_token(delight_number)
         get_card_req = MarqetaProviderGetCardRequest(token=card_token, last4=last4)
-        card_data = await self.marqeta_client.get_marqeta_card_and_verify(
-            req=get_card_req
-        )
+        try:
+            card_data = await self.marqeta_client.get_marqeta_card_and_verify(
+                req=get_card_req
+            )
+        except marqeta_errors.MarqetaResourceNotFound as e:
+            raise MarqetaResourceNotFoundError() from e
 
         num_prev_owners = 0
         card, created = await self.get_or_create_card(

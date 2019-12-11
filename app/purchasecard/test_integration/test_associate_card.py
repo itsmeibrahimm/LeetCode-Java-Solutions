@@ -7,6 +7,7 @@ from starlette.status import (
     HTTP_200_OK,
     HTTP_400_BAD_REQUEST,
     HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_404_NOT_FOUND,
 )
 from starlette.testclient import TestClient
 
@@ -29,7 +30,7 @@ class TestAssociateMarqetaCard:
     def get_fake_dasher_id(self):
         return random.randint(0, 999999)
 
-    def test_associate_marqeta_card_success(self, mocker, client: TestClient):
+    def test_success(self, mocker, client: TestClient):
         user_token = self.test_marqeta_env.setup_test_user()
         test_token = str(uuid4())
         card: MarqetaProviderCard = self.test_marqeta_env.setup_test_card_with_token(
@@ -59,7 +60,7 @@ class TestAssociateMarqetaCard:
         assert cardresp["num_prev_owners"] == 0
         assert cardresp["old_card_relinquished"] is False
 
-    def test_associate_marqeta_card_failure_retry(self, mocker, client: TestClient):
+    def test_failure_retry(self, mocker, client: TestClient):
         # mock failed card transition
         from app.purchasecard.core.card.processor import CardProcessor
 
@@ -109,9 +110,7 @@ class TestAssociateMarqetaCard:
         assert cardresp["num_prev_owners"] == 1
         assert cardresp["old_card_relinquished"] is False
 
-    def test_associate_marqeta_card_old_card_relinquished(
-        self, mocker, client: TestClient
-    ):
+    def test_old_card_relinquished(self, mocker, client: TestClient):
         user_token = self.test_marqeta_env.setup_test_user()
         dasher_id = self.get_fake_dasher_id()
         # old card
@@ -173,9 +172,7 @@ class TestAssociateMarqetaCard:
         assert cardresp["num_prev_owners"] == 0
         assert cardresp["old_card_relinquished"] is True
 
-    def test_associate_marqeta_card_cannot_move_card_to_new_cardholder(
-        self, mocker, client: TestClient
-    ):
+    def test_cannot_move_card_to_new_cardholder(self, mocker, client: TestClient):
         old_user_token = self.test_marqeta_env.setup_test_user()
 
         # issue new card and activate
@@ -214,9 +211,7 @@ class TestAssociateMarqetaCard:
             == MarqetaErrorCode.MARQETA_CANNOT_MOVE_CARD_TO_NEW_CARDHOLDER_ERROR
         )
 
-    def test_associate_marqeta_card_cannot_assign_card(
-        self, mocker, client: TestClient
-    ):
+    def test_cannot_assign_card(self, mocker, client: TestClient):
         prev_owner = self.get_fake_dasher_id()
         user_token = self.test_marqeta_env.setup_test_user()
         # issue new card
@@ -265,3 +260,26 @@ class TestAssociateMarqetaCard:
         from app.commons.core.errors import MarqetaErrorCode
 
         assert error_code == MarqetaErrorCode.MARQETA_CANNOT_ASSIGN_CARD_ERROR
+
+    def test_resource_not_found(self, mocker, client: TestClient):
+        user_token = self.test_marqeta_env.setup_test_user()
+        # generate invalid token
+        test_token = str(uuid4())
+        mocker.patch(
+            "app.purchasecard.core.card.processor.CardProcessor._get_card_token",
+            return_value=test_token,
+        )
+
+        request_body = AssociateMarqetaCardRequest(
+            delight_number=self.TEST_DELIGHT_NUMBER,
+            last4="1234",
+            dasher_id=self.get_fake_dasher_id(),
+            user_token=user_token,
+        )
+
+        response = client.post(
+            "/purchasecard/api/v0/marqeta/card/associate_marqeta",
+            json=request_body.dict(),
+        )
+
+        assert response.status_code == HTTP_404_NOT_FOUND
