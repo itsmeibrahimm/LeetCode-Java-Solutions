@@ -110,4 +110,4 @@ def create_app_config() -> AppConfig:
 
 def create_app_config_for_payin_cron() -> AppConfig:
     web_appconfig = create_app_config()
-    return dataclasses.replace(web_appconfig, STRIPE_MAX_WORKERS=30)
+    return dataclasses.replace(web_appconfig, STRIPE_MAX_WORKERS=40)
