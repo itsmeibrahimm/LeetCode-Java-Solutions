@@ -431,7 +431,7 @@ class WeeklyCreateTransferJob(Job):
         weekly_create_transfers_list: List[int] = []
         for weekly_create_transfer_dict_obj in weekly_create_transfers_dict_list:
             for key in weekly_create_transfer_dict_obj.keys():
-                weekly_create_transfers_list.append(key)
+                weekly_create_transfers_list.append(int(key))
         if weekly_create_transfers_list:
             start_time, end_time = get_last_week(
                 timezone_info=self.payout_country_timezone, inclusive_end=True
