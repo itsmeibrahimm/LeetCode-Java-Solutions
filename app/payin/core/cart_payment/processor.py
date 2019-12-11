@@ -383,15 +383,6 @@ class LegacyPaymentInterface:
             error_reason=self._extract_error_reason_from_exception(creation_exception),
         )
 
-    async def get_cart_payment(self, dd_charge_id: int):
-        cart_payment_id = await self.get_associated_cart_payment_id(dd_charge_id)
-        if not cart_payment_id:
-            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
-        cart_payment, _ = await self.payment_repo.get_cart_payment_by_id(
-            cart_payment_id
-        )
-        return cart_payment
-
 
 class IdempotencyKeyAction(Enum):
     CREATE = "create"
@@ -3241,28 +3232,25 @@ class CartPaymentProcessor:
             )
         ).to_payer()
 
-    async def get_cart_payment(
-        self,
-        cart_payment_id: Optional[uuid.UUID] = None,
-        dd_charge_id: Optional[int] = None,
-    ) -> CartPayment:
-        if dd_charge_id:
-            return await self.legacy_payment_interface.get_cart_payment(
-                dd_charge_id=dd_charge_id
+    async def legacy_get_cart_payment(self, dd_charge_id: int) -> CartPayment:
+        cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(
+            charge_id=dd_charge_id
+        )
+        if not cart_payment_id:
+            self.log.exception(
+                "[legacy_get_cart_payment] Cart payment not found for dd_charge_id",
+                dd_charge_id,
             )
-        elif cart_payment_id:
-            cart_payment, _ = await self.cart_payment_interface.get_cart_payment(
-                cart_payment_id=cart_payment_id
-            )
-            if not cart_payment:
-                raise CartPaymentReadError(
-                    error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND
-                )
-            return cart_payment
-        else:
-            raise CartPaymentReadError(
-                error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA
-            )
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
+        return await self.get_cart_payment(cart_payment_id=cart_payment_id)
+
+    async def get_cart_payment(self, cart_payment_id: uuid.UUID) -> CartPayment:
+        cart_payment, _ = await self.cart_payment_interface.get_cart_payment(
+            cart_payment_id=cart_payment_id
+        )
+        if not cart_payment:
+            raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
+        return cart_payment
 
 
 # TODO PAYIN-36 Decouple CommandoProcessor from CartPaymentProcessor

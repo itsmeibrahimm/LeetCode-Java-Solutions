@@ -137,7 +137,7 @@ async def get_cart_payment(
     - **dd_charge_id**: charge id for a cart payment.
     """
     log.info("Getting cart payment", dd_charge_id=dd_charge_id)
-    cart_payment = await cart_payment_processor.get_cart_payment(
+    cart_payment = await cart_payment_processor.legacy_get_cart_payment(
         dd_charge_id=dd_charge_id
     )
     log.info("Cart payment retrieved", dd_charge_id=dd_charge_id)
