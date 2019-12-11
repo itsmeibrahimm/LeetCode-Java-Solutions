@@ -10,6 +10,7 @@ This repo contains micros services including:
 # Table of contents
 
 - [Architecture and Tech Stack](#architecture-and-tech-stack)
+- [K8S access control](#k8s-access-control)
 - [Deployment](#deployment)
 - [Monitoring](#monitoring)
 - [Infrastructure](#infrastructure)
@@ -64,6 +65,17 @@ The following technologies/frameworks are used across the entire stack:
 # Infrastructure
 - [README-infra.md](README-infra.md)
 
+# K8S access control
+Only authorized personnel can access payment-service k8s deployment (i.e. execute kubectl command)
+## Staging
+In order to access staging payment-service deployment, you need to request permission in [payments-team@](https://groups.google.com/a/doordash.com/forum/#!forum/payments-team) google group
+## Prod
+1. Differently than staging, you need to be in [this list](https://github.com/doordash/engineering-keys/blob/master/groups/payments.sh)
+2. After you are authorized in step 1:
+    ```shell script
+   $ ssh <YOUR USERNAME>@bastion.doordash.com
+   $ kubeswitch payments # switch kube context to payment-service namespace
+    ```
 # Deployment
 
 Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddops) to control releases and k8s deployment:
