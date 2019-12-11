@@ -31,7 +31,7 @@ class TestConcurrentCartPayments(CartPaymentTest):
         )
         assert cart_payment
 
-        payment_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+        payment_intents = await cart_payment_repository.get_payment_intents_by_cart_payment_id_from_primary(
             cart_payment.id
         )
 

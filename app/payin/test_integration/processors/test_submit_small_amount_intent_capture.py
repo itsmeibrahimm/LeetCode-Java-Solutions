@@ -85,7 +85,7 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
             payment_method=payment_method,
         )
 
-        initial_payment_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+        initial_payment_intents = await cart_payment_repository.get_payment_intents_by_cart_payment_id_from_primary(
             cart_payment_id=cart_payment.id
         )
         initial_payment_intent = initial_payment_intents[0]
@@ -170,7 +170,7 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
                     cart_payment_repository=cart_payment_repository,
                 )
             assert e.value.orig_error == bad_exec
-            updated_payment_intent = await cart_payment_repository.get_payment_intent_by_id(
+            updated_payment_intent = await cart_payment_repository.get_payment_intent_by_id_from_primary(
                 initial_payment_intent.id
             )
             assert updated_payment_intent

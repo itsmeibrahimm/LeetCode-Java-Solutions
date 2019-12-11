@@ -118,7 +118,9 @@ class TestPaymentIntentCreatedHandler:
         cart_payment_repository = MagicMock()
         mock_get_payment_intent_by_id = CoroutineMock()
         mock_get_payment_intent_by_id.side_effect = coroutine_created_payment_intent
-        cart_payment_repository.get_payment_intent_by_id = mock_get_payment_intent_by_id
+        cart_payment_repository.get_payment_intent_by_id_from_primary = (
+            mock_get_payment_intent_by_id
+        )
         return cart_payment_repository
 
     @pytest.fixture
@@ -132,7 +134,9 @@ class TestPaymentIntentCreatedHandler:
         cart_payment_repository = MagicMock()
         mock_get_payment_intent_by_id = CoroutineMock()
         mock_get_payment_intent_by_id.side_effect = None
-        cart_payment_repository.get_payment_intent_by_id = mock_get_payment_intent_by_id
+        cart_payment_repository.get_payment_intent_by_id_from_primary = (
+            mock_get_payment_intent_by_id
+        )
         return cart_payment_repository
 
     @pytest.fixture
@@ -258,7 +262,9 @@ class TestPaymentIntentFailedHandler:
         mock_get_payment_intent_by_id.side_effect = (
             coroutine_payment_intent_created_failed
         )
-        cart_payment_repository.get_payment_intent_by_id = mock_get_payment_intent_by_id
+        cart_payment_repository.get_payment_intent_by_id_from_primary = (
+            mock_get_payment_intent_by_id
+        )
         return cart_payment_repository
 
     @pytest.fixture
@@ -272,7 +278,9 @@ class TestPaymentIntentFailedHandler:
         cart_payment_repository = MagicMock()
         mock_get_payment_intent_by_id = CoroutineMock()
         mock_get_payment_intent_by_id.side_effect = None
-        cart_payment_repository.get_payment_intent_by_id = mock_get_payment_intent_by_id
+        cart_payment_repository.get_payment_intent_by_id_from_primary = (
+            mock_get_payment_intent_by_id
+        )
         return cart_payment_repository
 
     @pytest.fixture
@@ -396,7 +404,9 @@ class TestPaymentIntentSucceededHandler:
         cart_payment_repository = MagicMock()
         mock_get_payment_intent_by_id = CoroutineMock()
         mock_get_payment_intent_by_id.side_effect = coroutine_payment_intent_succeeded
-        cart_payment_repository.get_payment_intent_by_id = mock_get_payment_intent_by_id
+        cart_payment_repository.get_payment_intent_by_id_from_primary = (
+            mock_get_payment_intent_by_id
+        )
         return cart_payment_repository
 
     @pytest.fixture
@@ -410,7 +420,9 @@ class TestPaymentIntentSucceededHandler:
         cart_payment_repository = MagicMock()
         mock_get_payment_intent_by_id = CoroutineMock()
         mock_get_payment_intent_by_id.side_effect = None
-        cart_payment_repository.get_payment_intent_by_id = mock_get_payment_intent_by_id
+        cart_payment_repository.get_payment_intent_by_id_from_primary = (
+            mock_get_payment_intent_by_id
+        )
         return cart_payment_repository
 
     @pytest.fixture

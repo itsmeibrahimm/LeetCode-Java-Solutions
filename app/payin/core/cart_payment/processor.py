@@ -138,7 +138,7 @@ class LegacyPaymentInterface:
             "Looking up stripe charges for charge", dd_charge_id=charge_id
         )
 
-        payment_intent = await self.payment_repo.get_payment_intent_for_legacy_consumer_charge_id(
+        payment_intent = await self.payment_repo.get_payment_intent_by_legacy_consumer_charge_id_from_primary(
             charge_id=charge_id
         )
         return payment_intent.cart_payment_id if payment_intent else None
@@ -432,7 +432,7 @@ class CartPaymentInterface:
         return intent_list[-1]
 
     async def _get_most_recent_pgp_payment_intent(self, payment_intent: PaymentIntent):
-        pgp_intents = await self.payment_repo.find_pgp_payment_intents(
+        pgp_intents = await self.payment_repo.list_pgp_payment_intents_from_primary(
             payment_intent.id
         )
         pgp_intents.sort(key=lambda x: x.created_at)
@@ -442,7 +442,7 @@ class CartPaymentInterface:
         self, payment_intent: PaymentIntent
     ) -> PgpPaymentIntent:
         # Get pgp intents for this specific intent
-        pgp_intents = await self.payment_repo.find_pgp_payment_intents(
+        pgp_intents = await self.payment_repo.list_pgp_payment_intents_from_primary(
             payment_intent.id
         )
 
@@ -567,14 +567,14 @@ class CartPaymentInterface:
     ) -> Union[
         Tuple[CartPayment, LegacyPayment, PaymentIntent], Tuple[None, None, None]
     ]:
-        payment_intent = await self.payment_repo.get_payment_intent_for_idempotency_key(
+        payment_intent = await self.payment_repo.get_payment_intent_by_idempotency_key_from_primary(
             idempotency_key
         )
 
         if not payment_intent:
             return None, None, None
 
-        cart_payment, legacy_payment = await self.payment_repo.get_cart_payment_by_id(
+        cart_payment, legacy_payment = await self.payment_repo.get_cart_payment_by_id_from_primary(
             payment_intent.cart_payment_id
         )
 
@@ -585,30 +585,32 @@ class CartPaymentInterface:
     async def get_cart_payment(
         self, cart_payment_id: uuid.UUID
     ) -> Tuple[Optional[CartPayment], Optional[LegacyPayment]]:
-        return await self.payment_repo.get_cart_payment_by_id(cart_payment_id)
+        return await self.payment_repo.get_cart_payment_by_id_from_primary(
+            cart_payment_id
+        )
 
     async def get_cart_payment_intents(self, cart_payment) -> List[PaymentIntent]:
-        return await self.payment_repo.get_payment_intents_for_cart_payment(
+        return await self.payment_repo.get_payment_intents_by_cart_payment_id_from_primary(
             cart_payment.id
         )
 
     async def get_payment_intent_adjustment(
         self, payment_intent: PaymentIntent, idempotency_key: str
     ) -> Optional[PaymentIntentAdjustmentHistory]:
-        return await self.payment_repo.get_payment_intent_adjustment_history(
+        return await self.payment_repo.get_payment_intent_adjustment_history_from_primary(
             payment_intent_id=payment_intent.id, idempotency_key=idempotency_key
         )
 
     async def find_existing_refund(
         self, idempotency_key: str
     ) -> Tuple[Optional[Refund], Optional[PgpRefund]]:
-        refund = await self.payment_repo.get_refund_by_idempotency_key(
+        refund = await self.payment_repo.get_refund_by_idempotency_key_from_primary(
             idempotency_key=idempotency_key
         )
         if not refund:
             return None, None
 
-        pgp_refund = await self.payment_repo.get_pgp_refund_by_refund_id(
+        pgp_refund = await self.payment_repo.get_pgp_refund_by_refund_id_from_primary(
             refund_id=refund.id
         )
         return refund, pgp_refund
@@ -3268,7 +3270,7 @@ class CommandoProcessor(CartPaymentProcessor):
         LegacyConsumerCharge,
         LegacyStripeCharge,
     ]:
-        cart_payment, legacy_payment = await self.cart_payment_repo.get_cart_payment_by_id(
+        cart_payment, legacy_payment = await self.cart_payment_repo.get_cart_payment_by_id_from_primary(
             cart_payment_id=payment_intent.cart_payment_id
         )
 

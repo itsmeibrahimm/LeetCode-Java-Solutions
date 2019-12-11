@@ -603,7 +603,9 @@ def cart_payment_repo():
     # Cart Payment DB Functions
     payment_repo.insert_cart_payment = mocked_repo.insert_cart_payment
     payment_repo.update_cart_payment_details = mocked_repo.update_cart_payment_details
-    payment_repo.get_cart_payment_by_id = mocked_repo.get_cart_payment_by_id
+    payment_repo.get_cart_payment_by_id_from_primary = (
+        mocked_repo.get_cart_payment_by_id
+    )
 
     # Intent DB Functions
     payment_repo.insert_payment_intent = mocked_repo.insert_payment_intent
@@ -612,10 +614,10 @@ def cart_payment_repo():
     )
     payment_repo.update_payment_intent = mocked_repo.update_payment_intent_status
     payment_repo.update_payment_intent_amount = mocked_repo.update_payment_intent_amount
-    payment_repo.get_payment_intents_for_cart_payment = (
+    payment_repo.get_payment_intents_by_cart_payment_id_from_primary = (
         mocked_repo.get_payment_intents_for_cart_payment
     )
-    payment_repo.get_payment_intent_for_legacy_consumer_charge_id = (
+    payment_repo.get_payment_intent_by_legacy_consumer_charge_id_from_primary = (
         mocked_repo.get_payment_intent_for_legacy_consumer_charge_id
     )
     payment_repo.update_payment_intent_capture_state = (
@@ -631,11 +633,13 @@ def cart_payment_repo():
     payment_repo.update_pgp_payment_intent_amount = (
         mocked_repo.update_pgp_payment_intent_amount
     )
-    payment_repo.find_pgp_payment_intents = mocked_repo.find_pgp_payment_intents
-    payment_repo.get_payment_intent_for_idempotency_key = FunctionMock(
+    payment_repo.list_pgp_payment_intents_from_primary = (
+        mocked_repo.find_pgp_payment_intents
+    )
+    payment_repo.get_payment_intent_by_idempotency_key_from_primary = FunctionMock(
         return_value=None
     )
-    payment_repo.get_intent_pair_by_provider_charge_id = (
+    payment_repo.get_intent_pair_by_provider_charge_id_from_primary = (
         mocked_repo.get_intent_pair_by_provider_charge_id
     )
 
@@ -692,16 +696,18 @@ def cart_payment_repo():
 
     # Refunds
     payment_repo.insert_refund = mocked_repo.insert_refund
-    payment_repo.get_payment_intent_adjustment_history = (
+    payment_repo.get_payment_intent_adjustment_history_from_primary = (
         mocked_repo.get_payment_intent_adjustment_history
     )
-    payment_repo.get_refund_by_idempotency_key = (
+    payment_repo.get_refund_by_idempotency_key_from_primary = (
         mocked_repo.get_refund_by_idempotency_key
     )
     payment_repo.update_refund_status = mocked_repo.update_refund_status
 
     payment_repo.insert_pgp_refund = mocked_repo.insert_pgp_refund
-    payment_repo.get_pgp_refund_by_refund_id = mocked_repo.get_pgp_refund_by_refund_id
+    payment_repo.get_pgp_refund_by_refund_id_from_primary = (
+        mocked_repo.get_pgp_refund_by_refund_id
+    )
     payment_repo.update_pgp_refund = mocked_repo.update_pgp_refund
 
     payment_repo.update_cart_payment_post_cancellation = (

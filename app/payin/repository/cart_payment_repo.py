@@ -155,15 +155,6 @@ class CartPaymentRepository(PayinDBRepository):
             stripe_card_id=row[cart_payments.legacy_provider_card_id],
         )
 
-    async def find_payment_intents_with_status(
-        self, status: IntentStatus
-    ) -> List[PaymentIntent]:
-        statement = payment_intents.table.select().where(
-            payment_intents.status == status
-        )
-        results = await self.payment_database.replica().fetch_all(statement)
-        return [self.to_payment_intent(row) for row in results]
-
     async def get_payment_intents_paginated(
         self, status: IntentStatus, limit: Optional[int] = None
     ) -> List[PaymentIntent]:
@@ -249,7 +240,7 @@ class CartPaymentRepository(PayinDBRepository):
         results = await self.payment_database.replica().fetch_all(statement)
         return [self.to_payment_intent(row) for row in results]
 
-    async def get_cart_payment_by_id(
+    async def get_cart_payment_by_id_from_primary(
         self, cart_payment_id: UUID
     ) -> Union[Tuple[CartPayment, LegacyPayment], Tuple[None, None]]:
         statement = cart_payments.table.select().where(
@@ -418,43 +409,43 @@ class CartPaymentRepository(PayinDBRepository):
         row = await self.payment_database.master().fetch_one(statement)
         return self.to_payment_intent(row)
 
-    async def get_payment_intent_for_idempotency_key(
+    async def get_payment_intent_by_idempotency_key_from_primary(
         self, idempotency_key: str
     ) -> Optional[PaymentIntent]:
         statement = payment_intents.table.select().where(
             payment_intents.idempotency_key == idempotency_key
         )
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
 
         if not row:
             return None
 
         return self.to_payment_intent(row)
 
-    async def get_payment_intent_for_legacy_consumer_charge_id(
+    async def get_payment_intent_by_legacy_consumer_charge_id_from_primary(
         self, charge_id: int
     ) -> Optional[PaymentIntent]:
         statement = payment_intents.table.select().where(
             payment_intents.legacy_consumer_charge_id == charge_id
         )
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
 
         if not row:
             return None
 
         return self.to_payment_intent(row)
 
-    async def get_payment_intents_for_cart_payment(
+    async def get_payment_intents_by_cart_payment_id_from_primary(
         self, cart_payment_id: UUID
     ) -> List[PaymentIntent]:
         statement = payment_intents.table.select().where(
             payment_intents.cart_payment_id == cart_payment_id
         )
-        results = await self.payment_database.replica().fetch_all(statement)
+        results = await self.payment_database.master().fetch_all(statement)
 
         return [self.to_payment_intent(row) for row in results]
 
-    async def get_payment_intent_adjustment_history(
+    async def get_payment_intent_adjustment_history_from_primary(
         self, payment_intent_id: UUID, idempotency_key: str
     ) -> Optional[PaymentIntentAdjustmentHistory]:
         statement = payment_intents_adjustment_history.table.select().where(
@@ -464,7 +455,7 @@ class CartPaymentRepository(PayinDBRepository):
                 payment_intents_adjustment_history.idempotency_key == idempotency_key,
             )
         )
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
 
         if not row:
             return None
@@ -558,12 +549,14 @@ class CartPaymentRepository(PayinDBRepository):
         row = await self.payment_database.master().fetch_one(statement)
         return self.to_pgp_payment_intent(row)
 
-    async def get_payment_intent_by_id(self, id: UUID) -> Optional[PaymentIntent]:
+    async def get_payment_intent_by_id_from_primary(
+        self, id: UUID
+    ) -> Optional[PaymentIntent]:
         statement = payment_intents.table.select().where(payment_intents.id == id)
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         return self.to_payment_intent(row) if row else None
 
-    async def find_pgp_payment_intents(
+    async def list_pgp_payment_intents_from_primary(
         self, payment_intent_id: UUID
     ) -> List[PgpPaymentIntent]:
         statement = (
@@ -571,7 +564,7 @@ class CartPaymentRepository(PayinDBRepository):
             .where(pgp_payment_intents.payment_intent_id == payment_intent_id)
             .order_by(pgp_payment_intents.created_at.asc())
         )
-        query_results = await self.payment_database.replica().fetch_all(statement)
+        query_results = await self.payment_database.master().fetch_all(statement)
 
         matched_intents = []
         for row in query_results:
@@ -647,7 +640,7 @@ class CartPaymentRepository(PayinDBRepository):
             cancelled_at=row[pgp_payment_intents.cancelled_at],
         )
 
-    async def get_intent_pair_by_provider_charge_id(
+    async def get_intent_pair_by_provider_charge_id_from_primary(
         self, provider_charge_id: str
     ) -> Tuple[Optional[PaymentIntent], Optional[PgpPaymentIntent]]:
         join_statement = payment_intents.table.join(
@@ -661,7 +654,7 @@ class CartPaymentRepository(PayinDBRepository):
             .where(pgp_payment_intents.charge_resource_id == provider_charge_id)
         )
 
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         if not row:
             return None, None
 
@@ -1263,13 +1256,13 @@ class CartPaymentRepository(PayinDBRepository):
             updated_at=row[refunds.updated_at],
         )
 
-    async def get_refund_by_idempotency_key(
+    async def get_refund_by_idempotency_key_from_primary(
         self, idempotency_key: str
     ) -> Optional[Refund]:
         statement = refunds.table.select().where(
             refunds.idempotency_key == idempotency_key
         )
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         if not row:
             return None
         return self.to_refund(row)
@@ -1333,9 +1326,11 @@ class CartPaymentRepository(PayinDBRepository):
             updated_at=row[pgp_refunds.updated_at],
         )
 
-    async def get_pgp_refund_by_refund_id(self, refund_id: UUID) -> Optional[PgpRefund]:
+    async def get_pgp_refund_by_refund_id_from_primary(
+        self, refund_id: UUID
+    ) -> Optional[PgpRefund]:
         statement = pgp_refunds.table.select().where(pgp_refunds.refund_id == refund_id)
-        row = await self.payment_database.replica().fetch_one(statement)
+        row = await self.payment_database.master().fetch_one(statement)
         if not row:
             return None
         return self.to_pgp_refund(row)

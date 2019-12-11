@@ -257,15 +257,15 @@ class TestCartPaymentProcessor:
     async def test_resubmit(self, cart_payment_processor, request_cart_payment):
 
         intent = generate_payment_intent()
-        cart_payment_processor.cart_payment_interface.payment_repo.get_payment_intent_for_idempotency_key = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.get_payment_intent_by_idempotency_key_from_primary = FunctionMock(
             return_value=intent
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary = FunctionMock(
             return_value=[generate_pgp_payment_intent(payment_intent_id=intent.id)]
         )
 
         legacy_payment = generate_legacy_payment()
-        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=(request_cart_payment, legacy_payment)
         )
         cart_payment_processor.legacy_payment_interface.find_existing_payment_charge = FunctionMock(
@@ -284,7 +284,7 @@ class TestCartPaymentProcessor:
         )
         assert result_cart_payment
 
-        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=(result_cart_payment, legacy_payment)
         )
 
@@ -300,7 +300,7 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.asyncio
     async def test_update_fake_cart_payment(self, cart_payment_processor):
-        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=(None, None)
         )
 
@@ -470,7 +470,7 @@ class TestCartPaymentProcessor:
                 status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
             )
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary = FunctionMock(
             return_value=[
                 generate_pgp_payment_intent(
                     status=IntentStatus.REQUIRES_CAPTURE, amount=new_amount
@@ -521,7 +521,7 @@ class TestCartPaymentProcessor:
                 status=IntentStatus.SUCCEEDED, amount=new_amount
             )
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary = FunctionMock(
             return_value=[
                 generate_pgp_payment_intent(status=IntentStatus.SUCCEEDED, amount=780)
             ]
@@ -715,7 +715,7 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.asyncio
     async def test_cancel_payment_fake_cart_payment(self, cart_payment_processor):
-        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_processor.cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=(None, None)
         )
 
@@ -752,7 +752,7 @@ class TestCartPaymentProcessor:
         self, cart_payment_processor
     ):
         legacy_charge = generate_legacy_consumer_charge()
-        cart_payment_processor.legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+        cart_payment_processor.legacy_payment_interface.payment_repo.get_payment_intent_by_legacy_consumer_charge_id_from_primary = FunctionMock(
             return_value=None
         )
         with pytest.raises(CartPaymentReadError) as payment_error:
@@ -811,7 +811,7 @@ class TestCartPaymentProcessor:
         self, cart_payment_processor
     ):
         legacy_charge = generate_legacy_consumer_charge()
-        cart_payment_processor.legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+        cart_payment_processor.legacy_payment_interface.payment_repo.get_payment_intent_by_legacy_consumer_charge_id_from_primary = FunctionMock(
             return_value=None
         )
 

@@ -83,7 +83,7 @@ class TestLegacyPaymentInterface:
     async def test_get_associated_cart_payment_id(self, legacy_payment_interface):
         cart_payment = generate_cart_payment()
         consumer_charge = generate_legacy_consumer_charge()
-        legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+        legacy_payment_interface.payment_repo.get_payment_intent_by_legacy_consumer_charge_id_from_primary = FunctionMock(
             return_value=generate_payment_intent(cart_payment_id=cart_payment.id)
         )
 
@@ -97,7 +97,7 @@ class TestLegacyPaymentInterface:
         self, legacy_payment_interface
     ):
         consumer_charge = generate_legacy_consumer_charge()
-        legacy_payment_interface.payment_repo.get_payment_intent_for_legacy_consumer_charge_id = FunctionMock(
+        legacy_payment_interface.payment_repo.get_payment_intent_by_legacy_consumer_charge_id_from_primary = FunctionMock(
             return_value=None
         )
 
@@ -566,7 +566,7 @@ class TestCartPaymentInterface:
         first_pgp_intent = generate_pgp_payment_intent()
         second_pgp_intent = generate_pgp_payment_intent()
 
-        cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+        cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary = FunctionMock(
             return_value=[first_pgp_intent, second_pgp_intent]
         )
 
@@ -580,7 +580,7 @@ class TestCartPaymentInterface:
         first_intent = generate_pgp_payment_intent(status="init")
         second_intent = generate_pgp_payment_intent(status="init")
         pgp_intents = [first_intent, second_intent]
-        cart_payment_interface.payment_repo.find_pgp_payment_intents = FunctionMock(
+        cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary = FunctionMock(
             return_value=pgp_intents
         )
         selected_intent = await cart_payment_interface.get_cart_payment_submission_pgp_intent(
@@ -830,7 +830,7 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_find_existing_payment_no_matches(self, cart_payment_interface):
         mock_intent_search = FunctionMock(return_value=None)
-        cart_payment_interface.payment_repo.get_payment_intent_for_idempotency_key = (
+        cart_payment_interface.payment_repo.get_payment_intent_by_idempotency_key_from_primary = (
             mock_intent_search
         )
         result = await cart_payment_interface.find_existing_payment(
@@ -842,14 +842,14 @@ class TestCartPaymentInterface:
     async def test_find_existing_payment_with_matches(self, cart_payment_interface):
         # Mock function to find intent
         intent = generate_payment_intent()
-        cart_payment_interface.payment_repo.get_payment_intent_for_idempotency_key = FunctionMock(
+        cart_payment_interface.payment_repo.get_payment_intent_by_idempotency_key_from_primary = FunctionMock(
             return_value=intent
         )
 
         # Mock function to find cart payment
         cart_payment = MagicMock()
         legacy_payment = MagicMock()
-        cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=(cart_payment, legacy_payment)
         )
 
@@ -861,7 +861,7 @@ class TestCartPaymentInterface:
     @pytest.mark.asyncio
     async def test_get_cart_payment_with_match(self, cart_payment_interface):
         cart_payment = generate_cart_payment()
-        cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=cart_payment
         )
 
@@ -870,7 +870,7 @@ class TestCartPaymentInterface:
 
     @pytest.mark.asyncio
     async def test_get_cart_payment_no_match(self, cart_payment_interface):
-        cart_payment_interface.payment_repo.get_cart_payment_by_id = FunctionMock(
+        cart_payment_interface.payment_repo.get_cart_payment_by_id_from_primary = FunctionMock(
             return_value=None
         )
 
@@ -886,7 +886,7 @@ class TestCartPaymentInterface:
 
     @pytest.mark.asyncio
     async def test_get_payment_intent_adjustment(self, cart_payment_interface):
-        cart_payment_interface.payment_repo.get_payment_intent_adjustment_history = FunctionMock(
+        cart_payment_interface.payment_repo.get_payment_intent_adjustment_history_from_primary = FunctionMock(
             return_value=None
         )
         payment_intent = generate_payment_intent()
@@ -896,7 +896,7 @@ class TestCartPaymentInterface:
         assert result is None
 
         history_record = generate_payment_intent_adjustment_history()
-        cart_payment_interface.payment_repo.get_payment_intent_adjustment_history = FunctionMock(
+        cart_payment_interface.payment_repo.get_payment_intent_adjustment_history_from_primary = FunctionMock(
             return_value=history_record
         )
         result = await cart_payment_interface.get_payment_intent_adjustment(
@@ -911,10 +911,10 @@ class TestCartPaymentInterface:
 
         refund = generate_refund()
         pgp_refund = generate_pgp_refund()
-        cart_payment_interface.payment_repo.get_refund_by_idempotency_key = FunctionMock(
+        cart_payment_interface.payment_repo.get_refund_by_idempotency_key_from_primary = FunctionMock(
             return_value=refund
         )
-        cart_payment_interface.payment_repo.get_pgp_refund_by_refund_id = FunctionMock(
+        cart_payment_interface.payment_repo.get_pgp_refund_by_refund_id_from_primary = FunctionMock(
             return_value=pgp_refund
         )
         result_refund, result_pgp_refund = await cart_payment_interface.find_existing_refund(
@@ -1801,10 +1801,10 @@ class TestCapturePayment:
             asynctest.CoroutineMock()
         )
         pgp_payment_intent = PgpPaymentIntentFactory()  # type: PgpPaymentIntent
-        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents = (  # type: ignore
+        cart_payment_processor.cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary = (  # type: ignore
             asynctest.CoroutineMock()
         )
-        cart_payment_processor.cart_payment_interface.payment_repo.find_pgp_payment_intents.return_value = [
+        cart_payment_processor.cart_payment_interface.payment_repo.list_pgp_payment_intents_from_primary.return_value = [
             # type: ignore
             pgp_payment_intent
         ]

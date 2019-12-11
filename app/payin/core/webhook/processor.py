@@ -114,7 +114,7 @@ class PaymentIntentCreatedHandler(BaseWebhookHandler):
         if not payment_intent_id:
             self.log.info("payment_intent_id not found in metadata. Unable to verify")
             return False
-        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id(
+        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id_from_primary(
             id=payment_intent_id
         )
         if not payment_intent:
@@ -177,7 +177,7 @@ class PaymentIntentPaymentFailedHandler(BaseWebhookHandler):
         if not payment_intent_id:
             self.log.info("payment_intent_id not found in metadata. Unable to verify")
             return False
-        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id(
+        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id_from_primary(
             id=payment_intent_id
         )
         if not payment_intent:
@@ -238,7 +238,7 @@ class PaymentIntentSucceededHandler(BaseWebhookHandler):
         if not payment_intent_id:
             self.log.info("payment_intent_id not found in metadata. Unable to verify")
             return False
-        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id(
+        payment_intent = await self.cart_payment_repository.get_payment_intent_by_id_from_primary(
             id=payment_intent_id
         )
         if not payment_intent:

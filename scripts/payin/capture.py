@@ -160,7 +160,9 @@ async def _capture_payment_intent(
         legacy_payment_interface=legacy_payment_interface,
     )
 
-    payment_intent = await cart_payment_repo.get_payment_intent_by_id(payment_intent_id)
+    payment_intent = await cart_payment_repo.get_payment_intent_by_id_from_primary(
+        payment_intent_id
+    )
 
     if payment_intent:
         log.info(f"Found payment intent={payment_intent.json()}")

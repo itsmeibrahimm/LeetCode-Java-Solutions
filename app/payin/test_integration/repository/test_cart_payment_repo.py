@@ -322,41 +322,20 @@ async def pgp_payment_charge(
 
 class TestPaymentIntent:
     @pytest.mark.asyncio
-    @pytest.mark.skip("fix this to not relying on forcerollback")
-    async def test_find_uncaptured_payment_intents_when_none_exist(
-        self, cart_payment_repository: CartPaymentRepository
-    ):
-        uncaptured_payment_intents = await cart_payment_repository.find_payment_intents_with_status(
-            IntentStatus.REQUIRES_CAPTURE
-        )
-        assert uncaptured_payment_intents == []
-
-    @pytest.mark.asyncio
     async def test_get_payment_intent_by_id(
         self,
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
     ):
-        retrieved_correct_payment_intent = await cart_payment_repository.get_payment_intent_by_id(
+        retrieved_correct_payment_intent = await cart_payment_repository.get_payment_intent_by_id_from_primary(
             id=payment_intent.id
         )
         assert retrieved_correct_payment_intent
         assert retrieved_correct_payment_intent == payment_intent
-        retrieved_incorrect_payment_intent = await cart_payment_repository.get_payment_intent_by_id(
+        retrieved_incorrect_payment_intent = await cart_payment_repository.get_payment_intent_by_id_from_primary(
             id=uuid4()
         )
         assert not retrieved_incorrect_payment_intent
-
-    @pytest.mark.asyncio
-    @pytest.mark.skip("fix this to not relying on forcerollback")
-    async def test_find_uncaptured_payment_intents_when_one_exists(
-        self, cart_payment_repository: CartPaymentRepository, payment_intent
-    ):
-        uncaptured_payment_intents = await cart_payment_repository.find_payment_intents_with_status(
-            IntentStatus.REQUIRES_CAPTURE
-        )
-        uncaptured_payment_intent_ids = [pi.id for pi in uncaptured_payment_intents]
-        assert uncaptured_payment_intent_ids == [payment_intent.id]
 
     @pytest.mark.asyncio
     async def test_update_payment_intent_capture_state(
@@ -496,19 +475,19 @@ class TestPaymentIntentAdjustmentHistory:
             idempotency_key=str(uuid4()),
         )
 
-        result = await cart_payment_repository.get_payment_intent_adjustment_history(
+        result = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
             payment_intent_id=history_record.payment_intent_id,
             idempotency_key=history_record.idempotency_key,
         )
         assert result == history_record
 
-        result = await cart_payment_repository.get_payment_intent_adjustment_history(
+        result = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
             payment_intent_id=history_record.payment_intent_id,
             idempotency_key=f"{history_record.idempotency_key}-does-not-exist",
         )
         assert result is None
 
-        result = await cart_payment_repository.get_payment_intent_adjustment_history(
+        result = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
             payment_intent_id=uuid4(), idempotency_key=history_record.idempotency_key
         )
         assert result is None
@@ -1153,13 +1132,13 @@ class TestCartPayment:
         self, cart_payment_repository: CartPaymentRepository, cart_payment: CartPayment
     ):
         # No result
-        result = await cart_payment_repository.get_cart_payment_by_id(
+        result = await cart_payment_repository.get_cart_payment_by_id_from_primary(
             cart_payment_id=uuid4()
         )
         assert result == (None, None)
 
         # Match
-        result = await cart_payment_repository.get_cart_payment_by_id(
+        result = await cart_payment_repository.get_cart_payment_by_id_from_primary(
             cart_payment_id=cart_payment.id
         )
 
@@ -1311,12 +1290,12 @@ class TestRefunds:
     async def test_get_refund_by_idempotency_key(
         self, cart_payment_repository: CartPaymentRepository, refund: Refund
     ):
-        result = await cart_payment_repository.get_refund_by_idempotency_key(
+        result = await cart_payment_repository.get_refund_by_idempotency_key_from_primary(
             refund.idempotency_key
         )
         assert result == refund
 
-        result = await cart_payment_repository.get_refund_by_idempotency_key(
+        result = await cart_payment_repository.get_refund_by_idempotency_key_from_primary(
             f"{refund.idempotency_key}-does-not-exist"
         )
         assert result is None
@@ -1387,7 +1366,7 @@ class TestRefunds:
     async def test_get_pgp_refund_by_refund_id(
         self, cart_payment_repository: CartPaymentRepository, pgp_refund: PgpRefund
     ):
-        result = await cart_payment_repository.get_pgp_refund_by_refund_id(
+        result = await cart_payment_repository.get_pgp_refund_by_refund_id_from_primary(
             pgp_refund.refund_id
         )
         assert result == pgp_refund

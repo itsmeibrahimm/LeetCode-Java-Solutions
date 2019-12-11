@@ -147,7 +147,7 @@ class CartPaymentTestBase(ABC):
             )
 
         # Verify intent, pgp intent
-        payment_intent = await cart_payment_repository.get_payment_intent_for_idempotency_key(
+        payment_intent = await cart_payment_repository.get_payment_intent_by_idempotency_key_from_primary(
             idempotency_key=idempotency_key
         )
 
@@ -156,13 +156,13 @@ class CartPaymentTestBase(ABC):
             payment_intent, cart_payment_state.payment_intent_states[0]
         )
 
-        all_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+        all_intents = await cart_payment_repository.get_payment_intents_by_cart_payment_id_from_primary(
             cart_payment_id=payment_intent.cart_payment_id
         )
         assert len(all_intents) == 1
         assert all_intents[0].id == payment_intent.id
 
-        pgp_payment_intents = await cart_payment_repository.find_pgp_payment_intents(
+        pgp_payment_intents = await cart_payment_repository.list_pgp_payment_intents_from_primary(
             payment_intent.id
         )
         assert len(pgp_payment_intents) == 1
@@ -210,7 +210,7 @@ class CartPaymentTestBase(ABC):
             init_cart_payment.amount == init_cart_payment_state.expected_amount
         ), f"cart payment amount as expected {init_cart_payment_state}"
 
-        init_payment_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+        init_payment_intents = await cart_payment_repository.get_payment_intents_by_cart_payment_id_from_primary(
             init_cart_payment.id
         )
 
@@ -239,7 +239,7 @@ class CartPaymentTestBase(ABC):
                     f"Failed cart payment state change: {new_cart_payment_state}, exception {e}"
                 ) from e
 
-        latest_cart_payment, _ = await cart_payment_repository.get_cart_payment_by_id(
+        latest_cart_payment, _ = await cart_payment_repository.get_cart_payment_by_id_from_primary(
             init_cart_payment.id
         )
         assert latest_cart_payment
@@ -253,7 +253,7 @@ class CartPaymentTestBase(ABC):
         cart_payment_processor: CartPaymentProcessor,
         cart_payment_repository: CartPaymentRepository,
     ):
-        pre_update_payment_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+        pre_update_payment_intents = await cart_payment_repository.get_payment_intents_by_cart_payment_id_from_primary(
             cart_payment_id=init_cart_payment.id
         )
         id_to_pre_update_payment_intents = {
@@ -264,7 +264,7 @@ class CartPaymentTestBase(ABC):
         adjustment_idempotency_key = None
 
         if new_cart_payment_state.amount_delta_update:
-            cart_payment_pre_update, _ = await cart_payment_repository.get_cart_payment_by_id(
+            cart_payment_pre_update, _ = await cart_payment_repository.get_cart_payment_by_id_from_primary(
                 init_cart_payment.id
             )
             assert (
@@ -289,7 +289,7 @@ class CartPaymentTestBase(ABC):
                 cart_payment_processor=cart_payment_processor,
             )
 
-        updated_cart_payment, _ = await cart_payment_repository.get_cart_payment_by_id(
+        updated_cart_payment, _ = await cart_payment_repository.get_cart_payment_by_id_from_primary(
             init_cart_payment.id
         )
 
@@ -298,7 +298,7 @@ class CartPaymentTestBase(ABC):
             updated_cart_payment.amount == new_cart_payment_state.expected_amount
         ), "updated_cart_payment amount mismatch"
 
-        updated_payment_intents = await cart_payment_repository.get_payment_intents_for_cart_payment(
+        updated_payment_intents = await cart_payment_repository.get_payment_intents_by_cart_payment_id_from_primary(
             updated_cart_payment.id
         )
         updated_payment_intents.sort(key=lambda pi: pi.created_at)
@@ -308,7 +308,7 @@ class CartPaymentTestBase(ABC):
         ):
             # verify new path
             self._verify_payment_intent_state(payment_intent, payment_intent_state)
-            pgp_payment_intents = await cart_payment_repository.find_pgp_payment_intents(
+            pgp_payment_intents = await cart_payment_repository.list_pgp_payment_intents_from_primary(
                 payment_intent.id
             )
 
@@ -321,7 +321,7 @@ class CartPaymentTestBase(ABC):
                 assert (
                     adjustment_idempotency_key
                 ), "expect idempotency key when updates happen"
-                payment_intent_adjustment_history = await cart_payment_repository.get_payment_intent_adjustment_history(
+                payment_intent_adjustment_history = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
                     payment_intent.id, adjustment_idempotency_key
                 )
                 pre_update_payment_intent: PaymentIntent = id_to_pre_update_payment_intents[
@@ -400,7 +400,9 @@ class CartPaymentTestBase(ABC):
 
         pgp_payment_intents: List[
             PgpPaymentIntent
-        ] = await cart_payment_repository.find_pgp_payment_intents(payment_intent.id)
+        ] = await cart_payment_repository.list_pgp_payment_intents_from_primary(
+            payment_intent.id
+        )
         if not pgp_payment_intents:
             return False
         for pgp_payment_intent in pgp_payment_intents:
