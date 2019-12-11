@@ -1,7 +1,17 @@
+import inspect
 import json
 from typing import Optional, List
 
 from app.payout.models import PayoutTask
+
+
+def normalize_task_arguments(frame) -> dict:
+    fn_kwargs = {}
+    args, _, _, values = inspect.getargvalues(frame)
+    for i in args:
+        if not i == "self":
+            fn_kwargs[i] = values[i]
+    return fn_kwargs
 
 
 class BaseTask:
