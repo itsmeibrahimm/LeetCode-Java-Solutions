@@ -51,7 +51,7 @@ class WebhookProcessor:
     async def process_webhook_transactions(self, transactions: List[Transaction]):
         results = await self._process_webhook_transactions(transactions)
         return await self.dsj_client.post(
-            f"/v1/payments/post_process_marqeta_webhook", results.dict()
+            f"/v1/payments/post_process_marqeta_webhook/", results.dict()
         )
 
     async def _process_webhook_transactions(
@@ -119,4 +119,5 @@ class WebhookProcessor:
                         user_token=user_token,
                     )
                 )
+
         return TransactionProcessResults(processed_results=results)
