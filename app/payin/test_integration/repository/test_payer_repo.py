@@ -1,4 +1,5 @@
 from datetime import datetime
+from random import randint
 from uuid import uuid4, UUID
 
 import pytest
@@ -16,6 +17,7 @@ from app.payin.repository.payer_repo import (
     UpdatePgpCustomerWhereInput,
     UpdatePayerSetInput,
     UpdatePayerWhereInput,
+    GetConsumerIdByPayerIdInput,
 )
 
 
@@ -156,3 +158,23 @@ class TestPayerRepository:
             == new_legacy_default_dd_stripe_card_id
         )
         assert update_payer.default_payment_method_id == new_default_payment_method_id
+
+    async def test_get_consumer_id_by_payer_id(self, payer_repository: PayerRepository):
+        payer_id: UUID = uuid4()
+        default_payment_method_id: UUID = uuid4()
+        legacy_default_dd_stripe_card_id: int = 1
+        insert_payer_input = InsertPayerInput(
+            id=payer_id,
+            payer_type=PayerType.STORE,
+            country=CountryCode.US,
+            default_payment_method_id=default_payment_method_id,
+            legacy_default_dd_stripe_card_id=legacy_default_dd_stripe_card_id,
+            dd_payer_id=randint(1, 1000),
+        )
+        payer = await payer_repository.insert_payer(request=insert_payer_input)
+        assert payer
+        consumer_id = await payer_repository.get_consumer_id_by_payer_id(
+            input=GetConsumerIdByPayerIdInput(payer_id=str(payer_id))
+        )
+        assert consumer_id
+        assert consumer_id == insert_payer_input.dd_payer_id

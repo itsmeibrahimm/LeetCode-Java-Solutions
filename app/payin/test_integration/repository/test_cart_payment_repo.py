@@ -1,5 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
-from typing import cast, Optional, Tuple
+from typing import cast, Optional, Tuple, List
 from uuid import UUID, uuid4
 
 import pytest
@@ -39,6 +39,7 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
+    GetCartPaymentsByConsumerIdInput,
 )
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -2035,3 +2036,42 @@ class TestExistingSuccessChargeForStripeCard:
         assert not await cart_payment_repository.is_stripe_card_valid_and_has_success_charge_record(
             stripe_card_stripe_id=stripe_card_expired.stripe_id
         )
+
+
+class TestListCartPayments:
+    pytestmark = [pytest.mark.asyncio]
+
+    async def test_get_cart_payments_by_dd_consumer_id(
+        self, payer: PayerDbEntity, cart_payment_repository: CartPaymentRepository
+    ):
+        client_description = str(uuid4())
+        cart_payment = await cart_payment_repository.insert_cart_payment(
+            id=uuid4(),
+            payer_id=cast(UUID, payer.id),
+            amount_original=99,
+            amount_total=100,
+            client_description=client_description,
+            reference_id="99",
+            reference_type="88",
+            delay_capture=False,
+            metadata=None,
+            legacy_consumer_id=1,
+            legacy_stripe_card_id=1,
+            legacy_provider_customer_id="stripe_customer_id",
+            legacy_provider_card_id="stripe_card_id",
+        )
+        cart_payment_list = await cart_payment_repository.get_cart_payments_by_dd_consumer_id(
+            input=GetCartPaymentsByConsumerIdInput(dd_consumer_id=1)
+        )
+        assert cart_payment_list
+        assert isinstance(cart_payment_list, List)
+        retrieve_inserted_cart_payment = next(
+            filter(
+                lambda cart_payment: cart_payment.client_description
+                == client_description,
+                cart_payment_list,
+            ),
+            None,
+        )
+        assert retrieve_inserted_cart_payment
+        assert retrieve_inserted_cart_payment == cart_payment

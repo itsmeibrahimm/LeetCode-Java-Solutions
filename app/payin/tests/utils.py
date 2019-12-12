@@ -140,6 +140,8 @@ def generate_cart_payment(
     payment_method_id: uuid.UUID = uuid.uuid4(),
     amount=500,
     capture_method=CaptureMethod.MANUAL.value,
+    deleted_at: datetime = None,
+    created_at: datetime = None,
 ) -> CartPayment:
     return CartPayment(
         id=id if id else uuid.uuid4(),
@@ -150,6 +152,8 @@ def generate_cart_payment(
         correlation_ids=CorrelationIds(reference_id="0", reference_type="2"),
         delay_capture=True,
         client_description="Test description",
+        deleted_at=deleted_at,
+        created_at=created_at,
     )
 
 

@@ -94,6 +94,14 @@ class UpdatePayerWhereInput(DBRequestModel):
     id: UUID
 
 
+class GetConsumerIdByPayerIdInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    payer_id: str
+
+
 ###########################################################
 # PgpCustomer DBEntity and CRUD operations                #
 ###########################################################
@@ -326,6 +334,12 @@ class PayerRepositoryInterface:
     ) -> StripeCustomerDbEntity:
         ...
 
+    @abstractmethod
+    async def get_consumer_id_by_payer_id(
+        self, input: GetConsumerIdByPayerIdInput
+    ) -> int:
+        ...
+
 
 @final
 @tracing.track_breadcrumb(repository_name="payer")
@@ -526,3 +540,10 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
+
+    async def get_consumer_id_by_payer_id(
+        self, input: GetConsumerIdByPayerIdInput
+    ) -> int:
+        stmt = payers.table.select().where(payers.id == input.payer_id)
+        row = await self.payment_database.replica().fetch_one(stmt)
+        return PayerDbEntity.from_row(row).dd_payer_id if row else None

@@ -63,6 +63,7 @@ from app.payin.repository.payer_repo import (
     GetPayerByDDPayerIdInput,
     UpdatePayerSetInput,
     UpdatePayerWhereInput,
+    GetConsumerIdByPayerIdInput,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -450,6 +451,11 @@ class PayerClient:
                 error_code=PayinErrorCode.PAYER_UPDATE_STRIPE_ERROR
             ) from e
         return stripe_customer
+
+    async def get_consumer_id_by_payer_id(self, payer_id: str) -> int:
+        return await self.payer_repo.get_consumer_id_by_payer_id(
+            input=GetConsumerIdByPayerIdInput(payer_id=payer_id)
+        )
 
     def _is_legacy(self, payer_id_type: Optional[PayerIdType] = None):
         if not payer_id_type or payer_id_type in (

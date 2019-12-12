@@ -1,6 +1,7 @@
 import random
 import uuid
 from asyncio import AbstractEventLoop
+from datetime import datetime
 from typing import Any, Dict, Optional, List
 
 import pytest
@@ -25,6 +26,7 @@ from app.conftest import RuntimeContextManager, RuntimeSetter, StripeAPISettings
 from app.payin.core.cart_payment.model import LegacyStripeCharge
 from app.payin.core.cart_payment.processor import CommandoProcessor
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
+from app.payin.core.payment_method.types import CartPaymentSortKey
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payment_method_repo import (
     PaymentMethodRepository,
@@ -131,6 +133,7 @@ class TestCartPayment:
         amount: int = 500,
         delay_capture: bool = True,
         split_payment: Dict[str, Any] = None,
+        client_description: str = None,
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         request_body = {
@@ -140,7 +143,9 @@ class TestCartPayment:
             "currency": "usd",
             "payment_method_id": payment_method["id"],
             "delay_capture": delay_capture,
-            "client_description": f"{payer['id']} description",
+            "client_description": f"{payer['id']} description"
+            if not client_description
+            else client_description,
             "payer_statement_description": f"{payer['id'][0:10]} statement",
             "correlation_ids": {"reference_id": "123", "reference_type": "3"},
         }
@@ -162,13 +167,16 @@ class TestCartPayment:
         idempotency_key: Optional[str] = None,
         split_payment: Optional[Dict[str, Any]] = None,
         dd_stripe_card_id: int = 1,
+        client_description: str = None,
     ) -> Dict[str, Any]:
         # No payer_id or payment_method_id.  Instead we use legacy_payment.
         request_body = {
             "amount": amount,
             "currency": "usd",
             "delay_capture": True,
-            "client_description": f"{stripe_customer_id} description",
+            "client_description": f"{stripe_customer_id} description"
+            if not client_description
+            else client_description,
             "payer_statement_description": f"{stripe_customer_id} bill"[-22:],
             "payer_country": "US",
             "payment_country": merchant_country.value,
@@ -262,6 +270,7 @@ class TestCartPayment:
         merchant_country: CountryCode,
         split_payment: Optional[Dict[str, Any]] = None,
         dd_stripe_card_id: int = 1,
+        client_description: Optional[str] = None,
     ) -> requests.Response:
 
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -271,6 +280,7 @@ class TestCartPayment:
             split_payment=split_payment,
             merchant_country=merchant_country,
             dd_stripe_card_id=dd_stripe_card_id,
+            client_description=client_description,
         )
 
         return client.post("/payin/api/v0/cart_payments", json=request_body)
@@ -295,6 +305,7 @@ class TestCartPayment:
         amount: int,
         merchant_country: CountryCode,
         split_payment: Optional[Dict[str, Any]] = None,
+        client_description: str = None,
         dd_stripe_card_id: int = 1,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
@@ -304,6 +315,7 @@ class TestCartPayment:
             split_payment=split_payment,
             merchant_country=merchant_country,
             dd_stripe_card_id=dd_stripe_card_id,
+            client_description=client_description,
         )
 
         response = self._create_cart_payment_legacy_get_raw_response(
@@ -314,6 +326,7 @@ class TestCartPayment:
             split_payment=split_payment,
             merchant_country=merchant_country,
             dd_stripe_card_id=dd_stripe_card_id,
+            client_description=client_description,
         )
         assert response.status_code == 201
         cart_payment = response.json()
@@ -387,9 +400,15 @@ class TestCartPayment:
         amount: int,
         delay_capture: bool,
         split_payment: Optional[Dict[str, Any]] = None,
+        client_description: str = None,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_request(
-            payer, payment_method, amount, delay_capture, split_payment
+            payer,
+            payment_method,
+            amount,
+            delay_capture,
+            split_payment,
+            client_description=client_description,
         )
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
@@ -651,6 +670,44 @@ class TestCartPayment:
         )
         assert body["split_payment"] == expected_split_payment
         return body
+
+    def _list_cart_payment_get_legacy_response(
+        self,
+        client: TestClient,
+        dd_consumer_id: str,
+        created_at_gte: Optional[datetime],
+        created_at_lte: Optional[datetime],
+        active_only: bool,
+        sort_by: CartPaymentSortKey,
+    ) -> requests.Response:
+        base_request = f"/payin/api/v0/cart_payments?dd_consumer_id={dd_consumer_id}&sort_by={sort_by}"
+        if created_at_gte:
+            base_request = base_request + f"&created_at_gte={created_at_gte}"
+        if created_at_lte:
+            base_request = base_request + f"&created_at_lte={created_at_lte}"
+        if active_only:
+            base_request = base_request + f"&active_only={active_only}"
+        return client.get(base_request)
+
+    def _list_cart_payment_response(
+        self,
+        client: TestClient,
+        payer_id: str,
+        created_at_gte: Optional[datetime],
+        created_at_lte: Optional[datetime],
+        active_only: bool,
+        sort_by: CartPaymentSortKey,
+    ) -> requests.Response:
+        base_request = (
+            f"/payin/api/v1/cart_payments?payer_id={payer_id}&sort_by={sort_by}"
+        )
+        if created_at_gte:
+            base_request = base_request + f"&created_at_gte={created_at_gte}"
+        if created_at_lte:
+            base_request = base_request + f"&created_at_lte={created_at_lte}"
+        if active_only:
+            base_request = base_request + f"&active_only={active_only}"
+        return client.get(base_request)
 
     def test_cancellation(
         self, client: TestClient, payer: Dict[str, Any], payment_method: Dict[str, Any]
@@ -1552,3 +1609,121 @@ class TestCartPayment:
         self._test_cart_payment_get_not_found(
             client=client, cart_payment_id=str(uuid.uuid4())
         )
+
+    def test_list_legacy_cart_payment(
+        self,
+        stripe_api: StripeAPISettings,
+        stripe_customer: StripeCustomer,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        client: TestClient,
+    ):
+        stripe_api.enable_outbound()
+
+        # Getting the inital cart payment list for a consumer id
+        inital_response = self._list_cart_payment_get_legacy_response(
+            client=client,
+            dd_consumer_id="1",
+            created_at_gte=None,
+            created_at_lte=None,
+            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert inital_response.status_code == 200
+        inital_cart_payment_list = inital_response.json()
+        assert inital_cart_payment_list
+        assert isinstance(inital_cart_payment_list["data"], List)
+        initial_cart_payment_count = inital_cart_payment_list["count"]
+
+        # Creating a new cart payment
+        test_client_description: str = str(uuid.uuid4())
+        provider_account_id = payer["payment_gateway_provider_customers"][0][
+            "payment_provider_customer_id"
+        ]
+
+        provider_card_id = payment_method["payment_gateway_provider_details"][
+            "payment_method_id"
+        ]
+        cart_payment = self._test_cart_payment_legacy_payment_creation(
+            client=client,
+            stripe_customer_id=provider_account_id,
+            stripe_card_id=provider_card_id,
+            amount=900,
+            merchant_country=CountryCode.US,
+            client_description=test_client_description,
+        )
+        assert cart_payment
+
+        # Getting the final cart payment list for a consumer id
+        final_response = self._list_cart_payment_get_legacy_response(
+            client=client,
+            dd_consumer_id="1",
+            created_at_gte=None,
+            created_at_lte=None,
+            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert final_response.status_code == 200
+        final_cart_payment_list = final_response.json()
+        assert final_cart_payment_list
+        assert final_cart_payment_list["data"]
+        final_cart_payment_count = final_cart_payment_list["count"]
+        assert final_cart_payment_count - initial_cart_payment_count == 1
+        created_cart_payment = next(
+            filter(
+                lambda cart_payment: cart_payment["client_description"]
+                == test_client_description,
+                final_cart_payment_list["data"],
+            ),
+            None,
+        )
+        assert created_cart_payment
+
+    def test_list_cart_payments(
+        self, client: TestClient, payer: Dict[str, Any], payment_method: Dict[str, Any]
+    ):
+        initial_response = self._list_cart_payment_response(
+            client=client,
+            payer_id=payer["id"],
+            created_at_gte=None,
+            created_at_lte=None,
+            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert initial_response.status_code == 200
+        cart_payment_list = initial_response.json()
+        assert cart_payment_list
+        inital_count = cart_payment_list["count"]
+
+        test_client_description = str(uuid.uuid4())
+        cart_payment = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=600,
+            delay_capture=False,
+            client_description=test_client_description,
+        )
+        assert cart_payment
+
+        response = self._list_cart_payment_response(
+            client=client,
+            payer_id=payer["id"],
+            created_at_gte=None,
+            created_at_lte=None,
+            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert response.status_code == 200
+        cart_payment_list = response.json()
+        assert cart_payment_list
+        assert cart_payment_list["count"] - inital_count == 1
+        retrieve_created_cart_payment = next(
+            filter(
+                lambda cart_payment: cart_payment["client_description"]
+                == test_client_description,
+                cart_payment_list["data"],
+            ),
+            None,
+        )
+        assert retrieve_created_cart_payment

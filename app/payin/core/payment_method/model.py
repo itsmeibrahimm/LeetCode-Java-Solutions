@@ -67,7 +67,7 @@ class PaymentMethod(BaseModel):
 @final
 class PaymentMethodList(BaseModel):
     count: int
-    has_more: bool  # Currently default to False. Returning all the disputes for a query
+    has_more: bool  # Currently default to False. Returning all the payment methods for a query
     data: List[PaymentMethod]
 
 

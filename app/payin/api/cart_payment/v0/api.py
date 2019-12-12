@@ -1,3 +1,4 @@
+from datetime import datetime
 import typing
 
 from fastapi import APIRouter, Depends
@@ -5,6 +6,7 @@ from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
+from app.commons.core.errors import PaymentError
 from app.payin.api.cart_payment.v0.helper import legacy_create_request_to_model
 from app.payin.api.cart_payment.v0.request import (
     CreateCartPaymentLegacyRequest,
@@ -18,9 +20,14 @@ from app.payin.api.commando_mode import (
     commando_route_dependency,
     override_commando_mode_legacy_cart_payment,
 )
-from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
+from app.payin.core.cart_payment.model import (
+    CartPayment,
+    LegacyPayment,
+    CartPaymentList,
+)
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import LegacyConsumerChargeId
+from app.payin.core.payment_method.types import CartPaymentSortKey
 from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
 
 api_tags = ["CartPaymentV0"]
@@ -117,6 +124,36 @@ async def cancel_cart_payment(
     )
     log.info("Cancelled cart_payment for legacy charge", dd_charge_id=dd_charge_id)
     return cart_payment
+
+
+@router.get(
+    "/cart_payments",
+    response_model=CartPaymentList,
+    status_code=HTTP_200_OK,
+    operation_id="ListCartPayment",
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def list_cart_payments(
+    dd_consumer_id: int,
+    created_at_gte: datetime = None,
+    created_at_lte: datetime = None,
+    active_only: bool = False,
+    sort_by: CartPaymentSortKey = CartPaymentSortKey.CREATED_AT,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+) -> CartPaymentList:
+    try:
+        return await cart_payment_processor.list_legacy_cart_payment(
+            dd_consumer_id=dd_consumer_id,
+            created_at_gte=created_at_gte,
+            created_at_lte=created_at_gte,
+            active_only=active_only,
+            sort_by=sort_by,
+        )
+    except PaymentError:
+        log.warn("[list_cart_payments] PaymentError")
+        raise
 
 
 @router.get(

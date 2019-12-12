@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -5,14 +6,16 @@ from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
+from app.commons.core.errors import PaymentError
 from app.payin.api.cart_payment.v1.helper import create_request_to_model
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
 )
 from app.payin.api.commando_mode import commando_route_dependency
-from app.payin.core.cart_payment.model import CartPayment
+from app.payin.core.cart_payment.model import CartPayment, CartPaymentList
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
+from app.payin.core.payment_method.types import CartPaymentSortKey
 
 api_tags = ["CartPaymentV1"]
 router = APIRouter()
@@ -140,6 +143,36 @@ async def cancel_cart_payment(
     )
     log.info("Cancelled cart_payment", cart_payment_id=cart_payment_id)
     return cart_payment
+
+
+@router.get(
+    "/cart_payments",
+    response_model=CartPaymentList,
+    status_code=HTTP_200_OK,
+    operation_id="ListCartPayment",
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def list_cart_payments(
+    payer_id: str,
+    created_at_gte: datetime = None,
+    created_at_lte: datetime = None,
+    active_only: bool = False,
+    sort_by: CartPaymentSortKey = CartPaymentSortKey.CREATED_AT,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+) -> CartPaymentList:
+    try:
+        return await cart_payment_processor.list_cart_payments(
+            payer_id=payer_id,
+            created_at_gte=created_at_gte,
+            created_at_lte=created_at_lte,
+            active_only=active_only,
+            sort_by=sort_by,
+        )
+    except PaymentError:
+        log.warn("[list_cart_payments] PaymentError")
+        raise
 
 
 @router.get(

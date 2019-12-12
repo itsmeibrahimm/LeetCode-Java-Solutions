@@ -26,6 +26,14 @@ class PaymentMethodSortKey(str, Enum):
     CREATED_AT = "created_at"
 
 
+class CartPaymentSortKey(str, Enum):
+    """
+    Enum definition of sorting method of cart payment list.
+    """
+
+    CREATED_AT = "created_at"
+
+
 class LegacyPaymentMethodInfo(BaseModel):
     country: CountryCode
     stripe_customer_id: str

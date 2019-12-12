@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -55,6 +55,12 @@ class CartPayment(BaseModel):
     split_payment: Optional[SplitPayment] = None
     capture_after: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
+
+
+class CartPaymentList(BaseModel):
+    count: int
+    has_more: bool  # Currently default to False. Returning all the cart payments for a query
+    data: List[CartPayment]
 
 
 @final

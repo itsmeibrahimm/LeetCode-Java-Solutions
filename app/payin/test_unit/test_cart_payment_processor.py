@@ -5,7 +5,12 @@ import pytest
 
 import app.payin.core.cart_payment.processor as processor
 from app.commons.types import CountryCode, Currency
-from app.payin.core.cart_payment.model import CartPayment, IntentStatus, SplitPayment
+from app.payin.core.cart_payment.model import (
+    CartPayment,
+    IntentStatus,
+    SplitPayment,
+    CartPaymentList,
+)
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus, RefundStatus
 from app.payin.core.exceptions import (
     CartPaymentCreateError,
@@ -16,6 +21,7 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
+from app.payin.core.payment_method.types import CartPaymentSortKey
 from app.payin.tests.utils import (
     FunctionMock,
     generate_cart_payment,
@@ -921,3 +927,71 @@ class TestCartPaymentProcessor:
             payment_error.value.error_code
             == PayinErrorCode.CART_PAYMENT_NOT_FOUND.value
         )
+
+    @pytest.mark.asyncio
+    async def test_list_legacy_cart_payments(self, cart_payment_processor):
+        cart_payment_list: CartPaymentList = CartPaymentList(
+            count=1, has_more=False, data=[generate_cart_payment()]
+        )
+        cart_payment_processor.legacy_payment_interface.list_cart_payments = FunctionMock(
+            return_value=cart_payment_list
+        )
+        get_cart_payment_list = await cart_payment_processor.list_legacy_cart_payment(
+            dd_consumer_id=1,
+            created_at_lte=None,
+            created_at_gte=None,
+            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert get_cart_payment_list
+        assert isinstance(get_cart_payment_list, CartPaymentList)
+
+    @pytest.mark.asyncio
+    async def test_list_cart_payments(self, cart_payment_processor):
+        cart_payment_list: CartPaymentList = CartPaymentList(
+            count=1, has_more=False, data=[generate_cart_payment()]
+        )
+        cart_payment_processor.legacy_payment_interface.list_cart_payments = FunctionMock(
+            return_value=cart_payment_list
+        )
+        cart_payment_processor.payer_client.get_consumer_id_by_payer_id = FunctionMock(
+            return_value=1
+        )
+        get_cart_payment_list = await cart_payment_processor.list_cart_payments(
+            payer_id=uuid.uuid4(),
+            created_at_lte=None,
+            created_at_gte=None,
+            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert get_cart_payment_list
+        assert isinstance(get_cart_payment_list, CartPaymentList)
+
+    @pytest.mark.asyncio
+    async def test_exception_list_cart_payments_invalid_input(
+        self, cart_payment_processor
+    ):
+        cart_payment_list: CartPaymentList = CartPaymentList(
+            count=1, has_more=False, data=[generate_cart_payment()]
+        )
+        cart_payment_processor.legacy_payment_interface.list_cart_payments = FunctionMock(
+            return_value=cart_payment_list
+        )
+        cart_payment_processor.payer_client.get_consumer_id_by_payer_id = FunctionMock(
+            return_value=None
+        )
+        error_code = ""
+        error_message = ""
+        try:
+            await cart_payment_processor.list_cart_payments(
+                payer_id=1,
+                created_at_lte=None,
+                created_at_gte=None,
+                active_only=False,
+                sort_by=CartPaymentSortKey.CREATED_AT,
+            )
+        except CartPaymentReadError as e:
+            error_code = e.error_code
+            error_message = e.error_message
+        assert error_code == "payin_63"
+        assert error_message == "Cart Payment data is invalid."

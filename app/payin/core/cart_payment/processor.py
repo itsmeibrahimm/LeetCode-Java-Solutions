@@ -56,6 +56,7 @@ from app.payin.core.cart_payment.model import (
     PgpRefund,
     Refund,
     SplitPayment,
+    CartPaymentList,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -86,7 +87,7 @@ from app.payin.core.legacy.utils import get_country_code_by_id, get_country_id_b
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
-from app.payin.core.payment_method.types import PgpPaymentMethod
+from app.payin.core.payment_method.types import PgpPaymentMethod, CartPaymentSortKey
 from app.payin.core.types import (
     PayerIdType,
     PaymentMethodIdType,
@@ -100,6 +101,7 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
+    GetCartPaymentsByConsumerIdInput,
 )
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
@@ -381,6 +383,62 @@ class LegacyPaymentInterface:
             else f"stripeid_lost_{str(uuid.uuid4())}",
             status=LegacyStripeChargeStatus.FAILED,
             error_reason=self._extract_error_reason_from_exception(creation_exception),
+        )
+
+    async def list_cart_payments(
+        self,
+        dd_consumer_id: int,
+        active_only: bool,
+        sort_by: CartPaymentSortKey,
+        created_at_gte: datetime = None,
+        created_at_lte: datetime = None,
+    ) -> CartPaymentList:
+        cart_payments: List[
+            CartPayment
+        ] = await self.payment_repo.get_cart_payments_by_dd_consumer_id(
+            input=GetCartPaymentsByConsumerIdInput(dd_consumer_id=dd_consumer_id)
+        )
+        if created_at_gte:
+            cart_payments = list(
+                filter(
+                    lambda cart_payment: (
+                        not cart_payment.created_at
+                        or (
+                            cart_payment.created_at
+                            and created_at_gte
+                            and cart_payment.created_at >= created_at_gte
+                        )
+                    ),
+                    cart_payments,
+                )
+            )
+        if created_at_lte:
+            cart_payments = list(
+                filter(
+                    lambda cart_payment: (
+                        not cart_payment.created_at
+                        or (
+                            cart_payment.created_at
+                            and created_at_lte
+                            and cart_payment.created_at <= created_at_lte
+                        )
+                    ),
+                    cart_payments,
+                )
+            )
+        if active_only:
+            cart_payments = list(
+                filter(
+                    lambda cart_payment: cart_payment.deleted_at is None, cart_payments
+                )
+            )
+        cart_payments = sorted(
+            cart_payments,
+            key=lambda cart_payment: cart_payment.created_at,
+            reverse=False,
+        )
+        return CartPaymentList(
+            count=len(cart_payments), has_more=False, data=cart_payments
         )
 
 
@@ -1902,10 +1960,12 @@ class CartPaymentProcessor:
         legacy_payment_interface: LegacyPaymentInterface = Depends(
             LegacyPaymentInterface
         ),
+        payer_client: PayerClient = Depends(PayerClient),
     ):
         self.log = log
         self.cart_payment_interface = cart_payment_interface
         self.legacy_payment_interface = legacy_payment_interface
+        self.payer_client = payer_client
 
     async def _update_state_after_cancel_with_provider(
         self,
@@ -3335,6 +3395,46 @@ class CartPaymentProcessor:
                 payer_id_type=PayerIdType.PAYER_ID, payer_id=payer_id
             )
         ).to_payer()
+
+    async def list_legacy_cart_payment(
+        self,
+        active_only: bool,
+        dd_consumer_id: int,
+        sort_by: CartPaymentSortKey,
+        created_at_gte: datetime = None,
+        created_at_lte: datetime = None,
+    ) -> CartPaymentList:
+        return await self.legacy_payment_interface.list_cart_payments(
+            dd_consumer_id=dd_consumer_id,
+            created_at_gte=created_at_gte,
+            created_at_lte=created_at_lte,
+            active_only=active_only,
+            sort_by=sort_by,
+        )
+
+    async def list_cart_payments(
+        self,
+        payer_id: str,
+        active_only: bool,
+        sort_by: CartPaymentSortKey,
+        created_at_gte: datetime = None,
+        created_at_lte: datetime = None,
+    ) -> CartPaymentList:
+        consumer_id = await self.payer_client.get_consumer_id_by_payer_id(
+            payer_id=payer_id
+        )
+        if not consumer_id:
+            self.log.exception("No valid consumer found for the input.")
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID
+            )
+        return await self.legacy_payment_interface.list_cart_payments(
+            dd_consumer_id=consumer_id,
+            created_at_gte=created_at_gte,
+            created_at_lte=created_at_lte,
+            active_only=active_only,
+            sort_by=sort_by,
+        )
 
     async def legacy_get_cart_payment(self, dd_charge_id: int) -> CartPayment:
         cart_payment_id = await self.legacy_payment_interface.get_associated_cart_payment_id(

@@ -80,6 +80,10 @@ class UpdateCartPaymentPostCancellationInput(DBRequestModel):
     deleted_at: datetime
 
 
+class GetCartPaymentsByConsumerIdInput(DBRequestModel):
+    dd_consumer_id: int
+
+
 @final
 @tracing.track_breadcrumb(repository_name="cart_payment")
 @dataclass
@@ -1364,3 +1368,15 @@ class CartPaymentRepository(PayinDBRepository):
 
         row = await self.payment_database.master().fetch_one(statement)
         return self.to_cart_payment(row)
+
+    async def get_cart_payments_by_dd_consumer_id(
+        self, input: GetCartPaymentsByConsumerIdInput
+    ) -> List[CartPayment]:
+        stmt = cart_payments.table.select().where(
+            cart_payments.legacy_consumer_id == input.dd_consumer_id
+        )
+        rows = await self.payment_database.replica().fetch_all(stmt)
+        cart_payment_list: List[CartPayment] = []
+        for row in rows:
+            cart_payment_list.append(self.to_cart_payment(row))
+        return cart_payment_list
