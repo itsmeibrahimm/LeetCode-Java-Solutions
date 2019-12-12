@@ -441,7 +441,7 @@ class WeeklyCreateTransferJob(Job):
                 payout_countries=self.payout_countries,
                 end_time=end_time,
                 unpaid_txn_start_time=start_time,
-                exclude_recently_updated_accounts=True,
+                exclude_recently_updated_accounts=False,
                 whitelist_payment_account_ids=weekly_create_transfers_list,
             )
             transfer_repo = TransferRepository(
