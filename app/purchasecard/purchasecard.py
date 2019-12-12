@@ -6,7 +6,7 @@ from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext, set_context_for_app
 from app.commons.routing import default_payment_router_builder
 from app.middleware.doordash_metrics import ServiceMetricsMiddleware
-from app.purchasecard.api import card, user, webhook, jit_funding
+from app.purchasecard.api import card, user, webhook, jit_funding, transaction
 
 
 def make_purchasecard_v0_marqeta_app(context: AppContext, config: AppConfig) -> FastAPI:
@@ -34,6 +34,7 @@ def make_purchasecard_v0_marqeta_app(context: AppContext, config: AppConfig) -> 
             "/card": card.v0.router,
             "/webhook": webhook.v0.router,
             "/jit_funding": jit_funding.v0.router,
+            "/transaction": transaction.v0.router,
         }
     ).attach_to_app(
         app_v0

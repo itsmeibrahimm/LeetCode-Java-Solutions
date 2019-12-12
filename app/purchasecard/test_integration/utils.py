@@ -2,13 +2,19 @@ import json
 from uuid import uuid4
 
 import requests
-from asynctest import MagicMock
+from datetime import datetime
+from typing import Optional
+from unittest.mock import MagicMock
 
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
 )
 from app.testcase_utils import validate_expected_items_in_dict
+from app.purchasecard.models.maindb.marqeta_transaction import (
+    MarqetaTransactionDBEntity,
+)
+from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 
 
 class FakeMarqetaEnvironment:
@@ -106,6 +112,30 @@ async def prepare_and_insert_store_mastercard_data(
     assert store_mastercard_data.id, "store mastercard data is created, assigned an ID"
     validate_expected_items_in_dict(expected=data, actual=store_mastercard_data.dict())
     return store_mastercard_data
+
+
+async def prepare_and_insert_marqeta_transaction_data(
+    marqeta_tx_repo: MarqetaTransactionRepository,
+    id: int,
+    token: str,
+    amount: int,
+    delivery_id: int,
+    card_acceptor: str,
+    timed_out: Optional[bool],
+    swiped_at: Optional[datetime],
+):
+    swiped_at = swiped_at if swiped_at else datetime.now()
+    data = MarqetaTransactionDBEntity(
+        id=id,
+        token=token,
+        amount=amount,
+        delivery_id=delivery_id,
+        card_acceptor=card_acceptor,
+        timed_out=timed_out,
+        swiped_at=swiped_at,
+    )
+    marqeta_transaction_data = await marqeta_tx_repo.create_marqeta_transaction(data)
+    assert marqeta_transaction_data
 
 
 class FunctionMock(MagicMock):

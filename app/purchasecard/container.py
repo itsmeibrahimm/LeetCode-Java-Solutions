@@ -5,11 +5,13 @@ from app.commons.context.req_context import ReqContext, get_context_from_req
 from app.purchasecard.core.card.processor import CardProcessor
 from app.purchasecard.core.user.processor import UserProcessor
 from app.purchasecard.core.webhook.processor import WebhookProcessor
+from app.purchasecard.core.transaction.processor import TransactionProcessor
 from app.purchasecard.marqeta_external.marqeta_provider_client import (
     MarqetaProviderClient,
 )
 from structlog.stdlib import BoundLogger
 
+from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
 from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 from app.purchasecard.repository.marqeta_card_ownership import (
@@ -69,10 +71,22 @@ class PurchaseCardContainer:
         )
 
     @property
+    def transaction_processor(self) -> TransactionProcessor:
+        return TransactionProcessor(
+            logger=self.logger,
+            marqeta_repository=self.marqeta_transaction_repository,
+            delivery_funding_repository=self.delivery_funding_repository,
+        )
+
+    @property
     def marqeta_transaction_repository(self) -> MarqetaTransactionRepository:
         return MarqetaTransactionRepository(
             database=self.app_context.purchasecard_maindb
         )
+
+    @property
+    def delivery_funding_repository(self) -> DeliveryFundingRepository:
+        return DeliveryFundingRepository(database=self.app_context.purchasecard_maindb)
 
     @property
     def marqeta_card_repository(self) -> MarqetaCardRepository:

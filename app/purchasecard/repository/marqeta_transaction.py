@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+from sqlalchemy import and_, or_, select
+from sqlalchemy.sql import text
 from typing_extensions import final
 from typing import Optional
 
@@ -8,6 +11,7 @@ from app.purchasecard.models.maindb import marqeta_transactions
 from app.purchasecard.models.maindb.marqeta_transaction import (
     MarqetaTransactionDBEntity,
 )
+from app.purchasecard.constants import MARQETA_WEBHOOK_TIMEOUT
 
 
 @final
@@ -49,3 +53,37 @@ class MarqetaTransactionRepository(PurchaseCardMainDBRepository):
         )
         row = await self._database.replica().fetch_one(stmt)
         return MarqetaTransactionDBEntity.from_row(row) if row else None
+
+    async def get_funded_amount_by_delivery_id(self, delivery_id: int) -> int:
+        """
+            A funded amount is considered to be any approval that is one of:
+
+            1. timed_out=False
+            2. timed_out=null and swipe more than 30 seconds
+
+            The latter case is just in case a marqeta webhook is not processed correctly. In effect
+            this assumes that any swipe within the last swipe has been approved
+        """
+        timeout = datetime.utcnow() - timedelta(seconds=MARQETA_WEBHOOK_TIMEOUT)
+        stmt = (
+            select([text("SUM(amount) as total_amount")])
+            .where(
+                and_(
+                    marqeta_transactions.delivery_id == delivery_id,
+                    or_(
+                        marqeta_transactions.timed_out == False,
+                        and_(
+                            marqeta_transactions.timed_out == None,
+                            marqeta_transactions.swiped_at < timeout,
+                        ),
+                    ),
+                )
+            )
+            .group_by(marqeta_transactions.delivery_id)
+        )
+
+        row = await self._database.replica().fetch_one(stmt)
+        if not row:
+            return 0
+        # sqlalchemy would return a tuple here
+        return row._row_proxy[0]  # type: ignore
