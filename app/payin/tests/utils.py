@@ -187,11 +187,11 @@ def generate_pgp_refund(
     )
 
 
-def generate_payment_intent_adjustment_history():
+def generate_payment_intent_adjustment_history(payment_intent_id: uuid.UUID = None):
     return PaymentIntentAdjustmentHistory(
         id=uuid.uuid4(),
         payer_id=uuid.uuid4(),
-        payment_intent_id=uuid.uuid4(),
+        payment_intent_id=payment_intent_id if payment_intent_id else uuid.uuid4(),
         amount=500,
         amount_original=400,
         amount_delta=100,

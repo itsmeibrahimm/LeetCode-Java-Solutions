@@ -446,14 +446,10 @@ class CartPaymentRepository(PayinDBRepository):
         return [self.to_payment_intent(row) for row in results]
 
     async def get_payment_intent_adjustment_history_from_primary(
-        self, payment_intent_id: UUID, idempotency_key: str
+        self, idempotency_key: str
     ) -> Optional[PaymentIntentAdjustmentHistory]:
         statement = payment_intents_adjustment_history.table.select().where(
-            and_(
-                payment_intents_adjustment_history.payment_intent_id
-                == payment_intent_id,
-                payment_intents_adjustment_history.idempotency_key == idempotency_key,
-            )
+            payment_intents_adjustment_history.idempotency_key == idempotency_key
         )
         row = await self.payment_database.master().fetch_one(statement)
 

@@ -41,6 +41,7 @@ _payin_error_message_maps = {
     "payin_47": "An error occurred attempting your payment request.  Please try again later.",
     "payin_48": "Invalid split payment payout account.  This is account is not configured correctly for payment use.",
     "payin_49": "Cannot create payment.  Payment card cvc incorrect.",
+    "payin_50": "Cannot create payment.  Payment creation failed.",
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
@@ -50,6 +51,7 @@ _payin_error_message_maps = {
     "was created in DSJ the update was requested against Payment Service",
     "payin_66": "Payment method used to create cart payment was not found",
     "payin_67": "Another process is attempting to modify the same cart payment.  Please try again later.",
+    "payin_68": "The idempotency key is invalid.",
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
@@ -115,6 +117,11 @@ class PayinErrorCode(str, Enum):
         "payin_67",
         SHOULD_RETRY,
         "Another process is attempting to modify the same cart payment.  Please try again later.",
+    )
+    CART_PAYMENT_IDEMPOTENCY_KEY_ERROR = (
+        "payin_68",
+        NO_RETRY,
+        "The idempotency key is invalid.",
     )
     PAYER_CREATE_INVALID_DATA = (
         "payin_1",
@@ -214,6 +221,11 @@ class PayinErrorCode(str, Enum):
         "payin_49",
         NO_RETRY,
         "Cannot create payment.  Payment card cvc incorrect.",
+    )
+    PAYMENT_INTENT_CREATE_FAILED_ERROR = (
+        "payin_50",
+        SHOULD_RETRY,
+        "Cannot create payment.  Payment creation failed.",
     )
     PAYMENT_METHOD_CREATE_INVALID_DATA = (
         "payin_20",

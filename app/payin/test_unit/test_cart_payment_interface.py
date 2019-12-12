@@ -659,17 +659,36 @@ class TestCartPaymentInterface:
         assert result == [target_payment_intent]
 
     def test_is_payment_intent_submitted(self, cart_payment_interface):
-        intent = generate_payment_intent(status="init")
+        intent = generate_payment_intent(status=IntentStatus.INIT.value)
         assert cart_payment_interface.is_payment_intent_submitted(intent) is False
 
-        intent = generate_payment_intent(status="requires_capture")
+        intent = generate_payment_intent(status=IntentStatus.REQUIRES_CAPTURE.value)
         assert cart_payment_interface.is_payment_intent_submitted(intent) is True
 
-        intent = generate_payment_intent(status="succeeded")
+        intent = generate_payment_intent(status=IntentStatus.SUCCEEDED.value)
         assert cart_payment_interface.is_payment_intent_submitted(intent) is True
 
-        intent = generate_payment_intent(status="failed")
+        intent = generate_payment_intent(status=IntentStatus.FAILED.value)
         assert cart_payment_interface.is_payment_intent_submitted(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.PENDING.value)
+        assert cart_payment_interface.is_payment_intent_submitted(intent) is False
+
+    def test_is_payment_intent_failed(self, cart_payment_interface):
+        intent = generate_payment_intent(status=IntentStatus.INIT.value)
+        assert cart_payment_interface.is_payment_intent_failed(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.REQUIRES_CAPTURE.value)
+        assert cart_payment_interface.is_payment_intent_failed(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.SUCCEEDED.value)
+        assert cart_payment_interface.is_payment_intent_failed(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.FAILED.value)
+        assert cart_payment_interface.is_payment_intent_failed(intent) is True
+
+        intent = generate_payment_intent(status=IntentStatus.PENDING.value)
+        assert cart_payment_interface.is_payment_intent_failed(intent) is False
 
     def test_can_payment_intent_be_cancelled(self, cart_payment_interface):
         intent = generate_payment_intent(status=IntentStatus.FAILED)
@@ -889,9 +908,8 @@ class TestCartPaymentInterface:
         cart_payment_interface.payment_repo.get_payment_intent_adjustment_history_from_primary = FunctionMock(
             return_value=None
         )
-        payment_intent = generate_payment_intent()
         result = await cart_payment_interface.get_payment_intent_adjustment(
-            payment_intent=payment_intent, idempotency_key=str(uuid.uuid4())
+            idempotency_key=str(uuid.uuid4())
         )
         assert result is None
 
@@ -900,7 +918,7 @@ class TestCartPaymentInterface:
             return_value=history_record
         )
         result = await cart_payment_interface.get_payment_intent_adjustment(
-            payment_intent=payment_intent, idempotency_key=str(uuid.uuid4())
+            idempotency_key=str(uuid.uuid4())
         )
         assert result == history_record
 
@@ -922,6 +940,23 @@ class TestCartPaymentInterface:
         )
         assert result_refund == refund
         assert result_pgp_refund == pgp_refund
+
+    def test_is_adjustment_for_payment_intents(self, cart_payment_interface):
+        payment_intent = generate_payment_intent()
+        adjustment_history = generate_payment_intent_adjustment_history(
+            payment_intent_id=payment_intent.id
+        )
+
+        result = cart_payment_interface.is_adjustment_for_payment_intents(
+            adjustment_history=adjustment_history, intent_list=[payment_intent]
+        )
+        assert result is True
+
+        result = cart_payment_interface.is_adjustment_for_payment_intents(
+            adjustment_history=adjustment_history,
+            intent_list=[generate_payment_intent()],
+        )
+        assert result is False
 
     def test_is_accessible(self, cart_payment_interface):
         # Stub function: return value is fixed

@@ -497,6 +497,9 @@ class CartPaymentInterface:
             IntentStatus.SUCCEEDED,
         ]
 
+    def is_payment_intent_failed(self, payment_intent: PaymentIntent) -> bool:
+        return payment_intent.status == IntentStatus.FAILED
+
     def can_payment_intent_be_cancelled(self, payment_intent: PaymentIntent) -> bool:
         # Not yet captured.  SCA related states will be added here later.
         return payment_intent.status in [IntentStatus.REQUIRES_CAPTURE]
@@ -595,10 +598,10 @@ class CartPaymentInterface:
         )
 
     async def get_payment_intent_adjustment(
-        self, payment_intent: PaymentIntent, idempotency_key: str
+        self, idempotency_key: str
     ) -> Optional[PaymentIntentAdjustmentHistory]:
         return await self.payment_repo.get_payment_intent_adjustment_history_from_primary(
-            payment_intent_id=payment_intent.id, idempotency_key=idempotency_key
+            idempotency_key=idempotency_key
         )
 
     async def find_existing_refund(
@@ -614,6 +617,18 @@ class CartPaymentInterface:
             refund_id=refund.id
         )
         return refund, pgp_refund
+
+    def is_adjustment_for_payment_intents(
+        self,
+        adjustment_history: PaymentIntentAdjustmentHistory,
+        intent_list: List[PaymentIntent],
+    ):
+        return any(
+            [
+                payment_intent.id == adjustment_history.payment_intent_id
+                for payment_intent in intent_list
+            ]
+        )
 
     def is_accessible(
         self,
@@ -2066,6 +2081,7 @@ class CartPaymentProcessor:
         self,
         cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
+        existing_payment_intents: List[PaymentIntent],
         idempotency_key: str,
         payer_country: CountryCode,
         amount: int,
@@ -2081,21 +2097,18 @@ class CartPaymentProcessor:
             idempotency_key=idempotency_key,
         )
 
-        payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
-            cart_payment
-        )
         existing_payment_intent = self.cart_payment_interface.filter_payment_intents_by_idempotency_key(
-            payment_intents, idempotency_key
+            existing_payment_intents, idempotency_key
         )
 
         if cart_payment.payer_id:
-            assert payment_intents[0].payment_method_id
+            assert existing_payment_intents[0].payment_method_id
             try:
                 pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_method(
                     payer_id=cart_payment.payer_id,
-                    payment_method_id=payment_intents[0].payment_method_id,
+                    payment_method_id=existing_payment_intents[0].payment_method_id,
                     legacy_country_id=get_country_id_by_code(
-                        payment_intents[0].country
+                        existing_payment_intents[0].country
                     ),
                 )
             except PaymentMethodReadError as e:
@@ -2177,7 +2190,7 @@ class CartPaymentProcessor:
             # First attempt at cart payment adjustment for this idempotency key.
             payment_intent, pgp_payment_intent = await self.cart_payment_interface.increase_payment_amount(
                 cart_payment=cart_payment,
-                existing_payment_intents=payment_intents,
+                existing_payment_intents=existing_payment_intents,
                 amount=amount,
                 split_payment=split_payment,
                 idempotency_key=idempotency_key,
@@ -2230,7 +2243,7 @@ class CartPaymentProcessor:
 
         # Cancel old intents
         intent_operations = []
-        for intent in payment_intents:
+        for intent in existing_payment_intents:
             intent_operations.append(
                 self._cancel_payment_intent(
                     cart_payment=cart_payment, payment_intent=intent
@@ -2242,20 +2255,19 @@ class CartPaymentProcessor:
         return payment_intent, pgp_payment_intent
 
     async def _update_payment_with_lower_amount(
-        self, cart_payment: CartPayment, new_amount: int, idempotency_key: str
+        self,
+        cart_payment: CartPayment,
+        existing_payment_intents: List[PaymentIntent],
+        new_amount: int,
+        idempotency_key: str,
     ) -> Tuple[PaymentIntent, PgpPaymentIntent]:
-
-        payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
-            cart_payment
-        )
-
         # TODO: refactor the logic - there's no combination of capturable and refundable payment intents.
         # We can simplify the logic below streamline the handling.
         capturable_intents = self.cart_payment_interface.get_capturable_payment_intents(
-            payment_intents
+            existing_payment_intents
         )
         refundable_intents = self.cart_payment_interface.get_refundable_payment_intents(
-            payment_intents
+            existing_payment_intents
         )
 
         self.log.info(
@@ -2271,7 +2283,7 @@ class CartPaymentProcessor:
         if not capturable_intents and not refundable_intents:
             self.log.warn(
                 "[_update_payment_with_lower_amount] no payment_intent for adjustment with lower amount.",
-                payment_intents=payment_intents,
+                payment_intents=existing_payment_intents,
             )
             raise PaymentIntentRefundError(
                 error_code=PayinErrorCode.PAYMENT_INTENT_ADJUST_REFUND_ERROR
@@ -2288,9 +2300,22 @@ class CartPaymentProcessor:
             # Check if we have seen this before.  If we have an adjustment_history record, then the transaction that updates
             # amount and also creates this record completed successfully, so we immediately return.
             adjustment_history = await self.cart_payment_interface.get_payment_intent_adjustment(
-                payment_intent=capturable_intent, idempotency_key=idempotency_key
+                idempotency_key=idempotency_key
             )
             if adjustment_history:
+                if not self.cart_payment_interface.is_adjustment_for_payment_intents(
+                    adjustment_history=adjustment_history,
+                    intent_list=[capturable_intent],
+                ):
+                    self.log.warning(
+                        "[_update_payment_with_lower_amount] idempotency_key for another cart_payment used",
+                        idempotency_key=idempotency_key,
+                        payment_intent_id=capturable_intent.cart_payment_id,
+                        history_payment_intent_id=adjustment_history.payment_intent_id,
+                    )
+                    raise CartPaymentUpdateError(
+                        error_code=PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
+                    )
                 self.log.info(
                     "[_update_payment_with_lower_amount] Duplicate adjustment for idempotency_key",
                     idempotency_key=idempotency_key,
@@ -2473,7 +2498,7 @@ class CartPaymentProcessor:
         new_amount = cart_payment.amount + amount
         if new_amount < 0:
             self.log.warning(
-                "Invalid amount provided",
+                "[update_payment_for_legacy_charge] Invalid amount provided",
                 amount=new_amount,
                 idempotency_key=idempotency_key,
                 dd_charge_id=dd_charge_id,
@@ -2487,10 +2512,78 @@ class CartPaymentProcessor:
             client_description
         )
 
+        # If clients resubmit a previously used idempotency key for v0 interfaces, return immediatey based on
+        # the previous result.  This takes care of cases where we see legacy interfaces in DSJ called multiple
+        # times in succession (duplicate requests).  Handling is specific to v0 path, as we expect actual handling
+        # of idempotency key with v1 clients: here we can immediately return, but with v1 we want to support retrying
+        # previously attempted but incomplete/failed attempt.
+        payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
+            cart_payment
+        )
+        existing_payment_intent = self.cart_payment_interface.filter_payment_intents_by_idempotency_key(
+            payment_intents, idempotency_key
+        )
+        if existing_payment_intent:
+            if self.cart_payment_interface.is_payment_intent_failed(
+                payment_intent=existing_payment_intent
+            ):
+                # If there was an intent with the same idempotency key and it failed, return an error.
+                # TODO support returning previous result based on idempotency key reuse.
+                self.log.warning(
+                    "[update_payment_for_legacy_charge] Reuse of idempotency key for failed payment intent",
+                    idempotency_key=idempotency_key,
+                )
+                raise CartPaymentUpdateError(
+                    error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_FAILED_ERROR
+                )
+            # For any non failed state, return success
+            self.log.info(
+                "[update_payment_for_legacy_charge] Reuse of idempotency key for previous payment intent",
+                idempotency_key=idempotency_key,
+                payment_intent_id=existing_payment_intent.id,
+            )
+            existing_pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                payment_intent=existing_payment_intent
+            )
+            return self.cart_payment_interface.populate_cart_payment_for_response(
+                cart_payment=cart_payment,
+                payment_intent=existing_payment_intent,
+                pgp_payment_intent=existing_pgp_payment_intent,
+            )
+        else:
+            # No payment intent with idempotency key.  Next check adjustment history, which may hold key from previous amount reduction.
+            adjustment_history = await self.cart_payment_interface.get_payment_intent_adjustment(
+                idempotency_key=idempotency_key
+            )
+            if adjustment_history:
+                if not self.cart_payment_interface.is_adjustment_for_payment_intents(
+                    adjustment_history, intent_list=payment_intents
+                ):
+                    self.log.error(
+                        "[update_payment_for_legacy_charge] Reuse of idempotency key for used by another payment intent",
+                        idempotency_key=idempotency_key,
+                        payment_intent_id=adjustment_history.payment_intent_id,
+                    )
+                    raise CartPaymentUpdateError(
+                        error_code=PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
+                    )
+                existing_payment_intent = self.cart_payment_interface.get_most_recent_intent(
+                    intent_list=payment_intents
+                )
+                existing_pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                    payment_intent=existing_payment_intent
+                )
+                return self.cart_payment_interface.populate_cart_payment_for_response(
+                    cart_payment=cart_payment,
+                    payment_intent=existing_payment_intent,
+                    pgp_payment_intent=existing_pgp_payment_intent,
+                )
+
         updated_cart_payment = await self._lock_and_update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
+            existing_payment_intents=payment_intents,
             payer_id=None,
             payer_country=payer_country_code,
             amount=new_amount,
@@ -2538,12 +2631,17 @@ class CartPaymentProcessor:
             raise CartPaymentReadError(
                 error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH
             )
+
         payer = await self.get_payer_by_id(cart_payment.payer_id)
+        payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
+            cart_payment
+        )
 
         updated_cart_payment = await self._lock_and_update_payment(
             idempotency_key=idempotency_key,
             cart_payment=cart_payment,
             legacy_payment=legacy_payment,
+            existing_payment_intents=payment_intents,
             payer_id=payer_id,
             payer_country=CountryCode(payer.country),
             amount=amount,
@@ -2565,6 +2663,7 @@ class CartPaymentProcessor:
         idempotency_key: str,
         cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
+        existing_payment_intents: List[PaymentIntent],
         payer_id: Optional[uuid.UUID],
         payer_country: CountryCode,
         amount: int,
@@ -2580,6 +2679,7 @@ class CartPaymentProcessor:
                 idempotency_key=idempotency_key,
                 cart_payment=cart_payment,
                 legacy_payment=legacy_payment,
+                existing_payment_intents=existing_payment_intents,
                 payer_id=payer_id,
                 payer_country=payer_country,
                 amount=amount,
@@ -2601,6 +2701,7 @@ class CartPaymentProcessor:
                     idempotency_key=idempotency_key,
                     cart_payment=cart_payment,
                     legacy_payment=legacy_payment,
+                    existing_payment_intents=existing_payment_intents,
                     payer_id=payer_id,
                     payer_country=payer_country,
                     amount=amount,
@@ -2621,6 +2722,7 @@ class CartPaymentProcessor:
         idempotency_key: str,
         cart_payment: CartPayment,
         legacy_payment: LegacyPayment,
+        existing_payment_intents: List[PaymentIntent],
         payer_id: Optional[uuid.UUID],
         payer_country: CountryCode,
         amount: int,
@@ -2633,6 +2735,7 @@ class CartPaymentProcessor:
             idempotency_key {str} -- Client specified value for ensuring idempotency.
             cart_payment {CartPayment} -- Existing cart payment.
             legacy_payment {LegacyPayment} -- Legacy payment associated with cart payment.
+            existing_payment_intents: List[PaymentIntent] -- Existing payment intents for the cart payment.
             payer_id {str} -- ID of the payer who owns the specified cart payment.
             payer_country {CountryCode} -- The CountryCode of the payer whose payment is being modified.
             amount {int} -- New amount to use for cart payment.
@@ -2660,13 +2763,14 @@ class CartPaymentProcessor:
                 error_code=PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH
             )
 
-        # TODO Move idempotency key based checks up to here (from inside _update_payment_with_higher_amount,
+        # TODO PAYIN-32 Move idempotency key based checks up to here (from inside _update_payment_with_higher_amount,
         # _update_payment_with_lower_amount functions).
 
         if self.cart_payment_interface.is_amount_adjusted_higher(cart_payment, amount):
             payment_intent, pgp_payment_intent = await self._update_payment_with_higher_amount(
                 cart_payment=cart_payment,
                 legacy_payment=legacy_payment,
+                existing_payment_intents=existing_payment_intents,
                 idempotency_key=idempotency_key,
                 payer_country=payer_country,
                 amount=amount,
@@ -2675,7 +2779,7 @@ class CartPaymentProcessor:
             )
         elif self.cart_payment_interface.is_amount_adjusted_lower(cart_payment, amount):
             payment_intent, pgp_payment_intent = await self._update_payment_with_lower_amount(
-                cart_payment, amount, idempotency_key
+                cart_payment, existing_payment_intents, amount, idempotency_key
             )
 
             # If new target amount is 0, we treat the operation as equivalent to cancelling the intent.

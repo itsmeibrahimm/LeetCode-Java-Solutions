@@ -522,7 +522,7 @@ class MockedPaymentRepo:
         return [utils.generate_legacy_stripe_charge()]
 
     async def get_payment_intent_adjustment_history(
-        self, payment_intent_id: UUID, idempotency_key: str
+        self, idempotency_key: str
     ) -> Optional[PaymentIntentAdjustmentHistory]:
         return None
 

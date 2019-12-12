@@ -1,4 +1,5 @@
 from typing import List
+from uuid import uuid4
 
 import pytest
 
@@ -1230,7 +1231,553 @@ create_and_partial_refund_and_small_amount_to_capture_test_data = [
 ]
 
 
-cart_payment_delay_capture_state_transit_tests = [
+def get_create_and_partial_refund_with_resubmit_legacy_test_data():
+    # Use a function to get the list of states.  This way we can ensure idempotency keys can be reused for resubmit tests,
+    # without conflicts between test cases.
+    resubmit_idempotency_key = str(uuid4())
+    return [
+        CartPaymentState(
+            description="create cart payment with 1000 amount",
+            initial_amount=1000,
+            amount_delta_update=None,
+            expected_amount=1000,
+            capture_intents=False,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="[partial refund] adjust cart payment with -200 amount",
+            initial_amount=1000,
+            amount_delta_update=-200,
+            expected_amount=800,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=800,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=200,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="[partial refund] resubmit cart payment adjustment with -200 amount",
+            initial_amount=800,
+            amount_delta_update=-200,
+            expected_amount=800,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=800,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=200,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="capture cart payment",
+            initial_amount=1000,
+            amount_delta_update=None,
+            expected_amount=800,
+            capture_intents=True,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=800,
+                    status=IntentStatus.SUCCEEDED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=800,
+                        status=IntentStatus.SUCCEEDED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=200,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+    ]
+
+
+def get_create_and_increase_with_resubmit_legacy_test_data():
+    resubmit_idempotency_key = str(uuid4())
+    return [
+        CartPaymentState(
+            description="create cart payment with 1000 amount",
+            initial_amount=1000,
+            amount_delta_update=None,
+            expected_amount=1000,
+            capture_intents=False,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="adjust cart payment with +150 amount",
+            initial_amount=1000,
+            amount_delta_update=150,
+            expected_amount=1150,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.CANCELLED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=0,
+                        status=IntentStatus.CANCELLED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=1000,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+                PaymentIntentState(
+                    amount=1150,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1150,
+                        amount_capturable=1150,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1150,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+            ],
+        ),
+        CartPaymentState(
+            description="resubmit adjust cart payment with +150 amount",
+            initial_amount=1150,
+            amount_delta_update=150,
+            expected_amount=1150,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.CANCELLED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=0,
+                        status=IntentStatus.CANCELLED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=1000,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+                PaymentIntentState(
+                    amount=1150,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1150,
+                        amount_capturable=1150,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1150,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+            ],
+        ),
+        CartPaymentState(
+            description="capture cart payment",
+            initial_amount=1150,
+            amount_delta_update=None,
+            expected_amount=1150,
+            capture_intents=True,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.CANCELLED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=0,
+                        status=IntentStatus.CANCELLED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=1000,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+                PaymentIntentState(
+                    amount=1150,
+                    status=IntentStatus.SUCCEEDED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1150,
+                        amount_capturable=0,
+                        amount_received=1150,
+                        status=IntentStatus.SUCCEEDED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1150,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+            ],
+        ),
+    ]
+
+
+def get_create_and_partial_refund_with_resubmit_test_data():
+    resubmit_idempotency_key = str(uuid4())
+    return [
+        CartPaymentState(
+            description="create cart payment with 1000 amount",
+            initial_amount=1000,
+            amount_delta_update=None,
+            expected_amount=1000,
+            capture_intents=False,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="[partial refund] adjust cart payment with -200 amount",
+            initial_amount=1000,
+            amount_delta_update=-200,
+            expected_amount=800,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=800,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=200,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="[partial refund] resubmit cart payment adjustment with -200 amount",
+            initial_amount=800,
+            amount_delta_update=0,  # To resubmit request with same amount, use 0 as delta
+            expected_amount=800,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=800,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=200,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="capture cart payment",
+            initial_amount=1000,
+            amount_delta_update=None,
+            expected_amount=800,
+            capture_intents=True,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=800,
+                    status=IntentStatus.SUCCEEDED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=800,
+                        status=IntentStatus.SUCCEEDED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=200,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+    ]
+
+
+def get_create_and_increase_with_resubmit_test_data():
+    resubmit_idempotency_key = str(uuid4())
+    return [
+        CartPaymentState(
+            description="create cart payment with 1000 amount",
+            initial_amount=1000,
+            amount_delta_update=None,
+            expected_amount=1000,
+            capture_intents=False,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=1000,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                )
+            ],
+        ),
+        CartPaymentState(
+            description="adjust cart payment with +150 amount",
+            initial_amount=1000,
+            amount_delta_update=150,
+            expected_amount=1150,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.CANCELLED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=0,
+                        status=IntentStatus.CANCELLED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=1000,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+                PaymentIntentState(
+                    amount=1150,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1150,
+                        amount_capturable=1150,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1150,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+            ],
+        ),
+        CartPaymentState(
+            description="resubmit adjust cart payment with +150 amount",
+            initial_amount=1150,
+            amount_delta_update=0,  # To resubmit request with same amount, use 0 as delta
+            expected_amount=1150,
+            capture_intents=False,
+            delay_capture=True,
+            adjustment_idempotency_key=resubmit_idempotency_key,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.CANCELLED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=0,
+                        status=IntentStatus.CANCELLED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=1000,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+                PaymentIntentState(
+                    amount=1150,
+                    status=IntentStatus.REQUIRES_CAPTURE,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1150,
+                        amount_capturable=1150,
+                        amount_received=0,
+                        status=IntentStatus.REQUIRES_CAPTURE,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1150,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+            ],
+        ),
+        CartPaymentState(
+            description="capture cart payment",
+            initial_amount=1150,
+            amount_delta_update=None,
+            expected_amount=1150,
+            capture_intents=True,
+            delay_capture=True,
+            payment_intent_states=[
+                PaymentIntentState(
+                    amount=1000,
+                    status=IntentStatus.CANCELLED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1000,
+                        amount_capturable=0,
+                        amount_received=0,
+                        status=IntentStatus.CANCELLED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1000,
+                        amount_refunded=1000,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+                PaymentIntentState(
+                    amount=1150,
+                    status=IntentStatus.SUCCEEDED,
+                    pgp_payment_intent_state=PgpPaymentIntentState(
+                        amount=1150,
+                        amount_capturable=0,
+                        amount_received=1150,
+                        status=IntentStatus.SUCCEEDED,
+                    ),
+                    stripe_charge_state=StripeChargeState(
+                        amount=1150,
+                        amount_refunded=0,
+                        status=LegacyStripeChargeStatus.SUCCEEDED,
+                        error_reason="",
+                    ),
+                ),
+            ],
+        ),
+    ]
+
+
+base_payment_delay_capture_state_transit_tests = [
     pytest.param(create_no_adjust_test_data, id="create_no_adjust"),
     pytest.param(create_and_partial_refund_test_data, id="create_and_partial_refund"),
     pytest.param(create_and_full_refund_test_data, id="create_and_full_refund"),
@@ -1268,6 +1815,34 @@ cart_payment_delay_capture_state_transit_tests = [
     ),
 ]
 
+cart_payment_delay_capture_state_transit_tests = (
+    base_payment_delay_capture_state_transit_tests
+    + [
+        pytest.param(
+            get_create_and_partial_refund_with_resubmit_test_data(),
+            id="create_and_partial_refund_with_resubmit_test_data",
+        ),
+        pytest.param(
+            get_create_and_increase_with_resubmit_test_data(),
+            id="create_and_increase_with_resubmit_test_data",
+        ),
+    ]
+)
+
+cart_payment_delay_capture_state_transit_legacy_tests = (
+    base_payment_delay_capture_state_transit_tests
+    + [
+        pytest.param(
+            get_create_and_partial_refund_with_resubmit_legacy_test_data(),
+            id="create_and_partial_refund_with_resubmit_test_data",
+        ),
+        pytest.param(
+            get_create_and_increase_with_resubmit_legacy_test_data(),
+            id="create_and_increase_with_resubmit_test_data",
+        ),
+    ]
+)
+
 
 class TestDelayedCapturePaymentIntent(CartPaymentTest):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
@@ -1296,7 +1871,7 @@ class TestDelayedCapturePaymentIntentLegacy(CartPaymentLegacyTest):
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
 
     @pytest.mark.parametrize(
-        "cart_payment_states", cart_payment_delay_capture_state_transit_tests
+        "cart_payment_states", cart_payment_delay_capture_state_transit_legacy_tests
     )
     async def test_cart_payment_state_transit(
         self,

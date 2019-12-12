@@ -476,19 +476,12 @@ class TestPaymentIntentAdjustmentHistory:
         )
 
         result = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
-            payment_intent_id=history_record.payment_intent_id,
-            idempotency_key=history_record.idempotency_key,
+            idempotency_key=history_record.idempotency_key
         )
         assert result == history_record
 
         result = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
-            payment_intent_id=history_record.payment_intent_id,
-            idempotency_key=f"{history_record.idempotency_key}-does-not-exist",
-        )
-        assert result is None
-
-        result = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
-            payment_intent_id=uuid4(), idempotency_key=history_record.idempotency_key
+            idempotency_key=f"{history_record.idempotency_key}-does-not-exist"
         )
         assert result is None
 

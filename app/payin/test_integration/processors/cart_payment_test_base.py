@@ -60,6 +60,7 @@ class CartPaymentState:
     capture_intents: bool
     delay_capture: bool
     payment_intent_states: List[PaymentIntentState]
+    adjustment_idempotency_key: Optional[str] = None
 
     def __post_init__(self):
         if self.amount_delta_update and self.capture_intents:
@@ -271,7 +272,11 @@ class CartPaymentTestBase(ABC):
                 cart_payment_pre_update
             ), "expect cart_payment already exists before update!"
             amount_delta_to_update = new_cart_payment_state.amount_delta_update
-            adjustment_idempotency_key = str(uuid4())
+            adjustment_idempotency_key = (
+                new_cart_payment_state.adjustment_idempotency_key
+                if new_cart_payment_state.adjustment_idempotency_key
+                else str(uuid4())
+            )
             await self._update_cart_payment(
                 cart_payment_processor=cart_payment_processor,
                 existing_cart_payment=cart_payment_pre_update,
@@ -322,7 +327,7 @@ class CartPaymentTestBase(ABC):
                     adjustment_idempotency_key
                 ), "expect idempotency key when updates happen"
                 payment_intent_adjustment_history = await cart_payment_repository.get_payment_intent_adjustment_history_from_primary(
-                    payment_intent.id, adjustment_idempotency_key
+                    adjustment_idempotency_key
                 )
                 pre_update_payment_intent: PaymentIntent = id_to_pre_update_payment_intents[
                     payment_intent.id
