@@ -79,6 +79,7 @@ class TestCreateTransfer:
             payment_lock_manager=app_context.redis_lock_manager,
             logger=mocker.Mock(),
             stripe=stripe,
+            kafka_producer=app_context.kafka_producer,
             request=CreateTransferRequest(
                 payout_account_id=123,
                 transfer_type=TransferType.SCHEDULED,
@@ -94,6 +95,7 @@ class TestCreateTransfer:
         self.payment_lock_manager = app_context.redis_lock_manager
         self.mocker = mocker
         self.stripe = stripe
+        self.kafka_producer = app_context.kafka_producer
 
     @pytest.fixture
     def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
@@ -168,6 +170,7 @@ class TestCreateTransfer:
             payment_lock_manager=self.payment_lock_manager,
             logger=self.mocker.Mock(),
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
                 transfer_type=transfer_type,
@@ -547,6 +550,7 @@ class TestCreateTransfer:
             payment_lock_manager=self.payment_lock_manager,
             logger=self.mocker.Mock(),
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
             request=CreateTransferRequest(
                 payout_account_id=111,
                 transfer_type=TransferType.SCHEDULED,

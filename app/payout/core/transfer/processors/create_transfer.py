@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from starlette.status import HTTP_400_BAD_REQUEST
 
@@ -31,6 +32,7 @@ from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
     SubmitTransfer,
 )
+from app.payout.core.transfer.tasks.submit_transfer_task import SubmitTransferTask
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
     get_target_metadata,
@@ -94,6 +96,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
     payment_lock_manager: Aioredlock
     stripe: StripeAsyncClient
+    kafka_producer: AIOKafkaProducer
 
     def __init__(
         self,
@@ -107,6 +110,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
         payment_lock_manager: Aioredlock,
         stripe: StripeAsyncClient,
+        kafka_producer: AIOKafkaProducer,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -119,6 +123,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self.managed_account_transfer_repo = managed_account_transfer_repo
         self.payment_lock_manager = payment_lock_manager
         self.stripe = stripe
+        self.kafka_producer = kafka_producer
 
     async def _execute(self) -> CreateTransferResponse:
         self.logger.info(
@@ -204,24 +209,38 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                 transfer_id=updated_transfer.id, data=update_transfer_request
             )
         if self.request.submit_after_creation and updated_transfer:
-            submit_transfer_request = SubmitTransferRequest(
-                transfer_id=updated_transfer.id,
-                method=payout_models.TransferMethodType.STRIPE,
-                retry=False,
-                submitted_by=None,
-            )
-            submit_transfer_op = SubmitTransfer(
-                logger=self.logger,
-                request=submit_transfer_request,
-                transfer_repo=self.transfer_repo,
-                payment_account_repo=self.payment_account_repo,
-                payment_account_edit_history_repo=self.payment_account_edit_history_repo,
-                managed_account_transfer_repo=self.managed_account_transfer_repo,
-                transaction_repo=self.transaction_repo,
-                stripe_transfer_repo=self.stripe_transfer_repo,
-                stripe=self.stripe,
-            )
-            await submit_transfer_op.execute()
+            if runtime.get_bool(
+                "payout/feature-flags/enable_queueing_mechanism.bool", False
+            ):
+                submit_transfer_task = SubmitTransferTask(
+                    transfer_id=updated_transfer.id,
+                    method=payout_models.TransferMethodType.STRIPE,
+                    retry=False,
+                    submitted_by=None,
+                )
+                msg = submit_transfer_task.serialize()
+                await self.kafka_producer.send_and_wait(
+                    submit_transfer_task.topic_name, msg.encode()
+                )
+            else:
+                submit_transfer_request = SubmitTransferRequest(
+                    transfer_id=updated_transfer.id,
+                    method=payout_models.TransferMethodType.STRIPE,
+                    retry=False,
+                    submitted_by=None,
+                )
+                submit_transfer_op = SubmitTransfer(
+                    logger=self.logger,
+                    request=submit_transfer_request,
+                    transfer_repo=self.transfer_repo,
+                    payment_account_repo=self.payment_account_repo,
+                    payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+                    managed_account_transfer_repo=self.managed_account_transfer_repo,
+                    transaction_repo=self.transaction_repo,
+                    stripe_transfer_repo=self.stripe_transfer_repo,
+                    stripe=self.stripe,
+                )
+                await submit_transfer_op.execute()
         return CreateTransferResponse(
             transfer=updated_transfer, transaction_ids=transaction_ids
         )

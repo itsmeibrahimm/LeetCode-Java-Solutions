@@ -1,3 +1,4 @@
+from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from fastapi import Depends
 from starlette.requests import Request
@@ -54,6 +55,7 @@ __all__ = [
     "PaymentAccountEditHistoryRepositoryInterface",
     "RedisLockManager",
     "create_instant_payout_processors",
+    "KafkaProducer",
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
@@ -98,6 +100,7 @@ class PayoutService(BaseService):
     dsj_client: DSJClient
     stripe: StripeAsyncClient
     redis_lock_manager: Aioredlock
+    kafka_producer: AIOKafkaProducer
 
     def __init__(self, request: Request):
         super().__init__(request)
@@ -137,6 +140,7 @@ class PayoutService(BaseService):
         self.stripe = get_stripe_async_client_from_req(request)  # type:ignore
 
         self.redis_lock_manager = self.app_context.redis_lock_manager
+        self.kafka_producer = self.app_context.kafka_producer
 
 
 def PaymentAccountRepository(
@@ -219,6 +223,10 @@ def RedisLockManager(payout_service: PayoutService = Depends()):
     return payout_service.redis_lock_manager
 
 
+def KafkaProducer(payout_service: PayoutService = Depends()):
+    return payout_service.kafka_producer
+
+
 def create_payout_account_processors(payout_service: PayoutService = Depends()):
     return PayoutAccountProcessors(
         logger=payout_service.log,
@@ -246,6 +254,7 @@ def create_transfer_processors(payout_service: PayoutService = Depends()):
         transaction_repo=payout_service.transactions,
         payment_account_edit_history_repo=payout_service.payment_account_edit_history,
         payment_lock_manager=payout_service.redis_lock_manager,
+        kafka_producer=payout_service.kafka_producer,
     )
 
 

@@ -473,6 +473,7 @@ class WeeklyCreateTransferJob(Job):
                 managed_account_transfer_repo=managed_account_transfer_repo,
                 stripe=req_context.stripe_async_client,
                 payment_lock_manager=job_instance_cxt.app_context.redis_lock_manager,
+                kafka_producer=job_instance_cxt.app_context.kafka_producer,
                 logger=logger,
                 request=weekly_create_transfer_req,
             )

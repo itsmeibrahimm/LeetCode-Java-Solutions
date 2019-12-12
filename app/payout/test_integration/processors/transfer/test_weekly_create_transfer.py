@@ -70,6 +70,7 @@ class TestWeeklyCreateTransfer:
             payment_lock_manager=app_context.redis_lock_manager,
             logger=mocker.Mock(),
             stripe=stripe,
+            kafka_producer=app_context.kafka_producer,
             request=WeeklyCreateTransferRequest(
                 payout_day=PayoutDay.MONDAY,
                 payout_countries=[],
@@ -87,6 +88,7 @@ class TestWeeklyCreateTransfer:
         self.payment_lock_manager = app_context.redis_lock_manager
         self.mocker = mocker
         self.stripe = stripe
+        self.kafka_producer = app_context.kafka_producer
 
     @pytest.fixture
     def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
@@ -155,6 +157,7 @@ class TestWeeklyCreateTransfer:
             managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_lock_manager=self.payment_lock_manager,
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
             request=request,
         )
         return weekly_create_transfer_op
@@ -297,6 +300,7 @@ class TestWeeklyCreateTransfer:
             managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_lock_manager=self.payment_lock_manager,
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
             request=request,
         )
         await weekly_create_transfer_op._execute()
@@ -304,8 +308,8 @@ class TestWeeklyCreateTransfer:
             payout_account_id=payment_account.id,
             transfer_type=TransferType.SCHEDULED,
             end_time=end_time,
-            payout_day=PayoutDay.MONDAY,
             payout_countries=[],
             start_time=None,
             submit_after_creation=True,
+            created_by_id=None,
         )

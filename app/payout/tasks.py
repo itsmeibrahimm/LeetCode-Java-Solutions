@@ -71,6 +71,7 @@ async def process_message(app_context: AppContext, message: str):
             stripe=req_context.stripe_async_client,
             payment_lock_manager=app_context.redis_lock_manager,
             logger=req_context.log,
+            kafka_producer=app_context.kafka_producer,
             request=weekly_create_transfer_req,
         )
         await weekly_create_transfer_op.execute()
@@ -98,6 +99,7 @@ async def process_message(app_context: AppContext, message: str):
             stripe=req_context.stripe_async_client,
             payment_lock_manager=app_context.redis_lock_manager,
             logger=req_context.log,
+            kafka_producer=app_context.kafka_producer,
             request=create_transfer_req,
         )
         await create_transfer_op.execute()

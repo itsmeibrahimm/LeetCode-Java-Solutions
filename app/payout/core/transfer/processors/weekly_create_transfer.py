@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
@@ -15,6 +16,7 @@ from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
     CreateTransfer,
 )
+from app.payout.core.transfer.tasks.create_transfer_task import CreateTransferTask
 from app.payout.models import PayoutDay, TransferType
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
@@ -63,6 +65,7 @@ class WeeklyCreateTransfer(
     managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
     payment_lock_manager: Aioredlock
     stripe: StripeAsyncClient
+    kafka_producer: AIOKafkaProducer
 
     def __init__(
         self,
@@ -76,6 +79,7 @@ class WeeklyCreateTransfer(
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
         payment_lock_manager: Aioredlock,
         stripe: StripeAsyncClient,
+        kafka_producer: AIOKafkaProducer,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -88,6 +92,7 @@ class WeeklyCreateTransfer(
         self.managed_account_transfer_repo = managed_account_transfer_repo
         self.payment_lock_manager = payment_lock_manager
         self.stripe = stripe
+        self.kafka_producer = kafka_producer
 
     async def _execute(self) -> WeeklyCreateTransferResponse:
         payout_day = self.request.payout_day
@@ -134,29 +139,55 @@ class WeeklyCreateTransfer(
 
         transfer_count = 0
         for account_id in payment_account_ids:
-            # todo: put create_transfer_for_account_id into queue
-            create_transfer_request = CreateTransferRequest(
-                payout_account_id=account_id,
-                transfer_type=TransferType.SCHEDULED,
-                end_time=end_time,
-                payout_day=payout_day,
-                payout_countries=self.request.payout_countries,
-                start_time=None,
-                submit_after_creation=True,
-            )
-            create_transfer_op = CreateTransfer(
-                logger=self.logger,
-                request=create_transfer_request,
-                transfer_repo=self.transfer_repo,
-                payment_account_repo=self.payment_account_repo,
-                payment_account_edit_history_repo=self.payment_account_edit_history_repo,
-                managed_account_transfer_repo=self.managed_account_transfer_repo,
-                transaction_repo=self.transaction_repo,
-                stripe_transfer_repo=self.stripe_transfer_repo,
-                payment_lock_manager=self.payment_lock_manager,
-                stripe=self.stripe,
-            )
-            await create_transfer_op.execute()
+            try:
+                if runtime.get_bool(
+                    "payout/feature-flags/enable_queueing_mechanism.bool", False
+                ):
+                    # put create_transfer into queue
+                    create_transfer_task = CreateTransferTask(
+                        payout_account_id=account_id,
+                        transfer_type=TransferType.SCHEDULED,
+                        end_time=end_time.isoformat(),
+                        payout_countries=self.request.payout_countries,
+                        start_time=None,
+                        submit_after_creation=True,
+                        created_by_id=None,
+                    )
+                    msg = create_transfer_task.serialize()
+                    await self.kafka_producer.send_and_wait(
+                        create_transfer_task.topic_name, msg.encode()
+                    )
+                else:
+                    create_transfer_request = CreateTransferRequest(
+                        payout_account_id=account_id,
+                        transfer_type=TransferType.SCHEDULED,
+                        end_time=end_time,
+                        payout_countries=self.request.payout_countries,
+                        start_time=None,
+                        submit_after_creation=True,
+                        created_by_id=None,
+                    )
+                    create_transfer_op = CreateTransfer(
+                        logger=self.logger,
+                        request=create_transfer_request,
+                        transfer_repo=self.transfer_repo,
+                        payment_account_repo=self.payment_account_repo,
+                        payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+                        managed_account_transfer_repo=self.managed_account_transfer_repo,
+                        transaction_repo=self.transaction_repo,
+                        stripe_transfer_repo=self.stripe_transfer_repo,
+                        payment_lock_manager=self.payment_lock_manager,
+                        stripe=self.stripe,
+                        kafka_producer=self.kafka_producer,
+                    )
+                    await create_transfer_op.execute()
+            except Exception as e:
+                self.logger.warn(
+                    "[weekly_create_transfer] Failed to creat_transfer for payment account. ",
+                    payment_account_id=account_id,
+                    error=e,
+                )
+                continue
             transfer_count += 1
         self.logger.info(
             "Finished executing weekly_create_transfers.",

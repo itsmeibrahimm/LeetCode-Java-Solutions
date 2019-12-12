@@ -1,3 +1,4 @@
+from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from structlog.stdlib import BoundLogger
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
@@ -51,6 +52,7 @@ class TransferProcessors:
     transaction_repo: TransactionRepositoryInterface
     payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
     payment_lock_manager: Aioredlock
+    kafka_producer: AIOKafkaProducer
 
     def __init__(
         self,
@@ -63,6 +65,7 @@ class TransferProcessors:
         transaction_repo: TransactionRepositoryInterface,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         payment_lock_manager: Aioredlock,
+        kafka_producer: AIOKafkaProducer,
     ):
         self.logger = logger
         self.stripe = stripe
@@ -73,6 +76,7 @@ class TransferProcessors:
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.payment_lock_manager = payment_lock_manager
+        self.kafka_producer = kafka_producer
 
     async def create_transfer(self, request: CreateTransferRequest):
         create_transfer_op = CreateTransfer(
@@ -86,6 +90,7 @@ class TransferProcessors:
             managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_lock_manager=self.payment_lock_manager,
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
         )
         return await create_transfer_op.execute()
 
@@ -115,6 +120,7 @@ class TransferProcessors:
             stripe_transfer_repo=self.stripe_transfer_repo,
             managed_account_transfer_repo=self.managed_account_transfer_repo,
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
         )
         return await weekly_create_transfer_op.execute()
 
