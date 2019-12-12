@@ -2,24 +2,23 @@ import asyncio
 from typing import Tuple
 
 from app.commons.config.app_config import AppConfig
-from app.commons.config.utils import init_app_config_for_payin_cron
 from app.commons.context.app_context import AppContext, create_app_context
+from app.commons.context.logger import init_logger
 from app.commons.instrumentation import sentry
 from app.commons.jobs.pool import JobPool
 from app.commons.stats import init_global_statsd
 
+logger = init_logger
+
 
 def init_worker_resources(
-    pool_name: str = "stripe"
+    app_config: AppConfig, pool_name: str, pool_size: int
 ) -> Tuple[AppConfig, AppContext, JobPool]:
     """
 
     :return: a tuple containing the app config, a pared version of the web app_context and a job pool for executing
     tasks
     """
-
-    app_config = init_app_config_for_payin_cron()
-
     if app_config.SENTRY_CONFIG:
         sentry.init_sentry_sdk(app_config.SENTRY_CONFIG)
 
@@ -33,9 +32,16 @@ def init_worker_resources(
     loop = asyncio.get_event_loop()
     app_context = loop.run_until_complete(create_app_context(app_config))
 
-    # syncing stripe client pool with jobpool to achieve optimal concurrency
-    stripe_pool = JobPool.create_pool(
-        size=app_config.STRIPE_MAX_WORKERS, name=pool_name
-    )
+    if pool_size > app_config.STRIPE_MAX_WORKERS:
+        logger.error(
+            "AioJobPool size is larger than stripe concurrent worker size",
+            pool_name=pool_name,
+            pool_size=pool_size,
+            stripe_max_worker=app_config.STRIPE_MAX_WORKERS,
+        )
+        pool_size = app_config.STRIPE_MAX_WORKERS
 
-    return app_config, app_context, stripe_pool
+    # syncing stripe client pool with jobpool to achieve optimal concurrency
+    job_pool = JobPool.create_pool(size=pool_size, name=pool_name)
+
+    return app_config, app_context, job_pool

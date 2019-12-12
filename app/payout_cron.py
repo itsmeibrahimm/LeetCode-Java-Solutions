@@ -8,6 +8,7 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
+from app.commons.config.utils import init_app_config_for_payout_cron
 from app.commons.context.logger import get_logger
 from app.payout.jobs import (
     MonitorTransfersWithIncorrectStatus,
@@ -29,7 +30,7 @@ from app.commons.jobs.pool import adjust_pool_sizes
 from app.commons.jobs.startup_util import init_worker_resources
 from app.commons.runtime import runtime
 
-logger = get_logger("cron")
+logger = get_logger("payout_cron")
 
 
 async def run_health_server(port: int = 80):
@@ -65,7 +66,13 @@ def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
     statsd_client.incr("scheduler.heartbeat")
 
 
-(app_config, app_context, stripe_pool) = init_worker_resources(pool_name="stripe")
+app_config = init_app_config_for_payout_cron()
+
+(app_config, app_context, job_pool) = init_worker_resources(
+    app_config=app_config,
+    pool_name="payout_cron",
+    pool_size=app_config.PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE,
+)
 
 scheduler = Scheduler()
 scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC timezone
@@ -75,15 +82,15 @@ loop = asyncio.get_event_loop()
 app_context.monitor.add(
     stat_resource_pool_jobs(
         stat_prefix="resource.job_pools.payout",
-        pool_name=stripe_pool.name,
-        pool_job_stats=stripe_pool,
+        pool_name=job_pool.name,
+        pool_job_stats=job_pool,
     ),
     interval_secs=app_config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
 )
 
 
 monitor_transfers_with_incorrect_status = MonitorTransfersWithIncorrectStatus(
-    app_context=app_context, job_pool=stripe_pool
+    app_context=app_context, job_pool=job_pool
 )
 scheduler.add_job(
     func=monitor_transfers_with_incorrect_status.run,
@@ -92,7 +99,7 @@ scheduler.add_job(
 )
 
 retry_instant_pay_in_new = RetryInstantPayoutInNew(
-    app_context=app_context, job_pool=stripe_pool
+    app_context=app_context, job_pool=job_pool
 )
 
 # Only run retry_instant_pay_in_new cron on prod
@@ -105,7 +112,7 @@ if app_config.ENVIRONMENT == "prod":
 
 weekly_create_transfer_thursday = WeeklyCreateTransferJob(
     app_context=app_context,
-    job_pool=stripe_pool,
+    job_pool=job_pool,
     payout_countries=[PayoutCountry.UNITED_STATES, PayoutCountry.CANADA],
     payout_country_timezone=pytz.timezone("US/Pacific"),
     payout_day=PayoutDay.THURSDAY,
@@ -138,7 +145,7 @@ scheduler.start()
 async def handle_shutdown():
     logger.info("Received scheduler shutdown request")
     scheduler.shutdown()
-    count, _results = await stripe_pool.cancel()
+    count, _results = await job_pool.cancel()
     logger.info("Cancelled stripe pool", count=count)
     loop.stop()
     logger("Done shutting down!")

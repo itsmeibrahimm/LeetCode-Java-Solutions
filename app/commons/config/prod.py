@@ -110,4 +110,24 @@ def create_app_config() -> AppConfig:
 
 def create_app_config_for_payin_cron() -> AppConfig:
     web_appconfig = create_app_config()
-    return dataclasses.replace(web_appconfig, STRIPE_MAX_WORKERS=40)
+
+    avg_cron_capture_latency_sec = 2
+    upper_rps = 30
+    stripe_max_worker = upper_rps * avg_cron_capture_latency_sec
+
+    target_rps = 20
+    cron_job_pool = target_rps * avg_cron_capture_latency_sec
+
+    return dataclasses.replace(
+        web_appconfig,
+        STRIPE_MAX_WORKERS=stripe_max_worker,
+        # rate limit job pool size by default lower than max stripe workers
+        PAYIN_CRON_JOB_POOL_DEFAULT_SIZE=cron_job_pool,
+    )
+
+
+def create_app_config_for_payout_cron() -> AppConfig:
+    web_appconfig = create_app_config()
+    return dataclasses.replace(
+        web_appconfig, STRIPE_MAX_WORKERS=30, PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE=30
+    )

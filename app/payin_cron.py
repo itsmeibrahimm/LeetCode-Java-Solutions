@@ -8,6 +8,7 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
+from app.commons.config.utils import init_app_config_for_payin_cron
 from app.commons.context.logger import get_logger
 
 init_newrelic_agent()
@@ -28,7 +29,7 @@ from app.payin.jobs import (
     EmitProblematicCaptureCount,
 )
 
-logger = get_logger("cron")
+logger = get_logger("payin_cron")
 
 
 async def run_health_server(port: int = 80):
@@ -64,7 +65,13 @@ def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
     statsd_client.incr("scheduler.heartbeat")
 
 
-(app_config, app_context, stripe_pool) = init_worker_resources(pool_name="stripe")
+app_config = init_app_config_for_payin_cron()
+
+(app_config, app_context, job_pool) = init_worker_resources(
+    app_config=app_config,
+    pool_name="payin_cron",
+    pool_size=app_config.PAYIN_CRON_JOB_POOL_DEFAULT_SIZE,
+)
 
 scheduler = Scheduler()
 scheduler.configure(timezone=pytz.UTC)  # all times will be interpreted in UTC timezone
@@ -74,15 +81,15 @@ loop = asyncio.get_event_loop()
 app_context.monitor.add(
     stat_resource_pool_jobs(
         stat_prefix="resource.job_pools.payin",
-        pool_name=stripe_pool.name,
-        pool_job_stats=stripe_pool,
+        pool_name=job_pool.name,
+        pool_job_stats=job_pool,
     ),
     interval_secs=app_config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
 )
 
 capture_uncaptured_payment_intents = CaptureUncapturedPaymentIntents(
     app_context=app_context,
-    job_pool=stripe_pool,
+    job_pool=job_pool,
     problematic_capture_delay=app_config.PROBLEMATIC_CAPTURE_DELAY,
     statsd_client=doorstats_global,
 )
@@ -94,7 +101,7 @@ scheduler.add_job(
 
 resolve_capturing_payment_intents = ResolveCapturingPaymentIntents(
     app_context=app_context,
-    job_pool=stripe_pool,
+    job_pool=job_pool,
     problematic_capture_delay=app_config.PROBLEMATIC_CAPTURE_DELAY,
     statsd_client=doorstats_global,
 )
@@ -106,7 +113,7 @@ scheduler.add_job(
 
 emit_problematic_capture_count = EmitProblematicCaptureCount(
     app_context=app_context,
-    job_pool=stripe_pool,
+    job_pool=job_pool,
     statsd_client=doorstats_global,
     problematic_threshold=app_config.PROBLEMATIC_CAPTURE_DELAY,
 )
@@ -133,7 +140,7 @@ scheduler.start()
 async def handle_shutdown():
     logger.info("Received scheduler shutdown request")
     scheduler.shutdown()
-    count, _results = await stripe_pool.cancel()
+    count, _results = await job_pool.cancel()
     logger.info("Cancelled stripe pool", count=count)
     loop.stop()
     logger("Done shutting down!")

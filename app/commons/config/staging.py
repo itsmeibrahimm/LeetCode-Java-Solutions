@@ -117,4 +117,13 @@ def create_app_config() -> AppConfig:
 
 def create_app_config_for_payin_cron() -> AppConfig:
     web_appconfig = create_app_config()
-    return dataclasses.replace(web_appconfig, STRIPE_MAX_WORKERS=30)
+    return dataclasses.replace(
+        web_appconfig, STRIPE_MAX_WORKERS=60, PAYIN_CRON_JOB_POOL_DEFAULT_SIZE=40
+    )
+
+
+def create_app_config_for_payout_cron() -> AppConfig:
+    web_appconfig = create_app_config()
+    return dataclasses.replace(
+        web_appconfig, STRIPE_MAX_WORKERS=30, PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE=30
+    )

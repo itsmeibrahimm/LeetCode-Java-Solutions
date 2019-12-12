@@ -169,6 +169,9 @@ class AppConfig(SecretAware):
     # PAYIN-189 Split web, cron resource initialization
     STRIPE_MAX_WORKERS: int = 20
 
+    PAYIN_CRON_JOB_POOL_DEFAULT_SIZE: int = 20
+    PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE: int = 20
+
     INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger", "purchasecard"})
 
     # Monitoring Intervals
