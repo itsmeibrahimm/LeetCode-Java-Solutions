@@ -168,12 +168,15 @@ class TestUtils:
         mocker: pytest_mock.MockFixture,
         payment_account_repository: PaymentAccountRepository,
     ):
-        payment_account = await prepare_and_insert_payment_account(
+        payment_account_1 = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repository
+        )
+        payment_account_2 = await prepare_and_insert_payment_account(
             payment_account_repo=payment_account_repository
         )
         data = [
             {
-                "123": {
+                str(payment_account_2.id): {
                     "target_type": PayoutTargetType.DASHER.value,
                     "target_id": 6666,
                     "statement_descriptor": "random_statement_descriptor",
@@ -183,7 +186,7 @@ class TestUtils:
         mocker.patch("app.commons.runtime.runtime.get_json", return_value=data)
 
         target_type, target_id, statement_descriptor = get_target_metadata(
-            payment_account_id=payment_account.id
+            payment_account_id=payment_account_1.id
         )
         assert target_type == PayoutTargetType.STORE.value
         assert target_id == 12345

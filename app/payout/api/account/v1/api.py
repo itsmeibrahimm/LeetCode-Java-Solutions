@@ -17,16 +17,12 @@ from app.payout.api.account.v1 import models
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.transfer.cancel_payout import CancelPayoutRequest
 from app.payout.core.account.processors.create_account import CreatePayoutAccountRequest
-from app.payout.core.transfer.create_instant_payout import CreateInstantPayoutRequest
 from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethodRequest,
 )
 from app.payout.core.transfer.create_standard_payout import CreateStandardPayoutRequest
 from app.payout.core.account.processors.get_account_stream import (
     GetPayoutAccountStreamRequest,
-)
-from app.payout.core.account.processors.get_default_payout_card import (
-    GetDefaultPayoutCardRequest,
 )
 from app.payout.core.account.processors.get_payout_method import GetPayoutMethodRequest
 from app.payout.core.account.processors.list_payout_methods import (
@@ -37,7 +33,6 @@ from app.payout.core.account.processors.update_account_statement_descriptor impo
 )
 from app.payout.core.account.processors.verify_account import VerifyPayoutAccountRequest
 from app.payout.core.account.processors.get_account import GetPayoutAccountRequest
-from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.service import create_payout_account_processors
 from app.payout.models import (
     PayoutType,
@@ -382,6 +377,7 @@ async def initiate_payout(
     payout_account_processors: PayoutAccountProcessors = Depends(
         create_payout_account_processors
     ),
+    log: BoundLogger = Depends(get_logger_from_req),
 ):
     # The if-else check here is ok for now, since PayoutType only has "standard" and "instant"
     if body.payout_type == PayoutType.STANDARD:
@@ -404,39 +400,7 @@ async def initiate_payout(
         # can not set default at Model directly due to our own constraint/enforcement
         return models.Payout(**standard_payout_response.dict(), id=0)
     else:
-        retrieve_method_request = GetDefaultPayoutCardRequest(
-            payout_account_id=payout_account_id
-        )
-        try:
-            payout_card_method = await payout_account_processors.get_default_payout_card(
-                retrieve_method_request
-            )
-            assert payout_card_method.id, "payout_card_method id is required"
-        except Exception:
-            raise PayoutError(
-                http_status_code=HTTP_400_BAD_REQUEST,
-                error_code=PayoutErrorCode.DEFAULT_PAYOUT_CARD_NOT_FOUND,
-                retryable=False,
-            )
-        payout_card_id = payout_card_method.id
-        instant_payout_request = CreateInstantPayoutRequest(
-            payout_account_id=payout_account_id,
-            amount=body.amount,
-            payout_type=body.payout_type,
-            payout_id=body.payout_id,
-            payout_card_id=payout_card_id,
-            payout_stripe_card_id=payout_card_method.stripe_card_id,
-            payout_idempotency_key=body.payout_idempotency_key,
-            method=body.method,
-            submitted_by=body.submitted_by,
-        )
-        instant_payout_response = await payout_account_processors.create_instant_payout(
-            instant_payout_request
-        )
-
-        # hotfix for pass client side data validator
-        # can not set default at Model directly due to our own constraint/enforcement
-        return models.Payout(**instant_payout_response.dict(), id=0)
+        log.info("[initiate_payout] Unsupported payout method")
 
 
 @router.post(

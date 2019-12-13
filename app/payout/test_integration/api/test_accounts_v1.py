@@ -12,6 +12,7 @@ from app.commons.test_integration.constants import (
 from app.commons.test_integration.utils import prepare_and_validate_stripe_account_token
 from app.commons.types import CountryCode, Currency
 from app.payout.api.account.v1 import models as account_models
+from app.payout.core.transfer.create_standard_payout import CreateStandardPayoutResponse
 from app.payout.models import PayoutTargetType, PayoutExternalAccountType
 from app.payout.test_integration.api import (
     verify_account_url,
@@ -24,7 +25,6 @@ from app.payout.test_integration.api import (
     create_payout_method_url_card,
     create_payout_method_url_bank,
 )
-from app.payout.core.transfer.create_instant_payout import CreateInstantPayoutResponse
 
 
 class TestAccountV1:
@@ -253,7 +253,7 @@ class TestAccountV1:
     ):
         # mock out processor/biz layer logic, test for API layer handling only
         async def mock_standard_pay(req):
-            return CreateInstantPayoutResponse()
+            return CreateStandardPayoutResponse()
 
         mocker.patch(
             "app.payout.core.account.processor.PayoutAccountProcessors.create_standard_payout",
@@ -271,38 +271,6 @@ class TestAccountV1:
         )
         response = client.post(
             get_initiate_payout_url(verified_payout_account["id"]),
-            json=request_body.dict(),
-        )
-        assert response.status_code == 200
-        assert response.json() == {"id": 0}
-
-    def test_initiate_fast_payout(
-        self,
-        mocker: pytest_mock.MockFixture,
-        client: TestClient,
-        verified_payout_account_with_payout_card: dict,
-    ):
-        # mock out processor/biz layer logic, test for API layer handling only
-        async def mock_fast_pay(req):
-            return CreateInstantPayoutResponse()
-
-        mocker.patch(
-            "app.payout.core.account.processor.PayoutAccountProcessors.create_instant_payout",
-            side_effect=mock_fast_pay,
-        )
-
-        request_body = account_models.InitiatePayoutRequest(
-            amount=100,
-            payout_type="instant",
-            statement_descriptor="test_initiate_payout-api-call",
-            target_id=1,
-            target_type="store",
-            payout_id=100,
-            method="stripe",
-            payout_idempotency_key="test_initiate_payout-api-call-ik",
-        )
-        response = client.post(
-            get_initiate_payout_url(verified_payout_account_with_payout_card["id"]),
             json=request_body.dict(),
         )
         assert response.status_code == 200

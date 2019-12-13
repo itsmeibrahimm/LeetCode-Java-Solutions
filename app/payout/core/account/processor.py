@@ -13,11 +13,6 @@ from app.payout.core.account.processors.create_account import (
     CreatePayoutAccountRequest,
     CreatePayoutAccount,
 )
-from app.payout.core.transfer.create_instant_payout import (
-    CreateInstantPayoutRequest,
-    CreateInstantPayoutResponse,
-    CreateInstantPayout,
-)
 from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethod,
     CreatePayoutMethodRequest,
@@ -238,19 +233,6 @@ class PayoutAccountProcessors:
             request=request,
         )
         return await create_standard_payout_op.execute()
-
-    async def create_instant_payout(
-        self, request: CreateInstantPayoutRequest
-    ) -> CreateInstantPayoutResponse:
-        create_instant_payout_op = CreateInstantPayout(
-            logger=self.logger,
-            stripe_payout_request_repo=self.stripe_payout_request_repo,
-            payment_account_repo=self.payment_account_repo,
-            stripe_managed_account_transfer_repo=self.stripe_managed_account_transfer_repo,
-            stripe_async_client=self.stripe,
-            request=request,
-        )
-        return await create_instant_payout_op.execute()
 
     async def cancel_payout(self, request: CancelPayoutRequest) -> CancelPayoutResponse:
         cancel_payout_op = CancelPayout(

@@ -25,11 +25,9 @@ payout_error_message_maps = {
     "payout_7": "Already submitted stripe transfer",
     "payout_8": "",
     "payout_9": "Payment account has no corresponding stripe_account",
-    "payout_10": "Failed to submit sma transfer due to connection error",
     "payout_11": "Failed to submit sma transfer due to other error",
     "payout_12": "All existing Stripe transfers must be failed or canceled.",
     "payout_13": "Cannot find payment_account with given id.",
-    "payout_14": "Failed to submit stripe payout due to RateLimitError",
     "payout_15": "Can only cancel if status is pending",
     "payout_16": "",
     "payout_17": "Amount does not match transaction amount.",
@@ -78,11 +76,9 @@ class PayoutErrorCode(str, Enum):
     DUPLICATE_STRIPE_TRANSFER = "payout_7"
     STRIPE_SUBMISSION_ERROR = "payout_8"
     INVALID_STRIPE_ACCOUNT = "payout_9"
-    API_CONNECTION_ERROR = "payout_10"
     OTHER_ERROR = "payout_11"
     TRANSFER_PROCESSING = "payout_12"
     INVALID_PAYMENT_ACCOUNT_ID = "payout_13"
-    RATE_LIMIT_ERROR = "payout_14"
     INVALID_STRIPE_PAYOUT = "payout_15"
     DUMMY_TRANSFER_CREATION_FAILED = "payout_16"
     MISMATCHED_TRANSFER_AMOUNT = "payout_17"
