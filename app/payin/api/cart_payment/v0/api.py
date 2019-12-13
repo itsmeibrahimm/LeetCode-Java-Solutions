@@ -147,7 +147,7 @@ async def list_cart_payments(
         return await cart_payment_processor.list_legacy_cart_payment(
             dd_consumer_id=dd_consumer_id,
             created_at_gte=created_at_gte,
-            created_at_lte=created_at_gte,
+            created_at_lte=created_at_lte,
             active_only=active_only,
             sort_by=sort_by,
         )

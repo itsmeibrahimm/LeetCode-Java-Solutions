@@ -11,8 +11,8 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-payin-v0-client = "==0.0.8"
-payin-v1-client = "==0.0.4"
+payin-v0-client = "==0.0.12"
+payin-v1-client = "==0.0.5"
 payout-v0-client = "==0.0.12"
 stripe = "==2.32.1"
 

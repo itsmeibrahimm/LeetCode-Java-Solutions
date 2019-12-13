@@ -123,6 +123,7 @@ class PaymentUtil:
         reference_id: str,
         reference_id_type: str,
         delay_capture: bool,
+        client_description: str = None,
     ):
         return CreateCartPaymentRequest(
             amount=amount,
@@ -130,7 +131,9 @@ class PaymentUtil:
             currency=currency,
             delay_capture=delay_capture,
             idempotency_key=str(uuid.uuid4()),
-            client_description="Test_Transaction",
+            client_description="Test_Transaction"
+            if not client_description
+            else client_description,
             payer_statement_description="Test_Transaction",
             split_payment=split_payment,
             payer_id=payer.id,
@@ -147,7 +150,6 @@ class PaymentUtil:
             idempotency_key=str(uuid.uuid4()),
             amount=updated_amount,
             client_description="Test Update Transaction",
-            payer_id=payer.id,
         )
 
     @staticmethod
@@ -162,6 +164,7 @@ class PaymentUtil:
         reference_id: str,
         reference_id_type: str,
         delay_capture: bool,
+        client_description: str = None,
     ):
         legacy_payment = LegacyPaymentInfo(
             dd_consumer_id=dd_consumer_id,
@@ -180,7 +183,9 @@ class PaymentUtil:
             currency=currency,
             delay_capture=delay_capture,
             idempotency_key=str(uuid.uuid4()),
-            client_description="Test Legacy Transaction",
+            client_description="Test Legacy Transaction"
+            if not client_description
+            else client_description,
             payer_statement_description="Test Transaction",
             split_payment=split_payment,
             legacy_payment=legacy_payment,

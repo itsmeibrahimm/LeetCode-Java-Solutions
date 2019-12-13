@@ -3443,7 +3443,7 @@ class CartPaymentProcessor:
         if not cart_payment_id:
             self.log.exception(
                 "[legacy_get_cart_payment] Cart payment not found for dd_charge_id",
-                dd_charge_id,
+                dd_charge_id=dd_charge_id,
             )
             raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
         return await self.get_cart_payment(cart_payment_id=cart_payment_id)
