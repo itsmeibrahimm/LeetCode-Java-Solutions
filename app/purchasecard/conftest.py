@@ -13,6 +13,9 @@ from app.purchasecard.repository.marqeta_card_ownership import (
 from app.purchasecard.repository.marqeta_card_transition import (
     MarqetaCardTransitionRepository,
 )
+from app.purchasecard.repository.store_mastercard_data import (
+    StoreMastercardDataRepository,
+)
 from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 
 
@@ -57,6 +60,13 @@ def marqeta_card_transition_repo(
     purchasecard_maindb: DB
 ) -> MarqetaCardTransitionRepository:
     return MarqetaCardTransitionRepository(database=purchasecard_maindb)
+
+
+@pytest.fixture
+def store_mastercard_data_repo(
+    purchasecard_maindb: DB
+) -> StoreMastercardDataRepository:
+    return StoreMastercardDataRepository(database=purchasecard_maindb)
 
 
 @pytest.fixture

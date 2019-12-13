@@ -3,6 +3,7 @@ from fastapi import Depends
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
 from app.purchasecard.core.card.processor import CardProcessor
+from app.purchasecard.core.jit_funding.processor import CardPaymentMetadataProcessor
 from app.purchasecard.core.user.processor import UserProcessor
 from app.purchasecard.core.webhook.processor import WebhookProcessor
 from app.purchasecard.core.transaction.processor import TransactionProcessor
@@ -21,6 +22,9 @@ from app.purchasecard.repository.marqeta_card_transition import (
     MarqetaCardTransitionRepository,
 )
 from app.commons.providers.dsj_client import DSJClient
+from app.purchasecard.repository.store_mastercard_data import (
+    StoreMastercardDataRepository,
+)
 
 
 class PurchaseCardContainer:
@@ -71,6 +75,12 @@ class PurchaseCardContainer:
         )
 
     @property
+    def card_payment_metadata_processor(self) -> CardPaymentMetadataProcessor:
+        return CardPaymentMetadataProcessor(
+            store_mastercard_data_repo=self.store_mastercard_data_repository
+        )
+
+    @property
     def transaction_processor(self) -> TransactionProcessor:
         return TransactionProcessor(
             logger=self.logger,
@@ -101,5 +111,11 @@ class PurchaseCardContainer:
     @property
     def marqeta_card_transition_repository(self) -> MarqetaCardTransitionRepository:
         return MarqetaCardTransitionRepository(
+            database=self.app_context.purchasecard_maindb
+        )
+
+    @property
+    def store_mastercard_data_repository(self) -> StoreMastercardDataRepository:
+        return StoreMastercardDataRepository(
             database=self.app_context.purchasecard_maindb
         )
