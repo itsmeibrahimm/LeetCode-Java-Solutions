@@ -11,6 +11,7 @@ from aioredlock.redis import Redis
 
 from app.commons.core.errors import PaymentLockAcquireError
 from app.commons.utils.pool import ThreadPoolHelper
+from app.conftest import RuntimeSetter
 from app.main import config
 from asynctest import mock
 from aioredlock import LockError
@@ -19,6 +20,10 @@ from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
 from app.commons.providers.stripe.stripe_models import StripeClientSettings
 
 from app.commons.database.infra import DB
+from app.payout.constants import (
+    FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
+    FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE,
+)
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,
@@ -468,13 +473,14 @@ class TestCreateTransfer:
             payout_date_time=datetime.utcnow(), payment_account_id=123
         )
 
-    @pytest.mark.skip("temp skip to enable testing")
-    async def test_should_block_mx_payout_target_biz_id_in_list(self):
+    async def test_should_block_mx_payout_target_biz_id_in_list(
+        self, runtime_setter: RuntimeSetter
+    ):
         # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
         # mocked get_json for runtime FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE
-        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
-        self.mocker.patch(
-            "app.commons.runtime.runtime.get_json", return_value={123: "yay"}
+        runtime_setter.set(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, True)
+        runtime_setter.set(
+            FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE, {123: "yay"}
         )
         assert not await self.create_transfer_operation.should_block_mx_payout(
             payout_date_time=datetime.utcnow(), payment_account_id=123
