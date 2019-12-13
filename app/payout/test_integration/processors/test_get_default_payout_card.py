@@ -1,7 +1,6 @@
 import pytest
 import pytest_mock
 
-from app.commons.database.infra import DB
 from app.payout.core.account.processors.get_default_payout_card import (
     GetDefaultPayoutCardRequest,
     GetDefaultPayoutCard,
@@ -25,18 +24,6 @@ from app.payout.test_integration.utils import (
 
 class TestGetDefaultPayoutCard:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payout_card_repo(self, payout_bankdb: DB) -> PayoutCardRepository:
-        return PayoutCardRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
-        return PayoutMethodRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_get_default_payout_card(
         self,

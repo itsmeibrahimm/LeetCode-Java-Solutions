@@ -1,11 +1,9 @@
 from datetime import datetime, timezone
 import pytest
-from app.commons.database.infra import DB
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
 )
 from app.payout.repository.maindb.model.transfer import TransferStatus
-from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import (
@@ -26,18 +24,6 @@ class TestTransferUtils:
     ):
         self.stripe_transfer_repo = stripe_transfer_repo
         self.transfer_repo = transfer_repo
-
-    @pytest.fixture
-    def payment_account_repository(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
 
     async def test_determine_transfer_status_from_latest_submission_transfer_deleted(
         self

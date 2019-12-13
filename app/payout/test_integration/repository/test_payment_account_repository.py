@@ -4,7 +4,6 @@ from typing import cast
 
 import pytest
 
-from app.commons.database.infra import DB
 import uuid
 from app.payout.repository.maindb.model.payment_account import (
     PaymentAccountCreate,
@@ -26,10 +25,6 @@ from app.testcase_utils import validate_expected_items_in_dict
 
 class TestPaymentAccountRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_create_payment_account(
         self, payment_account_repo: PaymentAccountRepository

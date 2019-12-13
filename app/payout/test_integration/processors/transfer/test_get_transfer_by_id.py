@@ -2,7 +2,6 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_404_NOT_FOUND
 
-from app.commons.database.infra import DB
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,
@@ -23,10 +22,6 @@ class TestGetTransferById:
     def setup(self, mocker: pytest_mock.MockFixture, transfer_repo: TransferRepository):
         self.transfer_repo = transfer_repo
         self.mocker = mocker
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
 
     def _construct_get_transfer_by_id_op(self, transfer_id: int):
         return GetTransferById(

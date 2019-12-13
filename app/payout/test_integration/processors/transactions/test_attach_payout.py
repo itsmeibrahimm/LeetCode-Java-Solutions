@@ -3,7 +3,6 @@ from typing import List
 import pytest
 import pytest_mock
 
-from app.commons.database.infra import DB
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.core.transaction.processors.attach_payout import (
     AttachPayoutRequest,
@@ -28,18 +27,6 @@ import app.payout.core.transaction.utils as utils
 
 class TestAttachPayout:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_repo(self, payout_bankdb: DB) -> PayoutRepository:
-        return PayoutRepository(database=payout_bankdb)
 
     async def test_attach_payout(
         self,

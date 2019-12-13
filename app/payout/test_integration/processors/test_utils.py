@@ -2,14 +2,7 @@ import asyncio
 import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
-from app.commons.config.app_config import AppConfig
-from app.commons.database.infra import DB
-from app.commons.providers.stripe.stripe_client import StripeClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import StripeClientSettings
-
-from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.core.account.utils import (
     get_country_shortname,
     get_account_balance,
@@ -34,73 +27,48 @@ from app.payout.test_integration.utils import (
 class TestUtils:
     pytestmark = [pytest.mark.asyncio]
 
-    @pytest.fixture
-    def payment_account_repository(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def stripe(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
-
     async def test_get_country_shortname_success(
-        self, payment_account_repository: PaymentAccountRepository
+        self, payment_account_repo: PaymentAccountRepository
     ):
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repository, country_shortname="ca"
+            payment_account_repo=payment_account_repo, country_shortname="ca"
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository, account_id=sma.id
+            payment_account_repo=payment_account_repo, account_id=sma.id
         )
         country_shortname = await get_country_shortname(
             payment_account=payment_account,
-            payment_account_repository=payment_account_repository,
+            payment_account_repository=payment_account_repo,
         )
         assert country_shortname == "ca"
 
     async def test_get_country_shortname_no_payment_account(
-        self, payment_account_repository: PaymentAccountRepository
+        self, payment_account_repo: PaymentAccountRepository
     ):
         country_shortname = await get_country_shortname(
-            payment_account=None, payment_account_repository=payment_account_repository
+            payment_account=None, payment_account_repository=payment_account_repo
         )
         assert not country_shortname
 
     async def test_get_country_shortname_no_account_id(
-        self, payment_account_repository: PaymentAccountRepository
+        self, payment_account_repo: PaymentAccountRepository
     ):
         # prepare and insert payment_account, update its account_id field as None
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository, account_id=None
+            payment_account_repo=payment_account_repo, account_id=None
         )
         country_shortname = await get_country_shortname(
             payment_account=payment_account,
-            payment_account_repository=payment_account_repository,
+            payment_account_repository=payment_account_repo,
         )
         assert not country_shortname
 
     async def test_get_country_shortname_no_sma(
         self,
         mocker: pytest_mock.MockFixture,
-        payment_account_repository: PaymentAccountRepository,
+        payment_account_repo: PaymentAccountRepository,
     ):
         @asyncio.coroutine
         def mock_get_sma(*args):
@@ -113,11 +81,11 @@ class TestUtils:
 
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository
+            payment_account_repo=payment_account_repo
         )
         country_shortname = await get_country_shortname(
             payment_account=payment_account,
-            payment_account_repository=payment_account_repository,
+            payment_account_repository=payment_account_repo,
         )
         assert not country_shortname
 
@@ -134,8 +102,8 @@ class TestUtils:
     async def test_get_account_balance_success(
         self,
         mocker: pytest_mock.MockFixture,
-        stripe: StripeAsyncClient,
-        payment_account_repository: PaymentAccountRepository,
+        stripe_async_client: StripeAsyncClient,
+        payment_account_repo: PaymentAccountRepository,
     ):
         mocked_balance = mock_balance()  # amount = 20
 
@@ -150,10 +118,12 @@ class TestUtils:
 
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repository
+            payment_account_repo=payment_account_repo
         )
 
-        balance = await get_account_balance(stripe_managed_account=sma, stripe=stripe)
+        balance = await get_account_balance(
+            stripe_managed_account=sma, stripe=stripe_async_client
+        )
         assert balance == 20
 
     async def test_get_account_balance_no_sma(self, mocker: pytest_mock.MockFixture):
@@ -166,13 +136,13 @@ class TestUtils:
     async def test_get_target_metadata_json_not_found(
         self,
         mocker: pytest_mock.MockFixture,
-        payment_account_repository: PaymentAccountRepository,
+        payment_account_repo: PaymentAccountRepository,
     ):
         payment_account_1 = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository
+            payment_account_repo=payment_account_repo
         )
         payment_account_2 = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository
+            payment_account_repo=payment_account_repo
         )
         data = [
             {
@@ -195,10 +165,10 @@ class TestUtils:
     async def test_get_target_metadata_success(
         self,
         mocker: pytest_mock.MockFixture,
-        payment_account_repository: PaymentAccountRepository,
+        payment_account_repo: PaymentAccountRepository,
     ):
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repository
+            payment_account_repo=payment_account_repo
         )
         data_key = str(payment_account.id)
         data = [

@@ -1,6 +1,5 @@
 import pytest
 
-from app.commons.database.infra import DB
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
@@ -13,18 +12,6 @@ from app.payout.test_integration.utils import (
 
 class TestPayoutCardRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payout_card_repo(self, payout_bankdb: DB) -> PayoutCardRepository:
-        return PayoutCardRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
-        return PayoutMethodRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_create_payout_card(
         self,

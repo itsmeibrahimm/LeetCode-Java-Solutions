@@ -4,7 +4,6 @@ import pytest
 import pytest_mock
 from IPython.utils.tz import utcnow
 
-from app.commons.database.infra import DB
 from app.payout.core.account.processors.create_account import (
     CreatePayoutAccount,
     CreatePayoutAccountRequest,
@@ -17,10 +16,6 @@ from app.payout.models import PayoutAccountTargetType
 
 class TestCreatePayoutAccount:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_create_payout_account(
         self,

@@ -1,7 +1,6 @@
 from datetime import timedelta, datetime
 
 import pytest
-from app.commons.database.infra import DB
 from app.payout.models import BankUpdateHistoryOwnerType
 from app.payout.repository.bankdb.model.payment_account_edit_history import (
     PaymentAccountEditHistoryCreate,
@@ -21,16 +20,6 @@ from app.payout.test_integration.utils import (
 
 class TestPaymentAccountEditHistoryRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_edit_history_repo(
-        self, payout_bankdb: DB
-    ) -> PaymentAccountEditHistoryRepository:
-        return PaymentAccountEditHistoryRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     @pytest.fixture
     async def created_payment_edit_history(

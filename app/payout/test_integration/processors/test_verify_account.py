@@ -5,17 +5,12 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.commons.config.app_config import AppConfig
-from app.commons.database.infra import DB
-from app.commons.providers.stripe.stripe_client import StripeAsyncClient, StripeClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
-    StripeClientSettings,
     CreateAccountRequest,
     UpdateAccountRequest,
 )
 from app.commons.types import CountryCode
-from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.core.account.processors.verify_account import (
     VerifyPayoutAccountRequest,
     VerifyPayoutAccount,
@@ -35,31 +30,6 @@ import stripe.error as stripe_error
 
 class TestVerifyPayoutAccount:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def stripe_async_client(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
 
     async def test_verify_payout_account_create(
         self,

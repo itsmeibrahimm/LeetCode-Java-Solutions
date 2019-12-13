@@ -5,25 +5,18 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext
 from aioredlock.redis import Redis
 
 from app.commons.core.errors import PaymentLockAcquireError
-from app.commons.utils.pool import ThreadPoolHelper
 from app.conftest import RuntimeSetter
 from app.main import config
-from asynctest import mock
 from aioredlock import LockError
-from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import StripeClientSettings
-
-from app.commons.database.infra import DB
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
     FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE,
 )
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,
@@ -72,7 +65,7 @@ class TestCreateTransfer:
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
         managed_account_transfer_repo: ManagedAccountTransferRepository,
         app_context: AppContext,
-        stripe: StripeAsyncClient,
+        stripe_async_client: StripeAsyncClient,
     ):
         self.create_transfer_operation = CreateTransfer(
             transfer_repo=transfer_repo,
@@ -83,7 +76,7 @@ class TestCreateTransfer:
             managed_account_transfer_repo=managed_account_transfer_repo,
             payment_lock_manager=app_context.redis_lock_manager,
             logger=mocker.Mock(),
-            stripe=stripe,
+            stripe=stripe_async_client,
             kafka_producer=app_context.kafka_producer,
             request=CreateTransferRequest(
                 payout_account_id=123,
@@ -96,65 +89,11 @@ class TestCreateTransfer:
         self.payment_account_repo = payment_account_repo
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
-        self.managed_account_repo = managed_account_transfer_repo
+        self.managed_account_transfer_repo = managed_account_transfer_repo
         self.payment_lock_manager = app_context.redis_lock_manager
         self.mocker = mocker
-        self.stripe = stripe
+        self.stripe = stripe_async_client
         self.kafka_producer = app_context.kafka_producer
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_edit_history_repo(
-        self, payout_bankdb: DB
-    ) -> PaymentAccountEditHistoryRepository:
-        return PaymentAccountEditHistoryRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def managed_account_transfer_repo(
-        self, payout_maindb: DB
-    ) -> ManagedAccountTransferRepository:
-        return ManagedAccountTransferRepository(database=payout_maindb)
-
-    @pytest.fixture()
-    def stripe(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
-
-    @pytest.fixture
-    def mock_set_lock(self):
-        with mock.patch("aioredlock.redis.Redis.set_lock") as mock_set_lock:
-            yield mock_set_lock
 
     def _construct_create_transfer_op(
         self,

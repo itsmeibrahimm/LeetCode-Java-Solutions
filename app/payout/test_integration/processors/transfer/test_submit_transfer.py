@@ -6,12 +6,7 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.commons.config.app_config import AppConfig
-from app.commons.database.infra import DB
-from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import StripeClientSettings
-from app.commons.utils.pool import ThreadPoolHelper
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,
@@ -67,7 +62,7 @@ class TestSubmitTransfer:
         transfer_repo: TransferRepository,
         transaction_repo: TransactionRepository,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
-        stripe: StripeAsyncClient,
+        stripe_async_client: StripeAsyncClient,
     ):
         self.submit_transfer_operation = SubmitTransfer(
             transfer_repo=transfer_repo,
@@ -77,7 +72,7 @@ class TestSubmitTransfer:
             transaction_repo=transaction_repo,
             payment_account_edit_history_repo=payment_account_edit_history_repo,
             logger=mocker.Mock(),
-            stripe=stripe,
+            stripe=stripe_async_client,
             request=SubmitTransferRequest(transfer_id="1234"),
         )
         self.transfer_repo = transfer_repo
@@ -87,56 +82,7 @@ class TestSubmitTransfer:
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.mocker = mocker
-        self.stripe = stripe
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def managed_account_transfer_repo(
-        self, payout_maindb: DB
-    ) -> ManagedAccountTransferRepository:
-        return ManagedAccountTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_edit_history_repo(
-        self, payout_bankdb: DB
-    ) -> PaymentAccountEditHistoryRepository:
-        return PaymentAccountEditHistoryRepository(database=payout_bankdb)
-
-    @pytest.fixture()
-    def stripe(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
+        self.stripe = stripe_async_client
 
     def _construct_submit_transfer_op(self, transfer_id: int, retry=False, method=None):
         return SubmitTransfer(
@@ -156,14 +102,10 @@ class TestSubmitTransfer:
             ),
         )
 
-    async def test_execute_submit_transfer_invalid_payment_account(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-    ):
+    async def test_execute_submit_transfer_invalid_payment_account(self):
         # prepare and insert transfer with invalid payment account
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=-1
+            transfer_repo=self.transfer_repo, payment_account_id=-1
         )
         submit_transfer_op = self._construct_submit_transfer_op(transfer_id=transfer.id)
         with pytest.raises(PayoutError) as e:
@@ -177,17 +119,13 @@ class TestSubmitTransfer:
             ]
         )
 
-    async def test_execute_submit_transfer_no_transaction_found(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-    ):
+    async def test_execute_submit_transfer_no_transaction_found(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         submit_transfer_op = self._construct_submit_transfer_op(transfer_id=transfer.id)
         with pytest.raises(PayoutError) as e:
@@ -199,7 +137,7 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.TRANSFER_INVALID_STATE.value]
         )
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -208,22 +146,17 @@ class TestSubmitTransfer:
             retrieved_transfer.status_code == TransferStatusCodeType.ERROR_INVALID_STATE
         )
 
-    async def test_execute_submit_transfer_amount_not_match(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-    ):
+    async def test_execute_submit_transfer_amount_not_match(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
 
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -240,7 +173,7 @@ class TestSubmitTransfer:
             ]
         )
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -250,25 +183,20 @@ class TestSubmitTransfer:
             == TransferStatusCodeType.ERROR_AMOUNT_MISMATCH
         )
 
-    async def test_execute_submit_transfer_not_retry_and_transfer_submitted(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-    ):
+    async def test_execute_submit_transfer_not_retry_and_transfer_submitted(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
             submitted_at=datetime.now(timezone.utc),
         )
 
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -283,27 +211,21 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.DUPLICATE_TRANSFER.value]
         )
 
-    async def test_execute_submit_transfer_not_retry_and_has_transfer_submission(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-    ):
+    async def test_execute_submit_transfer_not_retry_and_has_transfer_submission(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
         )
         await prepare_and_insert_stripe_transfer(
-            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer.id
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer.id
         )
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -318,24 +240,19 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.DUPLICATE_TRANSFER.value]
         )
 
-    async def test_execute_submit_transfer_retry_but_transfer_disabled(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-    ):
+    async def test_execute_submit_transfer_retry_but_transfer_disabled(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, transfers_enabled=False
+            payment_account_repo=self.payment_account_repo, transfers_enabled=False
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
             status=TransferStatus.ERROR,
         )
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -352,21 +269,18 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.TRANSFER_DISABLED_ERROR.value]
         )
 
-    async def test_execute_submit_transfer_zero_amount_dummy_transfer(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-    ):
+    async def test_execute_submit_transfer_zero_amount_dummy_transfer(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id, amount=0
+            transfer_repo=self.transfer_repo,
+            payment_account_id=payment_account.id,
+            amount=0,
         )
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
             amount=0,
@@ -377,7 +291,7 @@ class TestSubmitTransfer:
         )
         assert await submit_transfer_op._execute()
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -385,23 +299,18 @@ class TestSubmitTransfer:
         assert retrieved_transfer.submitted_at
         assert not retrieved_transfer.status_code
 
-    async def test_execute_submit_transfer_with_dummy_transfer_method(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-    ):
+    async def test_execute_submit_transfer_with_dummy_transfer_method(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
         )
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -411,7 +320,7 @@ class TestSubmitTransfer:
         )
         assert await submit_transfer_op._execute()
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -419,27 +328,21 @@ class TestSubmitTransfer:
         assert retrieved_transfer.submitted_at
         assert not retrieved_transfer.status_code
 
-    async def test_execute_submit_transfer_transfer_processing(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-    ):
+    async def test_execute_submit_transfer_transfer_processing(self):
         # prepare and insert transfer and payment account without account_id
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
         )
         await prepare_and_insert_stripe_transfer(
-            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer.id
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer.id
         )
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             payout_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -456,27 +359,20 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.TRANSFER_PROCESSING.value]
         )
 
-    async def test_execute_submit_transfer_success(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transaction_repo: TransactionRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        mocker: pytest_mock.MockFixture,
-    ):
+    async def test_execute_submit_transfer_success(self):
         # mocked get_json for runtime 'payment_account_transfer_limit_overrides'
         # mocked get_int for runtime 'default_transfer_max' and DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK
         # mocked get_bool for runtime 'FF_CHECK_FOR_RECENT_BANK_CHANGE'
-        mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
-        mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
-        mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
+        self.mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
+        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
         mocked_transfer = mock_transfer()
 
         @asyncio.coroutine
         def mock_create_transfer(*args, **kwargs):
             return mocked_transfer
 
-        mocker.patch(
+        self.mocker.patch(
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.create_transfer",
             side_effect=mock_create_transfer,
         )
@@ -487,7 +383,7 @@ class TestSubmitTransfer:
         def mock_create_payout(*args, **kwargs):
             return mocked_payout
 
-        mocker.patch(
+        self.mocker.patch(
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.create_payout",
             side_effect=mock_create_payout,
         )
@@ -498,27 +394,27 @@ class TestSubmitTransfer:
         def mock_retrieve_balance(*args, **kwargs):
             return mocked_balance
 
-        mocker.patch(
+        self.mocker.patch(
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_balance",
             side_effect=mock_retrieve_balance,
         )
 
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
 
         # prepare and insert transfer to get a random id
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=1000,
         )
         await prepare_and_insert_transaction(
-            transaction_repo=transaction_repo,
+            transaction_repo=self.transaction_repo,
             transfer_id=transfer.id,
             payout_account_id=payment_account.id,
         )
@@ -527,7 +423,7 @@ class TestSubmitTransfer:
         )
         assert await submit_transfer_op._execute()
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -535,17 +431,15 @@ class TestSubmitTransfer:
         assert retrieved_transfer.submitted_at
         assert not retrieved_transfer.status_code
 
-    async def test_handle_dummy_transfer_success(
-        self, transfer_repo: TransferRepository
-    ):
+    async def test_handle_dummy_transfer_success(self):
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=12345
+            transfer_repo=self.transfer_repo, payment_account_id=12345
         )
         assert await self.submit_transfer_operation.handle_dummy_transfer(
             transfer_id=transfer.id, method="stripe"
         )
 
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -553,20 +447,16 @@ class TestSubmitTransfer:
         assert retrieved_transfer.status == TransferStatus.PAID
         assert not retrieved_transfer.status_code
 
-    async def test_get_latest_transfer_submission_success(
-        self,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-    ):
+    async def test_get_latest_transfer_submission_success(self):
         # prepare and insert transfer and stripe_transfer
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=12345
+            transfer_repo=self.transfer_repo, payment_account_id=12345
         )
         first_stripe_transfer = await prepare_and_insert_stripe_transfer(
-            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer.id
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer.id
         )
         second_stripe_transfer = await prepare_and_insert_stripe_transfer(
-            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer.id
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer.id
         )
         retrieved_stripe_transfer = await self.submit_transfer_operation.get_latest_transfer_submission(
             transfer_id=transfer.id, method="stripe"
@@ -574,69 +464,51 @@ class TestSubmitTransfer:
         assert not retrieved_stripe_transfer == first_stripe_transfer
         assert retrieved_stripe_transfer == second_stripe_transfer
 
-    async def test_get_latest_transfer_submission_invalid_method(
-        self,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-    ):
+    async def test_get_latest_transfer_submission_invalid_method(self):
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=12345
+            transfer_repo=self.transfer_repo, payment_account_id=12345
         )
         assert not await self.submit_transfer_operation.get_latest_transfer_submission(
             transfer_id=transfer.id, method="invalid_method"
         )
 
-    async def test_get_latest_transfer_submission_transfer_non_exist(
-        self,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-    ):
+    async def test_get_latest_transfer_submission_transfer_non_exist(self):
         assert not await self.submit_transfer_operation.get_latest_transfer_submission(
             transfer_id=-1, method="stripe"
         )
 
-    async def test_transfer_amount_check_success(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-    ):
+    async def test_transfer_amount_check_success(self):
         # mocked get_json for runtime 'payment_account_transfer_limit_overrides'
         # mocked get_int for runtime 'default_transfer_max' and DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK
         # mocked get_bool for runtime 'FF_CHECK_FOR_RECENT_BANK_CHANGE'
-        mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
-        mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
-        mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
+        self.mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
+        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         await self.submit_transfer_operation.transfer_amount_check(
             transfer=transfer, submitted_by=None
         )
 
-    async def test_transfer_amount_check_negative_transfer_amount(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-    ):
+    async def test_transfer_amount_check_negative_transfer_amount(self):
         # mocked get_json for runtime 'payment_account_transfer_limit_overrides'
         # mocked get_int for runtime 'default_transfer_max' and DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK
         # mocked get_bool for runtime 'FF_CHECK_FOR_RECENT_BANK_CHANGE'
-        mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
-        mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
-        mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
+        self.mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
+        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
 
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=-10,
         )
@@ -652,7 +524,7 @@ class TestSubmitTransfer:
         )
 
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -662,35 +534,30 @@ class TestSubmitTransfer:
             == TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED
         )
 
-    async def test_transfer_amount_check_no_permission(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-    ):
+    async def test_transfer_amount_check_no_permission(self):
         # mocked get_json for runtime 'payment_account_transfer_limit_overrides'
         # mocked get_int for runtime 'default_transfer_max' and DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK
         # mocked get_bool for runtime 'FF_CHECK_FOR_RECENT_BANK_CHANGE'
-        mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
-        mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
-        mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
-        mocker.patch("app.commons.runtime.runtime.get_str", return_value="123")
+        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
+        self.mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
+        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+        self.mocker.patch("app.commons.runtime.runtime.get_str", return_value="123")
 
         @asyncio.coroutine
         def mock_get_bank_update(*args, **kwargs):
             return {"id": 1}
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.repository.bankdb.payment_account_edit_history.PaymentAccountEditHistoryRepository.get_most_recent_bank_update",
             side_effect=mock_get_bank_update,
         )
 
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo,
+            transfer_repo=self.transfer_repo,
             payment_account_id=payment_account.id,
             amount=3000000,
         )
@@ -707,7 +574,7 @@ class TestSubmitTransfer:
             ]
         )
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -717,28 +584,22 @@ class TestSubmitTransfer:
             == TransferStatusCodeType.ERROR_AMOUNT_LIMIT_EXCEEDED
         )
 
-    async def test_is_processing_or_processed_for_stripe_found_transfers(
-        self,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-    ):
+    async def test_is_processing_or_processed_for_stripe_found_transfers(self):
         # prepare and insert transfer and stripe_transfer
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=12345
+            transfer_repo=self.transfer_repo, payment_account_id=12345
         )
         await prepare_and_insert_stripe_transfer(
-            stripe_transfer_repo=stripe_transfer_repo, transfer_id=transfer.id
+            stripe_transfer_repo=self.stripe_transfer_repo, transfer_id=transfer.id
         )
 
         assert await self.submit_transfer_operation.is_processing_or_processed_for_method(
             transfer_id=transfer.id, method="stripe"
         )
 
-    async def test_is_processing_or_processed_for_stripe_transfers_invalid_method(
-        self, transfer_repo: TransferRepository
-    ):
+    async def test_is_processing_or_processed_for_stripe_transfers_invalid_method(self):
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=12345
+            transfer_repo=self.transfer_repo, payment_account_id=12345
         )
         assert not await self.submit_transfer_operation.is_processing_or_processed_for_method(
             transfer_id=transfer.id, method="invalid_method"
@@ -749,37 +610,29 @@ class TestSubmitTransfer:
             transfer_id=-1, method="stripe"
         )
 
-    async def test_has_stripe_managed_account_success(
-        self,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
-    ):
+    async def test_has_stripe_managed_account_success(self):
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         assert await self.submit_transfer_operation.has_stripe_managed_account(
             payment_account=payment_account, transfer_id=transfer.id
         )
 
-    async def test_has_stripe_managed_account_payment_account_without_account_id(
-        self,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
-    ):
+    async def test_has_stripe_managed_account_payment_account_without_account_id(self):
         # prepare and insert payment_account, update its account_id field as None
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=None
+            payment_account_repo=self.payment_account_repo, account_id=None
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.has_stripe_managed_account(
@@ -794,7 +647,7 @@ class TestSubmitTransfer:
             ]
         )
         # make sure that transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -804,27 +657,22 @@ class TestSubmitTransfer:
             == TransferStatusCodeType.ERROR_NO_GATEWAY_ACCOUNT
         )
 
-    async def test_has_stripe_managed_account_no_sma(
-        self,
-        mocker: pytest_mock.MockFixture,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
-    ):
+    async def test_has_stripe_managed_account_no_sma(self):
         @asyncio.coroutine
         def mock_get_sma(*args):
             return None
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_stripe_managed_account_by_id",
             side_effect=mock_get_sma,
         )
 
         # prepare and insert payment_account and transfer
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.has_stripe_managed_account(
@@ -839,7 +687,7 @@ class TestSubmitTransfer:
             ]
         )
         # make sure that transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -849,28 +697,24 @@ class TestSubmitTransfer:
             == TransferStatusCodeType.ERROR_NO_GATEWAY_ACCOUNT
         )
 
-    async def test_get_stripe_account_id_success(
-        self, payment_account_repo: PaymentAccountRepository
-    ):
+    async def test_get_stripe_account_id_success(self):
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         stripe_id = await self.submit_transfer_operation.get_stripe_account_id(
             payment_account=payment_account
         )
         assert stripe_id
 
-    async def test_get_stripe_account_id_no_account_id(
-        self, payment_account_repo: PaymentAccountRepository
-    ):
+    async def test_get_stripe_account_id_no_account_id(self):
         # prepare and insert payment_account, update its account_id field as None
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=None
+            payment_account_repo=self.payment_account_repo, account_id=None
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.get_stripe_account_id(
@@ -883,23 +727,19 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.INVALID_STRIPE_ACCOUNT.value]
         )
 
-    async def test_get_stripe_account_id_no_sma(
-        self,
-        mocker: pytest_mock.MockFixture,
-        payment_account_repo: PaymentAccountRepository,
-    ):
+    async def test_get_stripe_account_id_no_sma(self):
         @asyncio.coroutine
         def mock_get_sma(*args):
             return None
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.repository.maindb.payment_account.PaymentAccountRepository.get_stripe_managed_account_by_id",
             side_effect=mock_get_sma,
         )
 
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.get_stripe_account_id(
@@ -913,11 +753,7 @@ class TestSubmitTransfer:
         )
 
     async def test_managed_account_balance_check_store_positive_amount_without_ma_transfer(
-        self,
-        mocker: pytest_mock.MockFixture,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
-        managed_account_transfer_repo: ManagedAccountTransferRepository,
+        self
     ):
 
         mocked_balance = mock_balance()  # amount = 20
@@ -926,23 +762,25 @@ class TestSubmitTransfer:
         def mock_retrieve_balance(*args, **kwargs):
             return mocked_balance
 
-        mocker.patch(
+        self.mocker.patch(
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_balance",
             side_effect=mock_retrieve_balance,
         )
 
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
-        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, entity="store", account_id=sma.id
+            payment_account_repo=self.payment_account_repo,
+            entity="store",
+            account_id=sma.id,
         )
         await self.submit_transfer_operation.managed_account_balance_check(
             payment_account=payment_account, transfer_id=transfer.id, amount=1000
         )
-        retrieved_ma_transfer = await managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
+        retrieved_ma_transfer = await self.managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
             transfer_id=transfer.id
         )  # amount_still_needed = 980
         assert retrieved_ma_transfer
@@ -950,23 +788,18 @@ class TestSubmitTransfer:
         assert retrieved_ma_transfer.transfer_id == transfer.id
         assert retrieved_ma_transfer.payment_account_id == payment_account.id
 
-    async def test_validate_payment_account_of_managed_account_transfer_success(
-        self,
-        managed_account_transfer_repo: ManagedAccountTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
-    ):
+    async def test_validate_payment_account_of_managed_account_transfer_success(self):
 
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert transfer to get a random id
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         ma_transfer = await prepare_and_insert_managed_account_transfer(
-            managed_account_transfer_repo=managed_account_transfer_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_account_id=payment_account.id,
             transfer_id=transfer.id,
         )
@@ -977,18 +810,15 @@ class TestSubmitTransfer:
         )
 
     async def test_validate_payment_account_of_managed_account_transfer_no_managed_account_transfer(
-        self,
-        managed_account_transfer_repo: ManagedAccountTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
+        self
     ):
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert transfer to get a random id
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         assert await self.submit_transfer_operation.validate_payment_account_of_managed_account_transfer(
             payment_account=payment_account,
@@ -996,14 +826,7 @@ class TestSubmitTransfer:
             transfer_id=transfer.id,
         )
 
-    async def test_submit_stripe_transfer_success(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        stripe: StripeAsyncClient,
-    ):
+    async def test_submit_stripe_transfer_success(self):
         # mocked out create_for_managed_account
         mocked_payout = mock_payout()
 
@@ -1011,20 +834,20 @@ class TestSubmitTransfer:
         def mock_create_for_managed_account(*args, **kwargs):
             return mocked_payout
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         await self.submit_transfer_operation.submit_stripe_transfer(
             transfer_id=transfer.id,
@@ -1033,7 +856,7 @@ class TestSubmitTransfer:
             submitted_by=123456,
             method=TransferMethodType.STRIPE,
         )
-        retrieved_stripe_transfer = await stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+        retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
             transfer_id=transfer.id
         )
         assert retrieved_stripe_transfer
@@ -1050,25 +873,21 @@ class TestSubmitTransfer:
         )
         assert retrieved_stripe_transfer.submitted_at
         # check transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
         assert retrieved_transfer.submitted_at
         assert retrieved_transfer.submitted_by_id == 123456
 
-    async def test_submit_stripe_transfer_handle_check_transfer(
-        self,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
-    ):
+    async def test_submit_stripe_transfer_handle_check_transfer(self):
         self.mocker.patch("app.commons.runtime.runtime.get_str", return_value="123")
         # prepare and insert payment_account and transfer
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.submit_stripe_transfer(
@@ -1087,25 +906,18 @@ class TestSubmitTransfer:
             ]
         )
 
-    async def test_submit_stripe_transfer_with_stripe_id_raise_exception(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        stripe: StripeAsyncClient,
-    ):
+    async def test_submit_stripe_transfer_with_stripe_id_raise_exception(self):
         # prepare and insert payment_account and transfer
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
 
         # mock out create_stripe_transfer with a non-empty stripe_id so _submit_stripe_transfer will raise exception
         mock_stripe_transfer = await prepare_and_insert_stripe_transfer(
-            stripe_transfer_repo=stripe_transfer_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
             transfer_id=transfer.id,
             stripe_id=str(uuid.uuid4()),
         )
@@ -1114,7 +926,7 @@ class TestSubmitTransfer:
         def mock_create_stripe_transfer(*args, **kwargs):
             return mock_stripe_transfer
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.repository.maindb.stripe_transfer.StripeTransferRepository.create_stripe_transfer",
             side_effect=mock_create_stripe_transfer,
         )
@@ -1136,33 +948,26 @@ class TestSubmitTransfer:
             ]
         )
 
-    async def test_submit_stripe_transfer_no_external_account_in_currency(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        stripe: StripeAsyncClient,
-    ):
+    async def test_submit_stripe_transfer_no_external_account_in_currency(self):
         error = construct_stripe_error(code=StripeErrorCode.NO_EXT_ACCOUNT_IN_CURRENCY)
 
         @asyncio.coroutine
         def mock_create_for_managed_account(*args, **kwargs):
             raise error
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
-        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.submit_stripe_transfer(
@@ -1176,7 +981,7 @@ class TestSubmitTransfer:
         assert e.value.error_code == PayoutErrorCode.STRIPE_PAYOUT_ACCT_MISSING
         assert e.value.error_message == "error_msg"
 
-        retrieved_stripe_transfer = await stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+        retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
             transfer_id=transfer.id
         )
         assert retrieved_stripe_transfer
@@ -1197,35 +1002,28 @@ class TestSubmitTransfer:
         )
         assert retrieved_stripe_transfer.submission_error_type == "error_type"
 
-    async def test_submit_stripe_transfer_payout_not_allowed(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        stripe: StripeAsyncClient,
-    ):
+    async def test_submit_stripe_transfer_payout_not_allowed(self):
         error = construct_stripe_error(code=StripeErrorCode.PAYOUT_NOT_ALLOWED)
 
         @asyncio.coroutine
         def mock_create_for_managed_account(*args, **kwargs):
             raise error
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
 
         with pytest.raises(PayoutError) as e:
@@ -1240,7 +1038,7 @@ class TestSubmitTransfer:
         assert e.value.error_code == PayoutErrorCode.STRIPE_PAYOUT_DISALLOWED
         assert e.value.error_message == "error_msg"
 
-        retrieved_stripe_transfer = await stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+        retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
             transfer_id=transfer.id
         )
         assert retrieved_stripe_transfer
@@ -1261,35 +1059,28 @@ class TestSubmitTransfer:
         )
         assert retrieved_stripe_transfer.submission_error_type == "error_type"
 
-    async def test_submit_stripe_transfer_invalid_request_error(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        stripe: StripeAsyncClient,
-    ):
+    async def test_submit_stripe_transfer_invalid_request_error(self):
         error = construct_stripe_error(error_type=StripeErrorCode.INVALID_REQUEST_ERROR)
 
         @asyncio.coroutine
         def mock_create_for_managed_account(*args, **kwargs):
             raise error
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.submit_stripe_transfer(
@@ -1303,7 +1094,7 @@ class TestSubmitTransfer:
         assert e.value.error_code == PayoutErrorCode.STRIPE_INVALID_REQUEST_ERROR
         assert e.value.error_message == "error_msg"
 
-        retrieved_stripe_transfer = await stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+        retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
             transfer_id=transfer.id
         )
         assert retrieved_stripe_transfer
@@ -1324,33 +1115,26 @@ class TestSubmitTransfer:
             == StripeErrorCode.INVALID_REQUEST_ERROR
         )
 
-    async def test_submit_stripe_transfer_other_exception(
-        self,
-        mocker: pytest_mock.MockFixture,
-        transfer_repo: TransferRepository,
-        stripe_transfer_repo: StripeTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        stripe: StripeAsyncClient,
-    ):
+    async def test_submit_stripe_transfer_other_exception(self):
         error = construct_stripe_error(code="random_exception")
 
         @asyncio.coroutine
         def mock_create_for_managed_account(*args, **kwargs):
             raise error
 
-        mocker.patch(
+        self.mocker.patch(
             "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.create_for_managed_account",
             side_effect=mock_create_for_managed_account,
         )
 
-        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
         # prepare and insert stripe_managed_account
         sma = await prepare_and_insert_stripe_managed_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
         )
         with pytest.raises(PayoutError) as e:
             await self.submit_transfer_operation.submit_stripe_transfer(
@@ -1364,7 +1148,7 @@ class TestSubmitTransfer:
         assert e.value.error_code == PayoutErrorCode.STRIPE_SUBMISSION_ERROR
         assert e.value.error_message == "error_msg"
 
-        retrieved_stripe_transfer = await stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
+        retrieved_stripe_transfer = await self.stripe_transfer_repo.get_latest_stripe_transfer_by_transfer_id(
             transfer_id=transfer.id
         )
         assert retrieved_stripe_transfer
@@ -1383,21 +1167,18 @@ class TestSubmitTransfer:
         assert retrieved_stripe_transfer.submission_error_type == "error_type"
 
     async def test_validate_payment_account_of_managed_account_transfer_id_not_equal(
-        self,
-        managed_account_transfer_repo: ManagedAccountTransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        transfer_repo: TransferRepository,
+        self
     ):
         # prepare and insert payment_account
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         # prepare and insert transfer to get a random id
         transfer = await prepare_and_insert_transfer(
-            transfer_repo=transfer_repo, payment_account_id=payment_account.id
+            transfer_repo=self.transfer_repo, payment_account_id=payment_account.id
         )
         ma_transfer = await prepare_and_insert_managed_account_transfer(
-            managed_account_transfer_repo=managed_account_transfer_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_account_id=111,
             transfer_id=transfer.id,
         )
@@ -1415,7 +1196,7 @@ class TestSubmitTransfer:
         )
 
         # make sure that transfer is updated
-        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
         )
         assert retrieved_transfer
@@ -1425,19 +1206,14 @@ class TestSubmitTransfer:
             == TransferStatusCodeType.ERROR_ACCOUNT_ID_MISMATCH
         )
 
-    async def test_submit_managed_account_transfer_negative_amount(
-        self,
-        transfer_repo: TransferRepository,
-        payment_account_repo: PaymentAccountRepository,
-        managed_account_transfer_repo: ManagedAccountTransferRepository,
-    ):
+    async def test_submit_managed_account_transfer_negative_amount(self):
         # when a managed_account_transfer with negative amount attempts to submit, nothing will happen
-        transfer = await prepare_and_insert_transfer(transfer_repo=transfer_repo)
+        transfer = await prepare_and_insert_transfer(transfer_repo=self.transfer_repo)
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         ma_transfer = await prepare_and_insert_managed_account_transfer(
-            managed_account_transfer_repo=managed_account_transfer_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
             payment_account_id=payment_account.id,
             transfer_id=transfer.id,
             amount=-100,
@@ -1447,16 +1223,14 @@ class TestSubmitTransfer:
         )
         assert (
             ma_transfer
-            == await managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
+            == await self.managed_account_transfer_repo.get_managed_account_transfer_by_transfer_id(
                 transfer_id=transfer.id
             )
         )
 
-    async def test_get_stripe_transfer_metadata_payment_account_and_type_id(
-        self, payment_account_repo: PaymentAccountRepository
-    ):
+    async def test_get_stripe_transfer_metadata_payment_account_and_type_id(self):
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=payment_account_repo
+            payment_account_repo=self.payment_account_repo
         )
         transfer_metadata = self.submit_transfer_operation.get_stripe_transfer_metadata(
             transfer_id=1234,

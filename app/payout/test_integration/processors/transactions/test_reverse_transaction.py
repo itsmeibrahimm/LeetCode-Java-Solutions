@@ -3,7 +3,6 @@ import json
 import pytest
 import pytest_mock
 
-from app.commons.database.infra import DB
 from app.payout.core.exceptions import PayoutError, PayoutErrorCode
 from app.payout.core.transaction.processors.reverse_transaction import (
     ReverseTransactionRequest,
@@ -24,14 +23,6 @@ from app.payout.models import TransactionState
 
 class TestReverseTransactions:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
 
     async def test_reverse_transaction(
         self,

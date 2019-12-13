@@ -4,7 +4,6 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.commons.database.infra import DB
 from app.payout.core.exceptions import (
     PayoutError,
     PayoutErrorCode,
@@ -41,18 +40,6 @@ class TestListTransfers:
         self.payment_account_repo = payment_account_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.mocker = mocker
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
 
     def _construct_list_transfers_op(
         self,

@@ -1,7 +1,6 @@
 import pytest
 from pydantic import ValidationError
 
-from app.commons.database.infra import DB
 from app.payout.repository.bankdb.model.payout_method import (
     PayoutMethodMiscellaneousCreate,
 )
@@ -20,20 +19,6 @@ from app.payout.models import PayoutExternalAccountType
 
 class TestPayoutMethodMiscellaneousRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
-        return PayoutMethodRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_method_miscellaneous_repo(
-        self, payout_bankdb: DB
-    ) -> PayoutMethodMiscellaneousRepository:
-        return PayoutMethodMiscellaneousRepository(database=payout_bankdb)
 
     async def test_unset_default_and_create_payout_method_and_payout_card_success(
         self,

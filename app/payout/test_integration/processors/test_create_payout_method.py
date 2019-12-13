@@ -6,18 +6,12 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.commons.config.app_config import AppConfig
-
-from app.commons.database.infra import DB
-from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import StripeClientSettings
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.test_integration.constants import (
     VISA_DEBIT_CARD_TOKEN,
     BANK_ACCOUNT_TOKEN,
 )
 from app.commons.types import Currency, CountryCode
-from app.commons.utils.pool import ThreadPoolHelper
 from app.payout.core.account.processors.create_payout_method import (
     CreatePayoutMethod,
     CreatePayoutMethodRequest,
@@ -53,51 +47,6 @@ from app.payout.models import PayoutExternalAccountType
 
 class TestCreatePayoutMethod:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payout_card_repo(self, payout_bankdb: DB) -> PayoutCardRepository:
-        return PayoutCardRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
-        return PayoutMethodRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_edit_history_repo(
-        self, payout_bankdb: DB
-    ) -> PaymentAccountEditHistoryRepository:
-        return PaymentAccountEditHistoryRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payout_method_miscellaneous_repo(
-        self, payout_bankdb: DB
-    ) -> PayoutMethodMiscellaneousRepository:
-        return PayoutMethodMiscellaneousRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def stripe_async_client(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
 
     async def test_create_payout_method_card(
         self,

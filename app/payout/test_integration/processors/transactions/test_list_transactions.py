@@ -3,7 +3,6 @@ from typing import List
 import pytest
 import pytest_mock
 
-from app.commons.database.infra import DB
 from app.commons.test_integration.constants import TEST_DEFAULT_PAGE_SIZE
 from app.commons.types import Currency
 from app.payout.core.transaction.processors.list_transactions import (
@@ -35,22 +34,6 @@ import app.payout.models as payout_models
 
 class TestListTransactions:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_repo(self, payout_bankdb: DB) -> PayoutRepository:
-        return PayoutRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
 
     async def test_list_transactions_by_ids(
         self,

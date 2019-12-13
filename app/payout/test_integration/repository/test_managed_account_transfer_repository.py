@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.commons.database.infra import DB
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepository,
 )
@@ -19,16 +18,6 @@ from app.payout.models import ManagedAccountTransferStatus
 
 class TestTransferRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def managed_account_transfer_repo(
-        self, payout_maindb: DB
-    ) -> ManagedAccountTransferRepository:
-        return ManagedAccountTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
 
     async def test_create_managed_account_transfer_success(
         self,

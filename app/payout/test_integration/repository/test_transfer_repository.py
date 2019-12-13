@@ -2,10 +2,7 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from app.commons.database.infra import DB
 from app.payout.repository.maindb.model.transfer import TransferUpdate, TransferStatus
-from app.payout.repository.maindb.payment_account import PaymentAccountRepository
-from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_transfer,
@@ -17,18 +14,6 @@ from app.testcase_utils import validate_expected_items_in_dict
 
 class TestTransferRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
 
     async def test_create_transfer(self, transfer_repo: TransferRepository):
         await prepare_and_insert_transfer(transfer_repo=transfer_repo)

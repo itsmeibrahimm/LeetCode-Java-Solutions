@@ -3,7 +3,6 @@ from typing import List
 import pytest
 import pytest_mock
 
-from app.commons.database.infra import DB
 from app.commons.types import Currency, CountryCode
 from app.payout.core.account.processors.list_payout_methods import (
     ListPayoutMethod,
@@ -23,18 +22,6 @@ from app.payout.test_integration.utils import (
 
 class TestListPayoutMethod:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payout_card_repo(self, payout_bankdb: DB) -> PayoutCardRepository:
-        return PayoutCardRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
-        return PayoutMethodRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_list_payout_method(
         self,

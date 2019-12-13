@@ -35,7 +35,15 @@ from app.payout.repository.bankdb.model.payout import PayoutCreate
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestCreate,
 )
+from app.payout.repository.bankdb.payment_account_edit_history import (
+    PaymentAccountEditHistoryRepository,
+)
 from app.payout.repository.bankdb.payout import PayoutRepository
+from app.payout.repository.bankdb.payout_card import PayoutCardRepository
+from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
+from app.payout.repository.bankdb.payout_method_miscellaneous import (
+    PayoutMethodMiscellaneousRepository,
+)
 from app.payout.repository.bankdb.stripe_managed_account_transfer import (
     StripeManagedAccountTransferRepository,
 )
@@ -43,7 +51,11 @@ from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepository,
 )
 from app.payout.repository.bankdb.transaction import TransactionRepository
+from app.payout.repository.maindb.managed_account_transfer import (
+    ManagedAccountTransferRepository,
+)
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.api import (
     create_account_url,
@@ -87,6 +99,42 @@ def stripe_payout_request_repo(payout_bankdb: DB) -> StripePayoutRequestReposito
 @pytest.fixture
 def transaction_repo(payout_bankdb: DB) -> TransactionRepository:
     return TransactionRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def stripe_transfer_repo(payout_maindb: DB) -> StripeTransferRepository:
+    return StripeTransferRepository(database=payout_maindb)
+
+
+@pytest.fixture
+def payment_account_edit_history_repo(
+    payout_bankdb: DB
+) -> PaymentAccountEditHistoryRepository:
+    return PaymentAccountEditHistoryRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def managed_account_transfer_repo(
+    payout_maindb: DB
+) -> ManagedAccountTransferRepository:
+    return ManagedAccountTransferRepository(database=payout_maindb)
+
+
+@pytest.fixture
+def payout_card_repo(payout_bankdb: DB) -> PayoutCardRepository:
+    return PayoutCardRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def payout_method_repo(payout_bankdb: DB) -> PayoutMethodRepository:
+    return PayoutMethodRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def payout_method_miscellaneous_repo(
+    payout_bankdb: DB
+) -> PayoutMethodMiscellaneousRepository:
+    return PayoutMethodMiscellaneousRepository(database=payout_bankdb)
 
 
 #####################
@@ -194,6 +242,12 @@ def stripe_test(stripe_api, app_config: AppConfig):
             ),
         ]
     )
+
+
+@pytest.fixture
+def mock_set_lock():
+    with mock.patch("aioredlock.redis.Redis.set_lock") as mock_set_lock:
+        yield mock_set_lock
 
 
 @pytest.fixture

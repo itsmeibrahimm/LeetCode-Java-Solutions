@@ -3,12 +3,7 @@ import asyncio
 import pytest
 import pytest_mock
 
-from app.commons.config.app_config import AppConfig
-from app.commons.database.infra import DB
-from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import StripeClientSettings
-from app.commons.utils.pool import ThreadPoolHelper
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.transfer.processors.update_transfer_by_stripe_transfer_status import (
     UpdateTransferByStripeTransferStatus,
     UpdateTransferByStripeTransferStatusRequest,
@@ -35,48 +30,19 @@ class TestUpdateTransferByStripeTransferStatus:
         mocker: pytest_mock.MockFixture,
         transfer_repo: TransferRepository,
         stripe_transfer_repo: StripeTransferRepository,
-        stripe: StripeAsyncClient,
+        stripe_async_client: StripeAsyncClient,
     ):
         self.update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
             logger=mocker.Mock(),
-            stripe=stripe,
+            stripe=stripe_async_client,
             request=UpdateTransferByStripeTransferStatusRequest(transfer_id=12345),
         )
         self.transfer_repo = transfer_repo
         self.stripe_transfer_repo = stripe_transfer_repo
         self.mocker = mocker
-        self.stripe = stripe
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture()
-    def stripe(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
+        self.stripe = stripe_async_client
 
     async def test_update_transfer_status_from_latest_submission_same_status(self):
         # prepare a transfer with status NEW

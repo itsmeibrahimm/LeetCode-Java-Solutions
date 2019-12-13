@@ -4,7 +4,6 @@ import pytest_mock
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.commons.database.infra import DB
 from app.payout.core.account.processors.get_account_stream import (
     GetPayoutAccountStreamRequest,
     GetPayoutAccountStream,
@@ -16,10 +15,6 @@ from app.payout.models import AccountType
 
 class TestGetPayoutAccountStream:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_get_payout_account_stream_empty(
         self,

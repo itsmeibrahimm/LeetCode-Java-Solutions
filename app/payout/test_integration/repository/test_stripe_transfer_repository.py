@@ -1,7 +1,6 @@
 import uuid
 import pytest
 
-from app.commons.database.infra import DB
 from app.payout.repository.maindb.model.stripe_transfer import StripeTransferUpdate
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
@@ -14,14 +13,6 @@ from app.payout.models import StripePayoutStatus
 
 class TestTransferRepository:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
 
     async def test_create_stripe_transfer(
         self,

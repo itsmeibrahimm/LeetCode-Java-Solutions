@@ -5,7 +5,6 @@ import pytest
 import pytest_mock
 from IPython.utils.tz import utcnow
 
-from app.commons.database.infra import DB
 from app.commons.providers.stripe import stripe_models
 from app.commons.providers.stripe.stripe_client import StripeTestClient
 from app.commons.providers.stripe.stripe_models import CreateAccountTokenMetaDataRequest
@@ -39,10 +38,6 @@ from app.payout.models import AccountType
 
 class TestGetPayoutAccount:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_get_payout_account(
         self,

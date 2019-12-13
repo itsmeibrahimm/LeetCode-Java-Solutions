@@ -4,7 +4,6 @@ import pydantic
 from uuid import uuid4
 import json
 
-from app.commons.database.infra import DB
 from app.payout.core.transaction.processors.create_transaction import (
     CreateTransactionRequest,
     CreateTransaction,
@@ -16,14 +15,6 @@ from app.payout.test_integration.utils import prepare_and_insert_payment_account
 
 class TestCreateTransaction:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
 
     async def test_create_transaction(
         self,

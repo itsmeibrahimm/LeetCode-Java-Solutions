@@ -2,7 +2,6 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
-from app.commons.database.infra import DB
 from app.payout.core.account.processors.get_payout_method import (
     GetPayoutMethodRequest,
     GetPayoutMethod,
@@ -25,18 +24,6 @@ from app.payout.test_integration.utils import (
 
 class TestGetPayoutMethod:
     pytestmark = [pytest.mark.asyncio]
-
-    @pytest.fixture
-    def payout_card_repo(self, payout_bankdb: DB) -> PayoutCardRepository:
-        return PayoutCardRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
-        return PayoutMethodRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
 
     async def test_get_payout_method(
         self,

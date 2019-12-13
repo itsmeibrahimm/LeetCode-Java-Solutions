@@ -3,12 +3,7 @@ import asyncio
 import pytest
 import pytest_mock
 
-from app.commons.config.app_config import AppConfig
-from app.commons.database.infra import DB
-from app.commons.providers.stripe.stripe_client import StripeClient, StripeAsyncClient
-from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
-from app.commons.providers.stripe.stripe_models import StripeClientSettings
-from app.commons.utils.pool import ThreadPoolHelper
+from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferResponse,
     SubmitTransferRequest,
@@ -44,7 +39,7 @@ class TestSubmitUnsubmittedTransfer:
         transfer_repo: TransferRepository,
         transaction_repo: TransactionRepository,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
-        stripe: StripeAsyncClient,
+        stripe_async_client: StripeAsyncClient,
     ):
         self.submit_unsubmitted_transfers_operation = SubmitUnsubmittedTransfers(
             transfer_repo=transfer_repo,
@@ -54,7 +49,7 @@ class TestSubmitUnsubmittedTransfer:
             transaction_repo=transaction_repo,
             payment_account_edit_history_repo=payment_account_edit_history_repo,
             logger=mocker.Mock(),
-            stripe=stripe,
+            stripe=stripe_async_client,
             request=SubmitUnsubmittedTransfersRequest(
                 statement_descriptor="statement_descriptor"
             ),
@@ -66,56 +61,7 @@ class TestSubmitUnsubmittedTransfer:
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.mocker = mocker
-        self.stripe = stripe
-
-    @pytest.fixture
-    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
-        return StripeTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
-        return TransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def payment_account_repo(self, payout_maindb: DB) -> PaymentAccountRepository:
-        return PaymentAccountRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def managed_account_transfer_repo(
-        self, payout_maindb: DB
-    ) -> ManagedAccountTransferRepository:
-        return ManagedAccountTransferRepository(database=payout_maindb)
-
-    @pytest.fixture
-    def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
-        return TransactionRepository(database=payout_bankdb)
-
-    @pytest.fixture
-    def payment_account_edit_history_repo(
-        self, payout_bankdb: DB
-    ) -> PaymentAccountEditHistoryRepository:
-        return PaymentAccountEditHistoryRepository(database=payout_bankdb)
-
-    @pytest.fixture()
-    def stripe(self, app_config: AppConfig):
-        stripe_client = StripeClient(
-            settings_list=[
-                StripeClientSettings(
-                    api_key=app_config.STRIPE_US_SECRET_KEY.value, country="US"
-                )
-            ],
-            http_client=TimedRequestsClient(),
-        )
-
-        stripe_thread_pool = ThreadPoolHelper(
-            max_workers=app_config.STRIPE_MAX_WORKERS, prefix="stripe"
-        )
-
-        stripe_async_client = StripeAsyncClient(
-            executor_pool=stripe_thread_pool, stripe_client=stripe_client
-        )
-        yield stripe_async_client
-        stripe_thread_pool.shutdown()
+        self.stripe = stripe_async_client
 
     async def test_execute_submit_unsubmitted_transfers(self):
         transfer_a = await prepare_and_insert_transfer(
