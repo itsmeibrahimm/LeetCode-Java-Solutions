@@ -153,10 +153,7 @@ class WeeklyCreateTransfer(
                         submit_after_creation=True,
                         created_by_id=None,
                     )
-                    msg = create_transfer_task.serialize()
-                    await self.kafka_producer.send_and_wait(
-                        create_transfer_task.topic_name, msg.encode()
-                    )
+                    await create_transfer_task.send(kafka_producer=self.kafka_producer)
                 else:
                     create_transfer_request = CreateTransferRequest(
                         payout_account_id=account_id,

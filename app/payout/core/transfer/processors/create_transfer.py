@@ -218,10 +218,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     retry=False,
                     submitted_by=None,
                 )
-                msg = submit_transfer_task.serialize()
-                await self.kafka_producer.send_and_wait(
-                    submit_transfer_task.topic_name, msg.encode()
-                )
+                await submit_transfer_task.send(kafka_producer=self.kafka_producer)
             else:
                 submit_transfer_request = SubmitTransferRequest(
                     transfer_id=updated_transfer.id,

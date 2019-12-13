@@ -2,6 +2,9 @@ import inspect
 import json
 from typing import Optional, List
 
+from aiokafka import AIOKafkaProducer
+
+from app.commons.context.app_context import AppContext
 from app.payout.models import PayoutTask
 
 
@@ -31,6 +34,13 @@ class BaseTask:
         self.max_retries = max_retries
         self.fn_args = fn_args
         self.fn_kwargs = fn_kwargs
+
+    async def send(self, kafka_producer: AIOKafkaProducer):
+        await kafka_producer.send_and_wait(self.topic_name, self.serialize().encode())
+
+    @staticmethod
+    async def run(app_context: AppContext, data: dict):
+        pass
 
     def serialize(self) -> str:
         data = {

@@ -152,10 +152,8 @@ class TestKafkaWorker:
             whitelist_payment_account_ids=[payment_account.id],
             exclude_recently_updated_accounts=False,
         )
-
-        msg = weekly_create_transfer_task.serialize()
-        await app_context.kafka_producer.send_and_wait(
-            weekly_create_transfer_task.topic_name, msg.encode()
+        await weekly_create_transfer_task.send(
+            kafka_producer=app_context.kafka_producer
         )
 
         payout_worker = KafkaWorker(
