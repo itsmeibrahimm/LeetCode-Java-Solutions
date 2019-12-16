@@ -13,7 +13,7 @@ logger = init_logger
 
 def init_worker_resources(
     app_config: AppConfig, pool_name: str, pool_size: int
-) -> Tuple[AppConfig, AppContext, JobPool]:
+) -> Tuple[AppContext, JobPool]:
     """
 
     :return: a tuple containing the app config, a pared version of the web app_context and a job pool for executing
@@ -44,4 +44,4 @@ def init_worker_resources(
     # syncing stripe client pool with jobpool to achieve optimal concurrency
     job_pool = JobPool.create_pool(size=pool_size, name=pool_name)
 
-    return app_config, app_context, job_pool
+    return app_context, job_pool

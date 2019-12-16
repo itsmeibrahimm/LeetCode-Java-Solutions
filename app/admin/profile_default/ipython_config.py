@@ -5,6 +5,8 @@ c.InteractiveShellApp.exec_lines = [
     "from datetime import *",
     "from app.commons.context.logger import get_logger",
     "from app.commons.jobs.startup_util import init_worker_resources",
-    '(app_config, app_context, stripe_pool) = init_worker_resources(pool_name="stripe")',
+    "from app.commons.config.utils import init_app_config_for_payin_cron",
+    "app_config=init_app_config_for_payin_cron()",
+    '(app_context, stripe_pool)=init_worker_resources(app_config=app_config,pool_name="admin",pool_size=app_config.PAYIN_CRON_JOB_POOL_DEFAULT_SIZE)',
     'logger = get_logger("admin")',
 ]

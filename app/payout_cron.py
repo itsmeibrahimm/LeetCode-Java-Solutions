@@ -68,7 +68,7 @@ def scheduler_heartbeat(statsd_client: DoorStatsProxyMultiServer) -> None:
 
 app_config = init_app_config_for_payout_cron()
 
-(app_config, app_context, job_pool) = init_worker_resources(
+(app_context, job_pool) = init_worker_resources(
     app_config=app_config,
     pool_name="payout_cron",
     pool_size=app_config.PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE,
