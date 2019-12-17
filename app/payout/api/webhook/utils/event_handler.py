@@ -163,6 +163,7 @@ async def _syncing_events_to_db(
             if status in {
                 InstantPayoutStatusType.FAILED.value,
                 InstantPayoutStatusType.CANCELLED.value,
+                InstantPayoutStatusType.CANCELED.value,
             }:
                 log.info(
                     "[Payment Service Webhook] detaching transactions due to failed payout by webhook",

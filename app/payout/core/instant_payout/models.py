@@ -19,6 +19,9 @@ class InstantPayoutStatusType(str, Enum):
     PENDING = "pending"  # When submitted to PGP
     PAID = "paid"  # When PGP return paid
     CANCELLED = "cancelled"  # When PGP return cancelled
+    CANCELED = (
+        "canceled"
+    )  # When PGP return canceled (Stripe returning status is `canceled`)
     FAILED = "failed"  # When PGP return failed
     ERROR = "error"  # When there is error submitting instant payout
 
