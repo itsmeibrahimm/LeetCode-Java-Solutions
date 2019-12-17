@@ -2,6 +2,7 @@ import inspect
 import json
 import logging
 from typing import Optional
+from uuid import uuid4
 
 from aiokafka import AIOKafkaProducer
 
@@ -26,11 +27,20 @@ class BaseTask:
     max_retries: int
     attempts: int
     fn_args: list
+    task_id: Optional[str]
     fn_kwargs: Optional[dict] = None
 
     def __init__(
-        self, topic_name, task_type, max_retries, attempts, fn_args, fn_kwargs
+        self,
+        topic_name,
+        task_type,
+        max_retries,
+        attempts,
+        fn_args,
+        fn_kwargs,
+        task_id=str(uuid4()),
     ):
+        self.task_id = task_id
         self.topic_name = topic_name
         self.task_type = task_type
         self.max_retries = max_retries
@@ -78,7 +88,11 @@ class BaseTask:
                 if self.attempts < self.max_retries:
                     log.info(
                         "[BaseTask execute] task execution failure. Retrying.",
-                        extra={"attempts": self.attempts, "task_type": self.task_type},
+                        extra={
+                            "attempts": self.attempts,
+                            "task_type": self.task_type,
+                            "task_id": self.task_id,
+                        },
                         exc_info=e,
                     )
                     self.attempts += 1
@@ -89,6 +103,7 @@ class BaseTask:
                         extra={
                             "max_retries": self.max_retries,
                             "task_type": self.task_type,
+                            "task_id": self.task_id,
                         },
                     )
 
@@ -96,7 +111,7 @@ class BaseTask:
         else:
             log.warning(
                 "[BaseTask execute] Unsupported task type.",
-                extra={"task_type": data["task_type"]},
+                extra={"task_type": data["task_type"], "task_id": self.task_id},
             )
 
     async def send(self, kafka_producer: AIOKafkaProducer):
@@ -112,6 +127,7 @@ class BaseTask:
             "task_type": self.task_type,
             "max_retries": self.max_retries,
             "attempts": self.attempts,
+            "task_id": self.task_id,
             "fn_args": self.fn_args,
             "fn_kwargs": self.fn_kwargs,
         }

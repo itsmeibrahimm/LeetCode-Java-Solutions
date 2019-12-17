@@ -38,12 +38,12 @@ class WeeklyCreateTransferTask(BaseTask):
         attempts: int = 0
         fn_args: list = []
         super().__init__(
-            self.topic_name,
-            self.task_type,
-            max_retries,
-            attempts,
-            fn_args,
-            normalize_task_arguments(inspect.currentframe()),
+            topic_name=self.topic_name,
+            task_type=self.task_type,
+            max_retries=max_retries,
+            attempts=attempts,
+            fn_args=fn_args,
+            fn_kwargs=normalize_task_arguments(inspect.currentframe()),
         )
 
     @staticmethod
