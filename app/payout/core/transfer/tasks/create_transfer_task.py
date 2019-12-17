@@ -35,14 +35,14 @@ class CreateTransferTask(BaseTask):
     ):
         self.topic_name = "payment_payout"
         self.task_type = PayoutTask.CREATE_TRANSFER
-        auto_retry_for: List[Exception] = []
-        max_retries: int = 0
+        max_retries: int = 5
+        attempts: int = 0
         fn_args: list = []
         super().__init__(
             self.topic_name,
             self.task_type,
-            auto_retry_for,
             max_retries,
+            attempts,
             fn_args,
             normalize_task_arguments(inspect.currentframe()),
         )

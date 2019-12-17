@@ -1,5 +1,5 @@
 import inspect
-from typing import Optional, List
+from typing import Optional
 from uuid import uuid4
 
 from app.commons.context.app_context import AppContext
@@ -32,14 +32,14 @@ class SubmitTransferTask(BaseTask):
     ):
         self.topic_name = "payment_stripe"
         self.task_type = PayoutTask.SUBMIT_TRANSFER
-        auto_retry_for: List[Exception] = []
         max_retries: int = 0
+        attempts: int = 5
         fn_args: list = []
         super().__init__(
             self.topic_name,
             self.task_type,
-            auto_retry_for,
             max_retries,
+            attempts,
             fn_args,
             normalize_task_arguments(inspect.currentframe()),
         )

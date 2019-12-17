@@ -9,12 +9,16 @@ from kafka.errors import UnknownTopicOrPartitionError
 
 from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext
+from app.commons.core.errors import DBOperationError
 from app.commons.database.infra import DB
 from app.commons.kafka import KafkaWorker
 from app.payout import tasks
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferResponse,
     SubmitTransferRequest,
+)
+from app.payout.core.transfer.processors.weekly_create_transfer import (
+    WeeklyCreateTransferRequest,
 )
 from app.payout.core.transfer.tasks.weekly_create_transfer_task import (
     WeeklyCreateTransferTask,
@@ -189,3 +193,65 @@ class TestKafkaWorker:
             retry=False,
             submitted_by=None,
         )
+
+    async def test_weekly_create_transfer_retry(
+        self,
+        app_context: AppContext,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repo: PaymentAccountRepository,
+        transaction_repo: TransactionRepository,
+    ):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+
+        @asyncio.coroutine
+        def mock_execute_weekly_create_transfer(*args, **kwargs):
+            raise DBOperationError("test error")
+
+        mocker.patch(
+            "app.payout.core.transfer.processors.weekly_create_transfer.WeeklyCreateTransfer.execute",
+            side_effect=mock_execute_weekly_create_transfer,
+        )
+        mocked_init_weekly_create_transfer = mocker.patch.object(
+            WeeklyCreateTransferRequest, "__init__", return_value=None
+        )
+        mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+
+        end_time = datetime.now(timezone.utc).isoformat()
+        unpaid_txn_start_time = (datetime.utcnow() - timedelta(days=1)).isoformat()
+        weekly_create_transfer_task = WeeklyCreateTransferTask(
+            payout_day=PayoutDay.MONDAY,
+            payout_countries=[],
+            end_time=end_time,
+            unpaid_txn_start_time=unpaid_txn_start_time,
+            whitelist_payment_account_ids=[payment_account.id],
+            exclude_recently_updated_accounts=False,
+        )
+        await weekly_create_transfer_task.send(
+            kafka_producer=app_context.kafka_producer
+        )
+
+        payout_worker = KafkaWorker(
+            app_context=app_context,
+            topic_name=self.payout_topic_name,
+            kafka_url=self.kafka_url,
+            processor=tasks.process_message,
+            num_consumers=1,
+        )
+        await payout_worker.start()
+
+        # Stopping workers with graceful timeout set to 3 seconds
+        await payout_worker.stop(graceful_timeout_seconds=3)
+
+        # call_count should be max_retries + 1 (1 for producer)
+        for i in range(6):
+            assert mocked_init_weekly_create_transfer.call_args_list[i][1] == {
+                "payout_day": PayoutDay.MONDAY,
+                "payout_countries": [],
+                "end_time": end_time,
+                "unpaid_txn_start_time": unpaid_txn_start_time,
+                "whitelist_payment_account_ids": [payment_account.id],
+                "exclude_recently_updated_accounts": False,
+            }
+        assert mocked_init_weekly_create_transfer.call_count == 6
