@@ -10,7 +10,10 @@ from freezegun import freeze_time
 from stripe.error import InvalidRequestError, StripeError
 
 from app.commons.providers.errors import StripeCommandoError
-from app.commons.providers.stripe.stripe_models import StripeCreatePaymentIntentRequest
+from app.commons.providers.stripe.stripe_models import (
+    StripeCreatePaymentIntentRequest,
+    PaymentMethod as StripePaymentMethod,
+)
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.conftest import PaymentIntentFactory, PgpPaymentIntentFactory
 from app.payin.core.cart_payment.model import (
@@ -1184,6 +1187,57 @@ class TestCartPaymentInterface:
         assert not result_intent.capture_after
 
     @pytest.mark.asyncio
+    async def test_clone_payment_method(self, cart_payment_interface):
+        intent = generate_payment_intent(status=IntentStatus.INIT.value)
+        mocked_payment_method = create_autospec(StripePaymentMethod)
+        mocked_payment_method.id = "cloned_payment_method_id"
+        cart_payment_interface.stripe_async_client.clone_payment_method = FunctionMock(
+            return_value=mocked_payment_method
+        )
+        provider_payment_method_id = await cart_payment_interface._clone_payment_method(
+            payment_intent_id=intent.id,
+            provider_payment_method_id="payment_resource_id",
+            provider_customer_id="customer_resource_id",
+            source_country=CountryCode.CA,
+            destination_country=CountryCode.US,
+        )
+        assert provider_payment_method_id == "cloned_payment_method_id"
+
+    @pytest.mark.asyncio
+    async def test_clone_payment_method_errors(self, cart_payment_interface):
+        # StripeError case
+        intent = generate_payment_intent(status=IntentStatus.INIT.value)
+        cart_payment_interface.stripe_async_client.clone_payment_method = FunctionMock(
+            side_effect=StripeError()
+        )
+        with pytest.raises(CartPaymentCreateError) as e:
+            await cart_payment_interface._clone_payment_method(
+                payment_intent_id=intent.id,
+                provider_payment_method_id="payment_resource_id",
+                provider_customer_id="customer_resource_id",
+                source_country=CountryCode.CA,
+                destination_country=CountryCode.US,
+            )
+        assert (
+            e.value.error_code
+            == PayinErrorCode.PAYMENT_INTENT_CREATE_CROSS_COUNTRY_PAYMENT_METHOD_ERROR
+        )
+
+        # General exception case
+        cart_payment_interface.stripe_async_client.clone_payment_method = FunctionMock(
+            side_effect=Exception()
+        )
+        with pytest.raises(CartPaymentCreateError) as e:
+            await cart_payment_interface._clone_payment_method(
+                payment_intent_id=intent.id,
+                provider_payment_method_id="payment_resource_id",
+                provider_customer_id="customer_resource_id",
+                source_country=CountryCode.CA,
+                destination_country=CountryCode.US,
+            )
+        assert e.value.error_code == PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR
+
+    @pytest.mark.asyncio
     async def test_submit_payment_to_provider(self, cart_payment_interface):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
@@ -1540,7 +1594,9 @@ class TestCartPaymentInterface:
 
     @pytest.mark.asyncio
     @pytest.mark.skip("Not yet implemented")
-    async def test_get_required_payment_resource_ids(self, cart_payment_interface):
+    async def test_get_pgp_payment_method_by_legacy_payment(
+        self, cart_payment_interface
+    ):
         # TODO
         pass
 

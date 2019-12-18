@@ -42,6 +42,7 @@ _payin_error_message_maps = {
     "payin_48": "Invalid split payment payout account.  This is account is not configured correctly for payment use.",
     "payin_49": "Cannot create payment.  Payment card cvc incorrect.",
     "payin_50": "Cannot create payment.  Payment creation failed.",
+    "payin_51": "Unable to establish payment method for cross country payment.",
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
@@ -226,6 +227,11 @@ class PayinErrorCode(str, Enum):
         "payin_50",
         SHOULD_RETRY,
         "Cannot create payment.  Payment creation failed.",
+    )
+    PAYMENT_INTENT_CREATE_CROSS_COUNTRY_PAYMENT_METHOD_ERROR = (
+        "payin_51",
+        NO_RETRY,
+        "Unable to establish payment method for cross country payment.",
     )
     PAYMENT_METHOD_CREATE_INVALID_DATA = (
         "payin_20",

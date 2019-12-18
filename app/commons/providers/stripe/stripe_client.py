@@ -1108,7 +1108,7 @@ class StripeAsyncClient:
 
     async def clone_payment_method(
         self, request: models.ClonePaymentMethodRequest, country: CountryCode
-    ):
+    ) -> models.PaymentMethod:
         return await self.executor_pool.submit(
             self.stripe_client.clone_payment_method, request=request, country=country
         )

@@ -881,6 +881,51 @@ class CartPaymentInterface:
 
         return payment_intent, pgp_payment_intent
 
+    async def _clone_payment_method(
+        self,
+        payment_intent_id: uuid.UUID,
+        provider_payment_method_id: PaymentMethodId,
+        provider_customer_id: CustomerId,
+        source_country: CountryCode,
+        destination_country: CountryCode,
+    ) -> PaymentMethodId:
+        # Clone a payment method for use in another country.  Return the ID of the cloned payment method.
+        try:
+            cloned_provider_payment_method = await self.stripe_async_client.clone_payment_method(
+                request=ClonePaymentMethodRequest(
+                    payment_method=provider_payment_method_id,
+                    customer=provider_customer_id,
+                    stripe_account=STRIPE_PLATFORM_ACCOUNT_IDS[destination_country],
+                ),
+                country=source_country,
+            )
+            return PaymentMethodId(cloned_provider_payment_method.id)
+        except StripeError as e:
+            self.req_context.log.exception(
+                "[_clone_payment_method] Could not clone payment method",
+                payment_intent_id=payment_intent_id,
+                stripe_error_code=e.code,
+            )
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_CROSS_COUNTRY_PAYMENT_METHOD_ERROR,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ) from e
+        except Exception as e:
+            self.req_context.log.exception(
+                "[_clone_payment_method] Error invoking provider to clone payment method",
+                payment_intent_id=payment_intent_id,
+            )
+            raise CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            ) from e
+
     async def submit_payment_to_provider(
         self,
         *,
@@ -890,36 +935,32 @@ class CartPaymentInterface:
         pgp_payment_method: PgpPaymentMethod,
         provider_description: Optional[str],
     ) -> ProviderPaymentIntent:
-        #
-        # If the country for the payment intent does not match the country in which the payer is, then the payment
-        # method needs to be converted into a payment method that can be used in the pgp account for that country as
-        # payment methods are pgp account-specific
-        #
         self.req_context.log.info(
             "[submit_payment_to_provider][start]",
             payment_intent=payment_intent.summary,
             pgp_payment_intent=pgp_payment_intent.summary,
         )
+
+        # If the country for the payment intent does not match the country in which the payer is, then the payment
+        # method needs to be converted into a payment method that can be used in the pgp account for that country as
+        # payment methods are pgp account-specific
+        # TODO(update to use pgp_customer.country when that model exists)
         pgp_payment_method_resource_id: PaymentMethodId = PaymentMethodId(
             pgp_payment_method.pgp_payment_method_resource_id
         )
         pgp_customer_resource_id: Optional[
             PgpPayerResourceId
         ] = pgp_payment_method.pgp_payer_resource_id
-        # TODO(update to use pgp_customer.country when that model exists)
         if payment_intent.country != payer_country:
-            pgp_payment_method_resource_id = (
-                await self.stripe_async_client.clone_payment_method(
-                    request=ClonePaymentMethodRequest(
-                        payment_method=pgp_payment_method_resource_id,
-                        customer=CustomerId(pgp_payment_method.pgp_payer_resource_id),
-                        stripe_account=STRIPE_PLATFORM_ACCOUNT_IDS[
-                            payment_intent.country
-                        ],
-                    ),
-                    country=payer_country,
-                )
-            ).id
+            pgp_payment_method_resource_id = await self._clone_payment_method(
+                payment_intent_id=payment_intent.id,
+                provider_payment_method_id=pgp_payment_method_resource_id,
+                provider_customer_id=CustomerId(
+                    pgp_payment_method.pgp_payer_resource_id
+                ),
+                source_country=payer_country,
+                destination_country=payment_intent.country,
+            )
             pgp_customer_resource_id = None
 
         # For retrieval of payment intent as a part of the webhook
@@ -1823,7 +1864,7 @@ class CartPaymentInterface:
         # if not found, still check here since we have to support the legacy payment case.
         if not provider_payer_id:
             self.req_context.log.warning(
-                "[get_required_payment_resource_ids] No payer pgp resource ID found."
+                "[get_pgp_payment_method_by_legacy_payment] No payer pgp resource ID found."
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
@@ -1835,7 +1876,7 @@ class CartPaymentInterface:
 
         if not provider_payment_method_id:
             self.req_context.log.warning(
-                "[get_required_payment_resource_ids] No payment method pgp resource ID found."
+                "[get_pgp_payment_method_by_legacy_payment] No payment method pgp resource ID found."
             )
             raise CartPaymentCreateError(
                 error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
@@ -3358,7 +3399,7 @@ class CartPaymentProcessor:
             )
         except CartPaymentCreateError as e:
             # If any error occurs reaching out to the provider, cart_payment_interface.submit_payment_to_provider throws an exception
-            # of type CartPaymentCreateError.  In this case, update state in our system accordingly
+            # of type CartPaymentCreateError.  In this case, update state in our system accordingly.
             await self._update_state_after_provider_error(
                 creation_exception=e,
                 payment_intent=payment_intent,
@@ -3366,6 +3407,23 @@ class CartPaymentProcessor:
                 legacy_stripe_charge=legacy_stripe_charge,
             )
             raise
+        except Exception as e:
+            # cart_payment_interface.submit_payment_to_provider should throw a CartPaymentCreateError, but to be sure we mark intent as failed,
+            # we handle generic exceptions as well.
+            creation_exception = CartPaymentCreateError(
+                error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_ERROR,
+                provider_charge_id=None,
+                provider_error_code=None,
+                provider_decline_code=None,
+                has_provider_error_details=False,
+            )
+            await self._update_state_after_provider_error(
+                creation_exception=creation_exception,
+                payment_intent=payment_intent,
+                pgp_payment_intent=pgp_payment_intent,
+                legacy_stripe_charge=legacy_stripe_charge,
+            )
+            raise creation_exception from e
 
         # Update state of payment in our system now that payment exists in provider.
 
