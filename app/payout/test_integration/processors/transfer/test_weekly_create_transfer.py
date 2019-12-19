@@ -7,6 +7,8 @@ import pytest_mock
 from app.commons.context.app_context import AppContext
 
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.conftest import RuntimeSetter
+from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
 from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferResponse,
     CreateTransferRequest,
@@ -142,7 +144,9 @@ class TestWeeklyCreateTransfer:
             == payment_account.id
         )
 
-    async def test_execute_weekly_create_transfer_no_ato_check(self):
+    async def test_execute_weekly_create_transfer_no_ato_check(
+        self, runtime_setter: RuntimeSetter
+    ):
         sma = await prepare_and_insert_stripe_managed_account(
             payment_account_repo=self.payment_account_repo
         )
@@ -155,6 +159,7 @@ class TestWeeklyCreateTransfer:
         transaction_b = await prepare_and_insert_transaction(
             transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
         )
+        runtime_setter.set(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False)
 
         @asyncio.coroutine
         def mock_get_payment_account_ids(*args, **kwargs):
@@ -197,6 +202,7 @@ class TestWeeklyCreateTransfer:
         assert retrieved_transaction_a
         assert retrieved_transaction_b
         transfer_id = retrieved_transaction_a.transfer_id
+        assert transfer_id
         assert transfer_id == retrieved_transaction_b.transfer_id
 
         retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
@@ -212,10 +218,13 @@ class TestWeeklyCreateTransfer:
             method="stripe", retry=False, submitted_by=None, transfer_id=transfer_id
         )
 
-    async def test_execute_weekly_create_transfer_with_whitelist_payment_accounts(self):
+    async def test_execute_weekly_create_transfer_with_whitelist_payment_accounts(
+        self, runtime_setter: RuntimeSetter
+    ):
         payment_account = await prepare_and_insert_payment_account(
             payment_account_repo=self.payment_account_repo
         )
+        runtime_setter.set(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False)
 
         @asyncio.coroutine
         def mock_execute_create_transfer(*args, **kwargs):

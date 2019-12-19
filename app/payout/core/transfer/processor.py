@@ -140,6 +140,7 @@ class TransferProcessors:
             payment_account_repo=self.payment_account_repo,
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
         )
         return await submit_unsubmitted_transfers_op.execute()
 

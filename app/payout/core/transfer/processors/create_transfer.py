@@ -22,6 +22,7 @@ from app.payout.constants import (
     DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME,
     DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME,
     FRAUD_MX_AUTO_PAYMENT_DELAYED_RECENT_BANK_CHANGE,
+    ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT,
 )
 from app.payout.core.account.utils import (
     get_country_shortname,
@@ -209,9 +210,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                 transfer_id=updated_transfer.id, data=update_transfer_request
             )
         if self.request.submit_after_creation and updated_transfer:
-            if runtime.get_bool(
-                "payout/feature-flags/enable_queueing_mechanism.bool", False
-            ):
+            if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                 submit_transfer_task = SubmitTransferTask(
                     transfer_id=updated_transfer.id,
                     method=payout_models.TransferMethodType.STRIPE,
@@ -326,7 +325,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     ) -> Tuple[Optional[Transfer], List[int]]:
         # lock_name should be the same as the one for instant payout
         lock_name = get_payout_account_lock_name(payment_account_id)
-        # todo: PAYOUT-411: add retry when exception raised
         async with PaymentLock(lock_name, self.payment_lock_manager):
             return await self.create_with_redis_lock(
                 payment_account_id=payment_account_id,

@@ -12,6 +12,7 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
 from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
     CreateTransfer,
@@ -140,9 +141,7 @@ class WeeklyCreateTransfer(
         transfer_count = 0
         for account_id in payment_account_ids:
             try:
-                if runtime.get_bool(
-                    "payout/feature-flags/enable_queueing_mechanism.bool", False
-                ):
+                if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                     # put create_transfer into queue
                     create_transfer_task = CreateTransferTask(
                         payout_account_id=account_id,

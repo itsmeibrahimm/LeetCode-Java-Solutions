@@ -38,6 +38,10 @@ DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME = (
 
 DEFAULT_USER_EMAIL_FOR_SUPERPOWERS = "20156288"  # niket@doordash.com
 
+ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT = (
+    "payout/feature-flags/enable_queueing_mechanism.bool"
+)
+
 # transfer submission
 ATTEMPTED_COUNT_STAT = "attempted-count"
 ATTEMPTED_AMOUNT_STAT = "attempted-amount"

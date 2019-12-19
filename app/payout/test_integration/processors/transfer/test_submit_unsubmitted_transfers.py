@@ -3,7 +3,9 @@ import asyncio
 import pytest
 import pytest_mock
 
+from app.commons.context.app_context import AppContext
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
+from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferResponse,
     SubmitTransferRequest,
@@ -24,6 +26,7 @@ from app.payout.repository.maindb.payment_account import PaymentAccountRepositor
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import prepare_and_insert_transfer
+from app.conftest import RuntimeSetter
 
 
 class TestSubmitUnsubmittedTransfer:
@@ -40,6 +43,7 @@ class TestSubmitUnsubmittedTransfer:
         transaction_repo: TransactionRepository,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
         stripe_async_client: StripeAsyncClient,
+        app_context: AppContext,
     ):
         self.submit_unsubmitted_transfers_operation = SubmitUnsubmittedTransfers(
             transfer_repo=transfer_repo,
@@ -50,6 +54,7 @@ class TestSubmitUnsubmittedTransfer:
             payment_account_edit_history_repo=payment_account_edit_history_repo,
             logger=mocker.Mock(),
             stripe=stripe_async_client,
+            kafka_producer=app_context.kafka_producer,
             request=SubmitUnsubmittedTransfersRequest(
                 statement_descriptor="statement_descriptor"
             ),
@@ -62,8 +67,11 @@ class TestSubmitUnsubmittedTransfer:
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.mocker = mocker
         self.stripe = stripe_async_client
+        self.kafka_producer = app_context.kafka_producer
 
-    async def test_execute_submit_unsubmitted_transfers(self):
+    async def test_execute_submit_unsubmitted_transfers(
+        self, runtime_setter: RuntimeSetter
+    ):
         transfer_a = await prepare_and_insert_transfer(
             transfer_repo=self.transfer_repo, status=TransferStatus.NEW
         )
@@ -71,6 +79,8 @@ class TestSubmitUnsubmittedTransfer:
             transfer_repo=self.transfer_repo, status=TransferStatus.NEW
         )
         transfers = [transfer_a.id, transfer_b.id]
+
+        runtime_setter.set(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False)
 
         @asyncio.coroutine
         def mock_get_unsubmitted_transfer_ids(*args, **kwargs):
@@ -90,6 +100,7 @@ class TestSubmitUnsubmittedTransfer:
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             logger=self.mocker.Mock(),
             stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
             request=SubmitUnsubmittedTransfersRequest(
                 statement_descriptor="statement_descriptor"
             ),
@@ -108,21 +119,9 @@ class TestSubmitUnsubmittedTransfer:
         )
         await self.submit_unsubmitted_transfers_operation._execute()
         mocked_init_submit_transfer.assert_any_call(
-            method="stripe",
-            retry=True,
-            statement_descriptor="statement_descriptor",
-            submitted_by=None,
-            target_id=None,
-            target_type=None,
-            transfer_id=transfer_a.id,
+            method="stripe", retry=True, submitted_by=None, transfer_id=transfer_a.id
         )
         mocked_init_submit_transfer.assert_any_call(
-            method="stripe",
-            retry=True,
-            statement_descriptor="statement_descriptor",
-            submitted_by=None,
-            target_id=None,
-            target_type=None,
-            transfer_id=transfer_b.id,
+            method="stripe", retry=True, submitted_by=None, transfer_id=transfer_b.id
         )
         assert mocked_init_submit_transfer.call_count == len(transfers)
