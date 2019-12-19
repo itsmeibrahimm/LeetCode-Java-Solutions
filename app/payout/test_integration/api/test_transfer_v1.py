@@ -8,6 +8,7 @@ from app.payout.test_integration.api import (
     submit_transfer_url,
     list_transfers_url,
     create_transfer_url,
+    update_transfer_url,
 )
 
 
@@ -211,3 +212,30 @@ class TestTransferV1:
         response_dict: dict = response.json()
         assert response_dict["count"] >= 1
         assert transfer in response_dict["transfer_list"]
+
+    def test_create_then_update_transfer(
+        self,
+        client: TestClient,
+        verified_payout_account: dict,
+        new_transaction: dict,
+        transfer: dict,
+    ):
+        assert transfer["status"] == "new"
+        update_transfer_req = {"status": "pending"}
+        response = client.post(
+            update_transfer_url(transfer_id=transfer["id"]), json=update_transfer_req
+        )
+        assert response.status_code == 200
+        updated_transfer: dict = response.json()
+        assert updated_transfer["id"] == transfer["id"]
+        assert updated_transfer["status"] == "pending"
+
+    def test_update_transfer_not_found(self, client: TestClient):
+        update_transfer_req = {"status": "pending"}
+        response = client.post(
+            update_transfer_url(transfer_id=-1), json=update_transfer_req
+        )
+        assert response.status_code == 400
+        error: dict = response.json()
+        assert error["error_code"] == PayoutErrorCode.TRANSFER_NOT_FOUND
+        assert not error["retryable"]

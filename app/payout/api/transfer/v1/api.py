@@ -21,6 +21,7 @@ from app.payout.core.transfer.processors.get_transfer_by_id import (
 )
 from app.payout.core.transfer.processors.list_transfers import ListTransfersRequest
 from app.payout.core.transfer.processors.submit_transfer import SubmitTransferRequest
+from app.payout.core.transfer.processors.update_transfer import UpdateTransferRequest
 from app.payout.models import TransferId, TimeRange
 from app.payout.service import create_transfer_processors
 
@@ -104,6 +105,29 @@ async def submit_transfer(
         submit_transfer_request
     )
     return transfer_models.SubmitTransferResponse(**submit_transfer_response.dict())
+
+
+@router.post(
+    "/{transfer_id}",
+    operation_id="UpdateTransfer",
+    status_code=HTTP_200_OK,
+    responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
+    tags=api_tags,
+)
+async def update_transfer(
+    transfer_id: TransferId = Path(..., description="Transfer ID"),
+    body: transfer_models.UpdateTransfer = Body(
+        ..., description="Update transfer request body"
+    ),
+    transfer_processors: TransferProcessors = Depends(create_transfer_processors),
+):
+    update_transfer_request = UpdateTransferRequest(
+        transfer_id=transfer_id, status=body.status
+    )
+    update_transfer_response = await transfer_processors.update_transfer(
+        update_transfer_request
+    )
+    return transfer_models.Transfer(**update_transfer_response.transfer.dict())
 
 
 @router.get(

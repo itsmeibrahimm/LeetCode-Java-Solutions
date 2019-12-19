@@ -43,6 +43,14 @@ class CreateTransfer(PaymentRequest):
     )
 
 
+class UpdateTransfer(PaymentRequest):
+    """
+    Request model for updating a transfer
+    """
+
+    status: str = Schema(default=..., description="Transfer status to update")
+
+
 class SubmitTransferResponse(PaymentResponse):
     pass
 

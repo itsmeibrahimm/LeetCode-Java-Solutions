@@ -22,6 +22,10 @@ from app.payout.core.transfer.processors.submit_unsubmitted_transfers import (
     SubmitUnsubmittedTransfers,
     SubmitUnsubmittedTransfersRequest,
 )
+from app.payout.core.transfer.processors.update_transfer import (
+    UpdateTransferRequest,
+    UpdateTransfer,
+)
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepositoryInterface,
 )
@@ -150,3 +154,9 @@ class TransferProcessors:
             request=request, transfer_repo=self.transfer_repo
         )
         return await list_transfers_op.execute()
+
+    async def update_transfer(self, request: UpdateTransferRequest):
+        update_transfer_op = UpdateTransfer(
+            request=request, transfer_repo=self.transfer_repo
+        )
+        return await update_transfer_op.execute()

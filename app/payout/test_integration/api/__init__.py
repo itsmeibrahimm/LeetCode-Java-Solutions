@@ -59,6 +59,10 @@ def create_transfer_url():
     return TRANSFER_ENDPOINT + "/"
 
 
+def update_transfer_url(transfer_id: int):
+    return f"{TRANSFER_ENDPOINT}/{transfer_id}"
+
+
 def get_transfer_by_id_url(transfer_id: int):
     return f"{TRANSFER_ENDPOINT}/{transfer_id}"
 
