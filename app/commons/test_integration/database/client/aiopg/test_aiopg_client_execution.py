@@ -1,3 +1,4 @@
+from asyncio import CancelledError
 from concurrent.futures import TimeoutError as ConcurrentTimeoutError
 from collections import Sequence
 from datetime import datetime
@@ -12,7 +13,7 @@ from app.payout.repository.maindb.model import payment_accounts
 pytestmark = [pytest.mark.asyncio]
 
 
-_CONNECTION_TIMEOUT_SEC = 1
+_CONNECTION_TIMEOUT_SEC = 3
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ async def payout_maindb_aio_engine(app_config: AppConfig):
         minsize=2,
         maxsize=2,
         debug=True,
-        connection_timeout_sec=_CONNECTION_TIMEOUT_SEC,
+        default_client_stmt_timeout_sec=_CONNECTION_TIMEOUT_SEC,
     )
     await engine.connect()
     async with engine:
@@ -40,6 +41,37 @@ async def test_client_side_execution_timeout_via_connection_timeout(
         )
 
     assert isinstance(e.value, ConcurrentTimeoutError)
+
+    with pytest.raises(BaseException) as e:
+        async with payout_maindb_aio_engine.connection() as conn:
+            raw_connection = conn.raw_connection
+            await conn.execute(f"select pg_sleep({_CONNECTION_TIMEOUT_SEC+1})")
+
+    assert isinstance(e.value, ConcurrentTimeoutError)
+    assert raw_connection.closed
+
+
+async def test_server_local_stmt_timeout_via_transaction_context(
+    payout_maindb_aio_engine: AioEngine
+):
+    """
+    An example on how to use server local stmt timeout
+    :param payout_maindb_aio_engine:
+    :return:
+    """
+    server_local_stmt_timeout = _CONNECTION_TIMEOUT_SEC - 2
+    assert server_local_stmt_timeout > 0
+    assert server_local_stmt_timeout < _CONNECTION_TIMEOUT_SEC
+
+    async with payout_maindb_aio_engine.transaction() as tx:
+        await tx.connection().execute(
+            f"SET LOCAL statement_timeout = {server_local_stmt_timeout};"
+        )
+        with pytest.raises(BaseException) as e:
+            await tx.connection().execute(
+                f"select pg_sleep({server_local_stmt_timeout+1})"
+            )
+        assert isinstance(e.value, CancelledError)
 
     with pytest.raises(BaseException) as e:
         async with payout_maindb_aio_engine.connection() as conn:
