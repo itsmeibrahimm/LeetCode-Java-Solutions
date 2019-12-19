@@ -16,7 +16,6 @@ from app.commons.context.app_context import (
 from app.commons.context.logger import init_logger as init_log, root_logger
 from app.commons.api.exceptions import register_base_payment_exception_handler
 from app.commons.api.models import PaymentException, PaymentErrorResponseBody
-from app.example_v1.app import example_v1
 from app.ledger.ledger import create_ledger_app
 from app.commons.stats import init_global_statsd
 from app.middleware.doordash_metrics import DoorDashMetricsMiddleware
@@ -125,8 +124,6 @@ async def startup():
         purchasecard_app = make_purchasecard_v0_marqeta_app(context, config)
         app.mount(purchasecard_app.openapi_prefix, purchasecard_app)
         init_log.info("mounted", app="purchasecard")
-
-    app.mount(example_v1.openapi_prefix, example_v1)
 
     init_log.info("finished startup")
 
