@@ -1,3 +1,4 @@
+import uuid
 from typing import List
 
 import pytest
@@ -89,3 +90,50 @@ class TestPaymentMethodProcessor:
             error_message = e.error_message
         assert error_code == "payin_32"
         assert error_message == "Invalid payer type for list payment method"
+
+    @pytest.mark.asyncio
+    async def test_list_payment_methods_by_payer_id(self, payment_method_processor):
+        payment_method = RawPaymentMethod(
+            pgp_payment_method_entity=generate_pgp_payment_method(),
+            stripe_card_entity=generate_stripe_card(),
+        ).to_payment_method()
+        payment_method_list: List[PaymentMethod] = [payment_method]
+        payment_method_processor.payer_client.get_stripe_customer_id_by_payer_id = FunctionMock(
+            return_value="VALID_STRIPE_ID"
+        )
+        payment_method_processor.payment_method_client.get_payment_method_list_by_stripe_customer_id = FunctionMock(
+            return_value=payment_method_list
+        )
+        result = await payment_method_processor.list_payment_methods_by_payer_id(
+            payer_id=str(uuid.uuid4()),
+            active_only=False,
+            sort_by=PaymentMethodSortKey.CREATED_AT,
+            force_update=False,
+            country=None,
+        )
+        assert isinstance(result, PaymentMethodList)
+        assert result.count == 1
+        assert result.data[0] == payment_method
+        assert result.has_more is False
+
+    @pytest.mark.asyncio
+    async def test_list_active_payment_methods_by_payer_id(
+        self, payment_method_processor
+    ):
+        payment_method_processor.payer_client.get_stripe_customer_id_by_payer_id = FunctionMock(
+            return_value="VALID_STRIPE_ID"
+        )
+        payment_method_processor.payment_method_client.get_payment_method_list_by_stripe_customer_id = FunctionMock(
+            return_value=[]
+        )
+        result = await payment_method_processor.list_payment_methods_by_payer_id(
+            payer_id=str(uuid.uuid4()),
+            active_only=True,
+            sort_by=PaymentMethodSortKey.CREATED_AT,
+            force_update=False,
+            country=None,
+        )
+        assert isinstance(result, PaymentMethodList)
+        assert result.count == 0
+        assert len(result.data) == 0
+        assert result.has_more is False

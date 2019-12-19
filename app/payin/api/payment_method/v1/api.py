@@ -5,6 +5,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
+from app.commons.types import CountryCode
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
@@ -104,8 +105,9 @@ async def list_payment_methods(
     request: Request,
     payer_id: str,
     active_only: bool = False,
+    country: CountryCode = CountryCode.US,
     sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
-    force_update: bool = None,
+    force_update: bool = False,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
@@ -114,17 +116,20 @@ async def list_payment_methods(
         payer_id=payer_id,
         active_only=active_only,
         force_update=force_update,
+        country=country,
+        sort_by=sort_by,
     )
 
     try:
-        payment_methods_list: PaymentMethodList = await payment_method_processor.list_payment_methods(
+        payment_methods_list: PaymentMethodList = await payment_method_processor.list_payment_methods_by_payer_id(
             payer_id=payer_id,
             active_only=active_only,
             sort_by=sort_by,
             force_update=force_update,
+            country=country,
         )
     except PaymentError:
-        log.warn("[list_payment_methods] PaymentError")
+        log.warn("[list_payment_methods] PaymentError", payer_id=payer_id)
         raise
 
     return payment_methods_list

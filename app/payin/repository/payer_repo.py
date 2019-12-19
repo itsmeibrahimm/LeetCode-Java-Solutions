@@ -94,6 +94,14 @@ class UpdatePayerWhereInput(DBRequestModel):
     id: UUID
 
 
+class GetStripeCustomerIdByPayerIdInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    payer_id: str
+
+
 class GetConsumerIdByPayerIdInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
@@ -335,6 +343,12 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def get_stripe_customer_id_by_payer_id(
+        self, input: GetStripeCustomerIdByPayerIdInput
+    ) -> str:
+        ...
+
+    @abstractmethod
     async def get_consumer_id_by_payer_id(
         self, input: GetConsumerIdByPayerIdInput
     ) -> int:
@@ -540,6 +554,13 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
+
+    async def get_stripe_customer_id_by_payer_id(
+        self, input: GetStripeCustomerIdByPayerIdInput
+    ) -> str:
+        stmt = payers.table.select().where(payers.id == input.payer_id)
+        row = await self.payment_database.replica().fetch_one(stmt)
+        return PayerDbEntity.from_row(row).legacy_stripe_customer_id if row else None
 
     async def get_consumer_id_by_payer_id(
         self, input: GetConsumerIdByPayerIdInput

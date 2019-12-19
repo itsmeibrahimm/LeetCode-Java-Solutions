@@ -17,6 +17,7 @@ from app.payin.repository.payer_repo import (
     UpdatePgpCustomerWhereInput,
     UpdatePayerSetInput,
     UpdatePayerWhereInput,
+    GetStripeCustomerIdByPayerIdInput,
     GetConsumerIdByPayerIdInput,
 )
 
@@ -178,3 +179,27 @@ class TestPayerRepository:
         )
         assert consumer_id
         assert consumer_id == insert_payer_input.dd_payer_id
+
+    async def test_get_stripe_customer_id_by_payer_id(
+        self, payer_repository: PayerRepository
+    ):
+        payer_id: UUID = uuid4()
+        default_payment_method_id: UUID = uuid4()
+        legacy_default_dd_stripe_card_id: int = 1
+        legacy_stripe_customer_id: str = "VALID_STRIPE_CUSTOMER_ID"
+        insert_payer_input = InsertPayerInput(
+            id=payer_id,
+            payer_type=PayerType.STORE,
+            country=CountryCode.US,
+            default_payment_method_id=default_payment_method_id,
+            legacy_default_dd_stripe_card_id=legacy_default_dd_stripe_card_id,
+            legacy_stripe_customer_id=legacy_stripe_customer_id,
+        )
+        payer = await payer_repository.insert_payer(request=insert_payer_input)
+        assert payer
+        assert payer.id == payer_id
+
+        retrieved_stripe_customer_id = await payer_repository.get_stripe_customer_id_by_payer_id(
+            input=GetStripeCustomerIdByPayerIdInput(payer_id=str(payer_id))
+        )
+        assert retrieved_stripe_customer_id == legacy_stripe_customer_id

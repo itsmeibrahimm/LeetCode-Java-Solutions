@@ -265,16 +265,27 @@ class PaymentMethodProcessor:
 
         return raw_payment_method.to_payment_method()
 
-    async def list_payment_methods(
+    async def list_payment_methods_by_payer_id(
         self,
         payer_id: str,
-        payer_id_type: str = None,
-        country: Optional[CountryCode] = CountryCode.US,
-        active_only: bool = False,
-        sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
-        force_update: bool = None,
+        country: Optional[CountryCode],
+        active_only: bool,
+        sort_by: PaymentMethodSortKey,
+        force_update: bool,
     ) -> PaymentMethodList:
-        ...
+        stripe_customer_id = await self.payer_client.get_stripe_customer_id_by_payer_id(
+            payer_id=payer_id
+        )
+        payment_method_list = await self.payment_method_client.get_payment_method_list_by_stripe_customer_id(
+            stripe_customer_id=stripe_customer_id,
+            country=country,
+            active_only=active_only,
+            force_update=force_update,
+            sort_by=sort_by,
+        )
+        return PaymentMethodList(
+            count=len(payment_method_list), has_more=False, data=payment_method_list
+        )
 
     async def list_payment_methods_legacy(
         self,

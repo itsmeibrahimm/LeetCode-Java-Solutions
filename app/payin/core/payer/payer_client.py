@@ -63,6 +63,7 @@ from app.payin.repository.payer_repo import (
     GetPayerByDDPayerIdInput,
     UpdatePayerSetInput,
     UpdatePayerWhereInput,
+    GetStripeCustomerIdByPayerIdInput,
     GetConsumerIdByPayerIdInput,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
@@ -464,6 +465,19 @@ class PayerClient:
         ):
             return False
         return True
+
+    async def get_stripe_customer_id_by_payer_id(self, payer_id: str):
+        stripe_customer_id = await self.payer_repo.get_stripe_customer_id_by_payer_id(
+            input=GetStripeCustomerIdByPayerIdInput(payer_id=payer_id)
+        )
+        if not stripe_customer_id:
+            self.log.exception(
+                "[get_stripe_customer_id_by_payer_id] No stripe_customer_id available for payer: "
+            )
+            raise PayerReadError(
+                error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND
+            )
+        return stripe_customer_id
 
 
 class PayerOpsInterface:

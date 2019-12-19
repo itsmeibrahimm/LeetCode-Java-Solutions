@@ -30,6 +30,8 @@ _payin_error_message_maps = {
     "payin_27": "Invalid input. Please ensure valid id is provided!",
     "payin_28": "Error returned from Payment Provider. Please make sure your payment_method_id is correct!",
     "payin_29": "Data I/O error. Please retry again!",
+    "payin_30": "No Stripe Card associated to the payment method",
+    "payin_31": "Sorting method not supported for list payment methods",
     "payin_32": "Invalid payer type for list payment method",
     "payin_40": "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
     "payin_41": "Error returned from Payment Provider. Please verify parameters of capture.",
@@ -173,6 +175,16 @@ class PayinErrorCode(str, Enum):
         "Error returned from Payment Provider.",
     )
     PAYER_READ_STRIPE_ERROR_NOT_FOUND = "payin_13", NO_RETRY, "No such customer"
+    PAYMENT_METHOD_NO_STRIPE_CARD_FOUND = (
+        "payin_30",
+        NO_RETRY,
+        "No Stripe Card associated to the payment method",
+    )
+    LIST_PAYMENT_METHOD_SORTING_METHOD_NOT_SUPPORTED = (
+        "payin_31",
+        NO_RETRY,
+        "Sorting method not supported for list payment methods",
+    )
     PAYMENT_INTENT_CREATE_STRIPE_ERROR = (
         "payin_40",
         NO_RETRY,
