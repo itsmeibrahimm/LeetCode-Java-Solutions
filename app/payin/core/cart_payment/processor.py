@@ -83,7 +83,10 @@ from app.payin.core.exceptions import (
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
 )
-from app.payin.core.legacy.utils import get_country_code_by_id, get_country_id_by_code
+from app.commons.utils.legacy_utils import (
+    get_country_code_by_id,
+    get_country_id_by_code,
+)
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient

@@ -1,5 +1,5 @@
 from app.commons.types import LegacyCountryId, CountryCode
-from app.payin.core.legacy.utils import get_country_id_by_code
+from app.commons.utils.legacy_utils import get_country_id_by_code
 
 
 def test_get_country_id_by_code():
