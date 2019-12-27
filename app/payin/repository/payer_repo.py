@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -11,8 +11,9 @@ from typing_extensions import final
 from app.commons import tracing
 from app.commons.database.model import DBEntity, DBRequestModel
 from app.commons.types import CountryCode, PgpCode
+from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.models.maindb import stripe_customers
-from app.payin.models.paymentdb import payers, pgp_customers
+from app.payin.models.paymentdb import payers, pgp_customers, delete_payer_requests
 from app.payin.repository.base import PayinDBRepository
 
 
@@ -102,6 +103,39 @@ class GetConsumerIdByPayerIdInput(DBRequestModel):
     """
 
     payer_id: str
+
+
+class DeletePayerRequestDbEntity(DBEntity):
+    id: UUID
+    request_id: UUID
+    consumer_id: Optional[int]
+    payer_id: Optional[UUID]
+    status: str
+    summary: Optional[str]
+    retry_count: int
+    created_at: datetime
+    updated_at: datetime
+    acknowledged: bool
+
+
+class UpdateDeletePayerRequestSetInput(DBRequestModel):
+    status: str
+    summary: str
+    retry_count: int
+    updated_at: datetime
+    acknowledged: bool
+
+
+class UpdateDeletePayerRequestWhereInput(DBRequestModel):
+    request_id: UUID
+
+
+class FindDeletePayerRequestByRequestIdInput(DBRequestModel):
+    request_id: UUID
+
+
+class FindDeletePayerRequestByStatusInput(DBRequestModel):
+    status: DeletePayerRequestStatus
 
 
 ###########################################################
@@ -277,6 +311,34 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def insert_delete_payer_request(
+        self, delete_payer_request_db_entity: DeletePayerRequestDbEntity
+    ) -> DeletePayerRequestDbEntity:
+        ...
+
+    @abstractmethod
+    async def find_delete_payer_requests_by_request_id(
+        self,
+        find_delete_payer_request_by_request_id_input: FindDeletePayerRequestByRequestIdInput,
+    ) -> List[DeletePayerRequestDbEntity]:
+        ...
+
+    @abstractmethod
+    async def find_delete_payer_requests_by_status(
+        self,
+        find_delete_payer_request_by_status_input: FindDeletePayerRequestByStatusInput,
+    ) -> List[DeletePayerRequestDbEntity]:
+        ...
+
+    @abstractmethod
+    async def update_delete_payer_requests(
+        self,
+        update_delete_payer_requests_where_input: UpdateDeletePayerRequestWhereInput,
+        update_delete_payer_requests_set_input: UpdateDeletePayerRequestSetInput,
+    ) -> DeletePayerRequestDbEntity:
+        ...
+
+    @abstractmethod
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput
     ) -> PgpCustomerDbEntity:
@@ -446,6 +508,57 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
+
+    async def insert_delete_payer_request(
+        self, delete_payer_request_db_entity: DeletePayerRequestDbEntity
+    ) -> DeletePayerRequestDbEntity:
+        statement = (
+            delete_payer_requests.table.insert()
+            .values(delete_payer_request_db_entity.dict())
+            .returning(*delete_payer_requests.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(statement)
+        return DeletePayerRequestDbEntity.from_row(row) if row else None
+
+    async def find_delete_payer_requests_by_request_id(
+        self,
+        find_delete_payer_request_by_request_id_input: FindDeletePayerRequestByRequestIdInput,
+    ) -> List[DeletePayerRequestDbEntity]:
+        statement = delete_payer_requests.table.select().where(
+            delete_payer_requests.request_id
+            == find_delete_payer_request_by_request_id_input.request_id
+        )
+        results = await self.payment_database.replica().fetch_all(statement)
+        return [DeletePayerRequestDbEntity.from_row(row) for row in results]
+
+    async def find_delete_payer_requests_by_status(
+        self,
+        find_delete_payer_request_by_status_input: FindDeletePayerRequestByStatusInput,
+    ) -> List[DeletePayerRequestDbEntity]:
+        statement = delete_payer_requests.table.select().where(
+            delete_payer_requests.status
+            == find_delete_payer_request_by_status_input.status
+        )
+        results = await self.payment_database.replica().fetch_all(statement)
+        return [DeletePayerRequestDbEntity.from_row(row) for row in results]
+
+    async def update_delete_payer_requests(
+        self,
+        update_delete_payer_requests_where_input: UpdateDeletePayerRequestWhereInput,
+        update_delete_payer_requests_set_input: UpdateDeletePayerRequestSetInput,
+    ) -> DeletePayerRequestDbEntity:
+        statement = (
+            delete_payer_requests.table.update()
+            .where(
+                delete_payer_requests.request_id
+                == update_delete_payer_requests_where_input.request_id
+            )
+            .values(update_delete_payer_requests_set_input.dict())
+            .returning(*delete_payer_requests.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return DeletePayerRequestDbEntity.from_row(row) if row else None
 
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput

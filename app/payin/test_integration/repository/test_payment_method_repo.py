@@ -5,6 +5,7 @@ import pytest
 
 from app.commons.types import CountryCode, PgpCode
 from app.payin.core.types import PayerReferenceIdType
+from app.payin.models.paymentdb import pgp_payment_methods
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
     PayerRepository,
@@ -23,6 +24,8 @@ from app.payin.repository.payment_method_repo import (
     InsertStripeCardInput,
     ListStripeCardDbEntitiesByStripeCustomerId,
     ListPgpPaymentMethodByStripeCardId,
+    UpdateStripeCardsRemovePiiWhereInput,
+    UpdateStripeCardsRemovePiiSetInput,
 )
 
 
@@ -51,6 +54,42 @@ async def payment_method(
 
 class TestPaymentMethodRepository:
     pytestmark = [pytest.mark.asyncio]
+
+    @pytest.fixture
+    async def pgp_payment_method(
+        self, payment_method_repository: PaymentMethodRepository
+    ):
+        uuid = uuid4()
+        yield await payment_method_repository.insert_pgp_payment_method(
+            InsertPgpPaymentMethodInput(
+                id=uuid,
+                pgp_code=PgpCode.STRIPE,
+                pgp_resource_id=str(uuid4()),
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        await payment_method_repository.payment_database.master().execute(
+            pgp_payment_methods.table.delete().where(pgp_payment_methods.id == uuid)
+        )
+
+    @pytest.fixture
+    async def stripe_card(
+        self, pgp_payment_method, payment_method_repository: PaymentMethodRepository
+    ):
+        yield await payment_method_repository.insert_stripe_card(
+            InsertStripeCardInput(
+                stripe_id=pgp_payment_method.pgp_resource_id,
+                consumer_id=1,
+                fingerprint="",
+                last4="1234",
+                dynamic_last4="4321",
+                exp_month="01",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id="cus_1234567",
+            )
+        )
 
     async def test_insert_pgp_payment_method(
         self,
@@ -272,3 +311,20 @@ class TestPaymentMethodRepository:
         )
         assert len(pgp_payment_method_entities) == 1
         assert pgp_payment_method_entities[0] == pgp_payment_method
+
+    @pytest.mark.asyncio
+    async def test_update_stripe_cards_remove_pii(
+        self, payment_method_repository: PaymentMethodRepository, stripe_card
+    ):
+        updated_stripe_cards = await payment_method_repository.update_stripe_cards_remove_pii(
+            update_stripe_cards_remove_pii_where_input=UpdateStripeCardsRemovePiiWhereInput(
+                consumer_id=stripe_card.consumer_id
+            ),
+            update_stripe_cards_remove_pii_set_input=UpdateStripeCardsRemovePiiSetInput(
+                last4="", dynamic_last4=""
+            ),
+        )
+        assert updated_stripe_cards
+        for card in updated_stripe_cards:
+            assert card.last4 == ""
+            assert card.dynamic_last4 == ""

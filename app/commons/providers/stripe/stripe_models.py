@@ -98,6 +98,10 @@ class StripeUpdateCustomerRequest(StripeBaseModel):
     invoice_settings: InvoiceSettings
 
 
+class StripeDeleteCustomerRequest(StripeBaseModel):
+    sid: str
+
+
 class TransferData(StripeBaseModel):
     destination: ConnectedAccountId
     amount: Optional[int]
@@ -418,6 +422,12 @@ class Customer(StripeBaseModel):
     default_source: str
     description: str
     email: str
+
+
+class StripeDeleteCustomerResponse(StripeBaseModel):
+    id: str
+    object: str
+    deleted: bool
 
 
 class PaymentMethod(StripeBaseModel):

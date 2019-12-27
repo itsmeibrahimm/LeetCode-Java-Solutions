@@ -181,6 +181,15 @@ class ListPgpPaymentMethodByStripeCardId(DBRequestModel):
     stripe_id_list: List[str]
 
 
+class UpdateStripeCardsRemovePiiWhereInput(DBRequestModel):
+    consumer_id: int
+
+
+class UpdateStripeCardsRemovePiiSetInput(DBRequestModel):
+    last4: str
+    dynamic_last4: str
+
+
 class PaymentMethodRepositoryInterface:
     """
     PaymentMethod repository interface class that exposes complicated CRUD operations APIs for business layer.
@@ -256,6 +265,14 @@ class PaymentMethodRepositoryInterface:
     @abstractmethod
     async def list_stripe_card_db_entities_by_consumer_id(
         self, input: ListStripeCardDbEntitiesByConsumerId
+    ) -> List[StripeCardDbEntity]:
+        ...
+
+    @abstractmethod
+    async def update_stripe_cards_remove_pii(
+        self,
+        update_stripe_cards_remove_pii_where_input: UpdateStripeCardsRemovePiiWhereInput,
+        update_stripe_cards_remove_pii_set_input: UpdateStripeCardsRemovePiiSetInput,
     ) -> List[StripeCardDbEntity]:
         ...
 
@@ -467,3 +484,21 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
                 PgpPaymentMethodDbEntity.from_row(row)
             )
         return pgp_payment_method_db_entities
+
+    async def update_stripe_cards_remove_pii(
+        self,
+        update_stripe_cards_remove_pii_where_input: UpdateStripeCardsRemovePiiWhereInput,
+        update_stripe_cards_remove_pii_set_input: UpdateStripeCardsRemovePiiSetInput,
+    ) -> List[StripeCardDbEntity]:
+        statement = (
+            stripe_cards.table.update()
+            .where(
+                stripe_cards.consumer_id
+                == update_stripe_cards_remove_pii_where_input.consumer_id
+            )
+            .values(update_stripe_cards_remove_pii_set_input.dict())
+            .returning(*stripe_cards.table.columns.values())
+        )
+
+        rows = await self.main_database.master().fetch_all(statement)
+        return [StripeCardDbEntity.from_row(row) for row in rows]

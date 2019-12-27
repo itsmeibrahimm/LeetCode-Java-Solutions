@@ -26,3 +26,9 @@ class LegacyPayerInfo(BaseModel):
     # FIXME: can't enforce payer_type for Drive. This is for lazy creation use and will revisit to see if we can
     # do lazy creation without client input before removing it.
     payer_type: Optional[PayerType]
+
+
+class DeletePayerRequestStatus(str, Enum):
+    IN_PROGRESS = "IN PROGRESS"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"

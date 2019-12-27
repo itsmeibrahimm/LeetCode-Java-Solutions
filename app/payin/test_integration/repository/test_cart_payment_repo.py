@@ -30,11 +30,8 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
-from app.payin.core.types import (
-    PgpPayerResourceId,
-    PgpPaymentMethodResourceId,
-    PayerReferenceIdType,
-)
+from app.payin.core.types import PayerReferenceIdType
+from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
     UpdateCartPaymentPostCancellationInput,
@@ -43,6 +40,10 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
     GetCartPaymentsByConsumerIdInput,
+    UpdateStripeChargesRemovePiiWhereInput,
+    UpdateStripeChargesRemovePiiSetInput,
+    UpdateCartPaymentsRemovePiiWhereInput,
+    UpdateCartPaymentsRemovePiiSetInput,
 )
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -162,7 +163,7 @@ async def cart_payment(
         payer_id=cast(UUID, payer.id),
         amount_original=99,
         amount_total=100,
-        client_description=None,
+        client_description="John Doe ordered donuts",
         reference_id="99",
         reference_type="88",
         delay_capture=False,
@@ -1226,6 +1227,37 @@ class TestCartPayment:
         assert result == expected_cart_payment
 
     @pytest.mark.asyncio
+    async def test_update_cart_payments_remove_pii(
+        self, cart_payment_repository: CartPaymentRepository
+    ):
+        await cart_payment_repository.insert_cart_payment(
+            id=uuid4(),
+            payer_id=None,
+            amount_original=99,
+            amount_total=100,
+            client_description=None,
+            reference_id="99",
+            reference_type="88",
+            delay_capture=False,
+            metadata=None,
+            legacy_consumer_id=1,
+            legacy_stripe_card_id=1,
+            legacy_provider_customer_id="stripe_customer_id",
+            legacy_provider_card_id="stripe_card_id",
+        )
+        updated_cart_payments = await cart_payment_repository.update_cart_payments_remove_pii(
+            update_cart_payments_remove_pii_where_input=UpdateCartPaymentsRemovePiiWhereInput(
+                legacy_consumer_id=1
+            ),
+            update_cart_payments_remove_pii_set_input=UpdateCartPaymentsRemovePiiSetInput(
+                client_description=""
+            ),
+        )
+
+        for cart_payment in updated_cart_payments:
+            assert cart_payment.client_description == ""
+
+    @pytest.mark.asyncio
     async def test_cancel_cart_payment(
         self, cart_payment_repository: CartPaymentRepository, payer: PayerDbEntity
     ):
@@ -1429,7 +1461,7 @@ class TestLegacyCharges:
     ):
         yield await cart_payment_repository.insert_legacy_stripe_charge(
             stripe_id=str(uuid4()),
-            card_id=None,
+            card_id=1,
             charge_id=consumer_charge.id,
             amount=consumer_charge.total,
             amount_refunded=0,
@@ -1648,6 +1680,25 @@ class TestLegacyCharges:
             stripe_charge_id=stripe_charge.stripe_id
         )
         assert result == stripe_charge
+
+    @pytest.mark.asyncio
+    async def test_update_stripe_charges_remove_pii(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        stripe_charge,
+        consumer_charge,
+    ):
+        updated_stripe_charges = await cart_payment_repository.update_stripe_charges_remove_pii(
+            update_stripe_charges_remove_pii_where_input=UpdateStripeChargesRemovePiiWhereInput(
+                consumer_id=1
+            ),
+            update_stripe_charges_remove_pii_set_input=UpdateStripeChargesRemovePiiSetInput(
+                description=""
+            ),
+        )
+
+        for charge in updated_stripe_charges:
+            assert charge.description == ""
 
 
 class TestFindPaymentIntentsThatRequireCapture:

@@ -63,6 +63,18 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
+    def delete_customer(
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.StripeDeleteCustomerRequest,
+    ) -> models.StripeDeleteCustomerResponse:
+        """
+        Delete a customer
+        https://stripe.com/docs/api/customers/delete
+        """
+
+    @abc.abstractmethod
     def create_payment_method(
         self,
         *,
@@ -382,6 +394,18 @@ class StripeClient(StripeClientInterface):
             **request.dict(skip_defaults=True),
         )
         return customer
+
+    @tracing.track_breadcrumb(resource="customer", action="delete")
+    def delete_customer(
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.StripeDeleteCustomerRequest,
+    ) -> models.StripeDeleteCustomerResponse:
+        stripe_delete_customer_response = stripe.Customer.delete(
+            **self.settings_for(country), **request.dict(skip_defaults=True)
+        )
+        return stripe_delete_customer_response
 
     @tracing.track_breadcrumb(resource="paymentmethod", action="create")
     def create_payment_method(
@@ -799,6 +823,16 @@ class StripeAsyncClient:
             country=country,
             request=request,
             idempotency_key=idempotency_key,
+        )
+
+    async def delete_customer(
+        self,
+        *,
+        country: models.CountryCode,
+        request: models.StripeDeleteCustomerRequest,
+    ) -> models.StripeDeleteCustomerResponse:
+        return await self.executor_pool.submit(
+            self.stripe_client.delete_customer, country=country, request=request
         )
 
     async def create_payment_method(

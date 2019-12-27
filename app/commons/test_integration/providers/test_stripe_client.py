@@ -116,6 +116,25 @@ class TestStripeClient:
         )
         assert customer
 
+    @pytest.mark.vcr()
+    def test_customer_delete(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+        customer = stripe.create_customer(
+            country=models.CountryCode.US,
+            request=models.StripeCreateCustomerRequest(
+                email="jane.doe@gmail.com", description="jane name"
+            ),
+        )
+        assert customer
+
+        stripe_delete_customer_response = stripe.delete_customer(
+            country=models.CountryCode.US,
+            request=models.StripeDeleteCustomerRequest(sid=customer.id),
+        )
+
+        assert stripe_delete_customer_response.deleted is True
+
     @pytest.mark.skip(
         "requires to create the needed resource first in case it becomes flaky"
     )
@@ -516,6 +535,33 @@ class TestStripePool:
             ),
         )
         assert customer
+        httpClient = stripe_async_client.stripe_client.http_client
+        assert isinstance(httpClient, RequestsClient)
+        session: requests.Session = httpClient._session
+        http_adapter: HTTPAdapter = session.adapters.get("http://", None)
+        https_adapter: HTTPAdapter = session.adapters.get("https://", None)
+        assert http_adapter and getattr(http_adapter, "_pool_maxsize") == self.POOL_SIZE
+        assert (
+            https_adapter and getattr(https_adapter, "_pool_maxsize") == self.POOL_SIZE
+        )
+
+    async def test_customer_delete(
+        self, mode: str, stripe_async_client: StripeAsyncClient
+    ):
+        customer = await stripe_async_client.create_customer(
+            country=models.CountryCode.US,
+            request=models.StripeCreateCustomerRequest(
+                email="john.doe@gmail.com", description="john doe"
+            ),
+        )
+        assert customer
+
+        stripe_delete_customer_response = await stripe_async_client.delete_customer(
+            country=models.CountryCode.US,
+            request=models.StripeDeleteCustomerRequest(sid=customer.id),
+        )
+        assert stripe_delete_customer_response.deleted is True
+
         httpClient = stripe_async_client.stripe_client.http_client
         assert isinstance(httpClient, RequestsClient)
         session: requests.Session = httpClient._session

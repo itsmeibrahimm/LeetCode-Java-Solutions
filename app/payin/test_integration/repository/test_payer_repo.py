@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from random import randint
 from uuid import uuid4, UUID
@@ -6,7 +7,9 @@ import pytest
 from pytz import timezone
 
 from app.commons.types import CountryCode
+from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PayerReferenceIdType
+from app.payin.models.paymentdb import delete_payer_requests
 from app.payin.repository.payer_repo import (
     PayerRepository,
     InsertPayerInput,
@@ -19,11 +22,43 @@ from app.payin.repository.payer_repo import (
     UpdatePayerWhereInput,
     GetStripeCustomerIdByPayerIdInput,
     GetConsumerIdByPayerIdInput,
+    UpdateDeletePayerRequestWhereInput,
+    UpdateDeletePayerRequestSetInput,
+    FindDeletePayerRequestByRequestIdInput,
+    FindDeletePayerRequestByStatusInput,
+    DeletePayerRequestDbEntity,
 )
 
 
 class TestPayerRepository:
     pytestmark = [pytest.mark.asyncio]
+
+    @pytest.fixture
+    async def delete_payer_request(self, payer_repository: PayerRepository):
+        summary = {
+            "doordash.stripe_cards.pii.obfuscate": "IN_PROGRESS",
+            "doordash.stripe_charges.pii.obfuscate": "IN_PROGRESS",
+            "doordash.cart_payments.pii.obfuscate": "IN_PROGRESS",
+            "pgp.stripe.customer.delete": "IN_PROGRESS",
+        }
+        uuid = uuid4()
+        yield await payer_repository.insert_delete_payer_request(
+            DeletePayerRequestDbEntity(
+                id=uuid,
+                request_id=uuid,
+                consumer_id=1,
+                payer_id=None,
+                status=DeletePayerRequestStatus.IN_PROGRESS.value,
+                summary=json.dumps(summary),
+                retry_count=0,
+                created_at=datetime.now(timezone("UTC")),
+                updated_at=datetime.now(timezone("UTC")),
+                acknowledged=False,
+            )
+        )
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests.table.delete().where(delete_payer_requests.id == uuid)
+        )
 
     async def test_payer_timestamp_timezone(self, payer_repository: PayerRepository):
         created_at = datetime.now(timezone("Europe/Amsterdam"))
@@ -205,3 +240,128 @@ class TestPayerRepository:
             input=GetStripeCustomerIdByPayerIdInput(payer_id=str(payer_id))
         )
         assert retrieved_stripe_customer_id == legacy_stripe_customer_id
+
+    @pytest.mark.asyncio
+    async def test_insert_delete_payer_request(self, payer_repository: PayerRepository):
+        uuid = uuid4()
+        now = datetime.now(timezone("UTC"))
+        summary = {
+            "doordash.stripe_cards.pii.obfuscate": "IN_PROGRESS",
+            "doordash.stripe_charges.pii.obfuscate": "IN_PROGRESS",
+            "doordash.cart_payments.pii.obfuscate": "IN_PROGRESS",
+            "pgp.stripe.customer.delete": "IN_PROGRESS",
+        }
+        result = await payer_repository.insert_delete_payer_request(
+            DeletePayerRequestDbEntity(
+                id=uuid,
+                request_id=uuid,
+                consumer_id=123,
+                payer_id=None,
+                status=DeletePayerRequestStatus.IN_PROGRESS.value,
+                summary=json.dumps(summary),
+                retry_count=0,
+                created_at=now,
+                updated_at=now,
+                acknowledged=False,
+            )
+        )
+
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests.table.delete()
+        )
+
+        expected_delete_payer_request = DeletePayerRequestDbEntity(
+            id=uuid,
+            request_id=uuid,
+            consumer_id=123,
+            payer_id=None,
+            status=DeletePayerRequestStatus.IN_PROGRESS.value,
+            summary=json.dumps(summary),
+            retry_count=0,
+            created_at=now,
+            updated_at=now,
+            acknowledged=False,
+        )
+
+        assert result == expected_delete_payer_request
+
+    @pytest.mark.asyncio
+    async def test_find_delete_payer_requests_by_request_id(
+        self, payer_repository: PayerRepository, delete_payer_request
+    ):
+        results = await payer_repository.find_delete_payer_requests_by_request_id(
+            find_delete_payer_request_by_request_id_input=FindDeletePayerRequestByRequestIdInput(
+                request_id=delete_payer_request.request_id
+            )
+        )
+
+        expected_delete_payer_request = DeletePayerRequestDbEntity(
+            id=delete_payer_request.id,
+            request_id=delete_payer_request.request_id,
+            consumer_id=delete_payer_request.consumer_id,
+            payer_id=delete_payer_request.payer_id,
+            status=delete_payer_request.status,
+            summary=delete_payer_request.summary,
+            retry_count=delete_payer_request.retry_count,
+            created_at=delete_payer_request.created_at,
+            updated_at=delete_payer_request.updated_at,
+            acknowledged=delete_payer_request.acknowledged,
+        )
+
+        assert results
+        assert len(results) == 1
+        assert results[0] == expected_delete_payer_request
+
+    @pytest.mark.asyncio
+    async def test_find_delete_payer_requests_by_status(
+        self, payer_repository: PayerRepository, delete_payer_request
+    ):
+        results = await payer_repository.find_delete_payer_requests_by_status(
+            find_delete_payer_request_by_status_input=FindDeletePayerRequestByStatusInput(
+                status=DeletePayerRequestStatus.IN_PROGRESS
+            )
+        )
+
+        assert results
+        assert len(results) > 0
+        for request in results:
+            assert request.status == DeletePayerRequestStatus.IN_PROGRESS.value
+
+    @pytest.mark.asyncio
+    async def test_update_delete_payer_requests(
+        self, payer_repository, delete_payer_request
+    ):
+        now = datetime.now(timezone("UTC"))
+        summary = {
+            "doordash.stripe_cards.pii.obfuscate": "IN_PROGRESS",
+            "doordash.stripe_charges.pii.obfuscate": "IN_PROGRESS",
+            "doordash.cart_payments.pii.obfuscate": "IN_PROGRESS",
+            "pgp.stripe.customer.delete": "IN_PROGRESS",
+        }
+        result = await payer_repository.update_delete_payer_requests(
+            update_delete_payer_requests_where_input=UpdateDeletePayerRequestWhereInput(
+                request_id=delete_payer_request.request_id
+            ),
+            update_delete_payer_requests_set_input=UpdateDeletePayerRequestSetInput(
+                status=DeletePayerRequestStatus.SUCCEEDED.value,
+                summary=json.dumps(summary),
+                retry_count=0,
+                updated_at=now,
+                acknowledged=True,
+            ),
+        )
+
+        expected_delete_payer_request = DeletePayerRequestDbEntity(
+            id=delete_payer_request.id,
+            request_id=delete_payer_request.request_id,
+            consumer_id=delete_payer_request.consumer_id,
+            payer_id=delete_payer_request.payer_id,
+            status=DeletePayerRequestStatus.SUCCEEDED.value,
+            summary=json.dumps(summary),
+            retry_count=0,
+            created_at=delete_payer_request.created_at,
+            updated_at=now,
+            acknowledged=True,
+        )
+
+        assert result == expected_delete_payer_request

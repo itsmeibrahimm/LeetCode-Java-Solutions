@@ -73,3 +73,33 @@ class TestStripePoolStats:
             "status_code": "200",
             "request_status": "success",
         }
+
+    async def test_customer_delete(
+        self, stripe_async_client: StripeAsyncClient, get_mock_statsd_events
+    ):
+        customer = await stripe_async_client.create_customer(
+            country=models.CountryCode.US,
+            request=models.StripeCreateCustomerRequest(
+                email="john.doe@gmail.com", description="john doe", country="US"
+            ),
+        )
+        assert customer
+
+        stripe_delete_customer_response = await stripe_async_client.delete_customer(
+            country=models.CountryCode.US,
+            request=models.StripeDeleteCustomerRequest(sid=customer.id),
+        )
+        assert stripe_delete_customer_response.deleted is True
+
+        events: List[Stat] = get_mock_statsd_events()
+        assert len(events) == 2
+        event = events[1]
+        assert event.stat_name == "dd.pay.payment-service.io.stripe-lib.latency"
+        assert event.tags == {
+            "provider_name": "stripe",
+            "country": "US",
+            "resource": "customer",
+            "action": "delete",
+            "status_code": "200",
+            "request_status": "success",
+        }
