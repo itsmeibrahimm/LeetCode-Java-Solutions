@@ -11,7 +11,11 @@ from app.payin.core.exceptions import PayerReadError, PayinErrorCode
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethodIds
-from app.payin.core.types import PaymentMethodIdType, MixedUuidStrType, PayerIdType
+from app.payin.core.types import (
+    PaymentMethodIdType,
+    MixedUuidStrType,
+    PayerReferenceIdType,
+)
 
 
 class PayerProcessorV1:
@@ -34,8 +38,8 @@ class PayerProcessorV1:
 
     async def create_payer(
         self,
-        dd_payer_id: str,
-        payer_type: str,
+        payer_reference_id: str,
+        payer_reference_id_type: PayerReferenceIdType,
         email: str,
         country: CountryCode,
         description: str,
@@ -46,23 +50,26 @@ class PayerProcessorV1:
             - PgpCustomer
             - StripeCustomer (for backward compatibility)
 
-        :param dd_payer_id: DoorDash client identifier (consumer_id, etc.)
-        :param payer_type: Identify the owner type
+        :param payer_reference_id: DoorDash client identifier (consumer_id, etc.)
+        :param payer_reference_id_type: Payment predefined values.
         :param email: payer email
         :param country: payer country code
         :param description: short description for the payer
         :return: Payer object
         """
         self.log.info(
-            "[create_payer] started.", dd_payer_id=dd_payer_id, payer_type=payer_type
+            "[create_payer] started.",
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
         )
 
         # TODO: we should get pgp_code in different way
         pgp_code = PgpCode.STRIPE
 
-        # step 1: lookup active payer by dd_payer_id + payer_type, return error if payer already exists
+        # step 1: lookup active payer by payer_reference_id + payer_reference_id_type, return error if payer already exists
         await self.payer_client.has_existing_payer(
-            dd_payer_id=dd_payer_id, payer_type=payer_type
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
         )
 
         # step 2: create PGP customer
@@ -72,14 +79,14 @@ class PayerProcessorV1:
 
         self.log.info(
             "[create_payer] create PGP customer completed.",
-            dd_payer_id=dd_payer_id,
+            payer_reference_id=payer_reference_id,
             pgp_customer_id=pgp_customer_id,
         )
 
         # step 3: create Payer/PgpCustomer/StripeCustomer objects
         raw_payer: RawPayer = await self.payer_client.create_raw_payer(
-            dd_payer_id=dd_payer_id,
-            payer_type=payer_type,
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
             country=country,
             pgp_customer_resource_id=pgp_customer_id,
             pgp_code=pgp_code,
@@ -100,7 +107,8 @@ class PayerProcessorV1:
         )
 
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+            mixed_payer_id=payer_id,
+            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
         )
 
         if force_update:
@@ -144,7 +152,8 @@ class PayerProcessorV1:
 
         # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+            mixed_payer_id=payer_id,
+            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
         )
         pgp_country: Optional[str] = raw_payer.country()
         if not pgp_country:
@@ -181,7 +190,6 @@ class PayerProcessorV1:
                 dd_stripe_card_id=raw_pm.legacy_dd_stripe_card_id,
                 payment_method_id=raw_pm.payment_method_id,
             ),
-            payer_id=payer_id,
         )
 
         return updated_raw_payer.to_payer()

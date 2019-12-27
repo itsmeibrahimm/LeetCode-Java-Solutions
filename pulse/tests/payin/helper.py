@@ -77,20 +77,27 @@ class PaymentUtil:
         )
 
     @staticmethod
-    def get_create_payer_request(dd_payer_id: int, country: str, payer_type: str):
+    def get_create_payer_request(
+        payer_reference_id: int, country: str, payer_reference_id_type: str
+    ):
         return CreatePayerRequest(
-            dd_payer_id=dd_payer_id,
-            payer_type=payer_type,
-            email=str(dd_payer_id) + "-" + payer_type + "@email.com",
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
+            email=str(payer_reference_id)
+            + "-"
+            + payer_reference_id_type
+            + "@email.com",
             country=country,
             description="test payer creation",
         )
 
     @staticmethod
-    def create_payer(dd_payer_id=random.randint(1, 2147483647)):
+    def create_payer(payer_reference_id=random.randint(1, 2147483647)):
         return payer_v1_client.create_payer_with_http_info(
             create_payer_request=PaymentUtil.get_create_payer_request(
-                dd_payer_id=dd_payer_id, country="US", payer_type="store"
+                payer_reference_id=payer_reference_id,
+                country="US",
+                payer_reference_id_type="dd_drive_store_id",
             )
         )
 

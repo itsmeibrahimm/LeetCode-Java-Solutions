@@ -96,6 +96,7 @@ from app.payin.core.types import (
     PaymentMethodIdType,
     PgpPayerResourceId,
     PgpPaymentMethodResourceId,
+    PayerReferenceIdType,
 )
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
@@ -1811,7 +1812,8 @@ class CartPaymentInterface:
             payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
         )
         raw_payer = await self.payer_client.get_raw_payer(
-            payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+            mixed_payer_id=payer_id,
+            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
         )
         pgp_payer_ref_id = raw_payer.pgp_payer_resource_id
         pgp_payment_method_ref_id = raw_payment_method.pgp_payment_method_resource_id
@@ -1829,7 +1831,7 @@ class CartPaymentInterface:
             )
 
         result_legacy_payment = LegacyPayment(
-            dd_consumer_id=raw_payer.payer_entity.dd_payer_id,
+            dd_consumer_id=raw_payer.payer_entity.payer_reference_id,
             dd_stripe_card_id=str(raw_payment_method.legacy_dd_stripe_card_id),
             dd_country_id=legacy_country_id,
         )
@@ -3453,7 +3455,8 @@ class CartPaymentProcessor:
     async def get_payer_by_id(self, payer_id: uuid.UUID) -> Payer:
         return (
             await self.cart_payment_interface.payer_client.get_raw_payer(
-                payer_id_type=PayerIdType.PAYER_ID, payer_id=payer_id
+                mixed_payer_id=payer_id,
+                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             )
         ).to_payer()
 

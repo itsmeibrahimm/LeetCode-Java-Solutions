@@ -11,18 +11,17 @@ from app.commons import tracing
 from app.commons.context.logger import get_logger
 from app.commons.database.model import DBEntity, DBRequestModel
 
-###########################################################
-# PgpPaymentMethod DBEntity and CRUD operations           #
-###########################################################
 from app.commons.types import PgpCode
-from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.models.maindb import stripe_cards
 from app.payin.models.paymentdb import pgp_payment_methods, payment_methods
 from app.payin.repository.base import PayinDBRepository
 
 log = get_logger(__name__)
 
-
+###########################################################
+# PgpPaymentMethod DBEntity and CRUD operations           #
+###########################################################
 class PgpPaymentMethodDbEntity(DBEntity):
     """
     The variable name must be consistent with DB table column name
@@ -236,7 +235,9 @@ class PaymentMethodRepositoryInterface:
 
     @abstractmethod
     async def get_duplicate_stripe_card(
-        self, payer_type: PayerType, input: GetDuplicateStripeCardInput
+        self,
+        payer_reference_id_type: PayerReferenceIdType,
+        input: GetDuplicateStripeCardInput,
     ) -> Optional[StripeCardDbEntity]:
         ...
 
@@ -399,9 +400,11 @@ class PaymentMethodRepository(PaymentMethodRepositoryInterface, PayinDBRepositor
         return [StripeCardDbEntity.from_row(row) for row in rows]
 
     async def get_duplicate_stripe_card(
-        self, payer_type: PayerType, input: GetDuplicateStripeCardInput
+        self,
+        payer_reference_id_type: PayerReferenceIdType,
+        input: GetDuplicateStripeCardInput,
     ) -> Optional[StripeCardDbEntity]:
-        if payer_type == PayerType.MARKETPLACE:
+        if payer_reference_id_type == PayerReferenceIdType.DD_CONSUMER_ID:
             stmt = stripe_cards.table.select().where(
                 and_(
                     stripe_cards.fingerprint == input.fingerprint,

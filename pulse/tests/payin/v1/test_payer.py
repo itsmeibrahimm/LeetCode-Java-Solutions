@@ -24,7 +24,9 @@ def test_create_and_get_payer_with_non_numeric_id():
     try:
         payer_v1_client.create_payer_with_http_info(
             create_payer_request=PaymentUtil.get_create_payer_request(
-                dd_payer_id="abc", country="US", payer_type="store"
+                payer_reference_id="abc",
+                country="US",
+                payer_reference_id_type="dd_drive_store_id",
             )
         )
     except ApiException as e:
@@ -38,13 +40,17 @@ def test_create_and_get_payer_with_non_numeric_id():
 def test_create_two_payers_with_same_id():
     new_payer_one = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
-            dd_payer_id=123, country="US", payer_type="store"
+            payer_reference_id=123,
+            country="US",
+            payer_reference_id_type="dd_drive_store_id",
         )
     )
     assert new_payer_one[1] == 201
     new_payer_two = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
-            dd_payer_id=123, country="US", payer_type="store"
+            payer_reference_id=123,
+            country="US",
+            payer_reference_id_type="dd_drive_store_id",
         )
     )
     assert new_payer_two[1] == 201
@@ -126,17 +132,6 @@ def test_create_v1_get_v0_payer_by_stripe_customer_serial_id():
     get_payer = payer_v0_client.get_payer_with_http_info(
         payer_id_type="dd_stripe_customer_serial_id",
         payer_id=new_payer[0].dd_stripe_customer_id,
-    )
-    assert get_payer[1] == 200
-    logger.info(new_payer[0])
-
-
-def test_create_v1_get_v0_payer_by_dd_consumer_id():
-    new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
-
-    get_payer = payer_v0_client.get_payer_with_http_info(
-        payer_id_type="dd_consumer_id", payer_id=new_payer[0].dd_payer_id
     )
     assert get_payer[1] == 200
     logger.info(new_payer[0])

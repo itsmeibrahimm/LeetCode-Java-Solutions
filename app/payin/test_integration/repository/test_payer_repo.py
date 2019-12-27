@@ -6,7 +6,7 @@ import pytest
 from pytz import timezone
 
 from app.commons.types import CountryCode
-from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.payer_repo import (
     PayerRepository,
     InsertPayerInput,
@@ -29,7 +29,7 @@ class TestPayerRepository:
         created_at = datetime.now(timezone("Europe/Amsterdam"))
         insert_payer_input = InsertPayerInput(
             id=uuid4(),
-            payer_type=PayerType.STORE,
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             country=CountryCode.US,
             created_at=created_at,
         )
@@ -47,7 +47,9 @@ class TestPayerRepository:
     async def test_pgp_customer_crud(self, payer_repository: PayerRepository):
         # TODO: [PAYIN-37] don't need to create payer after we remove the foreign key constraint
         insert_payer_input = InsertPayerInput(
-            id=uuid4(), payer_type=PayerType.STORE, country=CountryCode.US
+            id=uuid4(),
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
+            country=CountryCode.US,
         )
         payer = await payer_repository.insert_payer(insert_payer_input)
 
@@ -106,7 +108,7 @@ class TestPayerRepository:
         legacy_default_dd_stripe_card_id: int = 1
         insert_payer_input = InsertPayerInput(
             id=payer_id,
-            payer_type=PayerType.STORE,
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             country=CountryCode.US,
             default_payment_method_id=default_payment_method_id,
             legacy_default_dd_stripe_card_id=legacy_default_dd_stripe_card_id,
@@ -166,11 +168,11 @@ class TestPayerRepository:
         legacy_default_dd_stripe_card_id: int = 1
         insert_payer_input = InsertPayerInput(
             id=payer_id,
-            payer_type=PayerType.STORE,
             country=CountryCode.US,
             default_payment_method_id=default_payment_method_id,
             legacy_default_dd_stripe_card_id=legacy_default_dd_stripe_card_id,
-            dd_payer_id=randint(1, 1000),
+            payer_reference_id=randint(1, 1000),
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
         )
         payer = await payer_repository.insert_payer(request=insert_payer_input)
         assert payer
@@ -178,7 +180,7 @@ class TestPayerRepository:
             input=GetConsumerIdByPayerIdInput(payer_id=str(payer_id))
         )
         assert consumer_id
-        assert consumer_id == insert_payer_input.dd_payer_id
+        assert consumer_id == insert_payer_input.payer_reference_id
 
     async def test_get_stripe_customer_id_by_payer_id(
         self, payer_repository: PayerRepository
@@ -189,7 +191,7 @@ class TestPayerRepository:
         legacy_stripe_customer_id: str = "VALID_STRIPE_CUSTOMER_ID"
         insert_payer_input = InsertPayerInput(
             id=payer_id,
-            payer_type=PayerType.STORE,
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             country=CountryCode.US,
             default_payment_method_id=default_payment_method_id,
             legacy_default_dd_stripe_card_id=legacy_default_dd_stripe_card_id,

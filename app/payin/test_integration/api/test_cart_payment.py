@@ -33,7 +33,11 @@ from app.payin.repository.payment_method_repo import (
     GetStripeCardByStripeIdInput,
     StripeCardDbEntity,
 )
-from app.payin.test_integration.integration_utils import build_commando_processor
+from app.payin.test_integration.integration_utils import (
+    build_commando_processor,
+    create_payer_v1,
+    CreatePayerV1Request,
+)
 
 
 @pytest.mark.external
@@ -43,37 +47,18 @@ class TestCartPayment:
         stripe_api.enable_outbound()
         return self._test_payer_creation(client)
 
-    def _get_payer_create_request(self):
-        unique_value = str(uuid.uuid4())
-        request_body = {
-            "dd_payer_id": "1",
-            "payer_type": "store",
-            "email": f"{unique_value}@doordash.com",
-            "country": "US",
-            "description": f"{unique_value} description",
-        }
-        return request_body
-
     def _test_payer_creation(self, client: TestClient) -> Dict[str, Any]:
-        request_body = self._get_payer_create_request()
-        response = client.post("/payin/api/v1/payers", json=request_body)
-        assert response.status_code == 201
-
-        payer = response.json()
-        assert payer
-        assert payer["id"]
-        assert payer["payer_type"] == request_body["payer_type"]
-        assert payer["country"] == request_body["country"]
-        assert payer["dd_payer_id"] == request_body["dd_payer_id"]
-        assert payer["description"] == request_body["description"]
-        assert payer["created_at"]
-        assert payer["updated_at"]
-        assert payer["deleted_at"] is None
-        assert payer["payment_gateway_provider_customers"]
-        assert len(payer["payment_gateway_provider_customers"]) == 1
-        provider_customer = payer["payment_gateway_provider_customers"][0]
-        assert provider_customer["payment_provider"] == "stripe"
-        assert provider_customer["payment_provider_customer_id"]
+        unique_value = str(uuid.uuid4())
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                payer_reference_id="1",
+                payer_reference_id_type="dd_drive_store_id",
+                country="US",
+                description=f"{unique_value} description",
+                email=(unique_value + "@dd.com"),
+            ),
+        )
         return payer
 
     @pytest.fixture

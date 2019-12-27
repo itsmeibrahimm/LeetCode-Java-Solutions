@@ -18,12 +18,17 @@ class PaymentUtil:
 
     @staticmethod
     def get_payer_info(
-        dd_payer_id=int(time.time() * 1e6), country="US", payer_type="store"
+        payer_reference_id=int(time.time() * 1e6),
+        country="US",
+        payer_reference_id_type="dd_drive_store_id",
     ):
         return {
-            "dd_payer_id": "1",
-            "payer_type": payer_type,
-            "email": str(dd_payer_id) + "-" + payer_type + "@email.com",
+            "payer_reference_id": "1",
+            "payer_reference_id_type": payer_reference_id_type,
+            "email": str(payer_reference_id)
+            + "-"
+            + payer_reference_id_type
+            + "@email.com",
             "country": country,
             "description": "payer creation for tests",
         }

@@ -7,6 +7,7 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.providers.stripe.stripe_models import Customer as StripeCustomer
 from app.commons.runtime import runtime
 from app.commons.types import CountryCode, PgpCode
+from app.commons.utils.legacy_utils import payer_id_type_to_payer_reference_id_type
 from app.payin.core.exceptions import PayerReadError, PayinErrorCode
 from app.payin.core.payer.model import Payer, RawPayer, PaymentGatewayProviderCustomer
 from app.payin.core.payer.payer_client import PayerClient
@@ -55,9 +56,10 @@ class PayerProcessorV0:
 
         try:
             raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-                payer_id=legacy_payer_info.payer_id,
-                payer_id_type=legacy_payer_info.payer_id_type,
-                payer_type=legacy_payer_info.payer_type,
+                mixed_payer_id=legacy_payer_info.payer_id,
+                payer_reference_id_type=payer_id_type_to_payer_reference_id_type(
+                    payer_id_type=legacy_payer_info.payer_id_type
+                ),
             )
         except PayerReadError as e:
             if (
@@ -130,9 +132,10 @@ class PayerProcessorV0:
         # step 2: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
         try:
             raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-                payer_id=legacy_payer_info.payer_id,
-                payer_id_type=legacy_payer_info.payer_id_type,
-                payer_type=legacy_payer_info.payer_type,
+                mixed_payer_id=legacy_payer_info.payer_id,
+                payer_reference_id_type=payer_id_type_to_payer_reference_id_type(
+                    payer_id_type=legacy_payer_info.payer_id_type
+                ),
             )
         except PayerReadError as e:
             if (
@@ -179,8 +182,6 @@ class PayerProcessorV0:
                 dd_stripe_card_id=raw_pm.legacy_dd_stripe_card_id,
                 payment_method_id=raw_pm.payment_method_id,
             ),
-            payer_id=legacy_payer_info.payer_id,
-            payer_id_type=legacy_payer_info.payer_id_type,
         )
 
         return updated_raw_payer.to_payer()

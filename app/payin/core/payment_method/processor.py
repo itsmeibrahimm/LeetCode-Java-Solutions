@@ -11,6 +11,7 @@ from app.commons.providers.stripe.stripe_models import (
 )
 from app.commons.runtime import runtime
 from app.commons.types import CountryCode, PgpCode
+from app.commons.utils.legacy_utils import payer_type_to_payer_reference_id_type
 from app.commons.utils.uuid import generate_object_uuid
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
@@ -20,7 +21,6 @@ from app.payin.core.exceptions import (
     PaymentMethodListError,
 )
 from app.payin.core.payer.model import RawPayer
-from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import (
     PaymentMethod,
     RawPaymentMethod,
@@ -32,7 +32,7 @@ from app.payin.core.payment_method.types import (
     PaymentMethodSortKey,
     LegacyPaymentMethodInfo,
 )
-from app.payin.core.types import PaymentMethodIdType, PayerIdType
+from app.payin.core.types import PaymentMethodIdType, PayerReferenceIdType
 
 
 class PaymentMethodProcessor:
@@ -98,19 +98,20 @@ class PaymentMethodProcessor:
         pgp_country: Optional[str] = None
         dd_consumer_id: Optional[str] = None
         dd_stripe_customer_id: Optional[str] = None
-        payer_type: Optional[str] = None
+        payer_reference_id_type: Optional[str] = None
         raw_payer: Optional[RawPayer] = None
 
         # step 1: lookup pgp_customer_resource_id and country information
         if payer_id:
             raw_payer = await self.payer_client.get_raw_payer(
-                payer_id=payer_id, payer_id_type=PayerIdType.PAYER_ID
+                mixed_payer_id=payer_id,
+                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             )
             if raw_payer and raw_payer.payer_entity:
                 pgp_country = raw_payer.country()
                 pgp_customer_res_id = raw_payer.pgp_payer_resource_id
-                payer_type = raw_payer.payer_entity.payer_type
-                if payer_type == PayerType.MARKETPLACE:
+                payer_reference_id_type = raw_payer.payer_entity.payer_reference_id_type
+                if payer_reference_id_type == PayerReferenceIdType.DD_CONSUMER_ID:
                     dd_consumer_id = raw_payer.payer_entity.dd_payer_id
                 else:
                     dd_stripe_customer_id = (
@@ -121,9 +122,8 @@ class PaymentMethodProcessor:
         elif legacy_payment_method_info:  # v0 path with legacy information
             try:
                 raw_payer = await self.payer_client.get_raw_payer(
-                    payer_id=legacy_payment_method_info.stripe_customer_id,
-                    payer_id_type=PayerIdType.STRIPE_CUSTOMER_ID,
-                    payer_type=payer_type,
+                    mixed_payer_id=legacy_payment_method_info.stripe_customer_id,
+                    payer_reference_id_type=PayerReferenceIdType.STRIPE_CUSTOMER_ID,
                 )
             except PayerReadError:
                 self.log.warn(
@@ -131,7 +131,9 @@ class PaymentMethodProcessor:
                 )
             pgp_country = legacy_payment_method_info.country
             pgp_customer_res_id = legacy_payment_method_info.stripe_customer_id
-            payer_type = legacy_payment_method_info.payer_type
+            payer_reference_id_type = payer_type_to_payer_reference_id_type(
+                legacy_payment_method_info.payer_type
+            )
             dd_consumer_id = legacy_payment_method_info.dd_consumer_id
             dd_stripe_customer_id = legacy_payment_method_info.dd_stripe_customer_id
         else:
@@ -149,8 +151,6 @@ class PaymentMethodProcessor:
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT
             )
 
-        # TODO: perform Payer's lazy creation
-
         # step 2: create PGP payment_method
         stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_create_payment_method(
             token=token, country=pgp_country
@@ -159,6 +159,8 @@ class PaymentMethodProcessor:
             "[create_payment_method] create stripe payment_method completed",
             payer_id=payer_id,
             pgp_payment_method_res_id=stripe_payment_method.id,
+            payer_reference_id_type=payer_reference_id_type,
+            dd_stripe_customer_id=dd_stripe_customer_id,
         )
 
         # step 3: de-dup same payment_method by card fingerprint
@@ -169,7 +171,7 @@ class PaymentMethodProcessor:
             try:
                 exist_pm: RawPaymentMethod = await self.payment_method_client.get_duplicate_payment_method(
                     stripe_payment_method=stripe_payment_method,
-                    payer_type=payer_type,
+                    payer_reference_id_type=payer_reference_id_type,
                     pgp_customer_resource_id=pgp_customer_res_id,
                     dd_consumer_id=dd_consumer_id,
                     dd_stripe_customer_id=dd_stripe_customer_id,
@@ -230,10 +232,6 @@ class PaymentMethodProcessor:
                         pgp_payment_method_resource_id=raw_payment_method.pgp_payment_method_resource_id,
                         dd_stripe_card_id=raw_payment_method.legacy_dd_stripe_card_id,
                         payment_method_id=raw_payment_method.payment_method_id,
-                    ),
-                    payer_id=(payer_id or dd_consumer_id),
-                    payer_id_type=(
-                        PayerIdType.PAYER_ID if payer_id else PayerIdType.DD_CONSUMER_ID
                     ),
                 )
         return raw_payment_method.to_payment_method()
@@ -348,14 +346,14 @@ class PaymentMethodProcessor:
         raw_payer: Optional[RawPayer] = None
         if raw_payment_method.payer_id():
             raw_payer = await self.payer_client.get_raw_payer(
-                payer_id=raw_payment_method.payer_id(),
-                payer_id_type=PayerIdType.PAYER_ID,
+                mixed_payer_id=raw_payment_method.payer_id(),
+                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             )
         elif raw_payment_method.stripe_card_entity:
             try:
                 raw_payer = await self.payer_client.get_raw_payer(
-                    payer_id=raw_payment_method.stripe_card_entity.external_stripe_customer_id,
-                    payer_id_type=PayerIdType.STRIPE_CUSTOMER_ID,
+                    mixed_payer_id=raw_payment_method.stripe_card_entity.external_stripe_customer_id,
+                    payer_reference_id_type=PayerReferenceIdType.STRIPE_CUSTOMER_ID,
                 )
             except PayerReadError as e:
                 if e.error_code != PayinErrorCode.PAYER_READ_NOT_FOUND:

@@ -14,7 +14,7 @@ from app.payin.core.cart_payment.types import (
     LegacyConsumerChargeId,
 )
 from app.payin.core.payer.model import Payer
-from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository, InsertPayerInput
 from app.payin.repository.payment_method_repo import (
@@ -42,7 +42,9 @@ def payment_method_repository(app_context: AppContext) -> PaymentMethodRepositor
 @pytest.fixture
 async def payer(payer_repository: PayerRepository):
     insert_payer_input = InsertPayerInput(
-        id=uuid4(), payer_type=PayerType.STORE, country=CountryCode.US
+        id=uuid4(),
+        payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
+        country=CountryCode.US,
     )
     return await payer_repository.insert_payer(insert_payer_input)
 

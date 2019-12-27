@@ -29,32 +29,31 @@ async def create_payer(
     """
     Create a payer on DoorDash payments platform
 
-    - **dd_payer_id**: DoorDash consumer_id, store_id, or business_id
-    - **payer_type**: type that specifies the role of payer
+    - **payer_reference_id**: DoorDash external reference id for Payer
+    - **payer_reference_id_type**: type that specifies the role of payer
     - **email**: payer email
     - **country**: payer country. It will be used by payment gateway provider.
     - **description**: a description of payer
     """
     log.info(
         "[create_payer] receive request.",
-        dd_payer_id=req_body.dd_payer_id,
-        payer_type=req_body.payer_type,
+        payer_reference_id=req_body.payer_reference_id,
+        payer_reference_id_type=req_body.payer_reference_id_type,
     )
 
-    # Verify dd_payer_id is numeric if it is provided.
-    if req_body.dd_payer_id:
-        try:
-            int(req_body.dd_payer_id)
-        except ValueError:
-            log.exception(
-                "[create_payer] Value error for non-numeric value.",
-                dd_payer_id=req_body.dd_payer_id,
-            )
-            raise PayinError(error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA)
+    # Currently all payer_reference_id are all numeric.
+    try:
+        int(req_body.payer_reference_id)
+    except ValueError:
+        log.exception(
+            "[create_payer] Value error for non-numeric value.",
+            payer_reference_id=req_body.payer_reference_id,
+        )
+        raise PayinError(error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA)
 
     payer: Payer = await payer_processor.create_payer(
-        dd_payer_id=req_body.dd_payer_id,
-        payer_type=req_body.payer_type,
+        payer_reference_id=req_body.payer_reference_id,
+        payer_reference_id_type=req_body.payer_reference_id_type,
         email=req_body.email,
         country=req_body.country,
         description=req_body.description,

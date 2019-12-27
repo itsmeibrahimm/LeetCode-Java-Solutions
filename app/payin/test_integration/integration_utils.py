@@ -25,8 +25,8 @@ V1_PAYMENT_METHODS_ENDPOINT = "/payin/api/v1/payment_methods"
 
 
 class CreatePayerV1Request(BaseModel):
-    dd_payer_id: Optional[str]
-    payer_type: Optional[str]
+    payer_reference_id: Optional[str]
+    payer_reference_id_type: Optional[str]
     email: Optional[str]
     country: Optional[str]
     description: Optional[str]
@@ -98,8 +98,8 @@ def create_payer_v1(
     client: TestClient, request: CreatePayerV1Request
 ) -> Dict[str, Any]:
     create_payer_request = {
-        "dd_payer_id": request.dd_payer_id,
-        "payer_type": request.payer_type,
+        "payer_reference_id": request.payer_reference_id,
+        "payer_reference_id_type": request.payer_reference_id_type,
         "email": request.email,
         "country": request.country,
         "description": request.description,
@@ -108,10 +108,13 @@ def create_payer_v1(
     assert response.status_code == 201
     payer: dict = response.json()
     assert UUID(payer["id"], version=4)
-    assert payer["dd_payer_id"] == request.dd_payer_id
+    assert payer["payer_reference_id"] == request.payer_reference_id
     assert payer["country"] == request.country
     assert payer["description"] == request.description
-    assert payer["payer_type"] == request.payer_type
+    assert payer["created_at"]
+    assert payer["updated_at"]
+    assert payer["deleted_at"] is None
+    assert payer["payer_reference_id_type"] == request.payer_reference_id_type
     assert (
         payer["payment_gateway_provider_customers"][0]["payment_provider"] == "stripe"
     )
@@ -131,8 +134,8 @@ def create_payer_failure_v1(
     client: TestClient, request: CreatePayerV1Request, error: PayinError
 ):
     create_payer_request = {
-        "dd_payer_id": request.dd_payer_id,
-        "payer_type": request.payer_type,
+        "payer_reference_id": request.payer_reference_id,
+        "payer_reference_id_type": request.payer_reference_id_type,
         "email": request.email,
         "country": request.country,
         "description": request.description,

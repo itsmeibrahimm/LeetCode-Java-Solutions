@@ -84,17 +84,17 @@ class TestPayersV1:
     def test_create_and_get_payer(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_create_payer()",
-                payer_type="marketplace",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_consumer_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 
@@ -122,17 +122,17 @@ class TestPayersV1:
         )
 
     def test_invalid_input(self, client: TestClient, stripe_client: StripeTestClient):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
-        # test non-numeric dd_payer_id
+        # test non-numeric payer_reference_id
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id="i am invalid dd_payer_id",
+                payer_reference_id="i am invalid payer_reference_id",
                 country="US",
                 description="Integration Test test_create_payer()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=400, error_code="payin_1", retryable=False
@@ -143,11 +143,11 @@ class TestPayersV1:
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                dd_payer_reference_id=random_payer_reference_id,
                 country="Clement is human being, not a country",
                 description="Integration Test test_invalid_input()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=422,
@@ -160,11 +160,11 @@ class TestPayersV1:
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_invalid_input()",
-                payer_type="fake payer type",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="fake payer type",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=422,
@@ -174,16 +174,16 @@ class TestPayersV1:
         )
 
     def test_missing_input(self, client: TestClient, stripe_client: StripeTestClient):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
-        # test missing dd_payer_id
+        # test missing payer_reference_id
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
                 country="US",
                 description="Integration Test test_missing_input()",
-                payer_type="fake payer type",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="fake payer type",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=422,
@@ -196,10 +196,10 @@ class TestPayersV1:
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 description="Integration Test test_missing_input()",
-                payer_type="fake payer type",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="fake payer type",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=422,
@@ -212,10 +212,10 @@ class TestPayersV1:
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
-                payer_type="fake payer type",
-                email=(random_dd_payer_id + "@dd.com"),
+                ppayer_reference_id_type="fake payer type",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=422,
@@ -224,14 +224,14 @@ class TestPayersV1:
             ),
         )
 
-        # test missing payer_type
+        # test missing payer_reference_id_type
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_missing_input()",
-                email=(random_dd_payer_id + "@dd.com"),
+                email=(random_payer_reference_id + "@dd.com"),
             ),
             error=PayinError(
                 http_status_code=422,
@@ -244,10 +244,10 @@ class TestPayersV1:
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_missing_input()",
-                payer_type="fake payer type",
+                payer_reference_id_type="fake payer type",
             ),
             error=PayinError(
                 http_status_code=422,
@@ -321,17 +321,17 @@ class TestPayersV1:
     def test_update_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_default_payment_method()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 
@@ -385,17 +385,17 @@ class TestPayersV1:
     def test_add_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_add_default_payment_method()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 

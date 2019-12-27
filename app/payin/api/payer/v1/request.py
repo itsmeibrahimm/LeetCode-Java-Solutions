@@ -4,12 +4,12 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.commons.types import CountryCode
-from app.payin.core.payer.types import PayerType
+from app.payin.core.types import PayerReferenceIdType
 
 
 class CreatePayerRequest(BaseModel):
-    dd_payer_id: str
-    payer_type: PayerType
+    payer_reference_id: str
+    payer_reference_id_type: PayerReferenceIdType
     email: str
     country: CountryCode = CountryCode.US
     description: str

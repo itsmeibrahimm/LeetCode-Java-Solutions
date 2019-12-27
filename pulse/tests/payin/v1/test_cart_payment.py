@@ -14,7 +14,7 @@ CART_AMOUNT = 1000
 
 
 def test_create_cart_payment_without_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -38,7 +38,7 @@ def test_create_cart_payment_without_delay_capture():
 
 
 def test_create_cart_payment_with_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -62,8 +62,8 @@ def test_create_cart_payment_with_delay_capture():
 
 
 def test_create_cart_payment_with_incorrect_payment_method():
-    payer_1 = PaymentUtil.create_payer(dd_payer_id=2)[0]
-    payer_2 = PaymentUtil.create_payer(dd_payer_id=3)[0]
+    payer_1 = PaymentUtil.create_payer(payer_reference_id=2)[0]
+    payer_2 = PaymentUtil.create_payer(payer_reference_id=3)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=payer_2.id
@@ -92,7 +92,7 @@ def test_create_cart_payment_with_incorrect_payment_method():
 
 
 def test_create_cart_payment_with_invalid_payment_method():
-    temp_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    temp_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payer = PaymentUtil.create_payer()[0]
     temp_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
@@ -124,7 +124,7 @@ def test_create_cart_payment_with_invalid_payment_method():
 
 
 def test_update_cart_payment_higher_without_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             new_payer.id
@@ -158,7 +158,7 @@ def test_update_cart_payment_higher_without_delay_capture():
 
 
 def test_update_cart_payment_lower_without_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -191,7 +191,7 @@ def test_update_cart_payment_lower_without_delay_capture():
 
 
 def test_update_cart_payment_higher_with_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -224,7 +224,7 @@ def test_update_cart_payment_higher_with_delay_capture():
 
 
 def test_update_cart_payment_lower_with_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -257,7 +257,7 @@ def test_update_cart_payment_lower_with_delay_capture():
 
 
 def test_update_cart_payment_cart_payment_not_found():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     updated_cart_amount = 800
     error_code = -1
     error_reason = ""
@@ -280,7 +280,7 @@ def test_update_cart_payment_cart_payment_not_found():
     msg="OpenAPI update does not allow UpdateCartPaymentRequest creation with a negative amount"
 )
 def test_update_cart_payment_cart_payment_with_invalid_amount():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -318,7 +318,7 @@ def test_update_cart_payment_cart_payment_with_invalid_amount():
 
 
 def test_cancel_cart_payment_with_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             new_payer.id
@@ -348,7 +348,7 @@ def test_cancel_cart_payment_with_delay_capture():
 
 
 def test_cancel_cart_payment_without_delay_capture():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             new_payer.id
@@ -393,7 +393,7 @@ def test_cancel_cart_payment_with_cart_payment_not_found():
 
 
 def test_get_cart_payment():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -441,7 +441,7 @@ def test_get_cart_payment_not_found():
 
 @pytest.mark.skip(reason="Connection aborted issue")
 def test_list_cart_payment():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id
@@ -484,7 +484,7 @@ def test_list_cart_payment():
 
 @pytest.mark.skip(reason="Connection aborted issue")
 def test_list_cart_payment_with_correct_datetime_filter():
-    new_payer = PaymentUtil.create_payer(dd_payer_id=2)[0]
+    new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]
     new_payment_method = payment_method_v1_client.create_payment_method(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer.id

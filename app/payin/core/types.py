@@ -25,13 +25,28 @@ class LegacyPaymentInfo(BaseModel):
 
 class PayerIdType(str, Enum):
     """
-    Enum definition of payer id type. This is used in most of payin API endpoints for
+    (V0 only) Enum definition of payer id type. This is used in most of payin API endpoints for
     backward compatibility purpose to identify the type of input payer_id.
     """
 
     PAYER_ID = "payer_id"
     DD_CONSUMER_ID = "dd_consumer_id"
     DD_STRIPE_CUSTOMER_SERIAL_ID = "dd_stripe_customer_serial_id"  # used for payer APIs
+    STRIPE_CUSTOMER_ID = "stripe_customer_id"  # used for payer/payment_method APIs
+
+
+class PayerReferenceIdType(str, Enum):
+    """
+    Enum definition of payer reference id type. This is used in most of payin API endpoints for
+    backward compatibility purpose to identify the type of input payer_id.
+    """
+
+    PAYER_ID = "payer_id"
+    DD_CONSUMER_ID = "dd_consumer_id"
+    DD_STRIPE_CUSTOMER_ID = "dd_stripe_customer_id"  # used for payer APIs
+    DD_DRIVE_STORE_ID = "dd_drive_store_id"
+    DD_DRIVE_MERCHANT_ID = "dd_drive_merchant_id"
+    DD_DRIVE_BUSINESS_ID = "dd_drive_business_id"
     STRIPE_CUSTOMER_ID = "stripe_customer_id"  # used for payer/payment_method APIs
 
 

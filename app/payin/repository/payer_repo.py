@@ -25,12 +25,14 @@ class PayerDbEntity(DBEntity):
     """
 
     id: UUID
-    payer_type: str
     country: CountryCode
+    payer_type: Optional[str] = None
     legacy_stripe_customer_id: Optional[str] = None
     balance: Optional[int] = None
     description: Optional[str] = None
     dd_payer_id: Optional[str] = None
+    payer_reference_id: Optional[str] = None
+    payer_reference_id_type: Optional[str] = None
     default_payment_method_id: Optional[UUID] = None
     legacy_default_dd_stripe_card_id: Optional[int] = None
     metadata: Optional[dict] = None
@@ -51,14 +53,6 @@ class GetPayerByIdInput(DBRequestModel):
     id: UUID
 
 
-class GetPayerByDDPayerIdInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    dd_payer_id: str
-
-
 class GetPayerByLegacyStripeCustomerIdInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
@@ -67,13 +61,13 @@ class GetPayerByLegacyStripeCustomerIdInput(DBRequestModel):
     legacy_stripe_customer_id: str
 
 
-class GetPayerByDDPayerIdAndTypeInput(DBRequestModel):
+class GetPayerByPayerRefIdAndTypeInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
     """
 
-    dd_payer_id: str
-    payer_type: str
+    payer_reference_id: str
+    payer_reference_id_type: str
 
 
 class UpdatePayerSetInput(BaseModel):
@@ -253,20 +247,14 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def get_payer_by_dd_payer_id_and_payer_type(
-        self, input: GetPayerByDDPayerIdAndTypeInput
+    async def get_payer_by_reference_id_and_type(
+        self, input: GetPayerByPayerRefIdAndTypeInput
     ) -> Optional[PayerDbEntity]:
         ...
 
     @abstractmethod
     async def get_payer_by_id(
         self, request: GetPayerByIdInput
-    ) -> Optional[PayerDbEntity]:
-        ...
-
-    @abstractmethod
-    async def get_payer_by_dd_payer_id(
-        self, request: GetPayerByDDPayerIdInput
     ) -> Optional[PayerDbEntity]:
         ...
 
@@ -398,13 +386,13 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
                 PgpCustomerDbEntity.from_row(pgp_cus_row),
             )
 
-    async def get_payer_by_dd_payer_id_and_payer_type(
-        self, input: GetPayerByDDPayerIdAndTypeInput
+    async def get_payer_by_reference_id_and_type(
+        self, input: GetPayerByPayerRefIdAndTypeInput
     ) -> Optional[PayerDbEntity]:
         stmt = payers.table.select().where(
             and_(
-                payers.dd_payer_id == input.dd_payer_id,
-                payers.payer_type == input.payer_type,
+                payers.payer_reference_id == input.payer_reference_id,
+                payers.payer_reference_id_type == input.payer_reference_id_type,
             )
         )
         row = await self.payment_database.replica().fetch_one(stmt)
@@ -414,13 +402,6 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         self, request: GetPayerByIdInput
     ) -> Optional[PayerDbEntity]:
         stmt = payers.table.select().where(payers.id == request.id)
-        row = await self.payment_database.replica().fetch_one(stmt)
-        return PayerDbEntity.from_row(row) if row else None
-
-    async def get_payer_by_dd_payer_id(
-        self, request: GetPayerByDDPayerIdInput
-    ) -> Optional[PayerDbEntity]:
-        stmt = payers.table.select().where(payers.dd_payer_id == request.dd_payer_id)
         row = await self.payment_database.replica().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
 
@@ -567,4 +548,4 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
     ) -> int:
         stmt = payers.table.select().where(payers.id == input.payer_id)
         row = await self.payment_database.replica().fetch_one(stmt)
-        return PayerDbEntity.from_row(row).dd_payer_id if row else None
+        return PayerDbEntity.from_row(row).payer_reference_id if row else None

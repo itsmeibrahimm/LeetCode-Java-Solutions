@@ -13,8 +13,10 @@ from app.commons.utils.dataclass_extensions import no_init_field
 class PayerTable(TableDefinition):
     name: str = no_init_field("payers")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    payer_type: Column = no_init_field(Column("payer_type", Text))
-    dd_payer_id: Column = no_init_field(Column("dd_payer_id", Text))
+    payer_reference_id_type: Column = no_init_field(
+        Column("payer_reference_id_type", Text)
+    )
+    payer_reference_id: Column = no_init_field(Column("payer_reference_id", Text))
     legacy_stripe_customer_id: Column = no_init_field(
         Column("legacy_stripe_customer_id", Text)
     )

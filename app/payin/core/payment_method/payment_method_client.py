@@ -28,10 +28,14 @@ from app.payin.core.exceptions import (
     PaymentMethodDeleteError,
     PaymentMethodReadError,
 )
-from app.payin.core.payer.types import PayerType
 from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethod
 from app.payin.core.payment_method.types import PaymentMethodSortKey
-from app.payin.core.types import MixedUuidStrType, PayerIdType, PaymentMethodIdType
+from app.payin.core.types import (
+    MixedUuidStrType,
+    PayerIdType,
+    PaymentMethodIdType,
+    PayerReferenceIdType,
+)
 from app.payin.repository.payment_method_repo import (
     DeletePgpPaymentMethodByIdSetInput,
     DeletePgpPaymentMethodByIdWhereInput,
@@ -250,7 +254,7 @@ class PaymentMethodClient:
     async def get_duplicate_payment_method(
         self,
         stripe_payment_method: StripePaymentMethod,
-        payer_type: PayerType,
+        payer_reference_id_type: PayerReferenceIdType,
         pgp_customer_resource_id: str,
         dd_consumer_id: Optional[str] = None,
         dd_stripe_customer_id: Optional[str] = None,
@@ -262,7 +266,7 @@ class PaymentMethodClient:
 
             # get stripe_card object
             sc_entity = await self.payment_method_repo.get_duplicate_stripe_card(
-                payer_type=payer_type,
+                payer_reference_id_type=payer_reference_id_type,
                 input=GetDuplicateStripeCardInput(
                     fingerprint=stripe_payment_method.card.fingerprint,
                     dynamic_last4=dynamic_last4 or "",

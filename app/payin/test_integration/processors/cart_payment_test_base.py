@@ -24,6 +24,7 @@ from app.payin.core.payer.v1.processor import PayerProcessorV1
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import LegacyPaymentMethodInfo
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 
 
@@ -447,8 +448,8 @@ class CartPaymentTest(CartPaymentTestBase):
     @pytest.fixture
     async def payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
         return await payer_processor_v1.create_payer(
-            dd_payer_id="1",
-            payer_type="store",
+            payer_reference_id="1",
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             email=f"{str(uuid4())}@doordash.com)",
             country=CountryCode.US,
             description="test-payer",
@@ -520,8 +521,8 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
     @pytest.fixture
     async def payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
         return await payer_processor_v1.create_payer(
-            dd_payer_id=f"{str(int(datetime.utcnow().timestamp()))}",
-            payer_type="store",
+            payer_reference_id=f"{str(int(datetime.utcnow().timestamp()))}",
+            payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             email=f"{str(uuid4())}@doordash.com)",
             country=CountryCode.US,
             description="test-payer",

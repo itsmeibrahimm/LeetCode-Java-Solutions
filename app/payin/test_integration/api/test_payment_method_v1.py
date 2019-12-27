@@ -35,17 +35,17 @@ class TestPaymentMethodsV1:
     def test_create_get_delete_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_create_get_delete_payment_method()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 
@@ -74,17 +74,17 @@ class TestPaymentMethodsV1:
     def test_create_duplicate_card(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
 
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_create_duplicate_card()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 
@@ -119,16 +119,16 @@ class TestPaymentMethodsV1:
     def test_list_payment_methods_v1(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
+        random_payer_reference_id: str = str(random.randint(1, 100000))
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="Integration Test test_create_duplicate_card()",
-                payer_type="store",
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 

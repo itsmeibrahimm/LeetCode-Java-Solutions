@@ -30,8 +30,11 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
-from app.payin.core.payer.types import PayerType
-from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
+from app.payin.core.types import (
+    PgpPayerResourceId,
+    PgpPaymentMethodResourceId,
+    PayerReferenceIdType,
+)
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
     UpdateCartPaymentPostCancellationInput,
@@ -59,7 +62,9 @@ from app.payin.repository.payment_method_repo import (
 @pytest.fixture
 async def payer(payer_repository: PayerRepository) -> PayerDbEntity:
     insert_payer_input = InsertPayerInput(
-        id=uuid4(), payer_type=PayerType.STORE, country=CountryCode.US
+        id=uuid4(),
+        payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
+        country=CountryCode.US,
     )
     return await payer_repository.insert_payer(insert_payer_input)
 

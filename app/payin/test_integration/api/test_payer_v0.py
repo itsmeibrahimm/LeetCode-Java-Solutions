@@ -97,17 +97,17 @@ class TestPayersV0:
     def test_create_and_get_payer_by_stripe_customer_id(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
-        payer_type: str = "marketplace"
+        random_payer_reference_id: str = str(random.randint(1, 100000))
+        payer_reference_id_type: str = "dd_consumer_id"
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="test_create_and_get_payer_by_stripe_customer_id",
-                payer_type=payer_type,
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type=payer_reference_id_type,
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 
@@ -119,8 +119,6 @@ class TestPayersV0:
                     "payment_provider_customer_id"
                 ],
             )
-            + "?payer_type="
-            + payer_type
         )
         assert response.status_code == 200
         get_payer: dict = response.json()
@@ -135,8 +133,6 @@ class TestPayersV0:
                 ],
             )
             + "?force_update=True"
-            + "&payer_type="
-            + payer_type
         )
         assert response.status_code == 200
         force_get_payer: dict = response.json()
@@ -145,17 +141,17 @@ class TestPayersV0:
     def test_create_and_get_payer_by_dd_stripe_customer_id(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
-        payer_type: str = "store"
+        random_payer_reference_id: str = str(random.randint(1, 100000))
+        payer_reference_id_type: str = "dd_drive_store_id"
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="test_create_and_get_payer_by_dd_stripe_customer_id",
-                payer_type=payer_type,
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type=payer_reference_id_type,
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
 
@@ -222,8 +218,8 @@ class TestPayersV0:
         payer = create_payer_v1(
             client,
             CreatePayerV1Request(
-                dd_payer_id=f"{str(int(datetime.utcnow().timestamp()))}",
-                payer_type="store",
+                payer_reference_id=f"{str(int(datetime.utcnow().timestamp()))}",
+                payer_reference_id_type="dd_drive_store_id",
                 email=f"{str(uuid4())}@doordash.com)",
                 country=CountryCode.US,
                 description="test-payer",
@@ -298,18 +294,18 @@ class TestPayersV0:
     def test_update_drive_default_payment_method(
         self, client: TestClient, stripe_client: StripeTestClient
     ):
-        random_dd_payer_id: str = str(random.randint(1, 100000))
-        payer_type: str = "store"
+        random_payer_reference_id: str = str(random.randint(1, 100000))
+        payer_reference_id_type: str = "dd_drive_store_id"
 
         # create payer
         payer = create_payer_v1(
             client=client,
             request=CreatePayerV1Request(
-                dd_payer_id=random_dd_payer_id,
+                payer_reference_id=random_payer_reference_id,
                 country="US",
                 description="test_update_drive_default_payment_method",
-                payer_type=payer_type,
-                email=(random_dd_payer_id + "@dd.com"),
+                payer_reference_id_type=payer_reference_id_type,
+                email=(random_payer_reference_id + "@dd.com"),
             ),
         )
         # create payment_method
