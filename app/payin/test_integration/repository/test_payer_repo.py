@@ -45,7 +45,7 @@ class TestPayerRepository:
         yield await payer_repository.insert_delete_payer_request(
             DeletePayerRequestDbEntity(
                 id=uuid,
-                request_id=uuid,
+                client_request_id=uuid,
                 consumer_id=1,
                 payer_id=None,
                 status=DeletePayerRequestStatus.IN_PROGRESS.value,
@@ -254,7 +254,7 @@ class TestPayerRepository:
         result = await payer_repository.insert_delete_payer_request(
             DeletePayerRequestDbEntity(
                 id=uuid,
-                request_id=uuid,
+                client_request_id=uuid,
                 consumer_id=123,
                 payer_id=None,
                 status=DeletePayerRequestStatus.IN_PROGRESS.value,
@@ -272,7 +272,7 @@ class TestPayerRepository:
 
         expected_delete_payer_request = DeletePayerRequestDbEntity(
             id=uuid,
-            request_id=uuid,
+            client_request_id=uuid,
             consumer_id=123,
             payer_id=None,
             status=DeletePayerRequestStatus.IN_PROGRESS.value,
@@ -291,13 +291,13 @@ class TestPayerRepository:
     ):
         results = await payer_repository.find_delete_payer_requests_by_request_id(
             find_delete_payer_request_by_request_id_input=FindDeletePayerRequestByRequestIdInput(
-                request_id=delete_payer_request.request_id
+                client_request_id=delete_payer_request.client_request_id
             )
         )
 
         expected_delete_payer_request = DeletePayerRequestDbEntity(
             id=delete_payer_request.id,
-            request_id=delete_payer_request.request_id,
+            client_request_id=delete_payer_request.client_request_id,
             consumer_id=delete_payer_request.consumer_id,
             payer_id=delete_payer_request.payer_id,
             status=delete_payer_request.status,
@@ -340,7 +340,7 @@ class TestPayerRepository:
         }
         result = await payer_repository.update_delete_payer_requests(
             update_delete_payer_requests_where_input=UpdateDeletePayerRequestWhereInput(
-                request_id=delete_payer_request.request_id
+                client_request_id=delete_payer_request.client_request_id
             ),
             update_delete_payer_requests_set_input=UpdateDeletePayerRequestSetInput(
                 status=DeletePayerRequestStatus.SUCCEEDED.value,
@@ -353,7 +353,7 @@ class TestPayerRepository:
 
         expected_delete_payer_request = DeletePayerRequestDbEntity(
             id=delete_payer_request.id,
-            request_id=delete_payer_request.request_id,
+            client_request_id=delete_payer_request.client_request_id,
             consumer_id=delete_payer_request.consumer_id,
             payer_id=delete_payer_request.payer_id,
             status=DeletePayerRequestStatus.SUCCEEDED.value,

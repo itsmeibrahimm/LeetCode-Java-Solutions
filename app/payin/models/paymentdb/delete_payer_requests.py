@@ -13,8 +13,8 @@ from app.commons.utils.dataclass_extensions import no_init_field
 class DeletePayerRequestsTable(TableDefinition):
     name: str = no_init_field("delete_payer_requests")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    request_id: Column = no_init_field(
-        Column("request_id", UUID(as_uuid=True), unique=True)
+    client_request_id: Column = no_init_field(
+        Column("client_request_id", UUID(as_uuid=True), unique=True)
     )
     consumer_id: Column = no_init_field(Column("consumer_id", Integer))
     payer_id: Column = no_init_field(Column("payer_id", UUID(as_uuid=True)))

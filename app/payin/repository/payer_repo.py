@@ -107,7 +107,7 @@ class GetConsumerIdByPayerIdInput(DBRequestModel):
 
 class DeletePayerRequestDbEntity(DBEntity):
     id: UUID
-    request_id: UUID
+    client_request_id: UUID
     consumer_id: Optional[int]
     payer_id: Optional[UUID]
     status: str
@@ -127,11 +127,11 @@ class UpdateDeletePayerRequestSetInput(DBRequestModel):
 
 
 class UpdateDeletePayerRequestWhereInput(DBRequestModel):
-    request_id: UUID
+    client_request_id: UUID
 
 
 class FindDeletePayerRequestByRequestIdInput(DBRequestModel):
-    request_id: UUID
+    client_request_id: UUID
 
 
 class FindDeletePayerRequestByStatusInput(DBRequestModel):
@@ -525,8 +525,8 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         find_delete_payer_request_by_request_id_input: FindDeletePayerRequestByRequestIdInput,
     ) -> List[DeletePayerRequestDbEntity]:
         statement = delete_payer_requests.table.select().where(
-            delete_payer_requests.request_id
-            == find_delete_payer_request_by_request_id_input.request_id
+            delete_payer_requests.client_request_id
+            == find_delete_payer_request_by_request_id_input.client_request_id
         )
         results = await self.payment_database.replica().fetch_all(statement)
         return [DeletePayerRequestDbEntity.from_row(row) for row in results]
@@ -550,8 +550,8 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         statement = (
             delete_payer_requests.table.update()
             .where(
-                delete_payer_requests.request_id
-                == update_delete_payer_requests_where_input.request_id
+                delete_payer_requests.client_request_id
+                == update_delete_payer_requests_where_input.client_request_id
             )
             .values(update_delete_payer_requests_set_input.dict())
             .returning(*delete_payer_requests.table.columns.values())
