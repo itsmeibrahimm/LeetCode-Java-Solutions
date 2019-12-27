@@ -8,6 +8,7 @@ from app.payin.api.cart_payment.base.request import (
     UpdateCartPaymentBaseRequest,
     ClientDescription,
 )
+from app.payin.core.types import PayerReferenceIdType
 
 
 class CorrelationIds(BaseModel):
@@ -21,6 +22,8 @@ class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
     client_description: Optional[ClientDescription] = None
     correlation_ids: CorrelationIds
     metadata: Optional[Dict[str, Any]]
+    payer_reference_id: Optional[str]
+    payer_reference_id_type: Optional[PayerReferenceIdType]
 
 
 class UpdateCartPaymentRequest(UpdateCartPaymentBaseRequest):

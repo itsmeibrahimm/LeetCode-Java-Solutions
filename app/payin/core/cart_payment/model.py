@@ -14,7 +14,11 @@ from app.payin.core.cart_payment.types import (
     LegacyStripeChargeStatus,
     RefundStatus,
 )
-from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
+from app.payin.core.types import (
+    PgpPayerResourceId,
+    PgpPaymentMethodResourceId,
+    PayerReferenceIdType,
+)
 
 
 @final
@@ -44,6 +48,8 @@ class CartPayment(BaseModel):
     id: UUID
     amount: int
     payer_id: Optional[UUID]
+    payer_reference_id: Optional[str]
+    payer_reference_id_type: Optional[PayerReferenceIdType]
     payment_method_id: Optional[UUID]
     delay_capture: bool
     correlation_ids: CorrelationIds

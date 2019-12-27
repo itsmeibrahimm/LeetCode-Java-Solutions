@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -7,7 +8,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
-from app.payin.api.cart_payment.v1.helper import create_request_to_model
+from app.payin.api.cart_payment.v1.converter import to_internal_cart_payment
 from app.payin.api.cart_payment.v1.request import (
     CreateCartPaymentRequest,
     UpdateCartPaymentRequest,
@@ -16,6 +17,7 @@ from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.core.cart_payment.model import CartPayment, CartPaymentList
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.payment_method.types import CartPaymentSortKey
+from app.payin.core.types import PayerReferenceIdType
 
 api_tags = ["CartPaymentV1"]
 router = APIRouter()
@@ -60,7 +62,7 @@ async def create_cart_payment(
 
     cart_payment = await cart_payment_processor.create_payment(
         # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
-        request_cart_payment=create_request_to_model(
+        request_cart_payment=to_internal_cart_payment(
             cart_payment_request, correlation_ids=cart_payment_request.correlation_ids
         ),
         idempotency_key=cart_payment_request.idempotency_key,
@@ -155,8 +157,10 @@ async def cancel_cart_payment(
 )
 async def list_cart_payments(
     payer_id: str,
-    created_at_gte: datetime = None,
-    created_at_lte: datetime = None,
+    payer_reference_id: Optional[str] = None,
+    payer_reference_id_type: Optional[PayerReferenceIdType] = None,
+    created_at_gte: Optional[datetime] = None,
+    created_at_lte: Optional[datetime] = None,
     active_only: bool = False,
     sort_by: CartPaymentSortKey = CartPaymentSortKey.CREATED_AT,
     log: BoundLogger = Depends(get_logger_from_req),

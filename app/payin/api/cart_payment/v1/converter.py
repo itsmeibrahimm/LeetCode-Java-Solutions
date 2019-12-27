@@ -2,24 +2,26 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from app.payin.api.cart_payment.v0.request import CreateCartPaymentLegacyRequest
-from app.payin.core.cart_payment.model import CartPayment, CorrelationIds
-from app.payin.core.exceptions import PayinErrorCode, PayinError
+from app.payin.api.cart_payment.v1.request import (
+    CorrelationIds,
+    CreateCartPaymentRequest,
+)
+from app.payin.core.cart_payment.model import CartPayment
+from app.payin.core.exceptions import PayinError, PayinErrorCode
 
 
-def legacy_create_request_to_model(
-    cart_payment_request: CreateCartPaymentLegacyRequest,
-    correlation_ids: CorrelationIds,
+def to_internal_cart_payment(
+    cart_payment_request: CreateCartPaymentRequest, correlation_ids: CorrelationIds
 ) -> CartPayment:
     try:
         return CartPayment(
             id=uuid4(),
-            payer_id=None,
+            payer_id=cart_payment_request.payer_id,
             amount=cart_payment_request.amount,
-            payment_method_id=None,
+            payment_method_id=cart_payment_request.payment_method_id,
             delay_capture=cart_payment_request.delay_capture,
             correlation_ids=correlation_ids,
-            metadata=None,
+            metadata=cart_payment_request.metadata,
             client_description=cart_payment_request.client_description,
             payer_statement_description=cart_payment_request.payer_statement_description,
             split_payment=cart_payment_request.split_payment,
