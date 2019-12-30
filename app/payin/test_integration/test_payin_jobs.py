@@ -9,7 +9,7 @@ from app.commons.jobs.pool import JobPool
 from app.payin.conftest import PaymentIntentFactory
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus
-from app.payin.jobs import (
+from app.payin.jobs.payin_jobs import (
     CaptureUncapturedPaymentIntents,
     ResolveCapturingPaymentIntents,
 )
@@ -32,7 +32,7 @@ def stripe_pool() -> JobPool:
 class TestCaptureUncapturedPaymentIntents:
     @pytest.mark.asyncio
     @patch(
-        "app.payin.jobs.CartPaymentRepository",
+        "app.payin.jobs.payin_jobs.CartPaymentRepository",
         return_value=create_autospec(CartPaymentRepository),
     )
     async def test_capture_uncaptured_payment_intents_when_none_exist(
@@ -53,11 +53,11 @@ class TestCaptureUncapturedPaymentIntents:
 
     @pytest.mark.asyncio
     @patch(
-        "app.payin.jobs.CartPaymentRepository",
+        "app.payin.jobs.payin_jobs.CartPaymentRepository",
         return_value=create_autospec(CartPaymentRepository),
     )
     @patch(
-        "app.payin.jobs.CartPaymentProcessor",
+        "app.payin.jobs.payin_jobs.CartPaymentProcessor",
         return_value=create_autospec(CartPaymentProcessor),
     )
     async def test_capture_uncaptured_payment_intents_when_one_exists(
@@ -92,7 +92,7 @@ class TestCaptureUncapturedPaymentIntents:
 class TestResolveCapturingPaymentIntents:
     @pytest.mark.asyncio
     @patch(
-        "app.payin.jobs.CartPaymentRepository",
+        "app.payin.jobs.payin_jobs.CartPaymentRepository",
         return_value=create_autospec(CartPaymentRepository),
     )
     async def test_resolve_payment_intent_to_requires_capture(
@@ -146,7 +146,7 @@ class TestResolveCapturingPaymentIntents:
 
     @pytest.mark.asyncio
     @patch(
-        "app.payin.jobs.CartPaymentRepository",
+        "app.payin.jobs.payin_jobs.CartPaymentRepository",
         return_value=create_autospec(CartPaymentRepository),
     )
     async def test_resolve_payment_intent_to_capture_failed(

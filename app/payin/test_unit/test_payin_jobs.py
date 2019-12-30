@@ -6,7 +6,7 @@ from asynctest import patch, Mock
 from doordash_python_stats.ddstats import DoorStatsProxyMultiServer
 
 from app.commons.utils.testing import Stat
-from app.payin.jobs import EmitProblematicCaptureCount
+from app.payin.jobs.payin_jobs import EmitProblematicCaptureCount
 
 
 @pytest.mark.asyncio

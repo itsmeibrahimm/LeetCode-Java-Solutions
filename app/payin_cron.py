@@ -23,7 +23,7 @@ from app.commons.instrumentation.pool import stat_resource_pool_jobs
 from app.commons.jobs.pool import adjust_pool_sizes
 from app.commons.jobs.startup_util import init_worker_resources
 from app.commons.runtime import runtime
-from app.payin.jobs import (
+from app.payin.jobs.payin_jobs import (
     CaptureUncapturedPaymentIntents,
     ResolveCapturingPaymentIntents,
     EmitProblematicCaptureCount,

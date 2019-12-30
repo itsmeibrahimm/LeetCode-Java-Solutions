@@ -3032,7 +3032,7 @@ class CartPaymentProcessor:
         Capturing state:
         - [capturing] state is used as an optimistic lock when attempting to capture a payment intent.
         while capturing fails due to any reason, the intent's state will pause at this stage.
-        - "app.payin.jobs.ResolveCapturingPaymentIntents" will pickup payment intents stuck this stage
+        - "app.payin.jobs.payin_jobs.ResolveCapturingPaymentIntents" will pickup payment intents stuck this stage
         and reset their states to [requires_capture] or [capture_failed] depending on how low the intent
         has been in [capturing] state
         """
