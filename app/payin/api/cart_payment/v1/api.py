@@ -10,8 +10,8 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.payin.api.cart_payment.v1.converter import to_internal_cart_payment
 from app.payin.api.cart_payment.v1.request import (
-    CreateCartPaymentRequest,
-    UpdateCartPaymentRequest,
+    CreateCartPaymentRequestV1,
+    UpdateCartPaymentRequestV1,
 )
 from app.payin.api.commando_mode import commando_route_dependency
 from app.payin.core.cart_payment.model import CartPayment, CartPaymentList
@@ -31,7 +31,7 @@ router = APIRouter()
     tags=api_tags,
 )
 async def create_cart_payment(
-    cart_payment_request: CreateCartPaymentRequest,
+    cart_payment_request: CreateCartPaymentRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):
@@ -89,7 +89,7 @@ async def create_cart_payment(
 )
 async def update_cart_payment(
     cart_payment_id: UUID,
-    cart_payment_request: UpdateCartPaymentRequest,
+    cart_payment_request: UpdateCartPaymentRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
 ):

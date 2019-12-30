@@ -12,8 +12,8 @@ from app.payin.api.cart_payment.v0.request import (
 from app.payin.api.cart_payment.v1 import api as v1_api
 from app.payin.api.cart_payment.v1.request import (
     CorrelationIds,
-    CreateCartPaymentRequest,
-    UpdateCartPaymentRequest,
+    CreateCartPaymentRequestV1,
+    UpdateCartPaymentRequestV1,
 )
 from app.payin.core.exceptions import (
     CartPaymentCreateError,
@@ -100,7 +100,7 @@ class TestCartPaymentApi:
     async def test_v1_creation_errors(
         self, cart_payment_processor, expected_error_state
     ):
-        request = CreateCartPaymentRequest(
+        request = CreateCartPaymentRequestV1(
             amount=500,
             payer_id=str(uuid4()),
             payment_method_id=str(uuid4()),
@@ -176,7 +176,7 @@ class TestCartPaymentApi:
     )
     @pytest.mark.asyncio
     async def test_v1_update_errors(self, cart_payment_processor, expected_error_state):
-        request = UpdateCartPaymentRequest(
+        request = UpdateCartPaymentRequestV1(
             amount=500, payer_id=uuid4(), idempotency_key=str(uuid4())
         )
 

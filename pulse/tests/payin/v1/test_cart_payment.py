@@ -277,7 +277,7 @@ def test_update_cart_payment_cart_payment_not_found():
 
 
 @pytest.mark.skip(
-    msg="OpenAPI update does not allow UpdateCartPaymentRequest creation with a negative amount"
+    msg="OpenAPI update does not allow UpdateCartPaymentRequestV1 creation with a negative amount"
 )
 def test_update_cart_payment_cart_payment_with_invalid_amount():
     new_payer = PaymentUtil.create_payer(payer_reference_id=2)[0]

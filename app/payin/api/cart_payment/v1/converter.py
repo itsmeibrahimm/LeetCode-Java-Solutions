@@ -4,14 +4,14 @@ from pydantic import ValidationError
 
 from app.payin.api.cart_payment.v1.request import (
     CorrelationIds,
-    CreateCartPaymentRequest,
+    CreateCartPaymentRequestV1,
 )
 from app.payin.core.cart_payment.model import CartPayment
 from app.payin.core.exceptions import PayinError, PayinErrorCode
 
 
 def to_internal_cart_payment(
-    cart_payment_request: CreateCartPaymentRequest, correlation_ids: CorrelationIds
+    cart_payment_request: CreateCartPaymentRequestV1, correlation_ids: CorrelationIds
 ) -> CartPayment:
     try:
         return CartPayment(

@@ -16,7 +16,7 @@ class CorrelationIds(BaseModel):
     reference_type: str
 
 
-class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
+class CreateCartPaymentRequestV1(CreateCartPaymentBaseRequest):
     payer_id: Optional[UUID]
     payment_method_id: UUID
     client_description: Optional[ClientDescription] = None
@@ -25,5 +25,5 @@ class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
     payer_correlation_ids: Optional[PayerCorrelationIds]
 
 
-class UpdateCartPaymentRequest(UpdateCartPaymentBaseRequest):
+class UpdateCartPaymentRequestV1(UpdateCartPaymentBaseRequest):
     pass
