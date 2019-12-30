@@ -74,7 +74,7 @@ class TestCartPaymentApi:
         )
 
         payin_error_code = expected_error_state
-        cart_payment_processor.legacy_create_payment = FunctionMock(
+        cart_payment_processor.create_cart_payment_v0 = FunctionMock(
             side_effect=CartPaymentCreateError(
                 error_code=payin_error_code,
                 provider_charge_id="test_charge",
@@ -114,7 +114,7 @@ class TestCartPaymentApi:
         )
 
         payin_error_code = expected_error_state
-        cart_payment_processor.create_payment = FunctionMock(
+        cart_payment_processor.create_cart_payment_v1 = FunctionMock(
             side_effect=CartPaymentCreateError(
                 error_code=payin_error_code,
                 provider_charge_id="test_charge",

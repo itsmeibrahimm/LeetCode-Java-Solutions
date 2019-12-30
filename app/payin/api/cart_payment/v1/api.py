@@ -60,7 +60,7 @@ async def create_cart_payment(
 
     log.info("Creating cart_payment for payer", payer_id=cart_payment_request.payer_id)
 
-    cart_payment = await cart_payment_processor.create_payment(
+    cart_payment = await cart_payment_processor.create_cart_payment_v1(
         # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
         request_cart_payment=to_internal_cart_payment(
             cart_payment_request, correlation_ids=cart_payment_request.correlation_ids

@@ -39,7 +39,7 @@ from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
-from app.payin.core.payment_method.types import PgpPaymentMethod
+from app.payin.core.payment_method.types import PgpPaymentInfo
 from app.payin.core.types import PgpPaymentMethodResourceId, PgpPayerResourceId
 from app.payin.repository.cart_payment_repo import (
     UpdatePgpPaymentIntentWhereInput,
@@ -778,9 +778,9 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
     )
 
     # Lookup functions
-    cart_payment_interface.get_pgp_payment_method_by_legacy_payment = FunctionMock(
+    cart_payment_interface.get_pgp_payment_info_v0 = FunctionMock(
         return_value=(
-            PgpPaymentMethod(
+            PgpPaymentInfo(
                 pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                     "payment_method_ref_id"
                 ),
@@ -789,9 +789,9 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
             utils.generate_legacy_payment(),
         )
     )
-    cart_payment_interface.get_pgp_payment_method = FunctionMock(
+    cart_payment_interface.get_pgp_payment_info_v1 = FunctionMock(
         return_value=(
-            PgpPaymentMethod(
+            PgpPaymentInfo(
                 pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                     "payment_method_ref_id"
                 ),

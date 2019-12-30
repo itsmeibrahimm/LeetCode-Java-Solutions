@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -14,11 +14,8 @@ from app.payin.core.cart_payment.types import (
     LegacyStripeChargeStatus,
     RefundStatus,
 )
-from app.payin.core.types import (
-    PgpPayerResourceId,
-    PgpPaymentMethodResourceId,
-    PayerReferenceIdType,
-)
+from app.payin.core.payer.model import PayerCorrelationIds
+from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 
 
 @final
@@ -48,8 +45,7 @@ class CartPayment(BaseModel):
     id: UUID
     amount: int
     payer_id: Optional[UUID]
-    payer_reference_id: Optional[str]
-    payer_reference_id_type: Optional[PayerReferenceIdType]
+    payer_correlation_ids: Optional[PayerCorrelationIds]
     payment_method_id: Optional[UUID]
     delay_capture: bool
     correlation_ids: CorrelationIds

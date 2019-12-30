@@ -46,7 +46,11 @@ class LegacyPaymentMethodInfo(BaseModel):
     ]  # required if PayerType is not "marketplace" in order to populate MainDB.stripe_card.stripe_customer_id
 
 
-class PgpPaymentMethod(BaseModel):
+class PgpPaymentInfo(BaseModel):
+    """
+    Information needed to submit a charge request to payment gateway provider.
+    """
+
     class Config:
         allow_mutation = False
 

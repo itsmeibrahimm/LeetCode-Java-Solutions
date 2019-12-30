@@ -49,10 +49,8 @@ async def create_cart_payment(
 ):
     log.info("Creating cart_payment for legacy client.")
 
-    cart_payment, legacy_consumer_charge_id = await cart_payment_processor.legacy_create_payment(
-        request_cart_payment=to_internal_cart_payment(
-            cart_payment_request, cart_payment_request.legacy_correlation_ids
-        ),
+    cart_payment, legacy_consumer_charge_id = await cart_payment_processor.create_cart_payment_v0(
+        request_cart_payment=to_internal_cart_payment(cart_payment_request),
         legacy_payment=to_internal_legacy_payment_info(
             cart_payment_request.legacy_payment
         ),

@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import MagicMock
 
 import pytest
+from asynctest import create_autospec
 
 import app.payin.core.cart_payment.processor as processor
 from app.commons.types import CountryCode, Currency
@@ -19,6 +20,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PaymentMethodReadError,
 )
+from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.payment_method.types import CartPaymentSortKey
@@ -115,6 +117,10 @@ class TestCartPaymentProcessor:
         )
         payment_method_client.get_raw_payment_method = mocked_method_fetch
 
+        mocked_get_raw_payer = FunctionMock()
+        mocked_get_raw_payer.return_value = create_autospec(RawPayer)
+        payer_client.get_raw_payer = mocked_get_raw_payer
+
         cart_payment_interface = processor.CartPaymentInterface(
             app_context=MagicMock(),
             req_context=MagicMock(),
@@ -134,7 +140,7 @@ class TestCartPaymentProcessor:
         )
 
         with pytest.raises(CartPaymentCreateError) as payment_error:
-            await cart_payment_processor.create_payment(
+            await cart_payment_processor.create_cart_payment_v1(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
                 payment_country=CountryCode.US,
@@ -159,6 +165,10 @@ class TestCartPaymentProcessor:
         )
         payment_method_client.get_raw_payment_method = mocked_method_fetch
 
+        mocked_get_raw_payer = FunctionMock()
+        mocked_get_raw_payer.return_value = create_autospec(RawPayer)
+        payer_client.get_raw_payer = mocked_get_raw_payer
+
         request_cart_payment.payer_id = f"changed-{request_cart_payment.payer_id}"
         cart_payment_interface = processor.CartPaymentInterface(
             app_context=MagicMock(),
@@ -179,7 +189,7 @@ class TestCartPaymentProcessor:
         )
 
         with pytest.raises(PaymentMethodReadError) as payment_error:
-            await cart_payment_processor.create_payment(
+            await cart_payment_processor.create_cart_payment_v1(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
                 payment_country=CountryCode.US,
@@ -198,7 +208,7 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.asyncio
     async def test_create_payment(self, cart_payment_processor, request_cart_payment):
-        result_cart_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             payment_country=CountryCode.US,
@@ -216,7 +226,7 @@ class TestCartPaymentProcessor:
     async def test_legacy_get_cart_payment(
         self, cart_payment_processor, request_cart_payment
     ):
-        result_cart_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             payment_country=CountryCode.US,
@@ -238,7 +248,7 @@ class TestCartPaymentProcessor:
 
     @pytest.mark.asyncio
     async def test_get_cart_payment(self, cart_payment_processor, request_cart_payment):
-        result_cart_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             payment_country=CountryCode.US,
@@ -271,7 +281,7 @@ class TestCartPaymentProcessor:
         )
 
         with pytest.raises(Exception):
-            await cart_payment_processor.create_payment(
+            await cart_payment_processor.create_cart_payment_v1(
                 request_cart_payment=request_cart_payment,
                 idempotency_key=str(uuid.uuid4()),
                 payment_country=CountryCode.US,
@@ -287,7 +297,7 @@ class TestCartPaymentProcessor:
         cart_payment_processor.cart_payment_interface.stripe_async_client.commando = (
             True
         )
-        result_cart_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             payment_country=CountryCode.US,
@@ -324,7 +334,7 @@ class TestCartPaymentProcessor:
         )
 
         # Submit when lookup functions mocked above return a result, meaning we have existing cart payment/intent
-        result_cart_payment = await cart_payment_processor.create_payment(
+        result_cart_payment = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             payment_country=CountryCode.US,
@@ -337,7 +347,7 @@ class TestCartPaymentProcessor:
         )
 
         # Second submission attempt
-        second_result_cart_payment = await cart_payment_processor.create_payment(
+        second_result_cart_payment = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request_cart_payment,
             idempotency_key=str(uuid.uuid4()),
             payment_country=CountryCode.US,

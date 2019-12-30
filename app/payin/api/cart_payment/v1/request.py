@@ -1,14 +1,14 @@
+from typing import Any, Dict, Optional
 from uuid import UUID
-from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
 
 from app.payin.api.cart_payment.base.request import (
+    ClientDescription,
     CreateCartPaymentBaseRequest,
     UpdateCartPaymentBaseRequest,
-    ClientDescription,
 )
-from app.payin.core.types import PayerReferenceIdType
+from app.payin.core.payer.model import PayerCorrelationIds
 
 
 class CorrelationIds(BaseModel):
@@ -17,13 +17,12 @@ class CorrelationIds(BaseModel):
 
 
 class CreateCartPaymentRequest(CreateCartPaymentBaseRequest):
-    payer_id: UUID
+    payer_id: Optional[UUID]
     payment_method_id: UUID
     client_description: Optional[ClientDescription] = None
     correlation_ids: CorrelationIds
     metadata: Optional[Dict[str, Any]]
-    payer_reference_id: Optional[str]
-    payer_reference_id_type: Optional[PayerReferenceIdType]
+    payer_correlation_ids: Optional[PayerCorrelationIds]
 
 
 class UpdateCartPaymentRequest(UpdateCartPaymentBaseRequest):

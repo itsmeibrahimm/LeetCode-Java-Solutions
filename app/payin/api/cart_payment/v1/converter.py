@@ -17,6 +17,7 @@ def to_internal_cart_payment(
         return CartPayment(
             id=uuid4(),
             payer_id=cart_payment_request.payer_id,
+            payer_correlation_ids=cart_payment_request.payer_correlation_ids,
             amount=cart_payment_request.amount,
             payment_method_id=cart_payment_request.payment_method_id,
             delay_capture=cart_payment_request.delay_capture,

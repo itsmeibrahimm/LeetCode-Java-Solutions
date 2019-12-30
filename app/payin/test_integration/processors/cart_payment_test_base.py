@@ -487,7 +487,7 @@ class CartPaymentTest(CartPaymentTestBase):
             client_description="client_description",
             payer_statement_description="description",
         )
-        created = await cart_payment_processor.create_payment(
+        created = await cart_payment_processor.create_cart_payment_v1(
             request_cart_payment=request,
             idempotency_key=idempotency_key,
             currency=Currency.USD,
@@ -569,7 +569,7 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
 
         assert payer.payment_gateway_provider_customers
 
-        created, _ = await cart_payment_processor.legacy_create_payment(
+        created, _ = await cart_payment_processor.create_cart_payment_v0(
             request_cart_payment=request,
             idempotency_key=idempotency_key,
             legacy_payment=LegacyPayment(

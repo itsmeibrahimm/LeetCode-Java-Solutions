@@ -19,6 +19,7 @@ from app.payin.repository.base import PayinDBRepository
 
 log = get_logger(__name__)
 
+
 ###########################################################
 # PgpPaymentMethod DBEntity and CRUD operations           #
 ###########################################################

@@ -47,7 +47,7 @@ from app.payin.core.exceptions import (
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
 )
-from app.payin.core.payment_method.types import PgpPaymentMethod, CartPaymentSortKey
+from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.tests.utils import (
     FunctionMock,
@@ -1241,7 +1241,7 @@ class TestCartPaymentInterface:
     async def test_submit_payment_to_provider(self, cart_payment_interface):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-        pgp_payment_method = PgpPaymentMethod(
+        pgp_payment_info = PgpPaymentInfo(
             pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                 "payment_resource_id"
@@ -1251,7 +1251,7 @@ class TestCartPaymentInterface:
             payer_country=CountryCode.US,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
-            pgp_payment_method=pgp_payment_method,
+            pgp_payment_info=pgp_payment_info,
             provider_description="test_description",
         )
         name, args, kwargs = cart_payment_interface.stripe_async_client.create_payment_intent.mock_calls[
@@ -1275,7 +1275,7 @@ class TestCartPaymentInterface:
         )
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-        pgp_payment_method = PgpPaymentMethod(
+        pgp_payment_info = PgpPaymentInfo(
             pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                 "payment_resource_id"
@@ -1286,7 +1286,7 @@ class TestCartPaymentInterface:
             payer_country=CountryCode.US,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
-            pgp_payment_method=pgp_payment_method,
+            pgp_payment_info=pgp_payment_info,
             provider_description="test_description",
         )
         assert response
@@ -1303,7 +1303,7 @@ class TestCartPaymentInterface:
         )
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-        pgp_payment_method = PgpPaymentMethod(
+        pgp_payment_info = PgpPaymentInfo(
             pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                 "payment_resource_id"
@@ -1318,7 +1318,7 @@ class TestCartPaymentInterface:
                 payer_country=CountryCode.US,
                 payment_intent=intent,
                 pgp_payment_intent=pgp_intent,
-                pgp_payment_method=pgp_payment_method,
+                pgp_payment_info=pgp_payment_info,
                 provider_description="test_description",
             )
 
@@ -1355,7 +1355,7 @@ class TestCartPaymentInterface:
 
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-        pgp_payment_method = PgpPaymentMethod(
+        pgp_payment_info = PgpPaymentInfo(
             pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                 "payment_resource_id"
@@ -1367,7 +1367,7 @@ class TestCartPaymentInterface:
                 payer_country=CountryCode.US,
                 payment_intent=intent,
                 pgp_payment_intent=pgp_intent,
-                pgp_payment_method=pgp_payment_method,
+                pgp_payment_info=pgp_payment_info,
                 provider_description="test_description",
             )
         name, args, kwargs = cart_payment_interface.stripe_async_client.create_payment_intent.mock_calls[
@@ -1394,7 +1394,7 @@ class TestCartPaymentInterface:
 
         intent = generate_payment_intent(status="init", created_at=created_at)
         pgp_intent = generate_pgp_payment_intent(status="init", created_at=created_at)
-        pgp_payment_method = PgpPaymentMethod(
+        pgp_payment_info = PgpPaymentInfo(
             pgp_payer_resource_id=PgpPayerResourceId("customer_resource_id"),
             pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
                 "payment_resource_id"
@@ -1404,7 +1404,7 @@ class TestCartPaymentInterface:
             payer_country=CountryCode.US,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
-            pgp_payment_method=pgp_payment_method,
+            pgp_payment_info=pgp_payment_info,
             provider_description="test_description",
         )
 

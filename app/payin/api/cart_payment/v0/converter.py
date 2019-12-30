@@ -4,24 +4,33 @@ from pydantic import ValidationError
 
 from app.payin.api.cart_payment.v0.request import CreateCartPaymentLegacyRequest
 from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyResponse
-from app.payin.core.cart_payment.model import CartPayment, CorrelationIds, LegacyPayment
+from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
 from app.payin.core.cart_payment.types import LegacyConsumerChargeId
-from app.payin.core.exceptions import PayinErrorCode, PayinError
-from app.payin.core.types import LegacyPaymentInfo as RequestLegacyPaymentInfo
+from app.payin.core.exceptions import PayinError, PayinErrorCode
+from app.payin.core.payer.model import PayerCorrelationIds
+from app.payin.core.types import (
+    LegacyPaymentInfo as RequestLegacyPaymentInfo,
+    PayerReferenceIdType,
+)
 
 
 def to_internal_cart_payment(
-    cart_payment_request: CreateCartPaymentLegacyRequest,
-    correlation_ids: CorrelationIds,
+    cart_payment_request: CreateCartPaymentLegacyRequest
 ) -> CartPayment:
     try:
         return CartPayment(
             id=uuid4(),
             payer_id=None,
+            payer_correlation_ids=PayerCorrelationIds(
+                payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
+                payer_reference_id=str(
+                    cart_payment_request.legacy_payment.dd_consumer_id
+                ),
+            ),
             amount=cart_payment_request.amount,
             payment_method_id=None,
             delay_capture=cart_payment_request.delay_capture,
-            correlation_ids=correlation_ids,
+            correlation_ids=cart_payment_request.legacy_correlation_ids,
             metadata=None,
             client_description=cart_payment_request.client_description,
             payer_statement_description=cart_payment_request.payer_statement_description,
@@ -56,6 +65,7 @@ def to_external_cart_payment(
         id=cart_payment.id,
         amount=cart_payment.amount,
         payer_id=cart_payment.payer_id,
+        payer_correlation_ids=cart_payment.payer_correlation_ids,
         payment_method_id=cart_payment.payment_method_id,
         delay_capture=cart_payment.delay_capture,
         correlation_ids=cart_payment.correlation_ids,
