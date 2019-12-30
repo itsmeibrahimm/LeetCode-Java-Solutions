@@ -68,6 +68,7 @@ _payin_error_message_maps = {
     "payin_110": "The given dispute_id does not have a consumer_charge associated to it's stripe charge",
     "payin_111": "Error. Empty data returned from DB after update",
     "payin_800": "API not accessible/usable in commando mode",
+    "not_implemented": "This API is not implemented!",
 }
 
 
@@ -360,6 +361,11 @@ class PayinErrorCode(str, Enum):
         "payin_32",
         NO_RETRY,
         "Invalid payer type for list payment method",
+    )
+    API_NOT_IMPLEMENTED_ERROR = (
+        "not_implemented",
+        NO_RETRY,
+        "This API is not implemented!",
     )
 
     def __new__(

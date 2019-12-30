@@ -78,6 +78,7 @@ _status_code_to_payin_error_code: Dict[int, Set[PayinErrorCode]] = {
         PayinErrorCode.DISPUTE_UPDATE_STRIPE_ERROR,
         PayinErrorCode.DISPUTE_UPDATE_DB_ERROR,
     },
+    status.HTTP_501_NOT_IMPLEMENTED: {PayinErrorCode.API_NOT_IMPLEMENTED_ERROR},
 }
 
 

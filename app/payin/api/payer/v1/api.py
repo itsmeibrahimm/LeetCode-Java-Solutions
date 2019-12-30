@@ -9,6 +9,7 @@ from app.payin.api.payer.v1.request import CreatePayerRequest, UpdatePayerReques
 from app.payin.core.exceptions import PayinError, PayinErrorCode
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.v1.processor import PayerProcessorV1
+from app.payin.core.types import PayerReferenceIdType
 
 api_tags = ["PayerV1"]
 router = APIRouter()
@@ -80,11 +81,41 @@ async def get_payer(
     """
     Get payer.
 
-    - **payer_id**: DoorDash payer_id or stripe_customer_id
+    - **payer_id**: DoorDash payer_id
     - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
     """
     log.info("[get_payer] received request.", payer_id=payer_id)
     return await payer_processor.get_payer(payer_id=payer_id, force_update=force_update)
+
+
+@router.get(
+    "/payers/{payer_reference_id_type}/{payer_reference_id}",
+    response_model=Payer,
+    status_code=HTTP_200_OK,
+    operation_id="GetPayerByReferenceId",
+    tags=api_tags,
+)
+async def get_payer_by_reference_id(
+    payer_reference_id_type: PayerReferenceIdType,
+    payer_reference_id: str,
+    force_update: bool = False,
+    log: BoundLogger = Depends(get_logger_from_req),
+    payer_processor: PayerProcessorV1 = Depends(PayerProcessorV1),
+) -> Payer:
+    """
+    Get payer by payer reference id and type.
+
+    - **payer_reference_id_type**: DoorDash payer_reference_id_type
+    - **payer_reference_id**: DoorDash payer_reference_id
+    - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
+    """
+    log.info(
+        "[get_payer_by_reference_id] received request.",
+        payer_reference_id_type=payer_reference_id_type,
+        payer_reference_id=payer_reference_id,
+    )
+
+    raise PayinError(error_code=PayinErrorCode.API_NOT_IMPLEMENTED_ERROR)
 
 
 @router.post(
@@ -103,6 +134,7 @@ async def update_default_payment_method(
     """
     Update payer's default payment method
 
+    - **payer_id**: DoorDash payer_id
     - **default_payment_method**: payer's payment method (source) on authorized Payment Provider
     - **default_payment_method.payment_method_id**: [UUID] identity of the payment method.
     - **default_payment_method.dd_stripe_card_id**: [string] legacy primary id of StripeCard object
@@ -117,6 +149,41 @@ async def update_default_payment_method(
         payment_method_id=req_body.default_payment_method.payment_method_id,
         dd_stripe_card_id=req_body.default_payment_method.dd_stripe_card_id,
     )
+
+
+@router.post(
+    "/payers/{payer_reference_id_type}/{payer_reference_id}/default_payment_method",
+    response_model=Payer,
+    status_code=HTTP_200_OK,
+    operation_id="UpdatePayer",
+    tags=api_tags,
+)
+async def update_default_payment_method_by_reference_id(
+    payer_reference_id_type: PayerReferenceIdType,
+    payer_reference_id: str,
+    req_body: UpdatePayerRequestV1,
+    log: BoundLogger = Depends(get_logger_from_req),
+    payer_processor: PayerProcessorV1 = Depends(PayerProcessorV1),
+):
+    """
+    Update payer's default payment method by payer reference id and type.
+
+    - **payer_reference_id_type**: DoorDash payer_reference_id_type
+    - **payer_reference_id**: DoorDash payer_reference_id
+    - **default_payment_method**: payer's payment method (source) on authorized Payment Provider
+    - **default_payment_method.payment_method_id**: [UUID] identity of the payment method.
+    - **default_payment_method.dd_stripe_card_id**: [string] legacy primary id of StripeCard object
+    """
+
+    log.info(
+        "[update_default_payment_method_by_reference_id] received request",
+        payer_reference_id_type=payer_reference_id_type,
+        payer_reference_id=payer_reference_id,
+    )
+    # verify default_payment_method to ensure only one id is provided
+    _verify_payment_method_id(req_body)
+
+    raise PayinError(error_code=PayinErrorCode.API_NOT_IMPLEMENTED_ERROR)
 
 
 def _verify_payment_method_id(request: UpdatePayerRequestV1):
