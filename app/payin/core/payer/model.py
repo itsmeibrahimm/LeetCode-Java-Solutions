@@ -21,6 +21,11 @@ class PaymentGatewayProviderCustomer(BaseModel):
     default_payment_method_id: Optional[str] = None
 
 
+class PayerCorrelationIds(BaseModel):
+    payer_reference_id: str
+    payer_reference_id_type: PayerReferenceIdType
+
+
 @final
 class Payer(BaseModel):
     id: Optional[UUID] = None  # make it optional for existing DSJ consumer
@@ -28,8 +33,7 @@ class Payer(BaseModel):
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None
     country: Optional[str] = None
-    payer_reference_id: Optional[str] = None
-    payer_reference_id_type: Optional[str] = None
+    payer_correlation_ids: Optional[PayerCorrelationIds] = None
     dd_stripe_customer_id: Optional[str] = None
     default_payment_method_id: Optional[UUID] = None
     default_dd_stripe_card_id: Optional[int] = None
@@ -94,8 +98,10 @@ class RawPayer:
 
         :return: Payer object
         """
+
         payer: Payer
         provider_customer: PaymentGatewayProviderCustomer
+
         if self.payer_entity:
             updated_at: datetime = self.payer_entity.updated_at
             dd_stripe_customer_id: Optional[str] = None
@@ -126,10 +132,12 @@ class RawPayer:
                 )
             payer = Payer(
                 id=self.payer_entity.id,
-                payer_reference_id_type=self.payer_entity.payer_reference_id_type,
                 payment_gateway_provider_customers=[provider_customer],
                 country=self.payer_entity.country,
-                payer_reference_id=self.payer_entity.payer_reference_id,
+                payer_correlation_ids=PayerCorrelationIds(
+                    payer_reference_id=self.payer_entity.payer_reference_id,
+                    payer_reference_id_type=self.payer_entity.payer_reference_id_type,
+                ),
                 dd_stripe_customer_id=dd_stripe_customer_id,
                 default_payment_method_id=self.payer_entity.default_payment_method_id,
                 default_dd_stripe_card_id=self.payer_entity.legacy_default_dd_stripe_card_id,
@@ -147,10 +155,12 @@ class RawPayer:
                 # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 country=self.stripe_customer_entity.country_shortname,
-                payer_reference_id=str(self.stripe_customer_entity.owner_id),
                 dd_stripe_customer_id=str(self.stripe_customer_entity.id),
-                payer_reference_id_type=owner_type_to_payer_reference_id_type(
-                    owner_type=self.stripe_customer_entity.owner_type
+                payer_correlation_ids=PayerCorrelationIds(
+                    payer_reference_id=str(self.stripe_customer_entity.owner_id),
+                    payer_reference_id_type=owner_type_to_payer_reference_id_type(
+                        owner_type=self.stripe_customer_entity.owner_type
+                    ),
                 ),
                 payment_gateway_provider_customers=[provider_customer],
             )

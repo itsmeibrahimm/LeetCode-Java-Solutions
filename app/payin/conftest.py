@@ -17,7 +17,7 @@ from app.payin.core.cart_payment.types import (
     CaptureMethod,
     LegacyConsumerChargeId,
 )
-from app.payin.core.payer.model import Payer
+from app.payin.core.payer.model import Payer, PayerCorrelationIds
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -29,10 +29,11 @@ async def payment_intent(
     cart_payment_repository: CartPaymentRepository, payer_repository: PayerRepository
 ):
     payer = PayerFactory()  # type: Payer
+    assert payer.payer_correlation_ids
     insert_payer_input = InsertPayerInput(
         id=payer.id,
-        payer_reference_id=payer.payer_reference_id,
-        payer_reference_id_type=payer.payer_reference_id_type,
+        payer_reference_id=payer.payer_correlation_ids.payer_reference_id,
+        payer_reference_id_type=payer.payer_correlation_ids.payer_reference_id_type,
         country=payer.country,
         created_at=payer.created_at,
         updated_at=payer.updated_at,
@@ -134,8 +135,11 @@ class PayerFactory(factory.Factory):
         model = Payer
 
     id = factory.LazyAttribute(lambda o: str(uuid4()))
-    payer_reference_id = 11
-    payer_reference_id_type = PayerReferenceIdType.DD_DRIVE_STORE_ID.value
+    # payer_correlation_ids = PayerCorrelationIdsFactory()
+    payer_correlation_ids = PayerCorrelationIds(
+        payer_reference_id=11,
+        payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID.value,
+    )
     country = CountryCode.US.value
     description = "Xilin"
     created_at = factory.LazyFunction(datetime.utcnow)

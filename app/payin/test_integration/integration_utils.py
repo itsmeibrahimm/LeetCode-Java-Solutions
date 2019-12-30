@@ -98,8 +98,10 @@ def create_payer_v1(
     client: TestClient, request: CreatePayerV1Request
 ) -> Dict[str, Any]:
     create_payer_request = {
-        "payer_reference_id": request.payer_reference_id,
-        "payer_reference_id_type": request.payer_reference_id_type,
+        "payer_correlation_ids": {
+            "payer_reference_id": request.payer_reference_id,
+            "payer_reference_id_type": request.payer_reference_id_type,
+        },
         "email": request.email,
         "country": request.country,
         "description": request.description,
@@ -108,13 +110,19 @@ def create_payer_v1(
     assert response.status_code == 201
     payer: dict = response.json()
     assert UUID(payer["id"], version=4)
-    assert payer["payer_reference_id"] == request.payer_reference_id
     assert payer["country"] == request.country
     assert payer["description"] == request.description
     assert payer["created_at"]
     assert payer["updated_at"]
     assert payer["deleted_at"] is None
-    assert payer["payer_reference_id_type"] == request.payer_reference_id_type
+    assert (
+        payer["payer_correlation_ids"]["payer_reference_id"]
+        == request.payer_reference_id
+    )
+    assert (
+        payer["payer_correlation_ids"]["payer_reference_id_type"]
+        == request.payer_reference_id_type
+    )
     assert (
         payer["payment_gateway_provider_customers"][0]["payment_provider"] == "stripe"
     )
@@ -134,8 +142,10 @@ def create_payer_failure_v1(
     client: TestClient, request: CreatePayerV1Request, error: PayinError
 ):
     create_payer_request = {
-        "payer_reference_id": request.payer_reference_id,
-        "payer_reference_id_type": request.payer_reference_id_type,
+        "payer_correlation_ids": {
+            "payer_reference_id": request.payer_reference_id,
+            "payer_reference_id_type": request.payer_reference_id_type,
+        },
         "email": request.email,
         "country": request.country,
         "description": request.description,

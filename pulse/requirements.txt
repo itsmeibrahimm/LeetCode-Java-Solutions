@@ -1,7 +1,7 @@
 --extra-index-url https://${ARTIFACTORY_USERNAME}:${ARTIFACTORY_PASSWORD}@ddartifacts.jfrog.io/ddartifacts/api/pypi/pypi-local/simple/
 
 payin-v0-client==0.0.12
-payin-v1-client==0.0.6
+payin-v1-client==0.0.7
 payout-v0-client==0.0.12
 payout-v1-client==0.0.11
 purchasecard-v0-client==0.0.1

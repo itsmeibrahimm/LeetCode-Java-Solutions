@@ -17,6 +17,7 @@ from payin_v1_client import (
     AppPayinCoreCartPaymentModelCorrelationIds,
     UpdateCartPaymentRequest,
     Payer,
+    PayerCorrelationIds,
     PaymentMethod,
 )
 
@@ -80,9 +81,12 @@ class PaymentUtil:
     def get_create_payer_request(
         payer_reference_id: int, country: str, payer_reference_id_type: str
     ):
-        return CreatePayerRequest(
+        payer_reference_ids: PayerCorrelationIds = PayerCorrelationIds(
             payer_reference_id=payer_reference_id,
             payer_reference_id_type=payer_reference_id_type,
+        )
+        return CreatePayerRequest(
+            payer_correlation_ids=payer_reference_ids,
             email=str(payer_reference_id)
             + "-"
             + payer_reference_id_type

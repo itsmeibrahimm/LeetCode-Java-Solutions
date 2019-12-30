@@ -29,31 +29,33 @@ async def create_payer(
     """
     Create a payer on DoorDash payments platform
 
-    - **payer_reference_id**: DoorDash external reference id for Payer
-    - **payer_reference_id_type**: type that specifies the role of payer
-    - **email**: payer email
+    - **payer_correlation_ids**: DoorDash external correlation id for Payer.
+    - **payer_correlation_ids.payer_reference_id**: DoorDash external reference id for Payer.
+    - **payer_correlation_ids.payer_reference_id_type**: type that specifies the role of payer.
+    - **email**: payer email.
     - **country**: payer country. It will be used by payment gateway provider.
-    - **description**: a description of payer
+    - **description**: a description of payer.
     """
     log.info(
         "[create_payer] receive request.",
-        payer_reference_id=req_body.payer_reference_id,
-        payer_reference_id_type=req_body.payer_reference_id_type,
+        payer_reference_id=req_body.payer_correlation_ids.payer_reference_id,
+        payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,
     )
 
     # Currently all payer_reference_id are all numeric.
     try:
-        int(req_body.payer_reference_id)
+        int(req_body.payer_correlation_ids.payer_reference_id)
     except ValueError:
         log.exception(
             "[create_payer] Value error for non-numeric value.",
-            payer_reference_id=req_body.payer_reference_id,
+            payer_reference_id=req_body.payer_correlation_ids.payer_reference_id,
+            payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,
         )
         raise PayinError(error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA)
 
     payer: Payer = await payer_processor.create_payer(
-        payer_reference_id=req_body.payer_reference_id,
-        payer_reference_id_type=req_body.payer_reference_id_type,
+        payer_reference_id=req_body.payer_correlation_ids.payer_reference_id,
+        payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,
         email=req_body.email,
         country=req_body.country,
         description=req_body.description,
