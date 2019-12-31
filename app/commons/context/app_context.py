@@ -5,7 +5,6 @@ from random import choice
 from typing import Any, cast
 
 import aiohttp
-from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from aredis import StrictRedisCluster
 from starlette.requests import Request
@@ -15,6 +14,7 @@ from app.commons.applications import FastAPI
 from app.commons.config.app_config import AppConfig
 from app.commons.context.logger import root_logger, get_logger
 from app.commons.database.infra import DB
+from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.providers.timed_aio_client import (
     TrackedIdentityClientSession,
     TrackedDsjClientSession,
@@ -79,7 +79,7 @@ class AppContext:
 
     redis_cluster: StrictRedisCluster
 
-    kafka_producer: AIOKafkaProducer
+    kafka_producer: KafkaMessageProducer
 
     async def close(self):
         # stop monitoring various application resources
@@ -101,12 +101,12 @@ class AppContext:
                 self.dsj_session.close(),
                 self.marqeta_session.close(),
                 self.redis_lock_manager.destroy(),
-                self.kafka_producer.stop(),
             )
         finally:
             # shutdown the threadpool
             self.stripe_thread_pool.shutdown(wait=False)
             self.redis_cluster.connection_pool.disconnect()
+            self.kafka_producer.stop()
 
 
 async def create_app_context(config: AppConfig) -> AppContext:
@@ -278,14 +278,10 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     redis_cluster = StrictRedisCluster(startup_nodes=config.REDIS_CLUSTER_INSTANCES)
 
-    kafka_producer = AIOKafkaProducer(
-        loop=asyncio.get_event_loop(), bootstrap_servers=config.KAFKA_URL
+    kafka_config = {"bootstrap.servers": config.KAFKA_URL}
+    kafka_producer = KafkaMessageProducer(
+        loop=asyncio.get_event_loop(), configs=kafka_config
     )
-    # TODO: PAYOUT-495, remove the try-except when infra is ready in staging and prod
-    try:
-        await kafka_producer.start()
-    except Exception:
-        await kafka_producer.stop()
 
     context = AppContext(
         log=root_logger,

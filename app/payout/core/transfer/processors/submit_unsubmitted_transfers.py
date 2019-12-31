@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-from aiokafka import AIOKafkaProducer
 from doordash_python_stats.ddstats import doorstats_global
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
@@ -11,6 +10,7 @@ from app.commons.core.processor import (
     OperationRequest,
     OperationResponse,
 )
+from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
 from app.payout.core.transfer.processors.submit_transfer import (
@@ -60,7 +60,7 @@ class SubmitUnsubmittedTransfers(
     managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
     transaction_repo: TransactionRepositoryInterface
     payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
-    kafka_producer: AIOKafkaProducer
+    kafka_producer: KafkaMessageProducer
     stripe: StripeAsyncClient
 
     def __init__(
@@ -74,7 +74,7 @@ class SubmitUnsubmittedTransfers(
         transaction_repo: TransactionRepositoryInterface,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         stripe: StripeAsyncClient,
-        kafka_producer: AIOKafkaProducer,
+        kafka_producer: KafkaMessageProducer,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)

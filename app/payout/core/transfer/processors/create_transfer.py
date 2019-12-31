@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from starlette.status import HTTP_400_BAD_REQUEST
 
@@ -13,6 +12,8 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from doordash_python_stats.ddstats import doorstats_global
+
+from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.lock.locks import PaymentLock
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import (
@@ -97,7 +98,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
     payment_lock_manager: Aioredlock
     stripe: StripeAsyncClient
-    kafka_producer: AIOKafkaProducer
+    kafka_producer: KafkaMessageProducer
 
     def __init__(
         self,
@@ -111,7 +112,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
         payment_lock_manager: Aioredlock,
         stripe: StripeAsyncClient,
-        kafka_producer: AIOKafkaProducer,
+        kafka_producer: KafkaMessageProducer,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)

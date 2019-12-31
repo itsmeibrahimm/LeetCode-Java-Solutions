@@ -1,9 +1,9 @@
-from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from fastapi import Depends
 from starlette.requests import Request
 
 from app.commons.context.req_context import get_stripe_async_client_from_req
+from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
@@ -100,7 +100,7 @@ class PayoutService(BaseService):
     dsj_client: DSJClient
     stripe: StripeAsyncClient
     redis_lock_manager: Aioredlock
-    kafka_producer: AIOKafkaProducer
+    kafka_producer: KafkaMessageProducer
 
     def __init__(self, request: Request):
         super().__init__(request)

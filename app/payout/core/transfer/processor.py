@@ -1,6 +1,7 @@
-from aiokafka import AIOKafkaProducer
 from aioredlock import Aioredlock
 from structlog.stdlib import BoundLogger
+
+from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
@@ -56,7 +57,7 @@ class TransferProcessors:
     transaction_repo: TransactionRepositoryInterface
     payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
     payment_lock_manager: Aioredlock
-    kafka_producer: AIOKafkaProducer
+    kafka_producer: KafkaMessageProducer
 
     def __init__(
         self,
@@ -69,7 +70,7 @@ class TransferProcessors:
         transaction_repo: TransactionRepositoryInterface,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         payment_lock_manager: Aioredlock,
-        kafka_producer: AIOKafkaProducer,
+        kafka_producer: KafkaMessageProducer,
     ):
         self.logger = logger
         self.stripe = stripe

@@ -4,9 +4,8 @@ import logging
 from typing import Optional
 from uuid import uuid4
 
-from aiokafka import AIOKafkaProducer
-
 from app.commons.context.app_context import AppContext
+from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.payout.models import PayoutTask
 
 log = logging.getLogger(__name__)
@@ -114,8 +113,8 @@ class BaseTask:
                 extra={"task_type": data["task_type"], "task_id": self.task_id},
             )
 
-    async def send(self, kafka_producer: AIOKafkaProducer):
-        await kafka_producer.send_and_wait(self.topic_name, self.serialize().encode())
+    async def send(self, kafka_producer: KafkaMessageProducer):
+        await kafka_producer.produce(self.topic_name, self.serialize().encode())
 
     @staticmethod
     async def run(app_context: AppContext, data: dict):

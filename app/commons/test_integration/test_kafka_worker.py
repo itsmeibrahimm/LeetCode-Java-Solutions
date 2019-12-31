@@ -97,9 +97,7 @@ class TestKafkaWorker:
             for i in range(10):
                 msg = f"message {i}: {datetime.timestamp(datetime.now())}"
                 msg_list.append(msg)
-                await app_context.kafka_producer.send_and_wait(
-                    self.topic_name, msg.encode()
-                )
+                await app_context.kafka_producer.produce(self.topic_name, msg.encode())
         except Exception as e:
             print(e)
 
@@ -112,12 +110,13 @@ class TestKafkaWorker:
         )
 
         await worker.start()
+        await asyncio.sleep(15)
         # Stopping workers with graceful timeout set to 3 seconds
         await worker.stop(graceful_timeout_seconds=3)
 
         assert mock_message_processor.call_count == len(msg_list)
         for msg in msg_list:
-            mock_message_processor.assert_any_call(app_context, msg.encode())
+            mock_message_processor.assert_any_call(app_context, msg)
 
     async def test_weekly_create_transfer_success(
         self,
@@ -177,6 +176,7 @@ class TestKafkaWorker:
         await payout_worker.start()
         await stripe_worker.start()
 
+        await asyncio.sleep(10)
         # Stopping workers with graceful timeout set to 3 seconds
         await payout_worker.stop(graceful_timeout_seconds=3)
         await stripe_worker.stop(graceful_timeout_seconds=3)
@@ -241,6 +241,7 @@ class TestKafkaWorker:
         )
         await payout_worker.start()
 
+        await asyncio.sleep(10)
         # Stopping workers with graceful timeout set to 3 seconds
         await payout_worker.stop(graceful_timeout_seconds=3)
 
