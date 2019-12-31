@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Schema
 from typing_extensions import final
 
 from app.commons.types import PgpCode
@@ -22,13 +22,18 @@ class PaymentGatewayProviderCustomer(BaseModel):
 
 
 class PayerCorrelationIds(BaseModel):
-    payer_reference_id: str
-    payer_reference_id_type: PayerReferenceIdType
+    payer_reference_id: str = Schema(  # type: ignore
+        default=..., description="DoorDash external reference id for Payer"
+    )
+    payer_reference_id_type: PayerReferenceIdType = Schema(  # type: ignore
+        default=..., description="type that specifies the role of payer"
+    )
 
 
 @final
 class Payer(BaseModel):
-    id: Optional[UUID] = None  # make it optional for existing DSJ consumer
+    # make it optional for existing DSJ consumer
+    id: Optional[UUID] = None
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     deleted_at: Optional[datetime] = None

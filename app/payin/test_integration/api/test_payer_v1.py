@@ -27,8 +27,20 @@ def _get_payer_url(payer_id: str):
     return f"{V1_PAYERS_ENDPOINT}/{payer_id}"
 
 
+def _get_payer_by_reference_id_url(
+    payer_reference_id_type: str, payer_reference_id: str
+):
+    return f"{V1_PAYERS_ENDPOINT}/{payer_reference_id_type}/{payer_reference_id}"
+
+
 def _update_payer_default_payment_method_url(payer_id: str):
     return f"{V1_PAYERS_ENDPOINT}/{payer_id}/default_payment_method"
+
+
+def _update_payer_default_payment_method_by_reference_id_url(
+    payer_reference_id_type: str, payer_reference_id: str
+):
+    return f"{V1_PAYERS_ENDPOINT}/{payer_reference_id_type}/{payer_reference_id}/default_payment_method"
 
 
 class UpdatePayerV1Request(BaseModel):
@@ -37,7 +49,7 @@ class UpdatePayerV1Request(BaseModel):
 
 
 def _update_payer_v1(
-    client: TestClient, payer_id: Any, request: UpdatePayerV1Request
+    client: TestClient, request: UpdatePayerV1Request, url: str
 ) -> Dict[str, Any]:
     update_payer_request = {
         "default_payment_method": {
@@ -45,10 +57,7 @@ def _update_payer_v1(
             "dd_stripe_card_id": request.dd_stripe_card_id,
         }
     }
-    response = client.post(
-        _update_payer_default_payment_method_url(payer_id=payer_id),
-        json=update_payer_request,
-    )
+    response = client.post(url, json=update_payer_request)
     assert response.status_code == 200
     return response.json()
 
@@ -156,7 +165,7 @@ class TestPayersV1:
             ),
         )
 
-        # test invalid payer_type
+        # test invalid payer_reference_id_type
         create_payer_failure_v1(
             client=client,
             request=CreatePayerV1Request(
@@ -351,7 +360,7 @@ class TestPayersV1:
         # set default_payment_method
         update_payer = _update_payer_v1(
             client=client,
-            payer_id=payer["id"],
+            url=_update_payer_default_payment_method_url(payer_id=payer["id"]),
             request=UpdatePayerV1Request(payment_method_id=payment_method["id"]),
         )
         assert (
@@ -427,3 +436,131 @@ class TestPayersV1:
             get_payer["default_dd_stripe_card_id"]
             == payment_method["dd_stripe_card_id"]
         )
+
+    def test_get_payer_by_reference_id(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        random_payer_reference_id: str = str(random.randint(1, 100000))
+
+        # create payer
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                payer_reference_id=random_payer_reference_id,
+                country="US",
+                description="Integration Test test_get_payer_by_reference_id()",
+                payer_reference_id_type="dd_consumer_id",
+                email=(random_payer_reference_id + "@dd.com"),
+            ),
+        )
+
+        # get payer
+        response = client.get(
+            _get_payer_by_reference_id_url(
+                payer_reference_id_type=payer["payer_correlation_ids"][
+                    "payer_reference_id_type"
+                ],
+                payer_reference_id=payer["payer_correlation_ids"]["payer_reference_id"],
+            )
+        )
+        assert response.status_code == 200
+        get_payer: dict = response.json()
+        assert payer == get_payer
+
+        # get payer with force_update
+        response = client.get(
+            _get_payer_by_reference_id_url(
+                payer_reference_id_type="dd_consumer_id",
+                payer_reference_id=payer["payer_correlation_ids"]["payer_reference_id"],
+            )
+            + "?force_update=True"
+        )
+        assert response.status_code == 200
+        force_get_payer: dict = response.json()
+        assert payer == force_get_payer
+
+    def test_get_payer_invalid_reference_id_type(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        response = client.get(
+            _get_payer_by_reference_id_url(
+                payer_reference_id_type="i_am_invalid_payer_ref_id_type",
+                payer_reference_id="123",
+            )
+        )
+        assert response.status_code == 422
+        get_payer: dict = response.json()
+        assert get_payer["error_code"] == "request_validation_error"
+        assert get_payer["retryable"] == False
+
+    def test_update_default_payment_method_by_reference_id(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        random_payer_reference_id: str = str(random.randint(1, 100000))
+
+        # create payer
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                payer_reference_id=random_payer_reference_id,
+                country="US",
+                description="Integration Test test_default_payment_method()",
+                payer_reference_id_type="dd_drive_store_id",
+                email=(random_payer_reference_id + "@dd.com"),
+            ),
+        )
+
+        # create payment_method
+        payment_method = create_payment_method_v1(
+            client=client,
+            request=CreatePaymentMethodV1Request(
+                payer_id=payer["id"],
+                payment_gateway="stripe",
+                token="tok_visa",
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
+            ),
+        )
+
+        # set default_payment_method
+        update_payer = _update_payer_v1(
+            client=client,
+            url=_update_payer_default_payment_method_by_reference_id_url(
+                payer_reference_id_type="dd_stripe_customer_id",
+                payer_reference_id=payer["dd_stripe_customer_id"],
+            ),
+            request=UpdatePayerV1Request(payment_method_id=payment_method["id"]),
+        )
+        assert (
+            update_payer["payment_gateway_provider_customers"][0][
+                "default_payment_method_id"
+            ]
+            == payment_method["payment_gateway_provider_details"]["payment_method_id"]
+        )
+        assert update_payer["default_payment_method_id"] == payment_method["id"]
+        assert (
+            update_payer["default_dd_stripe_card_id"]
+            == payment_method["dd_stripe_card_id"]
+        )
+
+        # delete payment_method
+        delete_payment_methods_v1(client=client, payment_method_id=payment_method["id"])
+
+        # get payer, and verify default_payment_method is gone
+        response = client.get(
+            _get_payer_by_reference_id_url(
+                payer_reference_id_type="dd_stripe_customer_id",
+                payer_reference_id=payer["dd_stripe_customer_id"],
+            )
+        )
+        assert response.status_code == 200
+        get_payer: dict = response.json()
+        assert (
+            get_payer["payment_gateway_provider_customers"][0][
+                "default_payment_method_id"
+            ]
+            is None
+        )
+        assert get_payer["default_payment_method_id"] is None
+        assert get_payer["default_dd_stripe_card_id"] is None

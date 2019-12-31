@@ -94,21 +94,30 @@ class PayerProcessorV1:
         )
         return raw_payer.to_payer()
 
-    async def get_payer(self, payer_id: UUID, force_update: bool):
+    async def get_payer(
+        self,
+        payer_lookup_id: MixedUuidStrType,
+        payer_reference_id_type: PayerReferenceIdType,
+        force_update: bool,
+    ) -> Payer:
         """
         Retrieve DoorDash payer.
 
-        :param payer_id: payer unique id.
+        :param payer_lookup_id: either payer_id or payer_reference_id.
+        :param payer_reference_id_type: payer reference id type.
         :param force_update: force update from payment provider.
         :return: Payer object
         """
         self.log.info(
-            "[get_payer] started.", payer_id=payer_id, force_update=force_update
+            "[get_payer] started.",
+            payer_lookup_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
+            force_update=force_update,
         )
 
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            mixed_payer_id=payer_id,
-            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
+            mixed_payer_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
         )
 
         if force_update:
@@ -124,14 +133,16 @@ class PayerProcessorV1:
 
     async def update_default_payment_method(
         self,
-        payer_id: UUID,
+        payer_lookup_id: MixedUuidStrType,
+        payer_reference_id_type: PayerReferenceIdType,
         payment_method_id: Optional[UUID],
         dd_stripe_card_id: Optional[str],
     ):
         """
         Update DoorDash payer's default payment method.
 
-        :param payer_id: payer unique id.
+        :param payer_lookup_id: either payer_id or payer_reference_id.
+        :param payer_reference_id_type: payer reference id type.
         :param payment_method_id: new default payment_method identity.
         :param dd_stripe_card_id: new default payment_method identity.
         :return: Payer object
@@ -152,8 +163,8 @@ class PayerProcessorV1:
 
         # step 1: find Payer object to get pgp_resource_id. Exception is handled by get_payer_raw_objects()
         raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            mixed_payer_id=payer_id,
-            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
+            mixed_payer_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
         )
         pgp_country: Optional[str] = raw_payer.country()
         if not pgp_country:
@@ -178,7 +189,8 @@ class PayerProcessorV1:
 
         self.log.info(
             "[update_payer] PGP update default_payment_method completed",
-            payer_id=payer_id,
+            payer_lookup_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
             pgp_default_payment_method_resource_id=stripe_customer.invoice_settings.default_payment_method,
         )
 

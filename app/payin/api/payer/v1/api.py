@@ -85,7 +85,11 @@ async def get_payer(
     - **force_update**: [boolean] specify if requires a force update from Payment Provider (default is "false")
     """
     log.info("[get_payer] received request.", payer_id=payer_id)
-    return await payer_processor.get_payer(payer_id=payer_id, force_update=force_update)
+    return await payer_processor.get_payer(
+        payer_lookup_id=payer_id,
+        payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
+        force_update=force_update,
+    )
 
 
 @router.get(
@@ -114,8 +118,11 @@ async def get_payer_by_reference_id(
         payer_reference_id_type=payer_reference_id_type,
         payer_reference_id=payer_reference_id,
     )
-
-    raise PayinError(error_code=PayinErrorCode.API_NOT_IMPLEMENTED_ERROR)
+    return await payer_processor.get_payer(
+        payer_lookup_id=payer_reference_id,
+        payer_reference_id_type=payer_reference_id_type,
+        force_update=force_update,
+    )
 
 
 @router.post(
@@ -145,7 +152,8 @@ async def update_default_payment_method(
     _verify_payment_method_id(req_body)
 
     return await payer_processor.update_default_payment_method(
-        payer_id=payer_id,
+        payer_lookup_id=payer_id,
+        payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
         payment_method_id=req_body.default_payment_method.payment_method_id,
         dd_stripe_card_id=req_body.default_payment_method.dd_stripe_card_id,
     )
@@ -183,7 +191,12 @@ async def update_default_payment_method_by_reference_id(
     # verify default_payment_method to ensure only one id is provided
     _verify_payment_method_id(req_body)
 
-    raise PayinError(error_code=PayinErrorCode.API_NOT_IMPLEMENTED_ERROR)
+    return await payer_processor.update_default_payment_method(
+        payer_lookup_id=payer_reference_id,
+        payer_reference_id_type=payer_reference_id_type,
+        payment_method_id=req_body.default_payment_method.payment_method_id,
+        dd_stripe_card_id=req_body.default_payment_method.dd_stripe_card_id,
+    )
 
 
 def _verify_payment_method_id(request: UpdatePayerRequestV1):
