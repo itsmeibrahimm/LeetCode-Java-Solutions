@@ -2088,7 +2088,14 @@ class TestExistingSuccessChargeForStripeCard:
             stripe_charge_succeeded_with_expired_stripe_card.card_id
             == stripe_card_expired.id
         )
-        assert int(stripe_card_expired.exp_month) < date.today().month
+        is_card_expired = False | (
+            int(stripe_card_expired.exp_month) < date.today().month
+            and int(stripe_card_expired.exp_year) <= date.today().year
+        )
+        is_card_expired = is_card_expired | (
+            int(stripe_card_expired.exp_year) < date.today().year
+        )
+        assert is_card_expired
         assert not await cart_payment_repository.is_stripe_card_valid_and_has_success_charge_record(
             stripe_card_stripe_id=stripe_card_expired.stripe_id
         )
