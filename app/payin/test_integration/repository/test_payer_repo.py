@@ -24,7 +24,7 @@ from app.payin.repository.payer_repo import (
     GetConsumerIdByPayerIdInput,
     UpdateDeletePayerRequestWhereInput,
     UpdateDeletePayerRequestSetInput,
-    FindDeletePayerRequestByRequestIdInput,
+    FindDeletePayerRequestByClientRequestIdInput,
     FindDeletePayerRequestByStatusInput,
     DeletePayerRequestDbEntity,
 )
@@ -286,11 +286,11 @@ class TestPayerRepository:
         assert result == expected_delete_payer_request
 
     @pytest.mark.asyncio
-    async def test_find_delete_payer_requests_by_request_id(
+    async def test_find_delete_payer_requests_by_client_request_id(
         self, payer_repository: PayerRepository, delete_payer_request
     ):
-        results = await payer_repository.find_delete_payer_requests_by_request_id(
-            find_delete_payer_request_by_request_id_input=FindDeletePayerRequestByRequestIdInput(
+        results = await payer_repository.find_delete_payer_requests_by_client_request_id(
+            find_delete_payer_request_by_client_request_id_input=FindDeletePayerRequestByClientRequestIdInput(
                 client_request_id=delete_payer_request.client_request_id
             )
         )

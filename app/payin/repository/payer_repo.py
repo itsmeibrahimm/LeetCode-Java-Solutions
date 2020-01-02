@@ -130,7 +130,7 @@ class UpdateDeletePayerRequestWhereInput(DBRequestModel):
     client_request_id: UUID
 
 
-class FindDeletePayerRequestByRequestIdInput(DBRequestModel):
+class FindDeletePayerRequestByClientRequestIdInput(DBRequestModel):
     client_request_id: UUID
 
 
@@ -317,9 +317,9 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def find_delete_payer_requests_by_request_id(
+    async def find_delete_payer_requests_by_client_request_id(
         self,
-        find_delete_payer_request_by_request_id_input: FindDeletePayerRequestByRequestIdInput,
+        find_delete_payer_request_by_client_request_id_input: FindDeletePayerRequestByClientRequestIdInput,
     ) -> List[DeletePayerRequestDbEntity]:
         ...
 
@@ -520,13 +520,13 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         row = await self.payment_database.master().fetch_one(statement)
         return DeletePayerRequestDbEntity.from_row(row) if row else None
 
-    async def find_delete_payer_requests_by_request_id(
+    async def find_delete_payer_requests_by_client_request_id(
         self,
-        find_delete_payer_request_by_request_id_input: FindDeletePayerRequestByRequestIdInput,
+        find_delete_payer_request_by_client_request_id_input: FindDeletePayerRequestByClientRequestIdInput,
     ) -> List[DeletePayerRequestDbEntity]:
         statement = delete_payer_requests.table.select().where(
             delete_payer_requests.client_request_id
-            == find_delete_payer_request_by_request_id_input.client_request_id
+            == find_delete_payer_request_by_client_request_id_input.client_request_id
         )
         results = await self.payment_database.replica().fetch_all(statement)
         return [DeletePayerRequestDbEntity.from_row(row) for row in results]

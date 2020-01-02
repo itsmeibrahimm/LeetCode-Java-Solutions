@@ -715,6 +715,13 @@
             "index": "artifactory",
             "version": "==0.2.29"
         },
+        "protobuf-privacy": {
+            "hashes": [
+                "sha256:a421ee1bf85d829cbac72b8e93b5917cc3183b81b3743b208b6d659978b2e7e2"
+            ],
+            "index": "artifactory",
+            "version": "==0.1.1"
+        },
         "psycopg2-binary": {
             "hashes": [
                 "sha256:040234f8a4a8dfd692662a8308d78f63f31a97e1c42d2480e5e6810c48966a29",
