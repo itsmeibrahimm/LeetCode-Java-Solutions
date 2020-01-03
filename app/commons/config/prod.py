@@ -97,8 +97,11 @@ def create_app_config() -> AppConfig:
         REDIS_INSTANCES=[
             ("prod-default-d.mhazzc.ng.0001.usw2.cache.amazonaws.com", 6379)
         ],
-        # todo: Get Kafka prod URL
-        KAFKA_URL="localhost:9092",
+        KAFKA_URL="kafka-02.instaclustr-prod.doordash.red:9093",
+        IS_PROTECTED_KAFKA=True,
+        KAFKA_USERNAME=Secret(name="kafka_username"),
+        KAFKA_PASSWORD=Secret(name="kafka_password"),
+        KAFKA_CLIENT_CERT=Secret(name="kafka_client_cert"),
         REDIS_CLUSTER_INSTANCES=[
             {
                 "host": "payment-service-cluster.mhazzc.clustercfg.usw2.cache.amazonaws.com",

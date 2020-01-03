@@ -68,7 +68,7 @@ class TestDeletePayerMessageProcessor:
         return action_request
 
     async def test_insert_delete_payer_request_success(
-        self, app_context: AppContext, action_request
+        self, app_context: AppContext, app_config: AppConfig, action_request
     ):
         payer_repo = PayerRepository(app_context)
 
@@ -78,8 +78,8 @@ class TestDeletePayerMessageProcessor:
 
         delete_payer_kafka_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.consumer_topic,
-            kafka_url=self.kafka_url,
             processor=delete_payer_message_processor.process_message,
             num_consumers=1,
         )
@@ -103,6 +103,7 @@ class TestDeletePayerMessageProcessor:
     async def test_insert_delete_payer_request_failure(
         self,
         app_context: AppContext,
+        app_config: AppConfig,
         action_request,
         mocker: pytest_mock.MockFixture,
         mock_send_response,
@@ -118,8 +119,8 @@ class TestDeletePayerMessageProcessor:
 
         delete_payer_kafka_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.consumer_topic,
-            kafka_url=self.kafka_url,
             processor=delete_payer_message_processor.process_message,
             num_consumers=1,
         )
@@ -138,7 +139,11 @@ class TestDeletePayerMessageProcessor:
         )
 
     async def test_invalid_action(
-        self, app_context: AppContext, mock_send_response, action_request
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mock_send_response,
+        action_request,
     ):
         action_request.action_id = action_pb2.ActionId.CONSUMER_FORGET
 
@@ -148,8 +153,8 @@ class TestDeletePayerMessageProcessor:
 
         delete_payer_kafka_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.consumer_topic,
-            kafka_url=self.kafka_url,
             processor=delete_payer_message_processor.process_message,
             num_consumers=1,
         )
@@ -168,7 +173,11 @@ class TestDeletePayerMessageProcessor:
         )
 
     async def test_invalid_profile_type(
-        self, app_context: AppContext, mock_send_response, action_request
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mock_send_response,
+        action_request,
     ):
         action_request.profile_type = common_pb2.ProfileType.UNKNOWN
 
@@ -178,8 +187,8 @@ class TestDeletePayerMessageProcessor:
 
         delete_payer_kafka_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.consumer_topic,
-            kafka_url=self.kafka_url,
             processor=delete_payer_message_processor.process_message,
             num_consumers=1,
         )
@@ -198,7 +207,11 @@ class TestDeletePayerMessageProcessor:
         )
 
     async def test_request_id_format_invalid(
-        self, app_context: AppContext, mock_send_response, action_request
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mock_send_response,
+        action_request,
     ):
         action_request.request_id = "test"
 
@@ -208,8 +221,8 @@ class TestDeletePayerMessageProcessor:
 
         delete_payer_kafka_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.consumer_topic,
-            kafka_url=self.kafka_url,
             processor=delete_payer_message_processor.process_message,
             num_consumers=1,
         )

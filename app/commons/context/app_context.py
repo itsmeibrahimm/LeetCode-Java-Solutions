@@ -278,9 +278,23 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     redis_cluster = StrictRedisCluster(startup_nodes=config.REDIS_CLUSTER_INSTANCES)
 
-    kafka_config = {"bootstrap.servers": config.KAFKA_URL}
+    kafka_producer_config = {"bootstrap.servers": config.KAFKA_URL}
+    if (
+        config.IS_PROTECTED_KAFKA
+        and config.KAFKA_USERNAME.value
+        and config.KAFKA_PASSWORD.value
+        and config.KAFKA_CLIENT_CERT.value
+    ):
+        kafka_client_cert_filename = "kafka_client_cert.pem"
+        with open(kafka_client_cert_filename, "w") as text_file:
+            print(f"{config.KAFKA_CLIENT_CERT.value}", file=text_file)
+        kafka_producer_config["ssl.ca.location"] = kafka_client_cert_filename
+        kafka_producer_config["security.protocol"] = "sasl_ssl"
+        kafka_producer_config["sasl.mechanism"] = "SCRAM-SHA-256"
+        kafka_producer_config["sasl.username"] = config.KAFKA_USERNAME.value
+        kafka_producer_config["sasl.password"] = config.KAFKA_PASSWORD.value
     kafka_producer = KafkaMessageProducer(
-        loop=asyncio.get_event_loop(), configs=kafka_config
+        loop=asyncio.get_event_loop(), configs=kafka_producer_config
     )
 
     context = AppContext(

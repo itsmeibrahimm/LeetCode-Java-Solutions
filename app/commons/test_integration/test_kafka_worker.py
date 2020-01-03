@@ -82,7 +82,10 @@ class TestKafkaWorker:
         return TransactionRepository(database=payout_bankdb)
 
     async def test_success(
-        self, app_context: AppContext, mocker: pytest_mock.MockFixture
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mocker: pytest_mock.MockFixture,
     ):
         @asyncio.coroutine
         def mock_processor(*args, **kwargs):
@@ -103,8 +106,8 @@ class TestKafkaWorker:
 
         worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.topic_name,
-            kafka_url=self.kafka_url,
             processor=mock_message_processor,
             num_consumers=1,
         )
@@ -121,6 +124,7 @@ class TestKafkaWorker:
     async def test_weekly_create_transfer_success(
         self,
         app_context: AppContext,
+        app_config: AppConfig,
         mocker: pytest_mock.MockFixture,
         payment_account_repo: PaymentAccountRepository,
         transaction_repo: TransactionRepository,
@@ -161,15 +165,15 @@ class TestKafkaWorker:
 
         payout_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.payout_topic_name,
-            kafka_url=self.kafka_url,
             processor=tasks.process_message,
             num_consumers=1,
         )
         stripe_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.stripe_topic_name,
-            kafka_url=self.kafka_url,
             processor=tasks.process_message,
             num_consumers=1,
         )
@@ -197,6 +201,7 @@ class TestKafkaWorker:
     async def test_weekly_create_transfer_retry(
         self,
         app_context: AppContext,
+        app_config: AppConfig,
         mocker: pytest_mock.MockFixture,
         payment_account_repo: PaymentAccountRepository,
         transaction_repo: TransactionRepository,
@@ -234,8 +239,8 @@ class TestKafkaWorker:
 
         payout_worker = KafkaWorker(
             app_context=app_context,
+            app_config=app_config,
             topic_name=self.payout_topic_name,
-            kafka_url=self.kafka_url,
             processor=tasks.process_message,
             num_consumers=1,
         )

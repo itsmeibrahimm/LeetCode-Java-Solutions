@@ -137,8 +137,12 @@ class AppConfig(SecretAware):
     # Redis Cluster Instances
     REDIS_CLUSTER_INSTANCES: List[dict]
 
-    # Kafka Url
+    # Kafka
     KAFKA_URL: str
+    IS_PROTECTED_KAFKA: bool
+    KAFKA_USERNAME: Secret
+    KAFKA_PASSWORD: Secret
+    KAFKA_CLIENT_CERT: Secret
 
     # DSJ client
     DSJ_API_USER_EMAIL: Secret

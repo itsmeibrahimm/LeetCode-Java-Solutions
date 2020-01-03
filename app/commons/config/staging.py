@@ -104,8 +104,11 @@ def create_app_config() -> AppConfig:
         # currently using merchant_datastore redis instance, which is the same as the one used for payment in DSJ
         # better to switch to payment's own redis instance after instant payout/transfer migration
         REDIS_INSTANCES=[("staging0.trwaqb.0001.usw2.cache.amazonaws.com", 6379)],
-        # todo: Get Kafka staging URL
-        KAFKA_URL="localhost:9092",
+        KAFKA_URL="kafka-00.instaclustr-staging.doordash.red:9093",
+        IS_PROTECTED_KAFKA=True,
+        KAFKA_USERNAME=Secret(name="kafka_username"),
+        KAFKA_PASSWORD=Secret(name="kafka_password"),
+        KAFKA_CLIENT_CERT=Secret(name="kafka_client_cert"),
         REDIS_CLUSTER_INSTANCES=[
             {
                 "host": "staging-payment-service-cluster.trwaqb.clustercfg.usw2.cache.amazonaws.com",

@@ -147,6 +147,10 @@ def create_app_config() -> AppConfig:
         # Assume the redis_endpoint is properly set in the format of "host:port"
         REDIS_INSTANCES=[(redis_endpoint.split(":")[0], redis_endpoint.split(":")[1])],
         KAFKA_URL=kafka_endpoint,
+        IS_PROTECTED_KAFKA=False,
+        KAFKA_USERNAME=Secret(name="kafka_username", value=""),
+        KAFKA_PASSWORD=Secret(name="kafka_password", value=""),
+        KAFKA_CLIENT_CERT=Secret(name="kafka_client_cert", value=""),
         REDIS_CLUSTER_INSTANCES=[
             {
                 "host": redis_cluster_endpoint.split(":")[0],

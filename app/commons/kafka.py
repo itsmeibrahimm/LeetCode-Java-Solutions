@@ -7,6 +7,7 @@ from asyncio_pool import AioPool
 from confluent_kafka import Consumer
 from typing import Awaitable, Callable, List
 
+from app.commons.config.app_config import AppConfig
 from app.commons.context.app_context import AppContext
 from app.commons.context.logger import set_request_id
 
@@ -15,6 +16,7 @@ log = logging.getLogger(__name__)
 
 class KafkaMessageConsumer:
     app_context: AppContext
+    app_config: AppConfig
     topic_name: str
     stop_consuming_event: asyncio.Event
 
@@ -22,34 +24,49 @@ class KafkaMessageConsumer:
         self,
         *,
         app_context: AppContext,
-        kafka_url: str,
+        app_config: AppConfig,
         topic_name: str,
         processor: Callable[[AppContext, str], Awaitable[bool]],
         stop_consuming_event: asyncio.Event,
     ):
         super().__init__()
         self.app_context = app_context
+        self.app_config = app_config
         self.processor = processor
         self.topic_name = topic_name
-        self.kafka_url = kafka_url
+        self.kafka_url = app_config.KAFKA_URL
         self.stop_consuming_event = stop_consuming_event
         consumer_group = f"payment-service-{topic_name}-task-consumer"
 
         log.info("starting consumer...")
-        self.consumer = Consumer(
-            {
-                "bootstrap.servers": kafka_url,
-                "group.id": consumer_group,  # Consumer must be in a group to commit
-                "auto.offset.reset": "earliest",  # If committed offset not found, start from beginning
-                "enable.auto.commit": True,
-                "auto.commit.interval.ms": (10 * 1000),  # Autocommit every 10 second
-                "fetch.min.bytes": 1,
-                "fetch.message.max.bytes": (1024 * 1024),
-                "session.timeout.ms": (10 * 1000),
-                "heartbeat.interval.ms": (3 * 1000),
-                "max.poll.interval.ms": (5 * 60 * 1000),
-            }
-        )
+        kafka_consumer_config = {
+            "bootstrap.servers": self.kafka_url,
+            "group.id": consumer_group,  # Consumer must be in a group to commit
+            "auto.offset.reset": "earliest",  # If committed offset not found, start from beginning
+            "enable.auto.commit": True,
+            "auto.commit.interval.ms": (10 * 1000),  # Autocommit every 10 second
+            "fetch.min.bytes": 1,
+            "fetch.message.max.bytes": (1024 * 1024),
+            "session.timeout.ms": (10 * 1000),
+            "heartbeat.interval.ms": (3 * 1000),
+            "max.poll.interval.ms": (5 * 60 * 1000),
+        }
+        if (
+            app_config.IS_PROTECTED_KAFKA
+            and app_config.KAFKA_USERNAME.value
+            and app_config.KAFKA_PASSWORD.value
+            and app_config.KAFKA_CLIENT_CERT.value
+        ):
+            kafka_client_cert_filename = "kafka_client_cert.pem"
+            with open(kafka_client_cert_filename, "w") as text_file:
+                print(f"{app_config.KAFKA_CLIENT_CERT.value}", file=text_file)
+            kafka_consumer_config["ssl.ca.location"] = kafka_client_cert_filename
+            kafka_consumer_config["security.protocol"] = "sasl_ssl"
+            kafka_consumer_config["sasl.mechanism"] = "SCRAM-SHA-256"
+            kafka_consumer_config["sasl.username"] = app_config.KAFKA_USERNAME.value
+            kafka_consumer_config["sasl.password"] = app_config.KAFKA_PASSWORD.value
+
+        self.consumer = Consumer(kafka_consumer_config)
 
     async def run(self):
         try:
@@ -91,6 +108,7 @@ class KafkaMessageConsumer:
 
 class KafkaWorker:
     app_context: AppContext
+    app_config: AppConfig
     pool: AioPool
     stop_consuming_event: asyncio.Event
     consumers: List[KafkaMessageConsumer]
@@ -101,22 +119,23 @@ class KafkaWorker:
         self,
         *,
         app_context: AppContext,
+        app_config: AppConfig,
         topic_name: str,
-        kafka_url: str,
         processor: Callable[[AppContext, str], Awaitable[bool]],
         num_consumers: int,
     ):
         self.app_context = app_context
+        self.app_config = app_config
         self.pool = AioPool(size=num_consumers + 1)
         self.stop_consuming_event = asyncio.Event()
         self.topic_name = topic_name
-        self.kafka_url = kafka_url
+        self.kafka_url = app_config.KAFKA_URL
 
         self.consumers = [
             KafkaMessageConsumer(
                 app_context=self.app_context,
-                kafka_url=kafka_url,
-                topic_name=topic_name,
+                app_config=self.app_config,
+                topic_name=self.topic_name,
                 processor=processor,
                 stop_consuming_event=self.stop_consuming_event,
             )

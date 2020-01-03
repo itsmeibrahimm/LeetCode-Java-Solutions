@@ -46,7 +46,7 @@ async def main(topic_name: str, processor, number_consumers: int):
 
     worker = KafkaWorker(
         app_context=app_context,
-        kafka_url=app_config.KAFKA_URL,
+        app_config=app_config,
         topic_name=topic_name,
         processor=processor,
         num_consumers=number_consumers,

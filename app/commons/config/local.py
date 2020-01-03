@@ -156,5 +156,9 @@ def create_app_config() -> AppConfig:
         ),
         REDIS_INSTANCES=[("localhost", 6380)],
         KAFKA_URL="localhost:9092",
+        IS_PROTECTED_KAFKA=False,
+        KAFKA_USERNAME=Secret(name="kafka_username", value=""),
+        KAFKA_PASSWORD=Secret(name="kafka_password", value=""),
+        KAFKA_CLIENT_CERT=Secret(name="kafka_client_cert", value=""),
         REDIS_CLUSTER_INSTANCES=[{"host": "localhost", "port": 7000}],
     )
