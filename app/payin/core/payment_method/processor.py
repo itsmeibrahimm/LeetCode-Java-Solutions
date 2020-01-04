@@ -112,7 +112,10 @@ class PaymentMethodProcessor:
                 pgp_customer_res_id = raw_payer.pgp_payer_resource_id
                 payer_reference_id_type = raw_payer.payer_entity.payer_reference_id_type
                 if payer_reference_id_type == PayerReferenceIdType.DD_CONSUMER_ID:
-                    dd_consumer_id = raw_payer.payer_entity.dd_payer_id
+                    dd_consumer_id = (
+                        raw_payer.payer_entity.dd_payer_id
+                        or raw_payer.payer_entity.payer_reference_id
+                    )
                 else:
                     dd_stripe_customer_id = (
                         str(raw_payer.stripe_customer_entity.id)
