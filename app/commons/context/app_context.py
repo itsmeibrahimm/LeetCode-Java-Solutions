@@ -287,7 +287,8 @@ async def create_app_context(config: AppConfig) -> AppContext:
     ):
         kafka_client_cert_filename = "kafka_client_cert.pem"
         with open(kafka_client_cert_filename, "w") as text_file:
-            print(f"{config.KAFKA_CLIENT_CERT.value}", file=text_file)
+            cert_to_write = config.KAFKA_CLIENT_CERT.value.replace("\\n", "\n")
+            print(f"{cert_to_write}", file=text_file)
         kafka_producer_config["ssl.ca.location"] = kafka_client_cert_filename
         kafka_producer_config["security.protocol"] = "sasl_ssl"
         kafka_producer_config["sasl.mechanism"] = "SCRAM-SHA-256"

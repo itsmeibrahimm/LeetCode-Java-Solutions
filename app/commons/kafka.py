@@ -59,7 +59,8 @@ class KafkaMessageConsumer:
         ):
             kafka_client_cert_filename = "kafka_client_cert.pem"
             with open(kafka_client_cert_filename, "w") as text_file:
-                print(f"{app_config.KAFKA_CLIENT_CERT.value}", file=text_file)
+                cert_to_write = app_config.KAFKA_CLIENT_CERT.value.replace("\\n", "\n")
+                print(f"{cert_to_write}", file=text_file)
             kafka_consumer_config["ssl.ca.location"] = kafka_client_cert_filename
             kafka_consumer_config["security.protocol"] = "sasl_ssl"
             kafka_consumer_config["sasl.mechanism"] = "SCRAM-SHA-256"
