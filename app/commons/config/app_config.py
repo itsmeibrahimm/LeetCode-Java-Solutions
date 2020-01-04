@@ -195,3 +195,5 @@ class AppConfig(SecretAware):
     # In other words, if a payment intent is not completed by `payment_intent.capture_after + PROBLEMATIC_CAPTURE_DELAY`,
     # then there is likely an issue with that payment intent and should be investigated
     PROBLEMATIC_CAPTURE_DELAY: timedelta = timedelta(days=1)
+
+    WORKER_HEALTH_SERVER_PORT: int = 80

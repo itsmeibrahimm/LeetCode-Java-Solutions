@@ -5,6 +5,7 @@ from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
 from app.commons.config.newrelic_loader import init_newrelic_agent
 from app.commons.kafka import KafkaWorker
+from app.commons.worker_health_server import HealthServer
 
 init_newrelic_agent()
 
@@ -33,8 +34,8 @@ log = get_logger("worker")
 async def main(topic_name: str, processor, number_consumers: int):
     app_config = init_app_config_for_web()
 
-    # health_server = HealthServer()
-    # await health_server.start(port=app_config.WORKER_HEALTH_SERVER_PORT)
+    health_server = HealthServer()
+    await health_server.start(port=app_config.WORKER_HEALTH_SERVER_PORT)
 
     init_global_statsd(
         prefix=app_config.GLOBAL_STATSD_PREFIX,
@@ -53,7 +54,7 @@ async def main(topic_name: str, processor, number_consumers: int):
     )
     await worker.run()
 
-    # await health_server.stop()
+    await health_server.stop()
 
     await app_context.close()
 

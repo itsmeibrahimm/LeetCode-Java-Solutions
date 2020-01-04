@@ -157,4 +157,5 @@ def create_app_config() -> AppConfig:
                 "port": redis_cluster_endpoint.split(":")[1],
             }
         ],
+        WORKER_HEALTH_SERVER_PORT=9000,
     )

@@ -161,4 +161,5 @@ def create_app_config() -> AppConfig:
         KAFKA_PASSWORD=Secret(name="kafka_password", value=""),
         KAFKA_CLIENT_CERT=Secret(name="kafka_client_cert", value=""),
         REDIS_CLUSTER_INSTANCES=[{"host": "localhost", "port": 7000}],
+        WORKER_HEALTH_SERVER_PORT=9000,
     )
