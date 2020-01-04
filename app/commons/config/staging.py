@@ -105,7 +105,7 @@ def create_app_config() -> AppConfig:
         # better to switch to payment's own redis instance after instant payout/transfer migration
         REDIS_INSTANCES=[("staging0.trwaqb.0001.usw2.cache.amazonaws.com", 6379)],
         KAFKA_URL="kafka-00.instaclustr-staging.doordash.red:9093",
-        IS_PROTECTED_KAFKA=True,
+        IS_PROTECTED_KAFKA=False,
         KAFKA_USERNAME=Secret(name="kafka_username"),
         KAFKA_PASSWORD=Secret(name="kafka_password"),
         KAFKA_CLIENT_CERT=Secret(name="kafka_client_cert"),
