@@ -184,11 +184,6 @@ module "payment-service-admin" {
   service_replica_count                     = "1"
   service_container_port                    = "80"
 
-  service_liveness_probe_init_delay         = "20"
-  service_liveness_probe_period             = "10"
-  service_liveness_probe_failure_threshold  = "3"
-  service_liveness_probe_path               = "/"
-
   service_resource_requests_memory          = "1Gi"
   service_resource_limits_memory            = "1Gi"
   service_resource_requests_cpu             = "1024m"
@@ -263,6 +258,11 @@ module "payment-service-payment-stripe-worker" {
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
+
+  service_liveness_probe_init_delay         = "20"
+  service_liveness_probe_period             = "10"
+  service_liveness_probe_failure_threshold  = "3"
+  service_liveness_probe_path               = "/"
 
   service_resource_requests_memory          = "1Gi"
   service_resource_limits_memory            = "1Gi"
