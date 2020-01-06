@@ -65,6 +65,7 @@ async def create_cart_payment(
         request_cart_payment=to_internal_cart_payment(
             cart_payment_request, correlation_ids=cart_payment_request.correlation_ids
         ),
+        dd_stripe_card_id=cart_payment_request.dd_stripe_card_id,
         idempotency_key=cart_payment_request.idempotency_key,
         payment_country=cart_payment_request.payment_country,
         currency=cart_payment_request.currency,

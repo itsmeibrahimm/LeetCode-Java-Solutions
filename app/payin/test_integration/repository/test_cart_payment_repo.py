@@ -2080,7 +2080,7 @@ class TestExistingSuccessChargeForStripeCard:
 
     async def test_success_charge_exists_but_card_expired(
         self,
-        stripe_card_expired,
+        stripe_card_expired: StripeCardDbEntity,
         cart_payment_repository: CartPaymentRepository,
         stripe_charge_succeeded_with_expired_stripe_card: LegacyStripeCharge,
     ):

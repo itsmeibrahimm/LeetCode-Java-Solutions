@@ -90,6 +90,7 @@ from app.commons.utils.legacy_utils import (
 )
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
 from app.payin.core.types import (
@@ -1804,17 +1805,32 @@ class CartPaymentInterface:
     async def get_pgp_payment_info_v1(
         self,
         payer_id: uuid.UUID,
-        payment_method_id: uuid.UUID,
+        payment_method_id: Optional[uuid.UUID],
         legacy_country_id: int,
         raw_payer: Optional[RawPayer] = None,
+        dd_stripe_card_id: Optional[int] = None,
     ) -> Tuple[PgpPaymentInfo, LegacyPayment]:
 
-        raw_payment_method = await self.payment_method_client.get_raw_payment_method(
-            payer_id=payer_id,
-            payer_id_type=PayerIdType.PAYER_ID,
-            payment_method_id=payment_method_id,
-            payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
-        )
+        if not (payment_method_id or dd_stripe_card_id):
+            raise ValueError(
+                "At least one of payment_method_id and dd_stripe_card_id need to be specified"
+            )
+
+        raw_payment_method: RawPaymentMethod
+        if payment_method_id:
+            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
+                payer_id=payer_id,
+                payer_id_type=PayerIdType.PAYER_ID,
+                payment_method_id=payment_method_id,
+                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
+            )
+        else:
+            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
+                payer_id=payer_id,
+                payer_id_type=PayerIdType.PAYER_ID,
+                payment_method_id=str(not_none(dd_stripe_card_id)),
+                payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
+            )
 
         if not raw_payer:
             raw_payer = await self.payer_client.get_raw_payer(
@@ -1838,7 +1854,7 @@ class CartPaymentInterface:
 
         result_legacy_payment = LegacyPayment(
             dd_consumer_id=raw_payer.payer_entity.payer_reference_id,
-            dd_stripe_card_id=str(raw_payment_method.legacy_dd_stripe_card_id),
+            dd_stripe_card_id=raw_payment_method.legacy_dd_stripe_card_id,
             dd_country_id=legacy_country_id,
         )
         self.req_context.log.debug(
@@ -3199,11 +3215,13 @@ class CartPaymentProcessor:
     @track_func
     @tracing.trackable
     async def create_cart_payment_v1(
+        # TODO PAYIN-292 refactor and consolidate cart payment internal interfaces.
         self,
         request_cart_payment: CartPayment,
         idempotency_key: str,
         payment_country: CountryCode,
         currency: Currency,
+        dd_stripe_card_id: Optional[int] = None,
     ) -> CartPayment:
         self.log.info(
             "[create_payment] creating cart_payment",
@@ -3214,9 +3232,9 @@ class CartPaymentProcessor:
             delay_capture=request_cart_payment.delay_capture,
             correlation_ids=request_cart_payment.correlation_ids,
         )
-        assert request_cart_payment.payment_method_id
+        assert request_cart_payment.payment_method_id or dd_stripe_card_id
 
-        # TODO: simplify and consolidate the process of fetching all required metadata to create a cart payment
+        # TODO: PAYIN-292 consolidate the process of fetching all required metadata to create a cart payment
         payer_reference_id: Union[uuid.UUID, str]
         payer_reference_id_type: PayerReferenceIdType
 
@@ -3249,6 +3267,7 @@ class CartPaymentProcessor:
                 payment_method_id=request_cart_payment.payment_method_id,
                 legacy_country_id=get_country_id_by_code(payment_country),
                 raw_payer=raw_payer,
+                dd_stripe_card_id=dd_stripe_card_id,
             )
         except PaymentMethodReadError as e:
             if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
@@ -3305,7 +3324,7 @@ class CartPaymentProcessor:
             CartPayment -- A CartPayment model for the created payment.
         """
         self.log.info(
-            "[_create_payment] Creating legacy payment",
+            "[_create_payment] Creating cart payment with consumer charge",
             stripe_customer_id=legacy_payment.stripe_customer_id,
             payer_country=payer_country,
             payment_country=payment_country,

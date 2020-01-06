@@ -702,7 +702,9 @@ class LegacyPaymentMethodOps(PaymentMethodOpsInterface):
             # no need to authorize payment_method
             is_owner = True
         else:
-            if payer_id_type is None and pm_entity:
+            if pm_entity and (
+                payer_id_type is None or payer_id_type == PayerIdType.PAYER_ID
+            ):
                 is_owner = payer_id == pm_entity.payer_id
             elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID and sc_entity:
                 is_owner = payer_id == sc_entity.external_stripe_customer_id

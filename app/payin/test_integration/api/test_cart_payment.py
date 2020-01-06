@@ -95,6 +95,7 @@ class TestCartPayment:
             payment_method["payment_gateway_provider_details"]["payment_provider"]
             == "stripe"
         )
+        assert payment_method["dd_stripe_card_id"]
         assert payment_method["card"]
         assert payment_method["card"]["last4"]
         assert payment_method["card"]["exp_year"]
@@ -122,20 +123,31 @@ class TestCartPayment:
         client_description: str = None,
         idempotency_key: Optional[str] = None,
         payer_id_extractor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        payment_method_extractor: Optional[
+            Callable[[Dict[str, Any]], Dict[str, Any]]
+        ] = None,
     ) -> Dict[str, Any]:
 
         if not payer_id_extractor:
 
-            def id_extractor(rpayer: Dict[str, Any]) -> Dict[str, Any]:
+            def payer_id_extractor_func(payer: Dict[str, Any]) -> Dict[str, Any]:
                 return {"payer_id": payer["id"]}
 
-            payer_id_extractor = id_extractor
+            payer_id_extractor = payer_id_extractor_func
+
+        if not payment_method_extractor:
+
+            def payment_method_extractor_func(
+                payment_method: Dict[str, Any]
+            ) -> Dict[str, Any]:
+                return {"payment_method_id": payment_method["id"]}
+
+            payment_method_extractor = payment_method_extractor_func
 
         request_body = {
             "amount": amount,
             "payment_country": "US",
             "currency": "usd",
-            "payment_method_id": payment_method["id"],
             "delay_capture": delay_capture,
             "client_description": f"{payer['id']} description"
             if not client_description
@@ -144,8 +156,11 @@ class TestCartPayment:
             "correlation_ids": {"reference_id": "123", "reference_type": "3"},
         }
 
-        payer_ids = payer_id_extractor(payer)
-        request_body.update(payer_ids)
+        payer_id_data = payer_id_extractor(payer)
+        request_body.update(payer_id_data)
+
+        payment_method_data = payment_method_extractor(payment_method)
+        request_body.update(payment_method_data)
 
         if split_payment:
             request_body["split_payment"] = split_payment
@@ -399,6 +414,9 @@ class TestCartPayment:
         split_payment: Optional[Dict[str, Any]] = None,
         client_description: str = None,
         payer_id_extractor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        payment_method_extractor: Optional[
+            Callable[[Dict[str, Any]], Dict[str, Any]]
+        ] = None,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_request(
             payer,
@@ -408,6 +426,7 @@ class TestCartPayment:
             split_payment,
             client_description=client_description,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
@@ -416,7 +435,10 @@ class TestCartPayment:
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
         assert cart_payment["payer_id"] == payer["id"]
-        assert cart_payment["payment_method_id"] == request_body["payment_method_id"]
+        if "payment_method_id" in request_body:
+            assert (
+                cart_payment["payment_method_id"] == request_body["payment_method_id"]
+            )
         assert cart_payment["delay_capture"] == request_body["delay_capture"]
         assert cart_payment["correlation_ids"]
         assert (
@@ -973,7 +995,7 @@ class TestCartPayment:
         )
 
     @pytest.mark.parametrize("commando_mode", [True, False])
-    def test_cart_payment_creation_with_payer_id(
+    def test_cart_payment_creation_with_payer_id_payment_method_id(
         self,
         stripe_api: StripeAPISettings,
         client: TestClient,
@@ -987,6 +1009,9 @@ class TestCartPayment:
         def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
             return {"payer_id": payer["id"]}
 
+        def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return {"payment_method_id": payment_method["id"]}
+
         self._test_cart_payment_creation_flows(
             stripe_api=stripe_api,
             client=client,
@@ -997,10 +1022,11 @@ class TestCartPayment:
             app_context=app_context,
             event_loop=event_loop,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
 
     @pytest.mark.parametrize("commando_mode", [True, False])
-    def test_cart_payment_creation_with_dd_stripe_customer_id(
+    def test_cart_payment_creation_with_dd_stripe_customer_id_payment_method_id(
         self,
         stripe_api: StripeAPISettings,
         client: TestClient,
@@ -1019,6 +1045,9 @@ class TestCartPayment:
             }
             return {"payer_correlation_ids": payer_correlation_ids}
 
+        def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return {"payment_method_id": payment_method["id"]}
+
         self._test_cart_payment_creation_flows(
             stripe_api=stripe_api,
             client=client,
@@ -1029,6 +1058,74 @@ class TestCartPayment:
             app_context=app_context,
             event_loop=event_loop,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
+        )
+
+    @pytest.mark.parametrize("commando_mode", [True, False])
+    def test_cart_payment_creation_with_payer_id_dd_stripe_card_id(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        runtime_setter: RuntimeSetter,
+        commando_mode: bool,
+        app_context: AppContext,
+        event_loop: AbstractEventLoop,
+    ):
+        def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
+            return {"payer_id": payer["id"]}
+
+        def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return {"dd_stripe_card_id": payment_method["dd_stripe_card_id"]}
+
+        self._test_cart_payment_creation_flows(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            runtime_setter=runtime_setter,
+            commando_mode=commando_mode,
+            app_context=app_context,
+            event_loop=event_loop,
+            payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
+        )
+
+    @pytest.mark.parametrize("commando_mode", [True, False])
+    def test_cart_payment_creation_with_dd_stripe_customer_id_dd_stripe_card_id(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        runtime_setter: RuntimeSetter,
+        commando_mode: bool,
+        app_context: AppContext,
+        event_loop: AbstractEventLoop,
+    ):
+        def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
+            dd_stripe_customer_id = payer["dd_stripe_customer_id"]
+            payer_correlation_ids = {
+                "payer_reference_id": dd_stripe_customer_id,
+                "payer_reference_id_type": PayerReferenceIdType.DD_STRIPE_CUSTOMER_ID,
+            }
+            return {"payer_correlation_ids": payer_correlation_ids}
+
+        def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return {"dd_stripe_card_id": payment_method["dd_stripe_card_id"]}
+
+        self._test_cart_payment_creation_flows(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            runtime_setter=runtime_setter,
+            commando_mode=commando_mode,
+            app_context=app_context,
+            event_loop=event_loop,
+            payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
 
     def _test_cart_payment_creation_flows(
@@ -1042,6 +1139,9 @@ class TestCartPayment:
         app_context: AppContext,
         event_loop: AbstractEventLoop,
         payer_id_extractor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        payment_method_extractor: Optional[
+            Callable[[Dict[str, Any]], Dict[str, Any]]
+        ] = None,
     ):
         stripe_api.enable_outbound()
         runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, commando_mode)
@@ -1056,6 +1156,7 @@ class TestCartPayment:
             amount=500,
             delay_capture=True,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
 
         # Success case: intent created, auto captured
@@ -1066,6 +1167,7 @@ class TestCartPayment:
             amount=600,
             delay_capture=False,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
 
         # Split payment use
@@ -1081,6 +1183,7 @@ class TestCartPayment:
             delay_capture=False,
             split_payment=split_payment,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
 
         # Other payer cannot use some else's payment method for cart payment creation
@@ -1091,6 +1194,7 @@ class TestCartPayment:
             payer=other_payer,
             payment_method=payment_method,
             payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
         )
         self._test_cart_payment_creation_error(
             client, request_body, 403, "payin_23", False

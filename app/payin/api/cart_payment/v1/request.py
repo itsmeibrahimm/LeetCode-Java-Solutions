@@ -18,7 +18,8 @@ class CorrelationIds(BaseModel):
 
 class CreateCartPaymentRequestV1(CreateCartPaymentBaseRequest):
     payer_id: Optional[UUID]
-    payment_method_id: UUID
+    payment_method_id: Optional[UUID]
+    dd_stripe_card_id: Optional[int]
     client_description: Optional[ClientDescription] = None
     correlation_ids: CorrelationIds
     metadata: Optional[Dict[str, Any]]
