@@ -184,6 +184,9 @@ class PayerClient:
             payer_reference_id=payer_reference_id,
             payer_reference_id_type=payer_reference_id_type,
             legacy_stripe_customer_id=pgp_customer_resource_id,
+            legacy_dd_stripe_customer_id=stripe_customer_entity.id
+            if stripe_customer_entity
+            else None,
             country=country,
             description=description,
             created_at=now,

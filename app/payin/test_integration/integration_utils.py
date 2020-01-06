@@ -15,6 +15,7 @@ from app.payin.core.cart_payment.processor import (
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.payment_method.types import PaymentMethodSortKey
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
@@ -134,6 +135,13 @@ def create_payer_v1(
         payer["payment_gateway_provider_customers"][0]["default_payment_method_id"]
         is None
     )
+    if request.payer_reference_id_type in (
+        PayerReferenceIdType.DD_DRIVE_BUSINESS_ID,
+        PayerReferenceIdType.DD_DRIVE_STORE_ID,
+        PayerReferenceIdType.DD_DRIVE_MERCHANT_ID,
+    ):
+        assert "legacy_dd_stripe_customer_id" in payer
+        assert payer["legacy_dd_stripe_customer_id"]
 
     return payer
 

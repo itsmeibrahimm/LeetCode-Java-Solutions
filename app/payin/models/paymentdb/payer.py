@@ -20,6 +20,9 @@ class PayerTable(TableDefinition):
     legacy_stripe_customer_id: Column = no_init_field(
         Column("legacy_stripe_customer_id", Text)
     )
+    legacy_dd_stripe_customer_id: Column = no_init_field(
+        Column("legacy_dd_stripe_customer_id", BigInteger)
+    )
     country: Column = no_init_field(Column("country", Text))
     balance: Column = no_init_field(Column("balance", BigInteger))
     description: Column = no_init_field(Column("description", Text))

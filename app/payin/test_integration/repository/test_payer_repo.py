@@ -96,7 +96,6 @@ class TestPayerRepository:
             country="US",
             is_primary=True,
             pgp_code="stripe",
-            legacy_id=1,
             balance=100,
             default_payment_method_id="fake_default_payment_method_id",
             created_at=datetime.utcnow(),
@@ -106,7 +105,6 @@ class TestPayerRepository:
         )
         assert pgp_customer.country is not None
         assert pgp_customer.is_primary is not None
-        assert pgp_customer.legacy_id is not None
         assert pgp_customer.balance is not None
         assert pgp_customer.default_payment_method_id is not None
 

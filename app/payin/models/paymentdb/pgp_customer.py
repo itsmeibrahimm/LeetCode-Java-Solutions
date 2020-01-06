@@ -13,7 +13,6 @@ from app.commons.utils.dataclass_extensions import no_init_field
 class PgpCustomerTable(TableDefinition):
     name: str = no_init_field("pgp_customers")
     id: Column = no_init_field(Column("id", UUID(as_uuid=True), primary_key=True))
-    legacy_id: Column = no_init_field(Column("legacy_id", BigInteger))
     pgp_code: Column = no_init_field(Column("pgp_code", Text))
     pgp_resource_id: Column = no_init_field(Column("pgp_resource_id", Text))
     country: Column = no_init_field(Column("country", Text))

@@ -40,6 +40,7 @@ class Payer(BaseModel):
     country: Optional[str] = None
     payer_correlation_ids: Optional[PayerCorrelationIds] = None
     dd_stripe_customer_id: Optional[str] = None
+    legacy_dd_stripe_customer_id: Optional[int] = None
     default_payment_method_id: Optional[UUID] = None
     default_dd_stripe_card_id: Optional[int] = None
     description: Optional[str] = None
@@ -144,6 +145,7 @@ class RawPayer:
                     payer_reference_id_type=self.payer_entity.payer_reference_id_type,
                 ),
                 dd_stripe_customer_id=dd_stripe_customer_id,
+                legacy_dd_stripe_customer_id=self.payer_entity.legacy_dd_stripe_customer_id,
                 default_payment_method_id=self.payer_entity.default_payment_method_id,
                 default_dd_stripe_card_id=self.payer_entity.legacy_default_dd_stripe_card_id,
                 description=self.payer_entity.description,
@@ -161,6 +163,7 @@ class RawPayer:
                 # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 country=self.stripe_customer_entity.country_shortname,
                 dd_stripe_customer_id=str(self.stripe_customer_entity.id),
+                legacy_dd_stripe_customer_id=self.stripe_customer_entity.id,
                 payer_correlation_ids=PayerCorrelationIds(
                     payer_reference_id=str(self.stripe_customer_entity.owner_id),
                     payer_reference_id_type=owner_type_to_payer_reference_id_type(
