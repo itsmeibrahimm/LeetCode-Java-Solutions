@@ -7,9 +7,11 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.types import CountryCode
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
+from app.payin.core.exceptions import PayinErrorCode, PayinError
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PaymentMethodSortKey
+from app.payin.core.types import PayerReferenceIdType
 
 api_tags = ["PaymentMethodV1"]
 router = APIRouter()
@@ -31,6 +33,9 @@ async def create_payment_method(
     Create a payment method for payer on DoorDash payments platform
 
     - **payer_id**: [string] DoorDash payer id.
+    - **payer_correlation_ids**: DoorDash external correlation id for Payer.
+    - **payer_correlation_ids.payer_reference_id**: DoorDash external reference id for Payer.
+    - **payer_correlation_ids.payer_reference_id_type**: type that specifies the role of payer.
     - **payment_gateway**: [string] external payment gateway provider name.
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
@@ -102,7 +107,6 @@ async def get_payment_method(
     tags=api_tags,
 )
 async def list_payment_methods(
-    request: Request,
     payer_id: str,
     active_only: bool = False,
     country: CountryCode = CountryCode.US,
@@ -133,6 +137,34 @@ async def list_payment_methods(
         raise
 
     return payment_methods_list
+
+
+@router.get(
+    "/payment_methods",
+    response_model=PaymentMethodList,
+    status_code=HTTP_200_OK,
+    operation_id="ListPaymentMethodsByPayerReferenceId",
+    tags=api_tags,
+)
+async def list_payment_methods_by_payer_reference_id(
+    payer_reference_id_type: PayerReferenceIdType,
+    payer_reference_id: str,
+    active_only: bool = False,
+    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
+    force_update: bool = False,
+    log: BoundLogger = Depends(get_logger_from_req),
+    payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
+):
+    log.info(
+        "[list_payment_method] receive request",
+        payer_reference_id_type=payer_reference_id_type,
+        payer_reference_id=payer_reference_id,
+        active_only=active_only,
+        force_update=force_update,
+        sort_by=sort_by,
+    )
+
+    raise PayinError(error_code=PayinErrorCode.API_NOT_IMPLEMENTED_ERROR)
 
 
 @router.delete(

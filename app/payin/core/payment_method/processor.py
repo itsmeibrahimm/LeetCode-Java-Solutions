@@ -274,6 +274,9 @@ class PaymentMethodProcessor:
         sort_by: PaymentMethodSortKey,
         force_update: bool,
     ) -> PaymentMethodList:
+        # FIXME: expose new API payer_client.get_payer_by_lookup_id() to get
+        # pgp_customer_resource_id and country information. Then we can remove
+        # the country from API signature.
         stripe_customer_id = await self.payer_client.get_stripe_customer_id_by_payer_id(
             payer_id=payer_id
         )
