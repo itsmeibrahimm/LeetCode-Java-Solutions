@@ -581,13 +581,16 @@ class StoreMastercardDataNotFoundError(PaymentError[JITFundingErrorCode]):
 #   - PaymentCacheSetError
 #   - PaymentCacheCheckExistenceError
 #   - PaymentCacheInvalidateError
+#   - PaymentCacheNotInitializedError
+#   - PaymentCacheDataNotCacheable
 ####################################
 class PaymentCacheErrorCode(str, Enum):
     CACHE_GET_ERROR = "cache_get_error"
     CACHE_SET_ERROR = "cache_set_error"
     CACHE_CHECK_EXISTENCE_ERROR = "cache_check_existence_error"
     CACHE_INVALIDATE_ERROR = "cache_invalidate_error"
-    INVALID_CACHE_KEY_PARAMS = "invalid_cache_key_params"
+    CACHE_NOT_INITIALIZED = "cache_not_initialized"
+    DATA_NOT_CACHEABLE = "data_not_cacheable"
 
 
 payment_cache_error_message_maps = {
@@ -595,7 +598,8 @@ payment_cache_error_message_maps = {
     PaymentCacheErrorCode.CACHE_SET_ERROR: "unable to set cache",
     PaymentCacheErrorCode.CACHE_CHECK_EXISTENCE_ERROR: "unable to check existence of a key in cache",
     PaymentCacheErrorCode.CACHE_INVALIDATE_ERROR: "unable to invalidate cache",
-    PaymentCacheErrorCode.INVALID_CACHE_KEY_PARAMS: "invalid cache key params, should be a non-empty dict",
+    PaymentCacheErrorCode.CACHE_NOT_INITIALIZED: "cache is not initialized yet, please check",
+    PaymentCacheErrorCode.DATA_NOT_CACHEABLE: "the data type is not supported by payment cache",
 }
 
 
@@ -672,17 +676,33 @@ class PaymentCacheInvalidateError(PaymentCacheError):
         )
 
 
-class PaymentCacheInvalidateCacheKeyParams(PaymentCacheError):
-    """Payment Cache invalid cache key params Error.
+class PaymentCacheIsNotInitialized(PaymentCacheError):
+    """Payment Cache is not initialized error.
 
-    Raised when the passed in key params are not a non-empty dict
+    Raised when the passed in app name was not found in the caches list
     """
 
     def __init__(self):
         super().__init__(
-            error_code=PaymentCacheErrorCode.INVALID_CACHE_KEY_PARAMS,
+            error_code=PaymentCacheErrorCode.CACHE_NOT_INITIALIZED,
             error_message=payment_cache_error_message_maps[
-                PaymentCacheErrorCode.INVALID_CACHE_KEY_PARAMS
+                PaymentCacheErrorCode.CACHE_NOT_INITIALIZED
+            ],
+            retryable=True,
+        )
+
+
+class PaymentCacheDataNotCacheable(PaymentCacheError):
+    """Payment Cache data is not cacheable.
+
+    Raised when the data type is not supported by payment cache
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentCacheErrorCode.DATA_NOT_CACHEABLE,
+            error_message=payment_cache_error_message_maps[
+                PaymentCacheErrorCode.DATA_NOT_CACHEABLE
             ],
             retryable=True,
         )

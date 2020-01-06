@@ -2,6 +2,7 @@ from structlog.stdlib import BoundLogger
 from typing import Optional, Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.cache.Cacheable import CacheKeyAware
 from app.commons.core.processor import AsyncOperation, OperationRequest
 from app.payout.core.account import models as account_models
 from app.payout.core.exceptions import payout_account_not_found_error
@@ -15,8 +16,11 @@ from app.payout.repository.maindb.payment_account import (
 from app.payout.models import PayoutAccountId
 
 
-class GetPayoutAccountRequest(OperationRequest):
+class GetPayoutAccountRequest(OperationRequest, CacheKeyAware):
     payout_account_id: PayoutAccountId
+
+    def get_cache_key(self) -> dict:
+        return {"payout_account_id": self.payout_account_id}
 
 
 class GetPayoutAccount(

@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Json, Schema
 
+from app.commons.cache.Cacheable import Cacheable
 from app.commons.core.processor import OperationResponse
 from app.commons.types import CountryCode, Currency
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
@@ -71,7 +72,15 @@ class VerificationRequirements(BaseModel):
     )
 
 
-class PayoutAccountInternal(OperationResponse):
+class PayoutAccountInternal(OperationResponse, Cacheable):
+    @classmethod
+    def serialize(cls, data) -> str:
+        return data.json()
+
+    @classmethod
+    def deserialize(cls, cached_data: str) -> Optional[BaseModel]:
+        return cls.parse_raw(cached_data)
+
     payment_account: PaymentAccount
     pgp_external_account_id: Optional[PgpExternalAccountId]
     verification_requirements: Optional[VerificationRequirements]

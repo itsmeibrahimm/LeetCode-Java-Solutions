@@ -2,6 +2,7 @@ from structlog.stdlib import BoundLogger
 from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.cache.Cacheable import CacheKeyAware
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.model.payment_account import PaymentAccountUpdate
@@ -11,7 +12,10 @@ from app.payout.repository.maindb.payment_account import (
 from app.payout.models import PayoutAccountId
 
 
-class UpdatePayoutAccountStatementDescriptorRequest(OperationRequest):
+class UpdatePayoutAccountStatementDescriptorRequest(OperationRequest, CacheKeyAware):
+    def get_cache_key(self) -> dict:
+        return {"payout_account_id": self.payout_account_id}
+
     payout_account_id: PayoutAccountId
     statement_descriptor: str
 

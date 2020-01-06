@@ -3,13 +3,11 @@ import asyncio
 import pytest
 
 from app.commons.context.app_context import AppContext
-from app.commons.core.cache import (
-    setup_cache,
-    get_cache,
-    PaymentCache,
-    cached,
-    composed_cache_key_from_args,
-)
+from app.commons.cache.cache import setup_cache, get_cache, PaymentCache, cached
+from app.commons.cache.utils import compose_cache_key
+from app.commons.operational_flags import ENABLED_KEY_PREFIX_LIST_FOR_CACHE
+from app.conftest import RuntimeSetter
+from app.payout.constants import CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT
 from app.payout.core.account import models as account_models
 from app.payout.repository.maindb.model.payment_account import PaymentAccount
 
@@ -61,15 +59,17 @@ class TestCache:
         assert await cache.exist(key=key_str)
         await cache.invalidate(key=key_str)
         assert not await cache.exist(key=key_str)
+        assert not await cache.get(key=key_str)
 
-    async def test_decorator(self, cache: PaymentCache):
-        payment_account_id_a = 1
-        key = "get_payment_account"
-        composed_cache_key = composed_cache_key_from_args(
-            key=key, args=(payment_account_id_a,), kwargs={}, use_hash=True
+    async def test_decorator_func(
+        self, cache: PaymentCache, runtime_setter: RuntimeSetter
+    ):
+        runtime_setter.set(
+            ENABLED_KEY_PREFIX_LIST_FOR_CACHE, [CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT]
         )
+        payment_account_id_a = 1
 
-        @cached(key=key, ttl=1, app="test_payment")
+        @cached(key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT, ttl_sec=1, app="test_payment")
         def get_payment_account(payout_account_id):
             return account_models.PayoutAccountInternal(
                 payment_account=PaymentAccount(
@@ -80,6 +80,13 @@ class TestCache:
                 verification_requirements=None,
             ).to_string()
 
+        composed_cache_key = compose_cache_key(
+            key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+            args=(payment_account_id_a,),
+            kwargs={},
+            use_hash=True,
+            is_method=False,
+        )
         # before calling get_payment_account
         assert cache
         await cache.invalidate(key=composed_cache_key)
@@ -95,8 +102,12 @@ class TestCache:
 
         # insert another payment account into cache
         payment_account_id_b = 2
-        composed_cache_key_b = composed_cache_key_from_args(
-            key=key, args=(payment_account_id_b,), kwargs={}, use_hash=True
+        composed_cache_key_b = compose_cache_key(
+            key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+            args=(payment_account_id_b,),
+            kwargs={},
+            use_hash=True,
+            is_method=False,
         )
         await cache.invalidate(key=composed_cache_key_b)
         assert not await cache.exist(key=composed_cache_key_b)
@@ -112,3 +123,89 @@ class TestCache:
         await asyncio.sleep(1)
         assert not await cache.exist(key=payment_account_internal_b)
         assert not await cache.exist(key=payment_account_internal)
+
+    async def test_decorator_method(
+        self, cache: PaymentCache, runtime_setter: RuntimeSetter
+    ):
+        runtime_setter.set(
+            ENABLED_KEY_PREFIX_LIST_FOR_CACHE, [CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT]
+        )
+        payment_account_id_a = 1
+
+        class TestObject:
+            @cached(
+                key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT, ttl_sec=1, app="test_payment"
+            )
+            def get_payment_account(self, payout_account_id):
+                return account_models.PayoutAccountInternal(
+                    payment_account=PaymentAccount(
+                        id=payout_account_id,
+                        statement_descriptor="test_statement_descriptor",
+                    ),
+                    pgp_external_account_id=1,
+                    verification_requirements=None,
+                ).to_string()
+
+        # get composed key for an instance method
+        test_object = TestObject()
+        composed_cache_key = compose_cache_key(
+            key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+            args=(test_object,),
+            kwargs={"payout_account_id": payment_account_id_a},
+            use_hash=True,
+            is_method=True,
+        )
+
+        # check cache before calling instance method
+        assert cache
+        await cache.invalidate(key=composed_cache_key)
+        assert not await cache.exist(key=composed_cache_key)
+
+        await test_object.get_payment_account(payout_account_id=payment_account_id_a)
+
+        assert await cache.exist(key=composed_cache_key)
+
+    async def test_decorator_with_feature_flag_disabled(
+        self, cache: PaymentCache, runtime_setter: RuntimeSetter
+    ):
+        runtime_setter.set(ENABLED_KEY_PREFIX_LIST_FOR_CACHE, [])
+
+        class TestObject:
+            class ArgT:
+                def __init__(self, value):
+                    self.value = value
+
+                def foo(self):
+                    return self.value
+
+            @cached(
+                key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT, ttl_sec=1, app="test_payment"
+            )
+            def get_payment_account(self, arg: ArgT):
+                return account_models.PayoutAccountInternal(
+                    payment_account=PaymentAccount(
+                        id=arg.foo(), statement_descriptor="test_statement_descriptor"
+                    ),
+                    pgp_external_account_id=1,
+                    verification_requirements=None,
+                ).to_string()
+
+        request = TestObject.ArgT(1)
+
+        # get composed key for an instance method
+        test_object = TestObject()
+        composed_cache_key = compose_cache_key(
+            key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+            args=(test_object,),
+            kwargs={"arg": request},
+            use_hash=True,
+            is_method=True,
+        )
+
+        # check cache before calling instance method
+        assert cache
+        await cache.invalidate(key=composed_cache_key)
+        assert not await cache.exist(key=composed_cache_key)
+
+        await test_object.get_payment_account(arg=request)
+        assert not await cache.exist(key=composed_cache_key)

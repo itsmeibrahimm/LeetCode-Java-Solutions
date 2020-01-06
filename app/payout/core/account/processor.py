@@ -2,8 +2,16 @@ from typing import Union
 
 from structlog.stdlib import BoundLogger
 
+from app.commons.cache.cache import cached, PaymentCache, get_cache
+from app.commons.cache.utils import compose_cache_key
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.types import CountryCode
+from app.payout.constants import (
+    PAYOUT_CACHE_APP_NAME,
+    CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+    CACHE_TTL_SEC_GET_PAYOUT_ACCOUNT,
+)
+from app.payout.core.feature_flags import enabled_cache_key_prefix_list
 from app.payout.core.transfer.cancel_payout import (
     CancelPayoutRequest,
     CancelPayoutResponse,
@@ -92,6 +100,7 @@ class PayoutAccountProcessors:
     stripe_transfer_repo: StripeTransferRepositoryInterface
     stripe_payout_request_repo: StripePayoutRequestRepositoryInterface
     stripe: StripeAsyncClient
+    cache: PaymentCache
 
     def __init__(
         self,
@@ -106,6 +115,7 @@ class PayoutAccountProcessors:
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepositoryInterface,
         stripe: StripeAsyncClient,
         managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface,
+        cache: PaymentCache,
     ):
         self.logger = logger
         self.payment_account_repo = payment_account_repo
@@ -120,6 +130,7 @@ class PayoutAccountProcessors:
         self.managed_account_transfer_repo = managed_account_transfer_repo
         self.payout_card_repo = payout_card_repo
         self.payout_method_repo = payout_method_repo
+        self.cache = cache
 
     async def get_payout_account_stream(
         self, request: GetPayoutAccountStreamRequest
@@ -141,6 +152,12 @@ class PayoutAccountProcessors:
         )
         return await create_account_op.execute()
 
+    @cached(
+        key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+        app=PAYOUT_CACHE_APP_NAME,
+        ttl_sec=CACHE_TTL_SEC_GET_PAYOUT_ACCOUNT,
+        response_model=account_models.PayoutAccountInternal,
+    )
     async def get_payout_account(
         self, request: GetPayoutAccountRequest
     ) -> account_models.PayoutAccountInternal:
@@ -154,6 +171,18 @@ class PayoutAccountProcessors:
     async def update_payout_account_statement_descriptor(
         self, request: UpdatePayoutAccountStatementDescriptorRequest
     ) -> account_models.PayoutAccountInternal:
+        if CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT in enabled_cache_key_prefix_list():
+            # invalidate cache
+            cache = get_cache(app=PAYOUT_CACHE_APP_NAME)
+            composed_cache_key = compose_cache_key(
+                key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+                args=(self,),
+                kwargs={"request": request},
+                use_hash=True,
+            )
+            if cache:
+                await cache.invalidate(key=composed_cache_key)
+
         update_account_op = UpdatePayoutAccountStatementDescriptor(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -164,6 +193,18 @@ class PayoutAccountProcessors:
     async def verify_payout_account(
         self, request: VerifyPayoutAccountRequest
     ) -> account_models.PayoutAccountInternal:
+        if CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT in enabled_cache_key_prefix_list():
+            # invalidate cache
+            cache = get_cache(app=PAYOUT_CACHE_APP_NAME)
+            composed_cache_key = compose_cache_key(
+                key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+                args=(self,),
+                kwargs={"request": request},
+                use_hash=True,
+            )
+            if cache:
+                await cache.invalidate(key=composed_cache_key)
+
         verify_account_op = VerifyPayoutAccount(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,
@@ -188,6 +229,18 @@ class PayoutAccountProcessors:
     ) -> Union[
         account_models.PayoutCardInternal, account_models.PayoutBankAccountInternal
     ]:
+        if CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT in enabled_cache_key_prefix_list():
+            # invalidate cache
+            cache = get_cache(app=PAYOUT_CACHE_APP_NAME)
+            composed_cache_key = compose_cache_key(
+                key=CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT,
+                args=(self,),
+                kwargs={"request": request},
+                use_hash=True,
+            )
+            if cache:
+                await cache.invalidate(key=composed_cache_key)
+
         create_payout_method_op = CreatePayoutMethod(
             logger=self.logger,
             payment_account_repo=self.payment_account_repo,

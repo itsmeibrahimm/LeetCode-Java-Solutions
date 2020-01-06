@@ -4,9 +4,11 @@ from starlette.requests import Request
 
 from app.commons.context.req_context import get_stripe_async_client_from_req
 from app.commons.async_kafka_producer import KafkaMessageProducer
+from app.commons.cache.cache import setup_cache, PaymentCache
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.service import BaseService
 from app.commons.providers.dsj_client import DSJClient
+from app.payout.constants import PAYOUT_CACHE_APP_NAME
 from app.payout.core.account.processor import PayoutAccountProcessors
 from app.payout.core.instant_payout.processor import InstantPayoutProcessors
 from app.payout.core.transfer.processor import TransferProcessors
@@ -101,6 +103,7 @@ class PayoutService(BaseService):
     stripe: StripeAsyncClient
     redis_lock_manager: Aioredlock
     kafka_producer: KafkaMessageProducer
+    cache: PaymentCache
 
     def __init__(self, request: Request):
         super().__init__(request)
@@ -141,6 +144,10 @@ class PayoutService(BaseService):
 
         self.redis_lock_manager = self.app_context.redis_lock_manager
         self.kafka_producer = self.app_context.kafka_producer
+
+        self.cache = setup_cache(
+            app_context=self.app_context, app=PAYOUT_CACHE_APP_NAME
+        )
 
 
 def PaymentAccountRepository(
@@ -240,6 +247,7 @@ def create_payout_account_processors(payout_service: PayoutService = Depends()):
         stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
         stripe=payout_service.stripe,
         managed_account_transfer_repo=payout_service.managed_account_transfers,
+        cache=payout_service.cache,
     )
 
 

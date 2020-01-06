@@ -78,3 +78,12 @@ PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT = 60  # in second
 FRAUD_MX_AUTO_PAYMENT_DELAYED_RECENT_BANK_CHANGE = (
     "fraud.mx_auto_payment_delayed.recent_bank_change"
 )
+
+# Payout Cache
+PAYOUT_CACHE_APP_NAME = "payout-service"
+CACHE_KEY_PREFIX_GET_PAYOUT_ACCOUNT = "get_payout_account"
+CACHE_TTL_SEC_GET_PAYOUT_ACCOUNT = 60
+PAYMENT_CACHE_DECORATOR_HIT_STATS_PREFIX = "payment-service-cache-decorator-hit-{}"
+PAYMENT_CACHE_DECORATOR_MISS_STATS_PREFIX = "payment-service-cache-decorator-miss-{}"
+PAYMENT_CACHE_HIT_STATS_PREFIX = "payment-service-cache-hit-{}"
+PAYMENT_CACHE_MISS_STATS_PREFIX = "payment-service-cache-miss-{}"

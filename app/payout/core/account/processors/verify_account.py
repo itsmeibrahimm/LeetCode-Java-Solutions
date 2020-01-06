@@ -4,6 +4,7 @@ from structlog.stdlib import BoundLogger
 from typing import Union
 
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
+from app.commons.cache.Cacheable import CacheKeyAware
 from app.commons.core.processor import OperationRequest, AsyncOperation
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
@@ -29,7 +30,10 @@ from app.payout.models import PayoutAccountId, StripeAccountToken
 import stripe.error as stripe_error
 
 
-class VerifyPayoutAccountRequest(OperationRequest):
+class VerifyPayoutAccountRequest(OperationRequest, CacheKeyAware):
+    def get_cache_key(self) -> dict:
+        return {"payout_account_id": self.payout_account_id}
+
     payout_account_id: PayoutAccountId
     country: CountryCode
     account_token: StripeAccountToken
