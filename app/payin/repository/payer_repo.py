@@ -27,12 +27,10 @@ class PayerDbEntity(DBEntity):
 
     id: UUID
     country: CountryCode
-    payer_type: Optional[str] = None
     legacy_stripe_customer_id: Optional[str] = None
     legacy_dd_stripe_customer_id: Optional[int] = None
     balance: Optional[int] = None
     description: Optional[str] = None
-    dd_payer_id: Optional[str] = None
     payer_reference_id: Optional[str] = None
     payer_reference_id_type: Optional[str] = None
     default_payment_method_id: Optional[UUID] = None
