@@ -4,7 +4,7 @@ from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
 from app.purchasecard.core.card.processor import CardProcessor
 from app.purchasecard.core.exemption.processor import ExemptionProcessor
-from app.purchasecard.core.jit_funding.processor import CardPaymentMetadataProcessor
+from app.purchasecard.core.store_metadata.processor import CardPaymentMetadataProcessor
 from app.purchasecard.core.user.processor import UserProcessor
 from app.purchasecard.core.webhook.processor import WebhookProcessor
 from app.purchasecard.core.transaction.processor import TransactionProcessor

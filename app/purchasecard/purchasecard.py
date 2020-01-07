@@ -14,6 +14,7 @@ from app.purchasecard.api import (
     jit_funding,
     transaction,
     exemption,
+    store_metadata,
 )
 
 
@@ -45,6 +46,7 @@ def make_purchasecard_v0_marqeta_app(context: AppContext, config: AppConfig) -> 
             "/transaction": transaction.v0.router,
             "/auth": auth.v0.router,
             "/exemption": exemption.v0.router,
+            "/store_metadata": store_metadata.v0.router,
         }
     ).attach_to_app(
         app_v0

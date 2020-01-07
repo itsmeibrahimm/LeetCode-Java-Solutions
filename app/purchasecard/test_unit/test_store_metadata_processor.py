@@ -4,7 +4,7 @@ import pytest
 import pytz
 from asynctest import MagicMock, patch, asynctest
 
-from app.purchasecard.core.jit_funding.processor import CardPaymentMetadataProcessor
+from app.purchasecard.core.store_metadata.processor import CardPaymentMetadataProcessor
 
 
 @pytest.mark.asyncio
