@@ -69,6 +69,7 @@ _payin_error_message_maps = {
     "payin_111": "Error. Empty data returned from DB after update",
     "payin_800": "API not accessible/usable in commando mode",
     "not_implemented": "This API is not implemented!",
+    "invalid_payer_reference_id": "Invalid input of payer_id and payer_reference_id",
 }
 
 
@@ -270,6 +271,11 @@ class PayinErrorCode(str, Enum):
         "payin_24",
         NO_RETRY,
         "Payment method not found. Please ensure your payment_method_id is correct",
+    )
+    PAYMENT_METHOD_GET_INVALID_PAYER_REFERENCE_ID = (
+        "invalid_payer_reference_id",
+        NO_RETRY,
+        "Invalid input of payer_id and payer_reference_id",
     )
     PAYMENT_METHOD_GET_DB_ERROR = (
         "payin_25",

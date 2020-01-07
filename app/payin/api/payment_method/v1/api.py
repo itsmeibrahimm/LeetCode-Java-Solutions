@@ -1,3 +1,6 @@
+from typing import Optional
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from starlette.requests import Request
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
@@ -5,13 +8,12 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
-from app.commons.types import CountryCode
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
-from app.payin.core.exceptions import PayinErrorCode, PayinError
+from app.payin.core.exceptions import PayinError, PayinErrorCode
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PaymentMethodSortKey
-from app.payin.core.types import PayerReferenceIdType
+from app.payin.core.types import PayerReferenceIdType, MixedUuidStrType
 
 api_tags = ["PaymentMethodV1"]
 router = APIRouter()
@@ -107,56 +109,18 @@ async def get_payment_method(
     tags=api_tags,
 )
 async def list_payment_methods(
-    payer_id: str,
-    active_only: bool = False,
-    country: CountryCode = CountryCode.US,
-    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
-    force_update: bool = False,
+    active_only: Optional[bool],
+    sort_by: Optional[PaymentMethodSortKey],
+    force_update: Optional[bool],
+    payer_id: Optional[UUID] = None,
+    payer_reference_id: Optional[str] = None,
+    payer_reference_id_type: Optional[PayerReferenceIdType] = None,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
 ):
     log.info(
         "[list_payment_method] receive request",
         payer_id=payer_id,
-        active_only=active_only,
-        force_update=force_update,
-        country=country,
-        sort_by=sort_by,
-    )
-
-    try:
-        payment_methods_list: PaymentMethodList = await payment_method_processor.list_payment_methods_by_payer_id(
-            payer_id=payer_id,
-            active_only=active_only,
-            sort_by=sort_by,
-            force_update=force_update,
-            country=country,
-        )
-    except PaymentError:
-        log.warn("[list_payment_methods] PaymentError", payer_id=payer_id)
-        raise
-
-    return payment_methods_list
-
-
-@router.get(
-    "/payment_methods",
-    response_model=PaymentMethodList,
-    status_code=HTTP_200_OK,
-    operation_id="ListPaymentMethodsByPayerReferenceId",
-    tags=api_tags,
-)
-async def list_payment_methods_by_payer_reference_id(
-    payer_reference_id_type: PayerReferenceIdType,
-    payer_reference_id: str,
-    active_only: bool = False,
-    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
-    force_update: bool = False,
-    log: BoundLogger = Depends(get_logger_from_req),
-    payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
-):
-    log.info(
-        "[list_payment_method] receive request",
         payer_reference_id_type=payer_reference_id_type,
         payer_reference_id=payer_reference_id,
         active_only=active_only,
@@ -164,7 +128,44 @@ async def list_payment_methods_by_payer_reference_id(
         sort_by=sort_by,
     )
 
-    raise PayinError(error_code=PayinErrorCode.API_NOT_IMPLEMENTED_ERROR)
+    if (
+        (not payer_id and not (payer_reference_id and payer_reference_id_type))
+        or (payer_id and (payer_reference_id or payer_reference_id_type))
+        or (payer_reference_id and not payer_reference_id_type)
+    ):
+        log.warn(
+            "[list_payment_method] invalid input payer_id or payer_reference_id",
+            payer_id=payer_id,
+            payer_reference_id_type=payer_reference_id_type,
+            payer_reference_id=payer_reference_id,
+            active_only=active_only,
+            force_update=force_update,
+            sort_by=sort_by,
+        )
+        raise PayinError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYER_REFERENCE_ID
+        )
+
+    payment_methods_list: PaymentMethodList
+    try:
+        payer_lookup_id: Optional[MixedUuidStrType] = payer_id or payer_reference_id
+        if payer_lookup_id:
+            payment_methods_list = await payment_method_processor.list_payment_methods(
+                payer_lookup_id=payer_lookup_id,
+                payer_reference_id_type=(
+                    payer_reference_id_type
+                    if payer_reference_id_type
+                    else PayerReferenceIdType.PAYER_ID
+                ),
+                active_only=active_only or False,
+                sort_by=sort_by or PaymentMethodSortKey.CREATED_AT,
+                force_update=force_update or False,
+            )
+    except PaymentError:
+        log.warn("[list_payment_methods] PaymentError", payer_id=payer_id)
+        raise
+
+    return payment_methods_list
 
 
 @router.delete(

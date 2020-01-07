@@ -32,7 +32,11 @@ from app.payin.core.payment_method.types import (
     PaymentMethodSortKey,
     LegacyPaymentMethodInfo,
 )
-from app.payin.core.types import PaymentMethodIdType, PayerReferenceIdType
+from app.payin.core.types import (
+    PaymentMethodIdType,
+    PayerReferenceIdType,
+    MixedUuidStrType,
+)
 
 
 class PaymentMethodProcessor:
@@ -259,27 +263,25 @@ class PaymentMethodProcessor:
             payment_method_id_type=payment_method_id_type,
         )
 
-        # TODO: step 2: if force_update is true, we should retrieve the payment_method from GPG
+        # TODO: step 2: if force_update is true, we should retrieve the payment_method from payment providers
 
         return raw_payment_method.to_payment_method()
 
-    async def list_payment_methods_by_payer_id(
+    async def list_payment_methods(
         self,
-        payer_id: str,
-        country: Optional[CountryCode],
+        payer_lookup_id: MixedUuidStrType,
+        payer_reference_id_type: PayerReferenceIdType,
         active_only: bool,
         sort_by: PaymentMethodSortKey,
         force_update: bool,
     ) -> PaymentMethodList:
-        # FIXME: expose new API payer_client.get_payer_by_lookup_id() to get
-        # pgp_customer_resource_id and country information. Then we can remove
-        # the country from API signature.
-        stripe_customer_id = await self.payer_client.get_stripe_customer_id_by_payer_id(
-            payer_id=payer_id
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
+            mixed_payer_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
         )
         payment_method_list = await self.payment_method_client.get_payment_method_list_by_stripe_customer_id(
-            stripe_customer_id=stripe_customer_id,
-            country=country,
+            stripe_customer_id=raw_payer.pgp_payer_resource_id,
+            country=raw_payer.country(),
             active_only=active_only,
             force_update=force_update,
             sort_by=sort_by,

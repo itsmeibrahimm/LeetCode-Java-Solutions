@@ -32,12 +32,13 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
-from app.payin.core.payer.model import Payer
+from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.dispute_repo import (
     ConsumerChargeDbEntity,
     StripeDisputeDbEntity,
 )
+from app.payin.repository.payer_repo import PayerDbEntity, PgpCustomerDbEntity
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -451,4 +452,16 @@ def generate_stripe_card(
         type="Visa",
         active=active,
         country_of_origin=country,
+    )
+
+
+def generate_raw_payer() -> RawPayer:
+    payer_id = uuid.uuid4()
+    return RawPayer(
+        payer_entity=PayerDbEntity(
+            id=payer_id, country=CountryCode.US, legacy_stripe_customer_id="cus_fakeid"
+        ),
+        pgp_customer_entity=PgpCustomerDbEntity(
+            id=uuid.uuid4(), payer_id=payer_id, pgp_resource_id="cus_fakeid"
+        ),
     )

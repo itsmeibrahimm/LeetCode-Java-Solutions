@@ -12,10 +12,12 @@ from app.payin.core.payment_method.model import (
 )
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PaymentMethodSortKey
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.tests.utils import (
     generate_pgp_payment_method,
     generate_stripe_card,
     FunctionMock,
+    generate_raw_payer,
 )
 
 
@@ -98,18 +100,18 @@ class TestPaymentMethodProcessor:
             stripe_card_entity=generate_stripe_card(),
         ).to_payment_method()
         payment_method_list: List[PaymentMethod] = [payment_method]
-        payment_method_processor.payer_client.get_stripe_customer_id_by_payer_id = FunctionMock(
-            return_value="VALID_STRIPE_ID"
+        payment_method_processor.payer_client.get_raw_payer = FunctionMock(
+            return_value=generate_raw_payer()
         )
         payment_method_processor.payment_method_client.get_payment_method_list_by_stripe_customer_id = FunctionMock(
             return_value=payment_method_list
         )
-        result = await payment_method_processor.list_payment_methods_by_payer_id(
-            payer_id=str(uuid.uuid4()),
+        result = await payment_method_processor.list_payment_methods(
+            payer_lookup_id=str(uuid.uuid4()),
+            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             active_only=False,
             sort_by=PaymentMethodSortKey.CREATED_AT,
             force_update=False,
-            country=None,
         )
         assert isinstance(result, PaymentMethodList)
         assert result.count == 1
@@ -120,18 +122,18 @@ class TestPaymentMethodProcessor:
     async def test_list_active_payment_methods_by_payer_id(
         self, payment_method_processor
     ):
-        payment_method_processor.payer_client.get_stripe_customer_id_by_payer_id = FunctionMock(
-            return_value="VALID_STRIPE_ID"
+        payment_method_processor.payer_client.get_raw_payer = FunctionMock(
+            return_value=generate_raw_payer()
         )
         payment_method_processor.payment_method_client.get_payment_method_list_by_stripe_customer_id = FunctionMock(
             return_value=[]
         )
-        result = await payment_method_processor.list_payment_methods_by_payer_id(
-            payer_id=str(uuid.uuid4()),
+        result = await payment_method_processor.list_payment_methods(
+            payer_lookup_id=str(uuid.uuid4()),
+            payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             active_only=True,
             sort_by=PaymentMethodSortKey.CREATED_AT,
             force_update=False,
-            country=None,
         )
         assert isinstance(result, PaymentMethodList)
         assert result.count == 0

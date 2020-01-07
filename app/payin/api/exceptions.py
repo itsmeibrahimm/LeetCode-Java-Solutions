@@ -50,6 +50,7 @@ _status_code_to_payin_error_code: Dict[int, Set[PayinErrorCode]] = {
         PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_DATA,
         PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYMENT_METHOD_TYPE,
         PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT,
+        PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYER_REFERENCE_ID,
         PayinErrorCode.DISPUTE_READ_INVALID_DATA,
         PayinErrorCode.DISPUTE_LIST_NO_PARAMETERS,
         PayinErrorCode.DISPUTE_LIST_NO_ID_PARAMETERS,

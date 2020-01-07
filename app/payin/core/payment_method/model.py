@@ -7,7 +7,7 @@ from typing_extensions import final
 
 from app.commons.types import PgpCode
 from app.payin.core.payment_method.types import WalletType
-from app.payin.core.types import PgpPaymentMethodResourceId
+from app.payin.core.types import PgpPaymentMethodResourceId, PayerReferenceIdType
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -54,7 +54,8 @@ class PaymentMethod(BaseModel):
     id: Optional[UUID] = None  # make it optional for existing DSJ stripe_card
     payer_id: Optional[UUID] = None
     type: str
-    dd_payer_id: Optional[str] = None
+    payer_reference_id: Optional[str] = None
+    payer_feference_id_type: Optional[PayerReferenceIdType] = None
     dd_stripe_card_id: int  # primary key of maindb_stripe_card
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -129,7 +130,9 @@ class RawPaymentMethod:
             PaymentMethod(
                 id=self.payment_method_id,
                 payer_id=self.pgp_payment_method_entity.payer_id,
-                dd_payer_id=self.pgp_payment_method_entity.legacy_consumer_id,
+                # FIXME (PAYIN-301): need to retrieve payer_reference_id and payer_reference_id_type from Payer
+                payer_reference_id=self.pgp_payment_method_entity.legacy_consumer_id,
+                payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
                 type=self.pgp_payment_method_entity.type,
                 dd_stripe_card_id=self.stripe_card_entity.id,
                 card=card,
@@ -142,7 +145,9 @@ class RawPaymentMethod:
             if self.pgp_payment_method_entity
             else PaymentMethod(
                 payer_id=None,
-                dd_payer_id=str(self.stripe_card_entity.consumer_id),
+                # FIXME (PAYIN-301): need to retrieve payer_reference_id and payer_reference_id_type from Payer
+                payer_reference_id=str(self.stripe_card_entity.consumer_id),
+                payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
                 type="card",
                 dd_stripe_card_id=self.stripe_card_entity.id,
                 card=card,

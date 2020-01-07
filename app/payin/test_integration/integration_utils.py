@@ -81,17 +81,29 @@ def _delete_payment_method_v1_url(payment_method_id: str):
 
 
 def _list_payment_method_v1_url(
-    payer_id: str,
     active_only: bool = False,
     sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
     force_update: bool = None,
     country: CountryCode = None,
+    payer_id: Optional[str] = None,
+    payer_reference_id: Optional[str] = None,
+    payer_reference_id_type: Optional[str] = None,
 ):
-    base_request = f"{V1_PAYMENT_METHODS_ENDPOINT}?payer_id={payer_id}&active_only={active_only}&sort_by={sort_by}"
+    base_request = (
+        f"{V1_PAYMENT_METHODS_ENDPOINT}?active_only={active_only}&sort_by={sort_by}"
+    )
     if force_update:
         base_request = base_request + f"&force_update={force_update}"
     if country:
         base_request = base_request + f"&country={country}"
+    if payer_id:
+        base_request = base_request + f"&payer_id={payer_id}"
+    if payer_reference_id:
+        base_request = base_request + f"&payer_reference_id={payer_reference_id}"
+    if payer_reference_id_type:
+        base_request = (
+            base_request + f"&payer_reference_id_type={payer_reference_id_type}"
+        )
     return base_request
 
 
@@ -334,15 +346,19 @@ def list_payment_method_v0(
 
 def list_payment_method_v1(
     client: TestClient,
-    payer_id: str,
     active_only: bool = False,
     sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
     force_update: bool = None,
     country: CountryCode = None,
+    payer_id: Optional[str] = None,
+    payer_reference_id: Optional[str] = None,
+    payer_reference_id_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     response = client.get(
         _list_payment_method_v1_url(
             payer_id=payer_id,
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
             active_only=active_only,
             sort_by=sort_by,
             force_update=force_update,
@@ -352,6 +368,34 @@ def list_payment_method_v1(
     assert response.status_code == 200
     payment_method_list: dict = response.json()
     return payment_method_list
+
+
+def list_payment_methods_v1_bad_request(
+    client: TestClient,
+    expected_http_code: int,
+    expected_error_code: str,
+    active_only: bool = False,
+    sort_by: PaymentMethodSortKey = PaymentMethodSortKey.CREATED_AT,
+    force_update: bool = None,
+    country: CountryCode = None,
+    payer_id: Optional[str] = None,
+    payer_reference_id: Optional[str] = None,
+    payer_reference_id_type: Optional[str] = None,
+):
+    response = client.get(
+        _list_payment_method_v1_url(
+            payer_id=payer_id,
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
+            active_only=active_only,
+            sort_by=sort_by,
+            force_update=force_update,
+            country=country,
+        )
+    )
+    assert response.status_code == expected_http_code
+    pm_response: dict = response.json()
+    assert pm_response["error_code"] == expected_error_code
 
 
 def build_commando_processor(app_context: AppContext) -> CommandoProcessor:
