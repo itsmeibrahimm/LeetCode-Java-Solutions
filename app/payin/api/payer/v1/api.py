@@ -129,7 +129,7 @@ async def get_payer_by_reference_id(
     "/payers/{payer_id}/default_payment_method",
     response_model=Payer,
     status_code=HTTP_200_OK,
-    operation_id="UpdatePayer",
+    operation_id="UpdatePayerDefaultPaymentMethodById",
     tags=api_tags,
 )
 async def update_default_payment_method(
@@ -163,7 +163,7 @@ async def update_default_payment_method(
     "/payers/{payer_reference_id_type}/{payer_reference_id}/default_payment_method",
     response_model=Payer,
     status_code=HTTP_200_OK,
-    operation_id="UpdatePayer",
+    operation_id="UpdatePayerDefaultPaymentMethodByReference",
     tags=api_tags,
 )
 async def update_default_payment_method_by_reference_id(
