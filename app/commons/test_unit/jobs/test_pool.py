@@ -42,7 +42,9 @@ class TestAdjustPoolSize:
         now_pt = datetime.now(tz=pytz.timezone("US/Pacific"))
 
         runtime.get_json.return_value = {
-            "start_hour_inclusive": now_pt.hour - 1,
+            "start_hour_inclusive": now_pt.hour - 1
+            if now_pt.hour
+            else 23,  # in case we got 0 - 1 = -1
             "end_hour_inclusive": now_pt.hour,
             "scheduled_size": 20,
             "timezone": str(now_pt.tzinfo),
@@ -87,14 +89,14 @@ class TestAdjustPoolSize:
         ):
             runtime.get_json.return_value = {
                 "start_hour_inclusive": 23,
-                "end_hour_inclusive": 1,
+                "end_hour_inclusive": 0,
                 "scheduled_size": 60,
                 "timezone": str(now_pt.tzinfo),
             }
             adjust_pool_sizes(runtime)
             assert test_pool.size == 60, "should be updated to new size"
 
-        # 22:00 is NOT in range of [23:00, 1:00 + day]
+        # 22:00 is NOT in range of [23:00, 0:00 + day]
         with freeze_time(
             datetime(year=2019, month=12, day=11, hour=22, tzinfo=now_pt.tzinfo)
         ):
