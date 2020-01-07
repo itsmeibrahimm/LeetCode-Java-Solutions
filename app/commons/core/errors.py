@@ -456,15 +456,6 @@ marqeta_error_message_maps = {
 }
 
 
-class JITFundingErrorCode(str, Enum):
-    STORE_MASTERCARD_DATA_NOT_FOUND_ERROR = "store_mastercard_data_not_found_error"
-
-
-jit_funding_error_message_maps = {
-    JITFundingErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR: "Fail to update an existing store mastercard data record"
-}
-
-
 class MarqetaResourceAlreadyCreatedError(PaymentError[MarqetaErrorCode]):
     def __init__(self):
         super().__init__(
@@ -559,17 +550,6 @@ class MarqetaCardNotFoundError(PaymentError[MarqetaErrorCode]):
             error_code=MarqetaErrorCode.MARQETA_NO_CARD_FOUND_FOR_TOKEN_ERROR,
             error_message=marqeta_error_message_maps[
                 MarqetaErrorCode.MARQETA_NO_CARD_FOUND_FOR_TOKEN_ERROR
-            ],
-            retryable=False,
-        )
-
-
-class StoreMastercardDataNotFoundError(PaymentError[JITFundingErrorCode]):
-    def __init__(self):
-        super().__init__(
-            error_code=JITFundingErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR,
-            error_message=jit_funding_error_message_maps[
-                JITFundingErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR
             ],
             retryable=False,
         )

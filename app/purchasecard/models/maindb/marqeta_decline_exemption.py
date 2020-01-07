@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Column, Integer, DateTime, Text
 from typing_extensions import final
 
-from app.commons.database.model import TableDefinition
+from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -19,3 +21,14 @@ class MarqetaDeclineExemptionTable(TableDefinition):
     used_at: Column = no_init_field(Column("used_at", DateTime(True)))
     dasher_id: Column = no_init_field(Column("dasher_id", Integer))
     created_by_id: Column = no_init_field(Column("created_by_id", Integer))
+
+
+class MarqetaDeclineExemption(DBEntity):
+    id: int
+    amount: int
+    mid: str
+    delivery_id: int
+    created_at: datetime
+    used_at: Optional[datetime]
+    dasher_id: int
+    created_by_id: int

@@ -3,6 +3,7 @@ from fastapi import Depends
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
 from app.purchasecard.core.card.processor import CardProcessor
+from app.purchasecard.core.exemption.processor import ExemptionProcessor
 from app.purchasecard.core.jit_funding.processor import CardPaymentMetadataProcessor
 from app.purchasecard.core.user.processor import UserProcessor
 from app.purchasecard.core.webhook.processor import WebhookProcessor
@@ -14,6 +15,9 @@ from structlog.stdlib import BoundLogger
 
 from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
+from app.purchasecard.repository.marqeta_decline_exemption import (
+    MarqetaDeclineExemptionRepository,
+)
 from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 from app.purchasecard.repository.marqeta_card_ownership import (
     MarqetaCardOwnershipRepository,
@@ -89,6 +93,13 @@ class PurchaseCardContainer:
         )
 
     @property
+    def exemption_processor(self) -> ExemptionProcessor:
+        return ExemptionProcessor(
+            delivery_funding_repo=self.delivery_funding_repository,
+            decline_exemption_repo=self.marqeta_decline_exemption_repository,
+        )
+
+    @property
     def marqeta_transaction_repository(self) -> MarqetaTransactionRepository:
         return MarqetaTransactionRepository(
             database=self.app_context.purchasecard_maindb
@@ -111,6 +122,12 @@ class PurchaseCardContainer:
     @property
     def marqeta_card_transition_repository(self) -> MarqetaCardTransitionRepository:
         return MarqetaCardTransitionRepository(
+            database=self.app_context.purchasecard_maindb
+        )
+
+    @property
+    def marqeta_decline_exemption_repository(self) -> MarqetaDeclineExemptionRepository:
+        return MarqetaDeclineExemptionRepository(
             database=self.app_context.purchasecard_maindb
         )
 

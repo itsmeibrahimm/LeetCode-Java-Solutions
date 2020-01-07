@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.commons.core.errors import StoreMastercardDataNotFoundError
+from app.purchasecard.core.errors import StoreMastercardDataNotFoundError
 from app.purchasecard.core.jit_funding.models import InternalStoreCardPaymentMetadata
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepositoryInterface,

@@ -7,6 +7,15 @@ from typing import Optional
 from unittest.mock import MagicMock
 
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
+from app.purchasecard.models.maindb.delivery_funding import DeliveryFunding
+from app.purchasecard.models.maindb.marqeta_decline_exemption import (
+    MarqetaDeclineExemption,
+)
+from app.purchasecard.models.maindb.store_mastercard_data import StoreMastercardData
+from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
+from app.purchasecard.repository.marqeta_decline_exemption import (
+    MarqetaDeclineExemptionRepository,
+)
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
 )
@@ -104,7 +113,7 @@ async def prepare_and_insert_store_mastercard_data(
     store_id: int,
     mid: str,
     mname: str = "",
-):
+) -> StoreMastercardData:
     data = {"store_id": store_id, "mid": mid}
     store_mastercard_data = await store_mastercard_data_repo.create_store_mastercard_data(
         store_id=store_id, mid=mid, mname=mname
@@ -136,6 +145,52 @@ async def prepare_and_insert_marqeta_transaction_data(
     )
     marqeta_transaction_data = await marqeta_tx_repo.create_marqeta_transaction(data)
     assert marqeta_transaction_data
+
+
+async def prepare_and_insert_delivery_funding_data(
+    delivery_funding_repo: DeliveryFundingRepository,
+    creator_id: int,
+    delivery_id: int,
+    swipe_amount: int,
+) -> DeliveryFunding:
+    data = {
+        "created_by_id": creator_id,
+        "delivery_id": delivery_id,
+        "amount": swipe_amount,
+    }
+    delivery_funding = await delivery_funding_repo.create(
+        creator_id=creator_id, delivery_id=delivery_id, swipe_amount=swipe_amount
+    )
+    assert delivery_funding.id
+    validate_expected_items_in_dict(expected=data, actual=delivery_funding.dict())
+    return delivery_funding
+
+
+async def prepare_and_insert_marqeta_decline_exemption(
+    marqeta_decline_exemption_repo: MarqetaDeclineExemptionRepository,
+    delivery_id: int,
+    creator_id: int,
+    amount: int,
+    dasher_id: int,
+    mid: str,
+) -> MarqetaDeclineExemption:
+    data = {
+        "created_by_id": creator_id,
+        "delivery_id": delivery_id,
+        "amount": amount,
+        "dasher_id": dasher_id,
+        "mid": mid,
+    }
+    decline_exemption = await marqeta_decline_exemption_repo.create(
+        creator_id=creator_id,
+        delivery_id=delivery_id,
+        amount=amount,
+        dasher_id=dasher_id,
+        mid=mid,
+    )
+    assert decline_exemption.id
+    validate_expected_items_in_dict(expected=data, actual=decline_exemption.dict())
+    return decline_exemption
 
 
 class FunctionMock(MagicMock):

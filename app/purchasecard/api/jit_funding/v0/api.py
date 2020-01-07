@@ -6,7 +6,7 @@ from starlette.status import (
 )
 
 from app.commons.api.models import PaymentErrorResponseBody, PaymentException
-from app.commons.core.errors import PaymentError, JITFundingErrorCode
+from app.commons.core.errors import PaymentError
 from app.purchasecard.api.jit_funding.v0.models import (
     JITFunding,
     LinkStoreWithMidRequest,
@@ -15,6 +15,7 @@ from app.purchasecard.api.jit_funding.v0.models import (
 )
 from app.purchasecard.api.webhook.v0.models import MarqetaWebhookRequest
 from app.purchasecard.container import PurchaseCardContainer
+from app.purchasecard.core.errors import StoreMastercardDataErrorCode
 from app.purchasecard.core.jit_funding.models import InternalStoreCardPaymentMetadata
 from app.purchasecard.core.jit_funding.processor import CardPaymentMetadataProcessor
 
@@ -60,7 +61,10 @@ async def link_store_with_mid(
         )
         return LinkStoreWithMidResponse(updated_at=response.updated_at)
     except PaymentError as e:
-        if e.error_code == JITFundingErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR:
+        if (
+            e.error_code
+            == StoreMastercardDataErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR
+        ):
             status_code = HTTP_404_NOT_FOUND
         else:
             status_code = HTTP_500_INTERNAL_SERVER_ERROR

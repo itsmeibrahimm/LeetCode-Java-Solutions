@@ -6,12 +6,16 @@ import pytest
 from asynctest import mock
 
 from app.commons.database.infra import DB
+from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
 from app.purchasecard.repository.marqeta_card_ownership import (
     MarqetaCardOwnershipRepository,
 )
 from app.purchasecard.repository.marqeta_card_transition import (
     MarqetaCardTransitionRepository,
+)
+from app.purchasecard.repository.marqeta_decline_exemption import (
+    MarqetaDeclineExemptionRepository,
 )
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
@@ -72,3 +76,15 @@ def store_mastercard_data_repo(
 @pytest.fixture
 def marqeta_transaction_repo(purchasecard_maindb: DB) -> MarqetaTransactionRepository:
     return MarqetaTransactionRepository(database=purchasecard_maindb)
+
+
+@pytest.fixture
+def delivery_funding_repo(purchasecard_maindb: DB) -> DeliveryFundingRepository:
+    return DeliveryFundingRepository(database=purchasecard_maindb)
+
+
+@pytest.fixture
+def marqeta_decline_exemption_repo(
+    purchasecard_maindb: DB
+) -> MarqetaDeclineExemptionRepository:
+    return MarqetaDeclineExemptionRepository(database=purchasecard_maindb)
