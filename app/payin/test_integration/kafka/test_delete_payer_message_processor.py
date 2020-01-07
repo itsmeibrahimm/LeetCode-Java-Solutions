@@ -239,3 +239,37 @@ class TestDeletePayerMessageProcessor:
             common_pb2.StatusCode.ERROR,
             "Request Id format invalid. It must be a UUID.",
         )
+
+    async def test_invalid_profile_id(
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mock_send_response,
+        action_request,
+    ):
+        action_request.profile_id = -1
+
+        await app_context.kafka_producer.produce(
+            self.consumer_topic, action_request.SerializeToString()
+        )
+
+        delete_payer_kafka_worker = KafkaWorker(
+            app_context=app_context,
+            app_config=app_config,
+            topic_name=self.consumer_topic,
+            processor=delete_payer_message_processor.process_message,
+            num_consumers=1,
+        )
+
+        await delete_payer_kafka_worker.start()
+        await asyncio.sleep(10)
+        # Stopping workers with graceful timeout set to 3 seconds
+        await delete_payer_kafka_worker.stop(graceful_timeout_seconds=3)
+
+        mock_send_response.assert_called_once_with(
+            app_context,
+            action_request.request_id,
+            action_pb2.ActionId.CONSUMER_PAYMENTS_FORGET,
+            common_pb2.StatusCode.ERROR,
+            "Invalid consumer id",
+        )

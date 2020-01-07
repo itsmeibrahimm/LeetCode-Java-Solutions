@@ -84,7 +84,14 @@ class KafkaMessageConsumer:
                     continue
 
                 log.debug(f"message processing starting")
-                await self.processor(self.app_context, msg.value().decode())
+                try:
+                    await self.processor(self.app_context, msg.value().decode())
+                except UnicodeDecodeError as unicode_decode_error:
+                    log.warning(
+                        "Error decoding message from bytes",
+                        exc_info=unicode_decode_error,
+                    )
+                    await self.processor(self.app_context, msg.value())
                 log.debug("message processing complete")
         except asyncio.CancelledError as e:
             log.error("consumer was cancelled mid-execution", exc_info=e)

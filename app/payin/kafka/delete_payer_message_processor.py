@@ -24,7 +24,11 @@ async def process_message(app_context: AppContext, message: str):
 
     payer_repository = PayerRepository(app_context)
 
-    action_request = action_pb2.ActionRequest.FromString(message.encode())
+    try:
+        action_request = action_pb2.ActionRequest.FromString(message)
+    except TypeError as type_error:
+        log.error("Unable to deserialize the message", exc_info=type_error)
+        action_request = action_pb2.ActionRequest.FromString(message.encode())
 
     if action_request.action_id != action_pb2.ActionId.CONSUMER_PAYMENTS_FORGET:
         await send_response(
@@ -63,9 +67,7 @@ async def process_message(app_context: AppContext, message: str):
             )
         )
     except ValueError as value_error:
-        log.exception(
-            "Request Id format invalid. It must be a UUID.", error=value_error
-        )
+        log.error("Request Id format invalid. It must be a UUID.", exc_info=value_error)
 
         await send_response(
             app_context,
@@ -104,7 +106,7 @@ async def process_message(app_context: AppContext, message: str):
                 request=delete_payer_request,
             )
         except psycopg2.Error as db_error:
-            log.exception("Database error occurred.", error=db_error)
+            log.error("Database error occurred.", exc_info=db_error)
             await send_response(
                 app_context,
                 action_request.request_id,
