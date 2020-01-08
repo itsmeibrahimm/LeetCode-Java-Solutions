@@ -56,6 +56,7 @@ class AppContext:
     ledger_maindb: DB
     ledger_paymentdb: DB
     purchasecard_maindb: DB
+    purchasecard_paymentdb: DB
 
     stripe_thread_pool: ThreadPoolHelper
 
@@ -164,6 +165,13 @@ async def create_app_context(config: AppConfig) -> AppContext:
         alternative_replica=selected_maindb_replica,
     )
 
+    purchasecard_paymentdb = DB.create(
+        db_id="purchasecard_paymentdb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PURCHASECARD_PAYMENTDB_MASTER_URL,
+        replica_url=config.PURCHASECARD_PAYMENTDB_REPLICA_URL,
+    )
+
     payout_bankdb = DB.create(
         db_id="payout_bankdb",
         db_config=config.DEFAULT_DB_CONFIG,
@@ -195,7 +203,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
         await asyncio.gather(ledger_maindb.connect(), ledger_paymentdb.connect())
 
     if "purchasecard" in config.INCLUDED_APPS:
-        await asyncio.gather(purchasecard_maindb.connect())
+        await asyncio.gather(
+            purchasecard_maindb.connect(), purchasecard_paymentdb.connect()
+        )
 
     stripe_client = StripeClient(
         settings_list=[
@@ -308,6 +318,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
         purchasecard_maindb=purchasecard_maindb,
+        purchasecard_paymentdb=purchasecard_paymentdb,
         dsj_client=dsj_client,
         identity_client=identity_client,
         stripe_client=stripe_client,

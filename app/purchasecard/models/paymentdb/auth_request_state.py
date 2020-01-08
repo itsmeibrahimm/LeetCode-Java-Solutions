@@ -1,10 +1,13 @@
+from datetime import datetime
+from enum import Enum
+from uuid import UUID as uuid_UUID
 from dataclasses import dataclass
 
 from sqlalchemy import Column, DateTime, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 
-from app.commons.database.model import TableDefinition
+from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -21,3 +24,23 @@ class AuthRequestStateTable(TableDefinition):
     state: Column = no_init_field(Column("state", Text))
     subtotal: Column = no_init_field(Column("subtotal", Integer))
     subtotal_tax: Column = no_init_field(Column("subtotal_tax", Integer))
+
+
+# TODO: @jasmine-tea to complete design and review with clement
+class AuthRequestStateName(str, Enum):
+    ACTIVE_CREATED = "CREATED"
+    ACTIVE_UPDATED = "UPDATED"
+    CLOSED_REVOKED = "REVOKED"
+    CLOSED_EXPIRED = "EXPIRED"
+    CLOSED_CONSUMED = "CONSUMED"
+    CLOSED_MANUAL = "MANUAL"
+
+
+class AuthRequestState(DBEntity):
+    id: uuid_UUID
+    auth_request_id: uuid_UUID
+    created_at: datetime
+    updated_at: datetime
+    state: AuthRequestStateName
+    subtotal: int
+    subtotal_tax: int

@@ -27,6 +27,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
     ledger_maindb = mocker.Mock()
     ledger_paymentdb = mocker.Mock()
     purchasecard_maindb = mocker.Mock()
+    purchasecard_paymentdb = mocker.Mock()
 
     # fake context
     context = AppContext(
@@ -39,6 +40,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         ledger_maindb=ledger_maindb,
         ledger_paymentdb=ledger_paymentdb,
         purchasecard_maindb=purchasecard_maindb,
+        purchasecard_paymentdb=purchasecard_paymentdb,
         dsj_client=DSJClient(session=MagicMock(), client_config={}),
         identity_client=StubbedIdentityClient(),  # Does not matter
         stripe_thread_pool=ThreadPoolHelper(),

@@ -2,6 +2,7 @@ from fastapi import Depends
 
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import ReqContext, get_context_from_req
+from app.purchasecard.core.auth.processor import AuthProcessor
 from app.purchasecard.core.card.processor import CardProcessor
 from app.purchasecard.core.exemption.processor import ExemptionProcessor
 from app.purchasecard.core.store_metadata.processor import CardPaymentMetadataProcessor
@@ -13,6 +14,13 @@ from app.purchasecard.marqeta_external.marqeta_provider_client import (
 )
 from structlog.stdlib import BoundLogger
 
+from app.purchasecard.repository.auth_request_repository import (
+    AuthRequestMasterRepository,
+    AuthRequestReplicaRepository,
+)
+from app.purchasecard.repository.auth_request_state_repository import (
+    AuthRequestStateRepository,
+)
 from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
 from app.purchasecard.repository.marqeta_decline_exemption import (
@@ -57,6 +65,16 @@ class PurchaseCardContainer:
         return self.app_context.dsj_client
 
     @property
+    def auth_processor(self) -> AuthProcessor:
+        return AuthProcessor(
+            marqeta_client=self.marqeta_client,
+            logger=self.logger,
+            auth_request_master_repo=self.auth_request_master_repository,
+            auth_request_replica_repo=self.auth_request_replica_repository,
+            auth_request_state_repo=self.auth_request_state_repository,
+        )
+
+    @property
     def user_processor(self) -> UserProcessor:
         return UserProcessor(marqeta_client=self.marqeta_client, logger=self.logger)
 
@@ -97,6 +115,24 @@ class PurchaseCardContainer:
         return ExemptionProcessor(
             delivery_funding_repo=self.delivery_funding_repository,
             decline_exemption_repo=self.marqeta_decline_exemption_repository,
+        )
+
+    @property
+    def auth_request_master_repository(self) -> AuthRequestMasterRepository:
+        return AuthRequestMasterRepository(
+            database=self.app_context.purchasecard_paymentdb
+        )
+
+    @property
+    def auth_request_replica_repository(self) -> AuthRequestReplicaRepository:
+        return AuthRequestReplicaRepository(
+            database=self.app_context.purchasecard_paymentdb
+        )
+
+    @property
+    def auth_request_state_repository(self) -> AuthRequestStateRepository:
+        return AuthRequestStateRepository(
+            database=self.app_context.purchasecard_paymentdb
         )
 
     @property

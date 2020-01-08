@@ -248,6 +248,7 @@ def dummy_app_context(mocker: MockFixture):
         ledger_maindb=mocker.Mock(),
         ledger_paymentdb=mocker.Mock(),
         purchasecard_maindb=mocker.Mock(),
+        purchasecard_paymentdb=mocker.Mock(),
         dsj_client=mocker.Mock(),
         identity_client=mocker.Mock(),
         stripe_thread_pool=mocker.Mock(),

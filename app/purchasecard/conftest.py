@@ -88,3 +88,27 @@ def marqeta_decline_exemption_repo(
     purchasecard_maindb: DB
 ) -> MarqetaDeclineExemptionRepository:
     return MarqetaDeclineExemptionRepository(database=purchasecard_maindb)
+
+
+@pytest.fixture()
+def mock_auth_request_master_repo():
+    mock_auth_request_master_repo = mock.patch(
+        "app.purchasecard.repository.auth_request_repository.AuthRequestMasterRepository"
+    )
+    return mock_auth_request_master_repo
+
+
+@pytest.fixture
+def mock_auth_request_replica_repo():
+    mock_auth_request_replica_repo = mock.patch(
+        "app.purchasecard.repository.auth_request_repository.AuthRequestReplicaRepository"
+    )
+    return mock_auth_request_replica_repo
+
+
+@pytest.fixture
+def mock_auth_request_state_repo():
+    mock_auth_request_state_repo = mock.patch(
+        "app.purchasecard.repository.auth_request_state_repository.AuthRequestStateRepository"
+    )
+    return mock_auth_request_state_repo
