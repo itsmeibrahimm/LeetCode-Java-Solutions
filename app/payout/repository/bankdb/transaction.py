@@ -395,7 +395,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
     async def get_payout_account_ids_for_unpaid_transactions_without_limit(
         self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
     ) -> List[int]:
-        override_stmt_timeout_in_ms = 10000
+        override_stmt_timeout_in_ms = 300 * 1000
         and_statement = and_(
             transactions.transfer_id.is_(None),
             transactions.payout_id.is_(None),
