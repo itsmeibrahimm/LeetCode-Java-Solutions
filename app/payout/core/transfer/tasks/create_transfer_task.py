@@ -2,6 +2,7 @@ import inspect
 from typing import Optional, List
 from uuid import uuid4
 
+from app.commons.cache.cache import setup_cache
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import build_req_context
 from app.payout.core.transfer.processors.create_transfer import (
@@ -69,6 +70,8 @@ class CreateTransferTask(BaseTask):
             app_context, task_name="CreateTransferTask", task_id=str(uuid4())
         )
 
+        cache = setup_cache(app_context=app_context)
+
         create_transfer_request_dict = {}
         if "fn_kwargs" in data:
             data_kwargs = data["fn_kwargs"]
@@ -85,6 +88,7 @@ class CreateTransferTask(BaseTask):
             "stripe": req_context.stripe_async_client,
             "payment_lock_manager": app_context.redis_lock_manager,
             "kafka_producer": app_context.kafka_producer,
+            "cache": cache,
             "logger": req_context.log,
             "request": CreateTransferRequest(**create_transfer_request_dict),
         }

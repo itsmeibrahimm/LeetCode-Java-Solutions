@@ -121,10 +121,9 @@ class UpdateTransferByStripeTransferStatus(
     ) -> Optional[StripeTransfer]:
         """
         Get Stripe payout by stripe id
-        :return: Return Tuple of boolean and StripeTransfer to indicate whether the stripe_transfer status
-        is synced with the actual payout on Stripe side.
-        If there is no stripe_id on stripe_transfer, return True to regard that as synced already
-        in order to skip futhur sync the status of transfer
+        :return: Return updated StripeTransfer
+        If there is no stripe_id on stripe_transfer, return None to represent that as synced already
+        in order to skip further sync the status of transfer
         """
 
         if not stripe_transfer.stripe_id:

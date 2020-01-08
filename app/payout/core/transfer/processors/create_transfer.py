@@ -6,6 +6,8 @@ from starlette.status import HTTP_400_BAD_REQUEST
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
 from typing import Union, Optional, List, Tuple
+
+from app.commons.cache.cache import PaymentCache
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -24,6 +26,7 @@ from app.payout.constants import (
     DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME,
     FRAUD_MX_AUTO_PAYMENT_DELAYED_RECENT_BANK_CHANGE,
     ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT,
+    WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING,
 )
 from app.payout.core.account.utils import (
     get_country_shortname,
@@ -50,7 +53,7 @@ from app.payout.repository.bankdb.transaction import TransactionRepositoryInterf
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepositoryInterface,
 )
-from app.payout.repository.maindb.model.payment_account import PaymentAccount
+from app.payout.repository.maindb.model.payment_account import PaymentAccount, Entity
 from app.payout.repository.maindb.model.transfer import (
     Transfer,
     TransferCreate,
@@ -79,6 +82,7 @@ class CreateTransferRequest(OperationRequest):
     payout_account_id: int
     transfer_type: str
     end_time: datetime
+    payout_day: Optional[payout_models.PayoutDay]
     start_time: Optional[datetime]
     payout_countries: Optional[List[str]]
     created_by_id: Optional[int]
@@ -99,6 +103,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     payment_lock_manager: Aioredlock
     stripe: StripeAsyncClient
     kafka_producer: KafkaMessageProducer
+    cache: PaymentCache
 
     def __init__(
         self,
@@ -113,6 +118,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         payment_lock_manager: Aioredlock,
         stripe: StripeAsyncClient,
         kafka_producer: KafkaMessageProducer,
+        cache: PaymentCache,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -126,6 +132,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self.payment_lock_manager = payment_lock_manager
         self.stripe = stripe
         self.kafka_producer = kafka_producer
+        self.cache = cache
 
     async def _execute(self) -> CreateTransferResponse:
         self.logger.info(
@@ -145,6 +152,32 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         # logic within following if statement is from create_transfer_for_account_id
         # when a transfer creation is triggered manually, we do not need to execute following logic
         if self.request.transfer_type != payout_models.TransferType.MANUAL:
+            if self.request.payout_day:
+                if not payment_account.entity:
+                    self.logger.warning(
+                        "[Create Transfer] Payment account entity not found.",
+                        account_id=payment_account.id,
+                    )
+                    return CreateTransferResponse(
+                        transfer=None,
+                        transaction_ids=[],
+                        error_code=PayoutErrorCode.PAYMENT_ACCOUNT_ENTITY_NOT_FOUND,
+                    )
+                account_payout_day = await self.get_payout_day(payment_account)
+
+                if account_payout_day is not self.request.payout_day:
+                    self.logger.info(
+                        "[Create Transfer] Skip creating transfer for account because payout day does not match",
+                        account_id=payment_account.id,
+                        payout_day=self.request.payout_day,
+                        account_payout_day=account_payout_day,
+                    )
+                    return CreateTransferResponse(
+                        transfer=None,
+                        transaction_ids=[],
+                        error_code=PayoutErrorCode.PAYOUT_DAY_NOT_MATCH,
+                    )
+
             if self.request.payout_countries:
                 stripe_managed_account = (
                     await self.payment_account_repo.get_stripe_managed_account_by_id(
@@ -425,3 +458,64 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         """
         amount = sum(t.amount for t in transactions)
         return amount
+
+    async def get_payout_day(
+        self, payment_account: PaymentAccount
+    ) -> payout_models.PayoutDay:
+        if payment_account.entity == Entity.DASHER:
+            return payout_models.PayoutDay.MONDAY
+        elif payment_account.entity in (Entity.STORE, Entity.MERCHANT):
+            for payout_day in payout_models.PayoutDay:
+                # go through payment account ids for each payout day
+                # check whether given id is in payment_account_ids of current payout_day
+                # if so, return corresponding payout day of that payment account, otherwise default to Thursday
+                payment_account_ids = await self.get_payment_account_ids_by_day_from_cache(
+                    payout_day
+                )
+                if payment_account.id in payment_account_ids:
+                    return payout_models.PayoutDay(payout_day)
+        self.logger.warn(
+            "Invalid payout entity type, default payout day to Thursday",
+            payment_account_id=payment_account.id,
+            entity=payment_account.entity,
+        )
+        return payout_models.PayoutDay.THURSDAY
+
+    async def get_payment_account_ids_by_day_from_cache(
+        self, payout_day: str
+    ) -> List[int]:
+        cache_key = f"{payout_day}_payout_payment_accounts"
+        payment_account_ids = await self.cache.get(cache_key)
+        if not payment_account_ids:
+            payment_account_ids = await self.get_payment_account_ids_by_payout_day(
+                payout_day
+            )
+            # cache results for 4 hours
+            await self.cache.set(cache_key, payment_account_ids, ttl_sec=60 * 60 * 4)
+        return payment_account_ids
+
+    async def get_payment_account_ids_by_payout_day(self, payout_day: str) -> List[int]:
+        payment_account_ids = []
+        biz_ids = runtime.get_json(
+            WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING[payout_day], []
+        )
+        for biz_id in biz_ids:
+            self.logger.info(
+                "Retrieving payment account ids with business_id",
+                payout_day=payout_day,
+                business_id=biz_id,
+            )
+            retrieved_payment_account_ids = await self.get_payment_account_ids_with_biz_id(
+                business_id=biz_id
+            )
+            payment_account_ids.extend(retrieved_payment_account_ids)
+        self.logger.info(
+            "Finished retrieving payment account ids by payout day",
+            payout_day=payout_day,
+            payment_account_count=len(payment_account_ids),
+        )
+        return payment_account_ids
+
+    async def get_payment_account_ids_with_biz_id(self, business_id: int) -> List[int]:
+        # todo: integrate with DSJ API
+        return []

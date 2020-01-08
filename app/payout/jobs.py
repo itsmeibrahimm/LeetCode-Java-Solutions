@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytz
 from structlog import BoundLogger
 
+from app.commons.cache.cache import setup_cache
 from app.commons.context.app_context import AppContext
 from app.commons.context.logger import get_logger
 from app.commons.context.req_context import ReqContext, build_req_context
@@ -496,6 +497,7 @@ class WeeklyCreateTransferJob(Job):
                     stripe=req_context.stripe_async_client,
                     payment_lock_manager=job_instance_cxt.app_context.redis_lock_manager,
                     kafka_producer=job_instance_cxt.app_context.kafka_producer,
+                    cache=setup_cache(app_context=job_instance_cxt.app_context),
                     logger=logger,
                     request=weekly_create_transfer_req,
                 )

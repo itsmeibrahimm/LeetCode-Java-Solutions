@@ -5,6 +5,7 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
+from app.commons.cache.cache import setup_cache
 from app.commons.context.app_context import AppContext
 from aioredlock.redis import Redis
 
@@ -15,6 +16,9 @@ from aioredlock import LockError
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
     FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE,
+    WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING,
+    DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME,
+    DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.exceptions import (
@@ -48,7 +52,7 @@ from app.payout.test_integration.utils import (
     prepare_and_insert_transaction,
     prepare_and_insert_stripe_managed_account,
 )
-from app.payout.models import PayoutTargetType, TransferType
+from app.payout.models import PayoutTargetType, TransferType, PayoutDay
 
 
 class TestCreateTransfer:
@@ -67,6 +71,7 @@ class TestCreateTransfer:
         app_context: AppContext,
         stripe_async_client: StripeAsyncClient,
     ):
+        self.cache = setup_cache(app_context=app_context)
         self.create_transfer_operation = CreateTransfer(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
@@ -78,6 +83,7 @@ class TestCreateTransfer:
             logger=mocker.Mock(),
             stripe=stripe_async_client,
             kafka_producer=app_context.kafka_producer,
+            cache=self.cache,
             request=CreateTransferRequest(
                 payout_account_id=123,
                 transfer_type=TransferType.SCHEDULED,
@@ -103,6 +109,7 @@ class TestCreateTransfer:
         target_type=None,
         created_by_id=None,
         submit_after_creation=False,
+        payout_day=None,
     ):
         return CreateTransfer(
             transfer_repo=self.transfer_repo,
@@ -115,6 +122,7 @@ class TestCreateTransfer:
             logger=self.mocker.Mock(),
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
+            cache=self.cache,
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
                 transfer_type=transfer_type,
@@ -123,6 +131,7 @@ class TestCreateTransfer:
                 target_type=target_type,
                 created_by_id=created_by_id,
                 submit_after_creation=submit_after_creation,
+                payout_day=payout_day,
             ),
         )
 
@@ -183,6 +192,34 @@ class TestCreateTransfer:
         assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND
 
+    async def test_execute_create_transfer_scheduled_transfer_type_payment_account_entity_not_found(
+        self
+    ):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo, entity=None
+        )
+        create_transfer_op = self._construct_create_transfer_op(
+            payment_account_id=payment_account.id, payout_day=PayoutDay.MONDAY
+        )
+        response = await create_transfer_op._execute()
+        assert not response.transfer
+        assert len(response.transaction_ids) == 0
+        assert response.error_code == PayoutErrorCode.PAYMENT_ACCOUNT_ENTITY_NOT_FOUND
+
+    async def test_execute_create_transfer_scheduled_transfer_type_payout_day_not_match(
+        self
+    ):
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        create_transfer_op = self._construct_create_transfer_op(
+            payment_account_id=payment_account.id, payout_day=PayoutDay.TUESDAY
+        )
+        response = await create_transfer_op._execute()
+        assert not response.transfer
+        assert len(response.transaction_ids) == 0
+        assert response.error_code == PayoutErrorCode.PAYOUT_DAY_NOT_MATCH
+
     async def test_execute_create_transfer_scheduled_transfer_type_invalid_country(
         self
     ):
@@ -235,26 +272,56 @@ class TestCreateTransfer:
         assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.PAYMENT_BLOCKED
 
-    async def test_execute_create_transfer_scheduled_transfer_type_success(self):
+    async def test_execute_create_transfer_scheduled_transfer_type_success(
+        self, runtime_setter: RuntimeSetter
+    ):
         # there is no corresponding stripe_transfer inserted, so the final status of transfer should be NEW
         sma = await prepare_and_insert_stripe_managed_account(
             payment_account_repo=self.payment_account_repo, country_shortname="US"
         )
         payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=self.payment_account_repo, account_id=sma.id
+            payment_account_repo=self.payment_account_repo,
+            account_id=sma.id,
+            entity="merchant",
         )
         transaction = await prepare_and_insert_transaction(
             transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
         )
         create_transfer_op = self._construct_create_transfer_op(
-            payment_account_id=payment_account.id, payout_countries=["US"]
+            payment_account_id=payment_account.id,
+            payout_countries=["US"],
+            payout_day=PayoutDay.THURSDAY,
         )
 
-        # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
-        # mocked get_json for runtime DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME, DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME
-        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=False)
-        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
+        @asyncio.coroutine
+        def mock_get_payment_account_ids_with_biz_id(*args, **kwargs):
+            return [payment_account.id]
 
+        mock_get_payment_account_ids = self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.get_payment_account_ids_with_biz_id",
+            side_effect=mock_get_payment_account_ids_with_biz_id,
+        )
+
+        runtime_setter.set(
+            WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING[PayoutDay.MONDAY], []
+        )
+        runtime_setter.set(
+            WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING[PayoutDay.TUESDAY], []
+        )
+        runtime_setter.set(
+            WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING[PayoutDay.WEDNESDAY], []
+        )
+        runtime_setter.set(
+            WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING[PayoutDay.THURSDAY], [123]
+        )
+        runtime_setter.set(
+            WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING[PayoutDay.FRIDAY], []
+        )
+        runtime_setter.set(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False)
+        runtime_setter.set(DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME, [])
+        runtime_setter.set(DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME, [])
+
+        await self.cache.invalidate(key="thursday_payout_payment_accounts")
         response = await create_transfer_op._execute()
         assert response.transfer
         assert response.transfer.status == TransferStatus.NEW
@@ -270,6 +337,9 @@ class TestCreateTransfer:
         )
         assert retrieved_transaction
         assert retrieved_transaction.transfer_id == response.transfer.id
+
+        # make sure retrieve payment account ids from given biz id is called
+        mock_get_payment_account_ids.assert_called_once_with(business_id=123)
 
     async def test_execute_create_transfer_scheduled_transfer_type_submit_after_creation_success(
         self
@@ -496,6 +566,7 @@ class TestCreateTransfer:
             logger=self.mocker.Mock(),
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
+            cache=self.cache,
             request=CreateTransferRequest(
                 payout_account_id=111,
                 transfer_type=TransferType.SCHEDULED,

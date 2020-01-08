@@ -2,6 +2,7 @@ import inspect
 from typing import Optional, List
 from uuid import uuid4
 
+from app.commons.cache.cache import setup_cache
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import build_req_context
 from app.payout.core.transfer.processors.weekly_create_transfer import (
@@ -83,6 +84,7 @@ class WeeklyCreateTransferTask(BaseTask):
             "stripe": req_context.stripe_async_client,
             "payment_lock_manager": app_context.redis_lock_manager,
             "kafka_producer": app_context.kafka_producer,
+            "cache": setup_cache(app_context=app_context),
             "logger": req_context.log,
             "request": WeeklyCreateTransferRequest(
                 **weekly_create_transfer_request_dict

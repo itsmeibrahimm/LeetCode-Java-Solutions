@@ -52,6 +52,7 @@ async def create_transfer(
         start_time=body.start_time,
         end_time=body.end_time,
         payout_countries=body.payout_countries,
+        payout_day=body.payout_day,
         created_by_id=body.created_by_id,
     )
     create_transfer_response = await transfer_processors.create_transfer(
@@ -76,6 +77,21 @@ async def create_transfer(
         raise PayoutError(
             http_status_code=HTTP_400_BAD_REQUEST,
             error_code=PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND,
+            retryable=False,
+        )
+    elif (
+        create_transfer_response.error_code
+        == PayoutErrorCode.PAYMENT_ACCOUNT_ENTITY_NOT_FOUND
+    ):
+        raise PayoutError(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayoutErrorCode.PAYMENT_ACCOUNT_ENTITY_NOT_FOUND,
+            retryable=False,
+        )
+    elif create_transfer_response.error_code == PayoutErrorCode.PAYOUT_DAY_NOT_MATCH:
+        raise PayoutError(
+            http_status_code=HTTP_400_BAD_REQUEST,
+            error_code=PayoutErrorCode.PAYOUT_DAY_NOT_MATCH,
             retryable=False,
         )
     return transfer_models.Transfer(**create_transfer_response.transfer.dict())

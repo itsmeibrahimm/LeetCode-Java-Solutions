@@ -98,7 +98,7 @@ class KafkaMessageConsumer:
         except Exception as e:
             log.error("message processing failed", exc_info=e)
         finally:
-            # consumer connection check is done in aiokafka
+            # todo: check if consumer is connected before closing
             await self.consumer.close()
         log.info("consumer stopping")
 
@@ -107,7 +107,7 @@ class KafkaMessageConsumer:
 
     async def stop(self):
         try:
-            # consumer connection check is done in aiokafka
+            # todo: check if consumer is connected before closing
             await self.consumer.close()
             log.info("consumer stopped")
         except Exception as e:

@@ -42,6 +42,14 @@ ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT = (
     "payout/feature-flags/enable_queueing_mechanism.bool"
 )
 
+WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING = {
+    "monday": "payout/feature-flags/WEEKLY_TRANSFER_MONDAY_PAYOUT_BUSINESS_IDS.json",
+    "tuesday": "payments/feature-flags/WEEKLY_TRANSFER_TUESDAY_PAYOUT_BUSINESS_IDS.json",
+    "wednesday": "payments/feature-flags/WEEKLY_TRANSFER_WEDNESDAY_PAYOUT_BUSINESS_IDS.json",
+    "thursday": "payments/feature-flags/WEEKLY_TRANSFER_THURSDAY_PAYOUT_BUSINESS_IDS.json",
+    "friday": "payments/feature-flags/WEEKLY_TRANSFER_FRIDAY_PAYOUT_BUSINESS_IDS.json",
+}
+
 # transfer submission
 ATTEMPTED_COUNT_STAT = "attempted-count"
 ATTEMPTED_AMOUNT_STAT = "attempted-amount"

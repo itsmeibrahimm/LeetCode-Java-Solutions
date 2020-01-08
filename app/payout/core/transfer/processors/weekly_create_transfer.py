@@ -5,6 +5,8 @@ from aioredlock import Aioredlock
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
 from typing import Union, Optional, List
+
+from app.commons.cache.cache import PaymentCache
 from app.commons.core.processor import (
     AsyncOperation,
     OperationRequest,
@@ -67,6 +69,7 @@ class WeeklyCreateTransfer(
     payment_lock_manager: Aioredlock
     stripe: StripeAsyncClient
     kafka_producer: KafkaMessageProducer
+    cache: PaymentCache
 
     def __init__(
         self,
@@ -81,6 +84,7 @@ class WeeklyCreateTransfer(
         payment_lock_manager: Aioredlock,
         stripe: StripeAsyncClient,
         kafka_producer: KafkaMessageProducer,
+        cache: PaymentCache,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -94,6 +98,7 @@ class WeeklyCreateTransfer(
         self.payment_lock_manager = payment_lock_manager
         self.stripe = stripe
         self.kafka_producer = kafka_producer
+        self.cache = cache
 
     async def _execute(self) -> WeeklyCreateTransferResponse:
         payout_day = self.request.payout_day
@@ -175,6 +180,7 @@ class WeeklyCreateTransfer(
                         payment_lock_manager=self.payment_lock_manager,
                         stripe=self.stripe,
                         kafka_producer=self.kafka_producer,
+                        cache=self.cache,
                     )
                     await create_transfer_op.execute()
             except Exception as e:

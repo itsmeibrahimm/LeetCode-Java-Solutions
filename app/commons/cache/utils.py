@@ -4,7 +4,7 @@ import inspect
 import six
 from pydantic import BaseModel
 
-from app.commons.cache.Cacheable import CacheKeyAware
+from app.commons.cache.cacheable import CacheKeyAware
 
 
 def safe_unicode(value, encoding="utf-8"):

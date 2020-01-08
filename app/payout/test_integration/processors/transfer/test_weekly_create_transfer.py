@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 import pytest
 import pytest_mock
 
+from app.commons.cache.cache import setup_cache
 from app.commons.context.app_context import AppContext
 
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
@@ -57,6 +58,7 @@ class TestWeeklyCreateTransfer:
         app_context: AppContext,
         stripe_async_client: StripeAsyncClient,
     ):
+        self.cache = setup_cache(app_context=app_context)
         self.weekly_create_transfer_operation = WeeklyCreateTransfer(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
@@ -68,6 +70,7 @@ class TestWeeklyCreateTransfer:
             logger=mocker.Mock(),
             stripe=stripe_async_client,
             kafka_producer=app_context.kafka_producer,
+            cache=self.cache,
             request=WeeklyCreateTransferRequest(
                 payout_day=PayoutDay.MONDAY,
                 payout_countries=[],
@@ -106,6 +109,7 @@ class TestWeeklyCreateTransfer:
             payment_lock_manager=self.payment_lock_manager,
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
+            cache=self.cache,
             request=request,
         )
         return weekly_create_transfer_op
@@ -256,6 +260,7 @@ class TestWeeklyCreateTransfer:
             payment_lock_manager=self.payment_lock_manager,
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
+            cache=self.cache,
             request=request,
         )
         await weekly_create_transfer_op._execute()

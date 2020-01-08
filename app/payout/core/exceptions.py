@@ -44,12 +44,14 @@ payout_error_message_maps = {
     "payout_28": "Payout country does not match",
     "payout_29": "Payment for the account is blocked",
     "payout_30": "No corresponding transactions found",
+    "payout_31": "Given payout day and account payout day not match",
     # payout account errors
     "account_0": "Cannot found payout_account with given id, please verify your input.",
     "account_1": "PGP account has not set up, please verify your payout account.",
     "account_2": "Create external payment gateway account failed due to invalid request error.",
     "account_3": "Create external payment gateway account failed due to some error.",
     "account_4": "Update external payment gateway account failed due to some error.",
+    "account_5": "No entity found on payment account, skip",
     # payout method errors
     "payout_method_0": "Cannot find a payout method with the given payout account id.",
     "payout_method_1": "Cannot find a payout card for the given payout account id.",
@@ -95,6 +97,7 @@ class PayoutErrorCode(str, Enum):
     PAYOUT_COUNTRY_NOT_MATCH = "payout_28"
     PAYMENT_BLOCKED = "payout_29"
     NO_UNPAID_TRANSACTION_FOUND = "payout_30"
+    PAYOUT_DAY_NOT_MATCH = "payout_31"
 
     # payout account error code
     PAYOUT_ACCOUNT_NOT_FOUND = "account_0"
@@ -102,6 +105,7 @@ class PayoutErrorCode(str, Enum):
     PGP_ACCOUNT_CREATE_INVALID_REQUEST = "account_2"
     PGP_ACCOUNT_CREATE_ERROR = "account_3"
     PGP_ACCOUNT_UPDATE_ERROR = "account_4"
+    PAYMENT_ACCOUNT_ENTITY_NOT_FOUND = "account_5"
 
     # payout method error code
     PAYOUT_METHOD_NOT_FOUND_FOR_ACCOUNT = "payout_method_0"
