@@ -169,6 +169,7 @@ class AppConfig(SecretAware):
     LEDGER_STATSD_CONFIG: StatsDConfig = StatsDConfig(PREFIX="dd.pay.payment-service")
 
     SENTRY_CONFIG: Optional[SentryConfig] = None
+    BANK_DB_CONFIG: Optional[DBConfig] = None
 
     # PAYIN-189 Split web, cron resource initialization
     STRIPE_MAX_WORKERS: int = 20

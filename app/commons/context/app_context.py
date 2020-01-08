@@ -174,7 +174,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
 
     payout_bankdb = DB.create(
         db_id="payout_bankdb",
-        db_config=config.DEFAULT_DB_CONFIG,
+        db_config=config.BANK_DB_CONFIG
+        if config.BANK_DB_CONFIG
+        else config.DEFAULT_DB_CONFIG,
         master_url=config.PAYOUT_BANKDB_MASTER_URL,
         replica_url=config.PAYOUT_BANKDB_REPLICA_URL,
     )

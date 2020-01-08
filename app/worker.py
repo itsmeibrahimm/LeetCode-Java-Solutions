@@ -1,6 +1,6 @@
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
-from app.commons.config.utils import init_app_config_for_web
+from app.commons.config.utils import init_app_config_for_payout_worker
 from app.commons.context.app_context import create_app_context
 from app.commons.context.logger import get_logger
 from app.commons.config.newrelic_loader import init_newrelic_agent
@@ -32,7 +32,7 @@ log = get_logger("worker")
 
 
 async def main(topic_name: str, processor, number_consumers: int):
-    app_config = init_app_config_for_web()
+    app_config = init_app_config_for_payout_worker()
 
     health_server = HealthServer()
     await health_server.start(port=app_config.WORKER_HEALTH_SERVER_PORT)
