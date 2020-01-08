@@ -336,6 +336,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
     ) -> List[TransactionDBEntity]:
+        override_stmt_timeout_in_ms = 10 * 1000
         and_statement = and_(
             transactions.payment_account_id == payout_account_id,
             transactions.transfer_id.is_(None),
@@ -349,12 +350,19 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
             and_statement.clauses.append(transactions.created_at.__ge__(start_time))
         if end_time:
             and_statement.clauses.append(transactions.created_at.__le__(end_time))
-        stmt = (
+        get_transactions_stmt = (
             transactions.table.select()
             .where(and_statement)
             .order_by(desc(transactions.created_at))
         )
-        rows = await self._database.replica().fetch_all(stmt)
+        override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
+            override_stmt_timeout_in_ms
+        )
+
+        async with self._database.replica().transaction() as transaction:
+            await transaction.connection().execute(override_stmt_timeout_stmt)
+            rows = await transaction.connection().fetch_all(get_transactions_stmt)
+
         if rows:
             return [TransactionDBEntity.from_row(row) for row in rows]
         else:
@@ -395,7 +403,7 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
     async def get_payout_account_ids_for_unpaid_transactions_without_limit(
         self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
     ) -> List[int]:
-        override_stmt_timeout_in_ms = 300 * 1000
+        override_stmt_timeout_in_ms = 900 * 1000
         and_statement = and_(
             transactions.transfer_id.is_(None),
             transactions.payout_id.is_(None),

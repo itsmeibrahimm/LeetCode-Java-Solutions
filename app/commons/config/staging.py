@@ -138,7 +138,7 @@ def create_app_config_for_payout_worker() -> AppConfig:
         replica_pool_max_size=5,
         master_pool_max_size=5,
         debug=False,
-        statement_timeout_sec=300,
+        statement_timeout_sec=900,
     )
     return dataclasses.replace(
         web_appconfig,
