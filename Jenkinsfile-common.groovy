@@ -619,27 +619,21 @@ def serviceNameEnvToOptArgs(String serviceName, String env) {
             helmFlags: '--install --force',
             helmValuesFile: "values-${env}.yaml",
             helmRelease: "${serviceName}-${env}",
-            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW',
-            k8sNamespace: 'staging',
-            tillerNamespace: 'staging'
+            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW'
     ]
   } else if (env == 'staging') {
     return [
             helmFlags: '--install --force',
             helmValuesFile: 'values-staging.yaml',
             helmRelease: serviceName,
-            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW',
-            k8sNamespace: 'staging',
-            tillerNamespace: 'staging'
+            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW'
     ]
   } else if (env == 'prod' || env == 'production') {
     return [
             helmFlags: '--install',
             helmValuesFile: 'values-prod.yaml',
             helmRelease: serviceName,
-            k8sCredFileCredentialId: 'K8S_CONFIG_PROD_NEW',
-            k8sNamespace: 'prod',
-            tillerNamespace: 'prod'
+            k8sCredFileCredentialId: 'K8S_CONFIG_PROD_NEW'
     ]
   } else {
     error("Unknown env value of '${env}' passed.")
