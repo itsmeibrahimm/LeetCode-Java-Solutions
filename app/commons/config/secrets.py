@@ -42,7 +42,7 @@ class Secret:
         return cls(name=name, version=None, value=value)
 
 
-@retry(stop=stop_after_attempt(6), wait=wait_fixed(10))
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
 def _init_ninox_with_retry(config_section: str) -> Helper:
     ninox = Helper(config_section=config_section)
     if ninox.disabled:
