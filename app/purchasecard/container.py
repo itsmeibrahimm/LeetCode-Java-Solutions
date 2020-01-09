@@ -14,12 +14,9 @@ from app.purchasecard.marqeta_external.marqeta_provider_client import (
 )
 from structlog.stdlib import BoundLogger
 
-from app.purchasecard.repository.auth_request_repository import (
-    AuthRequestMasterRepository,
-    AuthRequestReplicaRepository,
-)
-from app.purchasecard.repository.auth_request_state_repository import (
-    AuthRequestStateRepository,
+from app.purchasecard.repository.authorization_repository import (
+    AuthorizationMasterRepository,
+    AuthorizationReplicaRepository,
 )
 from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
@@ -69,9 +66,8 @@ class PurchaseCardContainer:
         return AuthProcessor(
             marqeta_client=self.marqeta_client,
             logger=self.logger,
-            auth_request_master_repo=self.auth_request_master_repository,
-            auth_request_replica_repo=self.auth_request_replica_repository,
-            auth_request_state_repo=self.auth_request_state_repository,
+            authorization_master_repo=self.authorization_master_repo,
+            authorization_replica_repo=self.authorization_replica_repo,
         )
 
     @property
@@ -118,20 +114,14 @@ class PurchaseCardContainer:
         )
 
     @property
-    def auth_request_master_repository(self) -> AuthRequestMasterRepository:
-        return AuthRequestMasterRepository(
+    def authorization_master_repo(self) -> AuthorizationMasterRepository:
+        return AuthorizationMasterRepository(
             database=self.app_context.purchasecard_paymentdb
         )
 
     @property
-    def auth_request_replica_repository(self) -> AuthRequestReplicaRepository:
-        return AuthRequestReplicaRepository(
-            database=self.app_context.purchasecard_paymentdb
-        )
-
-    @property
-    def auth_request_state_repository(self) -> AuthRequestStateRepository:
-        return AuthRequestStateRepository(
+    def authorization_replica_repo(self) -> AuthorizationReplicaRepository:
+        return AuthorizationReplicaRepository(
             database=self.app_context.purchasecard_paymentdb
         )
 

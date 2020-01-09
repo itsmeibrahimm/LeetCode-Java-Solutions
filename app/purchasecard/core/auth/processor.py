@@ -10,12 +10,8 @@ from app.purchasecard.core.auth.models import (
 from app.purchasecard.marqeta_external.marqeta_provider_client import (
     MarqetaProviderClient,
 )
-from app.purchasecard.models.paymentdb.auth_request import AuthRequest
-from app.purchasecard.repository.auth_request_repository import (
-    AuthRequestRepositoryInterface,
-)
-from app.purchasecard.repository.auth_request_state_repository import (
-    AuthRequestStateRepositoryInterface,
+from app.purchasecard.repository.authorization_repository import (
+    AuthorizationRepositoryInterface,
 )
 
 
@@ -27,15 +23,13 @@ class AuthProcessor:
         self,
         logger: BoundLogger,
         marqeta_client: MarqetaProviderClient,
-        auth_request_master_repo: AuthRequestRepositoryInterface,
-        auth_request_replica_repo: AuthRequestRepositoryInterface,
-        auth_request_state_repo: AuthRequestStateRepositoryInterface,
+        authorization_master_repo: AuthorizationRepositoryInterface,
+        authorization_replica_repo: AuthorizationRepositoryInterface,
     ):
         self.logger = logger
         self.marqeta_client = marqeta_client
-        self.auth_request_master_repo = auth_request_master_repo
-        self.auth_request_replica_repo = auth_request_replica_repo
-        self.auth_request_state_repo = auth_request_state_repo
+        self.authorization_master_repo = authorization_master_repo
+        self.authorization_replica_repo = authorization_replica_repo
 
     async def create_auth(
         self,
@@ -49,22 +43,17 @@ class AuthProcessor:
     ) -> InternalCreateAuthResponse:
         # generate random auth_request_id
         auth_request_id = uuid4()
+        auth_request_state_id = uuid4()
 
         # create db entries
-        auth_request: AuthRequest = await self.auth_request_master_repo.insert(
-            id=auth_request_id,
+        auth_request, _ = await self.authorization_master_repo.create_authorization(
+            auth_id=auth_request_id,
+            state_id=auth_request_state_id,
             shift_id=shift_id,
             delivery_id=delivery_id,
             store_id=store_meta.store_id,
             store_city=store_meta.store_city,
             store_business_name=store_meta.store_business_name,
-        )
-
-        auth_request_state_id = uuid4()
-
-        await self.auth_request_state_repo.insert(
-            id=auth_request_state_id,
-            auth_request_id=auth_request.id,
             subtotal=subtotal,
             subtotal_tax=subtotal_tax,
         )

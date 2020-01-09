@@ -23,16 +23,14 @@ class TestAuthProcessor:
     def setup(
         self,
         fake_marqeta_client,
-        mock_auth_request_master_repo,
-        mock_auth_request_replica_repo,
-        mock_auth_request_state_repo,
+        mock_authorization_master_repo,
+        mock_authorization_replica_repo,
     ):
         self.auth_processor = AuthProcessor(
             logger=MagicMock(),
             marqeta_client=fake_marqeta_client,
-            auth_request_master_repo=mock_auth_request_master_repo,
-            auth_request_replica_repo=mock_auth_request_replica_repo,
-            auth_request_state_repo=mock_auth_request_state_repo,
+            authorization_master_repo=mock_authorization_master_repo,
+            authorization_replica_repo=mock_authorization_replica_repo,
         )
 
     @pytest.fixture
@@ -48,27 +46,29 @@ class TestAuthProcessor:
         TEST_AUTH_REQUEST_STATE_ID = uuid4()
         TEST_SHIFT_ID = "TEST_SHIFT_ID"
         TEST_DELIVERY_ID = "TEST_DELIVERY_ID"
-        self.auth_processor.auth_request_master_repo.insert = CoroutineMock()
-        self.auth_processor.auth_request_master_repo.insert.return_value = AuthRequest(
-            id=TEST_AUTH_REQUEST_ID,
-            created_at=utcnow(),
-            updated_at=utcnow(),
-            shift_id=TEST_SHIFT_ID,
-            delivery_id=TEST_DELIVERY_ID,
-            store_id="123",
-            store_city="testcity",
-            store_business_name="testbusinessname",
+        self.auth_processor.authorization_master_repo.create_authorization = (
+            CoroutineMock()
         )
-
-        self.auth_processor.auth_request_state_repo.insert = CoroutineMock()
-        self.auth_processor.auth_request_state_repo.insert.return_value = AuthRequestState(
-            id=TEST_AUTH_REQUEST_STATE_ID,
-            auth_request_id=TEST_AUTH_REQUEST_ID,
-            created_at=utcnow(),
-            updated_at=utcnow(),
-            state=AuthRequestStateName.ACTIVE_CREATED,
-            subtotal=123,
-            subtotal_tax=123,
+        self.auth_processor.authorization_master_repo.create_authorization.return_value = (
+            AuthRequest(
+                id=TEST_AUTH_REQUEST_ID,
+                created_at=utcnow(),
+                updated_at=utcnow(),
+                shift_id=TEST_SHIFT_ID,
+                delivery_id=TEST_DELIVERY_ID,
+                store_id="123",
+                store_city="testcity",
+                store_business_name="testbusinessname",
+            ),
+            AuthRequestState(
+                id=TEST_AUTH_REQUEST_STATE_ID,
+                auth_request_id=TEST_AUTH_REQUEST_ID,
+                created_at=utcnow(),
+                updated_at=utcnow(),
+                state=AuthRequestStateName.ACTIVE_CREATED,
+                subtotal=123,
+                subtotal_tax=123,
+            ),
         )
 
         test_store_info = InternalStoreInfo(

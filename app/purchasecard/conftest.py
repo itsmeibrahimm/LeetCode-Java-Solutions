@@ -91,24 +91,16 @@ def marqeta_decline_exemption_repo(
 
 
 @pytest.fixture()
-def mock_auth_request_master_repo():
+def mock_authorization_master_repo():
     mock_auth_request_master_repo = mock.patch(
-        "app.purchasecard.repository.auth_request_repository.AuthRequestMasterRepository"
+        "app.purchasecard.repository.authorization_repository.AuthorizationMasterRepository"
     )
     return mock_auth_request_master_repo
 
 
 @pytest.fixture
-def mock_auth_request_replica_repo():
+def mock_authorization_replica_repo():
     mock_auth_request_replica_repo = mock.patch(
-        "app.purchasecard.repository.auth_request_repository.AuthRequestReplicaRepository"
+        "app.purchasecard.repository.authorization_repository.AuthorizationReplicaRepository"
     )
     return mock_auth_request_replica_repo
-
-
-@pytest.fixture
-def mock_auth_request_state_repo():
-    mock_auth_request_state_repo = mock.patch(
-        "app.purchasecard.repository.auth_request_state_repository.AuthRequestStateRepository"
-    )
-    return mock_auth_request_state_repo
