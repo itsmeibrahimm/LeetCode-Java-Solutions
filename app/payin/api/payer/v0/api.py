@@ -34,7 +34,7 @@ async def get_payer(
     Get payer with DSJ legacy information.
 
     - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_consumer_id",
-      "stripe_customer_id", "dd_stripe_customer_id"
+      "stripe_customer_id", "legacy_dd_stripe_customer_id"
     - **payer_id**: DSJ legacy id
     - **country**: country of DoorDash payer (consumer)
     - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",
@@ -74,7 +74,7 @@ async def update_default_payment_method(
     Update payer's default payment method
 
     - **payer_id_type**: [string] identify the type of payer_id. Valid values include "dd_consumer_id",
-      "stripe_customer_id", "dd_stripe_customer_id"
+      "stripe_customer_id", "legacy_dd_stripe_customer_id"
     - **payer_id**: DSJ legacy id
     - **country**: country of DoorDash payer (consumer)
     - **payer_type**: [string] identify the type of payer. Valid values include "marketplace",

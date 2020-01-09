@@ -7,7 +7,7 @@ from typing_extensions import final
 
 from app.commons.types import PgpCode
 from app.commons.utils.legacy_utils import owner_type_to_payer_reference_id_type
-from app.payin.core.types import PgpPayerResourceId, PayerReferenceIdType
+from app.payin.core.types import PayerReferenceIdType, PgpPayerResourceId
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
     PgpCustomerDbEntity,
@@ -39,8 +39,7 @@ class Payer(BaseModel):
     deleted_at: Optional[datetime] = None
     country: Optional[str] = None
     payer_correlation_ids: Optional[PayerCorrelationIds] = None
-    dd_stripe_customer_id: Optional[str] = None
-    legacy_dd_stripe_customer_id: Optional[int] = None
+    legacy_dd_stripe_customer_id: Optional[str] = None
     default_payment_method_id: Optional[UUID] = None
     default_dd_stripe_card_id: Optional[int] = None
     description: Optional[str] = None
@@ -110,7 +109,6 @@ class RawPayer:
 
         if self.payer_entity:
             updated_at: datetime = self.payer_entity.updated_at
-            dd_stripe_customer_id: Optional[str] = None
             if (
                 self.payer_entity.payer_reference_id_type
                 == PayerReferenceIdType.DD_CONSUMER_ID
@@ -128,7 +126,6 @@ class RawPayer:
             else:
                 if not self.stripe_customer_entity:
                     raise Exception("RawPayer doesn't have stripe_customer_entity")
-                dd_stripe_customer_id = str(self.stripe_customer_entity.id)
                 provider_customer = PaymentGatewayProviderCustomer(
                     payment_provider=PgpCode.STRIPE,
                     payment_provider_customer_id=self.payer_entity.legacy_stripe_customer_id,
@@ -144,8 +141,9 @@ class RawPayer:
                     payer_reference_id=self.payer_entity.payer_reference_id,
                     payer_reference_id_type=self.payer_entity.payer_reference_id_type,
                 ),
-                dd_stripe_customer_id=dd_stripe_customer_id,
-                legacy_dd_stripe_customer_id=self.payer_entity.legacy_dd_stripe_customer_id,
+                legacy_dd_stripe_customer_id=str(
+                    self.payer_entity.legacy_dd_stripe_customer_id
+                ),
                 default_payment_method_id=self.payer_entity.default_payment_method_id,
                 default_dd_stripe_card_id=self.payer_entity.legacy_default_dd_stripe_card_id,
                 description=self.payer_entity.description,
@@ -162,8 +160,7 @@ class RawPayer:
                 # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 country=self.stripe_customer_entity.country_shortname,
-                dd_stripe_customer_id=str(self.stripe_customer_entity.id),
-                legacy_dd_stripe_customer_id=self.stripe_customer_entity.id,
+                legacy_dd_stripe_customer_id=str(self.stripe_customer_entity.id),
                 payer_correlation_ids=PayerCorrelationIds(
                     payer_reference_id=str(self.stripe_customer_entity.owner_id),
                     payer_reference_id_type=owner_type_to_payer_reference_id_type(

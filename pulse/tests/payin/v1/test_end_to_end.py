@@ -40,7 +40,7 @@ def test_end_to_end():
     update_payer_request = UpdatePayerRequestV1(
         default_payment_method=default_payment_method
     )
-    updated_payer = payer_v1_client.update_payer_with_http_info(
+    updated_payer = payer_v1_client.update_payer_default_payment_method_by_id_with_http_info(
         payer_id=test_payer[0].id, update_payer_request_v1=update_payer_request
     )
     assert updated_payer[1] == 200

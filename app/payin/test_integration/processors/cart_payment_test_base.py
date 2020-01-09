@@ -544,7 +544,7 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
                 stripe_customer_id=payer.payment_gateway_provider_customers[
                     0
                 ].payment_provider_customer_id,
-                dd_stripe_customer_id=payer.dd_stripe_customer_id,
+                dd_stripe_customer_id=payer.legacy_dd_stripe_customer_id,
             ),
         )
 

@@ -46,7 +46,7 @@ def payer_id_type_to_payer_reference_id_type(
     elif payer_id_type == PayerIdType.DD_CONSUMER_ID:
         return PayerReferenceIdType.DD_CONSUMER_ID
     elif payer_id_type == PayerIdType.DD_STRIPE_CUSTOMER_SERIAL_ID:
-        return PayerReferenceIdType.DD_STRIPE_CUSTOMER_ID
+        return PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID
     elif payer_id_type == PayerIdType.STRIPE_CUSTOMER_ID:
         return PayerReferenceIdType.STRIPE_CUSTOMER_ID
 

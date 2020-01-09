@@ -43,7 +43,7 @@ class PayerReferenceIdType(str, Enum):
 
     PAYER_ID = "payer_id"
     DD_CONSUMER_ID = "dd_consumer_id"
-    DD_STRIPE_CUSTOMER_ID = "dd_stripe_customer_id"  # used for payer APIs
+    LEGACY_DD_STRIPE_CUSTOMER_ID = "legacy_dd_stripe_customer_id"  # used for payer APIs
     DD_DRIVE_STORE_ID = "dd_drive_store_id"
     DD_DRIVE_MERCHANT_ID = "dd_drive_merchant_id"
     DD_DRIVE_BUSINESS_ID = "dd_drive_business_id"

@@ -1038,10 +1038,10 @@ class TestCartPayment:
         event_loop: AbstractEventLoop,
     ):
         def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
-            dd_stripe_customer_id = payer["dd_stripe_customer_id"]
+            dd_stripe_customer_id = payer["legacy_dd_stripe_customer_id"]
             payer_correlation_ids = {
                 "payer_reference_id": dd_stripe_customer_id,
-                "payer_reference_id_type": PayerReferenceIdType.DD_STRIPE_CUSTOMER_ID,
+                "payer_reference_id_type": PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID.value,
             }
             return {"payer_correlation_ids": payer_correlation_ids}
 
@@ -1105,10 +1105,10 @@ class TestCartPayment:
         event_loop: AbstractEventLoop,
     ):
         def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
-            dd_stripe_customer_id = payer["dd_stripe_customer_id"]
+            dd_stripe_customer_id = payer["legacy_dd_stripe_customer_id"]
             payer_correlation_ids = {
                 "payer_reference_id": dd_stripe_customer_id,
-                "payer_reference_id_type": PayerReferenceIdType.DD_STRIPE_CUSTOMER_ID,
+                "payer_reference_id_type": PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID,
             }
             return {"payer_correlation_ids": payer_correlation_ids}
 

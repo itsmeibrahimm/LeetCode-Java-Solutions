@@ -159,7 +159,7 @@ class TestPayersV0:
         response = client.get(
             _get_payer_url(
                 payer_id_type="dd_stripe_customer_serial_id",
-                payer_id=payer["dd_stripe_customer_id"],
+                payer_id=payer["legacy_dd_stripe_customer_id"],
             )
         )
         assert response.status_code == 200
@@ -170,7 +170,7 @@ class TestPayersV0:
         response = client.get(
             _get_payer_url(
                 payer_id_type="dd_stripe_customer_serial_id",
-                payer_id=payer["dd_stripe_customer_id"],
+                payer_id=payer["legacy_dd_stripe_customer_id"],
             )
             + "?force_update=True"
         )
@@ -239,7 +239,7 @@ class TestPayersV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                dd_stripe_customer_id=payer["dd_stripe_customer_id"],
+                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
 
@@ -277,7 +277,7 @@ class TestPayersV0:
         response = client.get(
             _get_payer_url(
                 payer_id_type="dd_stripe_customer_serial_id",
-                payer_id=payer["dd_stripe_customer_id"],
+                payer_id=payer["legacy_dd_stripe_customer_id"],
             )
         )
         assert response.status_code == 200
@@ -320,14 +320,14 @@ class TestPayersV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                dd_stripe_customer_id=payer["dd_stripe_customer_id"],
+                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
 
         # set default_payment_method
         update_payer = _update_payer_v0(
             client=client,
-            payer_id=payer["dd_stripe_customer_id"],
+            payer_id=payer["legacy_dd_stripe_customer_id"],
             payer_id_type="dd_stripe_customer_serial_id",
             request=UpdatePayerV0Request(
                 dd_stripe_card_id=payment_method["dd_stripe_card_id"], country="US"
@@ -356,7 +356,7 @@ class TestPayersV0:
         response = client.get(
             _get_payer_url(
                 payer_id_type="dd_stripe_customer_serial_id",
-                payer_id=payer["dd_stripe_customer_id"],
+                payer_id=payer["legacy_dd_stripe_customer_id"],
             )
         )
         assert response.status_code == 200

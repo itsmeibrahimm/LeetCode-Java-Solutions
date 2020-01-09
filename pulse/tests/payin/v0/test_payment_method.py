@@ -20,7 +20,7 @@ def test_create_get_delete_payment_method_with_payment_method_id():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     logger.info(payment_method[0])
@@ -65,7 +65,7 @@ def test_create_get_delete_payment_method_with_stripe_payment_method_id():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -114,7 +114,7 @@ def test_create_get_delete_payment_method_with_dd_stripe_card_id():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -168,7 +168,7 @@ def test_get_payment_method_with_invalid_input():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -198,7 +198,7 @@ def test_create_v0_get_v1_payment_method():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -219,7 +219,7 @@ def test_create_v0_delete_v1_payment_method():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201

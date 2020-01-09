@@ -61,7 +61,7 @@ def test_update_payer_with_stripe_customer_id():
             stripe_customer_id=new_payer[0]
             .payment_gateway_provider_customers[0]
             .payment_provider_customer_id,
-            dd_stripe_customer_id=new_payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=new_payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert (
@@ -122,7 +122,7 @@ def test_update_payer_with_stripe_customer_serial_id():
             stripe_customer_id=new_payer[0]
             .payment_gateway_provider_customers[0]
             .payment_provider_customer_id,
-            dd_stripe_customer_id=new_payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=new_payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert (
@@ -139,7 +139,7 @@ def test_update_payer_with_stripe_customer_serial_id():
         default_payment_method=default_payment_method, country="US", payer_type="store"
     )
     updated_payer = payer_v0_client.update_payer_with_http_info(
-        payer_id=new_payer[0].dd_stripe_customer_id,
+        payer_id=new_payer[0].legacy_dd_stripe_customer_id,
         payer_id_type="dd_stripe_customer_serial_id",
         update_payer_request_v0=update_payer_request_v0,
     )
@@ -147,7 +147,7 @@ def test_update_payer_with_stripe_customer_serial_id():
 
     # step 3: Get the updated payer
     get_payer = payer_v0_client.get_payer_with_http_info(
-        payer_id=new_payer[0].dd_stripe_customer_id,
+        payer_id=new_payer[0].legacy_dd_stripe_customer_id,
         payer_id_type="dd_stripe_customer_serial_id",
     )
     assert get_payer[1] == 200

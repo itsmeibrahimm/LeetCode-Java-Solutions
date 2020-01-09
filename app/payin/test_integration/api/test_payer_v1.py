@@ -527,8 +527,8 @@ class TestPayersV1:
         update_payer = _update_payer_v1(
             client=client,
             url=_update_payer_default_payment_method_by_reference_id_url(
-                payer_reference_id_type="dd_stripe_customer_id",
-                payer_reference_id=payer["dd_stripe_customer_id"],
+                payer_reference_id_type="legacy_dd_stripe_customer_id",
+                payer_reference_id=payer["legacy_dd_stripe_customer_id"],
             ),
             request=UpdatePayerV1Request(payment_method_id=payment_method["id"]),
         )
@@ -550,8 +550,8 @@ class TestPayersV1:
         # get payer, and verify default_payment_method is gone
         response = client.get(
             _get_payer_by_reference_id_url(
-                payer_reference_id_type="dd_stripe_customer_id",
-                payer_reference_id=payer["dd_stripe_customer_id"],
+                payer_reference_id_type="legacy_dd_stripe_customer_id",
+                payer_reference_id=payer["legacy_dd_stripe_customer_id"],
             )
         )
         assert response.status_code == 200

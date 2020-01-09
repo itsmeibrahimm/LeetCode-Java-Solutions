@@ -23,7 +23,7 @@ def test_create_legacy_cart_payment_with_no_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -57,7 +57,7 @@ def test_create_legacy_cart_payment_with_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -93,7 +93,7 @@ def test_create_legacy_cart_payment_with_invalid_request():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -133,7 +133,7 @@ def test_update_legacy_cart_payment_higher_without_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -177,7 +177,7 @@ def test_update_legacy_cart_payment_lower_without_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -221,7 +221,7 @@ def test_update_legacy_cart_payment_lower_with_invalid_amount():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -267,7 +267,7 @@ def test_update_legacy_cart_payment_higher_with_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -311,7 +311,7 @@ def test_update_legacy_cart_payment_lower_with_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -374,7 +374,7 @@ def test_cancel_legacy_cart_payment_without_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -415,7 +415,7 @@ def test_cancel_legacy_cart_payment_with_delay_capture():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -470,7 +470,7 @@ def test_get_cart_payment():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -536,7 +536,7 @@ def test_list_cart_payment():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201
@@ -591,7 +591,7 @@ def test_list_cart_payment_with_correct_datetime_filter():
     payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=stripe_customer_id,
-            dd_stripe_customer_id=payer[0].dd_stripe_customer_id,
+            dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert payment_method[1] == 201

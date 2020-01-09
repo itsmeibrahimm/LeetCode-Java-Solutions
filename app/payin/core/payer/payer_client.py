@@ -270,7 +270,10 @@ class PayerClient:
                         request=GetPgpCustomerInput(payer_id=payer_entity.id)
                     )
                 is_found = bool(payer_entity and pgp_cus_entity)
-            elif payer_reference_id_type == PayerReferenceIdType.DD_STRIPE_CUSTOMER_ID:
+            elif (
+                payer_reference_id_type
+                == PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID
+            ):
                 # get stripe_customer object
                 stripe_cus_entity = await self.payer_repo.get_stripe_customer_by_id(
                     GetStripeCustomerByIdInput(id=mixed_payer_id)

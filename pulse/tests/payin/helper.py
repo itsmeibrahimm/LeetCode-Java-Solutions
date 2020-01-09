@@ -12,10 +12,10 @@ from payin_v0_client import (
 from payin_v1_client import (
     CreatePayerRequest,
     CreatePaymentMethodRequestV1,
-    CreateCartPaymentRequest,
+    CreateCartPaymentRequestV1,
     AppPayinCoreCartPaymentModelSplitPayment,
     AppPayinCoreCartPaymentModelCorrelationIds,
-    UpdateCartPaymentRequest,
+    UpdateCartPaymentRequestV1,
     Payer,
     PayerCorrelationIds,
     PaymentMethod,
@@ -136,7 +136,7 @@ class PaymentUtil:
         delay_capture: bool,
         client_description: str = None,
     ):
-        return CreateCartPaymentRequest(
+        return CreateCartPaymentRequestV1(
             amount=amount,
             payment_country=country,
             currency=currency,
@@ -157,7 +157,7 @@ class PaymentUtil:
 
     @staticmethod
     def get_update_cart_payment_request(payer: Payer, updated_amount: int):
-        return UpdateCartPaymentRequest(
+        return UpdateCartPaymentRequestV1(
             idempotency_key=str(uuid.uuid4()),
             amount=updated_amount,
             client_description="Test Update Transaction",

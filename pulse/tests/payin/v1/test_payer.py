@@ -92,7 +92,7 @@ def test_update_payer_with_payer_id():
         )
     )
     assert new_payment_method[1] == 201
-    update_payment_method = payer_v1_client.update_payer_with_http_info(
+    update_payment_method = payer_v1_client.update_payer_default_payment_method_by_id_with_http_info(
         new_payer[0].id, {"default_payment_method": new_payment_method[0]}
     )
     assert update_payment_method[1] == 200
@@ -131,7 +131,7 @@ def test_create_v1_get_v0_payer_by_stripe_customer_serial_id():
 
     get_payer = payer_v0_client.get_payer_with_http_info(
         payer_id_type="dd_stripe_customer_serial_id",
-        payer_id=new_payer[0].dd_stripe_customer_id,
+        payer_id=new_payer[0].legacy_dd_stripe_customer_id,
     )
     assert get_payer[1] == 200
     logger.info(new_payer[0])
