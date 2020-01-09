@@ -477,8 +477,8 @@ def deployHelm(Map optArgs = [:], String tag, String serviceName, String env) {
           helmValuesFile: "values-${env}.yaml",
           helmRelease: serviceName,
           k8sCredFileCredentialId: "K8S_CONFIG_${env.toUpperCase()}_NEW",
-          k8sNamespace: env,
-          tillerNamespace: env,
+          k8sNamespace: "payment-service",
+          tillerNamespace: "kube-system",
           timeoutSeconds: 600
   ] << serviceNameEnvToOptArgs(serviceName, env) << optArgs
   withCredentials([file(credentialsId: o.k8sCredFileCredentialId, variable: 'k8sCredsFile')]) {
