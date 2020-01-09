@@ -687,7 +687,7 @@ def getMigrationJobLog(String env) {
             |# Find pod name so that we can manage it
             |POD_NAME=''
             |for i in 1 2 4 8; do
-            |  POD_NAME=\$(kubectl get pods -n ${env} --selector='job-name=payment-service-migration-job' -o name)
+            |  POD_NAME=\$(kubectl get pods -n payment-service --selector='job-name=payment-service-migration-job' -o name)
             |  if [[ "\${POD_NAME}" != "" ]]; then
             |    echo "Found pod \${POD_NAME}"
             |    break
@@ -701,10 +701,10 @@ def getMigrationJobLog(String env) {
             |fi
             |
             |# Wait for job to be completed.
-            |kubectl wait --for=condition=complete --timeout=5m job.batch/payment-service-migration-job -n ${env}
+            |kubectl wait --for=condition=complete --timeout=5m job.batch/payment-service-migration-job -n payment-service
             |# Pod is completed, gather logs from it
-            |kubectl logs -n ${env} \$POD_NAME
-            |kubectl delete job payment-service-migration-job -n ${env}
+            |kubectl logs -n payment-service \$POD_NAME
+            |kubectl delete job payment-service-migration-job -n payment-service
             |""".stripMargin()
       }
 }
