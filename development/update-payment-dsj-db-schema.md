@@ -10,7 +10,7 @@ Instructions on how to dump DSJ maindb and bankdb schemas to separate local post
 1. Go to [PgAnalyze](https://app.pganalyze.com/databases/13362/tables) and looking for MainDB or BankDB's newly
 updated table schema you want to add
 2. Correspondly, in `payment-service/development/db-schemas/bankdb_dump.sql` or/and
-`payment-service/development/db-schemas/maindbdb_dump.sql` find creation statements of the table you want to update
+`payment-service/development/db-schemas/maindb_dump.sql` find creation statements of the table you want to update
 and update according to latest schema shown in PgAnalyze
 
 ### 2. Validate updated payment-dsj db schema

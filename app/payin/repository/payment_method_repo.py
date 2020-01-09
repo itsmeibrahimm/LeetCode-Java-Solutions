@@ -122,6 +122,7 @@ class InsertStripeCardDbEntity(DBEntity):
     address_line1_check: Optional[str] = None
     address_zip_check: Optional[str] = None
     validation_card_id: Optional[int] = None
+    funding_type: Optional[str] = None
 
 
 class StripeCardDbEntity(InsertStripeCardDbEntity):

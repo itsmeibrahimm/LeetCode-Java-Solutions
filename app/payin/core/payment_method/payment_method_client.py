@@ -148,6 +148,7 @@ class PaymentMethodClient:
                     address_zip_check=stripe_payment_method.card.checks.address_postal_code_check,
                     created_at=now,
                     is_scanned=is_scanned,
+                    funding_type=stripe_payment_method.card.funding,
                 )
             )
 

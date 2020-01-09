@@ -291,6 +291,7 @@ def create_payment_method_v1(
     assert payment_method["card"]["exp_year"] is not None
     assert payment_method["card"]["exp_month"] is not None
     assert payment_method["card"]["fingerprint"] is not None
+    assert payment_method["card"]["funding_type"] is not None
     # assert payment_method["dd_payer_id"] is not None
     return payment_method
 

@@ -30,6 +30,7 @@ class Card(BaseModel):
     country: Optional[str]
     brand: Optional[str]
     wallet: Optional[Wallet] = None
+    funding_type: Optional[str]
 
 
 @final
@@ -110,6 +111,7 @@ class RawPaymentMethod:
             active=self.stripe_card_entity.active,
             brand=self.stripe_card_entity.type,
             wallet=wallet,
+            funding_type=self.stripe_card_entity.funding_type,
         )
 
         payment_gateway_provider_details: PaymentGatewayProviderDetails = PaymentGatewayProviderDetails(

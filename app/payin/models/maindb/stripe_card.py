@@ -35,3 +35,4 @@ class StripeCardTable(TableDefinition):
     address_line1_check: Column = no_init_field(Column("address_line1_check", Text))
     address_zip_check: Column = no_init_field(Column("address_zip_check", Text))
     validation_card_id: Column = no_init_field(Column("validation_card_id", Integer))
+    funding_type: Column = no_init_field(Column("funding_type", Text))

@@ -8917,7 +8917,8 @@ CREATE TABLE stripe_card (
     tokenization_method text,
     address_line1_check character varying(50),
     address_zip_check character varying(50),
-    validation_card_id integer
+    validation_card_id integer,
+    funding_type text
 );
 
 

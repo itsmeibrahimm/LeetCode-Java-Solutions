@@ -26,6 +26,8 @@ from app.payin.repository.payment_method_repo import (
     ListPgpPaymentMethodByStripeCardId,
     UpdateStripeCardsRemovePiiWhereInput,
     UpdateStripeCardsRemovePiiSetInput,
+    StripeCardDbEntity,
+    GetStripeCardByIdInput,
 )
 
 
@@ -75,8 +77,8 @@ class TestPaymentMethodRepository:
     @pytest.fixture
     async def stripe_card(
         self, pgp_payment_method, payment_method_repository: PaymentMethodRepository
-    ):
-        yield await payment_method_repository.insert_stripe_card(
+    ) -> StripeCardDbEntity:
+        return await payment_method_repository.insert_stripe_card(
             InsertStripeCardInput(
                 stripe_id=pgp_payment_method.pgp_resource_id,
                 consumer_id=1,
@@ -88,9 +90,11 @@ class TestPaymentMethodRepository:
                 type="visa",
                 active=True,
                 external_stripe_customer_id="cus_1234567",
+                funding_type="credit",
             )
         )
 
+    @pytest.mark.asyncio
     async def test_insert_pgp_payment_method(
         self,
         payment_method: PaymentMethodDbEntity,
@@ -115,6 +119,7 @@ class TestPaymentMethodRepository:
             == insert_pgp_payment_method_input.pgp_resource_id
         )
 
+    @pytest.mark.asyncio
     async def test_insert_payment_method(
         self, payer: PayerDbEntity, payment_method_repository: PaymentMethodRepository
     ):
@@ -128,6 +133,7 @@ class TestPaymentMethodRepository:
         assert payment_method is not None
         assert payment_method.payer_id == insert_payment_method_input.payer_id
 
+    @pytest.mark.asyncio
     async def test_get_pgp_payment_method_by_pgp_resource_id(
         self,
         payment_method: PaymentMethodDbEntity,
@@ -155,6 +161,7 @@ class TestPaymentMethodRepository:
         assert get_pgp_payment_method is not None
         assert get_pgp_payment_method == pgp_payment_method
 
+    @pytest.mark.asyncio
     async def test_get_pgp_payment_method_by_id(
         self,
         payment_method: PaymentMethodDbEntity,
@@ -180,6 +187,7 @@ class TestPaymentMethodRepository:
         assert get_pgp_payment_method is not None
         assert get_pgp_payment_method == pgp_payment_method
 
+    @pytest.mark.asyncio
     async def test_get_pgp_payment_method_by_payment_id(
         self,
         payment_method: PaymentMethodDbEntity,
@@ -207,6 +215,7 @@ class TestPaymentMethodRepository:
         assert get_pgp_payment_method is not None
         assert get_pgp_payment_method == pgp_payment_method
 
+    @pytest.mark.asyncio
     async def test_delete_pgp_payment_method_by_id(
         self,
         payment_method: PaymentMethodDbEntity,
@@ -238,6 +247,7 @@ class TestPaymentMethodRepository:
         assert deleted_pgp_payment_method.detached_at == now
         assert deleted_pgp_payment_method.updated_at == now
 
+    @pytest.mark.asyncio
     async def test_list_stripe_card_db_entities_by_stripe_customer_id(
         self,
         payment_method_repository: PaymentMethodRepository,
@@ -275,6 +285,7 @@ class TestPaymentMethodRepository:
         assert len(stripe_card_entities) == 1
         assert stripe_card_entities[0] == stripe_card
 
+    @pytest.mark.asyncio
     async def test_list_pgp_payment_method_entities_by_stripe_card_ids(
         self,
         payment_method_repository: PaymentMethodRepository,
@@ -328,3 +339,20 @@ class TestPaymentMethodRepository:
         for card in updated_stripe_cards:
             assert card.last4 == ""
             assert card.dynamic_last4 == ""
+
+    @pytest.mark.asyncio
+    async def test_insert_and_get_stripe_card(
+        self, stripe_card, payment_method_repository: PaymentMethodRepository
+    ):
+        ...
+        input = GetStripeCardByIdInput(id=stripe_card.id)
+        stripe_card = await payment_method_repository.get_stripe_card_by_id(input=input)
+        assert stripe_card.funding_type == "credit"
+        assert stripe_card.consumer_id == 1
+        assert stripe_card.last4 == "1234"
+        assert stripe_card.dynamic_last4 == "4321"
+        assert stripe_card.exp_month == "01"
+        assert stripe_card.exp_year == "2020"
+        assert stripe_card.type == "visa"
+        assert stripe_card.active is True
+        assert stripe_card.external_stripe_customer_id == "cus_1234567"
