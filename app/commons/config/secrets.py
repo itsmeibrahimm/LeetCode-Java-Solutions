@@ -1,9 +1,10 @@
 import os
-from dataclasses import replace, dataclass
 from abc import ABC
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from ninox.interface.helper import Helper
+from tenacity import retry, stop_after_attempt, wait_fixed
 from typing_extensions import final
 
 from app.commons.context.logger import init_logger as log
@@ -41,6 +42,16 @@ class Secret:
         return cls(name=name, version=None, value=value)
 
 
+@retry(stop=stop_after_attempt(6), wait=wait_fixed(10))
+def _init_ninox_with_retry(config_section: str) -> Helper:
+    ninox = Helper(config_section=config_section)
+    if ninox.disabled:
+        # Ninox helper internally set itself to disabled when init fails without raising exception.
+        # We should fail fast here to prevent unknown service state at runtime.
+        raise Helper.DisabledError("Ninox initialization failed")
+    return ninox
+
+
 class SecretLoader:
     """
     A secret loader class backed by Ninox. Fetches / refreshes actual secret value of a given Secret holder instance.
@@ -52,14 +63,10 @@ class SecretLoader:
 
     def __init__(self, *, environment: str):
         try:
-            self.ninox = Helper(config_section=environment)
+            self.ninox = _init_ninox_with_retry(config_section=environment)
         except Exception:
             log.exception("ninox initialization failed")
             raise
-        if self.ninox.disabled:
-            # Ninox helper internally set itself to disabled when init fails without raising exception.
-            # We should fail fast here to prevent unknown service state at runtime.
-            raise Helper.DisabledError("Ninox initialization failed")
 
     def fetch_secret(self, *, secret_holder: Secret) -> Secret:
         try:
