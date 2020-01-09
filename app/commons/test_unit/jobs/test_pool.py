@@ -10,6 +10,11 @@ from freezegun import freeze_time
 from app.commons.jobs.pool import JobPool, adjust_pool_sizes
 
 
+@freeze_time(
+    time_to_freeze=datetime(
+        year=2020, month=1, day=7, hour=10, tzinfo=pytz.timezone("US/Pacific")
+    )
+)
 class TestAdjustPoolSize:
     @pytest.mark.asyncio
     async def test_adjust_pool_size_by_simple_pool_size(self):
