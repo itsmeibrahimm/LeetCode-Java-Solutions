@@ -5,7 +5,9 @@ from app.purchasecard.constants import (
     MarqetaResponseCodes,
     TransactionWebhookProcessType,
 )
-from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
+from app.purchasecard.repository.marqeta_transaction import (
+    MarqetaTransactionRepositoryInterface,
+)
 from app.purchasecard.core.webhook.models import (
     Transaction,
     TransactionProcessResult,
@@ -18,7 +20,7 @@ class WebhookProcessor:
     def __init__(
         self,
         logger: BoundLogger,
-        repository: MarqetaTransactionRepository,
+        repository: MarqetaTransactionRepositoryInterface,
         dsj_client: DSJClient,
     ):
         self.logger = logger

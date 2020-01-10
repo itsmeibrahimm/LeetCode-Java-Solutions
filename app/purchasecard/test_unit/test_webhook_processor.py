@@ -12,9 +12,7 @@ from app.purchasecard.core.webhook.models import (
     GpaOrder,
     Transaction,
 )
-from app.purchasecard.models.maindb.marqeta_transaction import (
-    MarqetaTransactionDBEntity,
-)
+from app.purchasecard.models.maindb.marqeta_transaction import MarqetaTransaction
 from app.purchasecard.core.webhook.processor import WebhookProcessor
 
 
@@ -25,7 +23,7 @@ class TestWebhookProcessor:
     def setup(self):
         marqeta_transaction_repo = MagicMock()
         marqeta_transaction_repo.update_marqeta_transaction_timeout_by_token = CoroutineMock(
-            return_value=MarqetaTransactionDBEntity(
+            return_value=MarqetaTransaction(
                 token="token",
                 id=1,
                 amount=2,

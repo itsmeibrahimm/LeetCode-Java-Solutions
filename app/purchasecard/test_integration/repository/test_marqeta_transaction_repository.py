@@ -1,5 +1,11 @@
+import random
+from uuid import uuid4
+
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+from app.commons.database.infra import DB
+from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 from app.purchasecard.test_integration.utils import (
     prepare_and_insert_marqeta_transaction_data,
 )
@@ -12,43 +18,50 @@ class TestMarqetaTransactionRepository:
     TEST_AMOUNT2 = 2
     TEST_AMOUNT3 = 3
 
-    @pytest.fixture(autouse=True)
-    def setup(self, marqeta_transaction_repo):
-        self.marqeta_transaction_repo = marqeta_transaction_repo
+    @pytest.fixture
+    def marqeta_transaction_repo(
+        self, purchasecard_maindb: DB
+    ) -> MarqetaTransactionRepository:
+        return MarqetaTransactionRepository(database=purchasecard_maindb)
 
-    async def test_get_funded_amount_by_delivery_id(self):
-        await prepare_and_insert_marqeta_transaction_data(
-            marqeta_tx_repo=self.marqeta_transaction_repo,
-            id=1,
-            token="token1",
+    async def test_get_funded_amount_by_delivery_id(self, marqeta_transaction_repo):
+        delivery_id_1 = random.randint(100000, 5000000)
+        mock_txn_1 = await prepare_and_insert_marqeta_transaction_data(
+            marqeta_tx_repo=marqeta_transaction_repo,
+            token=str(uuid4()),
             amount=self.TEST_AMOUNT1,
-            delivery_id=1,
+            delivery_id=delivery_id_1,
             card_acceptor="1",
             timed_out=False,
             swiped_at=None,
         )
-        await prepare_and_insert_marqeta_transaction_data(
-            marqeta_tx_repo=self.marqeta_transaction_repo,
-            id=2,
-            token="token2",
+        assert mock_txn_1.amount == 1
+        mock_txn_2 = await prepare_and_insert_marqeta_transaction_data(
+            marqeta_tx_repo=marqeta_transaction_repo,
+            token=str(uuid4()),
             amount=self.TEST_AMOUNT2,
-            delivery_id=1,
+            delivery_id=delivery_id_1,
             card_acceptor="1",
             timed_out=False,
             swiped_at=None,
         )
-        result = await self.marqeta_transaction_repo.get_funded_amount_by_delivery_id(1)
+        assert mock_txn_2.amount == 2
+        result = await marqeta_transaction_repo.get_funded_amount_by_delivery_id(
+            delivery_id_1
+        )
         assert result == self.TEST_AMOUNT1 + self.TEST_AMOUNT2
 
+        delivery_id_2 = random.randint(100000, 5000000)
         await prepare_and_insert_marqeta_transaction_data(
-            marqeta_tx_repo=self.marqeta_transaction_repo,
-            id=3,
-            token="token3",
+            marqeta_tx_repo=marqeta_transaction_repo,
+            token=str(uuid4()),
             amount=self.TEST_AMOUNT3,
-            delivery_id=3,
+            delivery_id=delivery_id_2,
             card_acceptor="1",
             timed_out=None,
-            swiped_at=(datetime.now() - timedelta(seconds=60)),
+            swiped_at=(datetime.now(timezone.utc) - timedelta(seconds=60)),
         )
-        result = await self.marqeta_transaction_repo.get_funded_amount_by_delivery_id(3)
+        result = await marqeta_transaction_repo.get_funded_amount_by_delivery_id(
+            delivery_id_2
+        )
         assert result == self.TEST_AMOUNT3

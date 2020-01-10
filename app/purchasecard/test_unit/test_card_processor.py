@@ -29,7 +29,7 @@ class TestCardProcessor:
     TEST_DELIGHT_NUMBER: int = 1234
     TEST_LAST_FOUR: str = "1234"
     TEST_DASHER_ID: int = 1234
-    TEST_USER_TOKEN: int = 1234
+    TEST_USER_TOKEN: str = "1234"
 
     @pytest.fixture(autouse=True)
     def setup(

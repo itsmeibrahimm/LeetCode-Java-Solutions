@@ -1,5 +1,6 @@
 import pytest
 
+from app.commons.database.infra import DB
 from app.purchasecard.repository.marqeta_decline_exemption import (
     MarqetaDeclineExemptionRepository,
 )
@@ -10,6 +11,12 @@ from app.purchasecard.test_integration.utils import (
 
 @pytest.mark.asyncio
 class TestMarqetaDeclineExemptionRepository:
+    @pytest.fixture
+    def marqeta_decline_exemption_repo(
+        self, purchasecard_maindb: DB
+    ) -> MarqetaDeclineExemptionRepository:
+        return MarqetaDeclineExemptionRepository(database=purchasecard_maindb)
+
     async def test_create(
         self, marqeta_decline_exemption_repo: MarqetaDeclineExemptionRepository
     ):

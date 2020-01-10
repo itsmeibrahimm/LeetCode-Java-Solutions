@@ -2,7 +2,9 @@ from structlog.stdlib import BoundLogger
 from app.purchasecard.repository.delivery_funding import (
     DeliveryFundingRepositoryInterface,
 )
-from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
+from app.purchasecard.repository.marqeta_transaction import (
+    MarqetaTransactionRepositoryInterface,
+)
 from app.purchasecard.constants import BUFFER_MULTIPLIER_FOR_DELIVERY
 
 
@@ -10,7 +12,7 @@ class TransactionProcessor:
     def __init__(
         self,
         logger: BoundLogger,
-        marqeta_repository: MarqetaTransactionRepository,
+        marqeta_repository: MarqetaTransactionRepositoryInterface,
         delivery_funding_repository: DeliveryFundingRepositoryInterface,
     ):
         self.logger = logger

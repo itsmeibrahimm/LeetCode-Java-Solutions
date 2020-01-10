@@ -1,5 +1,6 @@
 import pytest
 
+from app.commons.database.infra import DB
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
 )
@@ -16,6 +17,12 @@ class TestStoreMastercardDataRepository:
     TEST_MID_ID_3 = "test mid 3"
     TEST_STORE_ID = 123
     TEST_MNAME = "test name"
+
+    @pytest.fixture
+    def store_mastercard_data_repo(
+        self, purchasecard_maindb: DB
+    ) -> StoreMastercardDataRepository:
+        return StoreMastercardDataRepository(database=purchasecard_maindb)
 
     async def test_create_store_mastercard_data(
         self, store_mastercard_data_repo: StoreMastercardDataRepository

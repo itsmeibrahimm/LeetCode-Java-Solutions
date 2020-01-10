@@ -2,7 +2,7 @@ import json
 from uuid import uuid4
 
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import MagicMock
 
@@ -20,9 +20,7 @@ from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
 )
 from app.testcase_utils import validate_expected_items_in_dict
-from app.purchasecard.models.maindb.marqeta_transaction import (
-    MarqetaTransactionDBEntity,
-)
+from app.purchasecard.models.maindb.marqeta_transaction import MarqetaTransaction
 from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
 
 
@@ -125,26 +123,35 @@ async def prepare_and_insert_store_mastercard_data(
 
 async def prepare_and_insert_marqeta_transaction_data(
     marqeta_tx_repo: MarqetaTransactionRepository,
-    id: int,
     token: str,
     amount: int,
     delivery_id: int,
     card_acceptor: str,
-    timed_out: Optional[bool],
-    swiped_at: Optional[datetime],
-):
-    swiped_at = swiped_at if swiped_at else datetime.now()
-    data = MarqetaTransactionDBEntity(
-        id=id,
+    timed_out: Optional[bool] = None,
+    swiped_at: Optional[datetime] = None,
+) -> MarqetaTransaction:
+    swiped_at = swiped_at if swiped_at else datetime.now(timezone.utc)
+    data = {
+        "token": token,
+        "amount": amount,
+        "swiped_at": swiped_at,
+        "delivery_id": delivery_id,
+        "card_acceptor": card_acceptor,
+        "timed_out": timed_out,
+    }
+    marqeta_transaction_data = await marqeta_tx_repo.create_marqeta_transaction(
         token=token,
         amount=amount,
+        swiped_at=swiped_at,
         delivery_id=delivery_id,
         card_acceptor=card_acceptor,
         timed_out=timed_out,
-        swiped_at=swiped_at,
     )
-    marqeta_transaction_data = await marqeta_tx_repo.create_marqeta_transaction(data)
-    assert marqeta_transaction_data
+    assert marqeta_transaction_data.id
+    validate_expected_items_in_dict(
+        expected=data, actual=marqeta_transaction_data.dict()
+    )
+    return marqeta_transaction_data
 
 
 async def prepare_and_insert_delivery_funding_data(

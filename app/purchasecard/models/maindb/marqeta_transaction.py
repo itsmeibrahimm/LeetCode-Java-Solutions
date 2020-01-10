@@ -25,7 +25,7 @@ class MarqetaTransactionTable(TableDefinition):
     )
 
 
-class MarqetaTransactionDBEntity(DBEntity):
+class MarqetaTransaction(DBEntity):
     id: int
     token: str
     amount: int

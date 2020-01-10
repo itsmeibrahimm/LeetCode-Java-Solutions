@@ -16,7 +16,7 @@ from app.purchasecard.test_integration.utils import FakeMarqetaEnvironment, Func
 @pytest.mark.external
 class TestGetMarqetaCard:
     @pytest.fixture(autouse=True)
-    def setup(self, app_context, marqeta_card_ownership_repo):
+    def setup(self, app_context, mock_marqeta_card_ownership_repo):
         self.test_marqeta_env = FakeMarqetaEnvironment(app_context.marqeta_client)
 
     def get_fake_dasher_id(self):

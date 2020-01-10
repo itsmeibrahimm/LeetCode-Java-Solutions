@@ -5,23 +5,6 @@ import pytest
 #####################
 from asynctest import mock
 
-from app.commons.database.infra import DB
-from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
-from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
-from app.purchasecard.repository.marqeta_card_ownership import (
-    MarqetaCardOwnershipRepository,
-)
-from app.purchasecard.repository.marqeta_card_transition import (
-    MarqetaCardTransitionRepository,
-)
-from app.purchasecard.repository.marqeta_decline_exemption import (
-    MarqetaDeclineExemptionRepository,
-)
-from app.purchasecard.repository.store_mastercard_data import (
-    StoreMastercardDataRepository,
-)
-from app.purchasecard.repository.marqeta_transaction import MarqetaTransactionRepository
-
 
 @pytest.fixture
 def mock_marqeta_card_repo():
@@ -48,46 +31,35 @@ def mock_marqeta_card_transition_repo():
 
 
 @pytest.fixture
-def marqeta_card_repo(purchasecard_maindb: DB) -> MarqetaCardRepository:
-    return MarqetaCardRepository(database=purchasecard_maindb)
+def mock_store_mastercard_data_repo():
+    mock_store_mastercard_data_repo = mock.patch(
+        "app.purchasecard.repository.store_mastercard_data.StoreMastercardDataRepository"
+    )
+    return mock_store_mastercard_data_repo
 
 
 @pytest.fixture
-def marqeta_card_ownership_repo(
-    purchasecard_maindb: DB
-) -> MarqetaCardOwnershipRepository:
-    return MarqetaCardOwnershipRepository(database=purchasecard_maindb)
+def mock_marqeta_transaction_repo():
+    mock_marqeta_transaction_repo = mock.patch(
+        "app.purchasecard.repository.marqeta_transaction.MarqetaTransactionRepository"
+    )
+    return mock_marqeta_transaction_repo
 
 
 @pytest.fixture
-def marqeta_card_transition_repo(
-    purchasecard_maindb: DB
-) -> MarqetaCardTransitionRepository:
-    return MarqetaCardTransitionRepository(database=purchasecard_maindb)
+def mock_delivery_funding_repo():
+    mock_delivery_funding_repo = mock.patch(
+        "app.purchasecard.repository.delivery_funding.DeliveryFundingRepository"
+    )
+    return mock_delivery_funding_repo
 
 
 @pytest.fixture
-def store_mastercard_data_repo(
-    purchasecard_maindb: DB
-) -> StoreMastercardDataRepository:
-    return StoreMastercardDataRepository(database=purchasecard_maindb)
-
-
-@pytest.fixture
-def marqeta_transaction_repo(purchasecard_maindb: DB) -> MarqetaTransactionRepository:
-    return MarqetaTransactionRepository(database=purchasecard_maindb)
-
-
-@pytest.fixture
-def delivery_funding_repo(purchasecard_maindb: DB) -> DeliveryFundingRepository:
-    return DeliveryFundingRepository(database=purchasecard_maindb)
-
-
-@pytest.fixture
-def marqeta_decline_exemption_repo(
-    purchasecard_maindb: DB
-) -> MarqetaDeclineExemptionRepository:
-    return MarqetaDeclineExemptionRepository(database=purchasecard_maindb)
+def mock_marqeta_decline_exemption_repo():
+    mock_marqeta_decline_exemption_repo = mock.patch(
+        "app.purchasecard.repository.marqeta_decline_exemption.MarqetaDeclineExemptionRepository"
+    )
+    return mock_marqeta_decline_exemption_repo
 
 
 @pytest.fixture()
