@@ -91,7 +91,7 @@ class PaymentMethodClient:
         is_active: bool,
         payer_id: Optional[UUID] = None,
         dd_consumer_id: Optional[str] = None,
-        dd_stripe_customer_id: Optional[str] = None,
+        legacy_dd_stripe_customer_id: Optional[str] = None,
     ) -> RawPaymentMethod:
         now = datetime.utcnow()
         try:
@@ -141,7 +141,9 @@ class PaymentMethodClient:
                     active=is_active,
                     consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
                     stripe_customer_id=(
-                        int(dd_stripe_customer_id) if dd_stripe_customer_id else None
+                        int(legacy_dd_stripe_customer_id)
+                        if legacy_dd_stripe_customer_id
+                        else None
                     ),
                     zip_code=stripe_payment_method.billing_details.address.postal_code,
                     address_line1_check=stripe_payment_method.card.checks.address_line1_check,
@@ -258,7 +260,7 @@ class PaymentMethodClient:
         payer_reference_id_type: PayerReferenceIdType,
         pgp_customer_resource_id: str,
         dd_consumer_id: Optional[str] = None,
-        dd_stripe_customer_id: Optional[str] = None,
+        legacy_dd_stripe_customer_id: Optional[str] = None,
     ) -> RawPaymentMethod:
         try:
             dynamic_last4: Optional[str] = None
@@ -276,7 +278,9 @@ class PaymentMethodClient:
                     # external_stripe_customer_id=pgp_customer_resource_id,
                     consumer_id=(int(dd_consumer_id) if dd_consumer_id else None),
                     stripe_customer_id=(
-                        int(dd_stripe_customer_id) if dd_stripe_customer_id else None
+                        int(legacy_dd_stripe_customer_id)
+                        if legacy_dd_stripe_customer_id
+                        else None
                     ),
                     active=True,
                 ),

@@ -101,7 +101,7 @@ class PaymentMethodProcessor:
         pgp_customer_res_id: Optional[str] = None
         pgp_country: Optional[str] = None
         dd_consumer_id: Optional[str] = None
-        dd_stripe_customer_id: Optional[str] = None
+        legacy_dd_stripe_customer_id: Optional[str] = None
         payer_reference_id_type: Optional[str] = None
         raw_payer: Optional[RawPayer] = None
 
@@ -118,7 +118,7 @@ class PaymentMethodProcessor:
                 if payer_reference_id_type == PayerReferenceIdType.DD_CONSUMER_ID:
                     dd_consumer_id = raw_payer.payer_entity.payer_reference_id
                 else:
-                    dd_stripe_customer_id = (
+                    legacy_dd_stripe_customer_id = (
                         str(raw_payer.stripe_customer_entity.id)
                         if raw_payer.stripe_customer_entity
                         else None
@@ -139,7 +139,9 @@ class PaymentMethodProcessor:
                 legacy_payment_method_info.payer_type
             )
             dd_consumer_id = legacy_payment_method_info.dd_consumer_id
-            dd_stripe_customer_id = legacy_payment_method_info.dd_stripe_customer_id
+            legacy_dd_stripe_customer_id = (
+                legacy_payment_method_info.legacy_dd_stripe_customer_id
+            )
         else:
             self.log.error("[create_payment_method] invalid input. must provide id")
             raise PaymentMethodCreateError(
@@ -164,7 +166,7 @@ class PaymentMethodProcessor:
             payer_id=payer_id,
             pgp_payment_method_res_id=stripe_payment_method.id,
             payer_reference_id_type=payer_reference_id_type,
-            dd_stripe_customer_id=dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id,
         )
 
         # step 3: de-dup same payment_method by card fingerprint
@@ -178,7 +180,7 @@ class PaymentMethodProcessor:
                     payer_reference_id_type=payer_reference_id_type,
                     pgp_customer_resource_id=pgp_customer_res_id,
                     dd_consumer_id=dd_consumer_id,
-                    dd_stripe_customer_id=dd_stripe_customer_id,
+                    legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id,
                 )
             except PaymentMethodReadError:
                 pass
@@ -210,7 +212,7 @@ class PaymentMethodProcessor:
             stripe_payment_method=attach_stripe_payment_method,
             payer_id=payer_id,
             dd_consumer_id=dd_consumer_id,
-            dd_stripe_customer_id=dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id,
             is_scanned=is_scanned,
             is_active=is_active,
         )

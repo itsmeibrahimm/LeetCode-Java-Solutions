@@ -65,7 +65,7 @@ class TestPaymentMethodsV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
+                legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
 
@@ -122,7 +122,7 @@ class TestPaymentMethodsV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
+                legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
         payment_method_two = create_payment_method_v0(
@@ -136,7 +136,7 @@ class TestPaymentMethodsV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=False,
-                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
+                legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
 

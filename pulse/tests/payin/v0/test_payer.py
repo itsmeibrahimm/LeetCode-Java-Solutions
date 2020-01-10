@@ -61,7 +61,7 @@ def test_update_payer_with_stripe_customer_id():
             stripe_customer_id=new_payer[0]
             .payment_gateway_provider_customers[0]
             .payment_provider_customer_id,
-            dd_stripe_customer_id=new_payer[0].legacy_dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=new_payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert (
@@ -122,7 +122,7 @@ def test_update_payer_with_stripe_customer_serial_id():
             stripe_customer_id=new_payer[0]
             .payment_gateway_provider_customers[0]
             .payment_provider_customer_id,
-            dd_stripe_customer_id=new_payer[0].legacy_dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=new_payer[0].legacy_dd_stripe_customer_id,
         )
     )
     assert (

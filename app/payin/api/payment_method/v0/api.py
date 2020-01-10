@@ -54,7 +54,7 @@ async def create_payment_method(
             is_active=req_body.is_active,
             legacy_payment_method_info=LegacyPaymentMethodInfo(
                 dd_consumer_id=req_body.dd_consumer_id,
-                dd_stripe_customer_id=req_body.dd_stripe_customer_id,
+                legacy_dd_stripe_customer_id=req_body.legacy_dd_stripe_customer_id,
                 stripe_customer_id=req_body.stripe_customer_id,
                 country=req_body.country,
                 payer_type=req_body.payer_type,
@@ -65,7 +65,7 @@ async def create_payment_method(
             stripe_customer_id=req_body.stripe_customer_id,
             payer_type=req_body.payer_type,
             dd_consumer_id=req_body.dd_consumer_id,
-            dd_stripe_customer_id=req_body.dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=req_body.legacy_dd_stripe_customer_id,
         )
     except PaymentError:
         log.exception(
@@ -73,7 +73,7 @@ async def create_payment_method(
             stripe_customer_id=req_body.stripe_customer_id,
             payer_type=req_body.payer_type,
             dd_consumer_id=req_body.dd_consumer_id,
-            dd_stripe_customer_id=req_body.dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=req_body.legacy_dd_stripe_customer_id,
         )
         raise
     return payment_method

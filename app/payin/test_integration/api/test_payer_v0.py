@@ -239,7 +239,7 @@ class TestPayersV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
+                legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
 
@@ -320,7 +320,7 @@ class TestPayersV0:
                 set_default=False,
                 is_scanned=False,
                 is_active=True,
-                dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
+                legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
 

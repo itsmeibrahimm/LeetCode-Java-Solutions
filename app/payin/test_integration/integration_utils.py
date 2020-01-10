@@ -42,7 +42,7 @@ class CreatePaymentMethodV0Request(BaseModel):
     is_active: bool
     payer_type: Optional[str]
     dd_consumer_id: Optional[str]
-    dd_stripe_customer_id: Optional[str]
+    legacy_dd_stripe_customer_id: Optional[str]
 
 
 class CreatePaymentMethodV1Request(BaseModel):
@@ -194,9 +194,9 @@ def create_payment_method_v0(
         create_payment_method_request.update(
             {"dd_consumer_id": str(request.dd_consumer_id)}
         )
-    if request.dd_stripe_customer_id:
+    if request.legacy_dd_stripe_customer_id:
         create_payment_method_request.update(
-            {"dd_stripe_customer_id": str(request.dd_stripe_customer_id)}
+            {"legacy_dd_stripe_customer_id": str(request.legacy_dd_stripe_customer_id)}
         )
     if request.payer_type:
         create_payment_method_request.update({"payer_type": str(request.payer_type)})

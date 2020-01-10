@@ -63,7 +63,7 @@ class PaymentUtil:
 
     @staticmethod
     def get_payment_method_v0_info(
-        stripe_customer_id, dd_stripe_customer_id: int, set_default: bool = False
+        stripe_customer_id, legacy_dd_stripe_customer_id: int, set_default: bool = False
     ):
         return CreatePaymentMethodRequestV0(
             stripe_customer_id=stripe_customer_id,
@@ -74,7 +74,7 @@ class PaymentUtil:
             country="US",
             dd_consumer_id=None,
             payer_type="store",
-            dd_stripe_customer_id=dd_stripe_customer_id,
+            legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id,
         )
 
     @staticmethod

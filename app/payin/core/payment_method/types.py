@@ -41,7 +41,7 @@ class LegacyPaymentMethodInfo(BaseModel):
     dd_consumer_id: Optional[
         str
     ]  # required if PayerType is "marketplace" in order to populate MainDB.stripe_card.consumer_id
-    dd_stripe_customer_id: Optional[
+    legacy_dd_stripe_customer_id: Optional[
         str
     ]  # required if PayerType is not "marketplace" in order to populate MainDB.stripe_card.stripe_customer_id
 
