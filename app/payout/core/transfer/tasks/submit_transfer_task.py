@@ -78,6 +78,7 @@ class SubmitTransferTask(BaseTask):
             "transaction_repo": transaction_repo,
             "payment_account_edit_history_repo": payment_account_edit_history_repo,
             "stripe": req_context.stripe_async_client,
+            "dsj_client": app_context.dsj_client,
             "logger": req_context.log,
             "request": SubmitTransferRequest(**submit_transfer_request_dict),
         }

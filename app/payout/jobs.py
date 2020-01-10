@@ -457,6 +457,7 @@ class WeeklyCreateTransferJob(Job):
                 database=job_instance_cxt.app_context.payout_maindb
             )
             req_context = job_instance_cxt.build_req_context()
+            cache = setup_cache(app_context=job_instance_cxt.app_context)
 
             start_time, end_time = get_last_week(
                 timezone_info=self.payout_country_timezone, inclusive_end=True
@@ -497,7 +498,8 @@ class WeeklyCreateTransferJob(Job):
                     stripe=req_context.stripe_async_client,
                     payment_lock_manager=job_instance_cxt.app_context.redis_lock_manager,
                     kafka_producer=job_instance_cxt.app_context.kafka_producer,
-                    cache=setup_cache(app_context=job_instance_cxt.app_context),
+                    cache=cache,
+                    dsj_client=job_instance_cxt.app_context.dsj_client,
                     logger=logger,
                     request=weekly_create_transfer_req,
                 )

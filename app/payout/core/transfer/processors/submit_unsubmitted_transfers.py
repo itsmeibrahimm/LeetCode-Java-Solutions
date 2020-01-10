@@ -11,6 +11,7 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.commons.async_kafka_producer import KafkaMessageProducer
+from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
 from app.payout.core.transfer.processors.submit_transfer import (
@@ -75,6 +76,7 @@ class SubmitUnsubmittedTransfers(
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         stripe: StripeAsyncClient,
         kafka_producer: KafkaMessageProducer,
+        dsj_client: DSJClient,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -87,6 +89,7 @@ class SubmitUnsubmittedTransfers(
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.stripe = stripe
         self.kafka_producer = kafka_producer
+        self.dsj_client = dsj_client
 
     async def _execute(self) -> SubmitUnsubmittedTransfersResponse:
         created_before = datetime.utcnow() - timedelta(hours=3)
@@ -129,6 +132,7 @@ class SubmitUnsubmittedTransfers(
                     managed_account_transfer_repo=self.managed_account_transfer_repo,
                     transaction_repo=self.transaction_repo,
                     stripe=self.stripe,
+                    dsj_client=self.dsj_client,
                 )
                 await submit_transfer_op.execute()
 

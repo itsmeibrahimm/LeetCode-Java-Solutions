@@ -17,6 +17,7 @@ from doordash_python_stats.ddstats import doorstats_global
 
 from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.lock.locks import PaymentLock
+from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
@@ -104,6 +105,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     stripe: StripeAsyncClient
     kafka_producer: KafkaMessageProducer
     cache: PaymentCache
+    dsj_client: DSJClient
 
     def __init__(
         self,
@@ -119,6 +121,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         stripe: StripeAsyncClient,
         kafka_producer: KafkaMessageProducer,
         cache: PaymentCache,
+        dsj_client: DSJClient,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -133,6 +136,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self.stripe = stripe
         self.kafka_producer = kafka_producer
         self.cache = cache
+        self.dsj_client = dsj_client
 
     async def _execute(self) -> CreateTransferResponse:
         self.logger.info(
@@ -243,6 +247,23 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             updated_transfer = await self.transfer_repo.update_transfer_by_id(
                 transfer_id=updated_transfer.id, data=update_transfer_request
             )
+        if runtime.get_bool(
+            "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool",
+            False,
+        ):
+            if (
+                payment_account.entity == payout_models.PayoutAccountTargetType.DASHER
+                and updated_transfer
+                and transaction_ids
+            ):
+                await self.dsj_client.post(
+                    "/v1/transactions/target_metadata/",
+                    {
+                        "transfer_id": updated_transfer.id,
+                        "transaction_ids": transaction_ids,
+                    },
+                )
+
         if self.request.submit_after_creation and updated_transfer:
             if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                 submit_transfer_task = SubmitTransferTask(
@@ -269,6 +290,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     transaction_repo=self.transaction_repo,
                     stripe_transfer_repo=self.stripe_transfer_repo,
                     stripe=self.stripe,
+                    dsj_client=self.dsj_client,
                 )
                 await submit_transfer_op.execute()
         return CreateTransferResponse(
@@ -304,11 +326,9 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     async def should_block_mx_payout(
         self, payout_date_time: datetime, payment_account_id: int
     ) -> bool:
-        target_type, target_id, statement_descriptor = get_target_metadata(
-            payment_account_id=payment_account_id
+        target_type, target_id, statement_descriptor, target_biz_id = await get_target_metadata(
+            payment_account_id=payment_account_id, dsj_client=self.dsj_client
         )
-        # todo: update when upstream team external api is ready
-        target_biz_id = 0
         if runtime.get_bool(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False):
             try:
                 if (
@@ -506,7 +526,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                 business_id=biz_id,
             )
             retrieved_payment_account_ids = await self.get_payment_account_ids_with_biz_id(
-                business_id=biz_id
+                business_id=biz_id, dsj_client=self.dsj_client
             )
             payment_account_ids.extend(retrieved_payment_account_ids)
         self.logger.info(
@@ -516,6 +536,18 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         )
         return payment_account_ids
 
-    async def get_payment_account_ids_with_biz_id(self, business_id: int) -> List[int]:
-        # todo: integrate with DSJ API
+    async def get_payment_account_ids_with_biz_id(
+        self, business_id: int, dsj_client: DSJClient
+    ) -> List[int]:
+        if runtime.get_bool(
+            "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool",
+            False,
+        ):
+            response = await dsj_client.get(
+                "/v1/payment_accounts/", {"business_id": business_id}
+            )
+
+            if response:
+                payment_account_ids = response["payment_account_ids"]
+                return payment_account_ids
         return []

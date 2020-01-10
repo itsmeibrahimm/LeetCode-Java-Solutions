@@ -4,6 +4,8 @@ from doordash_python_stats.ddstats import doorstats_global
 
 from starlette.status import HTTP_400_BAD_REQUEST
 from stripe.error import StripeError
+
+from app.commons.providers.dsj_client import DSJClient
 from app.commons.runtime import runtime
 from app.commons.api.models import DEFAULT_INTERNAL_EXCEPTION, PaymentException
 from structlog.stdlib import BoundLogger
@@ -108,6 +110,8 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
     managed_account_transfer_repo: ManagedAccountTransferRepositoryInterface
     transaction_repo: TransactionRepositoryInterface
     payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface
+    stripe: StripeAsyncClient
+    dsj_client: DSJClient
 
     def __init__(
         self,
@@ -120,6 +124,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         transaction_repo: TransactionRepositoryInterface,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepositoryInterface,
         stripe: StripeAsyncClient,
+        dsj_client: DSJClient,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -131,6 +136,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         self.transaction_repo = transaction_repo
         self.payment_account_edit_history_repo = payment_account_edit_history_repo
         self.stripe = stripe
+        self.dsj_client = dsj_client
 
     async def _execute(self) -> SubmitTransferResponse:
         payout_method = self.request.method
@@ -942,8 +948,8 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
                 error_code=PayoutErrorCode.UNSUPPORTED_COUNTRY,
                 retryable=False,
             )
-        target_type, target_id, statement_descriptor = get_target_metadata(
-            payment_account_id=payment_account.id
+        target_type, target_id, statement_descriptor, target_biz_id = await get_target_metadata(
+            payment_account_id=payment_account.id, dsj_client=self.dsj_client
         )
         create_payout_request = StripeCreatePayoutRequest(
             statement_descriptor=statement_descriptor,

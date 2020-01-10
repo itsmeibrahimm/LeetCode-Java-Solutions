@@ -6,6 +6,7 @@ import pytest
 import pytest_mock
 from starlette.status import HTTP_400_BAD_REQUEST
 
+from app.commons.context.app_context import AppContext
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.exceptions import (
     PayoutError,
@@ -63,7 +64,9 @@ class TestSubmitTransfer:
         transaction_repo: TransactionRepository,
         payment_account_edit_history_repo: PaymentAccountEditHistoryRepository,
         stripe_async_client: StripeAsyncClient,
+        app_context: AppContext,
     ):
+        self.dsj_client = app_context.dsj_client
         self.submit_transfer_operation = SubmitTransfer(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
@@ -73,6 +76,7 @@ class TestSubmitTransfer:
             payment_account_edit_history_repo=payment_account_edit_history_repo,
             logger=mocker.Mock(),
             stripe=stripe_async_client,
+            dsj_client=self.dsj_client,
             request=SubmitTransferRequest(transfer_id="1234"),
         )
         self.transfer_repo = transfer_repo
@@ -94,6 +98,7 @@ class TestSubmitTransfer:
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             logger=self.mocker.Mock(),
             stripe=self.stripe,
+            dsj_client=self.dsj_client,
             request=SubmitTransferRequest(
                 transfer_id=transfer_id,
                 statement_descriptor="statement_descriptor",
@@ -397,6 +402,15 @@ class TestSubmitTransfer:
         self.mocker.patch(
             "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_balance",
             side_effect=mock_retrieve_balance,
+        )
+
+        @asyncio.coroutine
+        async def mock_dsj_client(*args, **kwargs):
+            return None
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
         )
 
         # prepare and insert stripe_managed_account

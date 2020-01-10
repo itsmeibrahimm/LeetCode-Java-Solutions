@@ -19,6 +19,7 @@ from app.payout.constants import (
     WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING,
     DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME,
     DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME,
+    FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE,
 )
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.exceptions import (
@@ -72,6 +73,7 @@ class TestCreateTransfer:
         stripe_async_client: StripeAsyncClient,
     ):
         self.cache = setup_cache(app_context=app_context)
+        self.dsj_client = app_context.dsj_client
         self.create_transfer_operation = CreateTransfer(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
@@ -84,6 +86,7 @@ class TestCreateTransfer:
             stripe=stripe_async_client,
             kafka_producer=app_context.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
             request=CreateTransferRequest(
                 payout_account_id=123,
                 transfer_type=TransferType.SCHEDULED,
@@ -123,6 +126,7 @@ class TestCreateTransfer:
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
                 transfer_type=transfer_type,
@@ -238,7 +242,7 @@ class TestCreateTransfer:
         assert response.error_code == PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH
 
     async def test_execute_create_transfer_scheduled_transfer_type_mx_blocked_for_payout(
-        self
+        self, runtime_setter: RuntimeSetter
     ):
         sma = await prepare_and_insert_stripe_managed_account(
             payment_account_repo=self.payment_account_repo, country_shortname="US"
@@ -251,12 +255,15 @@ class TestCreateTransfer:
             payout_countries=["US"],
             target_type=PayoutTargetType.STORE,
         )
-        # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
-        # mocked get_json for runtime FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE
-        # mocked get_int for runtime FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE
-        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
-        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
-        self.mocker.patch("app.commons.runtime.runtime.get_int", return_value=12)
+        runtime_setter.set(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, True)
+        runtime_setter.set(
+            "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool",
+            True,
+        )
+        runtime_setter.set(
+            FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE, []
+        )
+        runtime_setter.set(FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE, 12)
 
         @asyncio.coroutine
         def mock_get_bank_update(*args, **kwargs):
@@ -265,6 +272,20 @@ class TestCreateTransfer:
         self.mocker.patch(
             "app.payout.repository.bankdb.payment_account_edit_history.PaymentAccountEditHistoryRepository.get_bank_updates_for_store_with_payment_account_and_time_range",
             side_effect=mock_get_bank_update,
+        )
+
+        @asyncio.coroutine
+        def mock_dsj_client(*args, **kwargs):
+            return {
+                "target_type": PayoutTargetType.STORE.value,
+                "target_id": 12345,
+                "statement_descriptor": "yay",
+                "business_id": 1,
+            }
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
         )
 
         response = await create_transfer_op._execute()
@@ -339,7 +360,9 @@ class TestCreateTransfer:
         assert retrieved_transaction.transfer_id == response.transfer.id
 
         # make sure retrieve payment account ids from given biz id is called
-        mock_get_payment_account_ids.assert_called_once_with(business_id=123)
+        mock_get_payment_account_ids.assert_called_once_with(
+            business_id=123, dsj_client=self.dsj_client
+        )
 
     async def test_execute_create_transfer_scheduled_transfer_type_submit_after_creation_success(
         self
@@ -478,6 +501,15 @@ class TestCreateTransfer:
     async def test_should_block_mx_payout_none_store_target(self):
         # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
         self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+
+        @asyncio.coroutine
+        async def mock_dsj_client(*args, **kwargs):
+            return None
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
+        )
         assert not await self.create_transfer_operation.should_block_mx_payout(
             payout_date_time=datetime.utcnow(), payment_account_id=123
         )
@@ -502,6 +534,15 @@ class TestCreateTransfer:
         self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
         self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
         self.mocker.patch("app.commons.runtime.runtime.get_int", return_value=0)
+
+        @asyncio.coroutine
+        async def mock_dsj_client(*args, **kwargs):
+            return None
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
+        )
         assert not await self.create_transfer_operation.should_block_mx_payout(
             payout_date_time=datetime.utcnow(), payment_account_id=123
         )
@@ -516,20 +557,31 @@ class TestCreateTransfer:
         payment_account = await prepare_and_insert_payment_account(
             payment_account_repo=self.payment_account_repo
         )
+
+        @asyncio.coroutine
+        async def mock_dsj_client(*args, **kwargs):
+            return None
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
+        )
         assert not await self.create_transfer_operation.should_block_mx_payout(
             payout_date_time=datetime.utcnow(), payment_account_id=payment_account.id
         )
 
-    async def test_should_block_mx_payout_has_recent_bank_update_return_true(self):
-        # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
-        # mocked get_json for runtime FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE
-        # mocked get_int for runtime FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE
-        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
-        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
-        self.mocker.patch("app.commons.runtime.runtime.get_int", return_value=12)
-        payment_account = await prepare_and_insert_payment_account(
-            payment_account_repo=self.payment_account_repo
+    async def test_should_block_mx_payout_has_recent_bank_update_return_true(
+        self, runtime_setter: RuntimeSetter
+    ):
+        runtime_setter.set(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, True)
+        runtime_setter.set(
+            "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool",
+            True,
         )
+        runtime_setter.set(
+            FRAUD_BUSINESS_WHITELIST_FOR_PAYOUT_DELAY_AFTER_BANK_CHANGE, []
+        )
+        runtime_setter.set(FRAUD_MINIMUM_HOURS_BEFORE_MX_PAYOUT_AFTER_BANK_CHANGE, 12)
 
         @asyncio.coroutine
         def mock_get_bank_update(*args, **kwargs):
@@ -539,6 +591,24 @@ class TestCreateTransfer:
             "app.payout.repository.bankdb.payment_account_edit_history.PaymentAccountEditHistoryRepository.get_bank_updates_for_store_with_payment_account_and_time_range",
             side_effect=mock_get_bank_update,
         )
+
+        @asyncio.coroutine
+        def mock_dsj_client(*args, **kwargs):
+            return {
+                "target_type": PayoutTargetType.STORE.value,
+                "target_id": 12345,
+                "statement_descriptor": "yay",
+                "business_id": 1,
+            }
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
+        )
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+
         assert await self.create_transfer_operation.should_block_mx_payout(
             payout_date_time=datetime.utcnow(), payment_account_id=payment_account.id
         )
@@ -567,6 +637,7 @@ class TestCreateTransfer:
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
             request=CreateTransferRequest(
                 payout_account_id=111,
                 transfer_type=TransferType.SCHEDULED,

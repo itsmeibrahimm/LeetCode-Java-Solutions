@@ -68,6 +68,8 @@ class WeeklyCreateTransferTask(BaseTask):
         req_context = build_req_context(
             app_context, task_name="WeeklyCreateTransferTask", task_id=str(uuid4())
         )
+        cache = setup_cache(app_context=app_context)
+
         weekly_create_transfer_request_dict = {}
         if "fn_kwargs" in data:
             data_kwargs = data["fn_kwargs"]
@@ -84,7 +86,8 @@ class WeeklyCreateTransferTask(BaseTask):
             "stripe": req_context.stripe_async_client,
             "payment_lock_manager": app_context.redis_lock_manager,
             "kafka_producer": app_context.kafka_producer,
-            "cache": setup_cache(app_context=app_context),
+            "cache": cache,
+            "dsj_client": app_context.dsj_client,
             "logger": req_context.log,
             "request": WeeklyCreateTransferRequest(
                 **weekly_create_transfer_request_dict

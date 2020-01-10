@@ -13,6 +13,7 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.commons.async_kafka_producer import KafkaMessageProducer
+from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
 from app.payout.core.transfer.processors.create_transfer import (
@@ -70,6 +71,7 @@ class WeeklyCreateTransfer(
     stripe: StripeAsyncClient
     kafka_producer: KafkaMessageProducer
     cache: PaymentCache
+    dsj_client: DSJClient
 
     def __init__(
         self,
@@ -85,6 +87,7 @@ class WeeklyCreateTransfer(
         stripe: StripeAsyncClient,
         kafka_producer: KafkaMessageProducer,
         cache: PaymentCache,
+        dsj_client: DSJClient,
         logger: BoundLogger = None,
     ):
         super().__init__(request, logger)
@@ -99,6 +102,7 @@ class WeeklyCreateTransfer(
         self.stripe = stripe
         self.kafka_producer = kafka_producer
         self.cache = cache
+        self.dsj_client = dsj_client
 
     async def _execute(self) -> WeeklyCreateTransferResponse:
         payout_day = self.request.payout_day
@@ -149,6 +153,7 @@ class WeeklyCreateTransfer(
                 if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                     # put create_transfer into queue
                     create_transfer_task = CreateTransferTask(
+                        payout_day=payout_day,
                         payout_account_id=account_id,
                         transfer_type=TransferType.SCHEDULED,
                         end_time=end_time.isoformat(),
@@ -164,6 +169,7 @@ class WeeklyCreateTransfer(
                         transfer_type=TransferType.SCHEDULED,
                         end_time=end_time,
                         payout_countries=self.request.payout_countries,
+                        payout_day=payout_day,
                         start_time=None,
                         submit_after_creation=True,
                         created_by_id=None,
@@ -181,6 +187,7 @@ class WeeklyCreateTransfer(
                         stripe=self.stripe,
                         kafka_producer=self.kafka_producer,
                         cache=self.cache,
+                        dsj_client=self.dsj_client,
                     )
                     await create_transfer_op.execute()
             except Exception as e:

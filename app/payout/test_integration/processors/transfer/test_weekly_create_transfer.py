@@ -59,6 +59,7 @@ class TestWeeklyCreateTransfer:
         stripe_async_client: StripeAsyncClient,
     ):
         self.cache = setup_cache(app_context=app_context)
+        self.dsj_client = app_context.dsj_client
         self.weekly_create_transfer_operation = WeeklyCreateTransfer(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
@@ -71,6 +72,7 @@ class TestWeeklyCreateTransfer:
             stripe=stripe_async_client,
             kafka_producer=app_context.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
             request=WeeklyCreateTransferRequest(
                 payout_day=PayoutDay.MONDAY,
                 payout_countries=[],
@@ -110,6 +112,7 @@ class TestWeeklyCreateTransfer:
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
             request=request,
         )
         return weekly_create_transfer_op
@@ -261,10 +264,12 @@ class TestWeeklyCreateTransfer:
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
             request=request,
         )
         await weekly_create_transfer_op._execute()
         mocked_init_create_transfer.assert_called_once_with(
+            payout_day=PayoutDay.MONDAY,
             payout_account_id=payment_account.id,
             transfer_type=TransferType.SCHEDULED,
             end_time=end_time,

@@ -149,6 +149,24 @@ class TestKafkaWorker:
         )
         mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
 
+        @asyncio.coroutine
+        async def mock_dsj_client_post(*args, **kwargs):
+            return None
+
+        mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.post",
+            side_effect=mock_dsj_client_post,
+        )
+
+        @asyncio.coroutine
+        async def mock_dsj_client_get(*args, **kwargs):
+            return None
+
+        mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client_get,
+        )
+
         end_time = datetime.now(timezone.utc).isoformat()
         unpaid_txn_start_time = (datetime.utcnow() - timedelta(days=1)).isoformat()
         weekly_create_transfer_task = WeeklyCreateTransferTask(

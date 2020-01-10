@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta, tzinfo
-from typing import Tuple
+from typing import Tuple, Optional
 
 import pytz
+
+from app.commons.providers.dsj_client import DSJClient
 from app.payout.repository.maindb.model.transfer import Transfer, TransferStatus
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
-from app.payout.models import TransferMethodType, PayoutTargetType
+from app.payout.models import TransferMethodType
 from app.commons.runtime import runtime
 
 
@@ -124,20 +126,40 @@ def get_start_and_end_of_week(dt: datetime, inclusive_end: bool, timezone_info: 
     return start_time, end_time
 
 
-def get_target_metadata(payment_account_id: int) -> Tuple[str, int, str]:
-    # todo: call upstream team external api to update logic
-    weekly_create_transfers_dict_list = runtime.get_json(
-        "payout/feature-flags/enable_payment_service_weekly_create_transfers_list.json",
-        [],
-    )
-    target_type = PayoutTargetType.STORE.value
-    target_id = 12345
-    statement_descriptor = "test_statement_descriptor"
-    for weekly_create_transfer_dict_obj in weekly_create_transfers_dict_list:
-        value_dict = weekly_create_transfer_dict_obj.get(str(payment_account_id), None)
-        if value_dict:
-            target_type = value_dict.get("target_type")
-            target_id = value_dict.get("target_id")
-            statement_descriptor = value_dict.get("statement_descriptor")
-            break
-    return target_type, target_id, statement_descriptor
+async def get_target_metadata(
+    payment_account_id: int, dsj_client: DSJClient
+) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[int]]:
+    target_type = None
+    target_id = None
+    statement_descriptor = None
+    business_id = None
+
+    if runtime.get_bool(
+        "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool", False
+    ):
+        response = await dsj_client.get(
+            f"/v1/payment_accounts/{payment_account_id}/tr_metadata", {}
+        )
+
+        if response:
+            statement_descriptor = response["statement_descriptor"]
+            target_type = response["target_type"]
+            target_id = response["target_id"]
+            if "business_id" in response:
+                business_id = response["business_id"]
+    else:
+        weekly_create_transfers_dict_list = runtime.get_json(
+            "payout/feature-flags/enable_payment_service_weekly_create_transfers_list.json",
+            [],
+        )
+        for weekly_create_transfer_dict_obj in weekly_create_transfers_dict_list:
+            value_dict = weekly_create_transfer_dict_obj.get(
+                str(payment_account_id), None
+            )
+            if value_dict:
+                target_type = value_dict.get("target_type")
+                target_id = value_dict.get("target_id")
+                statement_descriptor = value_dict.get("statement_descriptor")
+                break
+
+    return target_type, target_id, statement_descriptor, business_id

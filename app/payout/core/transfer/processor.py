@@ -3,6 +3,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.cache.cache import PaymentCache
+from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.transfer.processors.create_transfer import (
     CreateTransferRequest,
@@ -60,6 +61,7 @@ class TransferProcessors:
     payment_lock_manager: Aioredlock
     kafka_producer: KafkaMessageProducer
     cache: PaymentCache
+    dsj_client: DSJClient
 
     def __init__(
         self,
@@ -74,6 +76,7 @@ class TransferProcessors:
         payment_lock_manager: Aioredlock,
         kafka_producer: KafkaMessageProducer,
         cache: PaymentCache,
+        dsj_client: DSJClient,
     ):
         self.logger = logger
         self.stripe = stripe
@@ -86,6 +89,7 @@ class TransferProcessors:
         self.payment_lock_manager = payment_lock_manager
         self.kafka_producer = kafka_producer
         self.cache = cache
+        self.dsj_client = dsj_client
 
     async def create_transfer(self, request: CreateTransferRequest):
         create_transfer_op = CreateTransfer(
@@ -101,6 +105,7 @@ class TransferProcessors:
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
         )
         return await create_transfer_op.execute()
 
@@ -109,6 +114,7 @@ class TransferProcessors:
             logger=self.logger,
             request=request,
             stripe=self.stripe,
+            dsj_client=self.dsj_client,
             transfer_repo=self.transfer_repo,
             payment_account_repo=self.payment_account_repo,
             stripe_transfer_repo=self.stripe_transfer_repo,
@@ -132,6 +138,7 @@ class TransferProcessors:
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
             cache=self.cache,
+            dsj_client=self.dsj_client,
         )
         return await weekly_create_transfer_op.execute()
 
@@ -148,6 +155,7 @@ class TransferProcessors:
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             stripe=self.stripe,
             kafka_producer=self.kafka_producer,
+            dsj_client=self.dsj_client,
         )
         return await submit_unsubmitted_transfers_op.execute()
 

@@ -45,6 +45,7 @@ class TestSubmitUnsubmittedTransfer:
         stripe_async_client: StripeAsyncClient,
         app_context: AppContext,
     ):
+        self.dsj_client = app_context.dsj_client
         self.submit_unsubmitted_transfers_operation = SubmitUnsubmittedTransfers(
             transfer_repo=transfer_repo,
             stripe_transfer_repo=stripe_transfer_repo,
@@ -54,6 +55,7 @@ class TestSubmitUnsubmittedTransfer:
             payment_account_edit_history_repo=payment_account_edit_history_repo,
             logger=mocker.Mock(),
             stripe=stripe_async_client,
+            dsj_client=self.dsj_client,
             kafka_producer=app_context.kafka_producer,
             request=SubmitUnsubmittedTransfersRequest(
                 statement_descriptor="statement_descriptor"
@@ -100,6 +102,7 @@ class TestSubmitUnsubmittedTransfer:
             payment_account_edit_history_repo=self.payment_account_edit_history_repo,
             logger=self.mocker.Mock(),
             stripe=self.stripe,
+            dsj_client=self.dsj_client,
             kafka_producer=self.kafka_producer,
             request=SubmitUnsubmittedTransfersRequest(
                 statement_descriptor="statement_descriptor"

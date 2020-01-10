@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, List
 from datetime import datetime, timedelta
 import aiohttp
 
@@ -99,7 +99,10 @@ class DSJClient:
         return self.auth_jwt_local_state["token"]
 
     async def get(
-        self, uri: str, params: Dict[str, str], timeout_sec: Optional[float] = None
+        self,
+        uri: str,
+        params: Dict[str, Union[str, int]],
+        timeout_sec: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         DSJ REST get method (wrap around aiohttp get)
@@ -132,7 +135,10 @@ class DSJClient:
                 return {}
 
     async def post(
-        self, uri: str, data: Dict[str, str], timeout_sec: Optional[float] = None
+        self,
+        uri: str,
+        data: Dict[str, Union[str, int, List[int]]],
+        timeout_sec: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         DSJ REST post method (wrap around aiohttp post)

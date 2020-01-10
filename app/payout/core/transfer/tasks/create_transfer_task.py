@@ -10,7 +10,7 @@ from app.payout.core.transfer.processors.create_transfer import (
     CreateTransfer,
 )
 from app.payout.core.transfer.tasks.base_task import BaseTask, normalize_task_arguments
-from app.payout.models import PayoutTask, TransferType
+from app.payout.models import PayoutTask, TransferType, PayoutDay
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepository,
 )
@@ -28,6 +28,7 @@ class CreateTransferTask(BaseTask):
         self,
         payout_account_id: int,
         end_time: str,
+        payout_day: Optional[PayoutDay],
         start_time: Optional[str],
         payout_countries: Optional[List[str]],
         created_by_id: Optional[int] = None,
@@ -89,6 +90,7 @@ class CreateTransferTask(BaseTask):
             "payment_lock_manager": app_context.redis_lock_manager,
             "kafka_producer": app_context.kafka_producer,
             "cache": cache,
+            "dsj_client": app_context.dsj_client,
             "logger": req_context.log,
             "request": CreateTransferRequest(**create_transfer_request_dict),
         }
