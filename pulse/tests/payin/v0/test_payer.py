@@ -55,7 +55,7 @@ def test_get_payer_with_invalid_id():
 def test_update_payer_with_stripe_customer_id():
     # step 1: Create a payment method
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
     new_payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=new_payer[0]
@@ -116,7 +116,7 @@ def test_update_payer_with_stripe_customer_id():
 def test_update_payer_with_stripe_customer_serial_id():
     # step 1: Create a payment method
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
     new_payment_method = payment_method_v0_client.create_payment_method_with_http_info(
         create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
             stripe_customer_id=new_payer[0]

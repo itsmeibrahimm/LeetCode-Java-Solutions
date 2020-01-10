@@ -1,6 +1,9 @@
+from typing import Union, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
+from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
@@ -19,6 +22,7 @@ router = APIRouter()
     "/payers",
     response_model=Payer,
     status_code=HTTP_201_CREATED,
+    responses={HTTP_200_OK: {"model": Payer}},
     operation_id="CreatePayer",
     tags=api_tags,
 )
@@ -26,7 +30,7 @@ async def create_payer(
     req_body: CreatePayerRequest,
     log: BoundLogger = Depends(get_logger_from_req),
     payer_processor: PayerProcessorV1 = Depends(PayerProcessorV1),
-) -> Payer:
+) -> Union[JSONResponse, Payer]:
     """
     Create a payer on DoorDash payments platform
 
@@ -53,14 +57,16 @@ async def create_payer(
             payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,
         )
         raise PayinError(error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA)
-
-    payer: Payer = await payer_processor.create_payer(
+    create_payer_result: Tuple[Payer, bool] = await payer_processor.create_payer(
         payer_reference_id=req_body.payer_correlation_ids.payer_reference_id,
         payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,
         email=req_body.email,
         country=req_body.country,
         description=req_body.description,
     )
+    payer, already_exists = create_payer_result
+    if already_exists:
+        return JSONResponse(status_code=HTTP_200_OK, content=jsonable_encoder(payer))
     log.info("[create_payer] completed.")
     return payer
 

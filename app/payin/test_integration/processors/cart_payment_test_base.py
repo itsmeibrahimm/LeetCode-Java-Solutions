@@ -447,13 +447,14 @@ class CartPaymentTest(CartPaymentTestBase):
 
     @pytest.fixture
     async def payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
-        return await payer_processor_v1.create_payer(
+        payer, already_exists = await payer_processor_v1.create_payer(
             payer_reference_id="1",
             payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             email=f"{str(uuid4())}@doordash.com)",
             country=CountryCode.US,
             description="test-payer",
         )
+        return payer
 
     @pytest.fixture
     async def payment_method(
@@ -520,13 +521,14 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
 
     @pytest.fixture
     async def payer(self, payer_processor_v1: PayerProcessorV1) -> Payer:
-        return await payer_processor_v1.create_payer(
+        payer, already_exists = await payer_processor_v1.create_payer(
             payer_reference_id=f"{str(int(datetime.utcnow().timestamp()))}",
             payer_reference_id_type=PayerReferenceIdType.DD_DRIVE_STORE_ID,
             email=f"{str(uuid4())}@doordash.com)",
             country=CountryCode.US,
             description="test-payer",
         )
+        return payer
 
     @pytest.fixture
     async def payment_method(

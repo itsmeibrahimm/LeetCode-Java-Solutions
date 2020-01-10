@@ -108,7 +108,7 @@ def _list_payment_method_v1_url(
 
 
 def create_payer_v1(
-    client: TestClient, request: CreatePayerV1Request
+    client: TestClient, request: CreatePayerV1Request, duplicate_request: bool = False
 ) -> Dict[str, Any]:
     create_payer_request = {
         "payer_correlation_ids": {
@@ -120,7 +120,9 @@ def create_payer_v1(
         "description": request.description,
     }
     response = client.post(_create_payer_v1_url(), json=create_payer_request)
-    assert response.status_code == 201
+    assert response.status_code in (201, 200)
+    if duplicate_request:
+        assert response.status_code == 200
     payer: dict = response.json()
     assert UUID(payer["id"], version=4)
     assert payer["country"] == request.country

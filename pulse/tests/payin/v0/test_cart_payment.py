@@ -16,7 +16,7 @@ CART_AMOUNT = 1000
 
 def test_create_legacy_cart_payment_with_no_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -50,7 +50,7 @@ def test_create_legacy_cart_payment_with_no_delay_capture():
 
 def test_create_legacy_cart_payment_with_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -86,7 +86,7 @@ def test_create_legacy_cart_payment_with_invalid_request():
     error_code = -1
     error_reason = ""
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -126,7 +126,7 @@ def test_create_legacy_cart_payment_with_invalid_request():
 
 def test_update_legacy_cart_payment_higher_without_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -170,7 +170,7 @@ def test_update_legacy_cart_payment_higher_without_delay_capture():
 
 def test_update_legacy_cart_payment_lower_without_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -214,7 +214,7 @@ def test_update_legacy_cart_payment_lower_without_delay_capture():
 
 def test_update_legacy_cart_payment_lower_with_invalid_amount():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -260,7 +260,7 @@ def test_update_legacy_cart_payment_lower_with_invalid_amount():
 
 def test_update_legacy_cart_payment_higher_with_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -304,7 +304,7 @@ def test_update_legacy_cart_payment_higher_with_delay_capture():
 
 def test_update_legacy_cart_payment_lower_with_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -367,7 +367,7 @@ def test_update_legacy_cart_payment_with_cart_payment_not_found():
 
 def test_cancel_legacy_cart_payment_without_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -408,7 +408,7 @@ def test_cancel_legacy_cart_payment_without_delay_capture():
 
 def test_cancel_legacy_cart_payment_with_delay_capture():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -463,7 +463,7 @@ def test_cancel_legacy_cart_payment_with_cart_payment_not_found():
 
 def test_get_cart_payment():
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -529,7 +529,7 @@ def test_list_cart_payment():
     initial_count = initial_cart_payment_list[0].count
 
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )
@@ -584,7 +584,7 @@ def test_list_cart_payment_with_correct_datetime_filter():
     initial_count = initial_cart_payment_list[0].count
 
     payer = PaymentUtil.create_payer()
-    assert payer[1] == 201
+    assert payer[1] in (200, 201)
     stripe_customer_id = (
         payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
     )

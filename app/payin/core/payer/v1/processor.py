@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 from uuid import UUID
 
 from fastapi import Depends
@@ -43,7 +43,7 @@ class PayerProcessorV1:
         email: str,
         country: CountryCode,
         description: str,
-    ) -> Payer:
+    ) -> Tuple[Payer, bool]:
         """
         create a new DoorDash payer. We will create 3 models under the hood:
             - Payer
@@ -67,10 +67,12 @@ class PayerProcessorV1:
         pgp_code = PgpCode.STRIPE
 
         # step 1: lookup active payer by payer_reference_id + payer_reference_id_type, return error if payer already exists
-        await self.payer_client.has_existing_payer(
+        existing_payer = await self.payer_client.find_existing_payer(
             payer_reference_id=payer_reference_id,
             payer_reference_id_type=payer_reference_id_type,
         )
+        if existing_payer:
+            return existing_payer, True
 
         # step 2: create PGP customer
         pgp_customer_id: CustomerId = await self.payer_client.pgp_create_customer(
@@ -92,7 +94,7 @@ class PayerProcessorV1:
             pgp_code=pgp_code,
             description=description,
         )
-        return raw_payer.to_payer()
+        return raw_payer.to_payer(), False
 
     async def get_payer(
         self,

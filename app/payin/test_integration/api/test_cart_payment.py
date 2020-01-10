@@ -36,8 +36,7 @@ from app.payin.repository.payment_method_repo import (
 )
 from app.payin.test_integration.integration_utils import (
     build_commando_processor,
-    create_payer_v1,
-    CreatePayerV1Request,
+    _create_payer_v1_url,
 )
 
 
@@ -46,20 +45,24 @@ class TestCartPayment:
     @pytest.fixture
     def payer(self, stripe_api: StripeAPISettings, client: TestClient):
         stripe_api.enable_outbound()
-        return self._test_payer_creation(client)
+        return self._test_payer_creation(client=client)
 
-    def _test_payer_creation(self, client: TestClient) -> Dict[str, Any]:
-        unique_value = str(uuid.uuid4())
-        payer = create_payer_v1(
-            client=client,
-            request=CreatePayerV1Request(
-                payer_reference_id="1",
-                payer_reference_id_type="dd_drive_store_id",
-                country="US",
-                description=f"{unique_value} description",
-                email=(unique_value + "@dd.com"),
-            ),
-        )
+    def _test_payer_creation(
+        self, client: TestClient, payer_reference_id: str = "1"
+    ) -> Dict[str, Any]:
+        description_string = "SAMPLE_DESCRIPTION"
+        create_payer_request = {
+            "payer_correlation_ids": {
+                "payer_reference_id": payer_reference_id,
+                "payer_reference_id_type": "dd_drive_store_id",
+            },
+            "email": (description_string + "@dd.com"),
+            "country": "US",
+            "description": (description_string + "@dd.com"),
+        }
+        response = client.post(_create_payer_v1_url(), json=create_payer_request)
+        assert response.status_code in (200, 201)
+        payer: dict = response.json()
         return payer
 
     @pytest.fixture
@@ -429,7 +432,7 @@ class TestCartPayment:
             payment_method_extractor=payment_method_extractor,
         )
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
-        assert response.status_code == 201
+        assert response.status_code in (200, 201)
         cart_payment = response.json()
         assert cart_payment
         assert cart_payment["id"]
@@ -1188,7 +1191,9 @@ class TestCartPayment:
 
         # Other payer cannot use some else's payment method for cart payment creation
         with RuntimeContextManager(STRIPE_COMMANDO_MODE_BOOLEAN, False, runtime_setter):
-            other_payer = payer = self._test_payer_creation(client)
+            other_payer = payer = self._test_payer_creation(
+                client, payer_reference_id=str(random.randint(2, 1000))
+            )
 
         request_body = self._get_cart_payment_create_request(
             payer=other_payer,
@@ -1260,13 +1265,13 @@ class TestCartPayment:
         self,
         stripe_api: StripeAPISettings,
         client: TestClient,
-        payer: Dict[str, Any],
-        payment_method: Dict[str, Any],
         runtime_setter: RuntimeSetter,
         app_context: AppContext,
         event_loop: AbstractEventLoop,
     ):
         stripe_api.enable_outbound()
+        payer = self._test_payer_creation(client=client, payer_reference_id="2")
+        payment_method = self._test_payment_method_creation(client=client, payer=payer)
         runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, False)
         # Use payer, payment method api calls to seed data into legacy table.  It would be better to
         # create directly in legacy system without creating corresponding records in the new tables since

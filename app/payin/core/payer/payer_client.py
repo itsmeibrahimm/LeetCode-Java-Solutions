@@ -30,7 +30,7 @@ from app.payin.core.exceptions import (
     PayinErrorCode,
     PayerUpdateError,
 )
-from app.payin.core.payer.model import RawPayer
+from app.payin.core.payer.model import RawPayer, Payer
 from app.payin.core.payment_method.model import PaymentMethodIds, RawPaymentMethod
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.types import (
@@ -86,9 +86,9 @@ class PayerClient:
         self.payer_repo = payer_repo
         self.stripe_async_client = stripe_async_client
 
-    async def has_existing_payer(
+    async def find_existing_payer(
         self, payer_reference_id: str, payer_reference_id_type: PayerReferenceIdType
-    ):
+    ) -> Optional[Payer]:
         try:
             exist_payer: Optional[
                 PayerDbEntity
@@ -99,22 +99,36 @@ class PayerClient:
                 )
             )
             if exist_payer:
-                self.log.error(
-                    "[has_existing_payer] payer already exists",
+                self.log.info(
+                    "[find_existing_payer] payer already exists",
                     payer_reference_id=payer_reference_id,
                     payer_reference_id_type=payer_reference_id_type,
                 )
-                # raise PayerCreationError(
-                #     error_code=PayinErrorCode.PAYER_CREATE_PAYER_ALREADY_EXIST,
-                #     retryable=False,
-                # )
+                pgp_customer: Optional[
+                    PgpCustomerDbEntity
+                ] = await self.payer_repo.get_pgp_customer(
+                    request=GetPgpCustomerInput(payer_id=exist_payer.id)
+                )
+                stripe_customer: Optional[StripeCustomerDbEntity] = None
+                if exist_payer.legacy_stripe_customer_id:
+                    stripe_customer = await self.payer_repo.get_stripe_customer_by_stripe_id(
+                        request=GetStripeCustomerByStripeIdInput(
+                            stripe_id=exist_payer.legacy_stripe_customer_id
+                        )
+                    )
+                return RawPayer(
+                    payer_entity=exist_payer,
+                    pgp_customer_entity=pgp_customer,
+                    stripe_customer_entity=stripe_customer,
+                ).to_payer()
         except DBDataError:
             self.log.exception(
-                "[has_existing_payer] DBDataError when reading from payers table.",
+                "[find_existing_payer] DBDataError when reading from payers table.",
                 payer_reference_id=payer_reference_id,
                 payer_reference_id_type=payer_reference_id_type,
             )
             raise PayerCreationError(error_code=PayinErrorCode.PAYER_READ_DB_ERROR)
+        return None
 
     def _payer_reference_id_type_to_owner_type(
         self, payer_reference_id_type: PayerReferenceIdType

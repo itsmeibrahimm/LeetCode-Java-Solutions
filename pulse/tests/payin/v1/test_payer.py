@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def test_create_and_get_payer():
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
     retrieved_payer = payer_v1_client.get_payer_with_http_info(payer_id=new_payer[0].id)
     assert retrieved_payer[1] == 200
     assert retrieved_payer[0] == new_payer[0]
@@ -45,7 +45,7 @@ def test_create_two_payers_with_same_id():
             payer_reference_id_type="dd_drive_store_id",
         )
     )
-    assert new_payer_one[1] == 201
+    assert new_payer_one[1] in (200, 201)
     new_payer_two = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
             payer_reference_id=123,
@@ -53,12 +53,12 @@ def test_create_two_payers_with_same_id():
             payer_reference_id_type="dd_drive_store_id",
         )
     )
-    assert new_payer_two[1] == 201
+    assert new_payer_two[1] == 200
 
 
 def test_get_payer_with_wrong_input():
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
 
     # Testing for wrong data type (Expected String)
     error_code_invalid_data_type = -1
@@ -85,7 +85,7 @@ def test_get_payer_with_wrong_input():
 
 def test_update_payer_with_payer_id():
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
     new_payment_method = payment_method_v1_client.create_payment_method_with_http_info(
         create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
             payer_id=new_payer[0].id, set_default=True
@@ -116,7 +116,7 @@ def test_update_payer_with_payer_id():
 
 def test_create_v1_get_v0_payer_by_payer_id():
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
 
     get_payer = payer_v0_client.get_payer_with_http_info(
         payer_id_type="payer_id", payer_id=new_payer[0].id
@@ -127,7 +127,7 @@ def test_create_v1_get_v0_payer_by_payer_id():
 
 def test_create_v1_get_v0_payer_by_stripe_customer_serial_id():
     new_payer = PaymentUtil.create_payer()
-    assert new_payer[1] == 201
+    assert new_payer[1] in (200, 201)
 
     get_payer = payer_v0_client.get_payer_with_http_info(
         payer_id_type="dd_stripe_customer_serial_id",

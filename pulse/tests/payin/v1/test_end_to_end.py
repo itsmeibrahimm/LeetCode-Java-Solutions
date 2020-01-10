@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def test_end_to_end():
     # Step 1: create payer object
     test_payer = PaymentUtil.create_payer()
-    assert test_payer[1] == 201
+    assert test_payer[1] in (200, 201)
 
     # Step 2: create payment_method
     create_payment_method_request = CreatePaymentMethodRequestV1(

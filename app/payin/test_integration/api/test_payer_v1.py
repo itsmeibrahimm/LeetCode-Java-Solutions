@@ -121,6 +121,35 @@ class TestPayersV1:
         force_get_payer: dict = response.json()
         assert payer == force_get_payer
 
+    def test_get_existing_payer(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        random_payer_reference_id: str = str(random.randint(1, 100000))
+
+        # create payer
+        payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                payer_reference_id=random_payer_reference_id,
+                country="US",
+                description="Integration Test test_create_payer()",
+                payer_reference_id_type="dd_consumer_id",
+                email=(random_payer_reference_id + "@dd.com"),
+            ),
+        )
+        duplicate_payer = create_payer_v1(
+            client=client,
+            request=CreatePayerV1Request(
+                payer_reference_id=random_payer_reference_id,
+                country="US",
+                description="Integration Test test_create_payer()",
+                payer_reference_id_type="dd_consumer_id",
+                email=(random_payer_reference_id + "@dd.com"),
+            ),
+            duplicate_request=True,
+        )
+        assert duplicate_payer == payer
+
     def test_payer_not_exist(self, client: TestClient, stripe_client: StripeTestClient):
         _get_payer_failure_v1(
             client=client,
