@@ -28,10 +28,10 @@ spec:
       - name: migration
         image: "{{ .Values.job.repository }}:{{ .Values.migration.tag }}"
         imagePullPolicy: {{ .Values.job.pullPolicy | default "IfNotPresent" }}
-        command: ["python"]
+        command: ["tail"]
         args:
-          - -m
-          - development.update_db_schemas
+          - -f
+          - /dev/null
         resources:
           {{- toYaml .Values.job.resources | nindent 10 }}
         ports:

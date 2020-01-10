@@ -699,12 +699,6 @@ def getMigrationJobLog(String env) {
             |  echo "Failed to find pod for payment-service-migration-job"
             |  exit 1
             |fi
-            |
-            |# Wait for job to be completed.
-            |kubectl wait --for=condition=complete --timeout=5m job.batch/payment-service-migration-job -n payment-service
-            |# Pod is completed, gather logs from it
-            |kubectl logs -n payment-service \$POD_NAME
-            |kubectl delete job payment-service-migration-job -n payment-service
             |""".stripMargin()
       }
 }
