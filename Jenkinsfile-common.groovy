@@ -477,8 +477,8 @@ def deployHelm(Map optArgs = [:], String tag, String serviceName, String env) {
           helmValuesFile: "values-${env}.yaml",
           helmRelease: serviceName,
           k8sCredFileCredentialId: "K8S_CONFIG_${env.toUpperCase()}_NEW",
-          k8sNamespace: "payment-service",
-          tillerNamespace: "kube-system",
+          k8sNamespace: env,
+          tillerNamespace: env,
           timeoutSeconds: 600
   ] << serviceNameEnvToOptArgs(serviceName, env) << optArgs
   withCredentials([file(credentialsId: o.k8sCredFileCredentialId, variable: 'k8sCredsFile')]) {
@@ -619,21 +619,27 @@ def serviceNameEnvToOptArgs(String serviceName, String env) {
             helmFlags: '--install --force',
             helmValuesFile: "values-${env}.yaml",
             helmRelease: "${serviceName}-${env}",
-            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW'
+            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW',
+            k8sNamespace: 'staging',
+            tillerNamespace: 'staging'
     ]
   } else if (env == 'staging') {
     return [
             helmFlags: '--install --force',
             helmValuesFile: 'values-staging.yaml',
             helmRelease: serviceName,
-            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW'
+            k8sCredFileCredentialId: 'K8S_CONFIG_STAGING_NEW',
+            k8sNamespace: 'staging',
+            tillerNamespace: 'staging'
     ]
   } else if (env == 'prod' || env == 'production') {
     return [
             helmFlags: '--install',
             helmValuesFile: 'values-prod.yaml',
             helmRelease: serviceName,
-            k8sCredFileCredentialId: 'K8S_CONFIG_PROD_NEW'
+            k8sCredFileCredentialId: 'K8S_CONFIG_PROD_NEW',
+            k8sNamespace: 'prod',
+            tillerNamespace: 'prod'
     ]
   } else {
     error("Unknown env value of '${env}' passed.")
@@ -687,7 +693,7 @@ def getMigrationJobLog(String env) {
             |# Find pod name so that we can manage it
             |POD_NAME=''
             |for i in 1 2 4 8; do
-            |  POD_NAME=\$(kubectl get pods -n payment-service --selector='job-name=payment-service-migration-job' -o name)
+            |  POD_NAME=\$(kubectl get pods -n ${env} --selector='job-name=payment-service-migration-job' -o name)
             |  if [[ "\${POD_NAME}" != "" ]]; then
             |    echo "Found pod \${POD_NAME}"
             |    break
@@ -699,6 +705,12 @@ def getMigrationJobLog(String env) {
             |  echo "Failed to find pod for payment-service-migration-job"
             |  exit 1
             |fi
+            |
+            |# Wait for job to be completed.
+            |kubectl wait --for=condition=complete --timeout=20m job.batch/payment-service-migration-job -n ${env}
+            |# Pod is completed, gather logs from it
+            |kubectl logs -n ${env} \$POD_NAME
+            |kubectl delete job payment-service-migration-job -n ${env}
             |""".stripMargin()
       }
 }
