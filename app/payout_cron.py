@@ -8,6 +8,7 @@ from app.commons.config.newrelic_loader import init_newrelic_agent
 
 # ensure logger is loaded before newrelic init,
 # so we don't reload the module and get duplicate log messages
+from app.commons.config.secrets import ninox_readiness_check
 from app.commons.config.utils import init_app_config_for_payout_cron
 from app.commons.context.logger import get_logger
 from app.payout.jobs import (
@@ -17,6 +18,7 @@ from app.payout.jobs import (
 )
 from app.payout.models import PayoutCountry, PayoutDay
 
+ninox_readiness_check()
 init_newrelic_agent()
 
 from aiohttp import web
