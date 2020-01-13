@@ -244,7 +244,7 @@ module "payment-service-payment-payout-worker" {
   net_service_type                          = "ClusterIP"
 
   service_environments_variables = <<EOF
-    ENVIRONMENT=staging
+    ENVIRONMENT=prod
    EOF
 }
 
@@ -284,6 +284,6 @@ module "payment-service-payment-stripe-worker" {
   net_service_type                          = "ClusterIP"
 
   service_environments_variables = <<EOF
-    ENVIRONMENT=staging
+    ENVIRONMENT=prod
    EOF
 }
