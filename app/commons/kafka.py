@@ -71,8 +71,13 @@ class KafkaMessageConsumer:
 
     async def run(self):
         try:
-            set_request_id(uuid.uuid4())
+            consumer_id = uuid.uuid4()
+            set_request_id(consumer_id)
             self.consumer.subscribe([self.topic_name])
+            log.info(
+                "consumer started.",
+                extra={"topic": self.topic_name, "consumer_id": consumer_id},
+            )
             while not self.stop_consuming_event.is_set():
                 loop = asyncio.get_event_loop()
                 msg = await loop.run_in_executor(None, self.read_next_task)
@@ -83,7 +88,10 @@ class KafkaMessageConsumer:
                     log.warning("Consumer error.", extra={"error": msg.error()})
                     continue
 
-                log.debug(f"message processing starting")
+                log.info(
+                    "Processing a message.",
+                    extra={"topic": self.topic_name, "consumer_id": consumer_id},
+                )
                 try:
                     await self.processor(self.app_context, msg.value().decode())
                 except UnicodeDecodeError as unicode_decode_error:
