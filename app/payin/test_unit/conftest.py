@@ -407,6 +407,8 @@ class MockedPaymentRepo:
         stripe_customer_id: Optional[int],
         total: int,
         original_total: int,
+        created_at: datetime,
+        updated_at: datetime,
     ) -> LegacyConsumerCharge:
         return LegacyConsumerCharge(
             id=LegacyConsumerChargeId(1),
@@ -420,7 +422,8 @@ class MockedPaymentRepo:
             country_id=country_id,
             issue_id=None,
             stripe_customer_id=stripe_customer_id,
-            created_at=datetime.now(),
+            created_at=created_at,
+            updated_at=updated_at,
         )
 
     async def get_legacy_consumer_charge_by_id(

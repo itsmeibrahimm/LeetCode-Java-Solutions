@@ -237,6 +237,7 @@ class LegacyPaymentInterface:
             country_id = get_country_id_by_code(country)
 
         self.req_context.log.debug("[create_new_payment_charges] Creating new charge")
+        now = datetime.now(timezone.utc)
         legacy_consumer_charge = await self.payment_repo.insert_legacy_consumer_charge(
             target_ct_id=int(correlation_ids.reference_type),
             target_id=int(correlation_ids.reference_id),
@@ -249,6 +250,8 @@ class LegacyPaymentInterface:
             stripe_customer_id=None,
             total=0,
             original_total=request_cart_payment.amount,
+            created_at=now,
+            updated_at=now,
         )
 
         legacy_stripe_charge = await self._insert_new_stripe_charge(

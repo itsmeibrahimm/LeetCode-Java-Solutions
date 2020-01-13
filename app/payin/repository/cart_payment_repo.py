@@ -983,6 +983,8 @@ class CartPaymentRepository(PayinDBRepository):
         stripe_customer_id: Optional[int],
         total: int,
         original_total: int,
+        created_at: datetime,
+        updated_at: datetime,
     ) -> LegacyConsumerCharge:
         data = {
             consumer_charges.target_ct_id: target_ct_id,
@@ -995,7 +997,8 @@ class CartPaymentRepository(PayinDBRepository):
             consumer_charges.stripe_customer_id: stripe_customer_id,
             consumer_charges.total: total,
             consumer_charges.original_total: original_total,
-            consumer_charges.created_at: datetime.now(timezone.utc),
+            consumer_charges.created_at: created_at,
+            consumer_charges.updated_at: updated_at,
         }
 
         statement = (
@@ -1021,6 +1024,7 @@ class CartPaymentRepository(PayinDBRepository):
             issue_id=row[consumer_charges.issue_id],
             stripe_customer_id=row[consumer_charges.stripe_customer_id],
             created_at=row[consumer_charges.created_at],
+            updated_at=row[consumer_charges.updated_at],
         )
 
     async def get_legacy_consumer_charge_by_id(

@@ -204,6 +204,7 @@ class TestLegacyPaymentInterface:
             country_id=LegacyCountryId.US,
             issue_id=None,
             stripe_customer_id=None,
+            updated_at=result_consumer_charge.updated_at,  # Generated
             created_at=result_consumer_charge.created_at,  # Generated
         )
         assert result_consumer_charge == expected_consumer_charge

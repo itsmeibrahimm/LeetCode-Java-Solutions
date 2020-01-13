@@ -218,9 +218,10 @@ def generate_legacy_payment() -> LegacyPayment:
     )
 
 
-def generate_legacy_consumer_charge() -> LegacyConsumerCharge:
+def generate_legacy_consumer_charge(charge_id: int = 1) -> LegacyConsumerCharge:
+    now = datetime.now()
     return LegacyConsumerCharge(
-        id=LegacyConsumerChargeId(1),
+        id=LegacyConsumerChargeId(charge_id),
         target_id=1,
         target_ct_id=2,
         idempotency_key=str(uuid.uuid4()),
@@ -231,7 +232,8 @@ def generate_legacy_consumer_charge() -> LegacyConsumerCharge:
         country_id=LegacyCountryId.US,
         issue_id=None,
         stripe_customer_id=None,
-        created_at=datetime.now(),
+        created_at=now,
+        updated_at=now,
     )
 
 

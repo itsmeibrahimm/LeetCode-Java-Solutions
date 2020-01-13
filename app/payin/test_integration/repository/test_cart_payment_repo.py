@@ -1440,6 +1440,7 @@ class TestRefunds:
 class TestLegacyCharges:
     @pytest.fixture
     async def consumer_charge(self, cart_payment_repository: CartPaymentRepository):
+        now = datetime.now(timezone.utc)
         yield await cart_payment_repository.insert_legacy_consumer_charge(
             target_ct_id=1,
             target_id=2,
@@ -1451,6 +1452,8 @@ class TestLegacyCharges:
             stripe_customer_id=None,
             total=800,
             original_total=800,
+            created_at=now,
+            updated_at=now,
         )
 
     @pytest.fixture
@@ -1478,6 +1481,7 @@ class TestLegacyCharges:
         self, cart_payment_repository: CartPaymentRepository
     ):
         idempotency_key = str(uuid4())
+        now = datetime.now(timezone.utc)
         result = await cart_payment_repository.insert_legacy_consumer_charge(
             target_ct_id=1,
             target_id=2,
@@ -1489,6 +1493,8 @@ class TestLegacyCharges:
             stripe_customer_id=None,
             total=800,
             original_total=800,
+            created_at=now,
+            updated_at=now,
         )
 
         expected_consumer_charge = LegacyConsumerCharge(
@@ -1504,6 +1510,7 @@ class TestLegacyCharges:
             issue_id=None,
             stripe_customer_id=None,
             created_at=result.created_at,  # Generated
+            updated_at=result.updated_at,  # Generated
         )
 
         assert result == expected_consumer_charge
@@ -1966,6 +1973,7 @@ class TestExistingSuccessChargeForStripeCard:
 
     @pytest.fixture
     async def consumer_charge(self, cart_payment_repository: CartPaymentRepository):
+        now = datetime.now(timezone.utc)
         yield await cart_payment_repository.insert_legacy_consumer_charge(
             target_ct_id=1,
             target_id=2,
@@ -1977,6 +1985,8 @@ class TestExistingSuccessChargeForStripeCard:
             stripe_customer_id=None,
             total=800,
             original_total=800,
+            created_at=now,
+            updated_at=now,
         )
 
     @pytest.fixture
