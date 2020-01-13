@@ -468,8 +468,8 @@ class WeeklyCreateTransferJob(Job):
                 weekly_create_transfer_task = WeeklyCreateTransferTask(
                     payout_day=self.payout_day,
                     payout_countries=self.payout_countries,
-                    end_time=end_time,
-                    unpaid_txn_start_time=start_time,
+                    end_time=end_time.isoformat(),
+                    unpaid_txn_start_time=start_time.isoformat(),
                     exclude_recently_updated_accounts=False,
                     whitelist_payment_account_ids=weekly_create_transfers_list,
                 )
