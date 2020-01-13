@@ -265,6 +265,10 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                 )
 
         if self.request.submit_after_creation and updated_transfer:
+            self.logger.info(
+                "Enqueuing transfer submission for account",
+                payout_account_id=payment_account.id,
+            )
             if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                 submit_transfer_task = SubmitTransferTask(
                     transfer_id=updated_transfer.id,
@@ -293,6 +297,10 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     dsj_client=self.dsj_client,
                 )
                 await submit_transfer_op.execute()
+        self.logger.info(
+            "Finished executing create transfer for account",
+            payout_account_id=payment_account.id,
+        )
         return CreateTransferResponse(
             transfer=updated_transfer, transaction_ids=transaction_ids
         )

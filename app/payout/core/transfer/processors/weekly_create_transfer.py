@@ -152,6 +152,10 @@ class WeeklyCreateTransfer(
             try:
                 if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                     # put create_transfer into queue
+                    self.logger.info(
+                        "Enqueuing transfer creation for account",
+                        payout_account_id=account_id,
+                    )
                     create_transfer_task = CreateTransferTask(
                         payout_day=payout_day,
                         payout_account_id=account_id,

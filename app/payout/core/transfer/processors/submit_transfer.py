@@ -141,7 +141,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
     async def _execute(self) -> SubmitTransferResponse:
         payout_method = self.request.method
         self.logger.info(
-            "Submitting transfer",
+            "Executing submit transfer for account",
             transfer_id=self.request.transfer_id,
             method=payout_method,
         )
@@ -286,6 +286,11 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
             method=payout_method,
             amount=transfer.amount,
             submitted_by=self.request.submitted_by,
+        )
+        self.logger.info(
+            "Finished executing submit transfer for account",
+            payment_account_id=payment_account.id,
+            transfer_id=transfer_id,
         )
         return SubmitTransferResponse()
 

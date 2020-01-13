@@ -465,6 +465,9 @@ class WeeklyCreateTransferJob(Job):
 
             if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
                 # put weekly_create_transfer into queue
+                logger.info(
+                    "Enqueuing weekly_create_transfer task", payout_day=self.payout_day
+                )
                 weekly_create_transfer_task = WeeklyCreateTransferTask(
                     payout_day=self.payout_day,
                     payout_countries=self.payout_countries,
