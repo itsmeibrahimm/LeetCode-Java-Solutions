@@ -70,3 +70,39 @@ class StoreMetadataInvalidInputError(PurchaseCardError):
             ],
             retryable=False,
         )
+
+
+###########################################################
+# AuthProcessor Errors
+###########################################################
+class AuthProcessorErrorCodes(str, Enum):
+    AUTH_REQUEST_NOT_FOUND_ERROR = "auth_request_not_found"
+    AUTH_REQUEST_NO_STATE_ERROR = "auth_request_no_state"
+
+
+auth_processor_error_message_maps = {
+    AuthProcessorErrorCodes.AUTH_REQUEST_NOT_FOUND_ERROR: "Unable to find auth request for given input",
+    AuthProcessorErrorCodes.AUTH_REQUEST_NO_STATE_ERROR: "There is no corresponding state for this auth request",
+}
+
+
+class AuthRequestNotFoundError(PurchaseCardError):
+    def __init__(self):
+        super().__init__(
+            error_code=AuthProcessorErrorCodes.AUTH_REQUEST_NOT_FOUND_ERROR,
+            error_message=auth_processor_error_message_maps[
+                AuthProcessorErrorCodes.AUTH_REQUEST_NOT_FOUND_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class AuthRequestInconsistentStateError(PurchaseCardError):
+    def __init__(self):
+        super().__init__(
+            error_code=AuthProcessorErrorCodes.AUTH_REQUEST_NO_STATE_ERROR,
+            error_message=auth_processor_error_message_maps[
+                AuthProcessorErrorCodes.AUTH_REQUEST_NO_STATE_ERROR
+            ],
+            retryable=False,
+        )

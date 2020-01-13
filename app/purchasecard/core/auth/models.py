@@ -13,3 +13,10 @@ class InternalCreateAuthResponse(BaseModel):
     delivery_id: str
     created_at: datetime
     updated_at: datetime
+
+
+class UpdatedAuthorization(BaseModel):
+    updated_at: datetime
+    state: str
+    delivery_id: str
+    shift_id: str

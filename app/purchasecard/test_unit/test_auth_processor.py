@@ -14,6 +14,7 @@ from app.purchasecard.models.paymentdb.auth_request_state import (
     AuthRequestState,
     AuthRequestStateName,
 )
+from datetime import datetime, timezone, timedelta
 
 
 class TestAuthProcessor:
@@ -89,3 +90,82 @@ class TestAuthProcessor:
 
         assert response
         assert response.delivery_id == TEST_DELIVERY_ID
+
+    async def test_updates_auth(self):
+        self.auth_processor.authorization_master_repo.update_auth_request_ttl = (
+            CoroutineMock()
+        )
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination = (
+            CoroutineMock()
+        )
+        self.auth_processor.authorization_master_repo.create_auth_request_state = (
+            CoroutineMock()
+        )
+
+        UUID_ONE = uuid4()
+        UUID_TWO = uuid4()
+        UUID_THREE = uuid4()
+        now = datetime.now(timezone.utc)
+        self.auth_processor.authorization_master_repo.update_auth_request_ttl.return_value = AuthRequest(
+            id=UUID_ONE,
+            created_at=now,
+            updated_at=now,
+            shift_id="3",
+            delivery_id="4",
+            dasher_id=None,
+            store_id="2",
+            store_city="Milpitas",
+            store_business_name="In n Out",
+            expire_sec=5,
+        )
+
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = AuthRequest(
+            id=UUID_TWO,
+            created_at=now,
+            updated_at=now + timedelta(hours=1),
+            shift_id="4",
+            delivery_id="5",
+            dasher_id=None,
+            store_id="3",
+            store_city="Milpitas",
+            store_business_name="Burger King",
+            expire_sec=None,
+        )
+
+        self.auth_processor.authorization_master_repo.create_auth_request_state.return_value = AuthRequestState(
+            id=UUID_THREE,
+            auth_request_id=UUID_ONE,
+            created_at=now,
+            updated_at=now,
+            state=AuthRequestStateName.ACTIVE_UPDATED,
+            subtotal=10,
+            subtotal_tax=20,
+        )
+
+        result_with_ttl = await self.auth_processor.update_auth(
+            subtotal=10,
+            subtotal_tax=20,
+            store_id="2",
+            store_city="Milpitas",
+            store_business_name="In n Out",
+            delivery_id="4",
+            shift_id="3",
+            ttl=5,
+        )
+
+        result_without_ttl = await self.auth_processor.update_auth(
+            subtotal=10,
+            subtotal_tax=20,
+            store_id="3",
+            store_city="Milpitas",
+            store_business_name="Burger King",
+            delivery_id="5",
+            shift_id="4",
+            ttl=None,
+        )
+
+        assert result_with_ttl.updated_at == now
+        assert result_without_ttl.updated_at == now + timedelta(hours=1)
+
+        assert result_with_ttl.state == AuthRequestStateName.ACTIVE_UPDATED
+        assert result_without_ttl.state == AuthRequestStateName.ACTIVE_UPDATED

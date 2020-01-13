@@ -1,3 +1,4 @@
+import sys
 import uuid
 from random import randint
 
@@ -5,6 +6,7 @@ import pytest
 from typing_extensions import TypedDict
 
 from app.commons.database.infra import DB
+from app.purchasecard.models.paymentdb.auth_request_state import AuthRequestStateName
 from app.purchasecard.repository.authorization_repository import (
     AuthorizationMasterRepository,
     AuthorizationReplicaRepository,
@@ -14,7 +16,8 @@ from app.purchasecard.repository.base import NonValidReplicaOperation
 
 class SimpleIntegerIdContainer:
     def __init__(self, num_ids):
-        self._ids = [172] * num_ids
+        rand_id = randint(-sys.maxsize - 1, sys.maxsize)
+        self._ids = [rand_id] * num_ids
         self._num_ids = num_ids
 
     def increment_random_id(self):
@@ -156,11 +159,126 @@ class TestAuthorizationtMasterRepository:
         assert auth_state.id == get_auth_state_master_result.id
         assert auth_state.id == get_auth_state_replica_result.id
 
-        assert auth_state.id == get_auth_state_by_auth_id_master_result.id
-        assert auth_state.id == get_auth_state_by_auth_id_replica_result.id
+        assert len(get_auth_state_by_auth_id_master_result) == 1
+        assert len(get_auth_state_by_auth_id_replica_result) == 1
+        assert auth_state.id == get_auth_state_by_auth_id_master_result[0].id
+        assert auth_state.id == get_auth_state_by_auth_id_replica_result[0].id
 
         non_existent_id_result = await authorization_replica_repo.get_auth_request(
             uuid.uuid4()
         )
 
         assert non_existent_id_result == None
+
+    async def test_create_auth_request_state_and_update_ttl(
+        self,
+        authorization_master_repo,
+        authorization_replica_repo,
+        unique_shift_delivery_store_id_generator: SimpleIntegerIdContainer,
+    ):
+        ids = unique_shift_delivery_store_id_generator.increment_random_id()
+
+        class AnnoyingMyPyDict(TypedDict):
+            auth_id: uuid.UUID
+            state_id: uuid.UUID
+            shift_id: str
+            delivery_id: str
+            store_id: str
+            store_city: str
+            store_business_name: str
+            subtotal: int
+            subtotal_tax: int
+            dasher_id: str
+
+        fake_auth_request: AnnoyingMyPyDict = {
+            "auth_id": uuid.uuid4(),
+            "state_id": uuid.uuid4(),
+            "shift_id": str(ids[0]),
+            "delivery_id": str(ids[1]),
+            "store_id": str(ids[2]),
+            "store_city": "Mountain View",
+            "store_business_name": "jazzy jasmine tea",
+            "subtotal": 3,
+            "subtotal_tax": 5,
+            "dasher_id": "7",
+        }
+        auth, auth_state = await authorization_master_repo.create_authorization(
+            **fake_auth_request
+        )
+
+        assert auth.expire_sec is None
+        assert auth_state.state == AuthRequestStateName.ACTIVE_CREATED
+
+        class AnnoyingMyPyDictTwo(TypedDict):
+            state_id: uuid.UUID
+            auth_id: uuid.UUID
+            state: AuthRequestStateName
+            subtotal: int
+            subtotal_tax: int
+
+        fake_auth_state_request: AnnoyingMyPyDictTwo = {
+            "auth_id": fake_auth_request["auth_id"],
+            "state_id": uuid.uuid4(),
+            "state": AuthRequestStateName.CLOSED_CONSUMED,
+            "subtotal": 300,
+            "subtotal_tax": 24,
+        }
+
+        create_auth_request_state_result = await authorization_master_repo.create_auth_request_state(
+            **fake_auth_state_request
+        )
+
+        assert (
+            create_auth_request_state_result.state
+            == AuthRequestStateName.CLOSED_CONSUMED
+        )
+        assert (
+            create_auth_request_state_result.id == fake_auth_state_request["state_id"]
+        )
+        assert (
+            create_auth_request_state_result.auth_request_id
+            == fake_auth_state_request["auth_id"]
+        )
+        assert (
+            create_auth_request_state_result.subtotal
+            == fake_auth_state_request["subtotal"]
+        )
+        assert (
+            create_auth_request_state_result.subtotal_tax
+            == fake_auth_state_request["subtotal_tax"]
+        )
+
+        updated_auth_request = await authorization_master_repo.update_auth_request_ttl(
+            shift_id=fake_auth_request["shift_id"],
+            delivery_id=fake_auth_request["delivery_id"],
+            store_id=fake_auth_request["store_id"],
+            ttl=5,
+        )
+
+        assert updated_auth_request.created_at != updated_auth_request.updated_at
+        assert updated_auth_request.expire_sec == 5
+
+        old_updated_at = updated_auth_request.updated_at
+
+        updated_auth_request = await authorization_master_repo.update_auth_request_ttl(
+            shift_id=fake_auth_request["shift_id"],
+            delivery_id=fake_auth_request["delivery_id"],
+            store_id=fake_auth_request["store_id"],
+            ttl=None,
+        )
+
+        assert old_updated_at < updated_auth_request.updated_at
+        assert updated_auth_request.expire_sec is None
+
+        with pytest.raises(NonValidReplicaOperation):
+            await authorization_replica_repo.create_auth_request_state(
+                **fake_auth_state_request
+            )
+
+        with pytest.raises(NonValidReplicaOperation):
+            await authorization_replica_repo.update_auth_request_ttl(
+                shift_id=fake_auth_request["shift_id"],
+                delivery_id=fake_auth_request["delivery_id"],
+                store_id=fake_auth_request["store_id"],
+                ttl=None,
+            )

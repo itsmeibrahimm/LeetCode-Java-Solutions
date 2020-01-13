@@ -1,6 +1,4 @@
-from datetime import datetime
 from enum import Enum
-from uuid import UUID as uuid_UUID
 from dataclasses import dataclass
 
 from sqlalchemy import Column, DateTime, Text, Integer
@@ -9,6 +7,8 @@ from typing_extensions import final
 
 from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
+from uuid import UUID as uuid_UUID
+from datetime import datetime
 
 
 @final

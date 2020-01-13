@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import text, and_
 from sqlalchemy.sql import select
 from typing_extensions import final
 
@@ -41,6 +41,18 @@ class AuthorizationRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def create_auth_request_state(
+        self,
+        *,
+        state_id: UUID,
+        auth_id: UUID,
+        state: str,
+        subtotal: int,
+        subtotal_tax: int,
+    ) -> AuthRequestState:
+        pass
+
+    @abstractmethod
     async def get_auth_request(self, id: UUID) -> Optional[AuthRequest]:
         pass
 
@@ -51,7 +63,19 @@ class AuthorizationRepositoryInterface(ABC):
     @abstractmethod
     async def get_auth_request_state_by_auth_id(
         self, auth_request_id: UUID
-    ) -> Optional[AuthRequestState]:
+    ) -> List[AuthRequestState]:
+        pass
+
+    @abstractmethod
+    async def get_auth_request_by_delivery_shift_combination(
+        self, delivery_id: str, shift_id: str
+    ) -> Optional[AuthRequest]:
+        pass
+
+    @abstractmethod
+    async def update_auth_request_ttl(
+        self, shift_id: str, delivery_id: str, store_id: str, ttl: int
+    ) -> Optional[AuthRequest]:
         pass
 
 
@@ -126,6 +150,39 @@ class AuthorizationMasterRepository(
 
         return auth_request_entity, auth_request_state_entity
 
+    async def create_auth_request_state(
+        self,
+        *,
+        state_id: UUID,
+        auth_id: UUID,
+        subtotal: int,
+        subtotal_tax: int,
+        state: str,
+    ) -> AuthRequestState:
+        now = datetime.now(timezone.utc)
+
+        auth_request_state_insertion_values = {
+            auth_request_state.id: state_id,
+            auth_request_state.auth_request_id: auth_id,
+            auth_request_state.created_at: now,
+            auth_request_state.updated_at: now,
+            auth_request_state.state: state,
+            auth_request_state.subtotal: subtotal,
+            auth_request_state.subtotal_tax: subtotal_tax,
+        }
+
+        auth_request_state_insertion_stmt = (
+            auth_request_state.table.insert()
+            .values(auth_request_state_insertion_values)
+            .returning(*auth_request_state.table.columns.values())
+        )
+
+        auth_request_state_result = await self._database.master().execute(
+            auth_request_state_insertion_stmt
+        )
+
+        return AuthRequestState.from_row(auth_request_state_result[0])
+
     async def get_auth_request(self, id: UUID) -> Optional[AuthRequest]:
         stmnt = select([text("*")]).where(auth_request.id == id)
 
@@ -142,14 +199,52 @@ class AuthorizationMasterRepository(
 
     async def get_auth_request_state_by_auth_id(
         self, auth_request_id: UUID
-    ) -> Optional[AuthRequestState]:
+    ) -> List[AuthRequestState]:
         stmt = select([text("*")]).where(
             auth_request_state.auth_request_id == auth_request_id
         )
 
-        result = await self._database.master().fetch_one(stmt)
+        results = await self._database.master().fetch_all(stmt)
 
-        return AuthRequestState.from_row(result) if result else None
+        return [AuthRequestState.from_row(result) for result in results]
+
+    async def get_auth_request_by_delivery_shift_combination(
+        self, delivery_id: str, shift_id: str
+    ) -> Optional[AuthRequest]:
+        stmnt = select([text("*")]).where(
+            and_(
+                auth_request.delivery_id == delivery_id,
+                auth_request.shift_id == shift_id,
+            )
+        )
+
+        result = await self._database.master().fetch_one(stmnt)
+
+        return AuthRequest.from_row(result) if result else None
+
+    async def update_auth_request_ttl(
+        self, shift_id: str, delivery_id: str, store_id: str, ttl: int
+    ) -> Optional[AuthRequest]:
+        now = datetime.now(timezone.utc)
+        auth_request_update_values = {
+            auth_request.expire_sec: ttl,
+            auth_request.updated_at: now,
+        }
+
+        statement = (
+            auth_request.table.update()
+            .where(
+                and_(
+                    auth_request.delivery_id == delivery_id,
+                    auth_request.shift_id == shift_id,
+                    auth_request.store_id == store_id,
+                )
+            )
+            .values(auth_request_update_values)
+            .returning(*auth_request.table.columns.values())
+        )
+        result = await self._database.master().fetch_one(statement)
+        return AuthRequest.from_row(result) if result else None
 
 
 @final
@@ -176,6 +271,17 @@ class AuthorizationReplicaRepository(
     ) -> Tuple[AuthRequest, AuthRequestState]:
         raise NonValidReplicaOperation()
 
+    async def create_auth_request_state(
+        self,
+        *,
+        state_id: UUID,
+        auth_id: UUID,
+        state: str,
+        subtotal: int,
+        subtotal_tax: int,
+    ) -> AuthRequestState:
+        raise NonValidReplicaOperation()
+
     async def get_auth_request(self, id: UUID) -> Optional[AuthRequest]:
         stmnt = select([text("*")]).where(auth_request.id == id)
 
@@ -186,17 +292,36 @@ class AuthorizationReplicaRepository(
     async def get_auth_request_state(self, id: UUID) -> Optional[AuthRequestState]:
         stmt = select([text("*")]).where(auth_request_state.id == id)
 
-        result = await self._database.master().fetch_one(stmt)
+        result = await self._database.replica().fetch_one(stmt)
 
         return AuthRequestState.from_row(result) if result else None
 
     async def get_auth_request_state_by_auth_id(
         self, auth_request_id: UUID
-    ) -> Optional[AuthRequestState]:
+    ) -> List[AuthRequestState]:
         stmt = select([text("*")]).where(
             auth_request_state.auth_request_id == auth_request_id
         )
 
-        result = await self._database.master().fetch_one(stmt)
+        results = await self._database.replica().fetch_all(stmt)
 
-        return AuthRequestState.from_row(result) if result else None
+        return [AuthRequestState.from_row(result) for result in results]
+
+    async def get_auth_request_by_delivery_shift_combination(
+        self, delivery_id: str, shift_id: str
+    ) -> Optional[AuthRequest]:
+        stmnt = select([text("*")]).where(
+            and_(
+                auth_request.delivery_id == delivery_id,
+                auth_request.shift_id == shift_id,
+            )
+        )
+
+        result = await self._database.replica().fetch_one(stmnt)
+
+        return AuthRequest.from_row(result) if result else None
+
+    async def update_auth_request_ttl(
+        self, shift_id: str, delivery_id: str, store_id: str, ttl: int
+    ) -> Optional[AuthRequest]:
+        raise NonValidReplicaOperation()

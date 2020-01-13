@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
-from sqlalchemy import Column, DateTime, Text
+from sqlalchemy import Column, DateTime, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from typing_extensions import final
 from datetime import datetime
@@ -26,6 +26,7 @@ class AuthRequestTable(TableDefinition):
     store_id: Column = no_init_field(Column("store_id", Text))
     store_city: Column = no_init_field(Column("store_city", Text))
     store_business_name: Column = no_init_field(Column("store_business_name", Text))
+    expire_sec: Column = no_init_field(Column("expire_sec", Integer))
 
 
 class AuthRequest(DBEntity):
@@ -40,6 +41,8 @@ class AuthRequest(DBEntity):
     store_city: str
     store_business_name: str
 
+    expire_sec: Optional[int]
+
 
 class LegacyAuthRequest(BaseModel):
     id: uuid_UUID
@@ -52,6 +55,8 @@ class LegacyAuthRequest(BaseModel):
     store_id: int
     store_city: str
     store_business_name: str
+
+    expire_sec: Optional[int]
 
     @classmethod
     def to_legacy_auth_request(cls, db_entity_dict: Dict[Any, Any]):
