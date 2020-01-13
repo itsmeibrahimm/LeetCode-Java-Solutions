@@ -1,4 +1,4 @@
-from starlette.status import HTTP_200_OK
+from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from starlette.testclient import TestClient
 
 
@@ -16,3 +16,21 @@ class TestMarqetaTransaction:
         )
         assert response.json()["funded_amount"] == 0
         assert response.status_code == HTTP_200_OK
+
+    def test_has_associated_marqeta_transaction(self, client: TestClient):
+        response = client.get(
+            "/purchasecard/api/v0/marqeta/transaction/associated/15?ignore_timed_out=False"
+        )
+        assert not response.json()["has_marqeta_transaction"]
+        assert response.status_code == HTTP_200_OK
+
+        response = client.get(
+            "/purchasecard/api/v0/marqeta/transaction/associated/15?ignore_timed_out=True"
+        )
+        assert not response.json()["has_marqeta_transaction"]
+        assert response.status_code == HTTP_200_OK
+
+        response = client.get(
+            "/purchasecard/api/v0/marqeta/transaction/associated/fake_delivery_id?ignore_timed_out=False"
+        )
+        assert response.status_code == HTTP_400_BAD_REQUEST

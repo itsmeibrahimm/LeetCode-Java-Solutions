@@ -15,7 +15,7 @@ from app.purchasecard.api.store_metadata.v0.models import (
 from app.purchasecard.container import PurchaseCardContainer
 from app.purchasecard.core.errors import (
     StoreMastercardDataErrorCode,
-    StoreMetadataErrorCode,
+    INPUT_PARAM_INVALID_ERROR_CODE,
 )
 from app.purchasecard.core.store_metadata.models import InternalStoreCardPaymentMetadata
 from app.purchasecard.core.store_metadata.processor import CardPaymentMetadataProcessor
@@ -51,7 +51,7 @@ async def link_store_with_mid(
             == StoreMastercardDataErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR
         ):
             status_code = HTTP_404_NOT_FOUND
-        elif e.error_code == StoreMetadataErrorCode.INVALID_EXEMPTION_INPUT_ERROR:
+        elif e.error_code == INPUT_PARAM_INVALID_ERROR_CODE:
             status_code = HTTP_400_BAD_REQUEST
         else:
             status_code = HTTP_500_INTERNAL_SERVER_ERROR

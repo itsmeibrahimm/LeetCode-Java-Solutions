@@ -1,6 +1,6 @@
 from typing import Optional
 
-from app.purchasecard.core.errors import ExemptionCreationInvalidInputError
+from app.purchasecard.core.utils import enriched_error_parse_int
 from app.purchasecard.repository.delivery_funding import (
     DeliveryFundingRepositoryInterface,
 )
@@ -27,19 +27,16 @@ class ExemptionProcessor:
         dasher_id: Optional[str] = None,
         decline_amount: Optional[int] = None,
     ):
-        try:
-            await self.delivery_funding_repo.create(
-                creator_id=int(creator_id),
-                delivery_id=int(delivery_id),
-                swipe_amount=swipe_amount,
+        await self.delivery_funding_repo.create(
+            creator_id=enriched_error_parse_int(creator_id, "creator id"),
+            delivery_id=enriched_error_parse_int(delivery_id, "delivery id"),
+            swipe_amount=swipe_amount,
+        )
+        if dasher_id and mid and decline_amount:
+            await self.decline_exemption_repo.create(
+                delivery_id=enriched_error_parse_int(delivery_id, "delivery id"),
+                creator_id=enriched_error_parse_int(creator_id, "creator id"),
+                amount=decline_amount,
+                dasher_id=enriched_error_parse_int(creator_id, "dasher id"),
+                mid=mid,
             )
-            if dasher_id and mid and decline_amount:
-                await self.decline_exemption_repo.create(
-                    delivery_id=int(delivery_id),
-                    creator_id=int(creator_id),
-                    amount=decline_amount,
-                    dasher_id=int(dasher_id),
-                    mid=mid,
-                )
-        except ValueError:
-            raise ExemptionCreationInvalidInputError()

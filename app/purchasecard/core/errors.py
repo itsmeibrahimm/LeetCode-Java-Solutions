@@ -36,38 +36,15 @@ class StoreMastercardDataNotFoundError(PaymentError[StoreMastercardDataErrorCode
 ###########################################################
 # JITFunding Errors
 ###########################################################
-class StoreMetadataErrorCode(str, Enum):
-    INVALID_EXEMPTION_INPUT_ERROR = "input_params_invalid"
+INPUT_PARAM_INVALID_ERROR_CODE = "input_params_invalid"
+INVALID_EXEMPTION_INPUT_ERROR_MESSAGE = "Cannot parse given {}"
 
 
-class ExemptionErrorCode(str, Enum):
-    INVALID_EXEMPTION_INPUT_ERROR = "input_params_invalid"
-
-
-jit_funding_error_message_maps = {
-    ExemptionErrorCode.INVALID_EXEMPTION_INPUT_ERROR: "Cannot parse given delivery id, creator id or dasher id",
-    StoreMetadataErrorCode.INVALID_EXEMPTION_INPUT_ERROR: "Cannot parse given store id",
-}
-
-
-class ExemptionCreationInvalidInputError(PurchaseCardError):
-    def __init__(self):
+class PurchaseCardInvalidInputError(PurchaseCardError):
+    def __init__(self, id_param: str):
         super().__init__(
-            error_code=ExemptionErrorCode.INVALID_EXEMPTION_INPUT_ERROR,
-            error_message=jit_funding_error_message_maps[
-                ExemptionErrorCode.INVALID_EXEMPTION_INPUT_ERROR
-            ],
-            retryable=False,
-        )
-
-
-class StoreMetadataInvalidInputError(PurchaseCardError):
-    def __init__(self):
-        super().__init__(
-            error_code=StoreMetadataErrorCode.INVALID_EXEMPTION_INPUT_ERROR,
-            error_message=jit_funding_error_message_maps[
-                StoreMetadataErrorCode.INVALID_EXEMPTION_INPUT_ERROR
-            ],
+            error_code=INPUT_PARAM_INVALID_ERROR_CODE,
+            error_message=INVALID_EXEMPTION_INPUT_ERROR_MESSAGE.format(id_param),
             retryable=False,
         )
 

@@ -7,3 +7,7 @@ class FundableAmountResponse(PaymentResponse):
 
 class FundedAmountResponse(PaymentResponse):
     funded_amount: int
+
+
+class HasAssociatedMarqetaTransactionResponse(PaymentResponse):
+    has_marqeta_transaction: bool

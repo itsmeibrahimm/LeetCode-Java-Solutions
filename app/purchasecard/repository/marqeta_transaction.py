@@ -44,6 +44,12 @@ class MarqetaTransactionRepositoryInterface(ABC):
     async def get_funded_amount_by_delivery_id(self, delivery_id: int) -> int:
         pass
 
+    @abstractmethod
+    async def has_associated_marqeta_transaction(
+        self, delivery_id: int, ignore_timed_out: bool
+    ) -> bool:
+        pass
+
 
 @final
 @tracing.track_breadcrumb(repository_name="marqeta_transaction")
@@ -139,3 +145,20 @@ class MarqetaTransactionRepository(
             return 0
         # sqlalchemy would return a tuple here
         return row._row_proxy[0]  # type: ignore
+
+    async def has_associated_marqeta_transaction(
+        self, delivery_id: int, ignore_timed_out: bool
+    ) -> bool:
+        if ignore_timed_out:
+            stmt = select([text("count(*)")]).where(
+                marqeta_transactions.delivery_id == delivery_id
+            )
+        else:
+            stmt = select([text("count(*)")]).where(
+                and_(
+                    marqeta_transactions.delivery_id == delivery_id,
+                    marqeta_transactions.timed_out == False,
+                )
+            )
+        result = await self._database.replica().fetch_value(stmt)
+        return True if result else False

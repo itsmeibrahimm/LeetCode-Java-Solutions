@@ -10,7 +10,7 @@ from app.commons.core.errors import PaymentError
 from app.purchasecard.api.exemption.v0.models import CreateExemptionRequest
 
 from app.purchasecard.container import PurchaseCardContainer
-from app.purchasecard.core.errors import ExemptionErrorCode
+from app.purchasecard.core.errors import INPUT_PARAM_INVALID_ERROR_CODE
 from app.purchasecard.core.exemption.processor import ExemptionProcessor
 
 api_tags = ["ExemptionV0"]
@@ -42,7 +42,7 @@ async def create_exemption(
             decline_amount=request.declined_amount,
         )
     except PaymentError as e:
-        if e.error_code == ExemptionErrorCode.INVALID_EXEMPTION_INPUT_ERROR:
+        if e.error_code == INPUT_PARAM_INVALID_ERROR_CODE:
             status_code = HTTP_400_BAD_REQUEST
         else:
             status_code = HTTP_500_INTERNAL_SERVER_ERROR

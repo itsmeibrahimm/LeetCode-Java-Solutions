@@ -1,10 +1,8 @@
 from datetime import datetime
 
-from app.purchasecard.core.errors import (
-    StoreMastercardDataNotFoundError,
-    StoreMetadataInvalidInputError,
-)
+from app.purchasecard.core.errors import StoreMastercardDataNotFoundError
 from app.purchasecard.core.store_metadata.models import InternalStoreCardPaymentMetadata
+from app.purchasecard.core.utils import enriched_error_parse_int
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepositoryInterface,
 )
@@ -19,10 +17,7 @@ class CardPaymentMetadataProcessor:
     async def create_or_update_store_card_payment_metadata(
         self, store_id: str, mid: str, mname: str
     ) -> InternalStoreCardPaymentMetadata:
-        try:
-            parsed_store_id = int(store_id)
-        except ValueError:
-            raise StoreMetadataInvalidInputError()
+        parsed_store_id = enriched_error_parse_int(store_id, "store id")
 
         existing_record_id = await self.store_mastercard_data_repo.get_store_mastercard_data_id_by_store_id_and_mid(
             store_id=parsed_store_id, mid=mid

@@ -65,3 +65,51 @@ class TestMarqetaTransactionRepository:
             delivery_id_2
         )
         assert result == self.TEST_AMOUNT3
+
+    async def test_no_marqeta_transaction_associated_with_delivery(
+        self, marqeta_transaction_repo
+    ):
+        delivery_id = random.randint(100000, 5000000)
+        result = await marqeta_transaction_repo.has_associated_marqeta_transaction(
+            delivery_id=delivery_id, ignore_timed_out=True
+        )
+        assert not result
+        result = await marqeta_transaction_repo.has_associated_marqeta_transaction(
+            delivery_id=delivery_id, ignore_timed_out=False
+        )
+        assert not result
+
+    async def test_marqeta_transaction_associated_with_delivery(
+        self, marqeta_transaction_repo
+    ):
+        delivery_id = random.randint(100000, 5000000)
+        await prepare_and_insert_marqeta_transaction_data(
+            marqeta_tx_repo=marqeta_transaction_repo,
+            token=str(uuid4()),
+            amount=self.TEST_AMOUNT1,
+            delivery_id=delivery_id,
+            card_acceptor="1",
+            timed_out=None,
+            swiped_at=None,
+        )
+        result = await marqeta_transaction_repo.has_associated_marqeta_transaction(
+            delivery_id=delivery_id, ignore_timed_out=True
+        )
+        assert result
+        result = await marqeta_transaction_repo.has_associated_marqeta_transaction(
+            delivery_id=delivery_id, ignore_timed_out=False
+        )
+        assert not result
+        await prepare_and_insert_marqeta_transaction_data(
+            marqeta_tx_repo=marqeta_transaction_repo,
+            token=str(uuid4()),
+            amount=self.TEST_AMOUNT1,
+            delivery_id=delivery_id,
+            card_acceptor="1",
+            timed_out=False,
+            swiped_at=None,
+        )
+        result = await marqeta_transaction_repo.has_associated_marqeta_transaction(
+            delivery_id=delivery_id, ignore_timed_out=False
+        )
+        assert result
