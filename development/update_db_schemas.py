@@ -2,6 +2,7 @@ import asyncio
 from asyncio import create_subprocess_exec
 
 from app.commons.config.app_config import AppConfig
+from app.commons.config.secrets import ninox_readiness_check
 from app.commons.config.utils import init_app_config_for_web
 
 
@@ -61,6 +62,7 @@ async def update_test_db_schema(app_config: AppConfig):
 
 
 async def main():
+    ninox_readiness_check()
     app_config = init_app_config_for_web()
     await update_test_db_schema(app_config)
 

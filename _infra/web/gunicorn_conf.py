@@ -12,6 +12,18 @@ max_requests = 10000
 max_requests_jitter = 500
 
 
+def on_starting(server):
+    """
+    Only check ninox connection readiness before master process being initialized. so that:
+    1. we don't need to spam duplicate readiness check in worker processes
+    2. the blocking readiness check call won't cause worker being considered timeout and killed be master
+
+    """
+    from app.commons.config.secrets import ninox_readiness_check
+
+    ninox_readiness_check()
+
+
 def post_fork(server, worker):
     import os
 

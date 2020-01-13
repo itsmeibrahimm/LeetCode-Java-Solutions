@@ -1,10 +1,10 @@
 import os
+import time
 from abc import ABC
 from dataclasses import dataclass, replace
 from typing import Optional
 
 from ninox.interface.helper import Helper
-from tenacity import retry, stop_after_attempt, wait_fixed
 from typing_extensions import final
 
 from app.commons.context.logger import init_logger as log
@@ -42,14 +42,44 @@ class Secret:
         return cls(name=name, version=None, value=value)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_fixed(3))
-def _init_ninox_with_retry(config_section: str) -> Helper:
+def init_ninox_client(config_section: str) -> Helper:
     ninox = Helper(config_section=config_section)
     if ninox.disabled:
         # Ninox helper internally set itself to disabled when init fails without raising exception.
         # We should fail fast here to prevent unknown service state at runtime.
         raise Helper.DisabledError("Ninox initialization failed")
     return ninox
+
+
+def ninox_readiness_check() -> bool:
+    """
+    A blocking function call to check if ninox can be successfully initialized with retries.
+    In prod, it currently could take up to 15 mins for a pod get IP assigned and being able to talk to kube2iam.
+    !! this is only a workaround to allow worker processes start after ninox is ready !!
+    """
+
+    environment = os.environ.get("ENVIRONMENT", "unknown")
+    if environment in ["prod", "staging"]:
+        print(f"Start ninox readiness check for environment={environment}")
+
+        timeout_sec = 15 * 60  # 15 mins.
+        retry_interval_sec = 30
+        max_retry = int(timeout_sec / retry_interval_sec)
+
+        for attempt in range(1, max_retry + 1):
+            print(f"checking ninox readiness attempt #{attempt}")
+            try:
+                init_ninox_client(config_section=environment)
+                break
+            except Exception as e:
+                if attempt == max_retry:
+                    raise ValueError(
+                        f"Ninox was not ready within in {timeout_sec} seconds"
+                    ) from e
+                print(f"retry after {retry_interval_sec} seconds")
+                time.sleep(retry_interval_sec)
+        print(f"Ninox is ready")
+    return True
 
 
 class SecretLoader:
@@ -63,7 +93,7 @@ class SecretLoader:
 
     def __init__(self, *, environment: str):
         try:
-            self.ninox = _init_ninox_with_retry(config_section=environment)
+            self.ninox = init_ninox_client(config_section=environment)
         except Exception:
             log.exception("ninox initialization failed")
             raise
