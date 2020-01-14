@@ -23,7 +23,7 @@ target_metadata = None
 
 # A separate version table is used so that areas within payment can manage
 # schema independently.
-version_table = "alembic_version_payout"
+version_table = "alembic_version_realpayout"
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

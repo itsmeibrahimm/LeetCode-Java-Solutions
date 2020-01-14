@@ -35,10 +35,12 @@ EOSQL
 echo "Initializing paymentdb copies"
 for dbname in "${paymentdb_copies[@]}"; do
 createdb --username=root ${dbname}
-# Only grant access of payment DB for $payin_db_user and $ledger_db_user
+# Only grant access of payment DB for $payin_db_user and $ledger_db_user $payout_db_user
 psql -v ON_ERROR_STOP=1 --username root --dbname ${dbname} <<-EOSQL
     GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${payin_db_user};
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payin_db_user};
+    GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${payout_db_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${payout_db_user};
     GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${ledger_db_user};
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${ledger_db_user};
     GRANT INSERT, SELECT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${purchasecard_db_user};

@@ -1,1 +1,12 @@
-Generic single-database configuration.
+Schema migrations for payout.
+
+To create migration locally, from root of repo, run:
+  alembic --config migrations/alembic.ini --name payout revision -m "create payout table"
+
+Note the --name option above; it is what distinguishes which sub directory of migrations that
+generated schema file will be placed in.
+
+To apply migrations locally, from root of repo, run:
+  env PAYOUT_PAYMENTDB_URL=postgresql://payout_user@0.0.0.0:5435/<paymentdb_test | paymentdb_dev> alembic --config migrations/alembic.ini --name payout upgrade head
+
+The above is only necessary for local testing until a migration target is added into the Makefile.

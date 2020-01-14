@@ -41,6 +41,8 @@ def create_app_config() -> AppConfig:
         PAYOUT_MAINDB_REPLICA_URL=Secret(name="payout_maindb_replica_url"),
         PAYOUT_BANKDB_MASTER_URL=Secret(name="payout_bankdb_url"),
         PAYOUT_BANKDB_REPLICA_URL=Secret(name="payout_bankdb_replica_url"),
+        PAYOUT_PAYMENTDB_MASTER_URL=Secret(name="payout_paymentdb_url"),
+        PAYOUT_PAYMENTDB_REPLICA_URL=Secret(name="payout_paymentdb_replica_url"),
         LEDGER_MAINDB_MASTER_URL=Secret(name="ledger_maindb_url"),
         LEDGER_MAINDB_REPLICA_URL=Secret(name="ledger_maindb_replica_url"),
         LEDGER_PAYMENTDB_MASTER_URL=Secret(name="ledger_paymentdb_url"),

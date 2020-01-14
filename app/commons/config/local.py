@@ -72,6 +72,14 @@ def create_app_config() -> AppConfig:
             name="payout_bankdb_url",
             value=f"postgresql://payout_user@{dsj_db_endpoint}/bankdb_dev",
         ),
+        PAYOUT_PAYMENTDB_MASTER_URL=Secret(
+            name="payout_paymentdb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/paymentdb_dev",
+        ),
+        PAYOUT_PAYMENTDB_REPLICA_URL=Secret(
+            name="payout_paymentdb_url",
+            value=f"postgresql://payout_user@{dsj_db_endpoint}/paymentdb_dev",
+        ),
         LEDGER_MAINDB_MASTER_URL=Secret(
             name="ledger_maindb_url",
             value=f"postgresql://ledger_user@{dsj_db_endpoint}/maindb_dev",

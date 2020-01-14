@@ -60,6 +60,11 @@ async def update_test_db_schema(app_config: AppConfig):
     )
     await run_alembic_command(purchasecard_db_url, "purchasecard")
 
+    payout_db_url = "PAYOUT_PAYMENTDB_URL={}".format(
+        app_config.PAYOUT_PAYMENTDB_MASTER_URL.value
+    )
+    await run_alembic_command(payout_db_url, "payout")
+
 
 async def main():
     ninox_readiness_check()
