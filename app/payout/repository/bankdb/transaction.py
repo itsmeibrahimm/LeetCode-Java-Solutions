@@ -439,7 +439,8 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
     async def update_transaction_ids_without_transfer_id(
         self, transaction_ids: List[int], data: TransactionUpdateDBEntity
     ) -> List[TransactionDBEntity]:
-        stmt = (
+        override_stmt_timeout_in_ms = 10 * 1000
+        update_transaction_stmt = (
             transactions.table.update()
             .where(
                 and_(
@@ -450,5 +451,12 @@ class TransactionRepository(PayoutBankDBRepository, TransactionRepositoryInterfa
             .values(data.dict(skip_defaults=True), updated_at=datetime.utcnow())
             .returning(*transactions.table.columns.values())
         )
-        rows = await self._database.master().fetch_all(stmt)
+        override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
+            override_stmt_timeout_in_ms
+        )
+
+        async with self._database.master().transaction() as transaction:
+            await transaction.connection().execute(override_stmt_timeout_stmt)
+            rows = await transaction.connection().fetch_all(update_transaction_stmt)
+
         return [TransactionDBEntity.from_row(row) for row in rows] if rows else []
