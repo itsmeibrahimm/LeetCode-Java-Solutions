@@ -288,7 +288,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
         retry_count=config.REDIS_LOCK_MAX_RETRY,
     )
 
-    redis_cluster = StrictRedisCluster(startup_nodes=config.REDIS_CLUSTER_INSTANCES)
+    redis_cluster = StrictRedisCluster(
+        startup_nodes=config.REDIS_CLUSTER_INSTANCES, skip_full_coverage_check=True
+    )
 
     kafka_producer_config = {"bootstrap.servers": config.KAFKA_URL}
     if (
