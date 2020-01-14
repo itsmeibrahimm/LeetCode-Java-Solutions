@@ -43,3 +43,12 @@ class UpdateAuthResponse(PaymentResponse):
     delivery_id: str
     updated_at: datetime
     state: str
+
+
+class CloseAuthRequest(BaseModel):
+    delivery_id: str
+    shift_id: str
+
+
+class CloseAuthResponse(BaseModel):
+    state: str

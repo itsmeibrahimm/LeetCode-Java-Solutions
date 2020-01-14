@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import uuid4
 
 from structlog import BoundLogger
@@ -8,11 +8,18 @@ from app.purchasecard.core.auth.models import (
     InternalCreateAuthResponse,
     UpdatedAuthorization,
 )
-from app.purchasecard.core.errors import AuthRequestNotFoundError
+from app.purchasecard.core.errors import (
+    AuthRequestNotFoundError,
+    AuthRequestInconsistentStateError,
+)
 from app.purchasecard.marqeta_external.marqeta_provider_client import (
     MarqetaProviderClient,
 )
-from app.purchasecard.models.paymentdb.auth_request_state import AuthRequestStateName
+from app.purchasecard.models.paymentdb.auth_request import AuthRequest
+from app.purchasecard.models.paymentdb.auth_request_state import (
+    AuthRequestStateName,
+    AuthRequestState,
+)
 from app.purchasecard.repository.authorization_repository import (
     AuthorizationRepositoryInterface,
 )
@@ -106,3 +113,39 @@ class AuthProcessor:
             delivery_id=delivery_id,
             shift_id=shift_id,
         )
+
+    async def close_auth(self, delivery_id: str, shift_id: str) -> AuthRequestStateName:
+        auth_request: Optional[
+            AuthRequest
+        ] = await self.authorization_master_repo.get_auth_request_by_delivery_shift_combination(
+            delivery_id=delivery_id, shift_id=shift_id
+        )
+
+        if not auth_request:
+            raise AuthRequestNotFoundError()
+
+        auth_request_states: List[
+            AuthRequestState
+        ] = await self.authorization_master_repo.get_auth_request_state_by_auth_id(
+            auth_request_id=auth_request.id
+        )
+
+        def sort_date(val: AuthRequestState):
+            return val.created_at
+
+        if len(auth_request_states) == 0:
+            raise AuthRequestInconsistentStateError()
+
+        # Getting the latest auth request state. There should be a limited amount of these states and adding a compound index
+        # may not be worth it. TBD
+        auth_request_states.sort(key=sort_date, reverse=True)
+
+        created_state: AuthRequestState = await self.authorization_master_repo.create_auth_request_state(
+            state_id=uuid4(),
+            auth_id=auth_request.id,
+            state=AuthRequestStateName.CLOSED_MANUAL,
+            subtotal=auth_request_states[0].subtotal,
+            subtotal_tax=auth_request_states[0].subtotal_tax,
+        )
+
+        return created_state.state

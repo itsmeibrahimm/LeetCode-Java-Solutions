@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends
+
+from app.purchasecard.api.auth.v0.models import UpdateAuthResponse, UpdateAuthRequest
 from starlette.status import (
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_201_CREATED,
@@ -11,8 +13,8 @@ from app.commons.core.errors import PaymentError
 from app.purchasecard.api.auth.v0.models import (
     CreateAuthResponse,
     CreateAuthRequest,
-    UpdateAuthResponse,
-    UpdateAuthRequest,
+    CloseAuthResponse,
+    CloseAuthRequest,
 )
 from app.purchasecard.container import PurchaseCardContainer
 from app.purchasecard.core.auth.models import (
@@ -22,6 +24,7 @@ from app.purchasecard.core.auth.models import (
 )
 from app.purchasecard.core.auth.processor import AuthProcessor
 from app.purchasecard.core.errors import AuthProcessorErrorCodes
+from app.purchasecard.models.paymentdb.auth_request_state import AuthRequestStateName
 
 api_tags = ["AuthV0"]
 router = APIRouter()
@@ -102,6 +105,35 @@ async def update_auth(
             updated_at=result.updated_at,
             state=result.state,
         )
+    except PaymentError as e:
+        status = HTTP_500_INTERNAL_SERVER_ERROR
+        if e.error_code == AuthProcessorErrorCodes.AUTH_REQUEST_NOT_FOUND_ERROR:
+            status = HTTP_404_NOT_FOUND
+        raise PaymentException(
+            http_status_code=status,
+            error_code=e.error_code,
+            error_message=e.error_message,
+            retryable=e.retryable,
+        )
+
+
+@router.post(
+    "/close",
+    status_code=HTTP_200_OK,
+    operation_id="CloseAuth",
+    response_model=CloseAuthResponse,
+    tags=api_tags,
+)
+async def close_auth(
+    request: CloseAuthRequest,
+    container: PurchaseCardContainer = Depends(PurchaseCardContainer),
+):
+    try:
+        auth_processor: AuthProcessor = container.auth_processor
+        result: AuthRequestStateName = await auth_processor.close_auth(
+            delivery_id=request.delivery_id, shift_id=request.shift_id
+        )
+        return CloseAuthResponse(state=result)
     except PaymentError as e:
         status = HTTP_500_INTERNAL_SERVER_ERROR
         if e.error_code == AuthProcessorErrorCodes.AUTH_REQUEST_NOT_FOUND_ERROR:

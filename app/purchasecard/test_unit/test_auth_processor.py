@@ -9,6 +9,10 @@ from app.purchasecard.core.auth.models import (
     InternalStoreInfo,
 )
 from app.purchasecard.core.auth.processor import AuthProcessor
+from app.purchasecard.core.errors import (
+    AuthRequestInconsistentStateError,
+    AuthRequestNotFoundError,
+)
 from app.purchasecard.models.paymentdb.auth_request import AuthRequest
 from app.purchasecard.models.paymentdb.auth_request_state import (
     AuthRequestState,
@@ -169,3 +173,113 @@ class TestAuthProcessor:
 
         assert result_with_ttl.state == AuthRequestStateName.ACTIVE_UPDATED
         assert result_without_ttl.state == AuthRequestStateName.ACTIVE_UPDATED
+
+    async def test_close_auth(self):
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination = (
+            CoroutineMock()
+        )
+        self.auth_processor.authorization_master_repo.get_auth_request_state_by_auth_id = (
+            CoroutineMock()
+        )
+        self.auth_processor.authorization_master_repo.create_auth_request_state = (
+            CoroutineMock()
+        )
+
+        UUID_ONE = uuid4()
+        UUID_TWO = uuid4()
+        UUID_THREE = uuid4()
+        UUID_FOUR = uuid4()
+        now = datetime.now(timezone.utc)
+
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = AuthRequest(
+            id=UUID_ONE,
+            created_at=now,
+            updated_at=now + timedelta(hours=1),
+            shift_id="4",
+            delivery_id="5",
+            dasher_id=None,
+            store_id="3",
+            store_city="Milpitas",
+            store_business_name="Burger King",
+            expire_sec=None,
+        )
+
+        self.auth_processor.authorization_master_repo.get_auth_request_state_by_auth_id.return_value = [
+            AuthRequestState(
+                id=UUID_THREE,
+                auth_request_id=UUID_ONE,
+                created_at=now + timedelta(microseconds=1),
+                updated_at=now - timedelta(microseconds=1),
+                state=AuthRequestStateName.ACTIVE_UPDATED,
+                subtotal=10,
+                subtotal_tax=20,
+            ),
+            AuthRequestState(
+                id=UUID_TWO,
+                auth_request_id=UUID_ONE,
+                created_at=now + timedelta(microseconds=4),
+                updated_at=now - timedelta(microseconds=4),
+                state=AuthRequestStateName.ACTIVE_UPDATED,
+                subtotal=2000,
+                subtotal_tax=17,
+            ),
+            AuthRequestState(
+                id=UUID_TWO,
+                auth_request_id=UUID_ONE,
+                created_at=now,
+                updated_at=now,
+                state=AuthRequestStateName.ACTIVE_UPDATED,
+                subtotal=9,
+                subtotal_tax=20,
+            ),
+        ]
+
+        self.auth_processor.authorization_master_repo.create_auth_request_state.return_value = AuthRequestState(
+            id=UUID_FOUR,
+            auth_request_id=UUID_ONE,
+            created_at=now,
+            updated_at=now,
+            state=AuthRequestStateName.CLOSED_MANUAL,
+            subtotal=10,
+            subtotal_tax=20,
+        )
+
+        result_state: AuthRequestStateName = await self.auth_processor.close_auth(
+            delivery_id="5", shift_id="4"
+        )
+
+        assert result_state == AuthRequestStateName.CLOSED_MANUAL
+        assert (
+            self.auth_processor.authorization_master_repo.create_auth_request_state.call_count
+            == 1
+        )
+        assert (
+            self.auth_processor.authorization_master_repo.create_auth_request_state.call_args[
+                1
+            ][
+                "subtotal"
+            ]
+            == 2000
+        )
+        assert (
+            self.auth_processor.authorization_master_repo.create_auth_request_state.call_args[
+                1
+            ][
+                "subtotal_tax"
+            ]
+            == 17
+        )
+
+        self.auth_processor.authorization_master_repo.get_auth_request_state_by_auth_id.return_value = (
+            []
+        )
+
+        with pytest.raises(AuthRequestInconsistentStateError):
+            await self.auth_processor.close_auth(delivery_id="5", shift_id="4")
+
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = (
+            None
+        )
+
+        with pytest.raises(AuthRequestNotFoundError):
+            await self.auth_processor.close_auth(delivery_id="5", shift_id="4")
