@@ -119,16 +119,25 @@ weekly_create_transfer_thursday = WeeklyCreateTransferJob(
     payout_country_timezone=pytz.timezone("US/Pacific"),
     payout_day=PayoutDay.THURSDAY,
 )
-scheduler.add_job(
-    func=weekly_create_transfer_thursday.run,
-    name=weekly_create_transfer_thursday.job_name,
-    trigger=CronTrigger(
-        day_of_week="thu",
-        hour="1, 4",
-        minute="10",
-        timezone=pytz.timezone("US/Pacific"),
-    ),
-)
+
+# Have a faster iteration in staging for easier debugging purpose
+if app_config.ENVIRONMENT == "prod":
+    scheduler.add_job(
+        func=weekly_create_transfer_thursday.run,
+        name=weekly_create_transfer_thursday.job_name,
+        trigger=CronTrigger(
+            day_of_week="thu",
+            hour="1, 4",
+            minute="10",
+            timezone=pytz.timezone("US/Pacific"),
+        ),
+    )
+elif app_config.ENVIRONMENT == "staging":
+    scheduler.add_job(
+        func=weekly_create_transfer_thursday.run,
+        name=weekly_create_transfer_thursday.job_name,
+        trigger=CronTrigger(minute="*/30"),
+    )
 
 weekly_create_transfer_monday = WeeklyCreateTransferJob(
     app_context=app_context,
@@ -137,16 +146,19 @@ weekly_create_transfer_monday = WeeklyCreateTransferJob(
     payout_country_timezone=pytz.timezone("US/Pacific"),
     payout_day=PayoutDay.MONDAY,
 )
-scheduler.add_job(
-    func=weekly_create_transfer_monday.run,
-    name=weekly_create_transfer_monday.job_name,
-    trigger=CronTrigger(
-        day_of_week="mon",
-        hour="1, 3",
-        minute="10",
-        timezone=pytz.timezone("US/Pacific"),
-    ),
-)
+
+# Only enable Monday payout cron on prod
+if app_config.ENVIRONMENT == "prod":
+    scheduler.add_job(
+        func=weekly_create_transfer_monday.run,
+        name=weekly_create_transfer_monday.job_name,
+        trigger=CronTrigger(
+            day_of_week="mon",
+            hour="1, 3",
+            minute="10",
+            timezone=pytz.timezone("US/Pacific"),
+        ),
+    )
 
 scheduler.add_job(
     scheduler_heartbeat,
