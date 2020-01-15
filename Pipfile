@@ -41,7 +41,7 @@ kafka-python = "==1.4.7"
 
 [packages]
 doordash-python-lib = {version = "==0.10.2",index = "gemfury"}
-ninox = {version = "*",index = "gemfury",extras = ["py3", "CLI"]}
+ninox = {version = "==20191108",index = "gemfury",extras = ["py3", "CLI"]}
 fastapi = "==0.38.1"
 uvicorn = "==0.10.8"
 gunicorn = "==19.9.0"

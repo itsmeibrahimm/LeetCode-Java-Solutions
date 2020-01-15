@@ -18,7 +18,10 @@ from app.commons.context.req_context import (
     ReqContext,
 )
 from app.commons.lock.locks import PaymentLock, PaymentLockAcquireError
-from app.commons.operational_flags import ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND
+from app.commons.operational_flags import (
+    ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND,
+    SET_ON_BE_HALF_OF_FOR_FLOW_OF_FUNDS,
+)
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.constants import STRIPE_PLATFORM_ACCOUNT_IDS
@@ -1010,6 +1013,16 @@ class CartPaymentInterface:
                 intent_request.transfer_data = TransferData(
                     destination=ConnectedAccountId(pgp_payment_intent.payout_account_id)
                 )
+
+                if runtime.get_bool(SET_ON_BE_HALF_OF_FOR_FLOW_OF_FUNDS, True):
+                    self.req_context.log.info(
+                        "[submit_payment_to_provider] set on_behalf_of for flow of funds charge",
+                        pgp_intent_id=pgp_payment_intent.id,
+                        destination_account_id=pgp_payment_intent.payout_account_id,
+                    )
+                    intent_request.on_behalf_of = ConnectedAccountId(
+                        pgp_payment_intent.payout_account_id
+                    )
 
             self.req_context.log.debug(
                 "[submit_payment_to_provider] Calling provider to create payment intent"

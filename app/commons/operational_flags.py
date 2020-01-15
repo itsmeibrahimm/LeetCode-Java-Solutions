@@ -7,6 +7,8 @@ ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND = (
     "ops/enabled_small_amount_capture_then_refund.bool"
 )
 
+SET_ON_BE_HALF_OF_FOR_FLOW_OF_FUNDS = "ops/set_on_behalf_of_for_flow_of_funds.bool"
+
 ENABLED_PAYOUT_HANDLE_STRIPE_TRANSFER_EVENT = (
     "payout_handle_stripe_transfer_event_enabled.bool"
 )
