@@ -144,8 +144,10 @@ class RawPayer:
                     payer_reference_id=self.payer_entity.payer_reference_id,
                     payer_reference_id_type=self.payer_entity.payer_reference_id_type,
                 ),
-                legacy_dd_stripe_customer_id=str(
-                    self.payer_entity.legacy_dd_stripe_customer_id
+                legacy_dd_stripe_customer_id=(
+                    str(self.payer_entity.legacy_dd_stripe_customer_id)
+                    if self.payer_entity.legacy_dd_stripe_customer_id
+                    else None
                 ),
                 default_payment_method_id=self.payer_entity.default_payment_method_id,
                 default_dd_stripe_card_id=self.payer_entity.legacy_default_dd_stripe_card_id,
@@ -163,7 +165,11 @@ class RawPayer:
                 # created_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 # updated_at=datetime.utcnow(),  # FIXME: ensure payer lazy creation
                 country=self.stripe_customer_entity.country_shortname,
-                legacy_dd_stripe_customer_id=str(self.stripe_customer_entity.id),
+                legacy_dd_stripe_customer_id=(
+                    str(self.stripe_customer_entity.id)
+                    if self.stripe_customer_entity.id
+                    else None
+                ),
                 payer_correlation_ids=PayerCorrelationIds(
                     payer_reference_id=str(self.stripe_customer_entity.owner_id),
                     payer_reference_id_type=owner_type_to_payer_reference_id_type(

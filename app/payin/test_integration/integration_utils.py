@@ -132,6 +132,10 @@ def create_payer_v1(
     assert payer["created_at"]
     assert payer["updated_at"]
     assert payer["deleted_at"] is None
+    if request.payer_reference_id_type == "dd_consumer_id":
+        assert payer["legacy_dd_stripe_customer_id"] is None
+    else:
+        assert payer["legacy_dd_stripe_customer_id"] is not None
     assert (
         payer["payer_correlation_ids"]["payer_reference_id"]
         == request.payer_reference_id
