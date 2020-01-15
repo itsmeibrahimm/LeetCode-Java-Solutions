@@ -11,3 +11,15 @@ def cart_payment_update_locking_enabled() -> bool:
     return runtime.get_bool(
         "payin/feature-flags/enable_payin_cart_payment_update_locking.bool", False
     )
+
+
+def enable_delete_payer_processing() -> bool:
+    return runtime.get_bool(
+        "payin/feature-flags/enable_delete_payer_processing.bool", False
+    )
+
+
+def enable_delete_payer_request_ingestion() -> bool:
+    return runtime.get_bool(
+        "payin/feature-flags/enable_delete_payer_request_ingestion.bool", False
+    )

@@ -37,6 +37,7 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payer.v0.processor import DeletePayerProcessor
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PgpPaymentInfo
@@ -883,3 +884,16 @@ def payment_method_processor():
         payment_method_client=MagicMock(), log=MagicMock()
     )
     return payment_method_processor
+
+
+@pytest.fixture
+def delete_payer_processor() -> DeletePayerProcessor:
+    return DeletePayerProcessor(
+        cart_payment_interface=cart_payment_interface,
+        payer_client=create_autospec(PayerClient),
+        payment_method_client=payment_method_client,
+        max_retries=5,
+        log=MagicMock(),
+        app_context=MagicMock(),
+        legacy_payment_interface=legacy_payment_interface,
+    )

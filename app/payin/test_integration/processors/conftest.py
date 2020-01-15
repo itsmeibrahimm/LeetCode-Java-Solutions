@@ -13,7 +13,7 @@ from app.payin.core.cart_payment.processor import (
     LegacyPaymentInterface,
 )
 from app.payin.core.payer.payer_client import PayerClient
-from app.payin.core.payer.v0.processor import PayerProcessorV0
+from app.payin.core.payer.v0.processor import PayerProcessorV0, DeletePayerProcessor
 from app.payin.core.payer.v1.processor import PayerProcessorV1
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
@@ -190,6 +190,26 @@ def payment_method_processor(
         app_ctxt=app_context,
         payment_method_client=payment_method_client,
         payer_client=payer_client,
+    )
+
+
+@pytest.fixture
+def delete_payer_processor(
+    app_context: AppContext,
+    req_context: ReqContext,
+    payer_client: PayerClient,
+    payment_method_client: PaymentMethodClient,
+    cart_payment_interface: CartPaymentInterface,
+    legacy_payment_interface: LegacyPaymentInterface,
+) -> DeletePayerProcessor:
+    return DeletePayerProcessor(
+        max_retries=5,
+        log=req_context.log,
+        app_context=app_context,
+        payer_client=payer_client,
+        payment_method_client=payment_method_client,
+        cart_payment_interface=cart_payment_interface,
+        legacy_payment_interface=legacy_payment_interface,
     )
 
 
