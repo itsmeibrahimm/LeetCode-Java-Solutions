@@ -184,6 +184,7 @@ class PayoutTask(str, Enum):
     WEEKLY_CREATE_TRANSFER = "weekly_create_transfer"
     CREATE_TRANSFER = "create_transfer"
     SUBMIT_TRANSFER = "submit_transfer"
+    MONITOR_TRANSFER_WITH_INCORRECT_STATUS = "monitor_transfer_with_incorrect_status"
 
 
 # Transactions

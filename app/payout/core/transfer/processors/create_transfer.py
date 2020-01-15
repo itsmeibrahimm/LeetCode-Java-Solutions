@@ -492,7 +492,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     ) -> payout_models.PayoutDay:
         if payment_account.entity == Entity.DASHER:
             return payout_models.PayoutDay.MONDAY
-        elif payment_account.entity in (Entity.STORE, Entity.MERCHANT):
+        elif payment_account.entity in (Entity.STORE.value, Entity.MERCHANT.value):
             for payout_day in payout_models.PayoutDay:
                 # go through payment account ids for each payout day
                 # check whether given id is in payment_account_ids of current payout_day

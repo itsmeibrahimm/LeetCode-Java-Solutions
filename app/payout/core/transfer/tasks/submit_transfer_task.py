@@ -32,8 +32,8 @@ class SubmitTransferTask(BaseTask):
     ):
         self.topic_name = "payment_stripe"
         self.task_type = PayoutTask.SUBMIT_TRANSFER
-        max_retries: int = 0
-        attempts: int = 5
+        max_retries: int = 5
+        attempts: int = 0
         fn_args: list = []
         super().__init__(
             self.topic_name,

@@ -20,15 +20,23 @@ from app.payout.core.transfer.processors.submit_transfer import (
 from app.payout.core.transfer.processors.weekly_create_transfer import (
     WeeklyCreateTransferRequest,
 )
+from app.payout.core.transfer.tasks.monitor_transfer_with_incorrect_status_task import (
+    MonitorTransferWithIncorrectStatusTask,
+)
 from app.payout.core.transfer.tasks.weekly_create_transfer_task import (
     WeeklyCreateTransferTask,
 )
 from app.payout.models import PayoutDay, TransferMethodType
 from app.payout.repository.bankdb.transaction import TransactionRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
+from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
+from app.payout.repository.maindb.transfer import TransferRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_and_insert_transaction,
+    prepare_and_insert_transfer,
+    mock_payout,
+    prepare_and_insert_stripe_transfer,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -80,6 +88,14 @@ class TestKafkaWorker:
     @pytest.fixture
     def transaction_repo(self, payout_bankdb: DB) -> TransactionRepository:
         return TransactionRepository(database=payout_bankdb)
+
+    @pytest.fixture
+    def transfer_repo(self, payout_maindb: DB) -> TransferRepository:
+        return TransferRepository(database=payout_maindb)
+
+    @pytest.fixture
+    def stripe_transfer_repo(self, payout_maindb: DB) -> StripeTransferRepository:
+        return StripeTransferRepository(database=payout_maindb)
 
     async def test_success(
         self,
@@ -279,3 +295,79 @@ class TestKafkaWorker:
                 "exclude_recently_updated_accounts": False,
             }
         assert mocked_init_weekly_create_transfer.call_count == 6
+
+    async def test_monitor_transfers_with_incorrect_status_task_success(
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repo: PaymentAccountRepository,
+        transfer_repo: TransferRepository,
+        stripe_transfer_repo: StripeTransferRepository,
+    ):
+        mocked_payout = mock_payout(status="paid")
+
+        @asyncio.coroutine
+        def mock_retrieve_payout(*args, **kwargs):
+            return mocked_payout
+
+        mocker.patch(
+            "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_payout",
+            side_effect=mock_retrieve_payout,
+        )
+
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=transfer_repo,
+            payment_account_id=payment_account.id,
+            status="pending",
+        )
+        stripe_transfer = await prepare_and_insert_stripe_transfer(
+            stripe_transfer_repo=stripe_transfer_repo,
+            transfer_id=transfer.id,
+            stripe_status="pending",
+            stripe_id=mocked_payout.id,
+        )
+
+        @asyncio.coroutine
+        def mock_list_transfers(*args, **kwargs):
+            return [transfer.id]
+
+        mocker.patch(
+            "app.payout.repository.maindb.transfer.TransferRepository.get_transfers_by_submitted_at_and_method",
+            side_effect=mock_list_transfers,
+        )
+
+        monitor_transfer_with_incorrect_status_task = MonitorTransferWithIncorrectStatusTask(
+            transfer_id=transfer.id
+        )
+        await monitor_transfer_with_incorrect_status_task.send(
+            kafka_producer=app_context.kafka_producer
+        )
+
+        stripe_worker = KafkaWorker(
+            app_context=app_context,
+            app_config=app_config,
+            topic_name=self.stripe_topic_name,
+            processor=tasks.process_message,
+            num_consumers=1,
+        )
+        await stripe_worker.start()
+
+        await asyncio.sleep(10)
+        # Stopping workers with graceful timeout set to 3 seconds
+        # await payout_worker.stop(graceful_timeout_seconds=3)
+        await stripe_worker.stop(graceful_timeout_seconds=3)
+
+        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+            transfer_id=transfer.id
+        )
+        assert retrieved_transfer
+        assert retrieved_transfer.status == "paid"
+        retrieved_stripe_transfer = await stripe_transfer_repo.get_stripe_transfer_by_id(
+            stripe_transfer_id=stripe_transfer.id
+        )
+        assert retrieved_stripe_transfer
+        assert retrieved_stripe_transfer.stripe_status == "paid"

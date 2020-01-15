@@ -50,6 +50,8 @@ WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING = {
     "friday": "payments/feature-flags/WEEKLY_TRANSFER_FRIDAY_PAYOUT_BUSINESS_IDS.json",
 }
 
+ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS = "payout/feature-flags/enable_queueing_mechanism_for_monitor_transfer_with_incorrect_status.bool"
+
 # transfer submission
 ATTEMPTED_COUNT_STAT = "attempted-count"
 ATTEMPTED_AMOUNT_STAT = "attempted-amount"

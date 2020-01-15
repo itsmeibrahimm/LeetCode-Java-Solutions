@@ -11,7 +11,10 @@ from app.commons.context.app_context import AppContext
 from app.commons.context.logger import get_logger
 from app.commons.context.req_context import ReqContext, build_req_context
 from app.commons.jobs.pool import JobPool
-from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
+from app.payout.constants import (
+    ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT,
+    ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
+)
 from app.payout.core.transfer.processors.update_transfer_by_stripe_transfer_status import (
     UpdateTransferByStripeTransferStatus,
     UpdateTransferByStripeTransferStatusRequest,
@@ -19,6 +22,9 @@ from app.payout.core.transfer.processors.update_transfer_by_stripe_transfer_stat
 from app.payout.core.transfer.processors.weekly_create_transfer import (
     WeeklyCreateTransfer,
     WeeklyCreateTransferRequest,
+)
+from app.payout.core.transfer.tasks.monitor_transfer_with_incorrect_status_task import (
+    MonitorTransferWithIncorrectStatusTask,
 )
 from app.payout.core.transfer.tasks.weekly_create_transfer_task import (
     WeeklyCreateTransferTask,
@@ -181,21 +187,42 @@ class MonitorTransfersWithIncorrectStatus(Job):
             )
             req_context = job_instance_cxt.build_req_context()
 
+            enable_queuing_mechanism_for_payout_service = runtime.get_bool(
+                ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
+                False,
+            )
+
             for transfer_id in transfer_ids:
-                update_transfer_req = UpdateTransferByStripeTransferStatusRequest(
-                    transfer_id=transfer_id
-                )
-                update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
-                    transfer_repo=transfer_repo,
-                    stripe_transfer_repo=stripe_transfer_repo,
-                    stripe=req_context.stripe_async_client,
-                    logger=logger,
-                    request=update_transfer_req,
-                )
-                await job_instance_cxt.job_pool.spawn(
-                    update_transfer_by_stripe_transfer_status_op.execute(),
-                    cb=job_callback,
-                )
+                if enable_queuing_mechanism_for_payout_service:
+                    # put monitor_transfer_with_incorrect_status into queue
+                    logger.info(
+                        "Enqueuing monitor_transfer_with_incorrect_status task",
+                        transfer_id=transfer_id,
+                    )
+                    monitor_transfer_with_incorrect_status_task = MonitorTransferWithIncorrectStatusTask(
+                        transfer_id=transfer_id
+                    )
+                    await job_instance_cxt.job_pool.spawn(
+                        monitor_transfer_with_incorrect_status_task.send(
+                            kafka_producer=job_instance_cxt.app_context.kafka_producer
+                        ),
+                        cb=job_callback,
+                    )
+                else:
+                    update_transfer_req = UpdateTransferByStripeTransferStatusRequest(
+                        transfer_id=transfer_id
+                    )
+                    update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
+                        transfer_repo=transfer_repo,
+                        stripe_transfer_repo=stripe_transfer_repo,
+                        stripe=req_context.stripe_async_client,
+                        logger=logger,
+                        request=update_transfer_req,
+                    )
+                    await job_instance_cxt.job_pool.spawn(
+                        update_transfer_by_stripe_transfer_status_op.execute(),
+                        cb=job_callback,
+                    )
 
     def _start_of_the_week(self, date: datetime) -> datetime:
         return date - timedelta(days=date.weekday())
