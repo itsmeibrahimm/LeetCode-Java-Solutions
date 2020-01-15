@@ -1525,6 +1525,46 @@ class TestLegacyCharges:
         assert result == expected_consumer_charge
 
     @pytest.mark.asyncio
+    async def test_insert_legacy_consumer_charge_with_none_updated_at(
+        self, cart_payment_repository: CartPaymentRepository
+    ):
+        idempotency_key = str(uuid4())
+        now = datetime.now(timezone.utc)
+        result = await cart_payment_repository.insert_legacy_consumer_charge(
+            target_ct_id=1,
+            target_id=2,
+            consumer_id=1,  # Use of pre-seeded consumer to satisfy FK constraint
+            idempotency_key=idempotency_key,
+            is_stripe_connect_based=False,
+            country_id=LegacyCountryId.US,
+            currency=Currency.USD,
+            stripe_customer_id=None,
+            total=800,
+            original_total=800,
+            created_at=now,
+            updated_at=None,
+        )
+
+        expected_consumer_charge = LegacyConsumerCharge(
+            id=LegacyConsumerChargeId(result.id),  # Generated
+            target_ct_id=1,
+            target_id=2,
+            idempotency_key=idempotency_key,
+            is_stripe_connect_based=False,
+            total=800,
+            original_total=800,
+            currency=Currency.USD,
+            country_id=LegacyCountryId.US,
+            issue_id=None,
+            stripe_customer_id=None,
+            created_at=result.created_at,  # Generated
+            updated_at=result.updated_at,  # Generated
+        )
+
+        assert result == expected_consumer_charge
+        assert result.updated_at is None
+
+    @pytest.mark.asyncio
     async def test_get_legacy_consumer_charge_by_id(
         self,
         cart_payment_repository: CartPaymentRepository,

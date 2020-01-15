@@ -253,7 +253,7 @@ class LegacyConsumerCharge(BaseModel):
     issue_id: Optional[int]
     stripe_customer_id: Optional[int]
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime]
 
 
 @final

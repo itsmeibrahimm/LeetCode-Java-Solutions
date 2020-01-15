@@ -988,7 +988,7 @@ class CartPaymentRepository(PayinDBRepository):
         total: int,
         original_total: int,
         created_at: datetime,
-        updated_at: datetime,
+        updated_at: Optional[datetime],
     ) -> LegacyConsumerCharge:
         data = {
             consumer_charges.target_ct_id: target_ct_id,
