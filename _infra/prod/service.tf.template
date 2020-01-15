@@ -220,11 +220,11 @@ module "payment-service-payment-payout-worker" {
   service_image_pull_policy                 = "Always"
   service_iam_role                          = "arn:aws:iam::611706558220:role/web.payment-service"
   service_cmd                               = "python"
-  service_cmd_args                          = "-m, app.worker, --topic_name, payment_payout, --processor, app.payout.tasks, --num_consumers, '2'"
+  service_cmd_args                          = "-m, app.worker, --topic_name, payment_payout, --processor, app.payout.tasks, --num_consumers, '8'"
 
   service_max_surge                         = "200%"
   service_max_unavailable                   = "0"
-  service_replica_count                     = "2"
+  service_replica_count                     = "3"
   service_container_port                    = "80"
 
   service_liveness_probe_init_delay         = "20"
@@ -260,11 +260,11 @@ module "payment-service-payment-stripe-worker" {
   service_image_pull_policy                 = "Always"
   service_iam_role                          = "arn:aws:iam::611706558220:role/web.payment-service"
   service_cmd                               = "python"
-  service_cmd_args                          = "-m, app.worker, --topic_name, payment_stripe, --processor, app.payout.tasks, --num_consumers, '2'"
+  service_cmd_args                          = "-m, app.worker, --topic_name, payment_stripe, --processor, app.payout.tasks, --num_consumers, '8'"
 
   service_max_surge                         = "200%"
   service_max_unavailable                   = "0"
-  service_replica_count                     = "2"
+  service_replica_count                     = "5"
   service_container_port                    = "80"
 
   service_liveness_probe_init_delay         = "20"
