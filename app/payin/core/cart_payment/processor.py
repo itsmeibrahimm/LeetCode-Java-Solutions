@@ -17,6 +17,7 @@ from app.commons.context.req_context import (
     get_stripe_async_client_from_req,
     ReqContext,
 )
+from app.commons.core.errors import DBOperationError
 from app.commons.lock.locks import PaymentLock, PaymentLockAcquireError
 from app.commons.operational_flags import (
     ENABLE_SMALL_AMOUNT_CAPTURE_THEN_REFUND,
@@ -44,6 +45,10 @@ from app.commons.providers.stripe.stripe_models import (
 from app.commons.runtime import runtime
 from app.commons.timing import track_func
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
+from app.commons.utils.legacy_utils import (
+    get_country_code_by_id,
+    get_country_id_by_code,
+)
 from app.commons.utils.validation import not_none
 from app.payin.core import feature_flags
 from app.payin.core.cart_payment.model import (
@@ -86,13 +91,11 @@ from app.payin.core.exceptions import (
     PaymentMethodReadError,
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
-)
-from app.commons.utils.legacy_utils import (
-    get_country_code_by_id,
-    get_country_id_by_code,
+    LegacyStripeChargeUpdateError,
 )
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
@@ -111,6 +114,11 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
     GetCartPaymentsByConsumerIdInput,
+    UpdateCartPaymentsRemovePiiWhereInput,
+    UpdateCartPaymentsRemovePiiSetInput,
+    GetLegacyConsumerChargeIdsByConsumerIdInput,
+    UpdateLegacyStripeChargeRemovePiiWhereInput,
+    UpdateLegacyStripeChargeRemovePiiSetInput,
 )
 
 IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
@@ -141,6 +149,43 @@ class LegacyPaymentInterface:
         self, provider_status: str
     ) -> LegacyStripeChargeStatus:
         return LegacyStripeChargeStatus(provider_status)
+
+    async def get_legacy_consumer_charge_ids_by_consumer_id(
+        self, consumer_id: int
+    ) -> List[int]:
+        return await self.payment_repo.get_legacy_consumer_charge_ids_by_consumer_id(
+            get_legacy_consumer_charge_ids_by_consumer_id_input=GetLegacyConsumerChargeIdsByConsumerIdInput(
+                consumer_id=consumer_id
+            )
+        )
+
+    async def get_legacy_stripe_charges_by_charge_id(
+        self, charge_id: int
+    ) -> List[LegacyStripeCharge]:
+        return await self.payment_repo.get_legacy_stripe_charges_by_charge_id(
+            charge_id=charge_id
+        )
+
+    async def update_legacy_stripe_charge_remove_pii(
+        self, id: int
+    ) -> Optional[LegacyStripeCharge]:
+        try:
+            return await self.payment_repo.update_legacy_stripe_charge_remove_pii(
+                update_legacy_stripe_charge_remove_pii_where_input=UpdateLegacyStripeChargeRemovePiiWhereInput(
+                    id=id
+                ),
+                update_legacy_stripe_charge_remove_pii_set_input=UpdateLegacyStripeChargeRemovePiiSetInput(
+                    description=DeletePayerRedactingText.REDACTED
+                ),
+            )
+        except DBOperationError as e:
+            self.req_context.log.exception(
+                "[update_legacy_stripe_charge_remove_pii] Error occurred with updating stripe charge",
+                charge_id=id,
+            )
+            raise LegacyStripeChargeUpdateError(
+                error_code=PayinErrorCode.LEGACY_STRIPE_CHARGE_UPDATE_DB_ERROR
+            ) from e
 
     async def get_associated_cart_payment_id(
         self, charge_id: int
@@ -486,6 +531,27 @@ class CartPaymentInterface:
         self.payment_method_client = payment_method_client
         self.stripe_async_client = stripe_async_client
         self.capture_service = self.app_context.capture_service
+
+    async def update_cart_payments_remove_pii(
+        self, consumer_id: int
+    ) -> List[CartPayment]:
+        try:
+            return await self.payment_repo.update_cart_payments_remove_pii(
+                update_cart_payments_remove_pii_where_input=UpdateCartPaymentsRemovePiiWhereInput(
+                    legacy_consumer_id=consumer_id
+                ),
+                update_cart_payments_remove_pii_set_input=UpdateCartPaymentsRemovePiiSetInput(
+                    client_description=DeletePayerRedactingText.REDACTED
+                ),
+            )
+        except DBOperationError as e:
+            self.req_context.log.exception(
+                "[update_cart_payments_remove_pii] Error occurred while updating cart payments",
+                consumer_id=consumer_id,
+            )
+            raise CartPaymentUpdateError(
+                error_code=PayinErrorCode.CART_PAYMENT_UPDATE_DB_ERROR
+            ) from e
 
     def get_idempotency_key_for_provider_call(
         self, client_key: str, action: IdempotencyKeyAction

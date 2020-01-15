@@ -20,6 +20,10 @@ _payin_error_message_maps = {
     "payin_11": "Data I/O error. Please retry again!",
     "payin_12": "Error returned from Payment Provider.",
     "payin_13": "No such customer",
+    "payin_14": "Data I/O error. Please retry again!",
+    "payin_15": "Data I/O error. Please retry again!",
+    "payin_16": "No such customer",
+    "payin_17": "Error returned from Payment Provider.",
     "payin_20": "Invalid data types. Please verify your input again!",
     "payin_21": "Data I/O error. Please retry again!",
     "payin_22": "Invalid input payment method type!",
@@ -33,6 +37,7 @@ _payin_error_message_maps = {
     "payin_30": "No Stripe Card associated to the payment method",
     "payin_31": "Sorting method not supported for list payment methods",
     "payin_32": "Invalid payer type for list payment method",
+    "payin_33": "Data I/O error. Please retry again!",
     "payin_40": "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
     "payin_41": "Error returned from Payment Provider. Please verify parameters of capture.",
     "payin_42": "Cannot refund previous charge for amount increase.",
@@ -55,6 +60,7 @@ _payin_error_message_maps = {
     "payin_66": "Payment method used to create cart payment was not found",
     "payin_67": "Another process is attempting to modify the same cart payment.  Please try again later.",
     "payin_68": "The idempotency key is invalid.",
+    "payin_69": "Data I/O error. Please retry again!",
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
@@ -67,6 +73,7 @@ _payin_error_message_maps = {
     "payin_109": "The given dispute_id does not have a stripe_card associated to it",
     "payin_110": "The given dispute_id does not have a consumer_charge associated to it's stripe charge",
     "payin_111": "Error. Empty data returned from DB after update",
+    "payin_120": "Data I/O error. Please retry again!",
     "payin_800": "API not accessible/usable in commando mode",
     "not_implemented": "This API is not implemented!",
     "invalid_payer_reference_id": "Invalid input of payer_id and payer_reference_id",
@@ -128,6 +135,11 @@ class PayinErrorCode(str, Enum):
         NO_RETRY,
         "The idempotency key is invalid.",
     )
+    CART_PAYMENT_UPDATE_DB_ERROR = (
+        "payin_68",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
     PAYER_CREATE_INVALID_DATA = (
         "payin_1",
         NO_RETRY,
@@ -177,6 +189,22 @@ class PayinErrorCode(str, Enum):
         "Error returned from Payment Provider.",
     )
     PAYER_READ_STRIPE_ERROR_NOT_FOUND = "payin_13", NO_RETRY, "No such customer"
+    DELETE_PAYER_REQUEST_INSERT_DB_ERROR = (
+        "payin_14",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
+    DELETE_PAYER_REQUEST_UPDATE_DB_ERROR = (
+        "payin_15",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
+    PAYER_DELETE_STRIPE_ERROR_NOT_FOUND = ("payin_16", NO_RETRY, "No such customer")
+    PAYER_DELETE_STRIPE_ERROR = (
+        "payin_17",
+        NO_RETRY,
+        "Error returned from Payment Provider.",
+    )
     PAYMENT_METHOD_NO_STRIPE_CARD_FOUND = (
         "payin_30",
         NO_RETRY,
@@ -302,6 +330,11 @@ class PayinErrorCode(str, Enum):
         SHOULD_RETRY,
         "Data I/O error. Please retry again!",
     )
+    PAYMENT_METHOD_UPDATE_DB_ERROR = (
+        "payin_33",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
+    )
     DISPUTE_NOT_FOUND = (
         "payin_100",
         NO_RETRY,
@@ -367,6 +400,11 @@ class PayinErrorCode(str, Enum):
         "payin_32",
         NO_RETRY,
         "Invalid payer type for list payment method",
+    )
+    LEGACY_STRIPE_CHARGE_UPDATE_DB_ERROR = (
+        "payin_120",
+        SHOULD_RETRY,
+        "Data I/O error. Please retry again!",
     )
     API_NOT_IMPLEMENTED_ERROR = (
         "not_implemented",
@@ -446,6 +484,10 @@ class PayerUpdateError(PayinError):
     pass
 
 
+class PayerDeleteError(PayinError):
+    pass
+
+
 ###########################################################
 # PaymentMethod Errors                                    #
 ###########################################################
@@ -458,6 +500,10 @@ class PaymentMethodReadError(PayinError):
 
 
 class PaymentMethodDeleteError(PayinError):
+    pass
+
+
+class PaymentMethodUpdateError(PayinError):
     pass
 
 
@@ -496,6 +542,10 @@ class CartPaymentUpdateError(PayinError):
 # PaymentCharge Errors                                      #
 ###########################################################
 class PaymentChargeRefundError(PayinError):
+    pass
+
+
+class LegacyStripeChargeUpdateError(PayinError):
     pass
 
 

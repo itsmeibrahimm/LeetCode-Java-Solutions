@@ -12,7 +12,7 @@ from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
-from app.commons.core.errors import DBDataError
+from app.commons.core.errors import DBDataError, DBOperationError
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     PaymentMethod as StripePaymentMethod,
@@ -27,7 +27,9 @@ from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PaymentMethodDeleteError,
     PaymentMethodReadError,
+    PaymentMethodUpdateError,
 )
+from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethod
 from app.payin.core.payment_method.types import PaymentMethodSortKey
 from app.payin.core.types import (
@@ -57,6 +59,8 @@ from app.payin.repository.payment_method_repo import (
     ListStripeCardDbEntitiesByStripeCustomerId,
     ListPgpPaymentMethodByStripeCardId,
     ListStripeCardDbEntitiesByConsumerId,
+    UpdateStripeCardsRemovePiiWhereInput,
+    UpdateStripeCardsRemovePiiSetInput,
 )
 
 
@@ -447,6 +451,35 @@ class PaymentMethodClient:
             input=GetStripeCardsByConsumerIdInput(consumer_id=consumer_id)
         )
         return [entity.id for entity in stripe_card_db_entities]
+
+    async def get_stripe_cards_for_consumer_id(
+        self, consumer_id: int
+    ) -> List[StripeCardDbEntity]:
+        return await self.payment_method_repo.get_stripe_cards_by_consumer_id(
+            input=GetStripeCardsByConsumerIdInput(consumer_id=consumer_id)
+        )
+
+    async def update_stripe_cards_remove_pii(
+        self, consumer_id: int
+    ) -> List[StripeCardDbEntity]:
+        try:
+            return await self.payment_method_repo.update_stripe_cards_remove_pii(
+                update_stripe_cards_remove_pii_where_input=UpdateStripeCardsRemovePiiWhereInput(
+                    consumer_id=consumer_id
+                ),
+                update_stripe_cards_remove_pii_set_input=UpdateStripeCardsRemovePiiSetInput(
+                    last4=DeletePayerRedactingText.XXXX,
+                    dynamic_last4=DeletePayerRedactingText.XXXX,
+                ),
+            )
+        except DBOperationError as e:
+            self.log.exception(
+                "[update_stripe_cards_remove_pii] Error occurred with updating stripe cards",
+                consumer_id=consumer_id,
+            )
+            raise PaymentMethodUpdateError(
+                error_code=PayinErrorCode.PAYMENT_METHOD_UPDATE_DB_ERROR
+            ) from e
 
     async def get_payment_method_list_by_dd_consumer_id(
         self,

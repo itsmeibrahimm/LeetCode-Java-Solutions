@@ -9,6 +9,7 @@ from asynctest import create_autospec
 from freezegun import freeze_time
 from stripe.error import InvalidRequestError, StripeError
 
+from app.commons.core.errors import DBOperationError
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.stripe_models import (
     StripeCreatePaymentIntentRequest,
@@ -46,7 +47,10 @@ from app.payin.core.exceptions import (
     PaymentIntentCouldNotBeUpdatedError,
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
+    CartPaymentUpdateError,
+    LegacyStripeChargeUpdateError,
 )
+from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
 from app.payin.tests.utils import (
@@ -82,6 +86,82 @@ class TestLegacyPaymentInterface:
             legacy_payment_interface._get_legacy_stripe_charge_status_from_provider_status(
                 "coffee_beans"
             )
+
+    @pytest.mark.asyncio
+    async def test_get_legacy_consumer_charge_ids_by_consumer_id(
+        self, legacy_payment_interface
+    ):
+        legacy_consumer_charge = generate_legacy_consumer_charge()
+
+        legacy_payment_interface.payment_repo.get_legacy_consumer_charge_ids_by_consumer_id = FunctionMock(
+            return_value=[legacy_consumer_charge.id]
+        )
+        result = await legacy_payment_interface.get_legacy_consumer_charge_ids_by_consumer_id(
+            1
+        )
+        assert len(result) == 1
+        assert result[0] == legacy_consumer_charge.id
+
+    @pytest.mark.asyncio
+    async def test_get_legacy_stripe_charges_by_charge_id(
+        self, legacy_payment_interface
+    ):
+        legacy_consumer_charge = generate_legacy_consumer_charge()
+        legacy_stripe_charge = generate_legacy_stripe_charge(
+            charge_id=legacy_consumer_charge.id
+        )
+
+        legacy_payment_interface.payment_repo.get_legacy_stripe_charges_by_charge_id = FunctionMock(
+            return_value=[legacy_stripe_charge]
+        )
+        result = await legacy_payment_interface.get_legacy_stripe_charges_by_charge_id(
+            legacy_consumer_charge.id
+        )
+        assert len(result) == 1
+        assert result[0] == legacy_stripe_charge
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_remove_pii(
+        self, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        legacy_stripe_charge.description = DeletePayerRedactingText.REDACTED
+
+        legacy_payment_interface.payment_repo.update_legacy_stripe_charge_remove_pii = FunctionMock(
+            return_value=legacy_stripe_charge
+        )
+        result = await legacy_payment_interface.update_legacy_stripe_charge_remove_pii(
+            legacy_stripe_charge.id
+        )
+        assert result == legacy_stripe_charge
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_remove_pii_none_found(
+        self, legacy_payment_interface
+    ):
+        legacy_payment_interface.payment_repo.update_legacy_stripe_charge_remove_pii = FunctionMock(
+            return_value=None
+        )
+        result = await legacy_payment_interface.update_legacy_stripe_charge_remove_pii(
+            1
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_remove_pii_errors(
+        self, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        legacy_stripe_charge.description = DeletePayerRedactingText.REDACTED
+
+        legacy_payment_interface.payment_repo.update_legacy_stripe_charge_remove_pii = FunctionMock(
+            side_effect=DBOperationError(error_message="")
+        )
+        with pytest.raises(LegacyStripeChargeUpdateError) as e:
+            await legacy_payment_interface.update_legacy_stripe_charge_remove_pii(
+                legacy_stripe_charge.id
+            )
+        assert e.value.error_code == PayinErrorCode.LEGACY_STRIPE_CHARGE_UPDATE_DB_ERROR
 
     @pytest.mark.asyncio
     async def test_get_associated_cart_payment_id(self, legacy_payment_interface):
@@ -544,6 +624,30 @@ class TestCartPaymentInterface:
     """
     Test CartPaymentInterface class functions.
     """
+
+    @pytest.mark.asyncio
+    async def test_update_cart_payments_remove_pii(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        cart_payment.client_description = DeletePayerRedactingText.REDACTED
+
+        cart_payment_interface.payment_repo.update_cart_payments_remove_pii = FunctionMock(
+            return_value=[cart_payment]
+        )
+        results = await cart_payment_interface.update_cart_payments_remove_pii(1)
+        assert len(results) == 1
+        assert results[0] == cart_payment
+
+    @pytest.mark.asyncio
+    async def test_update_cart_payments_remove_pii_errors(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        cart_payment.client_description = DeletePayerRedactingText.REDACTED
+
+        cart_payment_interface.payment_repo.update_cart_payments_remove_pii = FunctionMock(
+            side_effect=DBOperationError(error_message="")
+        )
+        with pytest.raises(CartPaymentUpdateError) as e:
+            await cart_payment_interface.update_cart_payments_remove_pii(1)
+        assert e.value.error_code == PayinErrorCode.CART_PAYMENT_UPDATE_DB_ERROR
 
     def test_enable_new_charge_tables(self, cart_payment_interface):
         # We expect new charge table use to be disabled on launch of payment service

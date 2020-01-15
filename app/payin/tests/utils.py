@@ -33,12 +33,17 @@ from app.payin.core.cart_payment.types import (
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
 from app.payin.core.payer.model import Payer, RawPayer
+from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PgpPayerResourceId
 from app.payin.repository.dispute_repo import (
     ConsumerChargeDbEntity,
     StripeDisputeDbEntity,
 )
-from app.payin.repository.payer_repo import PayerDbEntity, PgpCustomerDbEntity
+from app.payin.repository.payer_repo import (
+    PayerDbEntity,
+    PgpCustomerDbEntity,
+    DeletePayerRequestDbEntity,
+)
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
     StripeCardDbEntity,
@@ -476,4 +481,30 @@ def generate_payer_entity() -> PayerDbEntity:
         id=uuid.uuid4(),
         country=CountryCode.US,
         primary_pgp_payer_resource_id="cus_fakeid",
+    )
+
+
+def generate_delete_payer_request(
+    id: uuid.UUID = uuid.uuid4(),
+    client_request_id: uuid.UUID = uuid.uuid4(),
+    consumer_id: int = 1,
+    payer_id: Optional[uuid.UUID] = None,
+    status: str = DeletePayerRequestStatus.IN_PROGRESS,
+    summary: str = "",
+    retry_count: int = 0,
+    created_at: datetime = datetime.now(timezone.utc),
+    updated_at: datetime = datetime.now(timezone.utc),
+    acknowledged: bool = False,
+) -> DeletePayerRequestDbEntity:
+    return DeletePayerRequestDbEntity(
+        id=id,
+        client_request_id=client_request_id,
+        consumer_id=consumer_id,
+        payer_id=payer_id,
+        status=status,
+        summary=summary,
+        retry_count=retry_count,
+        created_at=created_at,
+        updated_at=updated_at,
+        acknowledged=acknowledged,
     )

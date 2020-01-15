@@ -1,17 +1,19 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
+from uuid import UUID, uuid4
 
 from fastapi import Depends
 from stripe.error import StripeError
 from structlog.stdlib import BoundLogger
 
+from app.commons import tracing
 from app.commons.context.app_context import AppContext, get_global_app_context
 from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
-from app.commons import tracing
-from app.commons.core.errors import DBDataError
+from app.commons.core.errors import DBDataError, DBOperationError
+from app.commons.providers.stripe.errors import StripeErrorParser, StripeErrorCode
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     StripeCreateCustomerRequest,
@@ -21,6 +23,8 @@ from app.commons.providers.stripe.stripe_models import (
     Customer as StripeCustomer,
     StripeRetrieveCustomerRequest,
     Customer,
+    StripeDeleteCustomerRequest,
+    StripeDeleteCustomerResponse,
 )
 from app.commons.types import CountryCode, PgpCode
 from app.commons.utils.uuid import generate_object_uuid
@@ -29,8 +33,17 @@ from app.payin.core.exceptions import (
     PayerCreationError,
     PayinErrorCode,
     PayerUpdateError,
+    PayerDeleteError,
 )
-from app.payin.core.payer.model import RawPayer, Payer
+from app.payin.core.payer.model import (
+    RawPayer,
+    Payer,
+    DoorDashDomainRedact,
+    RedactAction,
+    DeletePayerSummary,
+    StripeDomainRedact,
+)
+from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.payment_method.model import PaymentMethodIds, RawPaymentMethod
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.types import (
@@ -61,6 +74,10 @@ from app.payin.repository.payer_repo import (
     GetConsumerIdByPayerIdInput,
     GetPayerByPayerRefIdAndTypeInput,
     GetPayerByLegacyDDStripeCustomerIdInput,
+    DeletePayerRequestDbEntity,
+    UpdateDeletePayerRequestWhereInput,
+    UpdateDeletePayerRequestSetInput,
+    GetDeletePayerRequestsByClientRequestIdInput,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -84,6 +101,27 @@ class PayerClient:
         self.log = log
         self.payer_repo = payer_repo
         self.stripe_async_client = stripe_async_client
+
+    async def delete_pgp_customer(
+        self, country_code: CountryCode, customer_id: str
+    ) -> StripeDeleteCustomerResponse:
+        try:
+            return await self.stripe_async_client.delete_customer(
+                country=country_code,
+                request=StripeDeleteCustomerRequest(sid=customer_id),
+            )
+        except StripeError as e:
+            self.log.exception(
+                "[delete_pgp_customer] Exception occurred while deleting customer from stripe",
+                customer_id=customer_id,
+            )
+            stripe_error = StripeErrorParser(e)
+            if stripe_error.code == StripeErrorCode.resource_missing:
+                raise PayerDeleteError(
+                    error_code=PayinErrorCode.PAYER_DELETE_STRIPE_ERROR_NOT_FOUND
+                )
+
+            raise PayerDeleteError(error_code=PayinErrorCode.PAYER_DELETE_STRIPE_ERROR)
 
     async def find_existing_payer(
         self, payer_reference_id: str, payer_reference_id_type: PayerReferenceIdType
@@ -633,3 +671,97 @@ class PayerClient:
         return await self.payer_repo.get_consumer_id_by_payer_id(
             input=GetConsumerIdByPayerIdInput(payer_id=payer_id)
         )
+
+    async def update_delete_payer_request(
+        self,
+        client_request_id: UUID,
+        status: str,
+        summary: str,
+        retry_count: int,
+        acknowledged: bool,
+    ) -> DeletePayerRequestDbEntity:
+        try:
+            return await self.payer_repo.update_delete_payer_request(
+                update_delete_payer_request_where_input=UpdateDeletePayerRequestWhereInput(
+                    client_request_id=client_request_id
+                ),
+                update_delete_payer_request_set_input=UpdateDeletePayerRequestSetInput(
+                    status=status,
+                    summary=summary,
+                    retry_count=retry_count,
+                    updated_at=datetime.now(timezone.utc),
+                    acknowledged=acknowledged,
+                ),
+            )
+        except DBOperationError as e:
+            self.log.exception(
+                "[update_delete_payer_request] Error occurred with updating delete payer request",
+                client_request_id=client_request_id,
+            )
+            raise PayerDeleteError(
+                error_code=PayinErrorCode.DELETE_PAYER_REQUEST_UPDATE_DB_ERROR
+            ) from e
+
+    async def insert_delete_payer_request(
+        self, client_request_id: UUID, consumer_id: int
+    ) -> DeletePayerRequestDbEntity:
+        delete_payer_summary = DeletePayerSummary(
+            doordash_domain_redact=DoorDashDomainRedact(
+                stripe_cards=RedactAction(
+                    data_type="pii",
+                    action="obfuscate",
+                    status=DeletePayerRequestStatus.IN_PROGRESS,
+                ),
+                stripe_charges=RedactAction(
+                    data_type="pii",
+                    action="obfuscate",
+                    status=DeletePayerRequestStatus.IN_PROGRESS,
+                ),
+                cart_payments=RedactAction(
+                    data_type="pii",
+                    action="obfuscate",
+                    status=DeletePayerRequestStatus.IN_PROGRESS,
+                ),
+            ),
+            stripe_domain_redact=StripeDomainRedact(
+                customer=RedactAction(
+                    data_type="pii",
+                    action="delete",
+                    status=DeletePayerRequestStatus.IN_PROGRESS,
+                )
+            ),
+        )
+        try:
+            return await self.payer_repo.insert_delete_payer_request(
+                DeletePayerRequestDbEntity(
+                    id=uuid4(),
+                    client_request_id=client_request_id,
+                    consumer_id=consumer_id,
+                    payer_id=None,
+                    status=DeletePayerRequestStatus.IN_PROGRESS.value,
+                    summary=delete_payer_summary.json(),
+                    retry_count=0,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                    acknowledged=False,
+                )
+            )
+        except DBOperationError as e:
+            self.log.exception(
+                "[insert_delete_payer_request] Error occurred with inserting delete payer request",
+                consumer_id=consumer_id,
+                client_request_id=client_request_id,
+            )
+            raise PayerDeleteError(
+                error_code=PayinErrorCode.DELETE_PAYER_REQUEST_INSERT_DB_ERROR
+            ) from e
+
+    async def get_delete_payer_requests_by_client_request_id(
+        self, client_request_id: UUID
+    ) -> List[DeletePayerRequestDbEntity]:
+        delete_payer_requests = await self.payer_repo.get_delete_payer_requests_by_client_request_id(
+            get_delete_payer_requests_by_client_request_id_input=GetDeletePayerRequestsByClientRequestIdInput(
+                client_request_id=client_request_id
+            )
+        )
+        return delete_payer_requests
