@@ -1,7 +1,9 @@
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 from typing import List
 from uuid import uuid4
 
+import pytz
 from starlette.testclient import TestClient
 
 from app.commons.types import CountryCode, Currency
@@ -132,11 +134,28 @@ class TestTransactionV1:
             tx_retrieved_for_account_id["transaction_list"], transactions_for_account_b
         )
 
-        # 5. get unpaid transaction for payout account with start_time
-        assert transactions_for_account_b[3]["created_at"]
-        start_time_str = transactions_for_account_b[3]["created_at"]
+        # 5. add another set of transactions for payout_account b
+        # when we convert a utc time to timestamp, we truncate the fractional digits
+        # so when the timestamp gets converted back to a datetime, it only has the sec
+        # all millisec digits have been eliminated
+        # therefore we need to sleep for seconds here to make set_b have different sec digit
+        # with the previous set of transactions
+        time.sleep(2)
+        count_for_account_b_set_2 = 3
+        transactions_for_account_b_set_b = TestTransactionV1._prepare_transaction_list(
+            client=client,
+            payout_account=account_created,
+            count=count_for_account_b_set_2,
+        )
+        assert transactions_for_account_b_set_b[2]["created_at"]
+
+        # 6. get unpaid transaction for payout account b with start_time
+        start_time_str = transactions_for_account_b_set_b[2]["created_at"]
         start_time = datetime.strptime(start_time_str, "%Y-%m-%dT%H:%M:%S.%f")
-        timestamp = int((start_time - datetime.utcfromtimestamp(0)).total_seconds())
+        start_time = start_time.replace(tzinfo=pytz.UTC)
+        timestamp = int(
+            (start_time - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
+        )
         unpaid_tx_list_req_by_account_id_with_start_time = {
             "payout_account_id": account_created["id"],
             "unpaid": True,
@@ -150,7 +169,7 @@ class TestTransactionV1:
         tx_retrieved_for_account_id_with_start_time: dict = response.json()
         TestTransactionV1._validate_transaction_results(
             tx_retrieved_for_account_id_with_start_time["transaction_list"],
-            transactions_for_account_b,
+            transactions_for_account_b_set_b,
         )
 
     def test_create_then_reverse_transactions(
