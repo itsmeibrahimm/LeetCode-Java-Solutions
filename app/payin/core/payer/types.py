@@ -32,3 +32,8 @@ class DeletePayerRequestStatus(str, Enum):
     IN_PROGRESS = "IN PROGRESS"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
+
+
+class DeletePayerRedactingText(str, Enum):
+    REDACTED = "REDACTED"
+    XXXX = "XXXX"

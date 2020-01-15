@@ -15,7 +15,7 @@ from app.commons.kafka import KafkaWorker
 from app.payin.kafka import delete_payer_message_processor
 from app.payin.repository.payer_repo import (
     PayerRepository,
-    FindDeletePayerRequestByClientRequestIdInput,
+    GetDeletePayerRequestsByClientRequestIdInput,
 )
 
 
@@ -91,8 +91,8 @@ class TestDeletePayerMessageProcessor:
         # Stopping workers with graceful timeout set to 3 seconds
         await delete_payer_kafka_worker.stop(graceful_timeout_seconds=3)
 
-        delete_payer_request = await payer_repo.find_delete_payer_requests_by_client_request_id(
-            find_delete_payer_request_by_client_request_id_input=FindDeletePayerRequestByClientRequestIdInput(
+        delete_payer_request = await payer_repo.get_delete_payer_requests_by_client_request_id(
+            get_delete_payer_requests_by_client_request_id_input=GetDeletePayerRequestsByClientRequestIdInput(
                 client_request_id=uuid.UUID(action_request.request_id)
             )
         )

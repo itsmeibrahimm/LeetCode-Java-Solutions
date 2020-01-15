@@ -10,7 +10,7 @@ from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.repository.payer_repo import (
     DeletePayerRequestDbEntity,
     PayerRepository,
-    FindDeletePayerRequestByClientRequestIdInput,
+    GetDeletePayerRequestsByClientRequestIdInput,
 )
 
 privacy_actions_topic = "privacy_actions"
@@ -61,8 +61,8 @@ async def process_message(app_context: AppContext, message: str):
         return
 
     try:
-        existing_requests = await payer_repository.find_delete_payer_requests_by_client_request_id(
-            find_delete_payer_request_by_client_request_id_input=FindDeletePayerRequestByClientRequestIdInput(
+        existing_requests = await payer_repository.get_delete_payer_requests_by_client_request_id(
+            get_delete_payer_requests_by_client_request_id_input=GetDeletePayerRequestsByClientRequestIdInput(
                 client_request_id=uuid.UUID(action_request.request_id)
             )
         )

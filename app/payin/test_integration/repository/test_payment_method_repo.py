@@ -4,7 +4,9 @@ from uuid import uuid4
 import pytest
 
 from app.commons.types import CountryCode, PgpCode
+from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.types import PayerReferenceIdType
+from app.payin.models.maindb import stripe_cards
 from app.payin.models.paymentdb import pgp_payment_methods
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
@@ -325,20 +327,40 @@ class TestPaymentMethodRepository:
 
     @pytest.mark.asyncio
     async def test_update_stripe_cards_remove_pii(
-        self, payment_method_repository: PaymentMethodRepository, stripe_card
+        self, payment_method_repository: PaymentMethodRepository
     ):
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            InsertStripeCardInput(
+                stripe_id="huyuiih8989",
+                consumer_id=3,
+                fingerprint="ytr667",
+                last4="1234",
+                dynamic_last4="4321",
+                exp_month="01",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id="cus_1234567",
+                funding_type="credit",
+            )
+        )
         updated_stripe_cards = await payment_method_repository.update_stripe_cards_remove_pii(
             update_stripe_cards_remove_pii_where_input=UpdateStripeCardsRemovePiiWhereInput(
                 consumer_id=stripe_card.consumer_id
             ),
             update_stripe_cards_remove_pii_set_input=UpdateStripeCardsRemovePiiSetInput(
-                last4="", dynamic_last4=""
+                last4=DeletePayerRedactingText.XXXX,
+                dynamic_last4=DeletePayerRedactingText.XXXX,
             ),
         )
         assert updated_stripe_cards
-        for card in updated_stripe_cards:
-            assert card.last4 == ""
-            assert card.dynamic_last4 == ""
+        assert len(updated_stripe_cards) == 1
+        assert updated_stripe_cards[0].last4 == DeletePayerRedactingText.XXXX
+        assert updated_stripe_cards[0].dynamic_last4 == DeletePayerRedactingText.XXXX
+
+        await payment_method_repository.main_database.master().execute(
+            stripe_cards.table.delete().where(stripe_cards.id == stripe_card.id)
+        )
 
     @pytest.mark.asyncio
     async def test_insert_and_get_stripe_card(

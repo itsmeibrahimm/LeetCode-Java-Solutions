@@ -107,10 +107,10 @@ class GetConsumerIdByPayerIdInput(DBRequestModel):
 class DeletePayerRequestDbEntity(DBEntity):
     id: UUID
     client_request_id: UUID
-    consumer_id: Optional[int]
+    consumer_id: int
     payer_id: Optional[UUID]
     status: str
-    summary: Optional[str]
+    summary: str
     retry_count: int
     created_at: datetime
     updated_at: datetime
@@ -129,7 +129,7 @@ class UpdateDeletePayerRequestWhereInput(DBRequestModel):
     client_request_id: UUID
 
 
-class FindDeletePayerRequestByClientRequestIdInput(DBRequestModel):
+class GetDeletePayerRequestsByClientRequestIdInput(DBRequestModel):
     client_request_id: UUID
 
 
@@ -315,9 +315,9 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def find_delete_payer_requests_by_client_request_id(
+    async def get_delete_payer_requests_by_client_request_id(
         self,
-        find_delete_payer_request_by_client_request_id_input: FindDeletePayerRequestByClientRequestIdInput,
+        get_delete_payer_requests_by_client_request_id_input: GetDeletePayerRequestsByClientRequestIdInput,
     ) -> List[DeletePayerRequestDbEntity]:
         ...
 
@@ -329,10 +329,10 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def update_delete_payer_requests(
+    async def update_delete_payer_request(
         self,
-        update_delete_payer_requests_where_input: UpdateDeletePayerRequestWhereInput,
-        update_delete_payer_requests_set_input: UpdateDeletePayerRequestSetInput,
+        update_delete_payer_request_where_input: UpdateDeletePayerRequestWhereInput,
+        update_delete_payer_request_set_input: UpdateDeletePayerRequestSetInput,
     ) -> DeletePayerRequestDbEntity:
         ...
 
@@ -518,13 +518,13 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         row = await self.payment_database.master().fetch_one(statement)
         return DeletePayerRequestDbEntity.from_row(row) if row else None
 
-    async def find_delete_payer_requests_by_client_request_id(
+    async def get_delete_payer_requests_by_client_request_id(
         self,
-        find_delete_payer_request_by_client_request_id_input: FindDeletePayerRequestByClientRequestIdInput,
+        get_delete_payer_requests_by_client_request_id_input: GetDeletePayerRequestsByClientRequestIdInput,
     ) -> List[DeletePayerRequestDbEntity]:
         statement = delete_payer_requests.table.select().where(
             delete_payer_requests.client_request_id
-            == find_delete_payer_request_by_client_request_id_input.client_request_id
+            == get_delete_payer_requests_by_client_request_id_input.client_request_id
         )
         results = await self.payment_database.replica().fetch_all(statement)
         return [DeletePayerRequestDbEntity.from_row(row) for row in results]
@@ -540,18 +540,18 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         results = await self.payment_database.replica().fetch_all(statement)
         return [DeletePayerRequestDbEntity.from_row(row) for row in results]
 
-    async def update_delete_payer_requests(
+    async def update_delete_payer_request(
         self,
-        update_delete_payer_requests_where_input: UpdateDeletePayerRequestWhereInput,
-        update_delete_payer_requests_set_input: UpdateDeletePayerRequestSetInput,
+        update_delete_payer_request_where_input: UpdateDeletePayerRequestWhereInput,
+        update_delete_payer_request_set_input: UpdateDeletePayerRequestSetInput,
     ) -> DeletePayerRequestDbEntity:
         statement = (
             delete_payer_requests.table.update()
             .where(
                 delete_payer_requests.client_request_id
-                == update_delete_payer_requests_where_input.client_request_id
+                == update_delete_payer_request_where_input.client_request_id
             )
-            .values(update_delete_payer_requests_set_input.dict())
+            .values(update_delete_payer_request_set_input.dict())
             .returning(*delete_payer_requests.table.columns.values())
         )
 

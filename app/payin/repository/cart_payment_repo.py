@@ -84,11 +84,15 @@ class GetCartPaymentsByConsumerIdInput(DBRequestModel):
     dd_consumer_id: int
 
 
-class UpdateStripeChargesRemovePiiWhereInput(DBRequestModel):
+class GetLegacyConsumerChargeIdsByConsumerIdInput(DBRequestModel):
     consumer_id: int
 
 
-class UpdateStripeChargesRemovePiiSetInput(DBRequestModel):
+class UpdateLegacyStripeChargeRemovePiiWhereInput(DBRequestModel):
+    id: int
+
+
+class UpdateLegacyStripeChargeRemovePiiSetInput(DBRequestModel):
     description: str
 
 
@@ -1036,6 +1040,21 @@ class CartPaymentRepository(PayinDBRepository):
             return None
         return self.to_legacy_consumer_charge(row)
 
+    async def get_legacy_consumer_charge_ids_by_consumer_id(
+        self,
+        get_legacy_consumer_charge_ids_by_consumer_id_input: GetLegacyConsumerChargeIdsByConsumerIdInput,
+    ) -> List[int]:
+        statement = (
+            consumer_charges.table.select()
+            .column(consumer_charges.id)
+            .where(
+                consumer_charges.consumer_id
+                == get_legacy_consumer_charge_ids_by_consumer_id_input.consumer_id
+            )
+        )
+        rows = await self.main_database.replica().fetch_all(statement)
+        return [row[consumer_charges.id] for row in rows]
+
     async def insert_legacy_stripe_charge(
         self,
         stripe_id: str,
@@ -1208,26 +1227,23 @@ class CartPaymentRepository(PayinDBRepository):
         results = await self.main_database.replica().fetch_all(statement)
         return [self.to_legacy_stripe_charge(row) for row in results]
 
-    async def update_stripe_charges_remove_pii(
+    async def update_legacy_stripe_charge_remove_pii(
         self,
-        update_stripe_charges_remove_pii_where_input: UpdateStripeChargesRemovePiiWhereInput,
-        update_stripe_charges_remove_pii_set_input: UpdateStripeChargesRemovePiiSetInput,
-    ) -> List[LegacyStripeCharge]:
+        update_legacy_stripe_charge_remove_pii_where_input: UpdateLegacyStripeChargeRemovePiiWhereInput,
+        update_legacy_stripe_charge_remove_pii_set_input: UpdateLegacyStripeChargeRemovePiiSetInput,
+    ) -> Optional[LegacyStripeCharge]:
         statement = (
             stripe_charges.table.update()
             .where(
-                and_(
-                    stripe_charges.charge_id == consumer_charges.id,
-                    consumer_charges.consumer_id
-                    == update_stripe_charges_remove_pii_where_input.consumer_id,
-                )
+                stripe_charges.id
+                == update_legacy_stripe_charge_remove_pii_where_input.id
             )
-            .values(update_stripe_charges_remove_pii_set_input.dict())
+            .values(update_legacy_stripe_charge_remove_pii_set_input.dict())
             .returning(*stripe_charges.table.columns.values())
         )
 
-        rows = await self.main_database.master().fetch_all(statement)
-        return [self.to_legacy_stripe_charge(row) for row in rows]
+        row = await self.main_database.master().fetch_one(statement)
+        return self.to_legacy_stripe_charge(row) if row else None
 
     async def is_stripe_card_valid_and_has_success_charge_record(
         self, stripe_card_stripe_id: str

@@ -30,8 +30,10 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
+from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
+from app.payin.models.paymentdb import cart_payments
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
     UpdateCartPaymentPostCancellationInput,
@@ -40,10 +42,11 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
     GetCartPaymentsByConsumerIdInput,
-    UpdateStripeChargesRemovePiiWhereInput,
-    UpdateStripeChargesRemovePiiSetInput,
+    UpdateLegacyStripeChargeRemovePiiWhereInput,
+    UpdateLegacyStripeChargeRemovePiiSetInput,
     UpdateCartPaymentsRemovePiiWhereInput,
     UpdateCartPaymentsRemovePiiSetInput,
+    GetLegacyConsumerChargeIdsByConsumerIdInput,
 )
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -1240,22 +1243,28 @@ class TestCartPayment:
             reference_type="88",
             delay_capture=False,
             metadata=None,
-            legacy_consumer_id=1,
+            legacy_consumer_id=120,
             legacy_stripe_card_id=1,
             legacy_provider_customer_id="stripe_customer_id",
             legacy_provider_card_id="stripe_card_id",
         )
         updated_cart_payments = await cart_payment_repository.update_cart_payments_remove_pii(
             update_cart_payments_remove_pii_where_input=UpdateCartPaymentsRemovePiiWhereInput(
-                legacy_consumer_id=1
+                legacy_consumer_id=120
             ),
             update_cart_payments_remove_pii_set_input=UpdateCartPaymentsRemovePiiSetInput(
-                client_description=""
+                client_description=DeletePayerRedactingText.REDACTED
             ),
         )
+        assert len(updated_cart_payments) == 1
+        assert (
+            updated_cart_payments[0].client_description
+            == DeletePayerRedactingText.REDACTED
+        )
 
-        for cart_payment in updated_cart_payments:
-            assert cart_payment.client_description == ""
+        await cart_payment_repository.payment_database.master().execute(
+            cart_payments.table.delete().where(cart_payments.legacy_consumer_id == 120)
+        )
 
     @pytest.mark.asyncio
     async def test_cancel_cart_payment(
@@ -1527,6 +1536,19 @@ class TestLegacyCharges:
         assert result == consumer_charge
 
     @pytest.mark.asyncio
+    async def test_get_legacy_consumer_charge_ids_by_consumer_id(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        results = await cart_payment_repository.get_legacy_consumer_charge_ids_by_consumer_id(
+            get_legacy_consumer_charge_ids_by_consumer_id_input=GetLegacyConsumerChargeIdsByConsumerIdInput(
+                consumer_id=1
+            )
+        )
+        assert consumer_charge.id in results
+
+    @pytest.mark.asyncio
     async def test_insert_legacy_stripe_charge(
         self,
         cart_payment_repository: CartPaymentRepository,
@@ -1689,23 +1711,23 @@ class TestLegacyCharges:
         assert result == stripe_charge
 
     @pytest.mark.asyncio
-    async def test_update_stripe_charges_remove_pii(
+    async def test_update_stripe_charge_remove_pii(
         self,
         cart_payment_repository: CartPaymentRepository,
         stripe_charge,
         consumer_charge,
     ):
-        updated_stripe_charges = await cart_payment_repository.update_stripe_charges_remove_pii(
-            update_stripe_charges_remove_pii_where_input=UpdateStripeChargesRemovePiiWhereInput(
-                consumer_id=1
+        updated_stripe_charge = await cart_payment_repository.update_legacy_stripe_charge_remove_pii(
+            update_legacy_stripe_charge_remove_pii_where_input=UpdateLegacyStripeChargeRemovePiiWhereInput(
+                id=stripe_charge.id
             ),
-            update_stripe_charges_remove_pii_set_input=UpdateStripeChargesRemovePiiSetInput(
-                description=""
+            update_legacy_stripe_charge_remove_pii_set_input=UpdateLegacyStripeChargeRemovePiiSetInput(
+                description=DeletePayerRedactingText.REDACTED
             ),
         )
 
-        for charge in updated_stripe_charges:
-            assert charge.description == ""
+        assert updated_stripe_charge
+        assert updated_stripe_charge.description == DeletePayerRedactingText.REDACTED
 
 
 class TestFindPaymentIntentsThatRequireCapture:

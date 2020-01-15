@@ -7,6 +7,7 @@ from typing_extensions import final
 
 from app.commons.types import PgpCode
 from app.commons.utils.legacy_utils import owner_type_to_payer_reference_id_type
+from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PayerReferenceIdType, PgpPayerResourceId
 from app.payin.repository.payer_repo import (
     PayerDbEntity,
@@ -171,3 +172,28 @@ class RawPayer:
             )
 
         return payer
+
+
+# delete payer action
+class RedactAction(BaseModel):
+    data_type: str
+    action: str
+    status: DeletePayerRequestStatus
+
+
+# doordash domain actions
+class DoorDashDomainRedact(BaseModel):
+    stripe_cards: RedactAction
+    stripe_charges: RedactAction
+    cart_payments: RedactAction
+
+
+# pgp domain actions
+class StripeDomainRedact(BaseModel):
+    customer: RedactAction
+
+
+# DeletePayerSummary
+class DeletePayerSummary(BaseModel):
+    doordash_domain_redact: DoorDashDomainRedact
+    stripe_domain_redact: StripeDomainRedact
