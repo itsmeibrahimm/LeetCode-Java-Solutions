@@ -57,6 +57,7 @@ async def create_payer(
             payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,
         )
         raise PayinError(error_code=PayinErrorCode.PAYER_CREATE_INVALID_DATA)
+
     create_payer_result: Tuple[Payer, bool] = await payer_processor.create_payer(
         payer_reference_id=req_body.payer_correlation_ids.payer_reference_id,
         payer_reference_id_type=req_body.payer_correlation_ids.payer_reference_id_type,

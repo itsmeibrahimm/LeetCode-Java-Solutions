@@ -17,7 +17,7 @@ from app.payin.tests.utils import (
     generate_pgp_payment_method,
     generate_stripe_card,
     FunctionMock,
-    generate_raw_payer,
+    generate_payer_entity,
 )
 
 
@@ -100,8 +100,8 @@ class TestPaymentMethodProcessor:
             stripe_card_entity=generate_stripe_card(),
         ).to_payment_method()
         payment_method_list: List[PaymentMethod] = [payment_method]
-        payment_method_processor.payer_client.get_raw_payer = FunctionMock(
-            return_value=generate_raw_payer()
+        payment_method_processor.payer_client.get_payer_entity = FunctionMock(
+            return_value=generate_payer_entity()
         )
         payment_method_processor.payment_method_client.get_payment_method_list_by_stripe_customer_id = FunctionMock(
             return_value=payment_method_list
@@ -122,8 +122,8 @@ class TestPaymentMethodProcessor:
     async def test_list_active_payment_methods_by_payer_id(
         self, payment_method_processor
     ):
-        payment_method_processor.payer_client.get_raw_payer = FunctionMock(
-            return_value=generate_raw_payer()
+        payment_method_processor.payer_client.get_payer_entity = FunctionMock(
+            return_value=generate_payer_entity()
         )
         payment_method_processor.payment_method_client.get_payment_method_list_by_stripe_customer_id = FunctionMock(
             return_value=[]

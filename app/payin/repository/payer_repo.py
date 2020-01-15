@@ -27,7 +27,6 @@ class PayerDbEntity(DBEntity):
 
     id: UUID
     country: CountryCode
-    legacy_stripe_customer_id: Optional[str] = None
     legacy_dd_stripe_customer_id: Optional[int] = None
     balance: Optional[int] = None
     description: Optional[str] = None
@@ -36,6 +35,9 @@ class PayerDbEntity(DBEntity):
     default_payment_method_id: Optional[UUID] = None
     legacy_default_dd_stripe_card_id: Optional[int] = None
     metadata: Optional[dict] = None
+    primary_pgp_payer_resource_id: Optional[str] = None
+    primary_pgp_payer_id: Optional[UUID] = None
+    primary_pgp_code: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
@@ -53,12 +55,20 @@ class GetPayerByIdInput(DBRequestModel):
     id: UUID
 
 
-class GetPayerByLegacyStripeCustomerIdInput(DBRequestModel):
+class GetPayerByPgpPayerResourceIdInput(DBRequestModel):
     """
     The variable name must be consistent with DB table column name
     """
 
-    legacy_stripe_customer_id: str
+    pgp_payer_resource_id: str
+
+
+class GetPayerByLegacyDDStripeCustomerIdInput(DBRequestModel):
+    """
+    The variable name must be consistent with DB table column name
+    """
+
+    legacy_dd_stripe_customer_id: str
 
 
 class GetPayerByPayerRefIdAndTypeInput(DBRequestModel):
@@ -86,14 +96,6 @@ class UpdatePayerWhereInput(DBRequestModel):
     """
 
     id: UUID
-
-
-class GetStripeCustomerIdByPayerIdInput(DBRequestModel):
-    """
-    The variable name must be consistent with DB table column name
-    """
-
-    payer_id: str
 
 
 class GetConsumerIdByPayerIdInput(DBRequestModel):
@@ -291,14 +293,20 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def get_payer_by_legacy_stripe_customer_id(
-        self, request: GetPayerByLegacyStripeCustomerIdInput
+    async def get_payer_by_pgp_payer_resource_id(
+        self, request: GetPayerByPgpPayerResourceIdInput
     ) -> Optional[PayerDbEntity]:
         ...
 
     @abstractmethod
-    async def get_payer_and_pgp_customer_by_legacy_stripe_cus_id(
-        self, input: GetPayerByLegacyStripeCustomerIdInput
+    async def get_payer_by_legacy_dd_stripe_customer_id(
+        self, request: GetPayerByLegacyDDStripeCustomerIdInput
+    ) -> Optional[PayerDbEntity]:
+        ...
+
+    @abstractmethod
+    async def get_payer_and_pgp_customer_by_pgp_payer_resource_id(
+        self, input: GetPayerByPgpPayerResourceIdInput
     ) -> Tuple[Optional[PayerDbEntity], Optional[PgpCustomerDbEntity]]:
         ...
 
@@ -391,12 +399,6 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def get_stripe_customer_id_by_payer_id(
-        self, input: GetStripeCustomerIdByPayerIdInput
-    ) -> str:
-        ...
-
-    @abstractmethod
     async def get_consumer_id_by_payer_id(
         self, input: GetConsumerIdByPayerIdInput
     ) -> int:
@@ -465,17 +467,26 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         row = await self.payment_database.replica().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
 
-    async def get_payer_by_legacy_stripe_customer_id(
-        self, request: GetPayerByLegacyStripeCustomerIdInput
+    async def get_payer_by_pgp_payer_resource_id(
+        self, request: GetPayerByPgpPayerResourceIdInput
     ) -> Optional[PayerDbEntity]:
         stmt = payers.table.select().where(
-            payers.legacy_stripe_customer_id == request.legacy_stripe_customer_id
+            payers.primary_pgp_payer_resource_id == request.pgp_payer_resource_id
         )
         row = await self.payment_database.replica().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
 
-    async def get_payer_and_pgp_customer_by_legacy_stripe_cus_id(
-        self, input: GetPayerByLegacyStripeCustomerIdInput
+    async def get_payer_by_legacy_dd_stripe_customer_id(
+        self, request: GetPayerByLegacyDDStripeCustomerIdInput
+    ) -> Optional[PayerDbEntity]:
+        stmt = payers.table.select().where(
+            payers.legacy_dd_stripe_customer_id == request.legacy_dd_stripe_customer_id
+        )
+        row = await self.payment_database.replica().fetch_one(stmt)
+        return PayerDbEntity.from_row(row) if row else None
+
+    async def get_payer_and_pgp_customer_by_pgp_payer_resource_id(
+        self, input: GetPayerByPgpPayerResourceIdInput
     ) -> Tuple[Optional[PayerDbEntity], Optional[PgpCustomerDbEntity]]:
         join_stmt = payers.table.join(
             pgp_customers.table, payers.id == pgp_customers.payer_id
@@ -483,7 +494,7 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         stmt = (
             select([payers.table, pgp_customers.table], use_labels=True)
             .select_from(join_stmt)
-            .where(payers.legacy_stripe_customer_id == input.legacy_stripe_customer_id)
+            .where(payers.primary_pgp_payer_resource_id == input.pgp_payer_resource_id)
         )
         row = await self.payment_database.replica().fetch_one(stmt)
         if not row:
@@ -646,13 +657,6 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         return StripeCustomerDbEntity.from_row(row) if row else None
-
-    async def get_stripe_customer_id_by_payer_id(
-        self, input: GetStripeCustomerIdByPayerIdInput
-    ) -> str:
-        stmt = payers.table.select().where(payers.id == input.payer_id)
-        row = await self.payment_database.replica().fetch_one(stmt)
-        return PayerDbEntity.from_row(row).legacy_stripe_customer_id if row else None
 
     async def get_consumer_id_by_payer_id(
         self, input: GetConsumerIdByPayerIdInput

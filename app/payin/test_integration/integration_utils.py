@@ -46,7 +46,9 @@ class CreatePaymentMethodV0Request(BaseModel):
 
 
 class CreatePaymentMethodV1Request(BaseModel):
-    payer_id: str
+    payer_id: Optional[str] = None
+    payer_reference_id: Optional[str] = None
+    payer_reference_id_type: Optional[str] = None
     payment_gateway: str
     token: str
     set_default: bool
@@ -254,7 +256,7 @@ def create_payment_method_v1(
     request: CreatePaymentMethodV1Request,
     http_status: Optional[int] = 201,
 ) -> Dict[str, Any]:
-    create_payment_method_request = {
+    create_payment_method_request: Dict[str, Any] = {
         "payer_id": request.payer_id,
         "payment_gateway": request.payment_gateway,
         "token": request.token,
@@ -262,6 +264,16 @@ def create_payment_method_v1(
         "is_active": request.is_active,
         "is_scanned": request.is_scanned,
     }
+    if request.payer_id:
+        create_payment_method_request.update({"payer_id": request.payer_id})
+    if request.payer_reference_id and request.payer_reference_id_type:
+        payer_correlation_ids = {
+            "payer_reference_id": request.payer_reference_id,
+            "payer_reference_id_type": request.payer_reference_id_type,
+        }
+        create_payment_method_request.update(
+            {"payer_correlation_ids": payer_correlation_ids}
+        )
     if request.set_default:
         create_payment_method_request.update({"set_default": str(request.set_default)})
     if request.is_scanned:
@@ -273,7 +285,8 @@ def create_payment_method_v1(
     payment_method: dict = response.json()
     assert UUID(payment_method["id"], version=4)
     assert UUID(payment_method["payer_id"], version=4)
-    assert payment_method["payer_id"] == request.payer_id
+    if request.payer_id:
+        assert payment_method["payer_id"] == request.payer_id
     assert payment_method["dd_stripe_card_id"]
     assert payment_method["created_at"]
     assert payment_method["updated_at"]

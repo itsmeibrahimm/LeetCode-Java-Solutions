@@ -461,9 +461,19 @@ def generate_raw_payer() -> RawPayer:
     payer_id = uuid.uuid4()
     return RawPayer(
         payer_entity=PayerDbEntity(
-            id=payer_id, country=CountryCode.US, legacy_stripe_customer_id="cus_fakeid"
+            id=payer_id,
+            country=CountryCode.US,
+            primary_pgp_payer_resource_id="cus_fakeid",
         ),
         pgp_customer_entity=PgpCustomerDbEntity(
             id=uuid.uuid4(), payer_id=payer_id, pgp_resource_id="cus_fakeid"
         ),
+    )
+
+
+def generate_payer_entity() -> PayerDbEntity:
+    return PayerDbEntity(
+        id=uuid.uuid4(),
+        country=CountryCode.US,
+        primary_pgp_payer_resource_id="cus_fakeid",
     )

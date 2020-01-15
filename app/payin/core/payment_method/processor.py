@@ -37,6 +37,7 @@ from app.payin.core.types import (
     PayerReferenceIdType,
     MixedUuidStrType,
 )
+from app.payin.repository.payer_repo import PayerDbEntity
 
 
 class PaymentMethodProcessor:
@@ -82,7 +83,8 @@ class PaymentMethodProcessor:
         set_default: bool,
         is_scanned: bool,
         is_active: bool,
-        payer_id: UUID = None,
+        payer_lookup_id: Optional[MixedUuidStrType] = None,
+        payer_lookup_id_type: Optional[PayerReferenceIdType] = None,
         legacy_payment_method_info: Optional[LegacyPaymentMethodInfo] = None,
     ) -> PaymentMethod:
         """
@@ -93,7 +95,8 @@ class PaymentMethodProcessor:
         :param set_default: set the new payment method as default.
         :param is_scanned: for fraud usage.
         :param is_active: mark as active or not. For fraud usage.
-        :param payer_id: DoorDash payer id.
+        :param payer_lookup_id: DoorDash payer_lookup_id id.
+        :param payer_lookup_id_type: DoorDash payer_reference_id_type id.
         :param legacy_payment_method_info: legacy payment method info.
         :return: PaymentMethod object
         """
@@ -106,15 +109,15 @@ class PaymentMethodProcessor:
         raw_payer: Optional[RawPayer] = None
 
         # step 1: lookup pgp_customer_resource_id and country information
-        if payer_id:
+        if payer_lookup_id and payer_lookup_id_type:
             raw_payer = await self.payer_client.get_raw_payer(
-                mixed_payer_id=payer_id,
-                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
+                mixed_payer_id=payer_lookup_id,
+                payer_reference_id_type=payer_lookup_id_type,
             )
             if raw_payer and raw_payer.payer_entity:
                 pgp_country = raw_payer.country()
                 pgp_customer_res_id = raw_payer.pgp_payer_resource_id
-                payer_reference_id_type = raw_payer.payer_entity.payer_reference_id_type
+                payer_reference_id_type = payer_lookup_id_type
                 if payer_reference_id_type == PayerReferenceIdType.DD_CONSUMER_ID:
                     dd_consumer_id = raw_payer.payer_entity.payer_reference_id
                 else:
@@ -151,7 +154,8 @@ class PaymentMethodProcessor:
         if not pgp_customer_res_id:
             self.log.info(
                 "[create_payment_method] can't find pgp_customer_resource_id",
-                payer_id=payer_id,
+                payer_lookup_id=payer_lookup_id,
+                payer_reference_id_type=payer_reference_id_type,
             )
             raise PaymentMethodCreateError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_CREATE_INVALID_INPUT
@@ -163,7 +167,7 @@ class PaymentMethodProcessor:
         )
         self.log.info(
             "[create_payment_method] create stripe payment_method completed",
-            payer_id=payer_id,
+            payer_lookup_id=payer_lookup_id,
             pgp_payment_method_res_id=stripe_payment_method.id,
             payer_reference_id_type=payer_reference_id_type,
             legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id,
@@ -200,12 +204,17 @@ class PaymentMethodProcessor:
         )
         self.log.info(
             "[create_payment_method] attach stripe payment_method completed",
-            payer_id=payer_id,
+            payer_lookup_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
             pgp_customer_res_id=pgp_customer_res_id,
             pgp_payment_method_res_id=attach_stripe_payment_method.id,
         )
 
         # step 5: crete pgp_payment_method and stripe_card objects
+        payer_id: Optional[UUID] = None
+        if raw_payer and raw_payer.payer_entity:
+            payer_id = raw_payer.payer_entity.id
+
         raw_payment_method: RawPaymentMethod = await self.payment_method_client.create_raw_payment_method(
             payment_method_id=generate_object_uuid(),
             pgp_code=pgp_code,
@@ -227,7 +236,8 @@ class PaymentMethodProcessor:
 
             self.log.info(
                 "[create_payment_method] PGP update default_payment_method completed",
-                payer_id=payer_id,
+                payer_lookup_id=payer_lookup_id,
+                payer_reference_id_type=payer_reference_id_type,
                 default_payment_method=stripe_customer.invoice_settings.default_payment_method,
             )
 
@@ -277,13 +287,14 @@ class PaymentMethodProcessor:
         sort_by: PaymentMethodSortKey,
         force_update: bool,
     ) -> PaymentMethodList:
-        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
-            mixed_payer_id=payer_lookup_id,
+        # Precondition of v1 API is that all the payers has been migrated from maindb_consumers to paymentdb_payers.
+        payer_entity: PayerDbEntity = await self.payer_client.get_payer_entity(
+            payer_lookup_id=payer_lookup_id,
             payer_reference_id_type=payer_reference_id_type,
         )
         payment_method_list = await self.payment_method_client.get_payment_method_list_by_stripe_customer_id(
-            stripe_customer_id=raw_payer.pgp_payer_resource_id,
-            country=raw_payer.country(),
+            stripe_customer_id=payer_entity.primary_pgp_payer_resource_id,
+            country=payer_entity.country,
             active_only=active_only,
             force_update=force_update,
             sort_by=sort_by,

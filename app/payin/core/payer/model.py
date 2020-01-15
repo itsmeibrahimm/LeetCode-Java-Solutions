@@ -7,6 +7,7 @@ from typing_extensions import final
 
 from app.commons.types import PgpCode
 from app.commons.utils.legacy_utils import owner_type_to_payer_reference_id_type
+from app.commons.utils.validation import not_none
 from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PayerReferenceIdType, PgpPayerResourceId
 from app.payin.repository.payer_repo import (
@@ -72,8 +73,9 @@ class RawPayer:
     @property
     def pgp_payer_resource_id(self) -> PgpPayerResourceId:
         if self.payer_entity:
-            assert self.payer_entity.legacy_stripe_customer_id
-            return PgpPayerResourceId(self.payer_entity.legacy_stripe_customer_id)
+            return PgpPayerResourceId(
+                not_none(self.payer_entity.primary_pgp_payer_resource_id)
+            )
         elif self.pgp_customer_entity:
             return PgpPayerResourceId(self.pgp_customer_entity.pgp_resource_id)
         elif self.stripe_customer_entity:
@@ -129,7 +131,7 @@ class RawPayer:
                     raise Exception("RawPayer doesn't have stripe_customer_entity")
                 provider_customer = PaymentGatewayProviderCustomer(
                     payment_provider=PgpCode.STRIPE,
-                    payment_provider_customer_id=self.payer_entity.legacy_stripe_customer_id,
+                    payment_provider_customer_id=self.payer_entity.primary_pgp_payer_resource_id,
                     default_payment_method_id=(
                         self.stripe_customer_entity.default_source
                     ),

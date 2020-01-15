@@ -466,7 +466,8 @@ class CartPaymentTest(CartPaymentTestBase):
             set_default=True,
             is_scanned=True,
             is_active=True,
-            payer_id=payer.id,
+            payer_lookup_id=payer.id,
+            payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
         )
 
     async def _prepare_cart_payment(

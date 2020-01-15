@@ -5,6 +5,7 @@ from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
 from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
+from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.test_integration.processors.cart_payment_test_base import (
     CartPaymentTestBase,
@@ -60,7 +61,8 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
             set_default=True,
             is_scanned=True,
             is_active=True,
-            payer_id=payer.id,
+            payer_lookup_id=payer.id,
+            payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
         )
         await super()._test_cart_payment_creation_error(
             card_declined,

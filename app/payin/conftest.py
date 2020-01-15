@@ -60,7 +60,8 @@ async def payment_intent(
     payment_method = await payment_method_processor.create_payment_method(
         pgp_code=PgpCode.STRIPE,
         token="tok_visa",
-        payer_id=payer.id,
+        payer_lookup_id=payer.id,
+        payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
         set_default=False,
         is_scanned=False,
         is_active=True,

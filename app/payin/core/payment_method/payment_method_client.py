@@ -104,7 +104,7 @@ class PaymentMethodClient:
             payment_method = await self.payment_method_repo.insert_payment_method(
                 pm_input=InsertPaymentMethodInput(
                     id=generate_object_uuid(),
-                    payer_id=payer_id,
+                    payer_id=(payer_id if payer_id else None),
                     created_at=now,
                     updated_at=now,
                 )
@@ -113,7 +113,7 @@ class PaymentMethodClient:
             pm_entity = await self.payment_method_repo.insert_pgp_payment_method(
                 pm_input=InsertPgpPaymentMethodInput(
                     id=payment_method_id,
-                    payer_id=(payer_id if payer_id else None),
+                    payer_id=payer_id,
                     pgp_code=pgp_code,
                     pgp_resource_id=stripe_payment_method.id,
                     legacy_consumer_id=dd_consumer_id,

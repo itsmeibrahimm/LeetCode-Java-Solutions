@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -47,9 +47,27 @@ async def create_payment_method(
     """
     log.info("[create_payment_method] receive request", req_body=req_body)
 
+    payer_reference_ids: Tuple[
+        MixedUuidStrType, PayerReferenceIdType
+    ] = _parse_payer_reference_id_and_type(
+        log=log,
+        payer_id=req_body.payer_id,
+        payer_reference_id=(
+            req_body.payer_correlation_ids.payer_reference_id
+            if req_body.payer_correlation_ids
+            else None
+        ),
+        payer_reference_id_type=(
+            req_body.payer_correlation_ids.payer_reference_id_type
+            if req_body.payer_correlation_ids
+            else None
+        ),
+    )
+
     try:
         payment_method: PaymentMethod = await payment_method_processor.create_payment_method(
-            payer_id=req_body.payer_id,
+            payer_lookup_id=payer_reference_ids[0],
+            payer_lookup_id_type=payer_reference_ids[1],
             pgp_code=req_body.payment_gateway,
             token=req_body.token,
             set_default=req_body.set_default,
@@ -128,35 +146,22 @@ async def list_payment_methods(
         sort_by=sort_by,
     )
 
-    if (
-        (not payer_id and not (payer_reference_id and payer_reference_id_type))
-        or (payer_id and (payer_reference_id or payer_reference_id_type))
-        or (payer_reference_id and not payer_reference_id_type)
-    ):
-        log.warn(
-            "[list_payment_method] invalid input payer_id or payer_reference_id",
-            payer_id=payer_id,
-            payer_reference_id_type=payer_reference_id_type,
-            payer_reference_id=payer_reference_id,
-            active_only=active_only,
-            force_update=force_update,
-            sort_by=sort_by,
-        )
-        raise PayinError(
-            error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYER_REFERENCE_ID
-        )
+    payer_reference_ids: Tuple[
+        MixedUuidStrType, PayerReferenceIdType
+    ] = _parse_payer_reference_id_and_type(
+        log=log,
+        payer_id=payer_id,
+        payer_reference_id=payer_reference_id,
+        payer_reference_id_type=payer_reference_id_type,
+    )
 
     payment_methods_list: PaymentMethodList
     try:
         payer_lookup_id: Optional[MixedUuidStrType] = payer_id or payer_reference_id
         if payer_lookup_id:
             payment_methods_list = await payment_method_processor.list_payment_methods(
-                payer_lookup_id=payer_lookup_id,
-                payer_reference_id_type=(
-                    payer_reference_id_type
-                    if payer_reference_id_type
-                    else PayerReferenceIdType.PAYER_ID
-                ),
+                payer_lookup_id=payer_reference_ids[0],
+                payer_reference_id_type=payer_reference_ids[1],
                 active_only=active_only or False,
                 sort_by=sort_by or PaymentMethodSortKey.CREATED_AT,
                 force_update=force_update or False,
@@ -202,3 +207,25 @@ async def delete_payment_method(
         raise
 
     return payment_method
+
+
+def _parse_payer_reference_id_and_type(
+    log: BoundLogger,
+    payer_id: Optional[UUID],
+    payer_reference_id: Optional[str],
+    payer_reference_id_type: Optional[PayerReferenceIdType],
+) -> Tuple[MixedUuidStrType, PayerReferenceIdType]:
+    if payer_id and not (payer_reference_id or payer_reference_id_type):
+        return payer_id, PayerReferenceIdType.PAYER_ID
+    elif (payer_reference_id and payer_reference_id_type) and not payer_id:
+        return payer_reference_id, payer_reference_id_type
+    else:
+        log.warn(
+            "[_parse_payer_reference_id_and_type] invalid input payer_id or payer_reference_id",
+            payer_id=payer_id,
+            payer_reference_id_type=payer_reference_id_type,
+            payer_reference_id=payer_reference_id,
+        )
+        raise PayinError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYER_REFERENCE_ID
+        )

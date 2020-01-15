@@ -17,9 +17,6 @@ class PayerTable(TableDefinition):
         Column("payer_reference_id_type", Text)
     )
     payer_reference_id: Column = no_init_field(Column("payer_reference_id", Text))
-    legacy_stripe_customer_id: Column = no_init_field(
-        Column("legacy_stripe_customer_id", Text)
-    )
     legacy_dd_stripe_customer_id: Column = no_init_field(
         Column("legacy_dd_stripe_customer_id", BigInteger)
     )
@@ -36,3 +33,10 @@ class PayerTable(TableDefinition):
     legacy_default_dd_stripe_card_id: Column = no_init_field(
         Column("legacy_default_dd_stripe_card_id", Integer)
     )
+    primary_pgp_payer_resource_id: Column = no_init_field(
+        Column("primary_pgp_payer_resource_id", Text)
+    )
+    primary_pgp_payer_id: Column = no_init_field(
+        Column("primary_pgp_payer_id", UUID(as_uuid=True))
+    )
+    primary_pgp_code: Column = no_init_field(Column("primary_pgp_code", Text))

@@ -34,7 +34,6 @@ from app.payin.core.payer.model import RawPayer, Payer
 from app.payin.core.payment_method.model import PaymentMethodIds, RawPaymentMethod
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.types import (
-    PayerIdType,
     MixedUuidStrType,
     PaymentMethodIdType,
     PgpPayerResourceId,
@@ -56,12 +55,12 @@ from app.payin.repository.payer_repo import (
     GetStripeCustomerByStripeIdInput,
     GetStripeCustomerByIdInput,
     GetPgpCustomerInput,
-    GetPayerByLegacyStripeCustomerIdInput,
+    GetPayerByPgpPayerResourceIdInput,
     UpdatePayerSetInput,
     UpdatePayerWhereInput,
-    GetStripeCustomerIdByPayerIdInput,
     GetConsumerIdByPayerIdInput,
     GetPayerByPayerRefIdAndTypeInput,
+    GetPayerByLegacyDDStripeCustomerIdInput,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -110,10 +109,10 @@ class PayerClient:
                     request=GetPgpCustomerInput(payer_id=exist_payer.id)
                 )
                 stripe_customer: Optional[StripeCustomerDbEntity] = None
-                if exist_payer.legacy_stripe_customer_id:
+                if exist_payer.primary_pgp_payer_resource_id:
                     stripe_customer = await self.payer_repo.get_stripe_customer_by_stripe_id(
-                        request=GetStripeCustomerByStripeIdInput(
-                            stripe_id=exist_payer.legacy_stripe_customer_id
+                        GetStripeCustomerByStripeIdInput(
+                            stripe_id=exist_payer.primary_pgp_payer_resource_id
                         )
                     )
                 return RawPayer(
@@ -192,22 +191,25 @@ class PayerClient:
         payer_entity: PayerDbEntity
         pgp_customer_entity: PgpCustomerDbEntity
         payer_id = generate_object_uuid()
+        pgp_customer_id = generate_object_uuid()
         now = datetime.now(timezone.utc)
         payer_input = InsertPayerInput(
             id=payer_id,
             payer_reference_id=payer_reference_id,
             payer_reference_id_type=payer_reference_id_type,
-            legacy_stripe_customer_id=pgp_customer_resource_id,
             legacy_dd_stripe_customer_id=stripe_customer_entity.id
             if stripe_customer_entity
             else None,
             country=country,
             description=description,
+            primary_pgp_payer_resource_id=pgp_customer_resource_id,
+            primary_pgp_payer_id=pgp_customer_id,
+            primary_pgp_code=pgp_code,
             created_at=now,
             updated_at=now,
         )
         pgp_customer_input = InsertPgpCustomerInput(
-            id=generate_object_uuid(),
+            id=pgp_customer_id,
             payer_id=payer_id,
             pgp_code=pgp_code,
             pgp_resource_id=pgp_customer_resource_id,
@@ -266,7 +268,7 @@ class PayerClient:
                     # get stripe_customer object
                     stripe_cus_entity = await self.payer_repo.get_stripe_customer_by_stripe_id(
                         GetStripeCustomerByStripeIdInput(
-                            stripe_id=payer_entity.legacy_stripe_customer_id
+                            stripe_id=payer_entity.primary_pgp_payer_resource_id
                         )
                     )
                 is_found = bool(payer_entity and pgp_cus_entity)
@@ -294,17 +296,17 @@ class PayerClient:
                 )
                 # get payer/pgp_customer objects
                 if stripe_cus_entity:
-                    payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_legacy_stripe_cus_id(
-                        input=GetPayerByLegacyStripeCustomerIdInput(
-                            legacy_stripe_customer_id=stripe_cus_entity.stripe_id
+                    payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_pgp_payer_resource_id(
+                        input=GetPayerByPgpPayerResourceIdInput(
+                            pgp_payer_resource_id=stripe_cus_entity.stripe_id
                         )
                     )
                 is_found = bool(stripe_cus_entity)
             elif payer_reference_id_type == PayerReferenceIdType.STRIPE_CUSTOMER_ID:
                 # get payer/pgp_customer objects
-                payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_legacy_stripe_cus_id(
-                    input=GetPayerByLegacyStripeCustomerIdInput(
-                        legacy_stripe_customer_id=mixed_payer_id
+                payer_entity, pgp_cus_entity = await self.payer_repo.get_payer_and_pgp_customer_by_pgp_payer_resource_id(
+                    input=GetPayerByPgpPayerResourceIdInput(
+                        pgp_payer_resource_id=mixed_payer_id
                     )
                 )
                 # get stripe_customer object
@@ -313,14 +315,12 @@ class PayerClient:
                 )
                 is_found = bool(payer_entity and pgp_cus_entity)
         except DBDataError:
-            self.log.exception(
-                "[get_payer_raw_objects] DBDataError when reading data from db."
-            )
+            self.log.exception("[get_raw_payer] DBDataError when reading data from db.")
             raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_DB_ERROR)
 
         if not is_found:
             self.log.error(
-                "[get_payer_raw_objects] payer not found.",
+                "[get_raw_payer] payer not found.",
                 mixed_payer_id=mixed_payer_id,
                 payer_reference_id_type=payer_reference_id_type,
             )
@@ -330,6 +330,47 @@ class PayerClient:
             pgp_customer_entity=pgp_cus_entity,
             stripe_customer_entity=stripe_cus_entity,
         )
+
+    async def get_payer_entity(
+        self,
+        payer_lookup_id: MixedUuidStrType,
+        payer_reference_id_type: PayerReferenceIdType,
+    ) -> PayerDbEntity:
+        payer_entity: Optional[PayerDbEntity]
+        try:
+            if payer_reference_id_type == PayerReferenceIdType.PAYER_ID:
+                payer_entity = await self.payer_repo.get_payer_by_id(
+                    request=GetPayerByIdInput(id=payer_lookup_id)
+                )
+            elif (
+                payer_reference_id_type
+                == PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID
+            ):
+                payer_entity = await self.payer_repo.get_payer_by_legacy_dd_stripe_customer_id(
+                    request=GetPayerByLegacyDDStripeCustomerIdInput(
+                        legacy_dd_stripe_customer_id=payer_lookup_id
+                    )
+                )
+            else:
+                payer_entity = await self.payer_repo.get_payer_by_reference_id_and_type(
+                    input=GetPayerByPayerRefIdAndTypeInput(
+                        payer_reference_id=payer_lookup_id,
+                        payer_reference_id_type=payer_reference_id_type,
+                    )
+                )
+        except DBDataError:
+            self.log.exception(
+                "[get_payer_entity] DBDataError when reading data from db."
+            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_DB_ERROR)
+        if not payer_entity:
+            self.log.warn(
+                "[get_payer_entity] payer not found.",
+                mixed_payer_id=payer_lookup_id,
+                payer_reference_id_type=payer_reference_id_type,
+            )
+            raise PayerReadError(error_code=PayinErrorCode.PAYER_READ_NOT_FOUND)
+        return payer_entity
 
     async def force_update_payer(
         self, raw_payer: RawPayer, country: CountryCode
@@ -592,24 +633,3 @@ class PayerClient:
         return await self.payer_repo.get_consumer_id_by_payer_id(
             input=GetConsumerIdByPayerIdInput(payer_id=payer_id)
         )
-
-    def _is_legacy(self, payer_id_type: Optional[PayerIdType] = None):
-        if not payer_id_type or payer_id_type in (
-            PayerIdType.PAYER_ID,
-            PayerIdType.DD_CONSUMER_ID,
-        ):
-            return False
-        return True
-
-    async def get_stripe_customer_id_by_payer_id(self, payer_id: str):
-        stripe_customer_id = await self.payer_repo.get_stripe_customer_id_by_payer_id(
-            input=GetStripeCustomerIdByPayerIdInput(payer_id=payer_id)
-        )
-        if not stripe_customer_id:
-            self.log.exception(
-                "[get_stripe_customer_id_by_payer_id] No stripe_customer_id available for payer: "
-            )
-            raise PayerReadError(
-                error_code=PayinErrorCode.PAYER_READ_STRIPE_ERROR_NOT_FOUND
-            )
-        return stripe_customer_id
