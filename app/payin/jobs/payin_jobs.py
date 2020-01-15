@@ -25,7 +25,7 @@ from app.payin.repository.cart_payment_repo import (
 from app.payin.repository.payer_repo import PayerRepository
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
-logger = get_logger("jobs")
+logger = get_logger("payin_jobs")
 
 
 async def job_callback(res, err, ctx):
