@@ -51,6 +51,7 @@ class AppContext:
 
     payout_maindb: DB
     payout_bankdb: DB
+    payout_paymentdb: DB
     payin_maindb: DB
     payin_paymentdb: DB
     ledger_maindb: DB
@@ -93,6 +94,7 @@ class AppContext:
                 # The way of closing will break if we have same connection pool assigned to different Database instance
                 self.payout_maindb.disconnect(),
                 self.payout_bankdb.disconnect(),
+                self.payout_paymentdb.disconnect(),
                 self.payin_maindb.disconnect(),
                 self.payin_paymentdb.disconnect(),
                 self.ledger_maindb.disconnect(),
@@ -181,6 +183,13 @@ async def create_app_context(config: AppConfig) -> AppContext:
         replica_url=config.PAYOUT_BANKDB_REPLICA_URL,
     )
 
+    payout_paymentdb = DB.create(
+        db_id="payout_paymentdb",
+        db_config=config.DEFAULT_DB_CONFIG,
+        master_url=config.PAYOUT_PAYMENTDB_MASTER_URL,
+        replica_url=config.PAYOUT_PAYMENTDB_REPLICA_URL,
+    )
+
     payin_paymentdb = DB.create(
         db_id="payin_paymentdb",
         db_config=config.DEFAULT_DB_CONFIG,
@@ -196,7 +205,9 @@ async def create_app_context(config: AppConfig) -> AppContext:
     )
 
     if "payout" in config.INCLUDED_APPS:
-        await asyncio.gather(payout_maindb.connect(), payout_bankdb.connect())
+        await asyncio.gather(
+            payout_maindb.connect(), payout_bankdb.connect(), payout_paymentdb.connect()
+        )
 
     if "payin" in config.INCLUDED_APPS:
         await asyncio.gather(payin_maindb.connect(), payin_paymentdb.connect())
@@ -317,6 +328,7 @@ async def create_app_context(config: AppConfig) -> AppContext:
         monitor=monitor,
         payout_maindb=payout_maindb,
         payout_bankdb=payout_bankdb,
+        payout_paymentdb=payout_paymentdb,
         payin_maindb=payin_maindb,
         payin_paymentdb=payin_paymentdb,
         ledger_maindb=ledger_maindb,

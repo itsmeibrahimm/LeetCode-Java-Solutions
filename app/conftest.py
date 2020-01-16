@@ -209,6 +209,20 @@ async def payout_bankdb(app_config: AppConfig):
 
 
 @pytest.fixture
+async def payout_paymentdb(app_config: AppConfig):
+    """
+    initialize the paymentdb connection for Payout user
+    """
+    async with DB.create(
+        db_id="payout_paymentdb",
+        db_config=app_config.DEFAULT_DB_CONFIG,
+        master_url=app_config.PAYOUT_PAYMENTDB_MASTER_URL,
+        replica_url=app_config.PAYOUT_PAYMENTDB_MASTER_URL,
+    ) as db:
+        yield db
+
+
+@pytest.fixture
 async def ledger_paymentdb(app_config: AppConfig):
     """
     initialize the paymentdb connection for Ledger user
@@ -245,6 +259,7 @@ def dummy_app_context(mocker: MockFixture):
         payin_maindb=mocker.Mock(),
         payin_paymentdb=mocker.Mock(),
         payout_maindb=mocker.Mock(),
+        payout_paymentdb=mocker.Mock(),
         ledger_maindb=mocker.Mock(),
         ledger_paymentdb=mocker.Mock(),
         purchasecard_maindb=mocker.Mock(),

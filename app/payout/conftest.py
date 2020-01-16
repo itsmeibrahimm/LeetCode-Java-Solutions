@@ -57,6 +57,7 @@ from app.payout.repository.maindb.managed_account_transfer import (
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.repository.paymentdb.payout_lock import PayoutLockRepository
 from app.payout.test_integration.api import (
     create_account_url,
     verify_account_url,
@@ -84,6 +85,11 @@ def payment_account_repo(payout_maindb: DB) -> PaymentAccountRepository:
 @pytest.fixture
 def payout_repo(payout_bankdb: DB) -> PayoutRepository:
     return PayoutRepository(database=payout_bankdb)
+
+
+@pytest.fixture
+def payout_lock_repo(payout_paymentdb: DB) -> PayoutLockRepository:
+    return PayoutLockRepository(database=payout_paymentdb)
 
 
 @pytest.fixture

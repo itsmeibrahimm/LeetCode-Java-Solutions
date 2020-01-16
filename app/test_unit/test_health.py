@@ -21,6 +21,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
     monitor = mocker.Mock()
     logger = mocker.Mock()
     payout_bankdb = mocker.Mock()
+    payout_paymentdb = mocker.Mock()
     payin_maindb = mocker.Mock()
     payin_paymentdb = mocker.Mock()
     payout_maindb = mocker.Mock()
@@ -35,6 +36,7 @@ def client(mocker: pytest_mock.MockFixture, app_config: AppConfig):
         log=logger,
         payout_maindb=payout_maindb,
         payout_bankdb=payout_bankdb,
+        payout_paymentdb=payout_paymentdb,
         payin_maindb=payin_maindb,
         payin_paymentdb=payin_paymentdb,
         ledger_maindb=ledger_maindb,
