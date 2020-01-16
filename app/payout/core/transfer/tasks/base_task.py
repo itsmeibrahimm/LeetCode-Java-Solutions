@@ -79,12 +79,21 @@ class BaseTask:
 
         return MonitorTransferWithIncorrectStatusTask
 
+    @staticmethod
+    def update_transfer_by_stripe_transfer_status_task():
+        from app.payout.core.transfer.tasks.update_transfer_by_stripe_transfer_status_task import (
+            UpdateTransferByStripeTransferStatusTask,
+        )
+
+        return UpdateTransferByStripeTransferStatusTask
+
     async def execute(self, app_context: AppContext, data: dict):
         task_type_mapping = {
             "weekly_create_transfer": self.weekly_create_transfer_task(),
             "create_transfer": self.create_transfer_task(),
             "submit_transfer": self.submit_transfer_task(),
             "monitor_transfer_with_incorrect_status": self.monitor_transfer_with_incorrect_status_task(),
+            "update_transfer_by_stripe_transfer_status": self.update_transfer_by_stripe_transfer_status_task(),
         }
 
         task = task_type_mapping.get(self.task_type, None)

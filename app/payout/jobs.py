@@ -15,9 +15,9 @@ from app.payout.constants import (
     ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT,
     ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
 )
-from app.payout.core.transfer.processors.update_transfer_by_stripe_transfer_status import (
-    UpdateTransferByStripeTransferStatus,
-    UpdateTransferByStripeTransferStatusRequest,
+from app.payout.core.transfer.processors.monitor_transfer_with_incorrect_status import (
+    MonitorTransferWithIncorrectStatusRequest,
+    MonitorTransferWithIncorrectStatus,
 )
 from app.payout.core.transfer.processors.weekly_create_transfer import (
     WeeklyCreateTransfer,
@@ -176,53 +176,42 @@ class MonitorTransfersWithIncorrectStatus(Job):
             transfer_repo = TransferRepository(
                 database=job_instance_cxt.app_context.payout_maindb
             )
-            transfer_ids = await transfer_repo.get_transfers_by_submitted_at_and_method(
-                start_time=start
-            )
 
-            job_instance_cxt.log.info(
-                "[monitor_transfers_with_incorrect_status] Starting execution",
-                start_time=start,
-                transfers_total_number=len(transfer_ids),
-            )
             req_context = job_instance_cxt.build_req_context()
 
-            enable_queuing_mechanism_for_payout_service = runtime.get_bool(
+            if runtime.get_bool(
                 ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
                 False,
-            )
-
-            for transfer_id in transfer_ids:
-                if enable_queuing_mechanism_for_payout_service:
-                    # put monitor_transfer_with_incorrect_status into queue
-                    logger.info(
-                        "Enqueuing monitor_transfer_with_incorrect_status task",
-                        transfer_id=transfer_id,
-                    )
-                    monitor_transfer_with_incorrect_status_task = MonitorTransferWithIncorrectStatusTask(
-                        transfer_id=transfer_id
-                    )
-                    await job_instance_cxt.job_pool.spawn(
-                        monitor_transfer_with_incorrect_status_task.send(
-                            kafka_producer=job_instance_cxt.app_context.kafka_producer
-                        ),
-                        cb=job_callback,
-                    )
-                else:
-                    update_transfer_req = UpdateTransferByStripeTransferStatusRequest(
-                        transfer_id=transfer_id
-                    )
-                    update_transfer_by_stripe_transfer_status_op = UpdateTransferByStripeTransferStatus(
-                        transfer_repo=transfer_repo,
-                        stripe_transfer_repo=stripe_transfer_repo,
-                        stripe=req_context.stripe_async_client,
-                        logger=logger,
-                        request=update_transfer_req,
-                    )
-                    await job_instance_cxt.job_pool.spawn(
-                        update_transfer_by_stripe_transfer_status_op.execute(),
-                        cb=job_callback,
-                    )
+            ):
+                # put monitor_transfer_with_incorrect_status into queue
+                logger.info(
+                    "Enqueuing monitor_transfer_with_incorrect_status task",
+                    start_time=start,
+                )
+                monitor_transfer_with_incorrect_status_task = MonitorTransferWithIncorrectStatusTask(
+                    start_time=start.isoformat()
+                )
+                await job_instance_cxt.job_pool.spawn(
+                    monitor_transfer_with_incorrect_status_task.send(
+                        kafka_producer=job_instance_cxt.app_context.kafka_producer
+                    ),
+                    cb=job_callback,
+                )
+            else:
+                monitor_transfer_with_incorrect_status_req = MonitorTransferWithIncorrectStatusRequest(
+                    start_time=start
+                )
+                monitor_transfer_with_incorrect_status_op = MonitorTransferWithIncorrectStatus(
+                    transfer_repo=transfer_repo,
+                    stripe_transfer_repo=stripe_transfer_repo,
+                    stripe=req_context.stripe_async_client,
+                    logger=logger,
+                    request=monitor_transfer_with_incorrect_status_req,
+                    kafka_producer=job_instance_cxt.app_context.kafka_producer,
+                )
+                await job_instance_cxt.job_pool.spawn(
+                    monitor_transfer_with_incorrect_status_op.execute(), cb=job_callback
+                )
 
     def _start_of_the_week(self, date: datetime) -> datetime:
         return date - timedelta(days=date.weekday())

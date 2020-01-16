@@ -185,6 +185,9 @@ class PayoutTask(str, Enum):
     CREATE_TRANSFER = "create_transfer"
     SUBMIT_TRANSFER = "submit_transfer"
     MONITOR_TRANSFER_WITH_INCORRECT_STATUS = "monitor_transfer_with_incorrect_status"
+    UPDATE_TRANSFER_BY_STRIPE_TRANSFER_STATUS_TASK = (
+        "update_transfer_by_stripe_transfer_status"
+    )
 
 
 # Transactions

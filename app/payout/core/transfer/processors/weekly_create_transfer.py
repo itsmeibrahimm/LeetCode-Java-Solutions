@@ -196,7 +196,7 @@ class WeeklyCreateTransfer(
                     await create_transfer_op.execute()
             except Exception as e:
                 self.logger.warn(
-                    "[weekly_create_transfer] Failed to creat_transfer for payment account. ",
+                    "[weekly_create_transfer] Failed to create_transfer for payment account. ",
                     payment_account_id=account_id,
                     error=e,
                 )

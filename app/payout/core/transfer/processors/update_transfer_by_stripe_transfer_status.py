@@ -49,6 +49,7 @@ class UpdateTransferByStripeTransferStatus(
 
     transfer_repo: TransferRepositoryInterface
     stripe_transfer_repo: StripeTransferRepositoryInterface
+    stripe: StripeAsyncClient
 
     def __init__(
         self,

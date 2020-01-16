@@ -12,7 +12,11 @@ from app.commons.context.app_context import AppContext
 from app.commons.core.errors import DBOperationError
 from app.commons.database.infra import DB
 from app.commons.kafka import KafkaWorker
+from app.conftest import RuntimeSetter
 from app.payout import tasks
+from app.payout.constants import (
+    ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
+)
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferResponse,
     SubmitTransferRequest,
@@ -304,6 +308,7 @@ class TestKafkaWorker:
         payment_account_repo: PaymentAccountRepository,
         transfer_repo: TransferRepository,
         stripe_transfer_repo: StripeTransferRepository,
+        runtime_setter: RuntimeSetter,
     ):
         mocked_payout = mock_payout(status="paid")
 
@@ -340,11 +345,22 @@ class TestKafkaWorker:
             side_effect=mock_list_transfers,
         )
 
+        runtime_setter.set(
+            ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS, True
+        )
+
         monitor_transfer_with_incorrect_status_task = MonitorTransferWithIncorrectStatusTask(
-            transfer_id=transfer.id
+            start_time=datetime.now(timezone.utc).isoformat()
         )
         await monitor_transfer_with_incorrect_status_task.send(
             kafka_producer=app_context.kafka_producer
+        )
+        payout_worker = KafkaWorker(
+            app_context=app_context,
+            app_config=app_config,
+            topic_name=self.payout_topic_name,
+            processor=tasks.process_message,
+            num_consumers=1,
         )
 
         stripe_worker = KafkaWorker(
@@ -355,11 +371,13 @@ class TestKafkaWorker:
             num_consumers=1,
         )
         await stripe_worker.start()
+        await payout_worker.start()
 
         await asyncio.sleep(10)
         # Stopping workers with graceful timeout set to 3 seconds
         # await payout_worker.stop(graceful_timeout_seconds=3)
         await stripe_worker.stop(graceful_timeout_seconds=3)
+        await payout_worker.stop(graceful_timeout_seconds=3)
 
         retrieved_transfer = await transfer_repo.get_transfer_by_id(
             transfer_id=transfer.id
