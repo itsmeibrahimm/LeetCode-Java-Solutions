@@ -94,11 +94,18 @@ app_context.monitor.add(
 monitor_transfers_with_incorrect_status = MonitorTransfersWithIncorrectStatus(
     app_context=app_context, job_pool=job_pool
 )
-scheduler.add_job(
-    func=monitor_transfers_with_incorrect_status.run,
-    name=monitor_transfers_with_incorrect_status.job_name,
-    trigger=CronTrigger(hour="1", timezone=pytz.timezone("US/Pacific")),
-)
+if app_config.ENVIRONMENT == "prod":
+    scheduler.add_job(
+        func=monitor_transfers_with_incorrect_status.run,
+        name=monitor_transfers_with_incorrect_status.job_name,
+        trigger=CronTrigger(hour="1", timezone=pytz.timezone("US/Pacific")),
+    )
+elif app_config.ENVIRONMENT == "staging":
+    scheduler.add_job(
+        func=monitor_transfers_with_incorrect_status.run,
+        name=monitor_transfers_with_incorrect_status.job_name,
+        trigger=CronTrigger(minute="*/30"),
+    )
 
 retry_instant_pay_in_new = RetryInstantPayoutInNew(
     app_context=app_context, job_pool=job_pool

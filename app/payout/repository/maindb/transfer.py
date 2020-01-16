@@ -109,7 +109,7 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
     async def get_transfers_by_submitted_at_and_method(
         self, start_time: datetime
     ) -> List[int]:
-        override_stmt_timeout_in_ms = 10000
+        override_stmt_timeout_in_ms = 20 * 1000
         query = and_(
             transfers.submitted_at.__ge__(start_time),
             transfers.method == TransferMethodType.STRIPE,

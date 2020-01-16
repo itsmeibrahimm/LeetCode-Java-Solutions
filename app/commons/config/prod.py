@@ -146,9 +146,16 @@ def create_app_config_for_payout_worker() -> AppConfig:
         debug=False,
         statement_timeout_sec=900,
     )
+    payout_worker_default_db_config = DBConfig(
+        replica_pool_max_size=5,
+        master_pool_max_size=5,
+        debug=False,
+        statement_timeout_sec=30,
+    )
     return dataclasses.replace(
         web_appconfig,
         STRIPE_MAX_WORKERS=30,
         PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE=30,
         BANK_DB_CONFIG=payout_worker_bank_db_config,
+        DEFAULT_DB_CONFIG=payout_worker_default_db_config,
     )
