@@ -34,6 +34,7 @@ router = APIRouter()
     "/",
     operation_id="CreateTransfer",
     status_code=HTTP_201_CREATED,
+    response_model=transfer_models.Transfer,
     responses={
         HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
         HTTP_403_FORBIDDEN: {"model": PaymentErrorResponseBody},
@@ -101,6 +102,7 @@ async def create_transfer(
     "/{transfer_id}/submit",
     operation_id="SubmitTransfer",
     status_code=HTTP_200_OK,
+    response_model=transfer_models.SubmitTransferResponse,
     responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
@@ -127,6 +129,7 @@ async def submit_transfer(
     "/{transfer_id}",
     operation_id="UpdateTransfer",
     status_code=HTTP_200_OK,
+    response_model=transfer_models.Transfer,
     responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
@@ -150,6 +153,7 @@ async def update_transfer(
     "/{transfer_id}",
     operation_id="GetTransferById",
     status_code=HTTP_200_OK,
+    response_model=transfer_models.Transfer,
     responses={HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
@@ -168,6 +172,7 @@ async def get_transfer_by_id(
     "/",
     operation_id="ListTransfers",
     status_code=HTTP_200_OK,
+    response_model=transfer_models.TransferList,
     responses={HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody}},
     tags=api_tags,
 )
