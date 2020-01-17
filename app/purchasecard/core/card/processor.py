@@ -74,6 +74,13 @@ class CardProcessor:
                 req=get_card_req
             )
         except marqeta_errors.MarqetaResourceNotFound as e:
+            self.logger.warn(
+                "[associate_card_with_dasher] marqeta card not found",
+                delight_number=delight_number,
+                last4=last4,
+                user_token=user_token,
+                dasher_id=dasher_id,
+            )
             raise MarqetaResourceNotFoundError() from e
 
         num_prev_owners = 0
@@ -95,6 +102,13 @@ class CardProcessor:
                         ended_at=datetime.utcnow(),
                     )
                 else:
+                    self.logger.warn(
+                        "[associate_card_with_dasher] cannot assign marqeta card to dasher",
+                        delight_number=delight_number,
+                        last4=last4,
+                        user_token=user_token,
+                        dasher_id=dasher_id,
+                    )
                     raise MarqetaCannotAssignCardError()
 
         # if dasher already has a different card, relinquish ownership
@@ -120,6 +134,13 @@ class CardProcessor:
                 token=card_token, user_token=user_token
             )
         except marqeta_errors.MarqetaCannotMoveCardToNewCardHolderError:
+            self.logger.warn(
+                "[associate_card_with_dasher] cannot move card to new card holder",
+                delight_number=delight_number,
+                last4=last4,
+                user_token=user_token,
+                dasher_id=dasher_id,
+            )
             raise MarqetaCannotMoveCardToNewCardHolderError()
 
         await self.card_ownership_repo.create_card_ownership(
@@ -142,6 +163,10 @@ class CardProcessor:
             dasher_id
         )
         if not card_ownership:
+            self.logger.warn(
+                "[unassociate_card_from_dasher] no active marqeta card ownership for dasher",
+                dasher_id=dasher_id,
+            )
             raise MarqetaNoActiveCardOwnershipError()
 
         await self.transition_card(
@@ -161,10 +186,19 @@ class CardProcessor:
             dasher_id
         )
         if not card_ownership:
+            self.logger.warn(
+                "[get_marqeta_card_by_dasher_id] no active marqeta card ownership for dasher",
+                dasher_id=dasher_id,
+            )
             raise MarqetaNoActiveCardOwnershipError()
 
         card = await self.card_repo.get_by_token(token=card_ownership.card_id)
         if not card:
+            self.logger.warn(
+                "[get_marqeta_card_by_dasher_id] no marqeta card found for token",
+                dasher_id=dasher_id,
+                token=card_ownership.card_id,
+            )
             raise MarqetaCardNotFoundError()
         return InternalGetMarqetaCardResponse(
             token=card.token,
@@ -205,7 +239,7 @@ class CardProcessor:
                     token=card_id, active=True
                 )
             except marqeta_errors.MarqetaAPIError:
-                self.logger.info("[marqeta] Failed to activate card %s", card_id)
+                self.logger.warn("[marqeta] Failed to activate card %s", card_id)
                 raise MarqetaCannotActivateCardError()
 
         elif desired_state == TransitionState.INACTIVE:
@@ -214,7 +248,7 @@ class CardProcessor:
                     token=card_id, active=False
                 )
             except marqeta_errors.MarqetaAPIError:
-                self.logger.info("[marqeta] Failed to inactivate card %s", card_id)
+                self.logger.warn("[marqeta] Failed to inactivate card %s", card_id)
                 raise MarqetaCannotInactivateCardError()
 
         if card:
