@@ -86,15 +86,26 @@ class StripePayoutRequestRepository(
     async def list_stripe_payout_requests_by_payout_ids(
         self, payout_ids: List[int]
     ) -> List[StripePayoutRequest]:
-        stmt = (
-            stripe_payout_requests.table.select()
-            .where(stripe_payout_requests.payout_id.in_(payout_ids))
-            .order_by(desc(stripe_payout_requests.id))
-        )  # order by id desc
-        rows = await self._database.replica().fetch_all(stmt)
-        if rows:
-            return [StripePayoutRequest.from_row(row) for row in rows]
-        return []
+        override_stmt_timeout_in_ms = 10000
+        override_stmt_timeout_stmt = "SET LOCAL statement_timeout = {};".format(
+            override_stmt_timeout_in_ms
+        )
+        async with self._database.replica().transaction() as tx:
+            connection = tx.connection()
+
+            # 1. overwrite timeout
+            await connection.execute(override_stmt_timeout_stmt)
+
+            # 2. Query stripe payout request
+            stmt = (
+                stripe_payout_requests.table.select()
+                .where(stripe_payout_requests.payout_id.in_(payout_ids))
+                .order_by(desc(stripe_payout_requests.id))
+            )  # order by id desc
+            rows = await connection.fetch_all(stmt)
+            if rows:
+                return [StripePayoutRequest.from_row(row) for row in rows]
+            return []
 
     async def get_stripe_payout_request_by_stripe_payout_id(
         self, stripe_payout_id: str
