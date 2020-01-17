@@ -241,35 +241,87 @@ class PgpRefund(BaseModel):
 
 @final
 class LegacyConsumerCharge(BaseModel):
+    """
+    Represent simplified API model of consumer_charge object in doordash maindb.
+    Note: this model may not include all columns in consumer_charge and only stands for API contract purpose
+
+                                                     Table "public.consumer_charge"
+             Column          |           Type           | Collation | Nullable |
+    Default
+    -------------------------+--------------------------+-----------+----------+-------------------
+    --------------------------
+     id                      | integer                  |           | not null | nextval('payments_
+    charge_id_seq'::regclass)
+     target_ct_id            | integer                  |           | not null |
+     target_id               | integer                  |           | not null |
+     consumer_id             | integer                  |           |          |
+     total                   | integer                  |           | not null |
+     issue_id                | integer                  |           |          |
+     original_total          | integer                  |           | not null |
+     country_id              | integer                  |           | not null |
+     is_stripe_connect_based | boolean                  |           | not null |
+     currency                | text                     |           |          |
+     stripe_customer_id      | integer                  |           |          |
+     created_at              | timestamp with time zone |           |          |
+     idempotency_key         | character varying(120)   |           |          |
+     updated_at              | timestamp with time zone |           |          |
+    """
+
     id: LegacyConsumerChargeId
     target_id: int
     target_ct_id: int
-    idempotency_key: str
+    idempotency_key: Optional[str]
     is_stripe_connect_based: bool
     total: int
     original_total: int
-    currency: Currency
+    currency: Optional[Currency]
     country_id: int
     issue_id: Optional[int]
     stripe_customer_id: Optional[int]
-    created_at: datetime
+    created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
 
 @final
 class LegacyStripeCharge(BaseModel):
+    """
+    Represent simplified API model of stripe_charge object in doordash maindb.
+    Note: this model may not include all columns in stripe_charge and only stands for API contract purpose
+                                                     Table "public.stripe_charge"
+             Column          |           Type           | Collation | Nullable |
+       Default
+    -------------------------+--------------------------+-----------+----------+-------------------
+    --------------------------------
+     id                      | integer                  |           | not null | nextval('payments_
+    stripecharge_id_seq'::regclass)
+     created_at              | timestamp with time zone |           | not null |
+     stripe_id               | character varying(50)    |           | not null |
+     charge_id               | integer                  |           | not null |
+     amount                  | integer                  |           |          |
+     amount_refunded         | integer                  |           |          |
+     card_id                 | integer                  |           |          |
+     error_reason            | text                     |           |          |
+     status                  | text                     |           |          |
+     additional_payment_info | text                     |           |          |
+     currency                | text                     |           |          |
+     description             | text                     |           |          |
+     idempotency_key         | text                     |           |          |
+     refunded_at             | timestamp with time zone |           |          |
+     updated_at              | timestamp with time zone |           |          |
+    """
+
     id: int
-    amount: int
-    amount_refunded: int
-    currency: Currency
-    status: LegacyStripeChargeStatus
+    amount: Optional[int]
+    amount_refunded: Optional[int]
+    currency: Optional[Currency]
+    status: Optional[LegacyStripeChargeStatus]
     error_reason: Optional[str]
     additional_payment_info: Optional[str]
     description: Optional[str]
-    idempotency_key: str
+    idempotency_key: Optional[str]
     card_id: Optional[int]
     charge_id: int
     stripe_id: str
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime]
     refunded_at: Optional[datetime]

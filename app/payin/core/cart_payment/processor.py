@@ -121,7 +121,9 @@ from app.payin.repository.cart_payment_repo import (
     UpdateLegacyStripeChargeRemovePiiSetInput,
 )
 
-IntentFullfillmentResult = NewType("IntentFullfillmentResult", Tuple[str, int])
+IntentFullfillmentResult = NewType(
+    "IntentFullfillmentResult", Tuple[str, Optional[int]]
+)
 
 
 class LegacyPaymentInterface:
