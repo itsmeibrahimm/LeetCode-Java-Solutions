@@ -294,6 +294,12 @@ class DeletePayerProcessor:
         )
 
         if pii_removal_successful:
+            self.log.info(
+                "[delete_payer] Delete payer successful.",
+                consumer_id=delete_payer_request.consumer_id,
+                client_request_id=delete_payer_request.client_request_id,
+            )
+            doorstats_global.incr("delete-payer.success")
             status = DeletePayerRequestStatus.SUCCEEDED
             acknowledged = await send_response(
                 app_context=self.app_context,
@@ -304,15 +310,22 @@ class DeletePayerProcessor:
                 response=delete_payer_summary.json(),
             )
         else:
+            self.log.info(
+                "[delete_payer] Delete payer unsuccessful.",
+                consumer_id=delete_payer_request.consumer_id,
+                client_request_id=delete_payer_request.client_request_id,
+            )
+            doorstats_global.incr("delete-payer.error")
             retry_count += 1
             if retry_count >= self.max_retries:
-                self.log.info(
+                self.log.error(
                     "[delete_payer] Maximum number of retry attempts reached. "
                     "Please have someone from support take a look at the issue.",
                     consumer_id=delete_payer_request.consumer_id,
                     client_request_id=delete_payer_request.client_request_id,
                 )
                 # TODO Paging logic here, JIRA created - https: // doordash.atlassian.net / browse / PP - 124
+                doorstats_global.incr("delete-payer.failure")
                 status = DeletePayerRequestStatus.FAILED
                 self.update_delete_payer_summary_after_max_retries(delete_payer_summary)
                 acknowledged = await send_response(
@@ -325,31 +338,20 @@ class DeletePayerProcessor:
                 )
 
         try:
-            updated_delete_payer_request = await self.payer_client.update_delete_payer_request(
+            await self.payer_client.update_delete_payer_request(
                 delete_payer_request.client_request_id,
                 status,
                 delete_payer_summary.json(),
                 retry_count,
                 acknowledged,
             )
-            """If removal of all pii data successful, response successfully sent
-                    and status properly updated to db, increment success counter"""
-            if (
-                updated_delete_payer_request
-                and updated_delete_payer_request.status
-                == DeletePayerRequestStatus.SUCCEEDED
-                and updated_delete_payer_request.acknowledged
-            ):
-                doorstats_global.incr("delete-payer.success")
-            else:
-                doorstats_global.incr("delete-payer.failure")
         except PayerDeleteError:
-            doorstats_global.incr("delete-payer.errors")
             self.log.exception(
                 "[delete_payer] Database exception occurred with updating delete payer request",
                 consumer_id=delete_payer_request.consumer_id,
                 client_request_id=delete_payer_request.client_request_id,
             )
+            doorstats_global.incr("delete-payer.exception")
             raise
 
     async def remove_pii_from_stripe_cards(
@@ -370,7 +372,15 @@ class DeletePayerProcessor:
                     stripe_card.last4 != DeletePayerRedactingText.XXXX
                     or stripe_card.dynamic_last4 != DeletePayerRedactingText.XXXX
                 ):
+                    self.log.error(
+                        "[remove_pii_from_stripe_cards] Pii removal from stripe cards unsuccessful",
+                        consumer_id=consumer_id,
+                    )
                     return False
+            self.log.info(
+                "[remove_pii_from_stripe_cards] Pii removed from stripe cards",
+                consumer_id=consumer_id,
+            )
             return True
         except PaymentMethodUpdateError:
             self.log.exception(
@@ -423,6 +433,16 @@ class DeletePayerProcessor:
                             legacy_stripe_charge_id=legacy_stripe_charge.id,
                         )
         """If no of the updates failed then updated the status to succeeded"""
+        if not failed_updates:
+            self.log.info(
+                "[remove_pii_from_stripe_charges] Pii removed from stripe charges",
+                consumer_id=consumer_id,
+            )
+        else:
+            self.log.error(
+                "[remove_pii_from_stripe_charges] Pii removal from stripe charges unsuccessful",
+                consumer_id=consumer_id,
+            )
         return not failed_updates
 
     async def remove_pii_from_cart_payments(
@@ -440,7 +460,15 @@ class DeletePayerProcessor:
             )
             for cart_payment in updated_cart_payments:
                 if cart_payment.client_description != DeletePayerRedactingText.REDACTED:
+                    self.log.error(
+                        "[remove_pii_from_cart_payments] Pii removal from cart_payments unsuccessful",
+                        consumer_id=consumer_id,
+                    )
                     return False
+            self.log.info(
+                "[remove_pii_from_cart_payments] Pii removed from cart_payments",
+                consumer_id=consumer_id,
+            )
             return True
         except CartPaymentUpdateError:
             self.log.exception(
@@ -476,7 +504,8 @@ class DeletePayerProcessor:
 
         if not stripe_customer_id:
             self.log.info(
-                "No stripe customer id found for consumer", consumer_id=consumer_id
+                "[delete_stripe_customer] No stripe customer id found for consumer",
+                consumer_id=consumer_id,
             )
             return True
 
@@ -486,7 +515,7 @@ class DeletePayerProcessor:
         """
         for country_code in CountryCode:
             self.log.info(
-                "Trying to delete stripe customer for country",
+                "[delete_stripe_customer] Trying to delete stripe customer for country",
                 consumer_id=consumer_id,
                 stripe_customer_id=stripe_customer_id,
                 country_code=country_code,
@@ -497,6 +526,10 @@ class DeletePayerProcessor:
                 )
                 if stripe_response and stripe_response.deleted:
                     """Here we return early if stripe customer delete was successful in any of the pods"""
+                    self.log.info(
+                        "[delete_stripe_customer] Customer successfully deleted from stripe",
+                        consumer_id=consumer_id,
+                    )
                     return True
             except PayerDeleteError:
                 self.log.exception(

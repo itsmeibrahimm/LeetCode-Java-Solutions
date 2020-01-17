@@ -40,6 +40,13 @@ _CONFIG_MAP_PAYIN_CRON: Mapping[str, Callable[..., AppConfig]] = {
     "testing": TESTING,
 }
 
+_CONFIG_MAP_DELETE_PAYER_CRON: Mapping[str, Callable[..., AppConfig]] = {
+    "prod": PROD,
+    "staging": STAGING,
+    "local": LOCAL,
+    "testing": TESTING,
+}
+
 _CONFIG_MAP_PAYOUT_CRON: Mapping[str, Callable[..., AppConfig]] = {
     "prod": PAYOUT_CRON_PROD,
     "staging": PAYOUT_CRON_STAGING,
@@ -90,6 +97,10 @@ def init_app_config_for_payout_cron() -> AppConfig:
 
 def init_app_config_for_payin_cron() -> AppConfig:
     return _init_app_config(_CONFIG_MAP_PAYIN_CRON)
+
+
+def init_app_config_for_delete_payer_cron() -> AppConfig:
+    return _init_app_config(_CONFIG_MAP_DELETE_PAYER_CRON)
 
 
 def init_app_config_for_payout_worker() -> AppConfig:

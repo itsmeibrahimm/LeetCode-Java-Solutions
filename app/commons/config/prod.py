@@ -85,6 +85,9 @@ def create_app_config() -> AppConfig:
             hour="0-15,19-23", minute="*/15", timezone=pytz.timezone("US/Pacific")
         ),
         DEFAULT_CAPTURE_DELAY_IN_MINUTES=180,  # 180 mins
+        DELETE_PAYER_CRON_TRIGGER=CronTrigger(
+            hour="23", timezone=pytz.timezone("US/Pacific")
+        ),
         MARQETA_BASE_URL="https://doordash-api.marqeta.com/v3/",
         MARQETA_USERNAME=Secret(name="marqeta_username"),
         MARQETA_PASSWORD=Secret(name="marqeta_password"),

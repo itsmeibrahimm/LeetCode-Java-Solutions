@@ -179,6 +179,7 @@ class AppConfig(SecretAware):
 
     PAYIN_CRON_JOB_POOL_DEFAULT_SIZE: int = 20
     PAYOUT_CRON_JOB_POOL_DEFAULT_SIZE: int = 20
+    DELETE_PAYER_CRON_JOB_POOL_DEFAULT_SIZE: int = 20
 
     INCLUDED_APPS: frozenset = frozenset({"payout", "payin", "ledger", "purchasecard"})
 
@@ -201,3 +202,6 @@ class AppConfig(SecretAware):
     PROBLEMATIC_CAPTURE_DELAY: timedelta = timedelta(days=1)
 
     WORKER_HEALTH_SERVER_PORT: int = 80
+
+    # Configures cron trigger for delete payer job
+    DELETE_PAYER_CRON_TRIGGER: CronTrigger = CronTrigger(minute="*/5")
