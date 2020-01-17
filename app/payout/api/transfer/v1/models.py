@@ -7,7 +7,14 @@ from app.commons.api.models import PaymentRequest, PaymentResponse
 from app.payout.models import TransferId, PayoutDay
 from app.payout.repository.maindb.model.transfer import TransferStatus
 
-__all__ = ["SubmitTransfer", "CreateTransfer", "SubmitTransferResponse", "Transfer"]
+__all__ = [
+    "SubmitTransfer",
+    "CreateTransfer",
+    "UpdateTransfer",
+    "SubmitTransferResponse",
+    "Transfer",
+    "TransferList",
+]
 
 
 class SubmitTransfer(PaymentRequest):
