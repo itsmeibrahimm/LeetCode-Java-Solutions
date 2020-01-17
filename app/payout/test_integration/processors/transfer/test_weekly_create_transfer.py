@@ -151,6 +151,115 @@ class TestWeeklyCreateTransfer:
             == payment_account.id
         )
 
+    async def test_execute_weekly_create_transfer_no_ato_check_with_bucket_enabled_payment_accounts(
+        self, runtime_setter: RuntimeSetter
+    ):
+        sma_a = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        sma_b = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=self.payment_account_repo
+        )
+
+        payment_account_a = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo, account_id=sma_a.id
+        )
+        await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo,
+            payout_account_id=payment_account_a.id,
+        )
+        await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo,
+            payout_account_id=payment_account_a.id,
+        )
+
+        payment_account_b = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo, account_id=sma_b.id
+        )
+        await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo,
+            payout_account_id=payment_account_b.id,
+        )
+
+        # Use the minimum number of the modular remainder to determine the bucket size
+        # For example. if payment_account_a is 99 and payment_account_b is 100, the remainder will be 99 and 0, respectively
+        # so the bucket size will be set to 0 + 1 = 1, so payment_account_b will be enabled, and payment_account_a will be disabled
+        enabled_account = (
+            payment_account_a
+            if payment_account_a.id % 100 < payment_account_b.id % 100
+            else payment_account_b
+        )
+        account_list = [payment_account_a.id, payment_account_b.id]
+        account_list.remove(enabled_account.id)
+        disabled_account_id = account_list[0]
+        bucket = enabled_account.id % 100 + 1
+        runtime_setter.set(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False)
+        data = {"enable_all": False, "white_list": [], "bucket": bucket}
+        runtime_setter.set("payout/feature-flags/enable_list_transfers_v1.json", data)
+
+        @asyncio.coroutine
+        def mock_get_payment_account_ids(*args, **kwargs):
+            return [payment_account_a.id, payment_account_b.id]
+
+        self.mocker.patch(
+            "app.payout.repository.bankdb.transaction.TransactionRepository.get_payout_account_ids_for_unpaid_transactions_without_limit",
+            side_effect=mock_get_payment_account_ids,
+        )
+
+        @asyncio.coroutine
+        def mock_check_payment_account_auto_paid(*args, **kwargs):
+            return True
+
+        self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.should_payment_account_be_auto_paid_weekly",
+            side_effect=mock_check_payment_account_auto_paid,
+        )
+
+        @asyncio.coroutine
+        def mock_execute_submit_transfer(*args, **kwargs):
+            return SubmitTransferResponse()
+
+        self.mocker.patch(
+            "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.execute",
+            side_effect=mock_execute_submit_transfer,
+        )
+        mocked_init_submit_transfer = self.mocker.patch.object(
+            SubmitTransferRequest, "__init__", return_value=None
+        )
+
+        weekly_create_transfer_op = self._construct_weekly_create_transfer_op()
+        await weekly_create_transfer_op._execute()
+
+        enabled_transactions = await self.transaction_repo.get_transaction_by_payout_account_id(
+            payout_account_id=enabled_account.id, offset=0, limit=2
+        )
+        assert len(enabled_transactions) >= 1
+        expected_transfer_id = enabled_transactions[0].transfer_id
+        assert expected_transfer_id
+        aggregated_amount = 0
+        for transaction in enabled_transactions:
+            assert transaction.transfer_id == expected_transfer_id
+            aggregated_amount += transaction.amount
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
+            transfer_id=expected_transfer_id
+        )
+        assert retrieved_transfer
+        assert retrieved_transfer.amount == aggregated_amount
+
+        disabled_transactions = await self.transaction_repo.get_transaction_by_payout_account_id(
+            payout_account_id=disabled_account_id, offset=0, limit=2
+        )
+        assert len(disabled_transactions) >= 1
+        for transaction in disabled_transactions:
+            assert not transaction.transfer_id
+
+        mocked_init_submit_transfer.assert_called_once_with(
+            method="stripe",
+            retry=False,
+            submitted_by=None,
+            transfer_id=expected_transfer_id,
+        )
+
     async def test_execute_weekly_create_transfer_no_ato_check(
         self, runtime_setter: RuntimeSetter
     ):
@@ -167,6 +276,10 @@ class TestWeeklyCreateTransfer:
             transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
         )
         runtime_setter.set(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False)
+        self.mocker.patch(
+            "app.payout.core.transfer.processors.weekly_create_transfer.WeeklyCreateTransfer._is_enabled_for_payment_service_traffic",
+            return_value=True,
+        )
 
         @asyncio.coroutine
         def mock_get_payment_account_ids(*args, **kwargs):

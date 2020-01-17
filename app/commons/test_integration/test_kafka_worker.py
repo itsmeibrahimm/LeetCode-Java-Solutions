@@ -155,6 +155,10 @@ class TestKafkaWorker:
         transaction = await prepare_and_insert_transaction(
             transaction_repo=transaction_repo, payout_account_id=payment_account.id
         )
+        mocker.patch(
+            "app.payout.core.transfer.processors.weekly_create_transfer.WeeklyCreateTransfer._is_enabled_for_payment_service_traffic",
+            return_value=True,
+        )
 
         @asyncio.coroutine
         def mock_execute_submit_transfer(*args, **kwargs):

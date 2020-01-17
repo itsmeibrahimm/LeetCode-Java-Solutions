@@ -121,10 +121,13 @@ class WeeklyCreateTransfer(
         if self.request.whitelist_payment_account_ids:
             payment_account_ids = self.request.whitelist_payment_account_ids
         else:
+            payment_account_ids = []
             unpaid_payment_account_ids = await self.transaction_repo.get_payout_account_ids_for_unpaid_transactions_without_limit(
                 start_time=unpaid_txn_start_time, end_time=end_time
             )
-            payment_account_ids = unpaid_payment_account_ids
+            for unpaid_account_id in unpaid_payment_account_ids:
+                if self._is_enabled_for_payment_service_traffic(unpaid_account_id):
+                    payment_account_ids.append(unpaid_account_id)
             self.logger.info(
                 "[Weekly Create Transfers] total unpaid_payment_account_ids count",
                 total_number=len(payment_account_ids),
@@ -235,3 +238,26 @@ class WeeklyCreateTransfer(
             last_bank_account_update_allowed_at=last_bank_account_update_allowed_at
         )
         return recently_updated_payment_account_ids
+
+    def _is_enabled_for_payment_service_traffic(self, account_id: int) -> bool:
+        """
+        Check whether the given account is enabled for payment service or not
+        """
+        data = runtime.get_json(
+            "payout/feature-flags/enable_list_transfers_v1.json", {}
+        )
+
+        # Check if feature flag is turned on for all
+        if data.get("enable_all", False):
+            return True
+
+        if account_id is None:
+            return False
+
+        # Check if account id is in whitelist
+        if account_id in data.get("white_list", []):
+            return True
+        # Check if account id is in enabled bucket
+        if account_id % 100 < data.get("bucket", 0):
+            return True
+        return False
