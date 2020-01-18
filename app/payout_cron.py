@@ -160,10 +160,7 @@ if app_config.ENVIRONMENT == "prod":
         func=weekly_create_transfer_monday.run,
         name=weekly_create_transfer_monday.job_name,
         trigger=CronTrigger(
-            day_of_week="mon",
-            hour="1, 3",
-            minute="10",
-            timezone=pytz.timezone("US/Pacific"),
+            day_of_week="mon", hour="1, 3", timezone=pytz.timezone("US/Pacific")
         ),
     )
 
