@@ -42,6 +42,11 @@ class StripeUtil:
         stripe.api_key = STRIPE_US_SECRET_KEY
         return stripe.Customer.create(description="Customer for test.case@example.com")
 
+    @staticmethod
+    def get_stripe_customer(stripe_customer_id: str):
+        stripe.api_key = STRIPE_US_SECRET_KEY
+        return stripe.Customer.retrieve(stripe_customer_id)
+
 
 def get_correlation_ids(reference_id: str, reference_id_type: str):
     return AppPayinCoreCartPaymentModelCorrelationIds(
@@ -79,7 +84,7 @@ class PaymentUtil:
 
     @staticmethod
     def get_create_payer_request(
-        payer_reference_id: int, country: str, payer_reference_id_type: str
+        payer_reference_id: str, country: str, payer_reference_id_type: str
     ):
         payer_reference_ids: PayerCorrelationIds = PayerCorrelationIds(
             payer_reference_id=payer_reference_id,

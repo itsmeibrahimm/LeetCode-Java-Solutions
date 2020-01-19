@@ -3,7 +3,7 @@ import uuid
 
 from payin_v1_client import ApiException
 
-from tests.payin.helper import PaymentUtil
+from tests.payin.helper import PaymentUtil, StripeUtil
 from tests.payin.v0 import payer_v0_client
 from tests.payin.v1 import payer_v1_client, payment_method_v1_client
 
@@ -13,6 +13,15 @@ logger = logging.getLogger(__name__)
 def test_create_and_get_payer():
     new_payer = PaymentUtil.create_payer()
     assert new_payer[1] in (200, 201)
+    stripe_customer_id = (
+        new_payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
+    )
+    stripe_customer = StripeUtil.get_stripe_customer(
+        stripe_customer_id=stripe_customer_id
+    )
+    assert stripe_customer
+    assert stripe_customer.id == stripe_customer_id
+    assert stripe_customer.description == new_payer[0].description
     retrieved_payer = payer_v1_client.get_payer_with_http_info(payer_id=new_payer[0].id)
     assert retrieved_payer[1] == 200
     assert retrieved_payer[0] == new_payer[0]
@@ -40,15 +49,26 @@ def test_create_and_get_payer_with_non_numeric_id():
 def test_create_two_payers_with_same_id():
     new_payer_one = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
-            payer_reference_id=123,
+            payer_reference_id="123",
             country="US",
             payer_reference_id_type="dd_drive_store_id",
         )
     )
     assert new_payer_one[1] in (200, 201)
+    stripe_customer_id = (
+        new_payer_one[0]
+        .payment_gateway_provider_customers[0]
+        .payment_provider_customer_id
+    )
+    stripe_customer = StripeUtil.get_stripe_customer(
+        stripe_customer_id=stripe_customer_id
+    )
+    assert stripe_customer
+    assert stripe_customer.id == stripe_customer_id
+    assert stripe_customer.description == new_payer_one[0].description
     new_payer_two = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
-            payer_reference_id=123,
+            payer_reference_id="123",
             country="US",
             payer_reference_id_type="dd_drive_store_id",
         )
