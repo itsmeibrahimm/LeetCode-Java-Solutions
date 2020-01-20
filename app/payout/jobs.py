@@ -453,75 +453,75 @@ class WeeklyCreateTransferJob(Job):
         for weekly_create_transfer_dict_obj in weekly_create_transfers_dict_list:
             for key in weekly_create_transfer_dict_obj.keys():
                 weekly_create_transfers_list.append(int(key))
-        if weekly_create_transfers_list:
-            transfer_repo = TransferRepository(
-                database=job_instance_cxt.app_context.payout_maindb
-            )
-            transaction_repo = TransactionRepository(
-                database=job_instance_cxt.app_context.payout_bankdb
-            )
-            payment_account_repo = PaymentAccountRepository(
-                database=job_instance_cxt.app_context.payout_maindb
-            )
-            payment_account_edit_history_repo = PaymentAccountEditHistoryRepository(
-                database=job_instance_cxt.app_context.payout_bankdb
-            )
-            stripe_transfer_repo = StripeTransferRepository(
-                database=job_instance_cxt.app_context.payout_maindb
-            )
-            managed_account_transfer_repo = ManagedAccountTransferRepository(
-                database=job_instance_cxt.app_context.payout_maindb
-            )
-            req_context = job_instance_cxt.build_req_context()
-            cache = setup_cache(app_context=job_instance_cxt.app_context)
 
-            start_time, end_time = get_last_week(
-                timezone_info=self.payout_country_timezone, inclusive_end=True
-            )
+        transfer_repo = TransferRepository(
+            database=job_instance_cxt.app_context.payout_maindb
+        )
+        transaction_repo = TransactionRepository(
+            database=job_instance_cxt.app_context.payout_bankdb
+        )
+        payment_account_repo = PaymentAccountRepository(
+            database=job_instance_cxt.app_context.payout_maindb
+        )
+        payment_account_edit_history_repo = PaymentAccountEditHistoryRepository(
+            database=job_instance_cxt.app_context.payout_bankdb
+        )
+        stripe_transfer_repo = StripeTransferRepository(
+            database=job_instance_cxt.app_context.payout_maindb
+        )
+        managed_account_transfer_repo = ManagedAccountTransferRepository(
+            database=job_instance_cxt.app_context.payout_maindb
+        )
+        req_context = job_instance_cxt.build_req_context()
+        cache = setup_cache(app_context=job_instance_cxt.app_context)
 
-            if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
-                # put weekly_create_transfer into queue
-                logger.info(
-                    "Enqueuing weekly_create_transfer task", payout_day=self.payout_day
-                )
-                weekly_create_transfer_task = WeeklyCreateTransferTask(
-                    payout_day=self.payout_day,
-                    payout_countries=self.payout_countries,
-                    end_time=end_time.isoformat(),
-                    unpaid_txn_start_time=start_time.isoformat(),
-                    exclude_recently_updated_accounts=False,
-                    whitelist_payment_account_ids=weekly_create_transfers_list,
-                )
-                await job_instance_cxt.job_pool.spawn(
-                    weekly_create_transfer_task.send(
-                        kafka_producer=job_instance_cxt.app_context.kafka_producer
-                    ),
-                    cb=job_callback,
-                )
-            else:
-                weekly_create_transfer_req = WeeklyCreateTransferRequest(
-                    payout_day=self.payout_day,
-                    payout_countries=self.payout_countries,
-                    end_time=end_time,
-                    unpaid_txn_start_time=start_time,
-                    exclude_recently_updated_accounts=False,
-                    whitelist_payment_account_ids=weekly_create_transfers_list,
-                )
-                weekly_create_transfer_op = WeeklyCreateTransfer(
-                    transfer_repo=transfer_repo,
-                    transaction_repo=transaction_repo,
-                    payment_account_repo=payment_account_repo,
-                    payment_account_edit_history_repo=payment_account_edit_history_repo,
-                    stripe_transfer_repo=stripe_transfer_repo,
-                    managed_account_transfer_repo=managed_account_transfer_repo,
-                    stripe=req_context.stripe_async_client,
-                    payment_lock_manager=job_instance_cxt.app_context.redis_lock_manager,
-                    kafka_producer=job_instance_cxt.app_context.kafka_producer,
-                    cache=cache,
-                    dsj_client=job_instance_cxt.app_context.dsj_client,
-                    logger=logger,
-                    request=weekly_create_transfer_req,
-                )
-                await job_instance_cxt.job_pool.spawn(
-                    weekly_create_transfer_op.execute(), cb=job_callback
-                )
+        start_time, end_time = get_last_week(
+            timezone_info=self.payout_country_timezone, inclusive_end=True
+        )
+
+        if runtime.get_bool(ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT, False):
+            # put weekly_create_transfer into queue
+            logger.info(
+                "Enqueuing weekly_create_transfer task", payout_day=self.payout_day
+            )
+            weekly_create_transfer_task = WeeklyCreateTransferTask(
+                payout_day=self.payout_day,
+                payout_countries=self.payout_countries,
+                end_time=end_time.isoformat(),
+                unpaid_txn_start_time=start_time.isoformat(),
+                exclude_recently_updated_accounts=False,
+                whitelist_payment_account_ids=weekly_create_transfers_list,
+            )
+            await job_instance_cxt.job_pool.spawn(
+                weekly_create_transfer_task.send(
+                    kafka_producer=job_instance_cxt.app_context.kafka_producer
+                ),
+                cb=job_callback,
+            )
+        else:
+            weekly_create_transfer_req = WeeklyCreateTransferRequest(
+                payout_day=self.payout_day,
+                payout_countries=self.payout_countries,
+                end_time=end_time,
+                unpaid_txn_start_time=start_time,
+                exclude_recently_updated_accounts=False,
+                whitelist_payment_account_ids=weekly_create_transfers_list,
+            )
+            weekly_create_transfer_op = WeeklyCreateTransfer(
+                transfer_repo=transfer_repo,
+                transaction_repo=transaction_repo,
+                payment_account_repo=payment_account_repo,
+                payment_account_edit_history_repo=payment_account_edit_history_repo,
+                stripe_transfer_repo=stripe_transfer_repo,
+                managed_account_transfer_repo=managed_account_transfer_repo,
+                stripe=req_context.stripe_async_client,
+                payment_lock_manager=job_instance_cxt.app_context.redis_lock_manager,
+                kafka_producer=job_instance_cxt.app_context.kafka_producer,
+                cache=cache,
+                dsj_client=job_instance_cxt.app_context.dsj_client,
+                logger=logger,
+                request=weekly_create_transfer_req,
+            )
+            await job_instance_cxt.job_pool.spawn(
+                weekly_create_transfer_op.execute(), cb=job_callback
+            )
