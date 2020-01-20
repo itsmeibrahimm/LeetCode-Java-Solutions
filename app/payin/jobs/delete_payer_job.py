@@ -74,7 +74,6 @@ class DeletePayer(Job):
             processed_delete_payer_count += 1
             await job_instance_cxt.job_pool.spawn(
                 self._delete_payer(
-                    max_retries=5,
                     delete_payer_request=delete_payer_request,
                     cart_payment_repo=cart_payment_repo,
                     payer_repo=payer_repo,
@@ -121,7 +120,6 @@ class DeletePayer(Job):
 
     async def _delete_payer(
         self,
-        max_retries: int,
         delete_payer_request: DeletePayerRequestDbEntity,
         cart_payment_repo: CartPaymentRepository,
         payer_repo: PayerRepository,
@@ -130,7 +128,6 @@ class DeletePayer(Job):
     ):
         """
         Build request scoped processor and  attach req_id to each processor call
-        :param max_retries:
         :param delete_payer_request:
         :param cart_payment_repo:
         :param payer_repo:
@@ -139,7 +136,6 @@ class DeletePayer(Job):
         :return:
         """
         delete_payer_processor: DeletePayerProcessor = self._build_request_scoped_delete_payer_processor(
-            max_retries=max_retries,
             cart_payment_repo=cart_payment_repo,
             payer_repo=payer_repo,
             payment_method_repo=payment_method_repo,
@@ -149,7 +145,6 @@ class DeletePayer(Job):
 
     def _build_request_scoped_delete_payer_processor(
         self,
-        max_retries: int,
         cart_payment_repo: CartPaymentRepository,
         payer_repo: PayerRepository,
         payment_method_repo: PaymentMethodRepository,
@@ -188,7 +183,6 @@ class DeletePayer(Job):
         )
 
         return DeletePayerProcessor(
-            max_retries=max_retries,
             log=req_context.log,
             app_context=job_instance_cxt.app_context,
             payer_client=payer_client,

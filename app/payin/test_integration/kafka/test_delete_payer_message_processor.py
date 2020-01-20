@@ -109,7 +109,7 @@ class TestDeletePayerMessageProcessor:
         await delete_payer_kafka_worker.stop(graceful_timeout_seconds=3)
 
         delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
-            action_request.request_id
+            client_request_id=uuid.UUID(action_request.request_id)
         )
 
         assert len(delete_payer_requests) == 1
@@ -126,7 +126,7 @@ class TestDeletePayerMessageProcessor:
         return_value=True,
     )
     @patch("app.payin.kafka.delete_payer_message_processor.build_req_context")
-    async def test_acknowledge_already_succeeded_request(
+    async def test_acknowledge_already_succeeded_but_not_acknowledged_request(
         self,
         mock_req_context,
         mock_enable_delete_payer_request_ingestion,
@@ -170,7 +170,7 @@ class TestDeletePayerMessageProcessor:
         await delete_payer_kafka_worker.stop(graceful_timeout_seconds=3)
 
         delete_payer_requests_list = await payer_client.get_delete_payer_requests_by_client_request_id(
-            action_request.request_id
+            client_request_id=uuid.UUID(action_request.request_id)
         )
 
         assert len(delete_payer_requests_list) == 1
@@ -202,7 +202,7 @@ class TestDeletePayerMessageProcessor:
         return_value=True,
     )
     @patch("app.payin.kafka.delete_payer_message_processor.build_req_context")
-    async def test_acknowledge_already_failed_request(
+    async def test_acknowledge_already_succeeded_and_acknowledged_request(
         self,
         mock_req_context,
         mock_enable_delete_payer_request_ingestion,
@@ -220,10 +220,10 @@ class TestDeletePayerMessageProcessor:
 
         await payer_client.update_delete_payer_request(
             client_request_id=delete_payer_request.client_request_id,
-            status=DeletePayerRequestStatus.FAILED,
+            status=DeletePayerRequestStatus.SUCCEEDED,
             summary=delete_payer_request.summary,
             retry_count=delete_payer_request.retry_count,
-            acknowledged=False,
+            acknowledged=True,
         )
 
         await app_context.kafka_producer.produce(
@@ -246,12 +246,14 @@ class TestDeletePayerMessageProcessor:
         await delete_payer_kafka_worker.stop(graceful_timeout_seconds=3)
 
         delete_payer_requests_list = await payer_client.get_delete_payer_requests_by_client_request_id(
-            client_request_id=action_request.request_id
+            client_request_id=uuid.UUID(action_request.request_id)
         )
 
         assert len(delete_payer_requests_list) == 1
         assert delete_payer_requests_list[0].consumer_id == 1
-        assert delete_payer_requests_list[0].status == DeletePayerRequestStatus.FAILED
+        assert (
+            delete_payer_requests_list[0].status == DeletePayerRequestStatus.SUCCEEDED
+        )
         assert delete_payer_requests_list[0].acknowledged is True
 
         mock_send_response.assert_called_once_with(
@@ -259,7 +261,7 @@ class TestDeletePayerMessageProcessor:
             log=req_context.log,
             request_id=action_request.request_id,
             action_id=action_pb2.ActionId.CONSUMER_PAYMENTS_FORGET,
-            status=common_pb2.StatusCode.ERROR,
+            status=common_pb2.StatusCode.COMPLETE,
             response=delete_payer_requests_list[0].summary,
         )
 

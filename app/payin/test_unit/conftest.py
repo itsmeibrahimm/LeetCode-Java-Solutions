@@ -892,7 +892,6 @@ def delete_payer_processor() -> DeletePayerProcessor:
         cart_payment_interface=cart_payment_interface,
         payer_client=create_autospec(PayerClient),
         payment_method_client=payment_method_client,
-        max_retries=5,
         log=MagicMock(),
         app_context=MagicMock(),
         legacy_payment_interface=legacy_payment_interface,

@@ -219,7 +219,6 @@ class PayerProcessorV0:
 class DeletePayerProcessor:
     def __init__(
         self,
-        max_retries: int,
         log: BoundLogger = Depends(get_logger_from_req),
         app_context: AppContext = Depends(AppContext),
         payer_client: PayerClient = Depends(PayerClient),
@@ -232,7 +231,6 @@ class DeletePayerProcessor:
         self.cart_payment_interface = cart_payment_interface
         self.payer_client = payer_client
         self.payment_method_client = payment_method_client
-        self.max_retries = max_retries
         self.log = log
         self.app_context = app_context
         self.legacy_payment_interface = legacy_payment_interface
@@ -247,8 +245,7 @@ class DeletePayerProcessor:
         Steps:
             1. Try to individually update or delete pii from each table or domain
             2. If all of above individual update/delete successful send success response and mark status as successful
-            3. If any of above individual update/delete unsuccessful increment retry_count, and if max retry count
-            reached mark status as failure and send failure response
+            3. If any of above individual update/delete unsuccessful increment retry_count
             4. Update the request db entry, with new status, retry_count, summary and acknowledged fields.
         """
         self.log.info(
@@ -315,27 +312,8 @@ class DeletePayerProcessor:
                 consumer_id=delete_payer_request.consumer_id,
                 client_request_id=delete_payer_request.client_request_id,
             )
-            doorstats_global.incr("delete-payer.error")
+            doorstats_global.incr("delete-payer.failure")
             retry_count += 1
-            if retry_count >= self.max_retries:
-                self.log.error(
-                    "[delete_payer] Maximum number of retry attempts reached. "
-                    "Please have someone from support take a look at the issue.",
-                    consumer_id=delete_payer_request.consumer_id,
-                    client_request_id=delete_payer_request.client_request_id,
-                )
-                # TODO Paging logic here, JIRA created - https: // doordash.atlassian.net / browse / PP - 124
-                doorstats_global.incr("delete-payer.failure")
-                status = DeletePayerRequestStatus.FAILED
-                self.update_delete_payer_summary_after_max_retries(delete_payer_summary)
-                acknowledged = await send_response(
-                    app_context=self.app_context,
-                    log=self.log,
-                    request_id=str(delete_payer_request.client_request_id),
-                    action_id=action_pb2.ActionId.CONSUMER_PAYMENTS_FORGET,
-                    status=common_pb2.StatusCode.ERROR,
-                    response=delete_payer_summary.json(),
-                )
 
         try:
             await self.payer_client.update_delete_payer_request(
@@ -575,42 +553,4 @@ class DeletePayerProcessor:
         if stripe_customer_status:
             delete_payer_summary.stripe_domain_redact.customer.status = (
                 DeletePayerRequestStatus.SUCCEEDED
-            )
-
-    def update_delete_payer_summary_after_max_retries(
-        self, delete_payer_summary: DeletePayerSummary
-    ):
-        """
-
-        :param delete_payer_summary:
-        :return:
-        Update summary with failed status for operations that are still in progress
-        """
-        if (
-            delete_payer_summary.doordash_domain_redact.stripe_cards.status
-            == DeletePayerRequestStatus.IN_PROGRESS
-        ):
-            delete_payer_summary.doordash_domain_redact.stripe_cards.status = (
-                DeletePayerRequestStatus.FAILED
-            )
-        if (
-            delete_payer_summary.doordash_domain_redact.stripe_charges.status
-            == DeletePayerRequestStatus.IN_PROGRESS
-        ):
-            delete_payer_summary.doordash_domain_redact.stripe_charges.status = (
-                DeletePayerRequestStatus.FAILED
-            )
-        if (
-            delete_payer_summary.doordash_domain_redact.cart_payments.status
-            == DeletePayerRequestStatus.IN_PROGRESS
-        ):
-            delete_payer_summary.doordash_domain_redact.cart_payments.status = (
-                DeletePayerRequestStatus.FAILED
-            )
-        if (
-            delete_payer_summary.stripe_domain_redact.customer.status
-            == DeletePayerRequestStatus.IN_PROGRESS
-        ):
-            delete_payer_summary.stripe_domain_redact.customer.status = (
-                DeletePayerRequestStatus.FAILED
             )

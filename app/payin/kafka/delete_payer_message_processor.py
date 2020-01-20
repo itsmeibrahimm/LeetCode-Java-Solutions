@@ -23,8 +23,8 @@ async def process_message(app_context: AppContext, message: str):
     :return:
     Steps:
         1. Check if message is valid, if not send error response
-        2. If there is any existing request for this message then check if it succeeded or failed previously
-        without acknowledging. If so send appropriate acknowledgement and update existing request in db with
+        2. If there is any existing request for this message then check if it succeeded previously.
+        If so send appropriate acknowledgement and update existing request in db with
         new acknowledgement status
         3. If this message doesn't have an existing request than create a new request in db for later processing.
     """
@@ -111,11 +111,7 @@ async def process_message(app_context: AppContext, message: str):
         existing_delete_payer_request = existing_requests[0]
         acknowledged = existing_delete_payer_request.acknowledged
 
-        if (
-            not acknowledged
-            and existing_delete_payer_request.status
-            == DeletePayerRequestStatus.SUCCEEDED
-        ):
+        if existing_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED:
             acknowledged = await send_response(
                 app_context=app_context,
                 log=log,
@@ -124,19 +120,7 @@ async def process_message(app_context: AppContext, message: str):
                 status=common_pb2.StatusCode.COMPLETE,
                 response=existing_delete_payer_request.summary,
             )
-        elif (
-            not acknowledged
-            and existing_delete_payer_request.status == DeletePayerRequestStatus.FAILED
-        ):
-            acknowledged = await send_response(
-                app_context=app_context,
-                log=log,
-                request_id=str(existing_delete_payer_request.client_request_id),
-                action_id=action_pb2.ActionId.CONSUMER_PAYMENTS_FORGET,
-                status=common_pb2.StatusCode.ERROR,
-                response=existing_delete_payer_request.summary,
-            )
-
+        """We want to save status of our acknowledgement for our info and future reference"""
         if acknowledged:
             try:
                 await payer_client.update_delete_payer_request(

@@ -203,7 +203,6 @@ def delete_payer_processor(
     legacy_payment_interface: LegacyPaymentInterface,
 ) -> DeletePayerProcessor:
     return DeletePayerProcessor(
-        max_retries=5,
         log=req_context.log,
         app_context=app_context,
         payer_client=payer_client,

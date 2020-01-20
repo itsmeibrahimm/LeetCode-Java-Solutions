@@ -356,7 +356,9 @@ class TestDeletePayerProcessor:
         updated_delete_payer_summary = DeletePayerSummary.parse_raw(
             updated_delete_payer_request.summary
         )
-        assert updated_delete_payer_request.status == DeletePayerRequestStatus.FAILED
+        assert (
+            updated_delete_payer_request.status == DeletePayerRequestStatus.IN_PROGRESS
+        )
         assert (
             updated_delete_payer_summary.doordash_domain_redact.stripe_cards.status
             == DeletePayerRequestStatus.SUCCEEDED
@@ -371,9 +373,9 @@ class TestDeletePayerProcessor:
         )
         assert (
             updated_delete_payer_summary.stripe_domain_redact.customer.status
-            == DeletePayerRequestStatus.FAILED
+            == DeletePayerRequestStatus.IN_PROGRESS
         )
-        assert updated_delete_payer_request.acknowledged is True
+        assert updated_delete_payer_request.acknowledged is False
 
         await payer_repository.payment_database.master().execute(
             delete_payer_requests.table.delete().where(delete_payer_requests.id == uuid)
