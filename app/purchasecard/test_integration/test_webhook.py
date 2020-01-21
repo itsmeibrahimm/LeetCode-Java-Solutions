@@ -1,3 +1,4 @@
+import pytest
 from asynctest import CoroutineMock
 from starlette.status import HTTP_200_OK
 from starlette.testclient import TestClient
@@ -19,7 +20,7 @@ class TestMarqetaWebhook:
         )
         assert response.status_code == HTTP_200_OK
 
-    def test_empty_webhook_with_unneeded_fields(
+    def test_webhook_with_unneeded_fields(
         self, mocker, client: TestClient, app_context: AppContext
     ):
         request_body = {
@@ -188,3 +189,26 @@ class TestMarqetaWebhook:
         )
 
         assert response.status_code == HTTP_200_OK
+
+    def test_webhook_with_missing_required_field(
+        self, mocker, client: TestClient, app_context: AppContext
+    ):
+        request_body = {
+            "transactions": [
+                {
+                    # "type": "authorization",
+                    "state": "PENDING",
+                    "token": "36d04781-d34f-4e0c-b895-2f1af976b565",
+                    "user_token": "99f323d4-298f-4b0c-93b1-19b2d9921eb8",
+                    "state222": "PENDING",
+                }
+            ]
+        }
+
+        # mock dsj client until we can do something
+        mock = mocker.patch(
+            "app.purchasecard.container.PurchaseCardContainer.dsj_client"
+        )
+        mock.post = CoroutineMock()
+        with pytest.raises(Exception):
+            client.post("/purchasecard/api/v0/marqeta/webhook", json=request_body)

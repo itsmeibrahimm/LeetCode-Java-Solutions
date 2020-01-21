@@ -28,7 +28,9 @@ class WebhookProcessor:
         self.dsj_client = dsj_client
 
     def is_transaction_successful(self, transaction: Transaction) -> bool:
-        return transaction.response.code == MarqetaResponseCodes.SUCCESS.value
+        if transaction.response is not None:
+            return transaction.response.code == MarqetaResponseCodes.SUCCESS.value
+        return False
 
     def is_jit_failure(self, transaction: Transaction) -> bool:
         return transaction.gpa_order is not None
@@ -45,6 +47,8 @@ class WebhookProcessor:
         ) and not self.is_jit_failure_due_to_timeout(transaction)
 
     def is_terminal_misconfiguration_failure(self, transaction: Transaction) -> bool:
+        if transaction.response is None:
+            return False
         return transaction.response.code in (
             MarqetaResponseCodes.ECOMMERCE_TRANSACTION_NOT_ALLOWED.value,
             MarqetaResponseCodes.AUTH_RESTRICTION.value,
@@ -63,15 +67,20 @@ class WebhookProcessor:
         for transaction in transactions:
             transaction_type: str = transaction.type
             if transaction_type != "authorization":
+                doorstats_global.incr(
+                    "marqeta.transaction.payment.non_authorization_type.{}".format(
+                        transaction_type
+                    )
+                )
                 continue
-            transaction_token: str = transaction.token
-            transaction_state: str = transaction.state
+            transaction_token: str = transaction.token if transaction.token else "token"
+            transaction_state: str = transaction.state if transaction.state else "state"
             doorstats_global.incr(
                 "marqeta.transaction.payment.{}.{}".format(
                     transaction_type, transaction_state
                 )
             )
-            user_token: str = transaction.user_token
+            user_token: str = transaction.user_token if transaction.user_token else "user_token"
             if self.is_transaction_successful(transaction):
                 updated_tx = await self.repository.update_marqeta_transaction_timeout_by_token(
                     transaction_token=transaction_token, timed_out=False

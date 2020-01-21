@@ -20,12 +20,12 @@ class GpaOrder(BaseModel):
 
 
 class Transaction(BaseModel):
-    token: str
-    response: Response
+    token: Optional[str]
+    response: Optional[Response]
     gpa_order: Optional[GpaOrder]
     type: str
-    state: str
-    user_token: str
+    state: Optional[str]
+    user_token: Optional[str]
 
 
 class TransactionProcessResult(BaseModel):
