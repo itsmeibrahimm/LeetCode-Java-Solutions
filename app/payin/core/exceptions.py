@@ -24,6 +24,7 @@ _payin_error_message_maps = {
     "payin_15": "Data I/O error. Please retry again!",
     "payin_16": "No such customer",
     "payin_17": "Error returned from Payment Provider.",
+    "payin_18": "Invalid input.",
     "payin_20": "Invalid data types. Please verify your input again!",
     "payin_21": "Data I/O error. Please retry again!",
     "payin_22": "Invalid input payment method type!",
@@ -204,6 +205,11 @@ class PayinErrorCode(str, Enum):
         "payin_17",
         NO_RETRY,
         "Error returned from Payment Provider.",
+    )
+    DELETE_PAYER_REQUEST_METADATA_INSERT_DB_ERROR = (
+        "payin_18",
+        NO_RETRY,
+        "Invalid input.",
     )
     PAYMENT_METHOD_NO_STRIPE_CARD_FOUND = (
         "payin_30",

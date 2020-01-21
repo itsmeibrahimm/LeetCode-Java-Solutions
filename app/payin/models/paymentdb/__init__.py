@@ -1,6 +1,9 @@
 import sqlalchemy
 
 from app.payin.models.paymentdb.delete_payer_requests import DeletePayerRequestsTable
+from app.payin.models.paymentdb.delete_payer_requests_metadata import (
+    DeletePayerRequestsMetadataTable,
+)
 from app.payin.models.paymentdb.payer import PayerTable
 from app.payin.models.paymentdb.pgp_customer import PgpCustomerTable
 from app.payin.models.paymentdb.cart_payment import CartPaymentTable
@@ -33,3 +36,6 @@ pgp_payment_methods = PgpPaymentMethodTable(db_metadata=payin_paymentdb_metadata
 refunds = RefundTable(db_metadata=payin_paymentdb_metadata)
 pgp_refunds = PgpRefundTable(db_metadata=payin_paymentdb_metadata)
 delete_payer_requests = DeletePayerRequestsTable(db_metadata=payin_paymentdb_metadata)
+delete_payer_requests_metadata = DeletePayerRequestsMetadataTable(
+    db_metadata=payin_paymentdb_metadata
+)

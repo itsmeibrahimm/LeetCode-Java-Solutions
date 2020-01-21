@@ -1,10 +1,16 @@
 import uuid
+from datetime import timezone, datetime
 
 import pytest
 from asynctest import patch
 from privacy import action_pb2, common_pb2
 
-from app.commons.providers.stripe.stripe_models import StripeDeleteCustomerResponse
+from app.commons.providers.stripe.stripe_models import (
+    StripeDeleteCustomerResponse,
+    Customer,
+    InvoiceSettings,
+)
+from app.commons.types import CountryCode
 from app.payin.core.payer.model import (
     DeletePayerSummary,
     DoorDashDomainRedact,
@@ -62,6 +68,19 @@ class TestDeletePayerProcessor:
         )
         return generate_delete_payer_request(summary=delete_payer_summary.json())
 
+    @pytest.fixture
+    def stripe_customer(self):
+        return Customer(
+            id="cus_1234567",
+            object="customer",
+            created=datetime.now(timezone.utc),
+            currency="USD",
+            invoice_settings=InvoiceSettings(default_payment_method=""),
+            default_source="",
+            description="",
+            email="john.doe@gmail.com",
+        )
+
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
     async def test_delete_payer_success(
@@ -69,6 +88,7 @@ class TestDeletePayerProcessor:
         mock_send_response,
         delete_payer_request: DeletePayerRequestDbEntity,
         delete_payer_processor,
+        stripe_customer,
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card = StripeCardDbEntity(
@@ -141,7 +161,10 @@ class TestDeletePayerProcessor:
         delete_payer_processor.legacy_payment_interface.update_legacy_stripe_charge_remove_pii = FunctionMock(
             return_value=legacy_stripe_charge
         )
-        delete_payer_processor.payer_client.delete_pgp_customer = FunctionMock(
+        delete_payer_processor.payer_client.pgp_get_customer = FunctionMock(
+            side_effect=[stripe_customer, None, None]
+        )
+        delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
         await delete_payer_processor.delete_payer(delete_payer_request)
@@ -160,6 +183,12 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count,
             True,
         )
+        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
+            delete_payer_request.client_request_id,
+            delete_payer_request.consumer_id,
+            CountryCode.US,
+            stripe_customer.email,
+        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -168,6 +197,7 @@ class TestDeletePayerProcessor:
         mock_send_response,
         delete_payer_request: DeletePayerRequestDbEntity,
         delete_payer_processor,
+        stripe_customer,
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card = StripeCardDbEntity(
@@ -240,7 +270,10 @@ class TestDeletePayerProcessor:
         delete_payer_processor.legacy_payment_interface.update_legacy_stripe_charge_remove_pii = FunctionMock(
             return_value=legacy_stripe_charge
         )
-        delete_payer_processor.payer_client.delete_pgp_customer = FunctionMock(
+        delete_payer_processor.payer_client.pgp_get_customer = FunctionMock(
+            side_effect=[stripe_customer, None, None]
+        )
+        delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
         await delete_payer_processor.delete_payer(delete_payer_request)
@@ -252,6 +285,12 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
         )
+        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
+            delete_payer_request.client_request_id,
+            delete_payer_request.consumer_id,
+            CountryCode.US,
+            stripe_customer.email,
+        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -260,6 +299,7 @@ class TestDeletePayerProcessor:
         mock_send_response,
         delete_payer_request: DeletePayerRequestDbEntity,
         delete_payer_processor,
+        stripe_customer,
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card = StripeCardDbEntity(
@@ -331,7 +371,10 @@ class TestDeletePayerProcessor:
         delete_payer_processor.legacy_payment_interface.update_legacy_stripe_charge_remove_pii = FunctionMock(
             return_value=legacy_stripe_charge
         )
-        delete_payer_processor.payer_client.delete_pgp_customer = FunctionMock(
+        delete_payer_processor.payer_client.pgp_get_customer = FunctionMock(
+            side_effect=[stripe_customer, None, None]
+        )
+        delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
         await delete_payer_processor.delete_payer(delete_payer_request)
@@ -343,6 +386,12 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
         )
+        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
+            delete_payer_request.client_request_id,
+            delete_payer_request.consumer_id,
+            CountryCode.US,
+            stripe_customer.email,
+        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -351,6 +400,7 @@ class TestDeletePayerProcessor:
         mock_send_response,
         delete_payer_request: DeletePayerRequestDbEntity,
         delete_payer_processor,
+        stripe_customer,
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card = StripeCardDbEntity(
@@ -422,7 +472,10 @@ class TestDeletePayerProcessor:
         delete_payer_processor.legacy_payment_interface.update_legacy_stripe_charge_remove_pii = FunctionMock(
             return_value=legacy_stripe_charge
         )
-        delete_payer_processor.payer_client.delete_pgp_customer = FunctionMock(
+        delete_payer_processor.payer_client.pgp_get_customer = FunctionMock(
+            side_effect=[stripe_customer, None, None]
+        )
+        delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
         await delete_payer_processor.delete_payer(delete_payer_request)
@@ -434,6 +487,12 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
         )
+        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
+            delete_payer_request.client_request_id,
+            delete_payer_request.consumer_id,
+            CountryCode.US,
+            stripe_customer.email,
+        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -442,6 +501,7 @@ class TestDeletePayerProcessor:
         mock_send_response,
         delete_payer_request: DeletePayerRequestDbEntity,
         delete_payer_processor,
+        stripe_customer,
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card = StripeCardDbEntity(
@@ -514,7 +574,10 @@ class TestDeletePayerProcessor:
         delete_payer_processor.legacy_payment_interface.update_legacy_stripe_charge_remove_pii = FunctionMock(
             return_value=legacy_stripe_charge
         )
-        delete_payer_processor.payer_client.delete_pgp_customer = FunctionMock(
+        delete_payer_processor.payer_client.pgp_get_customer = FunctionMock(
+            side_effect=[stripe_customer, None, None]
+        )
+        delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
         await delete_payer_processor.delete_payer(delete_payer_request)
@@ -525,4 +588,10 @@ class TestDeletePayerProcessor:
             expected_summary.json(),
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
+        )
+        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
+            delete_payer_request.client_request_id,
+            delete_payer_request.consumer_id,
+            CountryCode.US,
+            stripe_customer.email,
         )

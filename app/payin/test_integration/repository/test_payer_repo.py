@@ -14,7 +14,10 @@ from app.payin.core.payer.model import (
 )
 from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PayerReferenceIdType
-from app.payin.models.paymentdb import delete_payer_requests
+from app.payin.models.paymentdb import (
+    delete_payer_requests,
+    delete_payer_requests_metadata,
+)
 from app.payin.repository.payer_repo import (
     PayerRepository,
     InsertPayerInput,
@@ -33,6 +36,7 @@ from app.payin.repository.payer_repo import (
     DeletePayerRequestDbEntity,
     GetPayerByLegacyDDStripeCustomerIdInput,
     GetPayerByPayerRefIdAndTypeInput,
+    DeletePayerRequestMetadataDbEntity,
 )
 
 
@@ -281,6 +285,42 @@ class TestPayerRepository:
         )
         assert consumer_id
         assert consumer_id == insert_payer_input.payer_reference_id
+
+    @pytest.mark.asyncio
+    async def test_insert_delete_payer_request_metadata(
+        self, payer_repository: PayerRepository
+    ):
+        uuid = uuid4()
+        now = datetime.now(timezone("UTC"))
+        result = await payer_repository.insert_delete_payer_request_metadata(
+            DeletePayerRequestMetadataDbEntity(
+                id=uuid,
+                client_request_id=uuid,
+                consumer_id=123,
+                country_code=CountryCode.US,
+                email="john.doe@doordash.com",
+                status=DeletePayerRequestStatus.IN_PROGRESS.value,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests_metadata.table.delete()
+        )
+
+        expected_delete_payer_request = DeletePayerRequestMetadataDbEntity(
+            id=uuid,
+            client_request_id=uuid,
+            consumer_id=123,
+            country_code=CountryCode.US,
+            email="john.doe@doordash.com",
+            status=DeletePayerRequestStatus.IN_PROGRESS.value,
+            created_at=now,
+            updated_at=now,
+        )
+
+        assert result == expected_delete_payer_request
 
     @pytest.mark.asyncio
     async def test_insert_delete_payer_request(

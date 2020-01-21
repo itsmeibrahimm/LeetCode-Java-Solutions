@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 
 from doordash_python_stats.ddstats import doorstats_global
 from fastapi import Depends
@@ -272,7 +273,7 @@ class DeletePayerProcessor:
             consumer_id, delete_payer_summary
         )
         stripe_customer_status = await self.delete_stripe_customer(
-            consumer_id, delete_payer_summary
+            consumer_id, delete_payer_summary, delete_payer_request.client_request_id
         )
 
         self.update_delete_payer_summary(
@@ -456,7 +457,10 @@ class DeletePayerProcessor:
             return False
 
     async def delete_stripe_customer(
-        self, consumer_id: int, delete_payer_summary: DeletePayerSummary
+        self,
+        consumer_id: int,
+        delete_payer_summary: DeletePayerSummary,
+        client_request_id: UUID,
     ) -> bool:
         if (
             delete_payer_summary.stripe_domain_redact.customer.status
@@ -499,7 +503,41 @@ class DeletePayerProcessor:
                 country_code=country_code,
             )
             try:
-                stripe_response = await self.payer_client.delete_pgp_customer(
+                stripe_customer = await self.payer_client.pgp_get_customer(
+                    stripe_customer_id, country_code
+                )
+            except PayerReadError:
+                self.log.exception(
+                    "[delete_stripe_customer] Exception occurred while retrieving customer from stripe",
+                    consumer_id=consumer_id,
+                )
+                continue
+
+            if (
+                stripe_customer
+                and hasattr(stripe_customer, "email")
+                and stripe_customer.email
+            ):
+                try:
+                    delete_payer_request_metadata = await self.payer_client.insert_delete_payer_request_metadata(
+                        client_request_id,
+                        consumer_id,
+                        country_code,
+                        stripe_customer.email,
+                    )
+                    self.log.info(
+                        "[delete_stripe_customer] Delete payer request metadata insert successful",
+                        consumer_id=consumer_id,
+                        client_request_id=delete_payer_request_metadata.client_request_id,
+                    )
+                except PayerDeleteError:
+                    self.log.exception(
+                        "[delete_stripe_customer] Exception occurred while inserting delete payer request metadata",
+                        consumer_id=consumer_id,
+                    )
+
+            try:
+                stripe_response = await self.payer_client.pgp_delete_customer(
                     country_code, stripe_customer_id
                 )
                 if stripe_response and stripe_response.deleted:

@@ -19,6 +19,7 @@ from app.payin.core.payer.v0.processor import DeletePayerProcessor
 from app.payin.models.maindb import consumer_charges, stripe_charges, stripe_cards
 from app.payin.models.paymentdb import (
     delete_payer_requests,
+    delete_payer_requests_metadata,
     payers,
     cart_payments,
     pgp_payment_methods,
@@ -236,10 +237,17 @@ class TestDeletePayerProcessor:
         stripe_card,
         stripe_charge,
         cart_payment,
+        payer_repository,
     ):
         await delete_payer_processor.delete_payer(delete_payer_request)
         updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
             client_request_id=delete_payer_request.client_request_id
+        )
+        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
+            delete_payer_requests_metadata.table.select().where(
+                delete_payer_requests_metadata.client_request_id
+                == delete_payer_request.client_request_id
+            )
         )
         assert len(updated_delete_payer_requests) == 1
         updated_delete_payer_request = updated_delete_payer_requests[0]
@@ -264,6 +272,11 @@ class TestDeletePayerProcessor:
         )
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
+        assert inserted_delete_payer_requests_metadata
+        assert inserted_delete_payer_requests_metadata["email"] == "john.doe@gmail.com"
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests_metadata.table.delete()
+        )
 
     async def test_delete_payer_without_card_success(
         self,

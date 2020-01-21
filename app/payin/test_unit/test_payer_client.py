@@ -1,10 +1,12 @@
+from datetime import datetime, timezone
 from typing import List
+from uuid import uuid4
 
 import pytest
 from asynctest import MagicMock
 from stripe.error import StripeError
 
-from app.commons.core.errors import DBOperationError
+from app.commons.core.errors import DBOperationError, DBIntegrityUniqueViolationError
 from app.commons.providers.stripe.stripe_models import StripeDeleteCustomerResponse
 from app.commons.types import CountryCode
 from app.payin.core.exceptions import PayerDeleteError, PayinErrorCode
@@ -16,7 +18,10 @@ from app.payin.core.payer.model import (
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payer.types import DeletePayerRequestStatus
-from app.payin.repository.payer_repo import DeletePayerRequestDbEntity
+from app.payin.repository.payer_repo import (
+    DeletePayerRequestDbEntity,
+    DeletePayerRequestMetadataDbEntity,
+)
 from app.payin.tests.utils import FunctionMock, generate_delete_payer_request
 
 
@@ -71,7 +76,7 @@ class TestPayerClient:
                 id="cus_1234567", object="customer", deleted=True
             )
         )
-        stripe_delete_customer_response = await payer_client.delete_pgp_customer(
+        stripe_delete_customer_response = await payer_client.pgp_delete_customer(
             CountryCode.US, "cus_1234567"
         )
         assert stripe_delete_customer_response.deleted is True
@@ -82,7 +87,7 @@ class TestPayerClient:
             side_effect=StripeError()
         )
         with pytest.raises(PayerDeleteError) as e:
-            await payer_client.delete_pgp_customer(CountryCode.US, "cus_1234567")
+            await payer_client.pgp_delete_customer(CountryCode.US, "cus_1234567")
         assert e.value.error_code == PayinErrorCode.PAYER_DELETE_STRIPE_ERROR
 
     @pytest.mark.asyncio
@@ -101,8 +106,48 @@ class TestPayerClient:
             )
         )
         with pytest.raises(PayerDeleteError) as e:
-            await payer_client.delete_pgp_customer(CountryCode.US, "cus_1234567")
+            await payer_client.pgp_delete_customer(CountryCode.US, "cus_1234567")
         assert e.value.error_code == PayinErrorCode.PAYER_DELETE_STRIPE_ERROR_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_insert_delete_payer_request_metadata(self, payer_client):
+        delete_payer_request_metadata: DeletePayerRequestMetadataDbEntity = DeletePayerRequestMetadataDbEntity(
+            id=uuid4(),
+            client_request_id=uuid4(),
+            consumer_id=123,
+            country_code=CountryCode.US,
+            email="john.doe@doordash.com",
+            status=DeletePayerRequestStatus.IN_PROGRESS,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        payer_client.payer_repo.insert_delete_payer_request_metadata = FunctionMock(
+            return_value=delete_payer_request_metadata
+        )
+        inserted_delete_payer_request_metadata = await payer_client.insert_delete_payer_request_metadata(
+            client_request_id=delete_payer_request_metadata.client_request_id,
+            consumer_id=delete_payer_request_metadata.consumer_id,
+            country_code=delete_payer_request_metadata.country_code,
+            email=delete_payer_request_metadata.email,
+        )
+        assert inserted_delete_payer_request_metadata == delete_payer_request_metadata
+
+    @pytest.mark.asyncio
+    async def test_insert_delete_payer_request_metadata_errors(self, payer_client):
+        payer_client.payer_repo.insert_delete_payer_request_metadata = FunctionMock(
+            side_effect=DBIntegrityUniqueViolationError()
+        )
+        with pytest.raises(PayerDeleteError) as e:
+            await payer_client.insert_delete_payer_request_metadata(
+                client_request_id=uuid4(),
+                consumer_id=123,
+                country_code=CountryCode.US,
+                email="john.doe@doordash.com",
+            )
+        assert (
+            e.value.error_code
+            == PayinErrorCode.DELETE_PAYER_REQUEST_METADATA_INSERT_DB_ERROR
+        )
 
     @pytest.mark.asyncio
     async def test_insert_delete_payer_request(

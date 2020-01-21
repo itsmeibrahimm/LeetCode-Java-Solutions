@@ -13,7 +13,12 @@ from app.commons.database.model import DBEntity, DBRequestModel
 from app.commons.types import CountryCode, PgpCode
 from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.models.maindb import stripe_customers
-from app.payin.models.paymentdb import payers, pgp_customers, delete_payer_requests
+from app.payin.models.paymentdb import (
+    payers,
+    pgp_customers,
+    delete_payer_requests,
+    delete_payer_requests_metadata,
+)
 from app.payin.repository.base import PayinDBRepository
 
 
@@ -104,6 +109,17 @@ class GetConsumerIdByPayerIdInput(DBRequestModel):
     """
 
     payer_id: str
+
+
+class DeletePayerRequestMetadataDbEntity(DBEntity):
+    id: UUID
+    client_request_id: UUID
+    consumer_id: int
+    country_code: str
+    email: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class DeletePayerRequestDbEntity(DBEntity):
@@ -317,6 +333,13 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def insert_delete_payer_request_metadata(
+        self,
+        delete_payer_request_metadata_db_entity: DeletePayerRequestMetadataDbEntity,
+    ) -> DeletePayerRequestMetadataDbEntity:
+        ...
+
+    @abstractmethod
     async def insert_delete_payer_request(
         self, delete_payer_request_db_entity: DeletePayerRequestDbEntity
     ) -> DeletePayerRequestDbEntity:
@@ -517,6 +540,18 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         row = await self.payment_database.master().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
+
+    async def insert_delete_payer_request_metadata(
+        self,
+        delete_payer_request_metadata_db_entity: DeletePayerRequestMetadataDbEntity,
+    ) -> DeletePayerRequestMetadataDbEntity:
+        statement = (
+            delete_payer_requests_metadata.table.insert()
+            .values(delete_payer_request_metadata_db_entity.dict())
+            .returning(*delete_payer_requests_metadata.table.columns.values())
+        )
+        row = await self.payment_database.master().fetch_one(statement)
+        return DeletePayerRequestMetadataDbEntity.from_row(row) if row else None
 
     async def insert_delete_payer_request(
         self, delete_payer_request_db_entity: DeletePayerRequestDbEntity
