@@ -42,9 +42,7 @@ router = APIRouter()
     tags=api_tags,
 )
 async def create_transfer(
-    body: transfer_models.CreateTransfer = Body(
-        ..., description="Create a new transfer request body"
-    ),
+    body: transfer_models.CreateTransfer = Body(...),
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     create_transfer_request = CreateTransferRequest(
@@ -108,9 +106,7 @@ async def create_transfer(
 )
 async def submit_transfer(
     transfer_id: TransferId = Path(..., description="Transfer ID"),
-    body: transfer_models.SubmitTransfer = Body(
-        ..., description="Request body for submitting transfer"
-    ),
+    body: transfer_models.SubmitTransfer = Body(...),
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     submit_transfer_request = SubmitTransferRequest(
@@ -135,9 +131,7 @@ async def submit_transfer(
 )
 async def update_transfer(
     transfer_id: TransferId = Path(..., description="Transfer ID"),
-    body: transfer_models.UpdateTransfer = Body(
-        ..., description="Update transfer request body"
-    ),
+    body: transfer_models.UpdateTransfer = Body(...),
     transfer_processors: TransferProcessors = Depends(create_transfer_processors),
 ):
     update_transfer_request = UpdateTransferRequest(
