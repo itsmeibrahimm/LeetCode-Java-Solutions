@@ -19,7 +19,7 @@ module "payment-service-web" {
   service_image_pull_policy                 = "Always"
   service_iam_role                          = "arn:aws:iam::914801092467:role/web.payment-service"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "2"
   service_container_port                    = "80"
@@ -57,7 +57,7 @@ module "payment-service-webhook" {
   service_image_pull_policy                 = "Always"
   service_iam_role                          = "arn:aws:iam::914801092467:role/web.payment-service"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "2"
   service_container_port                    = "80"
@@ -98,7 +98,7 @@ module "payment-service-cron" {
 
   service_iam_role                          = "arn:aws:iam::914801092467:role/cron.payment-service"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -139,7 +139,7 @@ module "payment-service-payout-cron" {
 
   service_iam_role                          = "arn:aws:iam::914801092467:role/cron.payment-service"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -180,7 +180,7 @@ module "payment-service-delete-payer-cron" {
 
   service_iam_role                          = "arn:aws:iam::914801092467:role/cron.payment-service"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -220,7 +220,7 @@ module "payment-service-admin" {
   service_cmd                               = "tail"
   service_cmd_args                          = "-f, /dev/null"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -255,7 +255,7 @@ module "payment-service-payment-payout-worker" {
   service_cmd                               = "python"
   service_cmd_args                          = "-m, app.worker, --topic_name, payment_payout, --processor, app.payout.tasks, --num_consumers, '1'"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -295,7 +295,7 @@ module "payment-service-payment-stripe-worker" {
   service_cmd                               = "python"
   service_cmd_args                          = "-m, app.worker, --topic_name, payment_stripe, --processor, app.payout.tasks, --num_consumers, '1'"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -335,7 +335,7 @@ module "payment-service-delete-payer-worker" {
   service_cmd                               = "python"
   service_cmd_args                          = "-m, app.worker, --topic_name, consumer_payments_forget, --processor, app.payin.kafka.delete_payer_message_processor, --num_consumers, '1'"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"

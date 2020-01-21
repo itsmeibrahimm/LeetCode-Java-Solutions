@@ -25,7 +25,7 @@ module "payment-service-web" {
   service_docker_image_tag                  = "localbuild"
   service_image_pull_policy                 = "Never"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -65,7 +65,7 @@ module "payment-service-cron" {
   service_cmd                               = "python"
   service_cmd_args                          = "app/payin_cron.py"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -105,7 +105,7 @@ module "payment-service-payout-cron" {
   service_cmd                               = "python"
   service_cmd_args                          = "app/payout_cron.py"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -145,7 +145,7 @@ module "payment-service-delete-payer-cron" {
   service_cmd                               = "python"
   service_cmd_args                          = "app/delete_payer_cron.py"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
@@ -184,7 +184,7 @@ module "payment-service-admin" {
   service_cmd                               = "tail"
   service_cmd_args                          = "-f, /dev/null"
 
-  service_max_surge                         = "200%"
+  service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
   service_replica_count                     = "1"
   service_container_port                    = "80"
