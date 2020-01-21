@@ -708,7 +708,6 @@ class TestCartPayment:
         dd_consumer_id: str,
         created_at_gte: Optional[datetime],
         created_at_lte: Optional[datetime],
-        active_only: bool,
         sort_by: CartPaymentSortKey,
     ) -> requests.Response:
         base_request = f"/payin/api/v0/cart_payments?dd_consumer_id={dd_consumer_id}&sort_by={sort_by}"
@@ -716,28 +715,30 @@ class TestCartPayment:
             base_request = base_request + f"&created_at_gte={created_at_gte}"
         if created_at_lte:
             base_request = base_request + f"&created_at_lte={created_at_lte}"
-        if active_only:
-            base_request = base_request + f"&active_only={active_only}"
         return client.get(base_request)
 
     def _list_cart_payment_response(
         self,
         client: TestClient,
-        payer_id: str,
         created_at_gte: Optional[datetime],
         created_at_lte: Optional[datetime],
-        active_only: bool,
         sort_by: CartPaymentSortKey,
+        payer_id: Optional[str] = None,
+        payer_reference_id: Optional[str] = None,
+        payer_reference_id_type: Optional[str] = None,
     ) -> requests.Response:
-        base_request = (
-            f"/payin/api/v1/cart_payments?payer_id={payer_id}&sort_by={sort_by}"
-        )
+        base_request = f"/payin/api/v1/cart_payments?sort_by={sort_by}"
         if created_at_gte:
             base_request = base_request + f"&created_at_gte={created_at_gte}"
         if created_at_lte:
             base_request = base_request + f"&created_at_lte={created_at_lte}"
-        if active_only:
-            base_request = base_request + f"&active_only={active_only}"
+        if payer_id:
+            base_request = base_request + f"&payer_id={payer_id}"
+        else:
+            base_request = (
+                base_request
+                + f"&payer_reference_id={payer_reference_id}&payer_reference_id_type={payer_reference_id_type}"
+            )
         return client.get(base_request)
 
     def test_cancellation(
@@ -1805,7 +1806,6 @@ class TestCartPayment:
             dd_consumer_id="1",
             created_at_gte=None,
             created_at_lte=None,
-            active_only=False,
             sort_by=CartPaymentSortKey.CREATED_AT,
         )
         assert inital_response.status_code == 200
@@ -1839,7 +1839,6 @@ class TestCartPayment:
             dd_consumer_id="1",
             created_at_gte=None,
             created_at_lte=None,
-            active_only=False,
             sort_by=CartPaymentSortKey.CREATED_AT,
         )
         assert final_response.status_code == 200
@@ -1866,7 +1865,6 @@ class TestCartPayment:
             payer_id=payer["id"],
             created_at_gte=None,
             created_at_lte=None,
-            active_only=False,
             sort_by=CartPaymentSortKey.CREATED_AT,
         )
         assert initial_response.status_code == 200
@@ -1890,7 +1888,56 @@ class TestCartPayment:
             payer_id=payer["id"],
             created_at_gte=None,
             created_at_lte=None,
-            active_only=False,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert response.status_code == 200
+        cart_payment_list = response.json()
+        assert cart_payment_list
+        assert cart_payment_list["count"] - inital_count == 1
+        retrieve_created_cart_payment = next(
+            filter(
+                lambda cart_payment: cart_payment["client_description"]
+                == test_client_description,
+                cart_payment_list["data"],
+            ),
+            None,
+        )
+        assert retrieve_created_cart_payment
+
+    def test_list_cart_payments_by_payer_reference_id(
+        self, client: TestClient, payer: Dict[str, Any], payment_method: Dict[str, Any]
+    ):
+        dd_stripe_customer_id = payer["legacy_dd_stripe_customer_id"]
+        initial_response = self._list_cart_payment_response(
+            client=client,
+            payer_reference_id=dd_stripe_customer_id,
+            payer_reference_id_type=PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID,
+            created_at_gte=None,
+            created_at_lte=None,
+            sort_by=CartPaymentSortKey.CREATED_AT,
+        )
+        assert initial_response.status_code == 200
+        cart_payment_list = initial_response.json()
+        assert cart_payment_list
+        inital_count = cart_payment_list["count"]
+
+        test_client_description = str(uuid.uuid4())
+        cart_payment = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            amount=600,
+            delay_capture=False,
+            client_description=test_client_description,
+        )
+        assert cart_payment
+
+        response = self._list_cart_payment_response(
+            client=client,
+            payer_reference_id=dd_stripe_customer_id,
+            payer_reference_id_type=PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID,
+            created_at_gte=None,
+            created_at_lte=None,
             sort_by=CartPaymentSortKey.CREATED_AT,
         )
         assert response.status_code == 200

@@ -62,6 +62,7 @@ _payin_error_message_maps = {
     "payin_67": "Another process is attempting to modify the same cart payment.  Please try again later.",
     "payin_68": "The idempotency key is invalid.",
     "payin_69": "Data I/O error. Please retry again!",
+    "payin_70": "No corresponding payer found for given payer_reference_id.",
     "payin_100": "Dispute not found. Please ensure your dispute_id is correct",
     "payin_101": "Data I/O error. Please retry again!",
     "payin_102": "Invalid data types. Please verify your input again!",
@@ -136,8 +137,13 @@ class PayinErrorCode(str, Enum):
         NO_RETRY,
         "The idempotency key is invalid.",
     )
+    CART_PAYMENT_PAYER_NOT_FOUND_ERROR = (
+        "payin_70",
+        NO_RETRY,
+        "No corresponding payer found for given payer_reference_id.",
+    )
     CART_PAYMENT_UPDATE_DB_ERROR = (
-        "payin_68",
+        "payin_69",
         SHOULD_RETRY,
         "Data I/O error. Please retry again!",
     )

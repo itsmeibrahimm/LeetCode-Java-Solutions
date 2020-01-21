@@ -157,12 +157,11 @@ async def cancel_cart_payment(
     dependencies=[Depends(commando_route_dependency)],
 )
 async def list_cart_payments(
-    payer_id: str,
+    payer_id: Optional[str] = None,
     payer_reference_id: Optional[str] = None,
     payer_reference_id_type: Optional[PayerReferenceIdType] = None,
     created_at_gte: Optional[datetime] = None,
     created_at_lte: Optional[datetime] = None,
-    active_only: bool = False,
     sort_by: CartPaymentSortKey = CartPaymentSortKey.CREATED_AT,
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
@@ -170,9 +169,10 @@ async def list_cart_payments(
     try:
         return await cart_payment_processor.list_cart_payments(
             payer_id=payer_id,
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
             created_at_gte=created_at_gte,
             created_at_lte=created_at_lte,
-            active_only=active_only,
             sort_by=sort_by,
         )
     except PaymentError:

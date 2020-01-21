@@ -137,7 +137,6 @@ async def list_cart_payments(
     dd_consumer_id: int,
     created_at_gte: datetime = None,
     created_at_lte: datetime = None,
-    active_only: bool = False,
     sort_by: CartPaymentSortKey = CartPaymentSortKey.CREATED_AT,
     log: BoundLogger = Depends(get_logger_from_req),
     cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
@@ -147,7 +146,6 @@ async def list_cart_payments(
             dd_consumer_id=dd_consumer_id,
             created_at_gte=created_at_gte,
             created_at_lte=created_at_lte,
-            active_only=active_only,
             sort_by=sort_by,
         )
     except PaymentError:
