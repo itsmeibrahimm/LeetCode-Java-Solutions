@@ -1,4 +1,4 @@
-@Library('common-pipelines@10.26.0') _
+@Library('common-pipelines') _
 // -----------------------------------------------------------------------------------
 // The following params are automatically provided by the callback gateway as inputs
 // to the Jenkins pipeline that starts this job.
@@ -25,7 +25,7 @@ pipeline {
       steps {
         script {
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          common.deployService(params['GITHUB_REPOSITORY'], params['SHA'], 'staging')
+          deployService(params['GITHUB_REPOSITORY'], params['SHA'], 'staging', common.getServiceName(), terraformVersion: '0.12.7')
         }
       }
     }

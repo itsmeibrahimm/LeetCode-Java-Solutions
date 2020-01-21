@@ -1,4 +1,4 @@
-@Library('common-pipelines@10.26.0') _
+@Library('common-pipelines') _
 
 /**
  * Expected inputs:

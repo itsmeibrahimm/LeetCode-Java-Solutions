@@ -1,4 +1,4 @@
-@Library('common-pipelines@10.26.0') _
+@Library('common-pipelines') _
 
 /**
  * Expected inputs:
@@ -23,7 +23,7 @@ pipeline {
       steps {
         script {
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          common.deployService(params['GITHUB_REPOSITORY'], params['SHA'], 'prod')
+          deployService(params['GITHUB_REPOSITORY'], params['SHA'], 'prod', common.getServiceName(), terraformVersion: '0.12.7')
         }
       }
       post {

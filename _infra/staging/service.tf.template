@@ -24,6 +24,10 @@ module "payment-service-web" {
   service_replica_count                     = "2"
   service_container_port                    = "80"
 
+  blue_green_enable                         = "true"
+  blue_green_first_deployment               = var.blue_green_first_deployment
+  blue_green_scale_down_delay_seconds       = 300
+
   service_resource_requests_memory          = "4Gi"
   service_resource_limits_memory            = "4Gi"
   service_resource_requests_cpu             = "4096m"
@@ -61,6 +65,10 @@ module "payment-service-webhook" {
   service_max_unavailable                   = "0"
   service_replica_count                     = "2"
   service_container_port                    = "80"
+
+  blue_green_enable                         = "true"
+  blue_green_first_deployment               = var.blue_green_first_deployment
+  blue_green_scale_down_delay_seconds       = 300
 
   service_resource_requests_memory          = "4Gi"
   service_resource_limits_memory            = "4Gi"

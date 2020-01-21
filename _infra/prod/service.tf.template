@@ -23,6 +23,11 @@ module "payment-service-web" {
   service_max_unavailable                   = "0"
   service_replica_count                     = "8"
   service_container_port                    = "80"
+
+  blue_green_enable                         = "true"
+  blue_green_first_deployment               = var.blue_green_first_deployment
+  blue_green_scale_down_delay_seconds       = 1800
+
   service_hpa_enable                        = "true"
   service_hpa_min_replicas                  = "8"
   service_hpa_max_replicas                  = "16"
@@ -65,6 +70,11 @@ module "payment-service-webhook" {
   service_max_unavailable                   = "0"
   service_replica_count                     = "8"
   service_container_port                    = "80"
+
+  blue_green_enable                         = "true"
+  blue_green_first_deployment               = var.blue_green_first_deployment
+  blue_green_scale_down_delay_seconds       = 1800
+
   service_hpa_enable                        = "true"
   service_hpa_min_replicas                  = "8"
   service_hpa_max_replicas                  = "16"
