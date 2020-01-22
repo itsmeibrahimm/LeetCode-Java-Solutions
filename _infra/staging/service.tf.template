@@ -26,7 +26,7 @@ module "payment-service-web" {
 
   blue_green_enable                         = "true"
   blue_green_first_deployment               = var.blue_green_first_deployment
-  blue_green_scale_down_delay_seconds       = 300
+  blue_green_scale_down_delay_seconds       = 0
 
   service_resource_requests_memory          = "4Gi"
   service_resource_limits_memory            = "4Gi"
@@ -68,7 +68,7 @@ module "payment-service-webhook" {
 
   blue_green_enable                         = "true"
   blue_green_first_deployment               = var.blue_green_first_deployment
-  blue_green_scale_down_delay_seconds       = 300
+  blue_green_scale_down_delay_seconds       = 0
 
   service_resource_requests_memory          = "4Gi"
   service_resource_limits_memory            = "4Gi"
