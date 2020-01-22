@@ -101,7 +101,8 @@ push:
 
 .PHONY: remove-docker-images
 remove-docker-images:
-	docker images -a --filter=reference="$(DOCKER_IMAGE_URL):$(SHA)" --format "{{.ID}}" | sort | uniq | xargs -r docker rmi -f
+	docker images -a --filter "since=$(DOCKER_IMAGE_URL):$(SHA)" --filter "reference=*$(SERVICE_NAME)*" --format "{{.ID}}" | sort | uniq | xargs docker rmi -f && \
+	docker images -a --filter "reference=$(DOCKER_IMAGE_URL):$(SHA)" --format "{{.ID}}" | sort | uniq | xargs docker rmi -f
 
 .PHONY: migrate
 migrate:
