@@ -35,6 +35,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundReason,
     RefundStatus,
 )
 from app.payin.core.exceptions import (
@@ -67,6 +68,7 @@ from app.payin.tests.utils import (
     generate_pgp_refund,
     generate_provider_charges,
     generate_provider_intent,
+    generate_provider_refund,
     generate_refund,
 )
 
@@ -872,6 +874,17 @@ class TestCartPaymentInterface:
         )
         assert refund_status == RefundStatus.FAILED
 
+    def test_get_refund_reason_from_provider_refund(self, cart_payment_interface):
+        refund_reason = cart_payment_interface._get_refund_reason_from_provider_refund(
+            "requested_by_customer"
+        )
+        assert refund_reason == RefundReason.REQUESTED_BY_CUSTOMER
+
+        refund_reason = cart_payment_interface._get_refund_reason_from_provider_refund(
+            None
+        )
+        assert refund_reason == None
+
     def test_get_charge_status_from_intent_status(self, cart_payment_interface):
         charge_status = cart_payment_interface._get_charge_status_from_intent_status(
             IntentStatus.SUCCEEDED
@@ -978,6 +991,21 @@ class TestCartPaymentInterface:
         result = cart_payment_interface._get_provider_future_usage(intent)
         assert result == StripeCreatePaymentIntentRequest.SetupFutureUsage.ON_SESSION
 
+    def test_get_provider_refund_from_intent_if_exists(self, cart_payment_interface):
+        # Provider payment intent and charge, but no refund
+        provider_intent = generate_provider_intent()
+        result = cart_payment_interface._get_provider_refund_from_intent_if_exists(
+            provider_payment_intent=provider_intent
+        )
+        assert result is None
+
+        # Provider payment intent and charge, with refund
+        provider_intent = generate_provider_intent(amount_refunded=100)
+        result = cart_payment_interface._get_provider_refund_from_intent_if_exists(
+            provider_payment_intent=provider_intent
+        )
+        assert result
+
     @pytest.mark.asyncio
     async def test_find_existing_payment_no_matches(self, cart_payment_interface):
         mock_intent_search = FunctionMock(return_value=None)
@@ -1073,6 +1101,25 @@ class TestCartPaymentInterface:
         assert result_refund == refund
         assert result_pgp_refund == pgp_refund
 
+    def test_match_payment_intent_for_adjustment(self, cart_payment_interface):
+        payment_intent = generate_payment_intent()
+        intent_list = [payment_intent, generate_payment_intent(())]
+        adjustment_history = generate_payment_intent_adjustment_history(
+            payment_intent_id=payment_intent.id,
+            idempotency_key=payment_intent.idempotency_key,
+        )
+
+        result = cart_payment_interface.match_payment_intent_for_adjustment(
+            adjustment_history=adjustment_history, intent_list=intent_list
+        )
+        assert result == payment_intent
+
+        result = cart_payment_interface.match_payment_intent_for_adjustment(
+            adjustment_history=generate_payment_intent_adjustment_history(),
+            intent_list=intent_list,
+        )
+        assert result is None
+
     def test_is_adjustment_for_payment_intents(self, cart_payment_interface):
         payment_intent = generate_payment_intent()
         adjustment_history = generate_payment_intent_adjustment_history(
@@ -1089,6 +1136,24 @@ class TestCartPaymentInterface:
             intent_list=[generate_payment_intent()],
         )
         assert result is False
+
+    def test_match_payment_intent_for_refund(self, cart_payment_interface):
+        payment_intent = generate_payment_intent()
+        intent_list = [payment_intent, generate_payment_intent()]
+        refund = generate_refund(
+            payment_intent_id=payment_intent.id,
+            idempotency_key=payment_intent.idempotency_key,
+        )
+
+        result = cart_payment_interface.match_payment_intent_for_refund(
+            refund=refund, intent_list=intent_list
+        )
+        assert result == payment_intent
+
+        result = cart_payment_interface.match_payment_intent_for_refund(
+            refund=refund, intent_list=[generate_payment_intent()]
+        )
+        assert result is None
 
     def test_is_accessible(self, cart_payment_interface):
         # Stub function: return value is fixed
@@ -1594,7 +1659,6 @@ class TestCartPaymentInterface:
             refund=refund,
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
-            reason="abandoned",
             refund_amount=500,
         )
         assert response
@@ -1614,7 +1678,6 @@ class TestCartPaymentInterface:
                 refund=refund,
                 payment_intent=intent,
                 pgp_payment_intent=pgp_intent,
-                reason="abandoned",
                 refund_amount=500,
             )
 
@@ -1734,8 +1797,7 @@ class TestCartPaymentInterface:
     ):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-        provider_intent = generate_provider_intent()
-        provider_intent.charges = generate_provider_charges(intent, pgp_intent)
+        provider_intent = generate_provider_intent(amount_refunded=200)
         result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_cancel_with_provider(
             payment_intent=intent,
             pgp_payment_intent=pgp_intent,
@@ -1747,6 +1809,90 @@ class TestCartPaymentInterface:
 
         assert result_pgp_intent
         assert result_pgp_intent.status == IntentStatus.CANCELLED
+
+    @pytest.mark.asyncio
+    async def test_update_payment_after_cancel_with_provider_refund_handling(
+        self, cart_payment_interface, runtime_setter
+    ):
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        feature_flag = "payin/feature-flags/record_refund_from_provider.bool"
+
+        # No refund in response from provider, refund recording enabled
+        runtime_setter.set(feature_flag, True)
+        cart_payment_interface.create_refund_from_provider = FunctionMock()
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        provider_intent = generate_provider_intent(amount=500, status="succeeded")
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_cancel_with_provider(
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            provider_payment_intent=provider_intent,
+        )
+        assert result_intent
+        assert result_pgp_intent
+        assert not cart_payment_interface.create_refund_from_provider.called
+
+        # Refund in response from provider, refund recording enabled
+        cart_payment_interface.create_refund_from_provider = FunctionMock()
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        provider_intent = generate_provider_intent(amount_refunded=200)
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_cancel_with_provider(
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            provider_payment_intent=provider_intent,
+        )
+        assert result_intent
+        assert result_pgp_intent
+        assert cart_payment_interface.create_refund_from_provider.called
+
+        # Refund recording disabled
+        runtime_setter.set(feature_flag, False)
+        cart_payment_interface.create_refund_from_provider = FunctionMock()
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        provider_intent = generate_provider_intent(amount_refunded=200)
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_cancel_with_provider(
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            provider_payment_intent=provider_intent,
+        )
+        assert result_intent
+        assert result_pgp_intent
+        assert not cart_payment_interface.create_refund_from_provider.called
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "refund_reason",
+        [None, RefundReason.REQUESTED_BY_CUSTOMER.value],
+        ids=["No reaso", f"Reason {RefundReason.REQUESTED_BY_CUSTOMER.value}"],
+    )
+    async def test_create_refund_from_provider(
+        self, cart_payment_interface, refund_reason
+    ):
+        cart_payment = generate_cart_payment(amount=600)
+        payment_intent = generate_payment_intent(
+            cart_payment_id=cart_payment.id, amount=cart_payment.amount
+        )
+        provider_refund = generate_provider_refund(reason=refund_reason)
+
+        result_refund, result_pgp_refund = await cart_payment_interface.create_refund_from_provider(
+            payment_intent_id=payment_intent.id,
+            provider_refund=provider_refund,
+            idempotency_key=str(uuid.uuid4()),
+        )
+
+        expected_reason = RefundReason(refund_reason) if refund_reason else None
+        assert result_refund.status == RefundStatus.SUCCEEDED
+        assert result_refund.amount == provider_refund.amount
+        assert result_refund.reason == expected_reason
+
+        assert result_pgp_refund.refund_id == result_refund.id
+        assert result_pgp_refund.idempotency_key == result_refund.idempotency_key
+        assert result_pgp_refund.status == RefundStatus.SUCCEEDED
+        assert result_pgp_refund.amount == provider_refund.amount
+        assert result_pgp_refund.reason == expected_reason
 
     @pytest.mark.asyncio
     async def test_create_new_refund(self, cart_payment_interface):
@@ -1761,15 +1907,18 @@ class TestCartPaymentInterface:
             cart_payment=cart_payment,
             payment_intent=payment_intent,
             idempotency_key=idempotency_key,
+            reason=RefundReason.REQUESTED_BY_CUSTOMER,
         )
         assert result_refund.idempotency_key == idempotency_key
         assert result_refund.status == RefundStatus.PROCESSING
         assert result_refund.amount == 200
+        assert result_refund.reason == RefundReason.REQUESTED_BY_CUSTOMER
 
         assert result_pgp_refund.refund_id == result_refund.id
         assert result_pgp_refund.idempotency_key == idempotency_key
         assert result_pgp_refund.status == RefundStatus.PROCESSING
         assert result_pgp_refund.amount == 200
+        assert result_pgp_refund.reason == RefundReason.REQUESTED_BY_CUSTOMER
 
     @pytest.mark.asyncio
     async def test_update_payment_after_refund_with_provider(
@@ -2010,7 +2159,8 @@ class TestCapturePayment:
             payment_intent
         )
         cart_payment_processor.cart_payment_interface.submit_capture_to_provider = create_autospec(  # type: ignore
-            cart_payment_processor.cart_payment_interface.submit_capture_to_provider
+            cart_payment_processor.cart_payment_interface.submit_capture_to_provider,
+            return_value=generate_provider_intent(),
         )
         cart_payment_processor.cart_payment_interface._get_intent_status_from_provider_status = create_autospec(
             # type: ignore
@@ -2138,13 +2288,7 @@ class TestCapturePaymentWithProvider(object):
     ):
         intent = generate_payment_intent(status="requires_capture")
         pgp_intent = generate_pgp_payment_intent(status="requires_capture")
-
-        provider_intent = await cart_payment_interface.submit_capture_to_provider(
-            intent, pgp_intent
-        )
-        provider_intent.amount_received = 750
-        provider_intent.amount_capturable = 0
-        provider_intent.status = "succeeded"
+        provider_intent = generate_provider_intent(amount=500, status="succeeded")
 
         result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_capture_with_provider(
             intent, pgp_intent, provider_intent
@@ -2152,6 +2296,56 @@ class TestCapturePaymentWithProvider(object):
         assert result_pgp_intent.amount_received == provider_intent.amount_received
         assert result_pgp_intent.amount_capturable == provider_intent.amount_capturable
         assert result_pgp_intent.status == IntentStatus.SUCCEEDED
+
+    @pytest.mark.asyncio
+    async def test_update_payment_after_capture_with_provider_refund_handling(
+        self, cart_payment_interface, runtime_setter
+    ):
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        feature_flag = "payin/feature-flags/record_refund_from_provider.bool"
+
+        # No refund in response from provider, refund recording enabled
+        runtime_setter.set(feature_flag, True)
+        provider_intent = generate_provider_intent(amount=500, status="succeeded")
+        cart_payment_interface.create_refund_from_provider = FunctionMock()
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_capture_with_provider(
+            intent, pgp_intent, provider_intent
+        )
+        assert result_pgp_intent.amount_received == provider_intent.amount_received
+        assert result_pgp_intent.amount_capturable == provider_intent.amount_capturable
+        assert result_pgp_intent.status == IntentStatus.SUCCEEDED
+        assert not cart_payment_interface.create_refund_from_provider.called
+
+        # Refund in response from provider, refund recording enabled
+        cart_payment_interface.create_refund_from_provider = FunctionMock()
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        provider_intent = generate_provider_intent(
+            amount=500, status="succeeded", amount_refunded=300
+        )
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_capture_with_provider(
+            intent, pgp_intent, provider_intent
+        )
+        assert result_pgp_intent.amount_received == provider_intent.amount_received
+        assert result_pgp_intent.amount_capturable == provider_intent.amount_capturable
+        assert result_pgp_intent.status == IntentStatus.SUCCEEDED
+        assert cart_payment_interface.create_refund_from_provider.called
+
+        # Refund recording disabled
+        cart_payment_interface.create_refund_from_provider = FunctionMock()
+        intent = generate_payment_intent(status="requires_capture")
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+        provider_intent = generate_provider_intent(amount=500, status="succeeded")
+        runtime_setter.set(feature_flag, False)
+
+        result_intent, result_pgp_intent = await cart_payment_interface.update_payment_after_capture_with_provider(
+            intent, pgp_intent, provider_intent
+        )
+        assert result_pgp_intent.amount_received == provider_intent.amount_received
+        assert result_pgp_intent.amount_capturable == provider_intent.amount_capturable
+        assert result_pgp_intent.status == IntentStatus.SUCCEEDED
+        assert not cart_payment_interface.create_refund_from_provider.called
 
 
 class TestListCartPayment(object):

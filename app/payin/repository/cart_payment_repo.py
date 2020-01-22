@@ -30,6 +30,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundReason,
     RefundStatus,
 )
 from app.payin.core.exceptions import (
@@ -1318,7 +1319,7 @@ class CartPaymentRepository(PayinDBRepository):
         idempotency_key: str,
         status: RefundStatus,
         amount: int,
-        reason: Optional[str],
+        reason: Optional[RefundReason],
     ) -> Refund:
         now = datetime.now(timezone.utc)
         data = {
@@ -1327,7 +1328,7 @@ class CartPaymentRepository(PayinDBRepository):
             refunds.idempotency_key: idempotency_key,
             refunds.status: status.value,
             refunds.amount: amount,
-            refunds.reason: reason,
+            refunds.reason: reason.value if reason else None,
             refunds.created_at: now,
             refunds.updated_at: now,
         }
@@ -1348,7 +1349,7 @@ class CartPaymentRepository(PayinDBRepository):
             idempotency_key=row[refunds.idempotency_key],
             status=RefundStatus(row[refunds.status]),
             amount=row[refunds.amount],
-            reason=row[refunds.reason],
+            reason=RefundReason(row[refunds.reason]) if row[refunds.reason] else None,
             created_at=row[refunds.created_at],
             updated_at=row[refunds.updated_at],
         )
@@ -1384,8 +1385,10 @@ class CartPaymentRepository(PayinDBRepository):
         idempotency_key: str,
         status: RefundStatus,
         pgp_code: PgpCode,
+        pgp_resource_id: Optional[str],
+        pgp_charge_resource_id: Optional[str],
         amount: int,
-        reason: Optional[str],
+        reason: Optional[RefundReason],
     ) -> PgpRefund:
         now = datetime.now(timezone.utc)
         data = {
@@ -1394,8 +1397,10 @@ class CartPaymentRepository(PayinDBRepository):
             pgp_refunds.idempotency_key: idempotency_key,
             pgp_refunds.status: status.value,
             pgp_refunds.amount: amount,
-            pgp_refunds.reason: reason,
+            pgp_refunds.reason: reason.value if reason else None,
             pgp_refunds.pgp_code: pgp_code.value,
+            pgp_refunds.pgp_resource_id: pgp_resource_id,
+            pgp_refunds.pgp_charge_resource_id: pgp_charge_resource_id,
             pgp_refunds.created_at: now,
             pgp_refunds.updated_at: now,
         }
@@ -1416,9 +1421,12 @@ class CartPaymentRepository(PayinDBRepository):
             idempotency_key=row[pgp_refunds.idempotency_key],
             status=RefundStatus(row[pgp_refunds.status]),
             amount=row[pgp_refunds.amount],
-            reason=row[pgp_refunds.reason],
+            reason=RefundReason(row[pgp_refunds.reason])
+            if row[pgp_refunds.reason]
+            else None,
             pgp_code=PgpCode(row[pgp_refunds.pgp_code]),
             pgp_resource_id=row[pgp_refunds.pgp_resource_id],
+            pgp_charge_resource_id=row[pgp_refunds.pgp_charge_resource_id],
             created_at=row[pgp_refunds.created_at],
             updated_at=row[pgp_refunds.updated_at],
         )
@@ -1433,7 +1441,11 @@ class CartPaymentRepository(PayinDBRepository):
         return self.to_pgp_refund(row)
 
     async def update_pgp_refund(
-        self, pgp_refund_id: UUID, status: RefundStatus, pgp_resource_id: str
+        self,
+        pgp_refund_id: UUID,
+        status: RefundStatus,
+        pgp_resource_id: str,
+        pgp_charge_resource_id: str,
     ) -> PgpRefund:
         statement = (
             pgp_refunds.table.update()
@@ -1441,6 +1453,7 @@ class CartPaymentRepository(PayinDBRepository):
             .values(
                 status=status.value,
                 pgp_resource_id=pgp_resource_id,
+                pgp_charge_resource_id=pgp_charge_resource_id,
                 updated_at=datetime.now(timezone.utc),
             )
             .returning(*pgp_refunds.table.columns.values())

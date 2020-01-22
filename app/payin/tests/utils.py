@@ -7,6 +7,8 @@ from asynctest import create_autospec
 
 from app.commons.providers.stripe.stripe_models import (
     PaymentIntent as StripePaymentIntent,
+    Refund as StripeRefund,
+    Charge as StripeCharge,
 )
 from app.commons.types import CountryCode, Currency, LegacyCountryId, PgpCode
 from app.payin.core.cart_payment.model import (
@@ -29,6 +31,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundReason,
     RefundStatus,
 )
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
@@ -164,23 +167,27 @@ def generate_cart_payment(
 
 
 def generate_refund(
-    payment_intent_id: uuid.UUID = None, status: RefundStatus = RefundStatus.PROCESSING
+    payment_intent_id: uuid.UUID = None,
+    status: RefundStatus = RefundStatus.PROCESSING,
+    idempotency_key: str = None,
 ):
     return Refund(
         id=uuid.uuid4(),
         payment_intent_id=payment_intent_id if payment_intent_id else uuid.uuid4(),
-        idempotency_key=str(uuid.uuid4()),
+        idempotency_key=idempotency_key if idempotency_key else str(uuid.uuid4()),
         status=status,
         amount=500,
         currency=Currency.USD,
-        reason=None,
+        reason=RefundReason.REQUESTED_BY_CUSTOMER,
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
 
 
 def generate_pgp_refund(
-    status: RefundStatus = RefundStatus.PROCESSING, pgp_resource_id: str = None
+    status: RefundStatus = RefundStatus.PROCESSING,
+    pgp_resource_id: str = None,
+    charge_resource_id: str = None,
 ):
     return PgpRefund(
         id=uuid.uuid4(),
@@ -189,15 +196,18 @@ def generate_pgp_refund(
         status=status,
         pgp_code=PgpCode.STRIPE,
         pgp_resource_id=pgp_resource_id,
+        charge_resource_id=charge_resource_id,
         amount=500,
         currency=Currency.USD,
-        reason=None,
+        reason=RefundReason.REQUESTED_BY_CUSTOMER,
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
 
 
-def generate_payment_intent_adjustment_history(payment_intent_id: uuid.UUID = None):
+def generate_payment_intent_adjustment_history(
+    payment_intent_id: uuid.UUID = None, idempotency_key: str = None
+):
     return PaymentIntentAdjustmentHistory(
         id=uuid.uuid4(),
         payer_id=uuid.uuid4(),
@@ -206,7 +216,7 @@ def generate_payment_intent_adjustment_history(payment_intent_id: uuid.UUID = No
         amount_original=400,
         amount_delta=100,
         currency=Currency.USD,
-        idempotency_key=str(uuid.uuid4()),
+        idempotency_key=idempotency_key if idempotency_key else str(uuid.uuid4()),
         created_at=datetime.now(),
     )
 
@@ -358,21 +368,52 @@ def generate_provider_charges(
     return charges
 
 
-def generate_provider_intent(amount: int = 500, amount_refunded: int = 0):
+def generate_provider_intent(
+    amount: int = 500,
+    amount_received: int = 0,
+    amount_capturable: int = 500,
+    amount_refunded: int = 0,
+    status: str = "requires_capture",
+):
     mocked_intent = create_autospec(StripePaymentIntent)
     mocked_intent.id = "test_intent_id"
-    mocked_intent.status = "requires_capture"  # Assume delayed capture is used
+    mocked_intent.status = status
     mocked_intent.amount = amount
-    mocked_intent.amount_received = 0
-    mocked_intent.amount_capturable = amount
+    mocked_intent.amount_received = amount_received
+    mocked_intent.amount_capturable = amount_capturable
     mocked_intent.charges = MagicMock()
-    mocked_intent.charges.data = [MagicMock()]
+    mocked_intent.charges.data = [create_autospec(StripeCharge)]
     mocked_intent.charges.data[0].status = "succeeded"
     mocked_intent.charges.data[0].currency = "usd"
     mocked_intent.charges.data[0].id = str(uuid.uuid4())
     mocked_intent.charges.data[0].amount = amount
     mocked_intent.charges.data[0].amount_refunded = amount_refunded
+    mocked_intent.charges.data[0].refunds = None
+
+    if amount_refunded > 0:
+        mocked_intent.charges.data[0].refunds = MagicMock()
+        mocked_intent.charges.data[0].refunds.data = [
+            generate_provider_refund(amount=amount_refunded)
+        ]
+
     return mocked_intent
+
+
+def generate_provider_refund(amount: int = 200, reason: str = None):
+    mocked_refund = create_autospec(StripeRefund)
+    mocked_refund.id = "test_refund_id"
+    mocked_refund.object = "refund"
+    mocked_refund.amount = amount
+    mocked_refund.balance_transaction = "balance_transaction"
+    mocked_refund.charge = "refund charge_id"
+    mocked_refund.currency = Currency.USD
+    mocked_refund.metadata = {}
+    mocked_refund.reason = reason
+    mocked_refund.receipt_number = None
+    mocked_refund.source_transfer_reversal = None
+    mocked_refund.status = "succeeded"
+    mocked_refund.transfer_reversal = None
+    return mocked_refund
 
 
 def generate_dispute() -> Dispute:

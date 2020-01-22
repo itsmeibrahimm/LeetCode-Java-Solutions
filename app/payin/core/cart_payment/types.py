@@ -27,7 +27,7 @@ class IntentStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-    # todo PAYIN-130 update "cancelled" in payin domain to "canceled" to sync with stripe
+    # TODO PAYIN-130 update "cancelled" in payin domain to "canceled" to sync with stripe
     @classmethod
     def from_str(cls, value: str) -> "IntentStatus":
         if value in ["canceled", "cancelled"]:
@@ -51,6 +51,17 @@ class RefundStatus(str, Enum):
     PROCESSING = "processing"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+
+
+class RefundReason(str, Enum):
+    """
+    Refund reasons is a superset of what providers support.  See provider models, such as
+    app.commons.providers.stripe.stripe_models.StripeRefundChargeRequest.RefundReason.
+    """
+
+    DUPLICATE = "duplicate"
+    FRAUDULENT = "fraudulent"
+    REQUESTED_BY_CUSTOMER = "requested_by_customer"
 
 
 class ChargeStatus(str, Enum):

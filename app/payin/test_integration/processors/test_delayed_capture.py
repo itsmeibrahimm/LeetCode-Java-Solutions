@@ -4,7 +4,11 @@ from uuid import uuid4
 import pytest
 
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
-from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    LegacyStripeChargeStatus,
+    RefundStatus,
+)
 from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -14,6 +18,8 @@ from app.payin.test_integration.processors.cart_payment_test_base import (
     CartPaymentState,
     PaymentIntentState,
     PgpPaymentIntentState,
+    RefundReason,
+    RefundState,
     StripeChargeState,
 )
 
@@ -35,6 +41,7 @@ create_no_adjust_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -61,6 +68,7 @@ create_no_adjust_test_data = [
                     amount_received=1000,
                     status=IntentStatus.SUCCEEDED,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -89,6 +97,7 @@ create_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -115,6 +124,7 @@ create_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=500,
@@ -140,6 +150,12 @@ create_and_partial_refund_test_data = [
                     amount_capturable=0,
                     amount_received=500,
                     status=IntentStatus.SUCCEEDED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=500,
+                    reason=None,
+                    is_refund_at_capture=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
@@ -170,6 +186,7 @@ create_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -196,6 +213,12 @@ create_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -221,6 +244,12 @@ create_and_full_refund_test_data = [
                     amount_capturable=0,
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
@@ -251,6 +280,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -277,6 +307,7 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=200,
@@ -303,6 +334,12 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -328,6 +365,12 @@ create_and_partial_refund_and_full_refund_test_data = [
                     amount_capturable=0,
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
@@ -358,6 +401,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -384,6 +428,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=200,
@@ -410,6 +455,12 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -426,6 +477,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=850,
                     amount_refunded=0,
@@ -452,6 +504,12 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -468,6 +526,7 @@ create_and_partial_refund_and_adjust_to_no_exceed_original_test_data = [
                     amount_received=850,
                     status=IntentStatus.SUCCEEDED,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=850,
                     amount_refunded=0,
@@ -497,6 +556,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -523,6 +583,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=200,
@@ -549,6 +610,12 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -565,6 +632,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1100,
                     amount_refunded=0,
@@ -591,6 +659,12 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -607,6 +681,7 @@ create_and_partial_refund_and_adjust_to_exceed_original_test_data = [
                     amount_received=1100,
                     status=IntentStatus.SUCCEEDED,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1100,
                     amount_refunded=0,
@@ -636,6 +711,7 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -662,6 +738,12 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -678,6 +760,7 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
                     amount_refunded=0,
@@ -704,6 +787,12 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -720,6 +809,7 @@ create_and_adjust_to_exceed_original_test_data = [
                     amount_received=1300,
                     status=IntentStatus.SUCCEEDED,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
                     amount_refunded=0,
@@ -749,6 +839,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -775,6 +866,12 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -791,6 +888,7 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
                     amount_refunded=0,
@@ -817,6 +915,12 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -832,6 +936,12 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_capturable=0,
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1300,
+                    reason=None,
+                    is_refund_at_cancel=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
@@ -859,6 +969,12 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -874,6 +990,12 @@ create_and_adjust_to_exceed_original_and_full_refund_test_data = [
                     amount_capturable=0,
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1300,
+                    reason=None,
+                    is_refund_at_cancel=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
@@ -904,6 +1026,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -930,6 +1053,12 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -946,6 +1075,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
                     amount_refunded=0,
@@ -972,6 +1102,12 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -988,6 +1124,7 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
                     amount_refunded=300,
@@ -1014,6 +1151,12 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.CANCELLED,
                 ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=1000,
+                    reason=None,
+                    is_refund_at_cancel=True,
+                ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=1000,
@@ -1029,6 +1172,12 @@ create_and_adjust_to_exceed_original_and_partial_refund_test_data = [
                     amount_capturable=0,
                     amount_received=1000,
                     status=IntentStatus.SUCCEEDED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=300,
+                    reason=None,
+                    is_refund_at_capture=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1300,
@@ -1059,6 +1208,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -1085,6 +1235,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=200,
@@ -1111,6 +1262,7 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=400,
@@ -1136,6 +1288,12 @@ create_and_partial_refund_and_partial_refund_test_data = [
                     amount_capturable=0,
                     amount_received=600,
                     status=IntentStatus.SUCCEEDED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=400,
+                    reason=None,
+                    is_refund_at_capture=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
@@ -1167,6 +1325,7 @@ create_and_partial_refund_and_small_amount_to_capture_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=0,
@@ -1193,6 +1352,7 @@ create_and_partial_refund_and_small_amount_to_capture_test_data = [
                     amount_received=0,
                     status=IntentStatus.REQUIRES_CAPTURE,
                 ),
+                refund_state=None,
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
                     amount_refunded=999,
@@ -1218,6 +1378,12 @@ create_and_partial_refund_and_small_amount_to_capture_test_data = [
                     amount_capturable=0,
                     amount_received=1000,
                     status=IntentStatus.SUCCEEDED,
+                ),
+                refund_state=RefundState(
+                    status=RefundStatus.SUCCEEDED,
+                    amount=999,
+                    reason=RefundReason.REQUESTED_BY_CUSTOMER,
+                    is_refund_at_capture=True,
                 ),
                 stripe_charge_state=StripeChargeState(
                     amount=1000,
@@ -1253,6 +1419,7 @@ def get_create_and_partial_refund_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=0,
@@ -1280,6 +1447,7 @@ def get_create_and_partial_refund_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=200,
@@ -1307,6 +1475,7 @@ def get_create_and_partial_refund_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=200,
@@ -1332,6 +1501,12 @@ def get_create_and_partial_refund_with_resubmit_legacy_test_data():
                         amount_capturable=0,
                         amount_received=800,
                         status=IntentStatus.SUCCEEDED,
+                    ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=200,
+                        reason=None,
+                        is_refund_at_capture=True,
                     ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
@@ -1365,6 +1540,7 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=0,
@@ -1392,6 +1568,12 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.CANCELLED,
                     ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=1000,
+                        reason=None,
+                        is_refund_at_cancel=True,
+                    ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=1000,
@@ -1408,6 +1590,7 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1150,
                         amount_refunded=0,
@@ -1435,6 +1618,12 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.CANCELLED,
                     ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=1000,
+                        reason=None,
+                        is_refund_at_cancel=True,
+                    ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=1000,
@@ -1451,6 +1640,7 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1150,
                         amount_refunded=0,
@@ -1477,6 +1667,12 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=0,
                         status=IntentStatus.CANCELLED,
                     ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=1000,
+                        reason=None,
+                        is_refund_at_cancel=True,
+                    ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=1000,
@@ -1493,6 +1689,7 @@ def get_create_and_increase_with_resubmit_legacy_test_data():
                         amount_received=1150,
                         status=IntentStatus.SUCCEEDED,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1150,
                         amount_refunded=0,
@@ -1525,6 +1722,7 @@ def get_create_and_partial_refund_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=0,
@@ -1552,6 +1750,7 @@ def get_create_and_partial_refund_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=200,
@@ -1579,6 +1778,7 @@ def get_create_and_partial_refund_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=200,
@@ -1604,6 +1804,12 @@ def get_create_and_partial_refund_with_resubmit_test_data():
                         amount_capturable=0,
                         amount_received=800,
                         status=IntentStatus.SUCCEEDED,
+                    ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=200,
+                        reason=None,
+                        is_refund_at_capture=True,
                     ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
@@ -1637,6 +1843,7 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=0,
@@ -1664,6 +1871,12 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.CANCELLED,
                     ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=1000,
+                        reason=None,
+                        is_refund_at_cancel=True,
+                    ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=1000,
@@ -1680,6 +1893,7 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1150,
                         amount_refunded=0,
@@ -1707,6 +1921,12 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.CANCELLED,
                     ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=1000,
+                        reason=None,
+                        is_refund_at_cancel=True,
+                    ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=1000,
@@ -1723,6 +1943,7 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1150,
                         amount_refunded=0,
@@ -1749,6 +1970,12 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=0,
                         status=IntentStatus.CANCELLED,
                     ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=1000,
+                        reason=None,
+                        is_refund_at_cancel=True,
+                    ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=1000,
@@ -1765,6 +1992,7 @@ def get_create_and_increase_with_resubmit_test_data():
                         amount_received=1150,
                         status=IntentStatus.SUCCEEDED,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1150,
                         amount_refunded=0,

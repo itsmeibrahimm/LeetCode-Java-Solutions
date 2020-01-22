@@ -27,6 +27,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundReason,
     RefundStatus,
 )
 from app.payin.core.exceptions import (
@@ -278,7 +279,7 @@ async def refund(
         idempotency_key=payment_intent.idempotency_key,
         status=RefundStatus.PROCESSING,
         amount=payment_intent.amount,
-        reason=None,
+        reason=RefundReason.REQUESTED_BY_CUSTOMER,
     )
 
 
@@ -290,8 +291,10 @@ async def pgp_refund(cart_payment_repository: CartPaymentRepository, refund: Ref
         idempotency_key=refund.idempotency_key,
         status=RefundStatus.PROCESSING,
         amount=refund.amount,
-        reason=None,
+        reason=RefundReason.REQUESTED_BY_CUSTOMER,
         pgp_code=PgpCode.STRIPE,
+        pgp_resource_id=f"test-refund-{uuid4()}",
+        pgp_charge_resource_id=f"test-charge-{uuid4()}",
     )
 
 
@@ -1303,10 +1306,16 @@ class TestCartPayment:
 
 class TestRefunds:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "refund_reason",
+        [None, RefundReason.REQUESTED_BY_CUSTOMER],
+        ids=["No reason", f"Reason {RefundReason.REQUESTED_BY_CUSTOMER.value}"],
+    )
     async def test_insert_refund(
         self,
         cart_payment_repository: CartPaymentRepository,
         payment_intent: PaymentIntent,
+        refund_reason: Optional[RefundReason],
     ):
         id = uuid4()
         result = await cart_payment_repository.insert_refund(
@@ -1315,7 +1324,7 @@ class TestRefunds:
             idempotency_key=payment_intent.idempotency_key,
             status=RefundStatus.PROCESSING,
             amount=payment_intent.amount,
-            reason=None,
+            reason=refund_reason,
         )
 
         expected_refund = Refund(
@@ -1324,7 +1333,7 @@ class TestRefunds:
             idempotency_key=payment_intent.idempotency_key,
             status=RefundStatus.PROCESSING,
             amount=payment_intent.amount,
-            reason=None,
+            reason=refund_reason,
             created_at=result.created_at,  # Generated
             updated_at=result.updated_at,  # Generated
         )
@@ -1358,7 +1367,7 @@ class TestRefunds:
             idempotency_key=idempotency_key,
             status=RefundStatus.PROCESSING,
             amount=500,
-            reason=None,
+            reason=RefundReason.REQUESTED_BY_CUSTOMER,
         )
         result = await cart_payment_repository.update_refund_status(
             refund.id, RefundStatus.FAILED
@@ -1378,8 +1387,16 @@ class TestRefunds:
         assert result == expected_refund
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "refund_reason",
+        [None, RefundReason.REQUESTED_BY_CUSTOMER],
+        ids=["No reason", f"Reason {RefundReason.REQUESTED_BY_CUSTOMER.value}"],
+    )
     async def test_insert_pgp_refund(
-        self, cart_payment_repository: CartPaymentRepository, refund: Refund
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        refund: Refund,
+        refund_reason: Optional[RefundReason],
     ):
         id = uuid4()
         result = await cart_payment_repository.insert_pgp_refund(
@@ -1388,8 +1405,10 @@ class TestRefunds:
             idempotency_key=refund.idempotency_key,
             status=RefundStatus.PROCESSING,
             pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=None,
+            pgp_charge_resource_id=None,
             amount=refund.amount,
-            reason=refund.reason,
+            reason=refund_reason,
         )
 
         expected_pgp_refund = PgpRefund(
@@ -1397,9 +1416,10 @@ class TestRefunds:
             refund_id=refund.id,
             idempotency_key=refund.idempotency_key,
             status=RefundStatus.PROCESSING,
-            reason=refund.reason,
+            reason=refund_reason,
             pgp_code=PgpCode.STRIPE,
             pgp_resource_id=None,
+            charge_resource_id=None,
             amount=refund.amount,
             created_at=result.created_at,  # Generated
             updated_at=result.updated_at,  # Generated
@@ -1428,12 +1448,15 @@ class TestRefunds:
             pgp_code=PgpCode.STRIPE,
             amount=refund.amount,
             reason=refund.reason,
+            pgp_resource_id=None,
+            pgp_charge_resource_id=None,
         )
 
         result = await cart_payment_repository.update_pgp_refund(
             pgp_refund_id=pgp_refund.id,
             status=RefundStatus.SUCCEEDED,
             pgp_resource_id="test resource id",
+            pgp_charge_resource_id="test charge id",
         )
 
         expected_pgp_refund = PgpRefund(
@@ -1444,6 +1467,7 @@ class TestRefunds:
             reason=refund.reason,
             pgp_code=PgpCode.STRIPE,
             pgp_resource_id="test resource id",
+            pgp_charge_resource_id="test charge id",
             amount=refund.amount,
             created_at=pgp_refund.created_at,
             updated_at=result.updated_at,  # Generated

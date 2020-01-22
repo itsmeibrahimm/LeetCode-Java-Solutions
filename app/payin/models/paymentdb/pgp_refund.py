@@ -20,5 +20,8 @@ class PgpRefundTable(TableDefinition):
     reason: Column = no_init_field(Column("reason", Text))
     pgp_code: Column = no_init_field(Column("pgp_code", Text))
     pgp_resource_id: Column = no_init_field(Column("pgp_resource_id", Text))
+    pgp_charge_resource_id: Column = no_init_field(
+        Column("pgp_charge_resource_id", Text)
+    )
     created_at: Column = no_init_field(Column("created_at", DateTime(True)))
     updated_at: Column = no_init_field(Column("updated_at", DateTime(True)))

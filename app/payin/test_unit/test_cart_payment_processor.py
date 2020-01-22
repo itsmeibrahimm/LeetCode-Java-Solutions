@@ -781,6 +781,97 @@ class TestCartPaymentProcessor:
         )
 
     @pytest.mark.asyncio
+    async def test_get_payment_intent_if_completed(self, cart_payment_processor):
+        # Existing intent with specified idempotency key
+        intent = generate_payment_intent()
+        result = await cart_payment_processor._get_payment_intent_if_completed(
+            idempotency_key=intent.idempotency_key, existing_payment_intents=[intent]
+        )
+        assert result == intent
+
+        # Existing intent with specified idempotency key, for a previously failed intent
+        intent = generate_payment_intent(status=IntentStatus.FAILED)
+        with pytest.raises(CartPaymentUpdateError) as e:
+            await cart_payment_processor._get_payment_intent_if_completed(
+                idempotency_key=intent.idempotency_key,
+                existing_payment_intents=[intent],
+            )
+        assert e.value.error_code == PayinErrorCode.PAYMENT_INTENT_CREATE_FAILED_ERROR
+
+    @pytest.mark.asyncio
+    async def test_get_payment_intent_if_completed_match_adjustment_with_key(
+        self, cart_payment_processor
+    ):
+        # Adjustment history with specified idempotency key
+        idempotency_key = str(uuid.uuid4())
+        intent = generate_payment_intent()
+        adjustment = generate_payment_intent_adjustment_history(
+            payment_intent_id=intent.id, idempotency_key=idempotency_key
+        )
+        cart_payment_processor.cart_payment_interface.get_payment_intent_adjustment = FunctionMock(
+            return_value=adjustment
+        )
+        result = await cart_payment_processor._get_payment_intent_if_completed(
+            idempotency_key=idempotency_key, existing_payment_intents=[intent]
+        )
+        assert result == intent
+
+        # Idempotency key used for other intents
+        adjustment = generate_payment_intent_adjustment_history(
+            payment_intent_id=uuid.uuid4(), idempotency_key=idempotency_key
+        )
+        cart_payment_processor.cart_payment_interface.get_payment_intent_adjustment = FunctionMock(
+            return_value=adjustment
+        )
+        with pytest.raises(CartPaymentUpdateError) as e:
+            await cart_payment_processor._get_payment_intent_if_completed(
+                idempotency_key=idempotency_key, existing_payment_intents=[intent]
+            )
+        assert e.value.error_code == PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
+
+    @pytest.mark.asyncio
+    async def test_get_payment_intent_if_completed_match_refund_with_key(
+        self, cart_payment_processor
+    ):
+        # Existing refund with specified idempotency key
+        idempotency_key = str(uuid.uuid4())
+        intent = generate_payment_intent()
+        refund = generate_refund(
+            payment_intent_id=intent.id, idempotency_key=idempotency_key
+        )
+        cart_payment_processor.cart_payment_interface.find_existing_refund = FunctionMock(
+            return_value=(refund, generate_pgp_refund())
+        )
+        result = await cart_payment_processor._get_payment_intent_if_completed(
+            idempotency_key=idempotency_key, existing_payment_intents=[intent]
+        )
+        assert result == intent
+
+        # Idempotency key used for other intents
+        refund = generate_refund(
+            payment_intent_id=uuid.uuid4(), idempotency_key=idempotency_key
+        )
+        cart_payment_processor.cart_payment_interface.find_existing_refund = FunctionMock(
+            return_value=(refund, generate_pgp_refund())
+        )
+        with pytest.raises(CartPaymentUpdateError) as e:
+            await cart_payment_processor._get_payment_intent_if_completed(
+                idempotency_key=idempotency_key, existing_payment_intents=[intent]
+            )
+        assert e.value.error_code == PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
+
+    @pytest.mark.asyncio
+    async def test_get_payment_intent_if_completed_no_match(
+        self, cart_payment_processor
+    ):
+        # No prior use of idempotency key
+        result = await cart_payment_processor._get_payment_intent_if_completed(
+            idempotency_key=str(uuid.uuid4()),
+            existing_payment_intents=[generate_payment_intent()],
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
     async def test_update_payment_for_legacy_charge(self, cart_payment_processor):
         legacy_charge = generate_legacy_consumer_charge()
         legacy_payment = generate_legacy_payment()

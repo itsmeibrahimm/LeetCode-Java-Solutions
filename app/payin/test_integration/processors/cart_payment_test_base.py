@@ -14,10 +14,18 @@ from app.payin.core.cart_payment.model import (
     LegacyPayment,
     LegacyStripeCharge,
     PaymentIntent,
+    PaymentIntentAdjustmentHistory,
     PgpPaymentIntent,
+    PgpRefund,
+    Refund,
 )
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
-from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    LegacyStripeChargeStatus,
+    RefundReason,
+    RefundStatus,
+)
 from app.payin.core.exceptions import CartPaymentCreateError
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.v1.processor import PayerProcessorV1
@@ -37,6 +45,17 @@ class PgpPaymentIntentState:
 
 
 @dataclass
+class RefundState:
+    status: RefundStatus
+    amount: int
+    reason: Optional[RefundReason]
+    # Fields used to indicate source of refund.  Used to determine how to query for refund.
+    is_refund_at_cancel: bool = False
+    is_refund_at_capture: bool = False
+    is_refund_past_intent_at_adjustment: bool = False
+
+
+@dataclass
 class StripeChargeState:
     status: LegacyStripeChargeStatus
     amount: int
@@ -49,6 +68,7 @@ class PaymentIntentState:
     status: IntentStatus
     amount: int
     pgp_payment_intent_state: PgpPaymentIntentState
+    refund_state: Optional[RefundState]
     stripe_charge_state: StripeChargeState
 
 
@@ -128,6 +148,60 @@ class CartPaymentTestBase(ABC):
             == expected_payment_intent_state.error_reason
         ), "stripe charge error_reason mismatch"
         assert actual_stripe_charge.stripe_id, "stripe charge resource id missing"
+
+    def _verify_adjustment_history(
+        self,
+        acutal_adjustment_history: PaymentIntentAdjustmentHistory,
+        expected_original_amount: int,
+        expected_amount: int,
+        expected_delta: int,
+    ):
+        assert (
+            acutal_adjustment_history.amount == expected_amount
+        ), "payment_intent_adjustment_history amount mismatch"
+        assert (
+            acutal_adjustment_history.amount_original == expected_original_amount
+        ), "payment_intent_adjustment_history amount_original mismatch"
+        assert (
+            acutal_adjustment_history.amount_delta == expected_delta
+        ), "payment_intent_adjustment_history amount_delta mismatch"
+
+    def _verify_refund(
+        self,
+        actual_refund: Refund,
+        expected_refund_state: RefundState,
+        expected_payment_intent_id: UUID,
+    ):
+        assert (
+            actual_refund.status == expected_refund_state.status
+        ), "refund status mismatch"
+        assert (
+            actual_refund.amount == expected_refund_state.amount
+        ), "refund amount mismatch"
+        assert (
+            actual_refund.reason == expected_refund_state.reason
+        ), "refund reason mismatch"
+        assert (
+            actual_refund.payment_intent_id == expected_payment_intent_id
+        ), "refund payment_intent_id mismatch"
+
+    def _verify_pgp_refund(
+        self, actual_refund: PgpRefund, expected_refund_state: RefundState
+    ):
+        assert (
+            actual_refund.status == expected_refund_state.status
+        ), "pgp_refund status mismatch"
+        assert (
+            actual_refund.amount == expected_refund_state.amount
+        ), "pgp_refund amount mismatch"
+        assert (
+            actual_refund.reason == expected_refund_state.reason
+        ), "pgp_refund reason mismatch"
+        assert actual_refund.pgp_code == "stripe", "pgp_refund pgp_code mismatch"
+        assert actual_refund.pgp_resource_id, "pgp_refund pgp_resource_id missing"
+        assert (
+            actual_refund.pgp_charge_resource_id
+        ), "pgp_refund pgp_resource_id missing"
 
     async def _test_cart_payment_creation_error(
         self,
@@ -265,7 +339,10 @@ class CartPaymentTestBase(ABC):
         # Presence of idempotency_key means whether there is adjustment
         adjustment_idempotency_key = None
 
-        if new_cart_payment_state.amount_delta_update:
+        if (
+            new_cart_payment_state.amount_delta_update
+            or new_cart_payment_state.amount_delta_update == 0
+        ):
             cart_payment_pre_update, _ = await cart_payment_repository.get_cart_payment_by_id_from_primary(
                 init_cart_payment.id
             )
@@ -334,23 +411,17 @@ class CartPaymentTestBase(ABC):
                     payment_intent.id
                 ]
                 if new_cart_payment_state.delay_capture:
-                    # TODO Fix this to work for the immediate capture case, where a record is added for the refund of past intents
-                    # TODO Verify expected refund state
                     assert (
                         payment_intent_adjustment_history
                     ), "payment_intent_adjustment_history not found!"
-                    assert (
-                        payment_intent_adjustment_history.amount_original
-                        == pre_update_payment_intent.amount
-                    ), "payment_intent_adjustment_history amount_original mismatch"
-                    assert (
-                        payment_intent_adjustment_history.amount_delta
-                        == payment_intent.amount - pre_update_payment_intent.amount
-                    ), "payment_intent_adjustment_history amount_delta mismatch"
-                    assert (
-                        payment_intent_adjustment_history.amount
-                        == payment_intent.amount
-                    ), "payment_intent_adjustment_history amount mismatch"
+                    self._verify_adjustment_history(
+                        acutal_adjustment_history=payment_intent_adjustment_history,
+                        expected_original_amount=pre_update_payment_intent.amount,
+                        expected_amount=payment_intent.amount,
+                        expected_delta=(
+                            payment_intent.amount - pre_update_payment_intent.amount
+                        ),
+                    )
 
             # verify pgp_payment_intents
             assert (
@@ -373,6 +444,37 @@ class CartPaymentTestBase(ABC):
             self._verify_stripe_charge_state(
                 stripe_charge, payment_intent_state.stripe_charge_state
             )
+
+            # verify expected refunds, if any
+            refund_state = payment_intent_state.refund_state
+            if refund_state:
+                refund_idempotency_key = adjustment_idempotency_key
+                if refund_state.is_refund_at_cancel:
+                    refund_idempotency_key = (
+                        f"{payment_intent.idempotency_key}-refund-at-cancel"
+                    )
+                elif refund_state.is_refund_at_capture:
+                    refund_idempotency_key = (
+                        f"{payment_intent.idempotency_key}-refund-at-capture"
+                    )
+                elif refund_state.is_refund_past_intent_at_adjustment:
+                    # Refund for previously captured intent
+                    refund_idempotency_key = f"{payment_intent.idempotency_key}-refund"
+
+                assert (
+                    refund_idempotency_key
+                ), "refund_idempotency_key missing, cannot verify refund"
+                refund = await cart_payment_repository.get_refund_by_idempotency_key_from_primary(
+                    idempotency_key=refund_idempotency_key
+                )
+                assert refund, "refund missing"
+                self._verify_refund(refund, refund_state, payment_intent.id)
+
+                pgp_refund = await cart_payment_repository.get_pgp_refund_by_refund_id_from_primary(
+                    refund.id
+                )
+                assert pgp_refund, "pgp_refund missing"
+                self._verify_pgp_refund(pgp_refund, refund_state)
 
     async def _capture_intents(
         self,

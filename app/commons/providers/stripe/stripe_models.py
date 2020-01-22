@@ -175,6 +175,10 @@ class StripeRetrievePaymentIntentRequest(StripeBaseModel):
 
 class StripeRefundChargeRequest(StripeBaseModel):
     class RefundReason(str, Enum):
+        """
+        See: https://stripe.com/docs/api/refunds/object#refund_object-reason
+        """
+
         DUPLICATE = "duplicate"
         FRAUDULENT = "fraudulent"
         REQUESTED_BY_CONSUMER = "requested_by_customer"
@@ -546,6 +550,12 @@ class Charge(StripeBaseModel):
 
     _STRIPE_OBJECT_NAME: str = "charge"
 
+    class Refunds(StripeBaseModel):
+        data: List[Refund]
+        has_more: bool
+        object: str
+        url: Optional[str]
+
     id: str
     object: str
     amount: int
@@ -578,7 +588,7 @@ class Charge(StripeBaseModel):
     receipt_number: Optional[str]
     receipt_url: Optional[str]
     refunded: bool
-    # TODO refunds
+    refunds: Optional[Refunds]
     review: Optional[str]
     shipping: Optional[Shipping]
     source_transfer: Optional[str]

@@ -12,6 +12,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundReason,
     RefundStatus,
 )
 from app.payin.core.payer.model import PayerCorrelationIds
@@ -218,7 +219,7 @@ class Refund(BaseModel):
     idempotency_key: str
     status: RefundStatus
     amount: int
-    reason: Optional[str]
+    reason: Optional[RefundReason]
     created_at: datetime
     updated_at: datetime
 
@@ -233,8 +234,9 @@ class PgpRefund(BaseModel):
     status: RefundStatus
     pgp_code: PgpCode
     pgp_resource_id: Optional[str]
+    pgp_charge_resource_id: Optional[str]
     amount: int
-    reason: Optional[str]
+    reason: Optional[RefundReason]
     created_at: datetime
     updated_at: datetime
 

@@ -34,6 +34,7 @@ card_declined = CartPaymentState(
                 amount_received=None,
                 status=IntentStatus.FAILED,
             ),
+            refund_state=None,
             stripe_charge_state=StripeChargeState(
                 amount=1000,
                 amount_refunded=0,

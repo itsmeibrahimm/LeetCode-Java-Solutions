@@ -73,6 +73,7 @@ from app.payin.core.cart_payment.types import (
     IntentStatus,
     LegacyConsumerChargeId,
     LegacyStripeChargeStatus,
+    RefundReason,
     RefundStatus,
 )
 from app.payin.core.exceptions import (
@@ -383,6 +384,9 @@ class LegacyPaymentInterface:
     async def update_charge_after_payment_captured(
         self, provider_intent: ProviderPaymentIntent
     ) -> LegacyStripeCharge:
+        # Update the status of stripe_charge based on the provider intent.
+        # We do not need to update amount_refunded here since we do that at cart payment adjustment time in order to preserve
+        # correct behavior in DSJ, which does not have the concept of delayed capture.
         charge = provider_intent.charges.data[0]
         return await self.payment_repo.update_legacy_stripe_charge_status(
             stripe_charge_id=charge.id, status=LegacyStripeChargeStatus(charge.status)
@@ -681,6 +685,11 @@ class CartPaymentInterface:
 
         return RefundStatus(provider_status)
 
+    def _get_refund_reason_from_provider_refund(
+        self, provider_reason: Optional[str]
+    ) -> Optional[RefundReason]:
+        return RefundReason(provider_reason) if provider_reason else None
+
     def _get_charge_status_from_intent_status(
         self, intent_status: IntentStatus
     ) -> ChargeStatus:
@@ -719,6 +728,24 @@ class CartPaymentInterface:
             return StripeCreatePaymentIntentRequest.SetupFutureUsage.ON_SESSION
 
         return StripeCreatePaymentIntentRequest.SetupFutureUsage.OFF_SESSION
+
+    def _get_provider_refund_from_intent_if_exists(
+        self, provider_payment_intent: ProviderPaymentIntent
+    ) -> Optional[ProviderRefund]:
+        provider_charge = (
+            provider_payment_intent.charges.data[0]
+            if provider_payment_intent.charges and provider_payment_intent.charges.data
+            else None
+        )
+        if (
+            provider_charge
+            and provider_charge.refunds
+            and provider_charge.refunds.data
+            and len(provider_charge.refunds.data) > 0
+        ):
+            return provider_charge.refunds.data[0]
+        else:
+            return None
 
     async def find_existing_payment(
         self, payer_id: Optional[uuid.UUID], idempotency_key: str
@@ -773,17 +800,37 @@ class CartPaymentInterface:
         )
         return refund, pgp_refund
 
+    def match_payment_intent_for_adjustment(
+        self,
+        *,
+        adjustment_history: PaymentIntentAdjustmentHistory,
+        intent_list: List[PaymentIntent],
+    ) -> Optional[PaymentIntent]:
+        matched_intents = filter(
+            lambda intent: intent.id == adjustment_history.payment_intent_id,
+            intent_list,
+        )
+        return next(matched_intents, None)
+
     def is_adjustment_for_payment_intents(
         self,
         adjustment_history: PaymentIntentAdjustmentHistory,
         intent_list: List[PaymentIntent],
-    ):
+    ) -> bool:
         return any(
             [
                 payment_intent.id == adjustment_history.payment_intent_id
                 for payment_intent in intent_list
             ]
         )
+
+    def match_payment_intent_for_refund(
+        self, *, refund: Refund, intent_list: List[PaymentIntent]
+    ) -> Optional[PaymentIntent]:
+        matched_intents = filter(
+            lambda intent: intent.id == refund.payment_intent_id, intent_list
+        )
+        return next(matched_intents, None)
 
     def is_accessible(
         self,
@@ -1432,15 +1479,15 @@ class CartPaymentInterface:
             reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
         )
 
-        # todo @Arjun please consumer this refund object and populate it to our control objects
         await self.stripe_async_client.refund_charge(
             country=country_code,
             request=refund_request,
             idempotency_key=refund_idempotency_key,
         )
 
-        # we will retrieve latest payment_intent from stripe to maintain integrity
-        # for underlying payment intent, charge and refund data
+        # We will retrieve latest payment_intent from stripe to maintain integrity
+        # for underlying payment intent, charge and refund data.  See the update_payment_after_capture_with_provider
+        # function for management of this state following capture.
         return await self.stripe_async_client.retrieve_payment_intent(
             country=CountryCode(payment_intent.country),
             request=StripeRetrievePaymentIntentRequest(
@@ -1523,6 +1570,23 @@ class CartPaymentInterface:
                     payment_intent, new_charge_status, provider_payment_intent
                 )
 
+            # If a partial refund was performed prior to capture, there will be a refund generated from the intent,
+            # as the final amount captured is less than the originally authorized amount.  Ensure we record this
+            # refund in our system.
+            # TODO remove runtime flag after verification
+            if feature_flags.record_refund_from_provider():
+                provider_refund = self._get_provider_refund_from_intent_if_exists(
+                    provider_payment_intent=provider_payment_intent
+                )
+                if provider_refund:
+                    # If there is a refund, there will be a single record of it from the provider.  Use a placeholder value for
+                    # idempotency key since this comes not from a client request, but rather internal logic.
+                    await self.create_refund_from_provider(
+                        payment_intent_id=payment_intent.id,
+                        idempotency_key=f"{payment_intent.idempotency_key}-refund-at-capture",
+                        provider_refund=provider_refund,
+                    )
+
         return updated_payment_intent, updated_pgp_payment_intent
 
     async def _update_charge_pair_after_capture(
@@ -1587,7 +1651,6 @@ class CartPaymentInterface:
         refund: Refund,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
-        reason: str,
         refund_amount: int,
     ) -> ProviderRefund:
 
@@ -1600,7 +1663,9 @@ class CartPaymentInterface:
             refund_request = StripeRefundChargeRequest(
                 charge=pgp_payment_intent.charge_resource_id,
                 amount=refund_amount,
-                reason=reason,
+                reason=StripeRefundChargeRequest.RefundReason(refund.reason.value)
+                if refund.reason
+                else None,
             )
 
             if payment_intent.application_fee_amount:
@@ -1727,7 +1792,60 @@ class CartPaymentInterface:
                     payment_intent=payment_intent, status=ChargeStatus.CANCELLED
                 )
 
+            # When cancelling a delayed capture intent, there will be a refund generated since the originally authorized amount is no longer held against
+            # the payment method.  Ensure we record this refund in our system.
+            # TODO remove runtime flag after verification
+            if feature_flags.record_refund_from_provider():
+                provider_refund = self._get_provider_refund_from_intent_if_exists(
+                    provider_payment_intent=provider_payment_intent
+                )
+                if provider_refund:
+                    # If there is a refund, there will be a single record of it from the provider.  Use a placeholder value for
+                    # idempotency key since this comes not from a client request, but rather internal logic.
+                    await self.create_refund_from_provider(
+                        payment_intent_id=payment_intent.id,
+                        idempotency_key=f"{payment_intent.idempotency_key}-refund-at-cancel",
+                        provider_refund=provider_refund,
+                    )
+
         return updated_intent, updated_pgp_intent
+
+    async def create_refund_from_provider(
+        self,
+        payment_intent_id: uuid.UUID,
+        idempotency_key: str,
+        provider_refund: ProviderRefund,
+    ) -> Tuple[Refund, PgpRefund]:
+        target_status = self._get_refund_status_from_provider_refund(
+            provider_refund.status
+        )
+
+        # Reason is extracted from provider refund object.  For stripe, we observe this is None if amount refunded
+        # is >= minimum charge for currency, or "requested_by_customer" if below (due to our small amount capture handling).
+        reason = self._get_refund_reason_from_provider_refund(provider_refund.reason)
+
+        refund = await self.payment_repo.insert_refund(
+            id=uuid.uuid4(),
+            payment_intent_id=payment_intent_id,
+            idempotency_key=idempotency_key,
+            status=target_status,
+            amount=provider_refund.amount,
+            reason=reason,
+        )
+
+        pgp_refund = await self.payment_repo.insert_pgp_refund(
+            id=uuid.uuid4(),
+            refund_id=refund.id,
+            idempotency_key=idempotency_key,
+            status=target_status,
+            pgp_code=PgpCode.STRIPE,
+            pgp_resource_id=provider_refund.id,
+            pgp_charge_resource_id=provider_refund.charge,
+            amount=provider_refund.amount,
+            reason=reason,
+        )
+
+        return refund, pgp_refund
 
     async def create_new_refund(
         self,
@@ -1735,6 +1853,7 @@ class CartPaymentInterface:
         cart_payment: CartPayment,
         payment_intent: PaymentIntent,
         idempotency_key: str,
+        reason: RefundReason,
     ) -> Tuple[Refund, PgpRefund]:
         async with self.payment_repo.payment_database_transaction():
             refund = await self.payment_repo.insert_refund(
@@ -1743,7 +1862,7 @@ class CartPaymentInterface:
                 idempotency_key=idempotency_key,
                 status=RefundStatus.PROCESSING,
                 amount=refund_amount,
-                reason=None,
+                reason=reason,
             )
 
             pgp_refund = await self.payment_repo.insert_pgp_refund(
@@ -1752,20 +1871,10 @@ class CartPaymentInterface:
                 idempotency_key=idempotency_key,
                 status=RefundStatus.PROCESSING,
                 pgp_code=PgpCode.STRIPE,
+                pgp_resource_id=None,
+                pgp_charge_resource_id=None,
                 amount=refund_amount,
-                reason=None,
-            )
-
-            # Insert adjustment history record
-            await self.payment_repo.insert_payment_intent_adjustment_history(
-                id=uuid.uuid4(),
-                payer_id=cart_payment.payer_id,
-                payment_intent_id=payment_intent.id,
-                amount=cart_payment.amount - refund_amount,
-                amount_original=cart_payment.amount,
-                amount_delta=-refund_amount,
-                currency=payment_intent.currency,
-                idempotency_key=idempotency_key,
+                reason=reason,
             )
 
         return refund, pgp_refund
@@ -1794,6 +1903,7 @@ class CartPaymentInterface:
                 pgp_refund_id=pgp_refund.id,
                 status=target_refund_status,
                 pgp_resource_id=provider_refund.id,
+                pgp_charge_resource_id=provider_refund.charge,
             )
             if self.ENABLE_NEW_CHARGE_TABLES:
                 await self._update_charge_pair_after_refund(
@@ -1849,17 +1959,22 @@ class CartPaymentInterface:
                 payer_statement_description=most_recent_intent.statement_descriptor,
             )
 
-            # Insert adjustment history record
-            await self.payment_repo.insert_payment_intent_adjustment_history(
-                id=uuid.uuid4(),
-                payer_id=cart_payment.payer_id,
-                payment_intent_id=payment_intent.id,
-                amount=amount,
-                amount_original=cart_payment.amount,
-                amount_delta=(amount - cart_payment.amount),
-                currency=payment_intent.currency,
-                idempotency_key=payment_intent.idempotency_key,
-            )
+            # Insert adjustment history record if the payment intent is not yet captured.
+            if self.does_intent_require_capture(most_recent_intent):
+                self.req_context.log.debug(
+                    "[increase_payment_amount] Inserting payment intent adjustment history",
+                    payment_intent_id=most_recent_intent.id,
+                )
+                await self.payment_repo.insert_payment_intent_adjustment_history(
+                    id=uuid.uuid4(),
+                    payer_id=cart_payment.payer_id,
+                    payment_intent_id=payment_intent.id,
+                    amount=amount,
+                    amount_original=cart_payment.amount,
+                    amount_delta=(amount - cart_payment.amount),
+                    currency=payment_intent.currency,
+                    idempotency_key=payment_intent.idempotency_key,
+                )
 
         self.req_context.log.debug(
             "[increase_payment_amount] Created intent pair",
@@ -2251,6 +2366,7 @@ class CartPaymentProcessor:
 
         if not can_intent_be_cancelled and not can_intent_be_refunded:
             # If not able to cancel or refund, no action is needed (for example, intent is in failed state or already fully refunded).
+            # This includes immediate capture intents where amount was already brought down to 0.
             self.log.info(
                 "[_cancel_payment_intent] Skipping intent, not in state that allows for cancel or refund",
                 payment_intent_id=payment_intent.id,
@@ -2277,6 +2393,7 @@ class CartPaymentProcessor:
         elif can_intent_be_refunded:
             # The intent cannot be cancelled because its state is beyond capture.  Instead we must refund
             # Insert new refund, adjustment history
+            reason = RefundReason.REQUESTED_BY_CUSTOMER
             refund, pgp_refund = await self.cart_payment_interface.create_new_refund(
                 refund_amount=payment_intent.amount,
                 cart_payment=cart_payment,
@@ -2284,13 +2401,13 @@ class CartPaymentProcessor:
                 idempotency_key=self.cart_payment_interface.get_idempotency_key_for_provider_call(
                     payment_intent.idempotency_key, IdempotencyKeyAction.REFUND
                 ),
+                reason=reason,
             )
 
             provider_refund = await self.cart_payment_interface.refund_provider_payment(
                 refund=refund,
                 payment_intent=payment_intent,
                 pgp_payment_intent=pgp_payment_intent,
-                reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
                 refund_amount=payment_intent.amount,
             )
 
@@ -2587,6 +2704,7 @@ class CartPaymentProcessor:
             # Interface contracts restrict new_amount to be > 0, and this method is called when new amount is lower than previous.
             # Amount to refund is difference between current and new target value.
             refund_amount = refundable_intent.amount - new_amount
+            reason = RefundReason.REQUESTED_BY_CUSTOMER
 
             # If refund for this idempotency key exists, return
             existing_refund, existing_pgp_refund = await self.cart_payment_interface.find_existing_refund(
@@ -2616,13 +2734,13 @@ class CartPaymentProcessor:
                     cart_payment=cart_payment,
                     payment_intent=refundable_intent,
                     idempotency_key=idempotency_key,
+                    reason=reason,
                 )
 
             provider_refund = await self.cart_payment_interface.refund_provider_payment(
                 refund=refund,
                 payment_intent=refundable_intent,
                 pgp_payment_intent=refundable_pgp_payment_intent,
-                reason=StripeRefundChargeRequest.RefundReason.REQUESTED_BY_CONSUMER,
                 refund_amount=refund_amount,
             )
 
@@ -2647,6 +2765,88 @@ class CartPaymentProcessor:
             return None
 
         return request_client_description[:1000]
+
+    async def _get_payment_intent_if_completed(
+        self, idempotency_key: str, existing_payment_intents: List[PaymentIntent]
+    ) -> Optional[PaymentIntent]:
+        """
+        Determine if an idempotency key was used previous for a request related to the specified payment intents.
+        Return the payment_intent if the key was successfully used before, otherwise return None.
+
+        Raise error in these cases, since in these scenarios it is not possible or allowed for the caller to make use of the idempotency_key:
+            - If idempotency key was used for other payment intents.
+
+        Arguments:
+            idempotency_key {str} -- The idempotency key to examine usage of.
+            existing_payment_intent {PaymenIntent} -- A list of payment intents for a cart payment.
+        """
+        existing_payment_intent = self.cart_payment_interface.filter_payment_intents_by_idempotency_key(
+            existing_payment_intents, idempotency_key
+        )
+        if existing_payment_intent:
+            if self.cart_payment_interface.is_payment_intent_failed(
+                payment_intent=existing_payment_intent
+            ):
+                # If there was an intent with the same idempotency key and it failed, return an error.
+                # TODO support returning previous result based on idempotency key reuse.
+                self.log.warning(
+                    "[_is_idempotency_key_used_for_intents] Reuse of idempotency key for failed payment intent",
+                    idempotency_key=idempotency_key,
+                )
+                raise CartPaymentUpdateError(
+                    error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_FAILED_ERROR
+                )
+
+            self.log.info(
+                "[_is_idempotency_key_used_for_intents] Reuse of idempotency key for previous payment intent",
+                idempotency_key=idempotency_key,
+                payment_intent_id=existing_payment_intent.id,
+            )
+            return existing_payment_intent
+
+        # No payment intent with idempotency key.  Next check adjustment history, which may hold key from previous amount reduction.
+        adjustment_history = await self.cart_payment_interface.get_payment_intent_adjustment(
+            idempotency_key=idempotency_key
+        )
+        if adjustment_history:
+            adjustment_intent = self.cart_payment_interface.match_payment_intent_for_adjustment(
+                adjustment_history=adjustment_history,
+                intent_list=existing_payment_intents,
+            )
+            if not adjustment_intent:
+                self.log.error(
+                    "[_is_idempotency_key_used_for_intents] Reuse of idempotency key for used by another payment intent",
+                    idempotency_key=idempotency_key,
+                    payment_intent_id=adjustment_history.payment_intent_id,
+                    adjustment_history_id=adjustment_history.id,
+                )
+                raise CartPaymentUpdateError(
+                    error_code=PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
+                )
+            return adjustment_intent
+
+        # No payment intent or adjustment history with this idempotency key.  Last possibility is in the refunds model.
+        refund, _ = await self.cart_payment_interface.find_existing_refund(
+            idempotency_key=idempotency_key
+        )
+        if refund:
+            refund_intent = self.cart_payment_interface.match_payment_intent_for_refund(
+                refund=refund, intent_list=existing_payment_intents
+            )
+            if not refund_intent:
+                self.log.error(
+                    "[_is_idempotency_key_used_for_intents] Reuse of idempotency key for used by another payment intent",
+                    idempotency_key=idempotency_key,
+                    payment_intent_id=refund.payment_intent_id,
+                    refund_id=refund.id,
+                )
+                raise CartPaymentUpdateError(
+                    error_code=PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
+                )
+            return refund_intent
+
+        # No trace of this idempotency key being used before, so there is no previous operation that completed.
+        return None
 
     @track_func
     @tracing.trackable
@@ -2749,64 +2949,19 @@ class CartPaymentProcessor:
         payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
             cart_payment
         )
-        existing_payment_intent = self.cart_payment_interface.filter_payment_intents_by_idempotency_key(
-            payment_intents, idempotency_key
+        completed_intent = await self._get_payment_intent_if_completed(
+            idempotency_key=idempotency_key, existing_payment_intents=payment_intents
         )
-        if existing_payment_intent:
-            if self.cart_payment_interface.is_payment_intent_failed(
-                payment_intent=existing_payment_intent
-            ):
-                # If there was an intent with the same idempotency key and it failed, return an error.
-                # TODO support returning previous result based on idempotency key reuse.
-                self.log.warning(
-                    "[update_payment_for_legacy_charge] Reuse of idempotency key for failed payment intent",
-                    idempotency_key=idempotency_key,
-                )
-                raise CartPaymentUpdateError(
-                    error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_FAILED_ERROR
-                )
-            # For any non failed state, return success
-            self.log.info(
-                "[update_payment_for_legacy_charge] Reuse of idempotency key for previous payment intent",
-                idempotency_key=idempotency_key,
-                payment_intent_id=existing_payment_intent.id,
-            )
-            existing_pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
-                payment_intent=existing_payment_intent
+        if completed_intent:
+            # Form response for cart payment without taking any action: This idempotency key was already re-used, so we return immediately.
+            pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
+                payment_intent=completed_intent
             )
             return self.cart_payment_interface.populate_cart_payment_for_response(
                 cart_payment=cart_payment,
-                payment_intent=existing_payment_intent,
-                pgp_payment_intent=existing_pgp_payment_intent,
+                payment_intent=completed_intent,
+                pgp_payment_intent=pgp_payment_intent,
             )
-        else:
-            # No payment intent with idempotency key.  Next check adjustment history, which may hold key from previous amount reduction.
-            adjustment_history = await self.cart_payment_interface.get_payment_intent_adjustment(
-                idempotency_key=idempotency_key
-            )
-            if adjustment_history:
-                if not self.cart_payment_interface.is_adjustment_for_payment_intents(
-                    adjustment_history, intent_list=payment_intents
-                ):
-                    self.log.error(
-                        "[update_payment_for_legacy_charge] Reuse of idempotency key for used by another payment intent",
-                        idempotency_key=idempotency_key,
-                        payment_intent_id=adjustment_history.payment_intent_id,
-                    )
-                    raise CartPaymentUpdateError(
-                        error_code=PayinErrorCode.CART_PAYMENT_IDEMPOTENCY_KEY_ERROR
-                    )
-                existing_payment_intent = self.cart_payment_interface.get_most_recent_intent(
-                    intent_list=payment_intents
-                )
-                existing_pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
-                    payment_intent=existing_payment_intent
-                )
-                return self.cart_payment_interface.populate_cart_payment_for_response(
-                    cart_payment=cart_payment,
-                    payment_intent=existing_payment_intent,
-                    pgp_payment_intent=existing_pgp_payment_intent,
-                )
 
         updated_cart_payment = await self._lock_and_update_payment(
             idempotency_key=idempotency_key,

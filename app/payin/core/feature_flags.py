@@ -23,3 +23,9 @@ def enable_delete_payer_request_ingestion() -> bool:
     return runtime.get_bool(
         "payin/feature-flags/enable_delete_payer_request_ingestion.bool", False
     )
+
+
+def record_refund_from_provider() -> bool:
+    return runtime.get_bool(
+        "payin/feature-flags/record_refund_from_provider.bool", True
+    )

@@ -5,7 +5,11 @@ from asynctest import mock
 from stripe.error import InvalidRequestError
 
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
-from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
+from app.payin.core.cart_payment.types import (
+    IntentStatus,
+    LegacyStripeChargeStatus,
+    RefundStatus,
+)
 from app.payin.core.payer.model import Payer
 from app.payin.core.payment_method.model import PaymentMethod
 from app.payin.repository.cart_payment_repo import (
@@ -18,6 +22,8 @@ from app.payin.test_integration.processors.cart_payment_test_base import (
     CartPaymentState,
     PaymentIntentState,
     PgpPaymentIntentState,
+    RefundReason,
+    RefundState,
     StripeChargeState,
 )
 
@@ -67,6 +73,7 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=0,
@@ -109,6 +116,7 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
                         amount_received=0,
                         status=IntentStatus.REQUIRES_CAPTURE,
                     ),
+                    refund_state=None,
                     stripe_charge_state=StripeChargeState(
                         amount=1000,
                         amount_refunded=999,
@@ -144,6 +152,12 @@ class TestSubmitSmallAmountIntentCaptureLegacy(CartPaymentLegacyTest):
                         amount_capturable=0,
                         amount_received=1000,
                         status=IntentStatus.SUCCEEDED,
+                    ),
+                    refund_state=RefundState(
+                        status=RefundStatus.SUCCEEDED,
+                        amount=999,
+                        reason=RefundReason.REQUESTED_BY_CUSTOMER,
+                        is_refund_at_capture=True,
                     ),
                     stripe_charge_state=StripeChargeState(
                         amount=1000,

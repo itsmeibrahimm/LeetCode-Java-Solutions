@@ -34,6 +34,7 @@ COMMAND_CHARGE = Charge(
     receipt_number=None,
     receipt_url=None,
     refunded=False,
+    refunds=None,
     review=None,
     shipping=None,
     source_transfer=None,

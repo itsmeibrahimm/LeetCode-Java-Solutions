@@ -565,6 +565,8 @@ class MockedPaymentRepo:
         idempotency_key: str,
         status: RefundStatus,
         pgp_code: PgpCode,
+        pgp_resource_id: Optional[str],
+        pgp_charge_resource_id: Optional[str],
         amount: int,
         reason: Optional[str],
     ) -> PgpRefund:
@@ -576,7 +578,8 @@ class MockedPaymentRepo:
             amount=amount,
             reason=reason,
             pgp_code=pgp_code,
-            pgp_resource_id=None,
+            pgp_resource_id=pgp_resource_id,
+            pgp_charge_resource_id=pgp_charge_resource_id,
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )
@@ -590,7 +593,11 @@ class MockedPaymentRepo:
         return utils.generate_refund(status=status)
 
     async def update_pgp_refund(
-        self, pgp_refund_id: UUID, status: RefundStatus, pgp_resource_id: str
+        self,
+        pgp_refund_id: UUID,
+        status: RefundStatus,
+        pgp_resource_id: str,
+        pgp_charge_resource_id: str,
     ) -> PgpRefund:
         return utils.generate_pgp_refund(status=status, pgp_resource_id=pgp_resource_id)
 
