@@ -48,7 +48,9 @@ from app.payin.core.exceptions import (
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
     CartPaymentUpdateError,
+    LegacyStripeChargeConcurrentAccessError,
     LegacyStripeChargeUpdateError,
+    LegacyStripeChargeCouldNotBeUpdatedError,
 )
 from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
@@ -618,6 +620,27 @@ class TestLegacyPaymentInterface:
         assert result.status == LegacyStripeChargeStatus.FAILED
         assert result.stripe_id.startswith("stripeid_lost_")
         assert result.error_reason == "generic_stripe_api_error"
+
+    @pytest.mark.asyncio
+    async def test_mark_charge_as_failed_record_not_updated(
+        self, cart_payment_interface, legacy_payment_interface
+    ):
+        legacy_stripe_charge = generate_legacy_stripe_charge()
+        legacy_payment_interface.payment_repo.update_legacy_stripe_charge_error_details = FunctionMock(
+            side_effect=LegacyStripeChargeCouldNotBeUpdatedError()
+        )
+        with pytest.raises(LegacyStripeChargeConcurrentAccessError) as e:
+            await legacy_payment_interface.mark_charge_as_failed(
+                stripe_charge=legacy_stripe_charge,
+                creation_exception=CartPaymentCreateError(
+                    error_code=PayinErrorCode.PAYMENT_INTENT_CREATE_STRIPE_ERROR,
+                    provider_charge_id=None,
+                    provider_error_code=None,
+                    provider_decline_code=None,
+                    has_provider_error_details=False,
+                ),
+            )
+        assert e.value.error_code == PayinErrorCode.CART_PAYMENT_CONCURRENT_ACCESS_ERROR
 
 
 class TestCartPaymentInterface:

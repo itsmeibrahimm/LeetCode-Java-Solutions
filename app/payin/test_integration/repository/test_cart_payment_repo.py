@@ -29,7 +29,10 @@ from app.payin.core.cart_payment.types import (
     LegacyStripeChargeStatus,
     RefundStatus,
 )
-from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
+from app.payin.core.exceptions import (
+    LegacyStripeChargeCouldNotBeUpdatedError,
+    PaymentIntentCouldNotBeUpdatedError,
+)
 from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
@@ -47,6 +50,8 @@ from app.payin.repository.cart_payment_repo import (
     UpdateCartPaymentsRemovePiiWhereInput,
     UpdateCartPaymentsRemovePiiSetInput,
     GetLegacyConsumerChargeIdsByConsumerIdInput,
+    UpdateLegacyStripeChargeErrorDetailsWhereInput,
+    UpdateLegacyStripeChargeErrorDetailsSetInput,
 )
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -1723,21 +1728,93 @@ class TestLegacyCharges:
     async def test_update_legacy_stripe_charge_error_details(
         self,
         cart_payment_repository: CartPaymentRepository,
-        stripe_charge: LegacyStripeCharge,
+        consumer_charge: LegacyConsumerCharge,
     ):
-        result = await cart_payment_repository.update_legacy_stripe_charge_error_details(
-            id=stripe_charge.id,
-            status=LegacyStripeChargeStatus.FAILED,
-            stripe_id="generated id",
-            error_reason="generic error",
+        # Create a stripe charge without stripe_id set, in pending state
+        stripe_charge = await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id="",
+            card_id=1,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=Currency.USD,
+            status=LegacyStripeChargeStatus.PENDING,
+            idempotency_key=str(uuid4()),
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="test description",
+            error_reason="",
         )
 
+        update_where_input = UpdateLegacyStripeChargeErrorDetailsWhereInput(
+            id=stripe_charge.id, previous_status=LegacyStripeChargeStatus.PENDING
+        )
+        updated_at = datetime.now(timezone.utc)
+        update_set_input = UpdateLegacyStripeChargeErrorDetailsSetInput(
+            stripe_id="generated id",
+            status=LegacyStripeChargeStatus.FAILED,
+            error_reason="generic error",
+            updated_at=updated_at,
+        )
+
+        result = await cart_payment_repository.update_legacy_stripe_charge_error_details(
+            update_legacy_stripe_charge_where_input=update_where_input,
+            update_legacy_stripe_charge_set_input=update_set_input,
+        )
+        assert result
         expected_result = stripe_charge
-        expected_result.status = LegacyStripeChargeStatus.FAILED
         expected_result.stripe_id = "generated id"
+        expected_result.status = LegacyStripeChargeStatus.FAILED
         expected_result.error_reason = "generic error"
-        expected_result.updated_at = result.updated_at  # Generated
+        expected_result.updated_at = updated_at
         assert result == expected_result
+
+    @pytest.mark.asyncio
+    async def test_update_legacy_stripe_charge_error_details_not_updated(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        # Create a stripe charge without stripe_id set
+        stripe_charge = await cart_payment_repository.insert_legacy_stripe_charge(
+            stripe_id=str(uuid4()),
+            card_id=1,
+            charge_id=consumer_charge.id,
+            amount=consumer_charge.total,
+            amount_refunded=0,
+            currency=Currency.USD,
+            status=LegacyStripeChargeStatus.SUCCEEDED,
+            idempotency_key=str(uuid4()),
+            additional_payment_info="{'test_key': 'test_value'}",
+            description="test description",
+            error_reason="",
+        )
+
+        update_where_input = UpdateLegacyStripeChargeErrorDetailsWhereInput(
+            id=stripe_charge.id, previous_status=LegacyStripeChargeStatus.PENDING
+        )
+        update_set_input = UpdateLegacyStripeChargeErrorDetailsSetInput(
+            stripe_id="generated id",
+            status=LegacyStripeChargeStatus.FAILED,
+            error_reason="generic error",
+            updated_at=datetime.now(timezone.utc),
+        )
+
+        with pytest.raises(LegacyStripeChargeCouldNotBeUpdatedError):
+            await cart_payment_repository.update_legacy_stripe_charge_error_details(
+                update_legacy_stripe_charge_where_input=update_where_input,
+                update_legacy_stripe_charge_set_input=update_set_input,
+            )
+
+        # Ensure original record was not modified
+        existing_charge = await cart_payment_repository.get_legacy_stripe_charge_by_stripe_id(
+            stripe_charge_id=stripe_charge.stripe_id
+        )
+        assert existing_charge
+        expected_existing_charge = stripe_charge
+        # Generated fields
+        expected_existing_charge.created_at = existing_charge.created_at
+        expected_existing_charge.updated_at = existing_charge.updated_at
+        assert existing_charge == expected_existing_charge
 
     @pytest.mark.asyncio
     async def test_get_legacy_stripe_charge_by_stripe_id(

@@ -92,6 +92,8 @@ from app.payin.core.exceptions import (
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
     PayerReadError,
+    LegacyStripeChargeConcurrentAccessError,
+    LegacyStripeChargeCouldNotBeUpdatedError,
     LegacyStripeChargeUpdateError,
 )
 from app.payin.core.payer.model import Payer, RawPayer
@@ -120,6 +122,8 @@ from app.payin.repository.cart_payment_repo import (
     GetLegacyConsumerChargeIdsByConsumerIdInput,
     UpdateLegacyStripeChargeRemovePiiWhereInput,
     UpdateLegacyStripeChargeRemovePiiSetInput,
+    UpdateLegacyStripeChargeErrorDetailsWhereInput,
+    UpdateLegacyStripeChargeErrorDetailsSetInput,
 )
 
 IntentFullfillmentResult = NewType(
@@ -436,14 +440,33 @@ class LegacyPaymentInterface:
         stripe_charge: LegacyStripeCharge,
         creation_exception: CartPaymentCreateError,
     ) -> LegacyStripeCharge:
-        return await self.payment_repo.update_legacy_stripe_charge_error_details(
-            id=stripe_charge.id,
-            stripe_id=creation_exception.provider_charge_id
-            if creation_exception.provider_charge_id
-            else f"stripeid_lost_{str(uuid.uuid4())}",
-            status=LegacyStripeChargeStatus.FAILED,
-            error_reason=self._extract_error_reason_from_exception(creation_exception),
-        )
+        try:
+            return await self.payment_repo.update_legacy_stripe_charge_error_details(
+                update_legacy_stripe_charge_where_input=UpdateLegacyStripeChargeErrorDetailsWhereInput(
+                    id=stripe_charge.id, previous_status=stripe_charge.status
+                ),
+                update_legacy_stripe_charge_set_input=UpdateLegacyStripeChargeErrorDetailsSetInput(
+                    stripe_id=creation_exception.provider_charge_id
+                    if creation_exception.provider_charge_id
+                    else f"stripeid_lost_{str(uuid.uuid4())}",
+                    status=LegacyStripeChargeStatus.FAILED,
+                    error_reason=self._extract_error_reason_from_exception(
+                        creation_exception
+                    ),
+                    updated_at=datetime.now(timezone.utc),
+                ),
+            )
+        except LegacyStripeChargeCouldNotBeUpdatedError as e:
+            self.req_context.log.error(
+                "Legacy stripe charge could not be updated",
+                stripe_charge_id=stripe_charge.id,
+                stripe_id=stripe_charge.stripe_id,
+                status=stripe_charge.status,
+                error_reason=stripe_charge.error_reason,
+            )
+            raise LegacyStripeChargeConcurrentAccessError(
+                error_code=PayinErrorCode.CART_PAYMENT_CONCURRENT_ACCESS_ERROR
+            ) from e
 
     async def list_cart_payments_by_dd_consumer_id(
         self,

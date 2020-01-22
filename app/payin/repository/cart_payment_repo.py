@@ -32,7 +32,10 @@ from app.payin.core.cart_payment.types import (
     LegacyStripeChargeStatus,
     RefundStatus,
 )
-from app.payin.core.exceptions import PaymentIntentCouldNotBeUpdatedError
+from app.payin.core.exceptions import (
+    LegacyStripeChargeCouldNotBeUpdatedError,
+    PaymentIntentCouldNotBeUpdatedError,
+)
 from app.payin.models.maindb import consumer_charges, stripe_cards, stripe_charges
 from app.payin.models.paymentdb import (
     cart_payments,
@@ -48,6 +51,39 @@ from app.payin.repository.base import PayinDBRepository
 from app.payin.repository.payment_method_repo import StripeCardDbEntity
 
 
+# CartPayment operation objects
+class UpdateCartPaymentPostCancellationInput(DBRequestModel):
+    id: UUID
+    updated_at: datetime
+    deleted_at: datetime
+
+
+class GetCartPaymentsByConsumerIdInput(DBRequestModel):
+    dd_consumer_id: int
+
+
+class UpdateCartPaymentsRemovePiiWhereInput(DBRequestModel):
+    legacy_consumer_id: int
+
+
+class UpdateCartPaymentsRemovePiiSetInput(DBRequestModel):
+    client_description: str
+
+
+# PaymentIntent operation objects
+class UpdatePaymentIntentWhereInput(DBRequestModel):
+    id: UUID
+    previous_status: str
+
+
+class UpdatePaymentIntentSetInput(DBRequestModel):
+    status: str
+    capture_after: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+
+
+# PgpPaymentIntent operation objects
 class UpdatePgpPaymentIntentWhereInput(DBRequestModel):
     id: UUID
 
@@ -62,32 +98,12 @@ class UpdatePgpPaymentIntentSetInput(DBRequestModel):
     cancelled_at: Optional[datetime] = None
 
 
-class UpdatePaymentIntentWhereInput(DBRequestModel):
-    id: UUID
-    previous_status: str
-
-
-class UpdatePaymentIntentSetInput(DBRequestModel):
-    status: str
-    capture_after: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
-
-
-class UpdateCartPaymentPostCancellationInput(DBRequestModel):
-    id: UUID
-    updated_at: datetime
-    deleted_at: datetime
-
-
-class GetCartPaymentsByConsumerIdInput(DBRequestModel):
-    dd_consumer_id: int
-
-
+# LegacyConsumerCharge operation objects
 class GetLegacyConsumerChargeIdsByConsumerIdInput(DBRequestModel):
     consumer_id: int
 
 
+# LegacyStripeCharge operation objects
 class UpdateLegacyStripeChargeRemovePiiWhereInput(DBRequestModel):
     id: int
 
@@ -96,12 +112,16 @@ class UpdateLegacyStripeChargeRemovePiiSetInput(DBRequestModel):
     description: str
 
 
-class UpdateCartPaymentsRemovePiiWhereInput(DBRequestModel):
-    legacy_consumer_id: int
+class UpdateLegacyStripeChargeErrorDetailsWhereInput(DBRequestModel):
+    id: int
+    previous_status: LegacyStripeChargeStatus
 
 
-class UpdateCartPaymentsRemovePiiSetInput(DBRequestModel):
-    client_description: str
+class UpdateLegacyStripeChargeErrorDetailsSetInput(DBRequestModel):
+    stripe_id: str
+    status: LegacyStripeChargeStatus
+    error_reason: str
+    updated_at: datetime
 
 
 @final
@@ -1176,24 +1196,26 @@ class CartPaymentRepository(PayinDBRepository):
 
     async def update_legacy_stripe_charge_error_details(
         self,
-        id: int,
-        stripe_id: str,
-        status: LegacyStripeChargeStatus,
-        error_reason: str,
-    ):
+        *,
+        update_legacy_stripe_charge_where_input: UpdateLegacyStripeChargeErrorDetailsWhereInput,
+        update_legacy_stripe_charge_set_input: UpdateLegacyStripeChargeErrorDetailsSetInput,
+    ) -> LegacyStripeCharge:
         statement = (
             stripe_charges.table.update()
-            .where(stripe_charges.id == id)
-            .values(
-                stripe_id=stripe_id,
-                status=status.value,
-                error_reason=error_reason,
-                updated_at=datetime.now(timezone.utc),
+            .where(
+                and_(
+                    stripe_charges.id == update_legacy_stripe_charge_where_input.id,
+                    stripe_charges.status
+                    == update_legacy_stripe_charge_where_input.previous_status,
+                )
             )
+            .values(update_legacy_stripe_charge_set_input.dict(skip_defaults=True))
             .returning(*stripe_charges.table.columns.values())
         )
 
         row = await self.main_database.master().fetch_one(statement)
+        if not row:
+            raise LegacyStripeChargeCouldNotBeUpdatedError()
         return self.to_legacy_stripe_charge(row)
 
     async def update_legacy_stripe_charge_status(

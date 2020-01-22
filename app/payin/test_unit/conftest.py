@@ -46,6 +46,8 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePgpPaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdateCartPaymentPostCancellationInput,
+    UpdateLegacyStripeChargeErrorDetailsWhereInput,
+    UpdateLegacyStripeChargeErrorDetailsSetInput,
 )
 from app.payin.tests import utils
 from app.payin.tests.utils import FunctionMock, ContextMock, generate_payer
@@ -499,13 +501,14 @@ class MockedPaymentRepo:
 
     async def update_legacy_stripe_charge_error_details(
         self,
-        id: int,
-        stripe_id: str,
-        status: LegacyStripeChargeStatus,
-        error_reason: str,
+        *,
+        update_legacy_stripe_charge_where_input: UpdateLegacyStripeChargeErrorDetailsWhereInput,
+        update_legacy_stripe_charge_set_input: UpdateLegacyStripeChargeErrorDetailsSetInput,
     ):
         return utils.generate_legacy_stripe_charge(
-            stripe_id=stripe_id, status=status, error_reason=error_reason
+            stripe_id=update_legacy_stripe_charge_set_input.stripe_id,
+            status=update_legacy_stripe_charge_set_input.status,
+            error_reason=update_legacy_stripe_charge_set_input.error_reason,
         )
 
     async def update_legacy_stripe_charge_status(

@@ -551,7 +551,7 @@ class CartPaymentUpdateError(PayinError):
 
 
 ###########################################################
-# PaymentCharge Errors                                      #
+# Legacy Charge and StripeCharge Errors                   #
 ###########################################################
 class PaymentChargeRefundError(PayinError):
     pass
@@ -561,8 +561,16 @@ class LegacyStripeChargeUpdateError(PayinError):
     pass
 
 
+class LegacyStripeChargeCouldNotBeUpdatedError(Exception):
+    pass
+
+
+class LegacyStripeChargeConcurrentAccessError(PayinError):
+    pass
+
+
 ###########################################################
-# PaymentIntent Errors                                      #
+# PaymentIntent Errors                                    #
 ###########################################################
 class PaymentIntentCaptureError(PayinError):
     pass
@@ -589,7 +597,7 @@ class PaymentIntentConcurrentAccessError(Exception):
 
 
 ###########################################################
-# StripeDispute Errors                                      #
+# StripeDispute Errors                                    #
 ###########################################################
 class DisputeReadError(PayinError):
     pass
