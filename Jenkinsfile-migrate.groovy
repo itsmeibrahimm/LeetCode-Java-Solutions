@@ -1,5 +1,3 @@
-@Library('common-pipelines') _
-
 /**
  * Expected inputs:
  * ----------------
@@ -18,26 +16,7 @@ pipeline {
     label 'universal'
   }
   stages {
-    stage('Migrate staging') {
-      steps {
-        script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          common.migrateService(params['GITHUB_REPOSITORY'], params['SHA'], 'staging')
-        }
-      }
-    }
-    stage('Continue to prod?') {
-      steps {
-        script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          canDeployToProd = common.inputCanDeployToProd("Migrate production?")
-        }
-      }
-    }
     stage('Migrate prod') {
-      when {
-        equals expected: true, actual: canDeployToProd
-      }
       steps {
         script {
           common = load "${WORKSPACE}/Jenkinsfile-common.groovy"

@@ -24,7 +24,7 @@ Before starting integration, things developers should know first:
    ```
    2. port forwarding:
    ```bash
-   kubectl port-forward -n payment-service deployment/payment-service-web 8080:80
+   kubectl port-forward -n payment-service service/payment-service-web 8080:80
    ```
    3. open browser, and type the following url (note: v0 supports legacy information as input and is expected to be called only by DSJ for backward compatibility):
    ```bash

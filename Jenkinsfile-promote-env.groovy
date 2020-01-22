@@ -1,11 +1,11 @@
-@Library('common-pipelines') _
-
 /**
  * Expected inputs:
  * ----------------
  * params['SHA']                - Sha to promote
  * params['GITHUB_REPOSITORY']  - GitHub ssh url of repository (git://....)
  * params['JSON']               - Extensible json doc with extra information
+ * params['REF']                - The reference (tag, branch, or sha) from the ddops command line
+ * params['ENV']                - The environment from the ddops command line
  */
 
 pipeline {

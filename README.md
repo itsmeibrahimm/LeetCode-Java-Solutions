@@ -91,20 +91,59 @@ Payment-service uses [ddops](https://github.com/doordash/infrastructure/wiki/ddo
 - Approved PRs are merged to master branch, **without** being deployed to k8s cluster.
 
 ## Deployment
-- Payment-service [deploy pilots](https://github.com/doordash/runtime/blob/master/data/ops/authorizedDeployPersonnel.yml#L78) are authorized to perform regular deployment, hotfix, rollback or migration by [ddops commands](https://github.com/doordash/infrastructure/wiki/ddops) through deployment [slack channel](https://doordash.slack.com/messages/CL52A5SKZ)
+- Payment-service [deploy pilots](https://github.com/doordash/runtime/blob/master/data/ops/authorizedDeployPersonnel.yml#L78) are authorized to perform regular deployment, hotfix, rollback, migration and bounce by [ddops commands](https://github.com/doordash/infrastructure/wiki/ddops) through deployment [slack channel](https://doordash.slack.com/messages/CL52A5SKZ)
 - Deployment procedures
   - Regular deployment:
     1. `/ddops cut-release payment-service` -> output: `releaseTag`
     2. `/ddops build payment-service <releaseTag>`
-    3. `/ddops migrate payment-service <releaseTag>`
-    4. `/ddops promote payment-service <releaseTag>`
+    3. `/ddops migrate payment-service <releaseTag> --env=staging` # Migrate **staging ONLY**
+    4. `/ddops migrate payment-service <releaseTag>` # Migrate **prod ONLY**
+    5. `/ddops promote payment-service <releaseTag> --env=staging` # Promote **staging ONLY**
+    6. `/ddops promote payment-service <releaseTag>` # Promote **prod ONLY**
   - Hotfix:
     1. `/ddops add-to-release-branch payment-service <hotfix-sha> payment-service <deployed-release-branch> <hotfix-reason>` -> output: `releaseTag` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566873325021800))
     2. `/ddops hotfix payment-service <releaseTag>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566862402011100))
   - Rollback:
     1. `/ddops rollback payment-service <rollback-to-release-tag> <rollback reason>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1566862671012400))
-  - Migration:
-    1. `/ddops migrate payment-service <releaseTag>` ([example](https://doordash.slack.com/archives/CL52A5SKZ/p1567711383003500))
+  - Bounce:
+    1. `/ddops bounce payment-service` # Rolling upgrade to bounce payment-service-web and payment-service-webhook with current live release
+### Blue-green deployment
+As of 1/21/2020 Payment service adopted blue-green deployment for web and webhook k8s services. These are the facts to keep in mind
+- As part of blue-green deployment, a k8s rollout resource was created on top of existing k8s service instead of k8s deployment resource. Therefore any blue-green enabled k8s service, use following command to get current rollout:
+    `kubectl -n payment-service get rollouts`
+- Each blue-green deployment will set green (new replica set) to directly serve traffic besides blue (old replica set). After certain amount of [delay](https://github.com/doordash/payment-service/blob/f5a565c05dc7756a9f0ac2f8b7e7372c17a6d2db/_infra/prod/service.tf.template#L29), blue will be deleted.
+- In case the green service behave unexpectedly during deployment, use `/ddops rollback payment-service <blue release tag>` will immediately remove green services and keep existing blue service unchanged.
+- Follow this [Install Argo Rollouts Kubectl Plugin](https://github.com/doordash/service-template/blob/ab155ee87124cf1c68e30bd34c1c37b0e2a0e612/README.md#2-install-deployment-tools) to install local argo-rollout kubectl plugin to get a friendly view of blue-green deployment (argo rollout) process. Example:
+```
+kubectl-argo-rollouts get rollout payment-service-web -n payment-service
+Name:            payment-service-web
+Namespace:       payment-service
+Status:          ◌ Progressing
+Strategy:        BlueGreen
+Images:          611706558220.dkr.ecr.us-west-2.amazonaws.com/payment-service:2af851a235cc327f4de02a89a72f76c2acffb5c2
+                 611706558220.dkr.ecr.us-west-2.amazonaws.com/payment-service:f5a565c05dc7756a9f0ac2f8b7e7372c17a6d2db (active)
+                 ddartifacts-docker.jfrog.io/runtime:latest (active)
+Replicas:
+  Desired:       2
+  Current:       4
+  Updated:       2
+  Ready:         4
+  Available:     2
+
+NAME                                             KIND        STATUS         AGE   INFO
+⟳ payment-service-web                            Rollout     ◌ Progressing  121m
+├──# revision:3
+│  └──⧉ payment-service-web-5b5bdcc678           ReplicaSet  ✔ Healthy      75s   active
+│     ├──□ payment-service-web-5b5bdcc678-gzr85  Pod         ✔ Running      75s   ready:2/2
+│     └──□ payment-service-web-5b5bdcc678-q826k  Pod         ✔ Running      75s   ready:2/2,restarts:1
+├──# revision:2
+│  └──⧉ payment-service-web-7c855dcb5b           ReplicaSet  ✔ Healthy      59m
+│     ├──□ payment-service-web-7c855dcb5b-pbzlk  Pod         ✔ Running      59m   ready:2/2
+│     └──□ payment-service-web-7c855dcb5b-vvvvj  Pod         ✔ Running      59m   ready:2/2
+└──# revision:1
+   └──⧉ payment-service-web-5547bd48cf           ReplicaSet  • ScaledDown   121m
+```
+
 # Development
 
 ## Environment Setup

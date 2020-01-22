@@ -14,6 +14,10 @@ variable "service_name" {
   type = string
 }
 
+variable "blue_green_first_deployment" {
+  type = string
+}
+
 provider "aws" {
   region  = "us-west-2"
   version = "2.23.0"
@@ -30,8 +34,4 @@ provider "helm" {
   }
   install_tiller = false
   version = "0.10.1" # Heredoc strings delimited by commas broken in 0.10.2
-}
-
-variable "blue_green_first_deployment" {
-  type = string
 }

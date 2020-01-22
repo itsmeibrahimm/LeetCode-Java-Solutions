@@ -59,7 +59,7 @@ def installTerraform() {
 def dockerBuild(Map optArgs = [:], String gitUrl, String sha) {
   String gitRepo = getGitRepoName(gitUrl)
   Map o = [
-    dockerImageUrl: "611706558220.dkr.ecr.us-west-2.amazonaws.com/${gitRepo}",
+    dockerImageUrl: "611706558220.dkr.ecr.us-west-2.amazonaws.com/${getServiceName()}",
   ] << optArgs
 
   // Ensure we have a SHA
@@ -76,6 +76,11 @@ def dockerBuild(Map optArgs = [:], String gitUrl, String sha) {
           |""".stripMargin()
     println "Docker image was found for ${o.dockerImageUrl}:${sha} - Skipping 'make docker-build tag push'"
     loadedCacheDockerTag = sha
+    sh """|#!/bin/bash
+          |set -ex
+          |# Tag localbuild for runTests
+          |docker tag ${o.dockerImageUrl}:${sha} ${getServiceName()}:localbuild
+          |""".stripMargin()
   } catch (oops) {
     println "No docker image was found for ${o.dockerImageUrl}:${sha} - Running 'make docker-build tag push'"
   }
@@ -103,9 +108,9 @@ def dockerBuild(Map optArgs = [:], String gitUrl, String sha) {
             |rm -rf .terraform terraform.*
             |sed 's/_GITREPO_/${gitRepo}/g' ecr.tf.template > ecr.tf
             |terraform="${WORKSPACE}/_infra/terraform"
-            |\${terraform} init
-            |\${terraform} plan -out terraform.tfplan -var="service_name=${getServiceName()}"
-            |\${terraform} apply terraform.tfplan
+            |\${terraform} init -no-color
+            |\${terraform} plan -no-color -out terraform.tfplan -var="service_name=${getServiceName()}"
+            |\${terraform} apply -no-color terraform.tfplan
             |popd
             |""".stripMargin()
     }
@@ -411,62 +416,6 @@ def migrateService(Map optArgs = [:], String gitUrl, String sha, String env) {
 }
 
 /**
- * Deploy a Microservice.
- */
-def deployService(Map optArgs = [:], String gitUrl, String sha, String env) {
-  Map o = [
-    k8sCredFileCredentialId: "K8S_CONFIG_${env.toUpperCase()}_NEW",
-    k8sCluster: env,
-    k8sNamespace: gitUrl,
-  ] << envToOptArgs(gitUrl, env) << optArgs
-
-  String tag = sha
-
-  try {
-    tag = getImmutableReleaseSemverTag(sha)
-  } catch (err) {
-    println "Sha does not have an associated semver tag. Using SHA as tag."
-  }
-
-  installTerraform()
-  sshagent (credentials: ['DDGHMACHINEUSER_PRIVATE_KEY']) { // Required for terraform to git clone
-    withCredentials([file(credentialsId: o.k8sCredFileCredentialId, variable: 'k8sCredsFile')]) { // Required for k8s config
-      sh """|#!/bin/bash
-            |set -ex
-            |
-            |# Use Terraform to create the namespace when it doesn't exist
-            |pushd _infra/namespace/${o.k8sCluster}
-            |rm -rf .terraform terraform.*
-            |sed 's/_GITREPO_/${o.k8sNamespace}/g' namespace.tf.template > namespace.tf
-            |terraform="${WORKSPACE}/_infra/terraform"
-            |\${terraform} init
-            |\${terraform} plan -out terraform.tfplan \\
-            | -var="k8s_config_path=${k8sCredsFile}" \\
-            | -var="namespace=${o.k8sNamespace}" \\
-            | -var="service_account_namespace=${o.k8sCluster}"
-            |\${terraform} apply terraform.tfplan
-            |popd
-            |
-            |# Use Terraform to deploy the service
-            |pushd _infra/${o.k8sCluster}
-            |rm -rf .terraform terraform.*
-            |sed 's/_GITREPO_/${o.k8sNamespace}/g' service.tf.template > service.tf
-            |cp -f ${WORKSPACE}/_infra/templates/common.tf common.tf
-            |terraform="${WORKSPACE}/_infra/terraform"
-            |\${terraform} init
-            |\${terraform} plan -out terraform.tfplan \\
-            | -var="k8s_config_path=${k8sCredsFile}" \\
-            | -var="image_tag=${tag}" \\
-            | -var="namespace=${o.k8sNamespace}" \\
-            | -var="service_name=${getServiceName()}"
-            |\${terraform} apply terraform.tfplan
-            |popd
-            |""".stripMargin()
-    }
-  }
-}
-
-/**
  * Deploy a Microservice using Helm.
  */
 def deployHelm(Map optArgs = [:], String tag, String serviceName, String env) {
@@ -550,6 +499,7 @@ def deployBlockingPulse(Map optArgs = [:], String gitUrl, String sha, String env
   String PULSE_DIR = o.pulseRootDir
   Integer TIMEOUT_S = 360
   Integer SLEEP_S = 5
+
   sshagent(credentials: ['DDGHMACHINEUSER_PRIVATE_KEY']) {
     // install doorctl and grab its executable path
     String doorctlPath = new Doorctl().installIntoWorkspace(DOORCTL_VERSION)
@@ -666,7 +616,7 @@ def dockerClean() {
  *
  * @return True if we can deploy to prod. False, otherwise.
  */
-def inputCanDeployToProd(String message = 'Deploy to production') {
+def inputCanDeployToProd(String message = 'Deploy to Production?') {
   boolean canDeployToProd = false
   try {
     timeout(time: 10, unit: 'MINUTES') {
@@ -724,7 +674,7 @@ def getMigrationJobLog(String env) {
  *
  * @return True if we can deploy the pipeline. False, otherwise.
  */
-def inputDeployPipeline(String message = 'Continue Deploying Pipeline') {
+def inputDeployPipeline(String message = 'Continue Deploying Pipeline?') {
   boolean canDeployPipeline = false
   try {
     timeout(time: 2, unit: 'MINUTES') {
@@ -741,20 +691,54 @@ def inputDeployPipeline(String message = 'Continue Deploying Pipeline') {
 /**
  * Run unit tests within a docker-compose container.
  */
-def runTests(String stageName, String gitUrl, String sha) {
+def runTests(String gitUrl, String sha) {
   return // Not necessary
-  new Github().doClosureWithStatus({
-    withCredentials([
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
-      string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
-      string(credentialsId: 'PIP_EXTRA_INDEX_URL', variable: 'PIP_EXTRA_INDEX_URL')
-    ]) {
-      sh """|#!/bin/bash
-            |set -x
-            |docker-compose run --rm web make test
-            |""".stripMargin()
-    }
-  }, gitUrl, sha, stageName, "${BUILD_URL}testReport")
+  withCredentials([
+    string(credentialsId: 'ARTIFACTORY_MACHINE_USER_NAME', variable: 'ARTIFACTORY_USERNAME'),
+    string(credentialsId: 'ARTIFACTORY_MACHINE_USER_PASS', variable: 'ARTIFACTORY_PASSWORD'),
+    string(credentialsId: 'PIP_EXTRA_INDEX_URL', variable: 'PIP_EXTRA_INDEX_URL')
+  ]) {
+    sh """|#!/bin/bash
+          |set -x
+          |docker-compose -f docker-compose-ci.yml run --rm web make test
+          |""".stripMargin()
+  }
+}
+
+/**
+ * Bounce a Microservice.
+ */
+def bounceService(Map optArgs = [:], String gitUrl, String sha, String env, String app) {
+  Map o = [
+    k8sCredFileCredentialId: "K8S_CONFIG_${env.toUpperCase()}_NEW",
+    k8sNamespace: gitUrl,
+    serviceApp: app,
+  ] << envToOptArgs(gitUrl, env) << optArgs
+
+  withCredentials([file(credentialsId: o.k8sCredFileCredentialId, variable: 'k8sCredsFile')]) { // Required for k8s config
+    sh """|#!/bin/bash
+          |set -ex
+          |
+          |export KUBECONFIG=${k8sCredsFile}
+          |set +e
+          |kubectl -n ${o.k8sNamespace} get deployment ${getServiceName()}-${o.serviceApp}
+          |if [[ "\$?" -eq 0 ]]
+          |then
+          |  set -e
+          |  kubectl -n ${o.k8sNamespace} patch deployment ${getServiceName()}-${o.serviceApp} --type=merge \\
+          |  -p '{"spec":{"template":{"metadata":{"annotations":{"bounce-date":"'`date +%s`'"}}}}}'
+          |fi
+          |
+          |set +e
+          |kubectl -n ${o.k8sNamespace} get rollout ${getServiceName()}-${o.serviceApp}
+          |if [[ "\$?" -eq 0 ]]
+          |then
+          |  set -e
+          |  kubectl -n ${o.k8sNamespace} patch rollout ${getServiceName()}-${o.serviceApp} --type=merge \\
+          |  -p '{"spec":{"template":{"metadata":{"annotations":{"bounce-date":"'`date +%s`'"}}}}}'
+          |fi
+          |""".stripMargin()
+  }
 }
 
 return this

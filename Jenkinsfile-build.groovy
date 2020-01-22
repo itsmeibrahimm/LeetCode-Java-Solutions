@@ -1,5 +1,3 @@
-@Library('common-pipelines') _
-
 /**
  * Expected inputs:
  * ----------------
