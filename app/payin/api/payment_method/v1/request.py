@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, Schema
 
 from app.commons.types import PgpCode
+from app.payin.api.payer.v1.request import CreatePayerRequest
 from app.payin.core.payer.model import PayerCorrelationIds
 
 
@@ -13,6 +14,9 @@ class CreatePaymentMethodRequestV1(BaseModel):
     )
     payer_correlation_ids: Optional[PayerCorrelationIds] = Schema(  # type: ignore
         default=..., description="external identity of payer."
+    )
+    create_payer_request: Optional[CreatePayerRequest] = Schema(  # type: ignore
+        default=..., description="detailed information to create payer."
     )
     payment_gateway: PgpCode = Schema(  # type: ignore
         default=PgpCode.STRIPE, description="payment provider."
