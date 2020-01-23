@@ -8,15 +8,15 @@ class Response(BaseModel):
 
 
 class GatewayLog(BaseModel):
-    timed_out: bool
+    timed_out: Optional[bool]
 
 
 class Funding(BaseModel):
-    gateway_log: GatewayLog
+    gateway_log: Optional[GatewayLog]
 
 
 class GpaOrder(BaseModel):
-    funding: Funding
+    funding: Optional[Funding]
 
 
 class Transaction(BaseModel):

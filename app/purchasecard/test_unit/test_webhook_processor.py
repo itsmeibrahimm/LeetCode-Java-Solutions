@@ -19,25 +19,6 @@ from app.purchasecard.core.webhook.processor import WebhookProcessor
 class TestWebhookProcessor:
     pytestmark = [pytest.mark.asyncio]
 
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        marqeta_transaction_repo = MagicMock()
-        marqeta_transaction_repo.update_marqeta_transaction_timeout_by_token = CoroutineMock(
-            return_value=MarqetaTransaction(
-                token="token",
-                id=1,
-                amount=2,
-                delivery_id=3,
-                card_acceptor="acceptor",
-                swiped_at=datetime.now(),
-            )
-        )
-        self.webhook_processor = WebhookProcessor(
-            logger=MagicMock(),
-            repository=marqeta_transaction_repo,
-            dsj_client=MagicMock(),
-        )
-
     @pytest.fixture
     def fake_transactions(self):
         token = "token"
@@ -89,6 +70,23 @@ class TestWebhookProcessor:
         return [t1, t2, t3, t4, t5]
 
     async def test_process_webhook_transactions(self, fake_transactions):
+        marqeta_transaction_repo = MagicMock()
+        marqeta_transaction_repo.update_marqeta_transaction_timeout_by_token = CoroutineMock(
+            return_value=MarqetaTransaction(
+                token="token",
+                id=1,
+                amount=2,
+                delivery_id=3,
+                card_acceptor="acceptor",
+                swiped_at=datetime.now(),
+            )
+        )
+        self.webhook_processor = WebhookProcessor(
+            logger=MagicMock(),
+            repository=marqeta_transaction_repo,
+            dsj_client=MagicMock(),
+        )
+
         results = await self.webhook_processor._process_webhook_transactions(
             fake_transactions
         )
@@ -121,3 +119,22 @@ class TestWebhookProcessor:
             results.processed_results[4].process_type
             == TransactionWebhookProcessType.OTHER.value
         )
+
+    async def test_process_webhook_transactions_with_none_return(
+        self, fake_transactions
+    ):
+        marqeta_transaction_repo = MagicMock()
+        marqeta_transaction_repo.update_marqeta_transaction_timeout_by_token = CoroutineMock(
+            return_value=None
+        )
+        self.webhook_processor = WebhookProcessor(
+            logger=MagicMock(),
+            repository=marqeta_transaction_repo,
+            dsj_client=MagicMock(),
+        )
+        results = await self.webhook_processor._process_webhook_transactions(
+            fake_transactions[0:1]
+        )
+
+        # an empty list return is expected if we can not update the transaction
+        assert len(results.processed_results) == 0

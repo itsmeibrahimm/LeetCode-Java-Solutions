@@ -17,7 +17,7 @@ class MarqetaTransactionRepositoryInterface(ABC):
     @abstractmethod
     async def update_marqeta_transaction_timeout_by_token(
         self, transaction_token: str, timed_out: bool
-    ) -> MarqetaTransaction:
+    ) -> Optional[MarqetaTransaction]:
         pass
 
     @abstractmethod
@@ -61,7 +61,7 @@ class MarqetaTransactionRepository(
 
     async def update_marqeta_transaction_timeout_by_token(
         self, transaction_token: str, timed_out: bool
-    ) -> MarqetaTransaction:
+    ) -> Optional[MarqetaTransaction]:
         stmt = (
             marqeta_transactions.table.update()
             .where(marqeta_transactions.token == transaction_token)
@@ -69,7 +69,8 @@ class MarqetaTransactionRepository(
             .returning(*marqeta_transactions.table.columns.values())
         )
         marqeta_transaction = await self._database.master().fetch_one(stmt)
-        assert marqeta_transaction
+        if not marqeta_transaction:
+            return None
         return MarqetaTransaction.from_row(marqeta_transaction)
 
     async def create_marqeta_transaction(

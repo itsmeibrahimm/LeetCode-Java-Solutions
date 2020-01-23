@@ -36,10 +36,14 @@ class WebhookProcessor:
         return transaction.gpa_order is not None
 
     def is_jit_failure_due_to_timeout(self, transaction: Transaction) -> bool:
-        return (
-            transaction.gpa_order is not None
+        if (
+            transaction.gpa_order
+            and transaction.gpa_order.funding
+            and transaction.gpa_order.funding.gateway_log
             and transaction.gpa_order.funding.gateway_log.timed_out
-        )
+        ):
+            return True
+        return False
 
     def is_legit_jit_failure(self, transaction: Transaction) -> bool:
         return self.is_jit_failure(
@@ -85,6 +89,12 @@ class WebhookProcessor:
                 updated_tx = await self.repository.update_marqeta_transaction_timeout_by_token(
                     transaction_token=transaction_token, timed_out=False
                 )
+                if not updated_tx:
+                    self.logger.error(
+                        "[update marqeta transaction token] cannot update this marqeta transaction",
+                        transaction_token=transaction_token,
+                    )
+                    continue
                 results.append(
                     TransactionProcessResult(
                         transaction_token=transaction_token,

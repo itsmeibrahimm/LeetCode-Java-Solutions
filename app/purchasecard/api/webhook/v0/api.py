@@ -22,8 +22,6 @@ async def marqeta_webhook(
     request: MarqetaWebhookRequest,
     dependency_container: PurchaseCardContainer = Depends(PurchaseCardContainer),
 ):
-    logger = dependency_container.logger
-    logger.debug("Rcvd marqeta webhook request", request=request)
     if not request.transactions:
         return WebhookResponse()
 

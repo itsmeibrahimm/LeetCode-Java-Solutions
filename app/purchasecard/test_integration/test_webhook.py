@@ -212,3 +212,18 @@ class TestMarqetaWebhook:
         mock.post = CoroutineMock()
         with pytest.raises(Exception):
             client.post("/purchasecard/api/v0/marqeta/webhook", json=request_body)
+
+    def test_webhook_with_missing_non_required_field(
+        self, mocker, client: TestClient, app_context: AppContext
+    ):
+        request_body = {"transactions": [{"type": "authorization."}]}
+
+        mock = mocker.patch(
+            "app.purchasecard.container.PurchaseCardContainer.dsj_client"
+        )
+        mock.post = CoroutineMock()
+        response = client.post(
+            "/purchasecard/api/v0/marqeta/webhook", json=request_body
+        )
+
+        assert response.status_code == HTTP_200_OK
