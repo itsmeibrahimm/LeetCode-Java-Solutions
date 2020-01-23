@@ -28,6 +28,7 @@ from app.payin.core.cart_payment.processor import CommandoProcessor
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.core.payment_method.types import CartPaymentSortKey
 from app.payin.core.types import PayerReferenceIdType
+from app.payin.models.paymentdb import payment_methods, pgp_payment_methods
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payment_method_repo import (
     GetStripeCardByStripeIdInput,
@@ -35,8 +36,8 @@ from app.payin.repository.payment_method_repo import (
     StripeCardDbEntity,
 )
 from app.payin.test_integration.integration_utils import (
-    build_commando_processor,
     _create_payer_v1_url,
+    build_commando_processor,
 )
 
 
@@ -1082,6 +1083,76 @@ class TestCartPayment:
 
         def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
             return {"dd_stripe_card_id": payment_method["dd_stripe_card_id"]}
+
+        self._test_cart_payment_creation_flows(
+            stripe_api=stripe_api,
+            client=client,
+            payer=payer,
+            payment_method=payment_method,
+            runtime_setter=runtime_setter,
+            commando_mode=commando_mode,
+            app_context=app_context,
+            event_loop=event_loop,
+            payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
+        )
+
+    @pytest.mark.parametrize("commando_mode", [True, False])
+    def test_cart_payment_creation_with_payer_id_dd_stripe_card_id_without_pgp_payment_method(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        runtime_setter: RuntimeSetter,
+        commando_mode: bool,
+        app_context: AppContext,
+        event_loop: AbstractEventLoop,
+    ):
+        def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
+            return {"payer_id": payer["id"]}
+
+        def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return {"dd_stripe_card_id": payment_method["dd_stripe_card_id"]}
+
+        # ugly hack to setup well formed pm, ppm and sc then remove pm and ppm from data store to simulate
+        # payer with sc without pm.
+        request_body = self._get_payer_payment_method_request(payer, "tok_visa")
+        response = client.post("/payin/api/v1/payment_methods", json=request_body)
+        assert response.status_code == 201
+        payment_method = response.json()
+        assert payment_method
+
+        event_loop.run_until_complete(
+            app_context.payin_paymentdb.master().execute(
+                payment_methods.table.delete().where(
+                    payment_methods.id == payment_method["id"]
+                )
+            )
+        )
+
+        event_loop.run_until_complete(
+            app_context.payin_paymentdb.master().execute(
+                pgp_payment_methods.table.delete().where(
+                    pgp_payment_methods.payment_method_id == payment_method["id"]
+                )
+            )
+        )
+
+        assert not event_loop.run_until_complete(
+            app_context.payin_paymentdb.master().execute(
+                pgp_payment_methods.table.select().where(
+                    pgp_payment_methods.payment_method_id == payment_method["id"]
+                )
+            )
+        )
+
+        assert not event_loop.run_until_complete(
+            app_context.payin_paymentdb.master().execute(
+                payment_methods.table.select().where(
+                    payment_methods.id == payment_method["id"]
+                )
+            )
+        )
 
         self._test_cart_payment_creation_flows(
             stripe_api=stripe_api,

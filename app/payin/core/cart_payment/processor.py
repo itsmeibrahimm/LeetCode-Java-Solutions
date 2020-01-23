@@ -2032,6 +2032,12 @@ class CartPaymentInterface:
                 "At least one of payment_method_id and dd_stripe_card_id need to be specified"
             )
 
+        if not raw_payer:
+            raw_payer = await self.payer_client.get_raw_payer(
+                mixed_payer_id=payer_id,
+                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
+            )
+
         raw_payment_method: RawPaymentMethod
         if payment_method_id:
             raw_payment_method = await self.payment_method_client.get_raw_payment_method(
@@ -2041,18 +2047,42 @@ class CartPaymentInterface:
                 payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
             )
         else:
-            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
+            # use stripe customer id instead of payer id in this case to unblock testing before pm migration
+            stripe_customer_id: str
+            if (
+                raw_payer.pgp_customer_entity
+                and raw_payer.pgp_customer_entity.pgp_resource_id
+            ):
+                stripe_customer_id = raw_payer.pgp_customer_entity.pgp_resource_id
+            elif (
+                raw_payer.stripe_customer_entity
+                and raw_payer.stripe_customer_entity.stripe_id
+            ):
+                stripe_customer_id = raw_payer.stripe_customer_entity.stripe_id
+            else:
+                self.req_context.log.error(
+                    "[get_pgp_payment_info_v1] Failed to get stripe customer resource id from payer",
+                    payer_id=payer_id,
+                )
+                raise CartPaymentCreateError(
+                    error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
+                    provider_charge_id=None,
+                    provider_error_code=None,
+                    provider_decline_code=None,
+                    has_provider_error_details=False,
+                )
+            self.req_context.log.info(
+                "[get_pgp_payment_info_v1] use stripe customer id for payer to fetch payment method",
                 payer_id=payer_id,
-                payer_id_type=PayerIdType.PAYER_ID,
+                stripe_customer_id=stripe_customer_id,
+            )
+            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
+                payer_id=stripe_customer_id,
+                payer_id_type=PayerIdType.STRIPE_CUSTOMER_ID,
                 payment_method_id=str(not_none(dd_stripe_card_id)),
                 payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
             )
 
-        if not raw_payer:
-            raw_payer = await self.payer_client.get_raw_payer(
-                mixed_payer_id=payer_id,
-                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
-            )
         pgp_payer_ref_id = raw_payer.pgp_payer_resource_id
         pgp_payment_method_ref_id = raw_payment_method.pgp_payment_method_resource_id
 
