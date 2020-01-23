@@ -46,6 +46,8 @@ module "payment-service-web" {
   net_service_type                          = "ClusterIP"
   net_service_port                          = "80"
 
+  helm_timeout                              = "0"
+
   service_environments_variables = <<EOF
     ENVIRONMENT=local
    EOF
@@ -85,6 +87,8 @@ module "payment-service-cron" {
   net_service_enable                        = "true"
   net_service_type                          = "ClusterIP"
   net_service_port                          = "80"
+
+  helm_timeout                              = "0"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=local
@@ -126,6 +130,8 @@ module "payment-service-payout-cron" {
   net_service_type                          = "ClusterIP"
   net_service_port                          = "80"
 
+  helm_timeout                              = "0"
+
   service_environments_variables = <<EOF
     ENVIRONMENT=local
    EOF
@@ -166,6 +172,8 @@ module "payment-service-delete-payer-cron" {
   net_service_type                          = "ClusterIP"
   net_service_port                          = "80"
 
+  helm_timeout                              = "0"
+
   service_environments_variables = <<EOF
     ENVIRONMENT=local
    EOF
@@ -199,6 +207,8 @@ module "payment-service-admin" {
   net_service_enable                        = "true"
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
+
+  helm_timeout                              = "0"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=local

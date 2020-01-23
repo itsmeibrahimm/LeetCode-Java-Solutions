@@ -12,7 +12,7 @@ pipeline {
   options {
     timestamps()
     skipStagesAfterUnstable()
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 60, unit: 'MINUTES')
   }
   agent {
     label 'universal'
