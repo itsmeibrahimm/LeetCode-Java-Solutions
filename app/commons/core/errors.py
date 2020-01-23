@@ -416,6 +416,63 @@ class PaymentLockReleaseError(PaymentLockError):
 
 
 ####################################
+# PaymentDBLockError
+#   - PaymentDBLockAcquireError
+#   - PaymentDBLockReleaseError
+####################################
+class PaymentDBLockErrorCode(str, Enum):
+    LOCK_ACQUIRE_ERROR = "db_lock_acquire_error"
+    LOCK_RELEASE_ERROR = "db_lock_release_error"
+
+
+payment_db_lock_error_message_maps = {
+    PaymentDBLockErrorCode.LOCK_ACQUIRE_ERROR: "unable to acquire a payment db lock",
+    PaymentDBLockErrorCode.LOCK_RELEASE_ERROR: "unable to release the payment db lock",
+}
+
+
+class PaymentDBLockError(PaymentError[PaymentDBLockErrorCode]):
+    """Payment DB Lock Base Error."""
+
+    def __init__(
+        self, error_code: PaymentDBLockErrorCode, error_message: str, retryable: bool
+    ):
+        super().__init__(error_code, error_message, retryable)
+
+
+class PaymentDBLockAcquireError(PaymentDBLockError):
+    """Payment DB Lock Acquire Error.
+
+    Raised when unable to acquire a lock using PaymentDBLock.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentDBLockErrorCode.LOCK_ACQUIRE_ERROR,
+            error_message=payment_db_lock_error_message_maps[
+                PaymentDBLockErrorCode.LOCK_ACQUIRE_ERROR
+            ],
+            retryable=True,
+        )
+
+
+class PaymentDBLockReleaseError(PaymentDBLockError):
+    """Payment DB Lock Release Error.
+
+    Raised when unable to release a lock using PaymentDBLock.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=PaymentDBLockErrorCode.LOCK_RELEASE_ERROR,
+            error_message=payment_db_lock_error_message_maps[
+                PaymentDBLockErrorCode.LOCK_RELEASE_ERROR
+            ],
+            retryable=False,
+        )
+
+
+####################################
 # Marqeta Related Errors
 #   - MarqetaResourceAlreadyCreatedError
 #   - MarqetaResourceNotFoundError
