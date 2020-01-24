@@ -701,6 +701,22 @@ class TestCartPaymentInterface:
         assert result == second_intent
 
     @pytest.mark.asyncio
+    async def test_get_most_recent_active_intent(self, cart_payment_interface):
+        first_intent = generate_payment_intent(status=IntentStatus.SUCCEEDED)
+        second_intent = generate_payment_intent(status=IntentStatus.SUCCEEDED)
+        third_intent = generate_payment_intent(status=IntentStatus.FAILED)
+
+        result = cart_payment_interface.get_most_recent_active_intent(
+            [first_intent, second_intent, third_intent]
+        )
+        assert result == second_intent
+
+        result = cart_payment_interface.get_most_recent_active_intent(
+            [third_intent, first_intent, second_intent]
+        )
+        assert result == second_intent
+
+    @pytest.mark.asyncio
     async def test_get_most_recent_pgp_payment_intent(self, cart_payment_interface):
         first_pgp_intent = generate_pgp_payment_intent()
         second_pgp_intent = generate_pgp_payment_intent()
@@ -828,6 +844,22 @@ class TestCartPaymentInterface:
 
         intent = generate_payment_intent(status=IntentStatus.PENDING.value)
         assert cart_payment_interface.is_payment_intent_failed(intent) is False
+
+    def test_is_payment_intent_pending(self, cart_payment_interface):
+        intent = generate_payment_intent(status=IntentStatus.INIT.value)
+        assert cart_payment_interface.is_payment_intent_pending(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.REQUIRES_CAPTURE.value)
+        assert cart_payment_interface.is_payment_intent_pending(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.SUCCEEDED.value)
+        assert cart_payment_interface.is_payment_intent_pending(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.FAILED.value)
+        assert cart_payment_interface.is_payment_intent_pending(intent) is False
+
+        intent = generate_payment_intent(status=IntentStatus.PENDING.value)
+        assert cart_payment_interface.is_payment_intent_pending(intent) is True
 
     def test_can_payment_intent_be_cancelled(self, cart_payment_interface):
         intent = generate_payment_intent(status=IntentStatus.FAILED)
@@ -2027,6 +2059,7 @@ class TestCartPaymentInterface:
         original_cart_payment: CartPayment,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
+        expected_deferred: bool,
     ):
         # Fields populated based on related objects
         assert (
@@ -2047,6 +2080,8 @@ class TestCartPaymentInterface:
             )
         else:
             assert response_cart_payment.split_payment is None
+
+        assert response_cart_payment.deferred == expected_deferred
 
         # Unchanged attributes
         assert response_cart_payment.id == original_cart_payment.id
@@ -2078,10 +2113,17 @@ class TestCartPaymentInterface:
 
         original_cart_payment = deepcopy(cart_payment)
         cart_payment_interface.populate_cart_payment_for_response(
-            cart_payment, intent, pgp_intent
+            cart_payment=cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            last_active_sibling_payment_intent=None,
         )
         self.verify_populate_cart_payment_for_response(
-            cart_payment, original_cart_payment, intent, pgp_intent
+            response_cart_payment=cart_payment,
+            original_cart_payment=original_cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            expected_deferred=False,
         )
 
     def test_populate_cart_payment_for_response_with_split_payment(
@@ -2097,10 +2139,75 @@ class TestCartPaymentInterface:
 
         original_cart_payment = deepcopy(cart_payment)
         cart_payment_interface.populate_cart_payment_for_response(
-            cart_payment, intent, pgp_intent
+            cart_payment=cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            last_active_sibling_payment_intent=None,
         )
         self.verify_populate_cart_payment_for_response(
-            cart_payment, original_cart_payment, intent, pgp_intent
+            response_cart_payment=cart_payment,
+            original_cart_payment=original_cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            expected_deferred=False,
+        )
+
+    def test_populate_cart_payment_for_response_commando_submitted(
+        self, cart_payment_interface
+    ):
+        cart_payment = generate_cart_payment()
+        cart_payment.delay_capture = True
+        cart_payment.payer_statement_description = "Fill in here"
+        intent = generate_payment_intent(
+            status="doordash_pending", capture_method="auto"
+        )
+        pgp_intent = generate_pgp_payment_intent(status="doordash_pending")
+
+        original_cart_payment = deepcopy(cart_payment)
+
+        # Pending state
+        cart_payment_interface.populate_cart_payment_for_response(
+            cart_payment=cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            last_active_sibling_payment_intent=None,
+        )
+        self.verify_populate_cart_payment_for_response(
+            response_cart_payment=cart_payment,
+            original_cart_payment=original_cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            expected_deferred=True,
+        )
+
+    def test_populate_cart_payment_for_response_submitted_with_existing(
+        self, cart_payment_interface
+    ):
+        cart_payment = generate_cart_payment()
+        cart_payment.delay_capture = True
+        cart_payment.payer_statement_description = "Fill in here"
+        intent = generate_payment_intent(
+            status="requires_capture", capture_method="auto"
+        )
+        pgp_intent = generate_pgp_payment_intent(status="requires_capture")
+
+        original_cart_payment = deepcopy(cart_payment)
+
+        # Pending state
+        cart_payment_interface.populate_cart_payment_for_response(
+            cart_payment=cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            last_active_sibling_payment_intent=generate_payment_intent(
+                status="succeeded"
+            ),
+        )
+        self.verify_populate_cart_payment_for_response(
+            response_cart_payment=cart_payment,
+            original_cart_payment=original_cart_payment,
+            payment_intent=intent,
+            pgp_payment_intent=pgp_intent,
+            expected_deferred=False,
         )
 
     @pytest.mark.asyncio
@@ -2109,10 +2216,10 @@ class TestCartPaymentInterface:
         result = await cart_payment_interface.update_cart_payment_attributes(
             cart_payment=deepcopy(cart_payment),
             idempotency_key=str(uuid.uuid4()),
-            payment_intent=generate_payment_intent(),
-            pgp_payment_intent=generate_pgp_payment_intent(),
             amount=100,
             client_description=None,
+            payment_intent=generate_payment_intent(),
+            pgp_payment_intent=generate_pgp_payment_intent(),
         )
 
         assert result

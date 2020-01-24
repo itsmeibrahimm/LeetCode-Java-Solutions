@@ -43,6 +43,7 @@ class SplitPayment(BaseModel):
 
 
 class CartPayment(BaseModel):
+    # TODO Different objects to represent external facing (response) model and internal model
     id: UUID
     amount: int
     payer_id: Optional[UUID]
@@ -58,6 +59,7 @@ class CartPayment(BaseModel):
     split_payment: Optional[SplitPayment] = None
     capture_after: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
+    deferred: Optional[bool] = None
 
 
 class CartPaymentList(BaseModel):

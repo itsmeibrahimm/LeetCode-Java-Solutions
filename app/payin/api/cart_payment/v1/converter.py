@@ -28,6 +28,7 @@ def to_internal_cart_payment(
             split_payment=cart_payment_request.split_payment,
             created_at=None,
             updated_at=None,
+            deferred=None,
         )
     except ValidationError as validation_error:
         raise PayinError(

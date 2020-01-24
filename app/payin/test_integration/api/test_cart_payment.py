@@ -323,6 +323,7 @@ class TestCartPayment:
         split_payment: Optional[Dict[str, Any]] = None,
         client_description: str = None,
         dd_stripe_card_id: int = 1,
+        commando_mode: bool = False,
     ) -> Dict[str, Any]:
         request_body = self._get_cart_payment_create_legacy_payment_request(
             stripe_customer_id=stripe_customer_id,
@@ -374,6 +375,7 @@ class TestCartPayment:
         assert cart_payment["deleted_at"] is None
         assert cart_payment["dd_charge_id"]
         assert type(cart_payment["dd_charge_id"]) is int
+        assert cart_payment["deferred"] == commando_mode
         return cart_payment
 
     def _test_cart_payment_legacy_payment_get(
@@ -417,6 +419,7 @@ class TestCartPayment:
         delay_capture: bool,
         split_payment: Optional[Dict[str, Any]] = None,
         client_description: str = None,
+        commando_mode: bool = False,
         payer_id_extractor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         payment_method_extractor: Optional[
             Callable[[Dict[str, Any]], Dict[str, Any]]
@@ -464,6 +467,7 @@ class TestCartPayment:
         assert cart_payment["created_at"]
         assert cart_payment["updated_at"]
         assert cart_payment["deleted_at"] is None
+        assert cart_payment["deferred"] == commando_mode
 
         if payer_id_extractor:
             expected_payer_ids = payer_id_extractor(payer)
@@ -575,6 +579,7 @@ class TestCartPayment:
         assert body["client_description"] == request_body["client_description"]
         statement_description = body["payer_statement_description"]
         assert statement_description == cart_payment["payer_statement_description"]
+        assert body["deferred"] == False
 
     def _test_legacy_update_cart_payment_not_found_error(
         self,
@@ -701,6 +706,7 @@ class TestCartPayment:
             split_payment if split_payment else cart_payment["split_payment"]
         )
         assert body["split_payment"] == expected_split_payment
+        assert body["deferred"] == False
         return body
 
     def _list_cart_payment_get_legacy_response(
@@ -1230,6 +1236,7 @@ class TestCartPayment:
             payment_method=payment_method,
             amount=500,
             delay_capture=True,
+            commando_mode=commando_mode,
             payer_id_extractor=payer_id_extractor,
             payment_method_extractor=payment_method_extractor,
         )
@@ -1241,6 +1248,7 @@ class TestCartPayment:
             payment_method=payment_method,
             amount=600,
             delay_capture=False,
+            commando_mode=commando_mode,
             payer_id_extractor=payer_id_extractor,
             payment_method_extractor=payment_method_extractor,
         )
@@ -1257,6 +1265,7 @@ class TestCartPayment:
             amount=560,
             delay_capture=False,
             split_payment=split_payment,
+            commando_mode=commando_mode,
             payer_id_extractor=payer_id_extractor,
             payment_method_extractor=payment_method_extractor,
         )
@@ -1391,6 +1400,7 @@ class TestCartPayment:
                 amount=700,
                 merchant_country=CountryCode.US,
                 dd_stripe_card_id=stripe_card.id,
+                commando_mode=True,
             )
             assert cart_payment_2
 
@@ -1405,6 +1415,7 @@ class TestCartPayment:
                 amount=800,
                 merchant_country=CountryCode.US,
                 dd_stripe_card_id=stripe_card.id,
+                commando_mode=True,
             )
             assert cart_payment_3
 
@@ -1451,6 +1462,7 @@ class TestCartPayment:
                 amount=1000,
                 merchant_country=CountryCode.US,
                 dd_stripe_card_id=stripe_card.id,
+                commando_mode=True,
             )
             assert cart_payment_4
 

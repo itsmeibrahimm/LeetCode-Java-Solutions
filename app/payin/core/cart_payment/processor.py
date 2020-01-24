@@ -552,6 +552,18 @@ class CartPaymentInterface:
         intent_list.sort(key=lambda x: x.created_at)
         return intent_list[-1]
 
+    def get_most_recent_active_intent(
+        self, intent_list: List[PaymentIntent]
+    ) -> Optional[PaymentIntent]:
+        # Sort with most recent first
+        intent_list.sort(key=lambda x: x.created_at, reverse=True)
+        for intent in intent_list:
+            if self.is_payment_intent_submitted(
+                intent
+            ) or self.is_payment_intent_pending(intent):
+                return intent
+        return None
+
     async def _get_most_recent_pgp_payment_intent(self, payment_intent: PaymentIntent):
         pgp_intents = await self.payment_repo.list_pgp_payment_intents_from_primary(
             payment_intent.id
@@ -620,6 +632,9 @@ class CartPaymentInterface:
 
     def is_payment_intent_failed(self, payment_intent: PaymentIntent) -> bool:
         return payment_intent.status == IntentStatus.FAILED
+
+    def is_payment_intent_pending(self, payment_intent: PaymentIntent) -> bool:
+        return payment_intent.status == IntentStatus.PENDING
 
     def can_payment_intent_be_cancelled(self, payment_intent: PaymentIntent) -> bool:
         # Not yet captured.  SCA related states will be added here later.
@@ -2155,9 +2170,11 @@ class CartPaymentInterface:
 
     def populate_cart_payment_for_response(
         self,
+        *,
         cart_payment: CartPayment,
         payment_intent: PaymentIntent,
         pgp_payment_intent: PgpPaymentIntent,
+        last_active_sibling_payment_intent: Optional[PaymentIntent],
     ) -> CartPayment:
         """
         Populate fields within a CartPayment instance to be suitable for an API response body.
@@ -2168,6 +2185,7 @@ class CartPaymentInterface:
             cart_payment {CartPayment} -- The CartPayment instance to update.
             payment_intent {PaymentIntent} -- An associated PaymentIntent.
             pgp_payment_intent {PgpPaymentIntent} -- An associated PgpPaymentIntent.
+            last_active_sibling_payment_intent {PaymentIntent} -- Most recent active PaymentIntent for the same cart_payment that preceded payment_intent
         """
         cart_payment.payer_statement_description = payment_intent.statement_descriptor
         cart_payment.payment_method_id = payment_intent.payment_method_id
@@ -2181,24 +2199,29 @@ class CartPaymentInterface:
                 application_fee_amount=payment_intent.application_fee_amount,
             )
 
+        # If any payment intent is in the doordash pending state, submitted is considered to be false
+        cart_payment.deferred = self.is_payment_intent_pending(
+            last_active_sibling_payment_intent
+            if last_active_sibling_payment_intent
+            else payment_intent
+        )
+
         return cart_payment
 
     async def update_cart_payment_attributes(
         self,
+        *,
         cart_payment: CartPayment,
         idempotency_key: str,
-        payment_intent: PaymentIntent,
-        pgp_payment_intent: PgpPaymentIntent,
         amount: int,
         client_description: Optional[str],
+        payment_intent: PaymentIntent,
+        pgp_payment_intent: PgpPaymentIntent,
     ) -> CartPayment:
         updated_cart_payment = await self.payment_repo.update_cart_payment_details(
             cart_payment_id=cart_payment.id,
             amount=amount,
             client_description=client_description,
-        )
-        self.populate_cart_payment_for_response(
-            updated_cart_payment, payment_intent, pgp_payment_intent
         )
         return updated_cart_payment
 
@@ -2540,9 +2563,6 @@ class CartPaymentProcessor:
                 )
                 pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
                     existing_payment_intent
-                )
-                self.cart_payment_interface.populate_cart_payment_for_response(
-                    cart_payment, existing_payment_intent, pgp_payment_intent
                 )
                 return existing_payment_intent, pgp_payment_intent
 
@@ -3007,6 +3027,7 @@ class CartPaymentProcessor:
                 cart_payment=cart_payment,
                 payment_intent=completed_intent,
                 pgp_payment_intent=pgp_payment_intent,
+                last_active_sibling_payment_intent=None,
             )
 
         updated_cart_payment = await self._lock_and_update_payment(
@@ -3226,11 +3247,8 @@ class CartPaymentProcessor:
                 )
         else:
             # Amount is the same: properties of cart payment other than the amount may be changing
-            payment_intents = await self.cart_payment_interface.get_cart_payment_intents(
-                cart_payment
-            )
             payment_intent = self.cart_payment_interface.get_most_recent_intent(
-                payment_intents
+                existing_payment_intents
             )
             pgp_payment_intent = await self.cart_payment_interface.get_cart_payment_submission_pgp_intent(
                 payment_intent
@@ -3239,13 +3257,19 @@ class CartPaymentProcessor:
         updated_cart_payment = await self.cart_payment_interface.update_cart_payment_attributes(
             cart_payment=cart_payment,
             idempotency_key=idempotency_key,
-            payment_intent=payment_intent,
-            pgp_payment_intent=pgp_payment_intent,
             amount=amount,
             client_description=client_description,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+        )
+        last_active_payment_intent = self.cart_payment_interface.get_most_recent_active_intent(
+            intent_list=existing_payment_intents
         )
         return self.cart_payment_interface.populate_cart_payment_for_response(
-            updated_cart_payment, payment_intent, pgp_payment_intent
+            cart_payment=updated_cart_payment,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            last_active_sibling_payment_intent=last_active_payment_intent,
         )
 
     @track_func
@@ -3661,9 +3685,10 @@ class CartPaymentProcessor:
                 )
                 return (
                     self.cart_payment_interface.populate_cart_payment_for_response(
-                        existing_cart_payment,
-                        existing_payment_intent,
-                        pgp_payment_intent,
+                        cart_payment=existing_cart_payment,
+                        payment_intent=existing_payment_intent,
+                        pgp_payment_intent=pgp_payment_intent,
+                        last_active_sibling_payment_intent=None,
                     ),
                     existing_payment_intent.legacy_consumer_charge_id,
                 )
@@ -3802,7 +3827,10 @@ class CartPaymentProcessor:
         )
 
         self.cart_payment_interface.populate_cart_payment_for_response(
-            cart_payment, payment_intent, pgp_payment_intent
+            cart_payment=cart_payment,
+            payment_intent=payment_intent,
+            pgp_payment_intent=pgp_payment_intent,
+            last_active_sibling_payment_intent=None,
         )
 
         cart_payment.payer_correlation_ids = request_cart_payment.payer_correlation_ids

@@ -77,7 +77,7 @@ def generate_payment_intent(
     captured_at: Optional[datetime] = None,
     legacy_consumer_charge_id: LegacyConsumerChargeId = LegacyConsumerChargeId(1),
     application_fee_amount: int = 0,
-    created_at: datetime = datetime.now(timezone.utc),
+    created_at: Optional[datetime] = None,
     capture_after: Optional[datetime] = None,
 ):
     return PaymentIntent(
@@ -94,7 +94,7 @@ def generate_payment_intent(
         statement_descriptor="descriptor",
         payment_method_id=uuid.uuid4(),
         legacy_consumer_charge_id=legacy_consumer_charge_id,
-        created_at=created_at,
+        created_at=created_at if created_at else datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
         captured_at=captured_at,
         cancelled_at=None,
