@@ -75,3 +75,5 @@ class LegacyStripeChargeStatus(str, Enum):
     PENDING = "doordash_pending"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    PENDING_FAILED = "doordash_pending_failed"
+    PENDING_REFUNDED = "doordash_pending_refunded"
