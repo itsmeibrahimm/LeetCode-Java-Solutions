@@ -39,6 +39,7 @@ _payin_error_message_maps = {
     "payin_31": "Sorting method not supported for list payment methods",
     "payin_32": "Invalid payer type for list payment method",
     "payin_33": "Data I/O error. Please retry again!",
+    "payin_34": "Mismatch in correlation ids for payer",
     "payin_40": "Error returned from Payment Provider. Please make sure your payer_id, payment_method_id are correct!",
     "payin_41": "Error returned from Payment Provider. Please verify parameters of capture.",
     "payin_42": "Cannot refund previous charge for amount increase.",
@@ -346,6 +347,11 @@ class PayinErrorCode(str, Enum):
         "payin_33",
         SHOULD_RETRY,
         "Data I/O error. Please retry again!",
+    )
+    PAYMENT_METHOD_PAYER_CORRELATION_ID_MISMATCH = (
+        "payin_34",
+        NO_RETRY,
+        "Mismatch in correlation ids for payer",
     )
     DISPUTE_NOT_FOUND = (
         "payin_100",

@@ -8,8 +8,12 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
+from app.commons.utils.validation import not_none
+from app.payin.api.payer.v1.request import CreatePayerRequest
 from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
 from app.payin.core.exceptions import PayinError, PayinErrorCode
+from app.payin.core.payer.model import PayerCorrelationIds
+from app.payin.core.payer.v1.processor import PayerProcessorV1
 from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PaymentMethodSortKey
@@ -30,6 +34,7 @@ async def create_payment_method(
     req_body: CreatePaymentMethodRequestV1,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
+    payer_processor_v1: PayerProcessorV1 = Depends(PayerProcessorV1),
 ):
     """
     Create a payment method for payer on DoorDash payments platform
@@ -38,6 +43,7 @@ async def create_payment_method(
     - **payer_correlation_ids**: DoorDash external correlation id for Payer.
     - **payer_correlation_ids.payer_reference_id**: DoorDash external reference id for Payer.
     - **payer_correlation_ids.payer_reference_id_type**: type that specifies the role of payer.
+    - **create_payer_request**: CreatePayerRequest for payer creation if payer does not exists
     - **payment_gateway**: [string] external payment gateway provider name.
     - **token**: [string] Token from external PSP to collect sensitive card or bank account
                  details, or personally identifiable information (PII), directly from your customers.
@@ -46,20 +52,40 @@ async def create_payment_method(
     - **param is_active**: [bool] mark as active or not. For fraud usage.
     """
     log.info("[create_payment_method] receive request", req_body=req_body)
-
+    payer_correlation_ids: Optional[
+        PayerCorrelationIds
+    ] = req_body.payer_correlation_ids
+    if req_body.create_payer_request:
+        create_payer_request: CreatePayerRequest = req_body.create_payer_request
+        _verify_correlation_ids(
+            log=log,
+            create_payer_request=create_payer_request,
+            payer_correlation_ids=payer_correlation_ids,
+        )
+        payer, _ = await payer_processor_v1.create_payer(
+            payer_reference_id=create_payer_request.payer_correlation_ids.payer_reference_id,
+            payer_reference_id_type=create_payer_request.payer_correlation_ids.payer_reference_id_type,
+            email=create_payer_request.email,
+            country=create_payer_request.country,
+            description=create_payer_request.description,
+        )
+        payer_correlation_ids = PayerCorrelationIds(
+            payer_reference_id=not_none(payer.payer_correlation_ids).payer_reference_id,
+            payer_reference_id_type=not_none(
+                payer.payer_correlation_ids
+            ).payer_reference_id_type,
+        )
     payer_reference_ids: Tuple[
         MixedUuidStrType, PayerReferenceIdType
     ] = _parse_payer_reference_id_and_type(
         log=log,
         payer_id=req_body.payer_id,
         payer_reference_id=(
-            req_body.payer_correlation_ids.payer_reference_id
-            if req_body.payer_correlation_ids
-            else None
+            payer_correlation_ids.payer_reference_id if payer_correlation_ids else None
         ),
         payer_reference_id_type=(
-            req_body.payer_correlation_ids.payer_reference_id_type
-            if req_body.payer_correlation_ids
+            payer_correlation_ids.payer_reference_id_type
+            if payer_correlation_ids
             else None
         ),
     )
@@ -228,4 +254,21 @@ def _parse_payer_reference_id_and_type(
         )
         raise PayinError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_INVALID_PAYER_REFERENCE_ID
+        )
+
+
+def _verify_correlation_ids(
+    log: BoundLogger,
+    create_payer_request: CreatePayerRequest,
+    payer_correlation_ids: Optional[PayerCorrelationIds] = None,
+):
+    if payer_correlation_ids and (
+        create_payer_request.payer_correlation_ids.payer_reference_id
+        != payer_correlation_ids.payer_reference_id
+        or create_payer_request.payer_correlation_ids.payer_reference_id_type
+        != payer_correlation_ids.payer_reference_id_type
+    ):
+        log.error("[create_payment_method] Mismatch in correlation ids for payer")
+        raise PayinError(
+            error_code=PayinErrorCode.PAYMENT_METHOD_PAYER_CORRELATION_ID_MISMATCH
         )

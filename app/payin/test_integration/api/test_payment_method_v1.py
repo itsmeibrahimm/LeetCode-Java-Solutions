@@ -1,5 +1,6 @@
 import random
 from typing import Any, Dict
+from uuid import uuid4
 
 import dateutil
 from starlette.testclient import TestClient
@@ -18,10 +19,15 @@ from app.payin.test_integration.integration_utils import (
 )
 
 V1_PAYMENT_METHODS_ENDPOINT = "/payin/api/v1/payment_methods"
+V1_PAYERS_ENDPOINT = "/payin/api/v1/payers"
 
 
 def _get_payment_methods_url(payment_method_id: str):
     return f"{V1_PAYMENT_METHODS_ENDPOINT}/{payment_method_id}"
+
+
+def _get_payer_url(payer_id: str):
+    return f"{V1_PAYERS_ENDPOINT}/{payer_id}"
 
 
 def _get_payment_methods_v1(
@@ -71,6 +77,74 @@ class TestPaymentMethodsV1:
 
         # delete payment_method
         delete_payment_methods_v1(client=client, payment_method_id=payment_method["id"])
+
+    def test_create_payment_method_when_payer_not_exists_and_when_payer_already_exists(
+        self, client: TestClient, stripe_client: StripeTestClient
+    ):
+        # create payment_method. This should create a new payer
+        create_payer_request: CreatePayerV1Request = CreatePayerV1Request(
+            payer_reference_id="2",  # Cannot use a random id as get_payer does not supports dd_drive_store_id
+            payer_reference_id_type="dd_consumer_id",
+            country="US",
+            description="Integration Test test_create_payment_method_when_payer_not_exists()",
+            email=(str(uuid4()) + "@dd.com"),
+        )
+        payment_method = create_payment_method_v1(
+            client=client,
+            request=CreatePaymentMethodV1Request(
+                payer_reference_id="2",
+                payer_reference_id_type="dd_consumer_id",
+                payment_gateway="stripe",
+                token="tok_visa",
+                create_payer_request=create_payer_request,
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
+            ),
+        )
+        # get payment_method
+        get_payment_method = _get_payment_methods_v1(
+            client=client, payment_method_id=payment_method["id"]
+        )
+        assert payment_method == get_payment_method
+        # Check if a new payer got created using the create_payer_request
+        new_created_payer = client.get(
+            _get_payer_url(payer_id=payment_method["payer_id"])
+        ).json()
+        assert new_created_payer["description"] == create_payer_request.description
+
+        # create payment_method. This should not create a new payer
+        create_payer_request = CreatePayerV1Request(
+            payer_reference_id="2",  # Cannot use a random id as get_payer does not supports dd_drive_store_id
+            payer_reference_id_type="dd_consumer_id",
+            country="US",
+            description="Integration Test test_create_payment_method_when_payer_exists()",
+            email=(str(uuid4()) + "@dd.com"),
+        )
+        payment_method = create_payment_method_v1(
+            client=client,
+            request=CreatePaymentMethodV1Request(
+                payer_reference_id="2",
+                payer_reference_id_type="dd_consumer_id",
+                payment_gateway="stripe",
+                token="tok_mastercard",
+                create_payer_request=create_payer_request,
+                set_default=False,
+                is_scanned=False,
+                is_active=True,
+            ),
+        )
+        # get payment_method
+        get_payment_method = _get_payment_methods_v1(
+            client=client, payment_method_id=payment_method["id"]
+        )
+        assert payment_method == get_payment_method
+        # Check if a new payer is not created using the create_payer_request
+        second_payer = client.get(
+            _get_payer_url(payer_id=payment_method["payer_id"])
+        ).json()
+        assert second_payer["description"] != create_payer_request.description
+        assert second_payer == new_created_payer
 
     def test_create_payment_method_by_payer_reference_id(
         self, client: TestClient, stripe_client: StripeTestClient

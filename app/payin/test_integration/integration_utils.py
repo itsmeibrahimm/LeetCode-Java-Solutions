@@ -54,6 +54,7 @@ class CreatePaymentMethodV1Request(BaseModel):
     set_default: bool
     is_scanned: bool
     is_active: bool
+    create_payer_request: Optional[CreatePayerV1Request] = None
 
 
 class PayinError(BaseModel):
@@ -267,6 +268,7 @@ def create_payment_method_v1(
         "set_default": request.set_default,
         "is_active": request.is_active,
         "is_scanned": request.is_scanned,
+        "create_payer_request": request.create_payer_request,
     }
     if request.payer_id:
         create_payment_method_request.update({"payer_id": request.payer_id})
@@ -282,6 +284,21 @@ def create_payment_method_v1(
         create_payment_method_request.update({"set_default": str(request.set_default)})
     if request.is_scanned:
         create_payment_method_request.update({"is_scanned": str(request.is_scanned)})
+    if request.create_payer_request:
+        create_payer_request = {
+            "payer_correlation_ids": {
+                "payer_reference_id": request.create_payer_request.payer_reference_id,
+                "payer_reference_id_type": request.create_payer_request.payer_reference_id_type,
+            },
+            "payer_reference_id": request.create_payer_request.payer_reference_id,
+            "payer_reference_id_type": request.create_payer_request.payer_reference_id_type,
+            "email": request.create_payer_request.email,
+            "country": request.create_payer_request.country,
+            "description": request.create_payer_request.description,
+        }
+        create_payment_method_request.update(
+            {"create_payer_request": create_payer_request}
+        )
     response = client.post(
         _create_payment_method_v1_url(), json=create_payment_method_request
     )
