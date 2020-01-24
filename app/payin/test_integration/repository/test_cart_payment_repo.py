@@ -53,6 +53,7 @@ from app.payin.repository.cart_payment_repo import (
     GetLegacyConsumerChargeIdsByConsumerIdInput,
     UpdateLegacyStripeChargeErrorDetailsWhereInput,
     UpdateLegacyStripeChargeErrorDetailsSetInput,
+    ListCartPaymentsByReferenceId,
 )
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -2298,6 +2299,44 @@ class TestListCartPayments:
         )
         cart_payment_list = await cart_payment_repository.get_cart_payments_by_dd_consumer_id(
             input=GetCartPaymentsByConsumerIdInput(dd_consumer_id=1)
+        )
+        assert cart_payment_list
+        assert isinstance(cart_payment_list, List)
+        retrieve_inserted_cart_payment = next(
+            filter(
+                lambda cart_payment: cart_payment.client_description
+                == client_description,
+                cart_payment_list,
+            ),
+            None,
+        )
+        assert retrieve_inserted_cart_payment
+        assert retrieve_inserted_cart_payment == cart_payment
+
+    async def test_get_cart_payments_by_reference_id(
+        self, payer: PayerDbEntity, cart_payment_repository: CartPaymentRepository
+    ):
+        client_description = str(uuid4())
+        reference_id = str(uuid4())
+        cart_payment = await cart_payment_repository.insert_cart_payment(
+            id=uuid4(),
+            payer_id=cast(UUID, payer.id),
+            amount_original=99,
+            amount_total=100,
+            client_description=client_description,
+            reference_id=reference_id,
+            reference_type="OrderCart",
+            delay_capture=False,
+            metadata=None,
+            legacy_consumer_id=1,
+            legacy_stripe_card_id=1,
+            legacy_provider_customer_id="stripe_customer_id",
+            legacy_provider_card_id="stripe_card_id",
+        )
+        cart_payment_list = await cart_payment_repository.get_cart_payments_by_reference_id(
+            input=ListCartPaymentsByReferenceId(
+                reference_id=reference_id, reference_type="OrderCart"
+            )
         )
         assert cart_payment_list
         assert isinstance(cart_payment_list, List)

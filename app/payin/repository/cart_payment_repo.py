@@ -125,6 +125,11 @@ class UpdateLegacyStripeChargeErrorDetailsSetInput(DBRequestModel):
     updated_at: datetime
 
 
+class ListCartPaymentsByReferenceId(DBRequestModel):
+    reference_id: str
+    reference_type: str
+
+
 @final
 @tracing.track_breadcrumb(repository_name="cart_payment")
 @dataclass
@@ -1484,6 +1489,21 @@ class CartPaymentRepository(PayinDBRepository):
     ) -> List[CartPayment]:
         stmt = cart_payments.table.select().where(
             cart_payments.legacy_consumer_id == input.dd_consumer_id
+        )
+        rows = await self.payment_database.replica().fetch_all(stmt)
+        cart_payment_list: List[CartPayment] = []
+        for row in rows:
+            cart_payment_list.append(self.to_cart_payment(row))
+        return cart_payment_list
+
+    async def get_cart_payments_by_reference_id(
+        self, input: ListCartPaymentsByReferenceId
+    ) -> List[CartPayment]:
+        stmt = cart_payments.table.select().where(
+            and_(
+                cart_payments.reference_id == input.reference_id,
+                cart_payments.reference_type == input.reference_type,
+            )
         )
         rows = await self.payment_database.replica().fetch_all(stmt)
         cart_payment_list: List[CartPayment] = []

@@ -37,7 +37,7 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.dispute.model import Dispute, DisputeChargeMetadata
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.types import DeletePayerRequestStatus
-from app.payin.core.types import PgpPayerResourceId
+from app.payin.core.types import PgpPayerResourceId, PayerReferenceIdType
 from app.payin.repository.dispute_repo import (
     ConsumerChargeDbEntity,
     StripeDisputeDbEntity,
@@ -46,6 +46,7 @@ from app.payin.repository.payer_repo import (
     PayerDbEntity,
     PgpCustomerDbEntity,
     DeletePayerRequestDbEntity,
+    StripeCustomerDbEntity,
 )
 from app.payin.repository.payment_method_repo import (
     PgpPaymentMethodDbEntity,
@@ -151,6 +152,8 @@ def generate_cart_payment(
     capture_method=CaptureMethod.MANUAL.value,
     deleted_at: datetime = None,
     created_at: datetime = None,
+    reference_id: str = None,
+    reference_type: str = None,
 ) -> CartPayment:
     return CartPayment(
         id=id if id else uuid.uuid4(),
@@ -158,7 +161,11 @@ def generate_cart_payment(
         payer_id=payer_id,
         payment_method_id=payment_method_id,
         capture_method=capture_method,
-        correlation_ids=CorrelationIds(reference_id="0", reference_type="2"),
+        correlation_ids=CorrelationIds(
+            reference_id=reference_id, reference_type=reference_type
+        )
+        if reference_id and reference_type
+        else CorrelationIds(reference_id="0", reference_type="2"),
         delay_capture=True,
         client_description="Test description",
         deleted_at=deleted_at,
@@ -509,10 +516,26 @@ def generate_raw_payer() -> RawPayer:
         payer_entity=PayerDbEntity(
             id=payer_id,
             country=CountryCode.US,
+            legacy_stripe_customer_id="cus_fakeid",
+            payer_reference_id="1",
+            payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
+            updated_at=datetime.now(timezone.utc),
             primary_pgp_payer_resource_id="cus_fakeid",
         ),
         pgp_customer_entity=PgpCustomerDbEntity(
-            id=uuid.uuid4(), payer_id=payer_id, pgp_resource_id="cus_fakeid"
+            id=uuid.uuid4(),
+            payer_id=payer_id,
+            pgp_resource_id="cus_fakeid",
+            updated_at=datetime.now(timezone.utc),
+            pgp_code=PgpCode.STRIPE,
+        ),
+        stripe_customer_entity=StripeCustomerDbEntity(
+            id=1,
+            stripe_id="VALID_STRIPE_ID",
+            country_shortname=CountryCode.US,
+            owner_type="VALID_OWNER_TYPE",
+            owner_id=1,
+            default_source=PgpCode.STRIPE,
         ),
     )
 

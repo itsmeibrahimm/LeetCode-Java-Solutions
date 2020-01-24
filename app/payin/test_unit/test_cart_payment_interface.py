@@ -1,6 +1,7 @@
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from typing import List
 from unittest.mock import MagicMock
 
 import asynctest
@@ -26,7 +27,6 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentCharge,
     PgpPaymentIntent,
     SplitPayment,
-    CartPaymentList,
 )
 from app.payin.core.cart_payment.processor import IdempotencyKeyAction
 from app.payin.core.cart_payment.types import (
@@ -54,8 +54,12 @@ from app.payin.core.exceptions import (
     LegacyStripeChargeCouldNotBeUpdatedError,
 )
 from app.payin.core.payer.types import DeletePayerRedactingText
-from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
-from app.payin.core.types import PgpPayerResourceId, PgpPaymentMethodResourceId
+from app.payin.core.payment_method.types import PgpPaymentInfo
+from app.payin.core.types import (
+    PgpPayerResourceId,
+    PgpPaymentMethodResourceId,
+    PayerReferenceIdType,
+)
 from app.payin.tests.utils import (
     FunctionMock,
     generate_cart_payment,
@@ -70,6 +74,7 @@ from app.payin.tests.utils import (
     generate_provider_intent,
     generate_provider_refund,
     generate_refund,
+    generate_raw_payer,
 )
 
 
@@ -2357,120 +2362,65 @@ class TestListCartPayment(object):
         legacy_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
             return_value=[cart_payment]
         )
-        cart_payment_list = await legacy_payment_interface.list_cart_payments_by_dd_consumer_id(
-            dd_consumer_id=1,
-            created_at_gte=None,
-            created_at_lte=None,
-            sort_by=CartPaymentSortKey.CREATED_AT,
+        cart_payments = await legacy_payment_interface.list_cart_payments_by_dd_consumer_id(
+            dd_consumer_id=1
         )
-        assert cart_payment_list
-        assert isinstance(cart_payment_list, CartPaymentList)
-        assert cart_payment_list.count
-        assert cart_payment_list.count == 1
-        assert cart_payment_list.has_more is False
-        assert cart_payment_list.data
-        assert cart_payment_list.data[0] == cart_payment
+        assert cart_payments
+        assert isinstance(cart_payments, List)
+        assert len(cart_payments) == 1
+        assert cart_payments[0] == cart_payment
 
-    @pytest.mark.asyncio
-    async def test_get_cart_payment_list__by_dd_consumer_id_sort_order(
-        self, legacy_payment_interface
-    ):
-        now = datetime.now(timezone.utc)
-        cart_payment_1 = generate_cart_payment(created_at=now)
-        cart_payment_2 = generate_cart_payment(created_at=now + timedelta(minutes=1))
-        legacy_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
-            return_value=[cart_payment_1, cart_payment_2]
+    async def test_list_cart_payments_by_reference_id(self, cart_payment_interface):
+        cart_payment = generate_cart_payment(
+            reference_id="1", reference_type="OrderCart"
         )
-        cart_payment_list = await legacy_payment_interface.list_cart_payments_by_dd_consumer_id(
-            dd_consumer_id=1,
-            created_at_gte=None,
-            created_at_lte=None,
-            sort_by=CartPaymentSortKey.CREATED_AT,
+        cart_payment_interface.payment_repo.get_cart_payments_by_reference_id = FunctionMock(
+            return_value=[cart_payment]
         )
-        assert cart_payment_list
-        assert isinstance(cart_payment_list, CartPaymentList)
-        assert cart_payment_list.count == 2
-        assert cart_payment_list.has_more is False
-        assert cart_payment_1 in cart_payment_list.data
-        assert cart_payment_2 in cart_payment_list.data
-        assert cart_payment_list.data.index(
-            cart_payment_1
-        ) < cart_payment_list.data.index(cart_payment_2)
+        cart_payments = await cart_payment_interface.list_cart_payments_by_reference_id(
+            reference_id="1", reference_type="OrderCart"
+        )
+        assert isinstance(cart_payments, List)
+        assert len(cart_payments) == 1
+        assert cart_payments[0] == cart_payment
 
-    @pytest.mark.asyncio
-    async def test_get_cart_payment_list_by_dd_consumer_id_with_created_at_gte(
-        self, legacy_payment_interface
+    async def test_list_cart_payments_by_payer_reference_id(
+        self, cart_payment_interface
     ):
-        now = datetime.now(timezone.utc)
-        cart_payment_1 = generate_cart_payment(created_at=now)
-        cart_payment_2 = generate_cart_payment(created_at=now - timedelta(minutes=1))
-        legacy_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
-            return_value=[cart_payment_1, cart_payment_2]
+        cart_payment = generate_cart_payment(
+            reference_id="1", reference_type="OrderCart"
         )
-        cart_payment_list = await legacy_payment_interface.list_cart_payments_by_dd_consumer_id(
-            dd_consumer_id=1,
-            created_at_gte=now,
-            created_at_lte=None,
-            sort_by=CartPaymentSortKey.CREATED_AT,
+        payer = generate_raw_payer()
+        cart_payment_interface.payer_client.get_raw_payer = FunctionMock(
+            return_value=payer
         )
-        assert cart_payment_list
-        assert isinstance(cart_payment_list, CartPaymentList)
-        assert cart_payment_list.count == 1
-        assert cart_payment_list.has_more is False
-        assert cart_payment_1 in cart_payment_list.data
-        assert cart_payment_2 not in cart_payment_list.data
+        cart_payment_interface.payer_client.get_consumer_id_by_payer_id = FunctionMock(
+            return_value=1
+        )
+        cart_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
+            return_value=[cart_payment]
+        )
+        cart_payments = await cart_payment_interface.list_cart_payments_by_payer_reference_id(
+            payer_reference_id="1",
+            payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
+        )
+        assert isinstance(cart_payments, List)
+        assert len(cart_payments) == 1
+        assert cart_payments[0] == cart_payment
 
-    @pytest.mark.asyncio
-    async def test_get_cart_payment_list_by_dd_consumer_id_with_created_at_lte(
-        self, legacy_payment_interface
-    ):
-        now = datetime.now(timezone.utc)
-        cart_payment_1 = generate_cart_payment(created_at=now)
-        cart_payment_2 = generate_cart_payment(created_at=now + timedelta(minutes=1))
-        legacy_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
-            return_value=[cart_payment_1, cart_payment_2]
+    async def test_list_cart_payments_by_payer_id(self, cart_payment_interface):
+        cart_payment = generate_cart_payment(
+            reference_id="1", reference_type="OrderCart"
         )
-        cart_payment_list = await legacy_payment_interface.list_cart_payments_by_dd_consumer_id(
-            dd_consumer_id=1,
-            created_at_gte=None,
-            created_at_lte=now,
-            sort_by=CartPaymentSortKey.CREATED_AT,
+        cart_payment_interface.payer_client.get_consumer_id_by_payer_id = FunctionMock(
+            return_value=1
         )
-        assert cart_payment_list
-        assert isinstance(cart_payment_list, CartPaymentList)
-        assert cart_payment_list.count == 1
-        assert cart_payment_list.has_more is False
-        assert cart_payment_1 in cart_payment_list.data
-        assert cart_payment_2 not in cart_payment_list.data
-
-    @pytest.mark.asyncio
-    async def test_get_cart_payment_list_by_dd_consumer_id_with_created_at_gte_and_created_at_lte(
-        self, legacy_payment_interface
-    ):
-        now = datetime.now(timezone.utc)
-        cart_payment_1 = generate_cart_payment(created_at=now)
-        cart_payment_2 = generate_cart_payment(created_at=now + timedelta(minutes=1))
-        cart_payment_3 = generate_cart_payment(created_at=now - timedelta(minutes=1))
-        cart_payment_4 = generate_cart_payment(created_at=now + timedelta(minutes=2))
-        legacy_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
-            return_value=[
-                cart_payment_1,
-                cart_payment_2,
-                cart_payment_3,
-                cart_payment_4,
-            ]
+        cart_payment_interface.payment_repo.get_cart_payments_by_dd_consumer_id = FunctionMock(
+            return_value=[cart_payment]
         )
-        cart_payment_list = await legacy_payment_interface.list_cart_payments_by_dd_consumer_id(
-            dd_consumer_id=1,
-            created_at_gte=now,
-            created_at_lte=now + timedelta(minutes=1),
-            sort_by=CartPaymentSortKey.CREATED_AT,
+        cart_payments = await cart_payment_interface.list_cart_payments_by_payer_id(
+            payer_id="1"
         )
-        assert cart_payment_list
-        assert isinstance(cart_payment_list, CartPaymentList)
-        assert cart_payment_list.count == 2
-        assert cart_payment_list.has_more is False
-        assert cart_payment_1 in cart_payment_list.data
-        assert cart_payment_2 in cart_payment_list.data
-        assert cart_payment_3 not in cart_payment_list.data
-        assert cart_payment_4 not in cart_payment_list.data
+        assert isinstance(cart_payments, List)
+        assert len(cart_payments) == 1
+        assert cart_payments[0] == cart_payment
