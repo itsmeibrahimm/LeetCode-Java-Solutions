@@ -29,6 +29,7 @@ _status_code_to_payin_error_code: Dict[int, Set[PayinErrorCode]] = {
         PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH,
         PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
         PayinErrorCode.COMMANDO_DISABLED_ENDPOINT,
+        PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_PROVIDER_PAYMENT_METHOD,
     },
     status.HTTP_400_BAD_REQUEST: {
         PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,

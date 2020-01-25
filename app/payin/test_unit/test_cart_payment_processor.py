@@ -118,7 +118,9 @@ class TestCartPaymentProcessor:
         mocked_method_fetch.side_effect = PaymentMethodReadError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND
         )
-        payment_method_client.get_raw_payment_method = mocked_method_fetch
+        payment_method_client.get_raw_payment_method_without_payer_auth = (
+            mocked_method_fetch
+        )
 
         mocked_get_raw_payer = FunctionMock()
         mocked_get_raw_payer.return_value = create_autospec(RawPayer)
@@ -166,7 +168,9 @@ class TestCartPaymentProcessor:
         mocked_method_fetch.side_effect = PaymentMethodReadError(
             error_code=PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH
         )
-        payment_method_client.get_raw_payment_method = mocked_method_fetch
+        payment_method_client.get_raw_payment_method_without_payer_auth = (
+            mocked_method_fetch
+        )
 
         mocked_get_raw_payer = FunctionMock()
         mocked_get_raw_payer.return_value = create_autospec(RawPayer)

@@ -52,6 +52,7 @@ _payin_error_message_maps = {
     "payin_49": "Cannot create payment.  Payment card cvc incorrect.",
     "payin_50": "Cannot create payment.  Payment creation failed.",
     "payin_51": "Unable to establish payment method for cross country payment.",
+    "payin_52": "Unable to create payment due to invalid provider payment method data.",
     "payin_60": "Invalid data provided. Please verify parameters.",
     "payin_61": "Cart Payment not found.  Please ensure your cart_payment_id is correct.",
     "payin_62": "Cart Payment not accessible by caller.",
@@ -287,6 +288,11 @@ class PayinErrorCode(str, Enum):
         "payin_51",
         NO_RETRY,
         "Unable to establish payment method for cross country payment.",
+    )
+    PAYMENT_INTENT_CREATE_INVALID_PROVIDER_PAYMENT_METHOD = (
+        "payin_52",
+        NO_RETRY,
+        "Unable to create payment due to invalid provider payment method data.",
     )
     PAYMENT_METHOD_CREATE_INVALID_DATA = (
         "payin_20",

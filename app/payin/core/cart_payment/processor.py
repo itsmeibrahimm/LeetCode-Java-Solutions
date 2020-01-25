@@ -26,7 +26,12 @@ from app.commons.operational_flags import (
 from app.commons.providers.errors import StripeCommandoError
 from app.commons.providers.stripe.commando import COMMANDO_PAYMENT_INTENT
 from app.commons.providers.stripe.constants import STRIPE_PLATFORM_ACCOUNT_IDS
-from app.commons.providers.stripe.errors import StripeErrorCode, StripeErrorParser
+from app.commons.providers.stripe.errors import (
+    StripeErrorCode,
+    StripeErrorParser,
+    StripeErrorType,
+    StripeInvalidParam,
+)
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
     ClonePaymentMethodRequest,
@@ -53,6 +58,7 @@ from app.commons.utils.validation import not_none
 from app.payin.core import feature_flags
 from app.payin.core.cart_payment.model import (
     CartPayment,
+    CartPaymentList,
     CorrelationIds,
     LegacyConsumerCharge,
     LegacyPayment,
@@ -65,7 +71,6 @@ from app.payin.core.cart_payment.model import (
     PgpRefund,
     Refund,
     SplitPayment,
-    CartPaymentList,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -82,6 +87,10 @@ from app.payin.core.exceptions import (
     CartPaymentUpdateError,
     CommandoProcessingError,
     InvalidProviderRequestError,
+    LegacyStripeChargeConcurrentAccessError,
+    LegacyStripeChargeCouldNotBeUpdatedError,
+    LegacyStripeChargeUpdateError,
+    PayerReadError,
     PayinErrorCode,
     PaymentChargeRefundError,
     PaymentIntentCancelError,
@@ -92,40 +101,35 @@ from app.payin.core.exceptions import (
     PaymentMethodReadError,
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
-    PayerReadError,
-    LegacyStripeChargeConcurrentAccessError,
-    LegacyStripeChargeCouldNotBeUpdatedError,
-    LegacyStripeChargeUpdateError,
 )
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payer.types import DeletePayerRedactingText
 from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodClient
-from app.payin.core.payment_method.types import PgpPaymentInfo, CartPaymentSortKey
+from app.payin.core.payment_method.types import CartPaymentSortKey, PgpPaymentInfo
 from app.payin.core.types import (
-    PayerIdType,
+    PayerReferenceIdType,
     PaymentMethodIdType,
     PgpPayerResourceId,
     PgpPaymentMethodResourceId,
-    PayerReferenceIdType,
 )
 from app.payin.repository.cart_payment_repo import (
     CartPaymentRepository,
+    GetCartPaymentsByConsumerIdInput,
+    GetLegacyConsumerChargeIdsByConsumerIdInput,
+    ListCartPaymentsByReferenceId,
     UpdateCartPaymentPostCancellationInput,
+    UpdateCartPaymentsRemovePiiSetInput,
+    UpdateCartPaymentsRemovePiiWhereInput,
+    UpdateLegacyStripeChargeErrorDetailsSetInput,
+    UpdateLegacyStripeChargeErrorDetailsWhereInput,
+    UpdateLegacyStripeChargeRemovePiiSetInput,
+    UpdateLegacyStripeChargeRemovePiiWhereInput,
     UpdatePaymentIntentSetInput,
     UpdatePaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
-    GetCartPaymentsByConsumerIdInput,
-    UpdateCartPaymentsRemovePiiWhereInput,
-    UpdateCartPaymentsRemovePiiSetInput,
-    GetLegacyConsumerChargeIdsByConsumerIdInput,
-    UpdateLegacyStripeChargeRemovePiiWhereInput,
-    UpdateLegacyStripeChargeRemovePiiSetInput,
-    UpdateLegacyStripeChargeErrorDetailsWhereInput,
-    UpdateLegacyStripeChargeErrorDetailsSetInput,
-    ListCartPaymentsByReferenceId,
 )
 
 IntentFullfillmentResult = NewType(
@@ -1172,6 +1176,13 @@ class CartPaymentInterface:
                 error_code = (
                     PayinErrorCode.PAYMENT_INTENT_CREATE_CARD_INCORRECT_CVC_ERROR
                 )
+            elif (
+                parser.type == StripeErrorType.invalid_request_error
+                and parser.has_invalid_param(StripeInvalidParam.payment_method)
+            ):
+                error_code = (
+                    PayinErrorCode.PAYMENT_INTENT_CREATE_INVALID_PROVIDER_PAYMENT_METHOD
+                )
             raise CartPaymentCreateError(
                 error_code=error_code,
                 provider_charge_id=parser.charge_id,
@@ -2009,57 +2020,23 @@ class CartPaymentInterface:
                 "At least one of payment_method_id and dd_stripe_card_id need to be specified"
             )
 
+        raw_payment_method: RawPaymentMethod
+        if payment_method_id:
+            raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
+                payment_method_id=payment_method_id,
+                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
+            )
+        else:
+            raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
+                payment_method_id=str(not_none(dd_stripe_card_id)),
+                payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
+            )
+
         if not raw_payer:
             raw_payer = await self.payer_client.get_raw_payer(
                 mixed_payer_id=payer_id,
                 payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             )
-
-        raw_payment_method: RawPaymentMethod
-        if payment_method_id:
-            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
-                payer_id=payer_id,
-                payer_id_type=PayerIdType.PAYER_ID,
-                payment_method_id=payment_method_id,
-                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
-            )
-        else:
-            # use stripe customer id instead of payer id in this case to unblock testing before pm migration
-            stripe_customer_id: str
-            if (
-                raw_payer.pgp_customer_entity
-                and raw_payer.pgp_customer_entity.pgp_resource_id
-            ):
-                stripe_customer_id = raw_payer.pgp_customer_entity.pgp_resource_id
-            elif (
-                raw_payer.stripe_customer_entity
-                and raw_payer.stripe_customer_entity.stripe_id
-            ):
-                stripe_customer_id = raw_payer.stripe_customer_entity.stripe_id
-            else:
-                self.req_context.log.error(
-                    "[get_pgp_payment_info_v1] Failed to get stripe customer resource id from payer",
-                    payer_id=payer_id,
-                )
-                raise CartPaymentCreateError(
-                    error_code=PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA,
-                    provider_charge_id=None,
-                    provider_error_code=None,
-                    provider_decline_code=None,
-                    has_provider_error_details=False,
-                )
-            self.req_context.log.info(
-                "[get_pgp_payment_info_v1] use stripe customer id for payer to fetch payment method",
-                payer_id=payer_id,
-                stripe_customer_id=stripe_customer_id,
-            )
-            raw_payment_method = await self.payment_method_client.get_raw_payment_method(
-                payer_id=stripe_customer_id,
-                payer_id_type=PayerIdType.STRIPE_CUSTOMER_ID,
-                payment_method_id=str(not_none(dd_stripe_card_id)),
-                payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
-            )
-
         pgp_payer_ref_id = raw_payer.pgp_payer_resource_id
         pgp_payment_method_ref_id = raw_payment_method.pgp_payment_method_resource_id
 

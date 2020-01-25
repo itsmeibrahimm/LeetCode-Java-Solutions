@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Union
 
 from pydantic import BaseModel
 from stripe.error import StripeError
@@ -199,6 +199,21 @@ class StripeDeclineCode(str, Enum):
         return None
 
 
+class StripeInvalidParam(str, Enum):
+    """
+    Possible invalid params identified on Stripe server end and raised with stripe.InvalidRequestError
+    !!Note!! there is no exhausted list on this yet, please add entries here as you observe and need
+    """
+
+    payment_method = "payment_method"
+
+    @classmethod
+    def get_or_none(cls, value: str) -> Optional["StripeInvalidParam"]:
+        if value in cls._value2member_map_:
+            return cls(value)
+        return None
+
+
 class _StripeErrorDetails(BaseModel):
     class Config:
         allow_mutation = False
@@ -209,6 +224,7 @@ class _StripeErrorDetails(BaseModel):
     decline_code: Optional[str]
     charge: Optional[str]
     payment_intent: Optional[Dict[str, Any]]
+    param: Optional[Union[str, List[str]]]
 
 
 class StripeErrorParser:
@@ -259,6 +275,20 @@ class StripeErrorParser:
     @property
     def charge_id(self) -> Optional[str]:
         return self._details.charge
+
+    def has_invalid_param(self, param: StripeInvalidParam) -> bool:
+        """
+        Args:
+            param (StripeInvalidParam): whether given invalid param is in the error
+        Returns:
+            whether given invalid param is in the error
+        """
+        known_invalid_params = self._details.param
+        if known_invalid_params:
+            if isinstance(known_invalid_params, list):
+                return bool(param in known_invalid_params)
+            return param == known_invalid_params
+        return False
 
     @staticmethod
     def _parse_details(stripe_error: StripeError) -> _StripeErrorDetails:

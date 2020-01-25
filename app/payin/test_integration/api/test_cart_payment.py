@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import pytest
 import requests
+from asynctest import mock
 from starlette.testclient import TestClient
 
 from app.commons.context.app_context import AppContext
@@ -24,10 +25,17 @@ from app.conftest import RuntimeContextManager, RuntimeSetter, StripeAPISettings
 # is marked as external.  The stripe simulator does not return the correct result since it does
 # persist state.
 from app.payin.core.cart_payment.model import LegacyStripeCharge
-from app.payin.core.cart_payment.processor import CommandoProcessor
+from app.payin.core.cart_payment.processor import (
+    CartPaymentInterface,
+    CommandoProcessor,
+)
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
-from app.payin.core.payment_method.types import CartPaymentSortKey
-from app.payin.core.types import PayerReferenceIdType
+from app.payin.core.payment_method.types import CartPaymentSortKey, PgpPaymentInfo
+from app.payin.core.types import (
+    PayerReferenceIdType,
+    PgpPayerResourceId,
+    PgpPaymentMethodResourceId,
+)
 from app.payin.models.paymentdb import payment_methods, pgp_payment_methods
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payment_method_repo import (
@@ -39,6 +47,7 @@ from app.payin.test_integration.integration_utils import (
     _create_payer_v1_url,
     build_commando_processor,
 )
+from app.payin.tests import utils
 
 
 @pytest.mark.external
@@ -1227,6 +1236,16 @@ class TestCartPayment:
         stripe_api.enable_outbound()
         runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, commando_mode)
 
+        # Recoup all existing pending cp to have a clean start
+        if commando_mode:
+            with RuntimeContextManager(
+                STRIPE_COMMANDO_MODE_BOOLEAN, False, runtime_setter
+            ):
+                commando_processor: CommandoProcessor = build_commando_processor(
+                    app_context=app_context
+                )
+                event_loop.run_until_complete(commando_processor.recoup())
+
         amounts = (500, 600, 560)
 
         # Success case: intent created, not captured yet
@@ -1272,27 +1291,46 @@ class TestCartPayment:
 
         # Other payer cannot use some else's payment method for cart payment creation
         with RuntimeContextManager(STRIPE_COMMANDO_MODE_BOOLEAN, False, runtime_setter):
-            other_payer = payer = self._test_payer_creation(
+            other_payer = self._test_payer_creation(
                 client, payer_reference_id=str(random.randint(2, 1000))
             )
 
-        request_body = self._get_cart_payment_create_request(
-            payer=other_payer,
-            payment_method=payment_method,
-            payer_id_extractor=payer_id_extractor,
-            payment_method_extractor=payment_method_extractor,
-        )
-        self._test_cart_payment_creation_error(
-            client, request_body, 403, "payin_23", False
-        )
+            # Why do we need to patch here? see: https://doordash.atlassian.net/browse/PAYIN-340
+            with mock.patch.object(
+                CartPaymentInterface,
+                "get_pgp_payment_info_v1",
+                return_value=(
+                    PgpPaymentInfo(
+                        pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                            payment_method["payment_gateway_provider_details"][
+                                "payment_method_id"
+                            ]
+                        ),
+                        pgp_payer_resource_id=PgpPayerResourceId(
+                            other_payer["payment_gateway_provider_customers"][0][
+                                "payment_provider_customer_id"
+                            ]
+                        ),
+                    ),
+                    utils.generate_legacy_payment(),
+                ),
+            ):
+
+                request_body = self._get_cart_payment_create_request(
+                    payer=payer,
+                    payment_method=payment_method,
+                    payer_id_extractor=payer_id_extractor,
+                    payment_method_extractor=payment_method_extractor,
+                )
+                self._test_cart_payment_creation_error(
+                    client, request_body, 403, "payin_52", False
+                )
 
         if commando_mode:
             with RuntimeContextManager(
                 STRIPE_COMMANDO_MODE_BOOLEAN, False, runtime_setter
             ):
-                commando_processor: CommandoProcessor = build_commando_processor(
-                    app_context=app_context
-                )
+                commando_processor = build_commando_processor(app_context=app_context)
                 total, result = event_loop.run_until_complete(
                     commando_processor.recoup()
                 )
