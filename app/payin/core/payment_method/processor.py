@@ -48,17 +48,21 @@ class PaymentMethodProcessor:
     2) create and attach pm_2
     3) set pm_1 as d_p_m
     4) detach pm_1 —> customer.invoice_setting[default_payment_method] is reset by stripe automatically
-    5) create and attach card source card_1 —> card_1 becomes default_source by stripe automatically (stripe will also tigger an event about " a card payment method was attached to customer xxx")
+    5) create and attach card source card_1 —> card_1 becomes default_source by stripe automatically (stripe will also
+       trigger an event about " a card payment method was attached to customer xxx")
     6) create and attach card source card_2
     7) set card_2 as default_payment_method —> stripe update customer.invoice_setting[default_payment_method] to card_2
     8) set pm_2 as default_source —> stripe rejects the request
-    9) set card_1 as default_source —> customer.default_source = card_1 and customer.invoice_setting[default_payment_method] still card_2
+    9) set card_1 as default_source —> customer.default_source = card_1
+       and customer.invoice_setting[default_payment_method] still card_2
     10) detach pm_2 —> nothing changed
-    11) delete card_2 —> customer.invoice_setting[default_payment_method]=None, and card_1 becomes default on Stripe Dashboard
+    11) delete card_2 —> customer.invoice_setting[default_payment_method]=None
+        and card_1 becomes default on Stripe Dashboard
     12) create and attach source card_3
     13) delete card_1 —> card_3 becomes new default by stripe automatically
     14) create card 4
-    15) detach card_1 with payment_method api —> card_4 becomes new default by stripe automatically. receive both "source deletion" event and "payment method detach" event
+    15) detach card_1 with payment_method api —> card_4 becomes new default by stripe automatically.
+        receive both "source deletion" event and "payment method detach" event
     """
 
     # prevent circular dependency

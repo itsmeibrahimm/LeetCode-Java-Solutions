@@ -10,9 +10,28 @@ from app.payin.core.cart_payment.model import CartPayment
 from app.payin.core.exceptions import PayinError, PayinErrorCode
 
 
+def validate_cart_payment_request_v1(cart_payment_request: CreateCartPaymentRequestV1):
+    number_of_payment_method_ids: int = int(
+        bool(cart_payment_request.payment_method_id)
+    ) + int(bool(cart_payment_request.payment_method_token)) + int(
+        bool(cart_payment_request.dd_stripe_card_id)
+    )
+
+    if number_of_payment_method_ids != 1:
+        raise ValueError(
+            f"only 1 of payment method identifiers should be provided but found "
+            f"payment_method_id={cart_payment_request.payment_method_id}, "
+            f"payment_method_token={cart_payment_request.payment_method_token}, "
+            f"dd_stripe_card_id={cart_payment_request.dd_stripe_card_id}"
+        )
+
+
 def to_internal_cart_payment(
     cart_payment_request: CreateCartPaymentRequestV1, correlation_ids: CorrelationIds
 ) -> CartPayment:
+
+    validate_cart_payment_request_v1(cart_payment_request)
+
     try:
         return CartPayment(
             id=uuid4(),
