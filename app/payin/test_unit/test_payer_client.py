@@ -7,7 +7,12 @@ from asynctest import MagicMock
 from stripe.error import StripeError
 
 from app.commons.core.errors import DBOperationError, DBIntegrityUniqueViolationError
-from app.commons.providers.stripe.stripe_models import StripeDeleteCustomerResponse
+from app.commons.providers.stripe.stripe_models import (
+    StripeDeleteCustomerResponse,
+    Customer,
+    InvoiceSettings,
+    Customers,
+)
 from app.commons.types import CountryCode
 from app.payin.core.exceptions import PayerDeleteError, PayinErrorCode
 from app.payin.core.payer.model import (
@@ -70,7 +75,68 @@ class TestPayerClient:
         )
 
     @pytest.mark.asyncio
-    async def test_delete_pgp_customer(self, payer_client):
+    async def test_pgp_get_customers(self, payer_client):
+        customers_list: List[Customer] = [
+            Customer(
+                id="cus_1234567",
+                object="customer",
+                created=datetime.now(timezone.utc),
+                currency="USD",
+                invoice_settings=InvoiceSettings(default_payment_method=""),
+                default_source="",
+                description="",
+                email="john.doe@gmail.com",
+            )
+        ]
+        payer_client.stripe_async_client.list_customers = FunctionMock(
+            return_value=Customers(
+                object="list", url="/v1/customers", has_more=False, data=customers_list
+            )
+        )
+        customers: List[Customer] = await payer_client.pgp_get_customers(
+            email="john.doe@gmail.com", country_code=CountryCode.US
+        )
+        assert customers == customers_list
+
+    @pytest.mark.asyncio
+    async def test_pgp_get_customers_multiple_pgp_calls(self, payer_client):
+        customers_list: List[Customer] = []
+        for i in range(200):
+            customer = Customer(
+                id=f"cus_{i}",
+                object="customer",
+                created=datetime.now(timezone.utc),
+                currency="USD",
+                invoice_settings=InvoiceSettings(default_payment_method=""),
+                default_source="",
+                description=f"customer {i}",
+                email="john.doe@gmail.com",
+            )
+            customers_list.append(customer)
+
+        payer_client.stripe_async_client.list_customers = FunctionMock(
+            side_effect=[
+                Customers(
+                    object="list",
+                    url="/v1/customers",
+                    has_more=True,
+                    data=customers_list[0:100],
+                ),
+                Customers(
+                    object="list",
+                    url="/v1/customers",
+                    has_more=False,
+                    data=customers_list[100:200],
+                ),
+            ]
+        )
+        customers: List[Customer] = await payer_client.pgp_get_customers(
+            email="john.doe@gmail.com", country_code=CountryCode.US
+        )
+        assert customers == customers_list
+
+    @pytest.mark.asyncio
+    async def test_pgp_delete_customer(self, payer_client):
         payer_client.stripe_async_client.delete_customer = FunctionMock(
             return_value=StripeDeleteCustomerResponse(
                 id="cus_1234567", object="customer", deleted=True
@@ -82,7 +148,7 @@ class TestPayerClient:
         assert stripe_delete_customer_response.deleted is True
 
     @pytest.mark.asyncio
-    async def test_delete_pgp_customer_errors(self, payer_client):
+    async def test_pgp_delete_customer_errors(self, payer_client):
         payer_client.stripe_async_client.delete_customer = FunctionMock(
             side_effect=StripeError()
         )
@@ -91,7 +157,7 @@ class TestPayerClient:
         assert e.value.error_code == PayinErrorCode.PAYER_DELETE_STRIPE_ERROR
 
     @pytest.mark.asyncio
-    async def test_delete_pgp_customer_errors_not_found(self, payer_client):
+    async def test_pgp_delete_customer_errors_not_found(self, payer_client):
         payer_client.stripe_async_client.delete_customer = FunctionMock(
             side_effect=StripeError(
                 json_body={

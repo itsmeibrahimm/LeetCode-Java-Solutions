@@ -22,6 +22,7 @@ from app.commons.providers.stripe.stripe_models import (
     StripeCreateCustomerRequest,
     TokenId,
     RetrieveAccountRequest,
+    Customers,
 )
 from app.commons.test_integration.constants import (
     VISA_DEBIT_CARD_TOKEN,
@@ -115,6 +116,42 @@ class TestStripeClient:
             request=models.StripeRetrieveCustomerRequest(id=customer.id),
         )
         assert customer
+
+    @pytest.mark.vcr()
+    def test_list_customers(self, mode: str, stripe: StripeClient):
+        if mode == "mock":
+            pytest.skip()
+        for i in range(20):
+            stripe.create_customer(
+                country=models.CountryCode.US,
+                request=models.StripeCreateCustomerRequest(
+                    email="john.law@doordash.com", description=f"customer {i}"
+                ),
+            )
+
+        has_more = None
+        customer_ids_list = []
+        while has_more is not False:
+            customers: Customers = stripe.list_customers(
+                country=models.CountryCode.US,
+                request=models.StripeListCustomersRequest(
+                    email="john.law@doordash.com",
+                    limit=10,
+                    starting_after=None if has_more is None else customers.data[-1].id,
+                ),
+            )
+            assert len(customers.data) == 10
+            for customer in customers.data:
+                assert customer.email == "john.law@doordash.com"
+                customer_ids_list.append(customer.id)
+            has_more = customers.has_more
+
+        """Clean up created customer accounts"""
+        for cid in customer_ids_list:
+            stripe.delete_customer(
+                country=models.CountryCode.US,
+                request=models.StripeDeleteCustomerRequest(sid=cid),
+            )
 
     @pytest.mark.vcr()
     def test_customer_delete(self, mode: str, stripe: StripeClient):
@@ -535,6 +572,53 @@ class TestStripePool:
             ),
         )
         assert customer
+        httpClient = stripe_async_client.stripe_client.http_client
+        assert isinstance(httpClient, RequestsClient)
+        session: requests.Session = httpClient._session
+        http_adapter: HTTPAdapter = session.adapters.get("http://", None)
+        https_adapter: HTTPAdapter = session.adapters.get("https://", None)
+        assert http_adapter and getattr(http_adapter, "_pool_maxsize") == self.POOL_SIZE
+        assert (
+            https_adapter and getattr(https_adapter, "_pool_maxsize") == self.POOL_SIZE
+        )
+
+    async def test_list_customers(
+        self, mode: str, stripe_async_client: StripeAsyncClient
+    ):
+        if mode == "mock":
+            pytest.skip()
+        for i in range(20):
+            await stripe_async_client.create_customer(
+                country=models.CountryCode.US,
+                request=models.StripeCreateCustomerRequest(
+                    email="john.law@doordash.com", description=f"customer {i}"
+                ),
+            )
+
+        has_more = None
+        customer_ids_list = []
+        while has_more is not False:
+            customers: Customers = await stripe_async_client.list_customers(
+                country=models.CountryCode.US,
+                request=models.StripeListCustomersRequest(
+                    email="john.law@doordash.com",
+                    limit=10,
+                    starting_after=None if has_more is None else customers.data[-1].id,
+                ),
+            )
+            assert len(customers.data) == 10
+            for customer in customers.data:
+                assert customer.email == "john.law@doordash.com"
+                customer_ids_list.append(customer.id)
+            has_more = customers.has_more
+
+        """Clean up created customer accounts"""
+        for cid in customer_ids_list:
+            await stripe_async_client.delete_customer(
+                country=models.CountryCode.US,
+                request=models.StripeDeleteCustomerRequest(sid=cid),
+            )
+
         httpClient = stripe_async_client.stripe_client.http_client
         assert isinstance(httpClient, RequestsClient)
         session: requests.Session = httpClient._session

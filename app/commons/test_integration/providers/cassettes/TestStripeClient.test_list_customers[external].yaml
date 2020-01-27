@@ -1,0 +1,3501 @@
+interactions:
+- request:
+    body: email=john.law%40doordash.com&description=customer+0
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - f04d9c13-3c5b-4c07-ac7a-5c28be0a69fc
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu23bFfHkgNhM\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926436,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 0\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"AA46B0BF\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu23bFfHkgNhM/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu23bFfHkgNhM/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu23bFfHkgNhM/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:16 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - f04d9c13-3c5b-4c07-ac7a-5c28be0a69fc
+      original-request:
+      - req_3K581Zd1L3VSlh
+      request-id:
+      - req_3K581Zd1L3VSlh
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+1
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 67f33e6e-4b4f-4794-9cbe-3c83d864b515
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_3K581Zd1L3VSlh", "request_duration_ms":
+        826}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2bSkRy5PNzy\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926436,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 1\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"7BC76E90\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2bSkRy5PNzy/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2bSkRy5PNzy/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2bSkRy5PNzy/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:16 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 67f33e6e-4b4f-4794-9cbe-3c83d864b515
+      original-request:
+      - req_NdFynbseB1ZkBD
+      request-id:
+      - req_NdFynbseB1ZkBD
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+2
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 1a0b0335-428b-435d-bb4d-41bae122013c
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_NdFynbseB1ZkBD", "request_duration_ms":
+        235}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2E4UQI5E4PO\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926436,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 2\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"6F4360B0\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2E4UQI5E4PO/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2E4UQI5E4PO/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2E4UQI5E4PO/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:17 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 1a0b0335-428b-435d-bb4d-41bae122013c
+      original-request:
+      - req_w3uAsvmNkU6Kmt
+      request-id:
+      - req_w3uAsvmNkU6Kmt
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+3
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 8f3fe968-3f7c-4ce1-9b7b-d0552444564d
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_w3uAsvmNkU6Kmt", "request_duration_ms":
+        241}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2cwyBrAjk2m\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926437,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 3\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"CF51CF9D\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2cwyBrAjk2m/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2cwyBrAjk2m/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2cwyBrAjk2m/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:17 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 8f3fe968-3f7c-4ce1-9b7b-d0552444564d
+      original-request:
+      - req_SkEA7xn6N7rrFl
+      request-id:
+      - req_SkEA7xn6N7rrFl
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+4
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - e74a051e-4333-45a7-be52-d87b3fc0bb38
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_SkEA7xn6N7rrFl", "request_duration_ms":
+        265}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2g3CT7kN1cM\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926437,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 4\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"0AB33496\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2g3CT7kN1cM/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2g3CT7kN1cM/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2g3CT7kN1cM/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:17 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - e74a051e-4333-45a7-be52-d87b3fc0bb38
+      original-request:
+      - req_hWd6E2XrNrhBra
+      request-id:
+      - req_hWd6E2XrNrhBra
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+5
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - ac4aba9e-63d6-442d-8de2-d6230a58168f
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_hWd6E2XrNrhBra", "request_duration_ms":
+        273}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2DR9QwYjixQ\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926437,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 5\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"218530FF\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2DR9QwYjixQ/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2DR9QwYjixQ/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2DR9QwYjixQ/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:17 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - ac4aba9e-63d6-442d-8de2-d6230a58168f
+      original-request:
+      - req_18garKvFwslGol
+      request-id:
+      - req_18garKvFwslGol
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+6
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 61fff1db-a755-474a-8f4e-f3206a37d070
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_18garKvFwslGol", "request_duration_ms":
+        408}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2INdoXwaeiX\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926438,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 6\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"900DA478\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2INdoXwaeiX/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2INdoXwaeiX/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2INdoXwaeiX/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:18 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 61fff1db-a755-474a-8f4e-f3206a37d070
+      original-request:
+      - req_P2eo1nbIimbz0z
+      request-id:
+      - req_P2eo1nbIimbz0z
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+7
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 2ae2b378-15ac-4edc-94a3-8d92561b658c
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_P2eo1nbIimbz0z", "request_duration_ms":
+        246}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2JMqaOKAr3u\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926438,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 7\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"4523258B\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2JMqaOKAr3u/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2JMqaOKAr3u/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2JMqaOKAr3u/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:18 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 2ae2b378-15ac-4edc-94a3-8d92561b658c
+      original-request:
+      - req_FUSsiAYXJEBX9S
+      request-id:
+      - req_FUSsiAYXJEBX9S
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+8
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 42243318-82a1-4df3-9540-cb535b5744ee
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_FUSsiAYXJEBX9S", "request_duration_ms":
+        251}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2eQRentYSge\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926438,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 8\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"7BBD6DB8\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2eQRentYSge/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2eQRentYSge/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2eQRentYSge/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:18 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 42243318-82a1-4df3-9540-cb535b5744ee
+      original-request:
+      - req_PTUy40YOFmW09A
+      request-id:
+      - req_PTUy40YOFmW09A
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+9
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '52'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 4d504183-be34-4d00-8ce3-53119022e947
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_PTUy40YOFmW09A", "request_duration_ms":
+        233}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2PyHTsCu0HO\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926438,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 9\",\n  \"discount\": null,\n  \"email\": \"\
+        john.law@doordash.com\",\n  \"invoice_prefix\": \"BCEFF5B6\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2PyHTsCu0HO/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2PyHTsCu0HO/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2PyHTsCu0HO/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1067'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:19 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 4d504183-be34-4d00-8ce3-53119022e947
+      original-request:
+      - req_5xe8LcpeCVGU1P
+      request-id:
+      - req_5xe8LcpeCVGU1P
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+10
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 9dddb776-4633-41a7-b785-16c27d58ce1a
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_5xe8LcpeCVGU1P", "request_duration_ms":
+        289}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2PIAUWiJJH6\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926439,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 10\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"6C921914\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2PIAUWiJJH6/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2PIAUWiJJH6/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2PIAUWiJJH6/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:19 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 9dddb776-4633-41a7-b785-16c27d58ce1a
+      original-request:
+      - req_NqGn5FNV9yD2Pf
+      request-id:
+      - req_NqGn5FNV9yD2Pf
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+11
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 8c6f4716-0e9a-48f5-b41a-4bc6a2dc15fa
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_NqGn5FNV9yD2Pf", "request_duration_ms":
+        246}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu290VkNdC8xT\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926439,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 11\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"CBB33B0F\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu290VkNdC8xT/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu290VkNdC8xT/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu290VkNdC8xT/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:19 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 8c6f4716-0e9a-48f5-b41a-4bc6a2dc15fa
+      original-request:
+      - req_69CCP4TEgiPOlT
+      request-id:
+      - req_69CCP4TEgiPOlT
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+12
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - fb10290f-612c-445b-afff-64ef9f39edb5
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_69CCP4TEgiPOlT", "request_duration_ms":
+        233}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2XHhifGBRhf\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926439,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 12\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"6D46720A\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2XHhifGBRhf/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2XHhifGBRhf/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2XHhifGBRhf/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:19 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - fb10290f-612c-445b-afff-64ef9f39edb5
+      original-request:
+      - req_Y0Bq4PxEp0HhoU
+      request-id:
+      - req_Y0Bq4PxEp0HhoU
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+13
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - b029b222-801a-4fe6-b5e2-74d798825d49
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_Y0Bq4PxEp0HhoU", "request_duration_ms":
+        331}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2GryakFVunv\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926439,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 13\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"F70D6BE2\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2GryakFVunv/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu2GryakFVunv/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu2GryakFVunv/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:20 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - b029b222-801a-4fe6-b5e2-74d798825d49
+      original-request:
+      - req_NRZqcw3r6sflE1
+      request-id:
+      - req_NRZqcw3r6sflE1
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+14
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - d2209fa9-dd7a-4275-810d-f464a796fe51
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_NRZqcw3r6sflE1", "request_duration_ms":
+        411}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu37TJP9HqkF5\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926440,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 14\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"173133F0\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu37TJP9HqkF5/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu37TJP9HqkF5/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu37TJP9HqkF5/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:20 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - d2209fa9-dd7a-4275-810d-f464a796fe51
+      original-request:
+      - req_t8Pv0SPcbimAQf
+      request-id:
+      - req_t8Pv0SPcbimAQf
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+15
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - c361264b-9599-4430-8716-3de4b3958a48
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_t8Pv0SPcbimAQf", "request_duration_ms":
+        239}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3UbSBVf4u0m\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926440,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 15\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"2E3A5018\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3UbSBVf4u0m/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu3UbSBVf4u0m/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3UbSBVf4u0m/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:20 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - c361264b-9599-4430-8716-3de4b3958a48
+      original-request:
+      - req_wNdpZYDx6e9VKl
+      request-id:
+      - req_wNdpZYDx6e9VKl
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+16
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 5064edbf-143a-4169-bff8-44bbe5f1e2ac
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_wNdpZYDx6e9VKl", "request_duration_ms":
+        261}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3fAl8zS9DDe\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926440,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 16\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"5B623339\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3fAl8zS9DDe/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu3fAl8zS9DDe/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3fAl8zS9DDe/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:21 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 5064edbf-143a-4169-bff8-44bbe5f1e2ac
+      original-request:
+      - req_ntDC89KdQOQlDw
+      request-id:
+      - req_ntDC89KdQOQlDw
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+17
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 39baa619-d3a5-44c8-9226-a9a8350c506e
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_ntDC89KdQOQlDw", "request_duration_ms":
+        315}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3QWf2TYrrKP\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926441,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 17\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"D67ECA24\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3QWf2TYrrKP/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu3QWf2TYrrKP/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3QWf2TYrrKP/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:21 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 39baa619-d3a5-44c8-9226-a9a8350c506e
+      original-request:
+      - req_N0CiWGwrOj8YXz
+      request-id:
+      - req_N0CiWGwrOj8YXz
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+18
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 41e88688-c782-44a3-a700-b76e548aed54
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_N0CiWGwrOj8YXz", "request_duration_ms":
+        236}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu30XjyQiE6r2\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926441,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 18\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"0316337C\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu30XjyQiE6r2/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu30XjyQiE6r2/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu30XjyQiE6r2/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:21 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 41e88688-c782-44a3-a700-b76e548aed54
+      original-request:
+      - req_fQntVZpyyddNCM
+      request-id:
+      - req_fQntVZpyyddNCM
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: email=john.law%40doordash.com&description=customer+19
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '53'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 67e0af8b-6f8c-4af9-84fe-7420ccf3f5a2
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_fQntVZpyyddNCM", "request_duration_ms":
+        375}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: POST
+    uri: https://api.stripe.com/v1/customers
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3OJ30MQx7p2\",\n  \"object\": \"customer\",\n\
+        \  \"address\": null,\n  \"balance\": 0,\n  \"created\": 1579926441,\n  \"\
+        currency\": null,\n  \"default_source\": null,\n  \"delinquent\": false,\n\
+        \  \"description\": \"customer 19\",\n  \"discount\": null,\n  \"email\":\
+        \ \"john.law@doordash.com\",\n  \"invoice_prefix\": \"B0BA6973\",\n  \"invoice_settings\"\
+        : {\n    \"custom_fields\": null,\n    \"default_payment_method\": null,\n\
+        \    \"footer\": null\n  },\n  \"livemode\": false,\n  \"metadata\": {\n \
+        \ },\n  \"name\": null,\n  \"phone\": null,\n  \"preferred_locales\": [\n\n\
+        \  ],\n  \"shipping\": null,\n  \"sources\": {\n    \"object\": \"list\",\n\
+        \    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3OJ30MQx7p2/sources\"\n  },\n  \"\
+        subscriptions\": {\n    \"object\": \"list\",\n    \"data\": [\n\n    ],\n\
+        \    \"has_more\": false,\n    \"total_count\": 0,\n    \"url\": \"/v1/customers/cus_Gbu3OJ30MQx7p2/subscriptions\"\
+        \n  },\n  \"tax_exempt\": \"none\",\n  \"tax_ids\": {\n    \"object\": \"\
+        list\",\n    \"data\": [\n\n    ],\n    \"has_more\": false,\n    \"total_count\"\
+        : 0,\n    \"url\": \"/v1/customers/cus_Gbu3OJ30MQx7p2/tax_ids\"\n  }\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1068'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:22 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      idempotency-key:
+      - 67e0af8b-6f8c-4af9-84fe-7420ccf3f5a2
+      original-request:
+      - req_JGU6FJsfLPSDTe
+      request-id:
+      - req_JGU6FJsfLPSDTe
+      stripe-should-retry:
+      - 'false'
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_JGU6FJsfLPSDTe", "request_duration_ms":
+        291}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: GET
+    uri: https://api.stripe.com/v1/customers?email=john.law%40doordash.com&limit=10
+  response:
+    body:
+      string: "{\n  \"object\": \"list\",\n  \"data\": [\n    {\n      \"id\": \"\
+        cus_Gbu3OJ30MQx7p2\",\n      \"object\": \"customer\",\n      \"address\"\
+        : null,\n      \"balance\": 0,\n      \"created\": 1579926441,\n      \"currency\"\
+        : null,\n      \"default_source\": null,\n      \"delinquent\": false,\n \
+        \     \"description\": \"customer 19\",\n      \"discount\": null,\n     \
+        \ \"email\": \"john.law@doordash.com\",\n      \"invoice_prefix\": \"B0BA6973\"\
+        ,\n      \"invoice_settings\": {\n        \"custom_fields\": null,\n     \
+        \   \"default_payment_method\": null,\n        \"footer\": null\n      },\n\
+        \      \"livemode\": false,\n      \"metadata\": {\n      },\n      \"name\"\
+        : null,\n      \"phone\": null,\n      \"preferred_locales\": [\n\n      ],\n\
+        \      \"shipping\": null,\n      \"sources\": {\n        \"object\": \"list\"\
+        ,\n        \"data\": [\n\n        ],\n        \"has_more\": false,\n     \
+        \   \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu3OJ30MQx7p2/sources\"\
+        \n      },\n      \"subscriptions\": {\n        \"object\": \"list\",\n  \
+        \      \"data\": [\n\n        ],\n        \"has_more\": false,\n        \"\
+        total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu3OJ30MQx7p2/subscriptions\"\
+        \n      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n      \
+        \  \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu3OJ30MQx7p2/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu30XjyQiE6r2\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926441,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 18\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"0316337C\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu30XjyQiE6r2/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu30XjyQiE6r2/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu30XjyQiE6r2/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu3QWf2TYrrKP\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926441,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 17\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"D67ECA24\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu3QWf2TYrrKP/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu3QWf2TYrrKP/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu3QWf2TYrrKP/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu3fAl8zS9DDe\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926440,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 16\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"5B623339\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu3fAl8zS9DDe/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu3fAl8zS9DDe/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu3fAl8zS9DDe/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu3UbSBVf4u0m\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926440,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 15\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"2E3A5018\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu3UbSBVf4u0m/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu3UbSBVf4u0m/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu3UbSBVf4u0m/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu37TJP9HqkF5\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926440,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 14\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"173133F0\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu37TJP9HqkF5/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu37TJP9HqkF5/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu37TJP9HqkF5/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2GryakFVunv\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926439,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 13\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"F70D6BE2\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2GryakFVunv/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2GryakFVunv/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2GryakFVunv/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2XHhifGBRhf\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926439,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 12\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"6D46720A\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2XHhifGBRhf/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2XHhifGBRhf/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2XHhifGBRhf/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu290VkNdC8xT\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926439,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 11\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"CBB33B0F\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu290VkNdC8xT/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu290VkNdC8xT/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu290VkNdC8xT/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2PIAUWiJJH6\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926439,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 10\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"6C921914\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2PIAUWiJJH6/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2PIAUWiJJH6/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2PIAUWiJJH6/tax_ids\"\
+        \n      }\n    }\n  ],\n  \"has_more\": true,\n  \"url\": \"/v1/customers\"\
+        \n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '12855'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:22 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_c2PGR1rh4klDbX
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_c2PGR1rh4klDbX", "request_duration_ms":
+        195}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: GET
+    uri: https://api.stripe.com/v1/customers?email=john.law%40doordash.com&limit=10&starting_after=cus_Gbu2PIAUWiJJH6
+  response:
+    body:
+      string: "{\n  \"object\": \"list\",\n  \"data\": [\n    {\n      \"id\": \"\
+        cus_Gbu2PyHTsCu0HO\",\n      \"object\": \"customer\",\n      \"address\"\
+        : null,\n      \"balance\": 0,\n      \"created\": 1579926438,\n      \"currency\"\
+        : null,\n      \"default_source\": null,\n      \"delinquent\": false,\n \
+        \     \"description\": \"customer 9\",\n      \"discount\": null,\n      \"\
+        email\": \"john.law@doordash.com\",\n      \"invoice_prefix\": \"BCEFF5B6\"\
+        ,\n      \"invoice_settings\": {\n        \"custom_fields\": null,\n     \
+        \   \"default_payment_method\": null,\n        \"footer\": null\n      },\n\
+        \      \"livemode\": false,\n      \"metadata\": {\n      },\n      \"name\"\
+        : null,\n      \"phone\": null,\n      \"preferred_locales\": [\n\n      ],\n\
+        \      \"shipping\": null,\n      \"sources\": {\n        \"object\": \"list\"\
+        ,\n        \"data\": [\n\n        ],\n        \"has_more\": false,\n     \
+        \   \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2PyHTsCu0HO/sources\"\
+        \n      },\n      \"subscriptions\": {\n        \"object\": \"list\",\n  \
+        \      \"data\": [\n\n        ],\n        \"has_more\": false,\n        \"\
+        total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2PyHTsCu0HO/subscriptions\"\
+        \n      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n      \
+        \  \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2PyHTsCu0HO/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2eQRentYSge\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926438,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 8\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"7BBD6DB8\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2eQRentYSge/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2eQRentYSge/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2eQRentYSge/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2JMqaOKAr3u\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926438,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 7\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"4523258B\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2JMqaOKAr3u/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2JMqaOKAr3u/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2JMqaOKAr3u/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2INdoXwaeiX\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926438,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 6\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"900DA478\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2INdoXwaeiX/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2INdoXwaeiX/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2INdoXwaeiX/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2DR9QwYjixQ\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926437,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 5\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"218530FF\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2DR9QwYjixQ/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2DR9QwYjixQ/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2DR9QwYjixQ/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2g3CT7kN1cM\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926437,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 4\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"0AB33496\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2g3CT7kN1cM/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2g3CT7kN1cM/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2g3CT7kN1cM/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2cwyBrAjk2m\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926437,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 3\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"CF51CF9D\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2cwyBrAjk2m/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2cwyBrAjk2m/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2cwyBrAjk2m/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2E4UQI5E4PO\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926436,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 2\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"6F4360B0\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2E4UQI5E4PO/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2E4UQI5E4PO/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2E4UQI5E4PO/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu2bSkRy5PNzy\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926436,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 1\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"7BC76E90\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu2bSkRy5PNzy/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu2bSkRy5PNzy/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu2bSkRy5PNzy/tax_ids\"\
+        \n      }\n    },\n    {\n      \"id\": \"cus_Gbu23bFfHkgNhM\",\n      \"\
+        object\": \"customer\",\n      \"address\": null,\n      \"balance\": 0,\n\
+        \      \"created\": 1579926436,\n      \"currency\": null,\n      \"default_source\"\
+        : null,\n      \"delinquent\": false,\n      \"description\": \"customer 0\"\
+        ,\n      \"discount\": null,\n      \"email\": \"john.law@doordash.com\",\n\
+        \      \"invoice_prefix\": \"AA46B0BF\",\n      \"invoice_settings\": {\n\
+        \        \"custom_fields\": null,\n        \"default_payment_method\": null,\n\
+        \        \"footer\": null\n      },\n      \"livemode\": false,\n      \"\
+        metadata\": {\n      },\n      \"name\": null,\n      \"phone\": null,\n \
+        \     \"preferred_locales\": [\n\n      ],\n      \"shipping\": null,\n  \
+        \    \"sources\": {\n        \"object\": \"list\",\n        \"data\": [\n\n\
+        \        ],\n        \"has_more\": false,\n        \"total_count\": 0,\n \
+        \       \"url\": \"/v1/customers/cus_Gbu23bFfHkgNhM/sources\"\n      },\n\
+        \      \"subscriptions\": {\n        \"object\": \"list\",\n        \"data\"\
+        : [\n\n        ],\n        \"has_more\": false,\n        \"total_count\":\
+        \ 0,\n        \"url\": \"/v1/customers/cus_Gbu23bFfHkgNhM/subscriptions\"\n\
+        \      },\n      \"tax_exempt\": \"none\",\n      \"tax_ids\": {\n       \
+        \ \"object\": \"list\",\n        \"data\": [\n\n        ],\n        \"has_more\"\
+        : false,\n        \"total_count\": 0,\n        \"url\": \"/v1/customers/cus_Gbu23bFfHkgNhM/tax_ids\"\
+        \n      }\n    }\n  ],\n  \"has_more\": false,\n  \"url\": \"/v1/customers\"\
+        \n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '12846'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:22 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_AHI4Ze1H159IZZ
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_AHI4Ze1H159IZZ", "request_duration_ms":
+        200}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu3OJ30MQx7p2
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3OJ30MQx7p2\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:22 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_saQQcZAJAJS8rD
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_saQQcZAJAJS8rD", "request_duration_ms":
+        325}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu30XjyQiE6r2
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu30XjyQiE6r2\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:23 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_SPamDQKnDqZbeV
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_SPamDQKnDqZbeV", "request_duration_ms":
+        413}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu3QWf2TYrrKP
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3QWf2TYrrKP\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:23 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_vt6hAd0xoe0MEr
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_vt6hAd0xoe0MEr", "request_duration_ms":
+        369}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu3fAl8zS9DDe
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3fAl8zS9DDe\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:23 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_74QfIYvqEe1DH6
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_74QfIYvqEe1DH6", "request_duration_ms":
+        446}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu3UbSBVf4u0m
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu3UbSBVf4u0m\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:24 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_CSfOKlhpLuVTKQ
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_CSfOKlhpLuVTKQ", "request_duration_ms":
+        409}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu37TJP9HqkF5
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu37TJP9HqkF5\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:24 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_ian52Y9vodQWxz
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_ian52Y9vodQWxz", "request_duration_ms":
+        406}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2GryakFVunv
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2GryakFVunv\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:25 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_FcA4MKssel0pBQ
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_FcA4MKssel0pBQ", "request_duration_ms":
+        410}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2XHhifGBRhf
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2XHhifGBRhf\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:25 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_9YJbdE7D1zHhm4
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_9YJbdE7D1zHhm4", "request_duration_ms":
+        301}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu290VkNdC8xT
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu290VkNdC8xT\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:25 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_dkHku7XB398Zqg
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_dkHku7XB398Zqg", "request_duration_ms":
+        513}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2PIAUWiJJH6
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2PIAUWiJJH6\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:26 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_snE7NmCslOOZwE
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_snE7NmCslOOZwE", "request_duration_ms":
+        411}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2PyHTsCu0HO
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2PyHTsCu0HO\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:26 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_g3iYCoEBhZ1eBK
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_g3iYCoEBhZ1eBK", "request_duration_ms":
+        407}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2eQRentYSge
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2eQRentYSge\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:27 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_zBpxCb7Ka4RVPF
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_zBpxCb7Ka4RVPF", "request_duration_ms":
+        411}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2JMqaOKAr3u
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2JMqaOKAr3u\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:27 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_nqSNS8d3TrbXm7
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_nqSNS8d3TrbXm7", "request_duration_ms":
+        408}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2INdoXwaeiX
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2INdoXwaeiX\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:27 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_2EyjwHC7DBX78a
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_2EyjwHC7DBX78a", "request_duration_ms":
+        408}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2DR9QwYjixQ
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2DR9QwYjixQ\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:28 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_w2wAAuA7najyxj
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_w2wAAuA7najyxj", "request_duration_ms":
+        409}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2g3CT7kN1cM
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2g3CT7kN1cM\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:28 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_9tftOsAaKA5AEL
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_9tftOsAaKA5AEL", "request_duration_ms":
+        485}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2cwyBrAjk2m
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2cwyBrAjk2m\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:29 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_mxrACwNokAdToE
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_mxrACwNokAdToE", "request_duration_ms":
+        535}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2E4UQI5E4PO
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2E4UQI5E4PO\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:29 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_xG4Tudp7t28olO
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_xG4Tudp7t28olO", "request_duration_ms":
+        410}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu2bSkRy5PNzy
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu2bSkRy5PNzy\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:30 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_6ln7bFOS6H37AU
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '0'
+      Stripe-Version:
+      - '2019-12-03'
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.32.1
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_6ln7bFOS6H37AU", "request_duration_ms":
+        408}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.32.1", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.5", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin MBP-0615 18.7.0 Darwin Kernel Version 18.7.0: Tue Aug 20
+        16:57:14 PDT 2019; root:xnu-4903.271.2~2/RELEASE_X86_64 x86_64 i386"}'
+      authorization:
+      - DUMMY
+    method: DELETE
+    uri: https://api.stripe.com/v1/customers/cus_Gbu23bFfHkgNhM
+  response:
+    body:
+      string: "{\n  \"id\": \"cus_Gbu23bFfHkgNhM\",\n  \"object\": \"customer\",\n\
+        \  \"deleted\": true\n}\n"
+    headers:
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - application/json
+      Date:
+      - Sat, 25 Jan 2020 04:27:30 GMT
+      Server:
+      - nginx
+      Strict-Transport-Security:
+      - max-age=31556926; includeSubDomains; preload
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-methods:
+      - GET, POST, HEAD, OPTIONS, DELETE
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - Request-Id, Stripe-Manage-Version, X-Stripe-External-Auth-Required, X-Stripe-Privileged-Session-Required
+      access-control-max-age:
+      - '300'
+      cache-control:
+      - no-cache, no-store
+      request-id:
+      - req_1eJXdWHJKBGkui
+      stripe-version:
+      - '2019-12-03'
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -93,6 +93,14 @@ class StripeRetrieveCustomerRequest(StripeBaseModel):
     id: str
 
 
+class StripeListCustomersRequest(StripeBaseModel):
+    email: Optional[str]
+    limit: Optional[int]
+    starting_after: Optional[str]
+    ending_before: Optional[str]
+    created: Optional[dict]
+
+
 class StripeUpdateCustomerRequest(StripeBaseModel):
     sid: str
     invoice_settings: InvoiceSettings
@@ -426,6 +434,17 @@ class Customer(StripeBaseModel):
     default_source: str
     description: str
     email: str
+
+
+class Customers(StripeBaseModel):
+    """
+    See: https://stripe.com/docs/api/customers/list
+    """
+
+    object: str
+    url: str
+    has_more: bool
+    data: List[Customer]
 
 
 class StripeDeleteCustomerResponse(StripeBaseModel):

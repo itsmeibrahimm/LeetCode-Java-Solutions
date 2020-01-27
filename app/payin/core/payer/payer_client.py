@@ -29,6 +29,8 @@ from app.commons.providers.stripe.stripe_models import (
     Customer,
     StripeDeleteCustomerRequest,
     StripeDeleteCustomerResponse,
+    Customers,
+    StripeListCustomersRequest,
 )
 from app.commons.types import CountryCode, PgpCode
 from app.commons.utils.uuid import generate_object_uuid
@@ -106,6 +108,24 @@ class PayerClient:
         self.log = log
         self.payer_repo = payer_repo
         self.stripe_async_client = stripe_async_client
+
+    async def pgp_get_customers(
+        self, email: str, country_code: CountryCode
+    ) -> List[Customer]:
+        has_more = None
+        customers_list: List[Customer] = []
+        while has_more is not False:
+            customers: Customers = await self.stripe_async_client.list_customers(
+                country=country_code,
+                request=StripeListCustomersRequest(
+                    email=email,
+                    limit=100,
+                    starting_after=None if has_more is None else customers.data[-1].id,
+                ),
+            )
+            has_more = customers.has_more
+            customers_list.extend(customers.data)
+        return customers_list
 
     async def pgp_delete_customer(
         self, country_code: CountryCode, pgp_customer_id: str

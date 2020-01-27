@@ -49,6 +49,16 @@ class StripeClientInterface(metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
+    def list_customers(
+        self, *, country: models.CountryCode, request: models.StripeListCustomersRequest
+    ) -> models.Customers:
+        """
+        List Stripe Customers
+        https://stripe.com/docs/api/customers/list
+        """
+        ...
+
+    @abc.abstractmethod
     def update_customer(
         self,
         *,
@@ -379,6 +389,15 @@ class StripeClient(StripeClientInterface):
             **self.settings_for(country), **request.dict(skip_defaults=True)
         )
         return customer
+
+    @tracing.track_breadcrumb(resource="customers", action="list")
+    def list_customers(
+        self, *, country: models.CountryCode, request: models.StripeListCustomersRequest
+    ) -> models.Customers:
+        customers = stripe.Customer.list(
+            **self.settings_for(country), **request.dict(skip_defaults=True)
+        )
+        return customers
 
     @tracing.track_breadcrumb(resource="customer", action="modify")
     def update_customer(
@@ -810,6 +829,13 @@ class StripeAsyncClient:
             country=country,
             request=request,
             idempotency_key=idempotency_key,
+        )
+
+    async def list_customers(
+        self, *, country: models.CountryCode, request: models.StripeListCustomersRequest
+    ) -> models.Customers:
+        return await self.executor_pool.submit(
+            self.stripe_client.list_customers, country=country, request=request
         )
 
     async def update_customer(

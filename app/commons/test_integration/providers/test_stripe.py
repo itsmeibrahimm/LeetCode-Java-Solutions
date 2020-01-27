@@ -3,6 +3,7 @@ import pytest
 from typing import List
 from app.commons.config.app_config import AppConfig
 from app.commons.providers.stripe.stripe_http_client import TimedRequestsClient
+from app.commons.providers.stripe.stripe_models import Customers
 from app.commons.utils.pool import ThreadPoolHelper
 from app.commons.utils.testing import Stat
 from app.commons.providers.stripe import stripe_http_client
@@ -70,6 +71,40 @@ class TestStripePoolStats:
             "country": "US",
             "resource": "customer",
             "action": "create",
+            "status_code": "200",
+            "request_status": "success",
+        }
+
+    async def test_list_customers(
+        self, stripe_async_client: StripeAsyncClient, get_mock_statsd_events
+    ):
+        await stripe_async_client.create_customer(
+            country=models.CountryCode.US,
+            request=models.StripeCreateCustomerRequest(
+                email="jane.doe@doordash.com", description="customer name"
+            ),
+        )
+
+        customers: Customers = await stripe_async_client.list_customers(
+            country=models.CountryCode.US,
+            request=models.StripeListCustomersRequest(email="jane.doe@doordash.com"),
+        )
+
+        """
+        Since we are checking here only pool functionality and not actual stripe calls,
+        we only check for length not individual values
+        """
+        assert len(customers.data) == 1
+
+        events: List[Stat] = get_mock_statsd_events()
+        assert len(events) == 2
+        event = events[-1]
+        assert event.stat_name == "dd.pay.payment-service.io.stripe-lib.latency"
+        assert event.tags == {
+            "provider_name": "stripe",
+            "country": "US",
+            "resource": "customers",
+            "action": "list",
             "status_code": "200",
             "request_status": "success",
         }
