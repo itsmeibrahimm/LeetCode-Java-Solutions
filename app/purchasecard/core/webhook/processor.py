@@ -72,7 +72,7 @@ class WebhookProcessor:
             transaction_type: str = transaction.type
             if transaction_type != "authorization":
                 doorstats_global.incr(
-                    "marqeta.transaction.payment.non_authorization_type.{}".format(
+                    "marqeta.transaction.non_authorization_type.{}".format(
                         transaction_type
                     )
                 )
@@ -80,9 +80,7 @@ class WebhookProcessor:
             transaction_token: str = transaction.token if transaction.token else "token"
             transaction_state: str = transaction.state if transaction.state else "state"
             doorstats_global.incr(
-                "marqeta.transaction.payment.{}.{}".format(
-                    transaction_type, transaction_state
-                )
+                "marqeta.transaction.{}.{}".format(transaction_type, transaction_state)
             )
             user_token: str = transaction.user_token if transaction.user_token else "user_token"
             if self.is_transaction_successful(transaction):
@@ -90,10 +88,11 @@ class WebhookProcessor:
                     transaction_token=transaction_token, timed_out=False
                 )
                 if not updated_tx:
-                    self.logger.error(
+                    self.logger.info(
                         "[update marqeta transaction token] cannot update this marqeta transaction",
                         transaction_token=transaction_token,
                     )
+                    doorstats_global.incr("marqeta.transaction.fail_to_update")
                     continue
                 results.append(
                     TransactionProcessResult(
