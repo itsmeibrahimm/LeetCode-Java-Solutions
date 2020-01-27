@@ -7,10 +7,10 @@ from typing import Any, Dict, Optional
 from app.commons.context.app_context import AppContext
 from app.commons.context.req_context import build_req_context
 from app.commons.types import CountryCode
-from app.payin.core.cart_payment.processor import (
-    CartPaymentInterface,
+from app.payin.core.cart_payment.commando_mode_processor import CommandoProcessor
+from app.payin.core.cart_payment.cart_payment_client import CartPaymentInterface
+from app.payin.core.cart_payment.legacy_cart_payment_client import (
     LegacyPaymentInterface,
-    CommandoProcessor,
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient

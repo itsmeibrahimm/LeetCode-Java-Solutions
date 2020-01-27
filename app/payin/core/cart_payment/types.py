@@ -4,6 +4,13 @@ from typing import List, NewType
 LegacyConsumerChargeId = NewType("LegacyConsumerChargeId", int)
 
 
+class IdempotencyKeyAction(Enum):
+    CREATE = "create"
+    ADJUST = "adjust"
+    CANCEL = "cancel"
+    REFUND = "refund"
+
+
 class CartType(str, Enum):
     UNKNOWN = "Unknown"
     ORDER_CART = "OrderCart"

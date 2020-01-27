@@ -25,10 +25,8 @@ from app.conftest import RuntimeContextManager, RuntimeSetter, StripeAPISettings
 # is marked as external.  The stripe simulator does not return the correct result since it does
 # persist state.
 from app.payin.core.cart_payment.model import LegacyStripeCharge
-from app.payin.core.cart_payment.processor import (
-    CartPaymentInterface,
-    CommandoProcessor,
-)
+from app.payin.core.cart_payment.commando_mode_processor import CommandoProcessor
+from app.payin.core.cart_payment.cart_payment_client import CartPaymentInterface
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.core.payment_method.types import CartPaymentSortKey, PgpPaymentInfo
 from app.payin.core.types import (
