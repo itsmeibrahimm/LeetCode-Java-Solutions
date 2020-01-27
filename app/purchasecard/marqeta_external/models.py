@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -38,6 +39,7 @@ class MarqetaProviderGetCardRequest(BaseModel):
     last4: str
 
 
+# marqeta card fields are not always consistent, we only map the useful ones
 class MarqetaProviderCard(BaseModel):
     created_time: datetime
     last_modified_time: datetime
@@ -45,13 +47,5 @@ class MarqetaProviderCard(BaseModel):
     user_token: str
     card_product_token: str
     last_four: str
-    pan: str
-    expiration: str
-    expiration_time: datetime
-    barcode: str
-    pin_is_set: bool
     state: CardState
-    state_reason: str
-    fulfillment_status: FulfillmentStatus
-    instrument_type: str
-    expedite: bool
+    state_reason: Optional[str]
