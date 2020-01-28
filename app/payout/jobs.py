@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, tzinfo
+from datetime import datetime, timedelta, tzinfo, timezone
 from typing import List
 from uuid import uuid4
 
@@ -14,6 +14,10 @@ from app.commons.jobs.pool import JobPool
 from app.payout.constants import (
     ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT,
     ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
+)
+from app.payout.core.transfer.processors.monitor_creating_status_transfer import (
+    MonitorCreatingStatusTransferRequest,
+    MonitorCreatingStatusTransfer,
 )
 from app.payout.core.transfer.processors.monitor_transfer_with_incorrect_status import (
     MonitorTransferWithIncorrectStatusRequest,
@@ -37,6 +41,7 @@ from app.payout.repository.bankdb.payment_account_edit_history import (
 from app.payout.repository.maindb.managed_account_transfer import (
     ManagedAccountTransferRepository,
 )
+from app.payout.repository.maindb.model.transfer import TransferStatus
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.instant_payout.models import (
@@ -169,7 +174,9 @@ class MonitorTransfersWithIncorrectStatus(Job):
             False,
         ):
             # Create a window of the last 7 days
-            start = self._start_of_the_week(date=datetime.utcnow()) - timedelta(weeks=1)
+            start = self._start_of_the_week(
+                date=datetime.now(timezone.utc)
+            ) - timedelta(weeks=1)
             stripe_transfer_repo = StripeTransferRepository(
                 database=job_instance_cxt.app_context.payout_maindb
             )
@@ -215,6 +222,57 @@ class MonitorTransfersWithIncorrectStatus(Job):
 
     def _start_of_the_week(self, date: datetime) -> datetime:
         return date - timedelta(days=date.weekday())
+
+
+class MonitorCreatingStatusTransfers(Job):
+    @property
+    def job_name(self) -> str:
+        return "MonitorCreatingStatusTransfers"
+
+    async def _trigger(self, job_instance_cxt: JobInstanceContext):
+        """Monitor job for monitoring transfers stuck in Creating status
+        Verify attached transactions and correct transfer status, submit transfer if needed
+        """
+        if runtime.get_bool(
+            "payout/feature-flags/enable_payment_service_monitor_creating_status_transfers.bool",
+            False,
+        ):
+            logger.info(
+                "[Monitor Creating Status Transfers Job] Start executing monitor creating status transfers job"
+            )
+            transfer_repo = TransferRepository(
+                database=job_instance_cxt.app_context.payout_maindb
+            )
+            transaction_repo = TransactionRepository(
+                database=job_instance_cxt.app_context.payout_bankdb
+            )
+            sixty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=60)
+            transfers, count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
+                status=TransferStatus.CREATING,
+                end_time=sixty_minutes_ago,
+                has_positive_amount=False,
+                offset=0,
+                limit=2000,
+                start_time=None,
+            )
+            logger.info(
+                "[Monitor Creating Status Transfers Job] Total transfers with 'creating' status",
+                transfer_count=count,
+            )
+            transfer_ids = [transfer.id for transfer in transfers]
+            monitor_creating_status_transfer_req = MonitorCreatingStatusTransferRequest(
+                transfer_ids=transfer_ids
+            )
+            monitor_creating_status_transfer_op = MonitorCreatingStatusTransfer(
+                transfer_repo=transfer_repo,
+                transaction_repo=transaction_repo,
+                logger=logger,
+                request=monitor_creating_status_transfer_req,
+                kafka_producer=job_instance_cxt.app_context.kafka_producer,
+            )
+            await job_instance_cxt.job_pool.spawn(
+                monitor_creating_status_transfer_op.execute(), cb=job_callback
+            )
 
 
 class RetryInstantPayoutInNew(Job):

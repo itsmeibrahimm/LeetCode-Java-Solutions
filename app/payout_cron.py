@@ -15,6 +15,7 @@ from app.payout.jobs import (
     MonitorTransfersWithIncorrectStatus,
     RetryInstantPayoutInNew,
     WeeklyCreateTransferJob,
+    MonitorCreatingStatusTransfers,
 )
 from app.payout.models import PayoutCountry, PayoutDay
 
@@ -90,7 +91,9 @@ app_context.monitor.add(
     interval_secs=app_config.MONITOR_INTERVAL_RESOURCE_JOB_POOL,
 )
 
-
+############################################
+# Payout Monitoring Jobs                   #
+############################################
 monitor_transfers_with_incorrect_status = MonitorTransfersWithIncorrectStatus(
     app_context=app_context, job_pool=job_pool
 )
@@ -107,6 +110,19 @@ elif app_config.ENVIRONMENT == "staging":
         trigger=CronTrigger(minute="*/30"),
     )
 
+monitor_creating_status_transfers = MonitorCreatingStatusTransfers(
+    app_context=app_context, job_pool=job_pool
+)
+scheduler.add_job(
+    func=monitor_creating_status_transfers.run,
+    name=monitor_creating_status_transfers.job_name,
+    trigger=CronTrigger(minute="*/10"),
+)
+
+
+############################################
+# Instant Pay Jobs                         #
+############################################
 retry_instant_pay_in_new = RetryInstantPayoutInNew(
     app_context=app_context, job_pool=job_pool
 )
@@ -118,6 +134,11 @@ if app_config.ENVIRONMENT == "prod":
         name=retry_instant_pay_in_new.job_name,
         trigger=CronTrigger(minute="*/30"),
     )
+
+
+############################################
+# Weekly Payout Jobs                       #
+############################################
 
 weekly_create_transfer_thursday = WeeklyCreateTransferJob(
     app_context=app_context,
