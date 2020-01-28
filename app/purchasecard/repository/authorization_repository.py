@@ -73,9 +73,19 @@ class AuthorizationRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_auth_requests_for_shift(self, shift_id: str) -> List[AuthRequest]:
+        pass
+
+    @abstractmethod
     async def update_auth_request_ttl(
         self, shift_id: str, delivery_id: str, store_id: str, ttl: int
     ) -> Optional[AuthRequest]:
+        pass
+
+    @abstractmethod
+    async def get_auth_request_states_for_multiple_auth_request(
+        self, ids: List[UUID]
+    ) -> List[AuthRequestState]:
         pass
 
 
@@ -246,6 +256,23 @@ class AuthorizationMasterRepository(
         result = await self._database.master().fetch_one(statement)
         return AuthRequest.from_row(result) if result else None
 
+    async def get_auth_requests_for_shift(self, shift_id: str) -> List[AuthRequest]:
+        stmt = select([text("*")]).where(auth_request.shift_id == shift_id)
+
+        results = await self._database.master().fetch_all(stmt)
+        return [AuthRequest.from_row(result) for result in results]
+
+    async def get_auth_request_states_for_multiple_auth_request(
+        self, ids: List[UUID]
+    ) -> List[AuthRequestState]:
+        stmt = select([text("*")]).where(
+            and_(auth_request_state.auth_request_id.in_(ids))
+        )
+
+        results = await self._database.master().fetch_all(stmt)
+
+        return [AuthRequestState.from_row(result) for result in results]
+
 
 @final
 @tracing.track_breadcrumb(repository_name="auth_request")
@@ -325,3 +352,20 @@ class AuthorizationReplicaRepository(
         self, shift_id: str, delivery_id: str, store_id: str, ttl: int
     ) -> Optional[AuthRequest]:
         raise NonValidReplicaOperation()
+
+    async def get_auth_requests_for_shift(self, shift_id: str) -> List[AuthRequest]:
+        stmt = select([text("*")]).where(auth_request.shift_id == shift_id)
+
+        results = await self._database.replica().fetch_all(stmt)
+        return [AuthRequest.from_row(result) for result in results]
+
+    async def get_auth_request_states_for_multiple_auth_request(
+        self, ids: List[UUID]
+    ) -> List[AuthRequestState]:
+        stmt = select([text("*")]).where(
+            and_(auth_request_state.auth_request_id.in_(ids))
+        )
+
+        results = await self._database.replica().fetch_all(stmt)
+
+        return [AuthRequestState.from_row(result) for result in results]

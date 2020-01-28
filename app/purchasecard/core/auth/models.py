@@ -20,3 +20,7 @@ class UpdatedAuthorization(BaseModel):
     state: str
     delivery_id: str
     shift_id: str
+
+
+class ClosedAuthorization(BaseModel):
+    num_success: int

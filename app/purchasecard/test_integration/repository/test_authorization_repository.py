@@ -282,3 +282,162 @@ class TestAuthorizationtMasterRepository:
                 store_id=fake_auth_request["store_id"],
                 ttl=None,
             )
+
+    async def test_get_auth_requests_for_shift(
+        self,
+        authorization_master_repo,
+        authorization_replica_repo,
+        unique_shift_delivery_store_id_generator: SimpleIntegerIdContainer,
+    ):
+        ids_one = unique_shift_delivery_store_id_generator.increment_random_id()
+
+        class AnnoyingMyPyDict(TypedDict):
+            auth_id: uuid.UUID
+            state_id: uuid.UUID
+            shift_id: str
+            delivery_id: str
+            store_id: str
+            store_city: str
+            store_business_name: str
+            subtotal: int
+            subtotal_tax: int
+            dasher_id: str
+
+        fake_auth_request: AnnoyingMyPyDict = {
+            "auth_id": uuid.uuid4(),
+            "state_id": uuid.uuid4(),
+            "shift_id": str(ids_one[0]),
+            "delivery_id": str(ids_one[1]),
+            "store_id": str(ids_one[2]),
+            "store_city": "Mountain View",
+            "store_business_name": "jazzy jasmine tea",
+            "subtotal": 3,
+            "subtotal_tax": 5,
+            "dasher_id": "7",
+        }
+        auth, auth_state = await authorization_master_repo.create_authorization(
+            **fake_auth_request
+        )
+
+        assert auth.expire_sec is None
+        assert auth_state.state == AuthRequestStateName.ACTIVE_CREATED
+
+        ids_two = unique_shift_delivery_store_id_generator.increment_random_id()
+
+        fake_auth_request_two: AnnoyingMyPyDict = {
+            "auth_id": uuid.uuid4(),
+            "state_id": uuid.uuid4(),
+            "shift_id": str(ids_two[0]),
+            "delivery_id": str(ids_two[1]),
+            "store_id": str(ids_two[2]),
+            "store_city": "Mountain View",
+            "store_business_name": "jazzy jasmine tea",
+            "subtotal": 3,
+            "subtotal_tax": 5,
+            "dasher_id": "7",
+        }
+        auth_2, auth_state_2 = await authorization_master_repo.create_authorization(
+            **fake_auth_request_two
+        )
+
+        assert auth_2.expire_sec is None
+        assert auth_state_2.state == AuthRequestStateName.ACTIVE_CREATED
+
+    async def test_get_auth_request_states_for_multiple_auth_request(
+        self,
+        authorization_master_repo,
+        authorization_replica_repo,
+        unique_shift_delivery_store_id_generator: SimpleIntegerIdContainer,
+    ):
+        ids = unique_shift_delivery_store_id_generator.increment_random_id()
+
+        class AnnoyingMyPyDict(TypedDict):
+            auth_id: uuid.UUID
+            state_id: uuid.UUID
+            shift_id: str
+            delivery_id: str
+            store_id: str
+            store_city: str
+            store_business_name: str
+            subtotal: int
+            subtotal_tax: int
+            dasher_id: str
+
+        fake_auth_request_one: AnnoyingMyPyDict = {
+            "auth_id": uuid.uuid4(),
+            "state_id": uuid.uuid4(),
+            "shift_id": str(ids[0]),
+            "delivery_id": str(ids[1]),
+            "store_id": str(ids[2]),
+            "store_city": "Mountain View",
+            "store_business_name": "jazzy jasmine tea",
+            "subtotal": 3,
+            "subtotal_tax": 5,
+            "dasher_id": "7",
+        }
+
+        ids = unique_shift_delivery_store_id_generator.increment_random_id()
+
+        fake_auth_request_two: AnnoyingMyPyDict = {
+            "auth_id": uuid.uuid4(),
+            "state_id": uuid.uuid4(),
+            "shift_id": str(ids[0]),
+            "delivery_id": str(ids[1]),
+            "store_id": str(ids[2]),
+            "store_city": "Mountain View",
+            "store_business_name": "jazzy jasmine tea",
+            "subtotal": 3,
+            "subtotal_tax": 5,
+            "dasher_id": "7",
+        }
+
+        auth_one, auth_state_one = await authorization_master_repo.create_authorization(
+            **fake_auth_request_one
+        )
+
+        auth_two, auth_state_two = await authorization_master_repo.create_authorization(
+            **fake_auth_request_two
+        )
+
+        class AnnoyingMyPyDictTwo(TypedDict):
+            state_id: uuid.UUID
+            auth_id: uuid.UUID
+            state: AuthRequestStateName
+            subtotal: int
+            subtotal_tax: int
+
+        fake_auth_state_request: AnnoyingMyPyDictTwo = {
+            "auth_id": fake_auth_request_two["auth_id"],
+            "state_id": uuid.uuid4(),
+            "state": AuthRequestStateName.CLOSED_CONSUMED,
+            "subtotal": 300,
+            "subtotal_tax": 24,
+        }
+
+        create_auth_request_state_result = await authorization_master_repo.create_auth_request_state(
+            **fake_auth_state_request
+        )
+
+        auth_request_states = await authorization_master_repo.get_auth_request_states_for_multiple_auth_request(
+            [fake_auth_request_one["auth_id"], fake_auth_request_two["auth_id"]]
+        )
+
+        auth_request_states_replica = await authorization_replica_repo.get_auth_request_states_for_multiple_auth_request(
+            [fake_auth_request_one["auth_id"], fake_auth_request_two["auth_id"]]
+        )
+
+        expected_ids = set(
+            [auth_state_one.id, auth_state_two.id, create_auth_request_state_result.id]
+        )
+
+        assert expected_ids == set([state.id for state in auth_request_states])
+        assert expected_ids == set([state.id for state in auth_request_states_replica])
+        assert len(auth_request_states) == 3
+        assert len(auth_request_states_replica) == 3
+
+        auth_request_state_one_id = await authorization_master_repo.get_auth_request_states_for_multiple_auth_request(
+            [fake_auth_request_one["auth_id"]]
+        )
+        expected_ids = set([auth_state_one.id])
+        assert expected_ids == set([state.id for state in auth_request_state_one_id])
+        assert len(auth_request_state_one_id) == 1

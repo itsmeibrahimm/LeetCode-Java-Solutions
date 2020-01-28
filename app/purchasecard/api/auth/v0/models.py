@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -52,3 +52,12 @@ class CloseAuthRequest(BaseModel):
 
 class CloseAuthResponse(BaseModel):
     state: str
+
+
+class CloseAllAuthRequest(BaseModel):
+    shift_id: str
+
+
+class CloseAllAuthResponse(BaseModel):
+    states: List[str]
+    num_success: int

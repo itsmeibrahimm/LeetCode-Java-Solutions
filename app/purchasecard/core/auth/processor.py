@@ -1,3 +1,4 @@
+from itertools import filterfalse
 from typing import Optional, List
 from uuid import uuid4
 
@@ -149,3 +150,54 @@ class AuthProcessor:
         )
 
         return created_state.state
+
+    async def close_all_auth(self, shift_id: str) -> List[AuthRequestStateName]:
+        auth_requests: List[
+            AuthRequest
+        ] = await self.authorization_master_repo.get_auth_requests_for_shift(
+            shift_id=shift_id
+        )
+
+        ids = [auth_request.id for auth_request in auth_requests]
+
+        jumbled_auth_request_states: List[
+            AuthRequestState
+        ] = await self.authorization_master_repo.get_auth_request_states_for_multiple_auth_request(
+            ids
+        )
+
+        results = []
+
+        for auth_request in auth_requests:
+            relevant_states = [
+                auth_request_state
+                for auth_request_state in filterfalse(
+                    lambda state: state.auth_request_id != auth_request.id,
+                    jumbled_auth_request_states,
+                )
+            ]
+
+            latest_state = AuthProcessor._get_latest_auth_request_state(relevant_states)
+
+            if latest_state.state != AuthRequestStateName.CLOSED_MANUAL:
+                created_state: AuthRequestState = await self.authorization_master_repo.create_auth_request_state(
+                    state_id=uuid4(),
+                    auth_id=auth_request.id,
+                    state=AuthRequestStateName.CLOSED_MANUAL,
+                    subtotal=latest_state.subtotal,
+                    subtotal_tax=latest_state.subtotal_tax,
+                )
+                results.append(created_state.state)
+
+        return results
+
+    @classmethod
+    def _get_latest_auth_request_state(
+        self, auth_request_states: List[AuthRequestState]
+    ):
+        def sort_date(val: AuthRequestState):
+            return val.created_at
+
+        auth_request_states.sort(key=sort_date, reverse=True)
+
+        return auth_request_states[0]

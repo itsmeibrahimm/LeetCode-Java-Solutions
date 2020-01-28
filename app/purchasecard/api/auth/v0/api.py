@@ -1,6 +1,13 @@
+from typing import List
+
 from fastapi import APIRouter, Depends
 
-from app.purchasecard.api.auth.v0.models import UpdateAuthResponse, UpdateAuthRequest
+from app.purchasecard.api.auth.v0.models import (
+    UpdateAuthResponse,
+    UpdateAuthRequest,
+    CloseAllAuthRequest,
+    CloseAllAuthResponse,
+)
 from starlette.status import (
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_201_CREATED,
@@ -122,6 +129,10 @@ async def update_auth(
     status_code=HTTP_200_OK,
     operation_id="CloseAuth",
     response_model=CloseAuthResponse,
+    responses={
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
     tags=api_tags,
 )
 async def close_auth(
@@ -138,6 +149,52 @@ async def close_auth(
         status = HTTP_500_INTERNAL_SERVER_ERROR
         if e.error_code == AuthProcessorErrorCodes.AUTH_REQUEST_NOT_FOUND_ERROR:
             status = HTTP_404_NOT_FOUND
+        raise PaymentException(
+            http_status_code=status,
+            error_code=e.error_code,
+            error_message=e.error_message,
+            retryable=e.retryable,
+        )
+
+
+@router.post(
+    "/close/all",
+    status_code=HTTP_200_OK,
+    operation_id="CloseAllAuth",
+    response_model=CloseAllAuthResponse,
+    responses={
+        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
+    },
+    tags=api_tags,
+)
+async def close_all_auth(
+    request: CloseAllAuthRequest,
+    container: PurchaseCardContainer = Depends(PurchaseCardContainer),
+):
+    try:
+        auth_processor: AuthProcessor = container.auth_processor
+        result: List[AuthRequestStateName] = await auth_processor.close_all_auth(
+            shift_id=request.shift_id
+        )
+        num_states = len(result)
+        num_success = len(
+            [
+                r
+                for r in filter(
+                    lambda x: x == AuthRequestStateName.CLOSED_MANUAL, result
+                )
+            ]
+        )
+        if num_success != num_states:
+            container.logger.warn(
+                "Number of states != number of success for close all auth",
+                num_states=num_states,
+                num_success=num_success,
+            )
+        return CloseAllAuthResponse(states=result, num_success=num_success)
+    except PaymentError as e:
+        status = HTTP_500_INTERNAL_SERVER_ERROR
         raise PaymentException(
             http_status_code=status,
             error_code=e.error_code,
