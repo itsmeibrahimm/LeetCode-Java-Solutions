@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, desc
 from sqlalchemy.sql import text
 from typing_extensions import final
 from typing import Optional
@@ -48,6 +48,12 @@ class MarqetaTransactionRepositoryInterface(ABC):
     async def has_associated_marqeta_transaction(
         self, delivery_id: int, ignore_timed_out: bool
     ) -> bool:
+        pass
+
+    @abstractmethod
+    async def get_last_transaction_by_delivery_id(
+        self, delivery_id: int
+    ) -> Optional[MarqetaTransaction]:
         pass
 
 
@@ -163,3 +169,14 @@ class MarqetaTransactionRepository(
             )
         result = await self._database.replica().fetch_value(stmt)
         return True if result else False
+
+    async def get_last_transaction_by_delivery_id(
+        self, delivery_id: int
+    ) -> Optional[MarqetaTransaction]:
+        stmt = (
+            select([text("*")])
+            .where(marqeta_transactions.delivery_id == delivery_id)
+            .order_by(desc(marqeta_transactions.id))
+        )
+        result = await self._database.replica().fetch_one(stmt)
+        return MarqetaTransaction.from_row(result) if result else None

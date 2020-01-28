@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Column, Integer, DateTime, Text
 from typing_extensions import final
 
-from app.commons.database.model import TableDefinition
+from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -21,3 +23,16 @@ class MarqetaTransactionEventTable(TableDefinition):
     shift_id: Column = no_init_field(Column("shift_id", Integer))
     raw_type: Column = no_init_field(Column("raw_type", Text))
     card_acceptor_id: Column = no_init_field(Column("card_acceptor_id", Integer))
+
+
+class MarqetaTransactionEvent(DBEntity):
+    id: int
+    created_at: datetime
+    token: str
+    amount: int
+    transaction_type: str
+    metadata: str
+    ownership_id: int
+    shift_id: Optional[int]
+    raw_type: str
+    card_acceptor_id: Optional[int]

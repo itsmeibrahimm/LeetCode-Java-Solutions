@@ -33,6 +33,68 @@ class StoreMastercardDataNotFoundError(PaymentError[StoreMastercardDataErrorCode
         )
 
 
+class MarqetaTransactionErrorCode(str, Enum):
+    MARQEATA_TRANSACTION_NOT_FOUND_ERROR = "marqeta_transaction_not_found_error"
+
+
+marqeta_transaction_error_message_maps = {
+    MarqetaTransactionErrorCode.MARQEATA_TRANSACTION_NOT_FOUND_ERROR: "Unable to find Marqeta transaction for given input"
+}
+
+
+class MarqetaTransactionNotFoundError(PaymentError[MarqetaTransactionErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaTransactionErrorCode.MARQEATA_TRANSACTION_NOT_FOUND_ERROR,
+            error_message=marqeta_transaction_error_message_maps[
+                MarqetaTransactionErrorCode.MARQEATA_TRANSACTION_NOT_FOUND_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaTransactionEventErrorCode(str, Enum):
+    MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR = "marqeta_transaction_not_found_error"
+
+
+marqeta_transaction_event_error_message_maps = {
+    MarqetaTransactionEventErrorCode.MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR: "Unable to find Marqeta transaction event for given input"
+}
+
+
+class MarqetaTransactionEventNotFoundError(
+    PaymentError[MarqetaTransactionEventErrorCode]
+):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaTransactionEventErrorCode.MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR,
+            error_message=marqeta_transaction_event_error_message_maps[
+                MarqetaTransactionEventErrorCode.MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaCardOwnershipErrorCode(str, Enum):
+    CARD_OWNERSHIP_NOT_FOUND_ERROR = "card_ownership_not_found_error"
+
+
+card_ownership_error_message_maps = {
+    MarqetaCardOwnershipErrorCode.CARD_OWNERSHIP_NOT_FOUND_ERROR: "Unable to find card ownership for given input"
+}
+
+
+class MarqetaCardOwnershipNotFoundError(PaymentError[MarqetaTransactionEventErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaCardOwnershipErrorCode.CARD_OWNERSHIP_NOT_FOUND_ERROR,
+            error_message=card_ownership_error_message_maps[
+                MarqetaCardOwnershipErrorCode.CARD_OWNERSHIP_NOT_FOUND_ERROR
+            ],
+            retryable=False,
+        )
+
+
 ###########################################################
 # JITFunding Errors
 ###########################################################

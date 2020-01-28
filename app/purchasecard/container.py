@@ -6,6 +6,7 @@ from app.purchasecard.core.auth.processor import AuthProcessor
 from app.purchasecard.core.card.processor import CardProcessor
 from app.purchasecard.core.exemption.processor import ExemptionProcessor
 from app.purchasecard.core.store_metadata.processor import CardPaymentMetadataProcessor
+from app.purchasecard.core.transaction_event.processor import TransactionEventProcessor
 from app.purchasecard.core.user.processor import UserProcessor
 from app.purchasecard.core.webhook.processor import WebhookProcessor
 from app.purchasecard.core.transaction.processor import TransactionProcessor
@@ -18,6 +19,7 @@ from app.purchasecard.repository.authorization_repository import (
     AuthorizationMasterRepository,
     AuthorizationReplicaRepository,
 )
+from app.purchasecard.repository.card_acceptor import CardAcceptorRepository
 from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
 from app.purchasecard.repository.marqeta_card import MarqetaCardRepository
 from app.purchasecard.repository.marqeta_decline_exemption import (
@@ -31,6 +33,9 @@ from app.purchasecard.repository.marqeta_card_transition import (
     MarqetaCardTransitionRepository,
 )
 from app.commons.providers.dsj_client import DSJClient
+from app.purchasecard.repository.marqeta_transaction_event import (
+    MarqetaTransactionEventRepository,
+)
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
 )
@@ -107,6 +112,14 @@ class PurchaseCardContainer:
         )
 
     @property
+    def transaction_event_processor(self) -> TransactionEventProcessor:
+        return TransactionEventProcessor(
+            transaction_repo=self.marqeta_transaction_repository,
+            transaction_event_repo=self.marqeta_transition_event_repository,
+            card_acceptor_repo=self.card_acceptor_repository,
+        )
+
+    @property
     def exemption_processor(self) -> ExemptionProcessor:
         return ExemptionProcessor(
             delivery_funding_repo=self.delivery_funding_repository,
@@ -132,12 +145,22 @@ class PurchaseCardContainer:
         )
 
     @property
+    def marqeta_transition_event_repository(self) -> MarqetaTransactionEventRepository:
+        return MarqetaTransactionEventRepository(
+            database=self.app_context.purchasecard_maindb
+        )
+
+    @property
     def delivery_funding_repository(self) -> DeliveryFundingRepository:
         return DeliveryFundingRepository(database=self.app_context.purchasecard_maindb)
 
     @property
     def marqeta_card_repository(self) -> MarqetaCardRepository:
         return MarqetaCardRepository(database=self.app_context.purchasecard_maindb)
+
+    @property
+    def card_acceptor_repository(self) -> CardAcceptorRepository:
+        return CardAcceptorRepository(database=self.app_context.purchasecard_maindb)
 
     @property
     def marqeta_card_ownership_repository(self) -> MarqetaCardOwnershipRepository:

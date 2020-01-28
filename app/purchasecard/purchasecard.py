@@ -15,6 +15,7 @@ from app.purchasecard.api import (
     transaction,
     exemption,
     store_metadata,
+    transaction_event,
 )
 
 
@@ -47,6 +48,7 @@ def make_purchasecard_v0_marqeta_app(context: AppContext, config: AppConfig) -> 
             "/auth": auth.v0.router,
             "/exemption": exemption.v0.router,
             "/store_metadata": store_metadata.v0.router,
+            "/transaction_event": transaction_event.v0.router,
         }
     ).attach_to_app(
         app_v0

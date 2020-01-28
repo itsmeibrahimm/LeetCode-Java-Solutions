@@ -3,18 +3,31 @@ from uuid import uuid4
 
 import requests
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Dict, Any
 from unittest.mock import MagicMock
 
+from app.purchasecard.constants import MARQETA_TRANSACTION_EVENT_TRANSACTION_TYPE
 from app.purchasecard.marqeta_external.models import MarqetaProviderCard
+from app.purchasecard.models.maindb.card_acceptor import CardAcceptor
 from app.purchasecard.models.maindb.delivery_funding import DeliveryFunding
+from app.purchasecard.models.maindb.marqeta_card_ownership import MarqetaCardOwnership
 from app.purchasecard.models.maindb.marqeta_decline_exemption import (
     MarqetaDeclineExemption,
 )
+from app.purchasecard.models.maindb.marqeta_transaction_event import (
+    MarqetaTransactionEvent,
+)
 from app.purchasecard.models.maindb.store_mastercard_data import StoreMastercardData
+from app.purchasecard.repository.card_acceptor import CardAcceptorRepository
 from app.purchasecard.repository.delivery_funding import DeliveryFundingRepository
+from app.purchasecard.repository.marqeta_card_ownership import (
+    MarqetaCardOwnershipRepository,
+)
 from app.purchasecard.repository.marqeta_decline_exemption import (
     MarqetaDeclineExemptionRepository,
+)
+from app.purchasecard.repository.marqeta_transaction_event import (
+    MarqetaTransactionEventRepository,
 )
 from app.purchasecard.repository.store_mastercard_data import (
     StoreMastercardDataRepository,
@@ -198,6 +211,85 @@ async def prepare_and_insert_marqeta_decline_exemption(
     assert decline_exemption.id
     validate_expected_items_in_dict(expected=data, actual=decline_exemption.dict())
     return decline_exemption
+
+
+async def prepare_and_insert_card_ownership(
+    marqeta_card_ownership_repo: MarqetaCardOwnershipRepository,
+    dasher_id: int,
+    card_id: str,
+) -> MarqetaCardOwnership:
+    data = {"card_id": card_id, "dasher_id": dasher_id}
+    card_ownership = await marqeta_card_ownership_repo.create_card_ownership(
+        dasher_id=dasher_id, card_id=card_id
+    )
+    assert card_ownership.id
+    validate_expected_items_in_dict(expected=data, actual=card_ownership.dict())
+    return card_ownership
+
+
+async def prepare_and_insert_card_acceptor(
+    card_acceptor_repo: CardAcceptorRepository,
+    mid: str,
+    name: str,
+    city: str,
+    zip_code: str,
+    state: str,
+    should_be_examined: Optional[bool] = False,
+) -> CardAcceptor:
+    data = {
+        "mid": mid,
+        "name": name,
+        "city": city,
+        "state": state,
+        "zip_code": zip_code,
+        "is_blacklisted": False,
+        "should_be_examined": should_be_examined,
+    }
+    card_acceptor = await card_acceptor_repo.create_card_acceptor(
+        mid=mid,
+        name=name,
+        city=city,
+        zip_code=zip_code,
+        state=state,
+        should_be_examined=should_be_examined,
+    )
+    assert card_acceptor.id
+    validate_expected_items_in_dict(expected=data, actual=card_acceptor.dict())
+    return card_acceptor
+
+
+async def prepare_and_insert_marqeta_transaction_event(
+    transaction_event_repo: MarqetaTransactionEventRepository,
+    token: str,
+    amount: int,
+    metadata: Dict[str, Any],
+    raw_type: str,
+    ownership_id: int,
+    shift_id: Optional[int] = None,
+    card_acceptor_id: Optional[int] = None,
+) -> MarqetaTransactionEvent:
+    data = {
+        "token": token,
+        "metadata": json.dumps(metadata),
+        "raw_type": raw_type,
+        "ownership_id": ownership_id,
+        "transaction_type": MARQETA_TRANSACTION_EVENT_TRANSACTION_TYPE,
+        "shift_id": shift_id,
+        "card_acceptor_id": card_acceptor_id,
+        "amount": amount,
+    }
+    transaction_event = await transaction_event_repo.create_transaction_event(
+        token=token,
+        metadata=metadata,
+        raw_type=raw_type,
+        ownership_id=ownership_id,
+        shift_id=shift_id,
+        card_acceptor_id=card_acceptor_id,
+        amount=amount,
+    )
+    assert transaction_event.id
+    validate_expected_items_in_dict(expected=data, actual=transaction_event.dict())
+    return transaction_event
 
 
 class FunctionMock(MagicMock):

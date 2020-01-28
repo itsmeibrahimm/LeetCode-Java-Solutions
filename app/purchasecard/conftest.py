@@ -47,6 +47,22 @@ def mock_marqeta_transaction_repo():
 
 
 @pytest.fixture
+def mock_marqeta_transaction_event_repo():
+    mock_marqeta_transaction_event_repo = mock.patch(
+        "app.purchasecard.repository.marqeta_transaction_event.MarqetaTransactionEventRepository"
+    )
+    return mock_marqeta_transaction_event_repo
+
+
+@pytest.fixture
+def mock_card_acceptor_repo():
+    mock_card_acceptor_repo = mock.patch(
+        "app.purchasecard.repository.card_acceptor.CardAcceptorRepository"
+    )
+    return mock_card_acceptor_repo
+
+
+@pytest.fixture
 def mock_delivery_funding_repo():
     mock_delivery_funding_repo = mock.patch(
         "app.purchasecard.repository.delivery_funding.DeliveryFundingRepository"

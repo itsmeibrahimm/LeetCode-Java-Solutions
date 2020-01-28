@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Column, Integer, DateTime, Text, Boolean
 from typing_extensions import final
 
-from app.commons.database.model import TableDefinition
+from app.commons.database.model import TableDefinition, DBEntity
 from app.commons.utils.dataclass_extensions import no_init_field
 
 
@@ -21,3 +23,16 @@ class CardAcceptorTable(TableDefinition):
     is_blacklisted: Column = no_init_field(Column("is_blacklisted", Boolean))
     blacklisted_by_id: Column = no_init_field(Column("blacklisted_by_id", Integer))
     should_be_examined: Column = no_init_field(Column("should_be_examined", Boolean))
+
+
+class CardAcceptor(DBEntity):
+    id: int
+    created_at: datetime
+    mid: str
+    name: str
+    city: str
+    zip_code: str
+    state: str
+    is_blacklisted: bool
+    blacklisted_by_id: Optional[int]
+    should_be_examined: bool
