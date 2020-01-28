@@ -1,6 +1,7 @@
 import inspect
 import json
 import logging
+import time
 from typing import Optional
 from uuid import uuid4
 
@@ -132,7 +133,23 @@ class BaseTask:
             )
 
     async def send(self, kafka_producer: KafkaMessageProducer):
-        await kafka_producer.produce(self.topic_name, self.serialize().encode())
+        start = time.time()
+
+        def ack(err, msg):
+            if err:
+                log.error(
+                    "[BaseTask send] Failed to deliver message from Producer.",
+                    extra={"err": err},
+                )
+            else:
+                elapsed_ms = (time.time() - start) * 1000
+                log.info(
+                    "[BaseTask send] Sent a message.", extra={"elapsed_ms": elapsed_ms}
+                )
+
+        kafka_producer.produce(
+            self.topic_name, self.serialize().encode(), on_delivery=ack
+        )
 
     @staticmethod
     async def run(app_context: AppContext, data: dict):

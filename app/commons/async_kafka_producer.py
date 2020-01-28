@@ -21,7 +21,7 @@ class KafkaMessageProducer:
         self._cancelled = True
         self._poll_thread.join(timeout=3)
 
-    def produce(self, topic, value):
+    def produce(self, topic, value, on_delivery=None):
         """
         An awaitable produce method.
         """
@@ -34,6 +34,8 @@ class KafkaMessageProducer:
                 )
             else:
                 self._loop.call_soon_threadsafe(result.set_result, msg)
+            if on_delivery:
+                self._loop.call_soon_threadsafe(on_delivery, err, msg)
 
         self._producer.produce(topic, value, on_delivery=ack)
         return result
