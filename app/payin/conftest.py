@@ -18,6 +18,7 @@ from app.payin.core.cart_payment.types import (
     LegacyConsumerChargeId,
 )
 from app.payin.core.payer.model import Payer, PayerCorrelationIds
+from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -57,7 +58,7 @@ async def payment_intent(
     )
 
     payment_method_processor = PaymentMethodProcessor()
-    payment_method = await payment_method_processor.create_payment_method(
+    raw_payment_method: RawPaymentMethod = await payment_method_processor.create_payment_method(
         pgp_code=PgpCode.STRIPE,
         token="tok_visa",
         payer_lookup_id=payer.id,
@@ -66,6 +67,8 @@ async def payment_intent(
         is_scanned=False,
         is_active=True,
     )
+
+    payment_method: PaymentMethod = raw_payment_method.to_payment_method()
 
     payment_intent = PaymentIntentFactory(
         status=IntentStatus.REQUIRES_CAPTURE.value, payment_method_id=payment_method.id

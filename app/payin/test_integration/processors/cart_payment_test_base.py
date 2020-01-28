@@ -29,7 +29,7 @@ from app.payin.core.cart_payment.types import (
 from app.payin.core.exceptions import CartPaymentCreateError
 from app.payin.core.payer.model import Payer
 from app.payin.core.payer.v1.processor import PayerProcessorV1
-from app.payin.core.payment_method.model import PaymentMethod
+from app.payin.core.payment_method.model import PaymentMethod, RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import LegacyPaymentMethodInfo
 from app.payin.core.types import PayerReferenceIdType
@@ -562,7 +562,7 @@ class CartPaymentTest(CartPaymentTestBase):
     async def payment_method(
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
-        return await payment_method_processor.create_payment_method(
+        raw_payment_method: RawPaymentMethod = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_mastercard",
             set_default=True,
@@ -571,6 +571,7 @@ class CartPaymentTest(CartPaymentTestBase):
             payer_lookup_id=payer.id,
             payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
         )
+        return raw_payment_method.to_payment_method()
 
     async def _prepare_cart_payment(
         self,
@@ -638,7 +639,7 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
         assert payer.payment_gateway_provider_customers
-        return await payment_method_processor.create_payment_method(
+        raw_payment_method: RawPaymentMethod = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_mastercard",
             set_default=True,
@@ -652,6 +653,7 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
                 legacy_dd_stripe_customer_id=payer.legacy_dd_stripe_customer_id,
             ),
         )
+        return raw_payment_method.to_payment_method()
 
     async def _prepare_cart_payment(
         self,

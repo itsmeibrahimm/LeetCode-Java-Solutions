@@ -90,7 +90,7 @@ class PaymentMethodProcessor:
         payer_lookup_id: Optional[MixedUuidStrType] = None,
         payer_lookup_id_type: Optional[PayerReferenceIdType] = None,
         legacy_payment_method_info: Optional[LegacyPaymentMethodInfo] = None,
-    ) -> PaymentMethod:
+    ) -> RawPaymentMethod:
         """
         Create payment method and attach to payer.
 
@@ -102,7 +102,7 @@ class PaymentMethodProcessor:
         :param payer_lookup_id: DoorDash payer_lookup_id id.
         :param payer_lookup_id_type: DoorDash payer_reference_id_type id.
         :param legacy_payment_method_info: legacy payment method info.
-        :return: PaymentMethod object
+        :return: RawPaymentMethod object
         """
 
         pgp_customer_res_id: Optional[str] = None
@@ -198,7 +198,7 @@ class PaymentMethodProcessor:
                     dd_consumer_id=dd_consumer_id,
                     pgp_payment_method_res_id=stripe_payment_method.id,
                 )
-                return exist_pm.to_payment_method()
+                return exist_pm
 
         # step 4: attach PGP payment_method
         attach_stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_attach_payment_method(
@@ -254,7 +254,7 @@ class PaymentMethodProcessor:
                         payment_method_id=raw_payment_method.payment_method_id,
                     ),
                 )
-        return raw_payment_method.to_payment_method()
+        return raw_payment_method
 
     async def get_payment_method(
         self,
