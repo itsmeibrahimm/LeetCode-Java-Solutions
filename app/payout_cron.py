@@ -163,6 +163,43 @@ if app_config.ENVIRONMENT == "prod":
             day_of_week="mon", hour="1, 3", timezone=pytz.timezone("US/Pacific")
         ),
     )
+if runtime.get_bool(
+    "payout/feature-flags/enable_payment_service_aus_weekly_payout.bool", False
+):
+    weekly_create_transfer_aus_monday = WeeklyCreateTransferJob(
+        app_context=app_context,
+        job_pool=job_pool,
+        payout_countries=[PayoutCountry.AUSTRALIA],
+        payout_country_timezone=pytz.timezone("Australia/Melbourne"),
+        payout_day=PayoutDay.MONDAY,
+    )
+    scheduler.add_job(
+        func=weekly_create_transfer_aus_monday.run,
+        name=weekly_create_transfer_aus_monday.job_name,
+        trigger=CronTrigger(
+            day_of_week="mon",
+            hour="1, 4",
+            timezone=pytz.timezone("Australia/Melbourne"),
+        ),
+    )
+
+    weekly_create_transfer_aus_thursday = WeeklyCreateTransferJob(
+        app_context=app_context,
+        job_pool=job_pool,
+        payout_countries=[PayoutCountry.AUSTRALIA],
+        payout_country_timezone=pytz.timezone("Australia/Melbourne"),
+        payout_day=PayoutDay.THURSDAY,
+    )
+
+    scheduler.add_job(
+        func=weekly_create_transfer_aus_thursday.run,
+        name=weekly_create_transfer_aus_thursday.job_name,
+        trigger=CronTrigger(
+            day_of_week="thu",
+            hour="1, 4",
+            timezone=pytz.timezone("Australia/Melbourne"),
+        ),
+    )
 
 scheduler.add_job(
     scheduler_heartbeat,
