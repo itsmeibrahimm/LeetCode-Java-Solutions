@@ -4,8 +4,8 @@ from starlette.status import HTTP_200_OK
 from app.purchasecard.api.jit_funding.v0.models import (
     JITFunding,
     MarqetaJITFundingResponse,
+    MarqetaJITFundingRequest,
 )
-from app.purchasecard.api.webhook.v0.models import MarqetaWebhookRequest
 from app.purchasecard.container import PurchaseCardContainer
 
 api_tags = ["JitFundingV0"]
@@ -20,9 +20,8 @@ router = APIRouter()
     tags=api_tags,
 )
 def marqeta_webhook(
-    request: MarqetaWebhookRequest,
+    request: MarqetaJITFundingRequest,
     dependency_container: PurchaseCardContainer = Depends(PurchaseCardContainer),
 ):
-    logger = dependency_container.logger
-    logger.info("Rcvd marqeta webhook request", request=request)
-    return MarqetaJITFundingResponse(jit_funding=JITFunding())
+    jit_funding: JITFunding = request.gpa_order.jit_funding
+    return MarqetaJITFundingResponse(jit_funding=jit_funding)
