@@ -73,6 +73,14 @@ class BaseTask:
         return WeeklyCreateTransferTask
 
     @staticmethod
+    def daily_create_transfers_by_business_task():
+        from app.payout.core.transfer.tasks.daily_create_transfers_by_business_task import (
+            DailyCreateTransfersByBusinessTask,
+        )
+
+        return DailyCreateTransfersByBusinessTask
+
+    @staticmethod
     def monitor_transfer_with_incorrect_status_task():
         from app.payout.core.transfer.tasks.monitor_transfer_with_incorrect_status_task import (
             MonitorTransferWithIncorrectStatusTask,
@@ -95,6 +103,7 @@ class BaseTask:
             "submit_transfer": self.submit_transfer_task(),
             "monitor_transfer_with_incorrect_status": self.monitor_transfer_with_incorrect_status_task(),
             "update_transfer_by_stripe_transfer_status": self.update_transfer_by_stripe_transfer_status_task(),
+            "daily_create_transfers_by_business": self.daily_create_transfers_by_business_task(),
         }
 
         task = task_type_mapping.get(self.task_type, None)

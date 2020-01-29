@@ -44,15 +44,16 @@ ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT = (
 
 WEEKLY_TRANSFER_PAYOUT_BUSINESS_IDS_MAPPING = {
     "monday": "payout/feature-flags/WEEKLY_TRANSFER_MONDAY_PAYOUT_BUSINESS_IDS.json",
-    "tuesday": "payments/feature-flags/WEEKLY_TRANSFER_TUESDAY_PAYOUT_BUSINESS_IDS.json",
-    "wednesday": "payments/feature-flags/WEEKLY_TRANSFER_WEDNESDAY_PAYOUT_BUSINESS_IDS.json",
-    "thursday": "payments/feature-flags/WEEKLY_TRANSFER_THURSDAY_PAYOUT_BUSINESS_IDS.json",
-    "friday": "payments/feature-flags/WEEKLY_TRANSFER_FRIDAY_PAYOUT_BUSINESS_IDS.json",
+    "tuesday": "payout/feature-flags/WEEKLY_TRANSFER_TUESDAY_PAYOUT_BUSINESS_IDS.json",
+    "wednesday": "payout/feature-flags/WEEKLY_TRANSFER_WEDNESDAY_PAYOUT_BUSINESS_IDS.json",
+    "thursday": "payout/feature-flags/WEEKLY_TRANSFER_THURSDAY_PAYOUT_BUSINESS_IDS.json",
+    "friday": "payout/feature-flags/WEEKLY_TRANSFER_FRIDAY_PAYOUT_BUSINESS_IDS.json",
 }
 
 ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS = "payout/feature-flags/enable_queueing_mechanism_for_monitor_transfer_with_incorrect_status.bool"
+DAILY_TRANSFER_BUSINESS_IDS = "payout/feature-flags/DAILY_TRANSFER_BUSINESS_IDS.json"
 
-# transfer submission
+# transfer submission stats
 ATTEMPTED_COUNT_STAT = "attempted-count"
 ATTEMPTED_AMOUNT_STAT = "attempted-amount"
 SUCCEEDED_COUNT_STAT = "succeeded-count"

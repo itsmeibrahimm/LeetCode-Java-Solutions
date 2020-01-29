@@ -16,6 +16,10 @@ from app.conftest import RuntimeSetter
 from app.payout import tasks
 from app.payout.constants import (
     ENABLE_QUEUEING_MECHANISM_FOR_MONITOR_TRANSFER_WITH_INCORRECT_STATUS,
+    DAILY_TRANSFER_BUSINESS_IDS,
+    DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME,
+    DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME,
+    FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
 )
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferResponse,
@@ -23,6 +27,9 @@ from app.payout.core.transfer.processors.submit_transfer import (
 )
 from app.payout.core.transfer.processors.weekly_create_transfer import (
     WeeklyCreateTransferRequest,
+)
+from app.payout.core.transfer.tasks.daily_create_transfers_by_business_task import (
+    DailyCreateTransfersByBusinessTask,
 )
 from app.payout.core.transfer.tasks.monitor_transfer_with_incorrect_status_task import (
     MonitorTransferWithIncorrectStatusTask,
@@ -379,7 +386,6 @@ class TestKafkaWorker:
 
         await asyncio.sleep(10)
         # Stopping workers with graceful timeout set to 3 seconds
-        # await payout_worker.stop(graceful_timeout_seconds=3)
         await stripe_worker.stop(graceful_timeout_seconds=3)
         await payout_worker.stop(graceful_timeout_seconds=3)
 
@@ -393,3 +399,123 @@ class TestKafkaWorker:
         )
         assert retrieved_stripe_transfer
         assert retrieved_stripe_transfer.stripe_status == "paid"
+
+    async def test_daily_create_transfers_by_business_task_success(
+        self,
+        app_context: AppContext,
+        app_config: AppConfig,
+        mocker: pytest_mock.MockFixture,
+        payment_account_repo: PaymentAccountRepository,
+        transaction_repo: TransactionRepository,
+        transfer_repo: TransferRepository,
+        runtime_setter: RuntimeSetter,
+    ):
+        # prepare two payment accounts, one eligible for creating transfer,
+        # another does not have unpaid transactions attached,
+        # mocked out all dsj calls along with runtime flags,
+        # and verify whether submit_transfer is called exactly once with transfer created for the first payment account.
+        payment_account_a = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+        payment_account_b = await prepare_and_insert_payment_account(
+            payment_account_repo=payment_account_repo
+        )
+        transaction = await prepare_and_insert_transaction(
+            transaction_repo=transaction_repo, payout_account_id=payment_account_a.id
+        )
+        mocker.patch(
+            "app.payout.core.transfer.processors.weekly_create_transfer.WeeklyCreateTransfer._is_enabled_for_payment_service_traffic",
+            return_value=True,
+        )
+
+        @asyncio.coroutine
+        def mock_get_account_ids(*args, **kwargs):
+            return [payment_account_a.id, payment_account_b.id]
+
+        mocker.patch(
+            "app.payout.core.transfer.processors.daily_create_transfers_by_business.get_payment_account_ids_with_biz_id",
+            side_effect=mock_get_account_ids,
+        )
+
+        @asyncio.coroutine
+        async def mock_dsj_client_post(*args, **kwargs):
+            return None
+
+        mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.post",
+            side_effect=mock_dsj_client_post,
+        )
+
+        @asyncio.coroutine
+        async def mock_dsj_client_get(*args, **kwargs):
+            return None
+
+        mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client_get,
+        )
+
+        runtime_setter.set("payout/feature-flags/ENABLE_DAILY_TRANSFERS.bool", True)
+        runtime_setter.set(DAILY_TRANSFER_BUSINESS_IDS, [666])
+        runtime_setter.set(DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME, [])
+        runtime_setter.set(DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME, [])
+        runtime_setter.set(FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE, False)
+
+        @asyncio.coroutine
+        def mock_execute_submit_transfer(*args, **kwargs):
+            return SubmitTransferResponse()
+
+        mocker.patch(
+            "app.payout.core.transfer.processors.submit_transfer.SubmitTransfer.execute",
+            side_effect=mock_execute_submit_transfer,
+        )
+        mocked_init_submit_transfer = mocker.patch.object(
+            SubmitTransferRequest, "__init__", return_value=None
+        )
+
+        daily_create_transfers_by_business_task = DailyCreateTransfersByBusinessTask(
+            end_time=datetime.now(timezone.utc).isoformat()
+        )
+        await daily_create_transfers_by_business_task.send(
+            kafka_producer=app_context.kafka_producer
+        )
+        payout_worker = KafkaWorker(
+            app_context=app_context,
+            app_config=app_config,
+            topic_name=self.payout_topic_name,
+            processor=tasks.process_message,
+            num_consumers=1,
+        )
+        stripe_worker = KafkaWorker(
+            app_context=app_context,
+            app_config=app_config,
+            topic_name=self.stripe_topic_name,
+            processor=tasks.process_message,
+            num_consumers=1,
+        )
+
+        await payout_worker.start()
+        await stripe_worker.start()
+
+        await asyncio.sleep(10)
+        # Stopping workers with graceful timeout set to 3 seconds
+        await payout_worker.stop(graceful_timeout_seconds=3)
+        await stripe_worker.stop(graceful_timeout_seconds=3)
+
+        retrieved_transaction = await transaction_repo.get_transaction_by_id(
+            transaction_id=transaction.id
+        )
+        assert retrieved_transaction
+        transfer_id = retrieved_transaction.transfer_id
+        assert transfer_id
+        retrieved_transfer = await transfer_repo.get_transfer_by_id(
+            transfer_id=transfer_id
+        )
+        assert retrieved_transfer
+        assert retrieved_transfer.payment_account_id == payment_account_a.id
+        mocked_init_submit_transfer.assert_called_once_with(
+            transfer_id=transfer_id,
+            method=TransferMethodType.STRIPE,
+            retry=False,
+            submitted_by=None,
+        )

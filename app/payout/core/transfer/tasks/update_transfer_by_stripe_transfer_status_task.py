@@ -16,7 +16,7 @@ from app.payout.repository.maindb.transfer import TransferRepository
 class UpdateTransferByStripeTransferStatusTask(BaseTask):
     def __init__(self, transfer_id: int):
         self.topic_name = "payment_stripe"
-        self.task_type = PayoutTask.UPDATE_TRANSFER_BY_STRIPE_TRANSFER_STATUS_TASK
+        self.task_type = PayoutTask.UPDATE_TRANSFER_BY_STRIPE_TRANSFER_STATUS
         max_retries: int = 5
         attempts: int = 0
         fn_args: list = []

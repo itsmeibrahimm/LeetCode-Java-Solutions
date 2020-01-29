@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, tzinfo
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 import pytz
 
@@ -175,3 +175,45 @@ async def get_target_metadata(
                 break
 
     return target_type, target_id, statement_descriptor, business_id
+
+
+def start_and_end_of_date(date: datetime, timezone_info: tzinfo):
+    """
+    Returns datetimes (in tzinfo) corresponding to the start and end of this date
+    (midnight). On a DST day this could actually be 23 or 25 hours
+    """
+    next_date = date + timedelta(days=1)
+
+    return (
+        get_local_datetime(
+            date.year, date.month, date.day, timezone_info=timezone_info
+        ),
+        get_local_datetime(
+            next_date.year, next_date.month, next_date.day, timezone_info=timezone_info
+        ),
+    )
+
+
+async def get_payment_account_ids_with_biz_id(
+    business_id: int, dsj_client: DSJClient
+) -> List[int]:
+    if runtime.get_bool(
+        "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool", False
+    ):
+        try:
+            response = await dsj_client.get(
+                "/v1/payment_accounts/", {"business_id": business_id}
+            )
+            if response:
+                payment_account_ids = response["payment_account_ids"]
+                return payment_account_ids
+
+        except DSJRESTCallException as e:
+            # log for monitor purpose
+            log.info(
+                "DSJRESTCallException: failed to retrieve payment account ids with biz id from dsj",
+                business_id=business_id,
+                error_msg=e,
+            )
+            raise
+    return []

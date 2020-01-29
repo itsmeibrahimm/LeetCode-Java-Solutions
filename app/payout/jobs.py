@@ -27,14 +27,17 @@ from app.payout.core.transfer.processors.weekly_create_transfer import (
     WeeklyCreateTransfer,
     WeeklyCreateTransferRequest,
 )
+from app.payout.core.transfer.tasks.daily_create_transfers_by_business_task import (
+    DailyCreateTransfersByBusinessTask,
+)
 from app.payout.core.transfer.tasks.monitor_transfer_with_incorrect_status_task import (
     MonitorTransferWithIncorrectStatusTask,
 )
 from app.payout.core.transfer.tasks.weekly_create_transfer_task import (
     WeeklyCreateTransferTask,
 )
-from app.payout.core.transfer.utils import get_last_week
-from app.payout.models import PayoutDay, PayoutCountry
+from app.payout.core.transfer.utils import get_last_week, start_and_end_of_date
+from app.payout.models import PayoutDay, PayoutCountry, Timezones
 from app.payout.repository.bankdb.payment_account_edit_history import (
     PaymentAccountEditHistoryRepository,
 )
@@ -489,7 +492,7 @@ class WeeklyCreateTransferJob(Job):
         job_pool: JobPool,
         payout_countries: List[PayoutCountry],
         payout_country_timezone: tzinfo,
-        payout_day: PayoutDay
+        payout_day: PayoutDay,
     ):
         self.app_context = app_context
         self.job_pool = job_pool
@@ -583,3 +586,29 @@ class WeeklyCreateTransferJob(Job):
             await job_instance_cxt.job_pool.spawn(
                 weekly_create_transfer_op.execute(), cb=job_callback
             )
+
+
+class DailyCreateTransferJob(Job):
+    def __init__(self, *, app_context: AppContext, job_pool: JobPool):
+        self.app_context = app_context
+        self.job_pool = job_pool
+        super().__init__(app_context=app_context, job_pool=job_pool)
+
+    @property
+    def job_name(self) -> str:
+        return "DailyCreateTransfer"
+
+    async def _trigger(self, job_instance_cxt: JobInstanceContext):
+        _, end_time = start_and_end_of_date(
+            date=datetime.now(timezone.utc) - timedelta(days=1),
+            timezone_info=Timezones.US_PACIFIC,
+        )
+        daily_create_transfers_by_task = DailyCreateTransfersByBusinessTask(
+            end_time=end_time.isoformat()
+        )
+        await job_instance_cxt.job_pool.spawn(
+            daily_create_transfers_by_task.send(
+                kafka_producer=job_instance_cxt.app_context.kafka_producer
+            ),
+            cb=job_callback,
+        )

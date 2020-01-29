@@ -319,7 +319,7 @@ class TestCreateTransfer:
             return [payment_account.id]
 
         mock_get_payment_account_ids = self.mocker.patch(
-            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.get_payment_account_ids_with_biz_id",
+            "app.payout.core.transfer.processors.create_transfer.get_payment_account_ids_with_biz_id",
             side_effect=mock_get_payment_account_ids_with_biz_id,
         )
 

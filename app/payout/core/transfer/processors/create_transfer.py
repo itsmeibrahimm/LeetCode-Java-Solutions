@@ -17,11 +17,7 @@ from doordash_python_stats.ddstats import doorstats_global
 
 from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.lock.locks import PaymentLock
-from app.commons.providers.dsj_client import (
-    DSJClient,
-    DSJAuthException,
-    DSJRESTCallException,
-)
+from app.commons.providers.dsj_client import DSJClient, DSJAuthException
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
@@ -46,6 +42,7 @@ from app.payout.core.transfer.tasks.submit_transfer_task import SubmitTransferTa
 from app.payout.core.transfer.utils import (
     determine_transfer_status_from_latest_submission,
     get_target_metadata,
+    get_payment_account_ids_with_biz_id,
 )
 from app.payout.repository.bankdb.model.transaction import (
     TransactionDBEntity,
@@ -546,7 +543,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                 payout_day=payout_day,
                 business_id=biz_id,
             )
-            retrieved_payment_account_ids = await self.get_payment_account_ids_with_biz_id(
+            retrieved_payment_account_ids = await get_payment_account_ids_with_biz_id(
                 business_id=biz_id, dsj_client=self.dsj_client
             )
             payment_account_ids.extend(retrieved_payment_account_ids)
@@ -556,28 +553,3 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             payment_account_count=len(payment_account_ids),
         )
         return payment_account_ids
-
-    async def get_payment_account_ids_with_biz_id(
-        self, business_id: int, dsj_client: DSJClient
-    ) -> List[int]:
-        if runtime.get_bool(
-            "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool",
-            False,
-        ):
-            try:
-                response = await dsj_client.get(
-                    "/v1/payment_accounts/", {"business_id": business_id}
-                )
-                if response:
-                    payment_account_ids = response["payment_account_ids"]
-                    return payment_account_ids
-
-            except DSJRESTCallException as e:
-                # log for monitor purpose
-                self.logger.info(
-                    "DSJRESTCallException: failed to retrieve payment account ids with biz id from dsj",
-                    business_id=business_id,
-                    error_msg=e,
-                )
-                raise
-        return []

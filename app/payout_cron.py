@@ -16,8 +16,9 @@ from app.payout.jobs import (
     RetryInstantPayoutInNew,
     WeeklyCreateTransferJob,
     MonitorCreatingStatusTransfers,
+    DailyCreateTransferJob,
 )
-from app.payout.models import PayoutCountry, PayoutDay
+from app.payout.models import PayoutCountry, PayoutDay, Timezones
 
 ninox_readiness_check()
 init_newrelic_agent()
@@ -101,7 +102,7 @@ if app_config.ENVIRONMENT == "prod":
     scheduler.add_job(
         func=monitor_transfers_with_incorrect_status.run,
         name=monitor_transfers_with_incorrect_status.job_name,
-        trigger=CronTrigger(hour="1", timezone=pytz.timezone("US/Pacific")),
+        trigger=CronTrigger(hour="1", timezone=Timezones.US_PACIFIC),
     )
 elif app_config.ENVIRONMENT == "staging":
     scheduler.add_job(
@@ -144,7 +145,7 @@ weekly_create_transfer_thursday = WeeklyCreateTransferJob(
     app_context=app_context,
     job_pool=job_pool,
     payout_countries=[PayoutCountry.UNITED_STATES, PayoutCountry.CANADA],
-    payout_country_timezone=pytz.timezone("US/Pacific"),
+    payout_country_timezone=Timezones.US_PACIFIC,
     payout_day=PayoutDay.THURSDAY,
 )
 
@@ -154,10 +155,7 @@ if app_config.ENVIRONMENT == "prod":
         func=weekly_create_transfer_thursday.run,
         name=weekly_create_transfer_thursday.job_name,
         trigger=CronTrigger(
-            day_of_week="thu",
-            hour="1, 4",
-            minute="10",
-            timezone=pytz.timezone("US/Pacific"),
+            day_of_week="thu", hour="1, 4", minute="10", timezone=Timezones.US_PACIFIC
         ),
     )
 elif app_config.ENVIRONMENT == "staging":
@@ -171,7 +169,7 @@ weekly_create_transfer_monday = WeeklyCreateTransferJob(
     app_context=app_context,
     job_pool=job_pool,
     payout_countries=[PayoutCountry.UNITED_STATES, PayoutCountry.CANADA],
-    payout_country_timezone=pytz.timezone("US/Pacific"),
+    payout_country_timezone=Timezones.US_PACIFIC,
     payout_day=PayoutDay.MONDAY,
 )
 
@@ -181,7 +179,7 @@ if app_config.ENVIRONMENT == "prod":
         func=weekly_create_transfer_monday.run,
         name=weekly_create_transfer_monday.job_name,
         trigger=CronTrigger(
-            day_of_week="mon", hour="1, 3", timezone=pytz.timezone("US/Pacific")
+            day_of_week="mon", hour="1, 3", timezone=Timezones.US_PACIFIC
         ),
     )
 if runtime.get_bool(
@@ -191,16 +189,14 @@ if runtime.get_bool(
         app_context=app_context,
         job_pool=job_pool,
         payout_countries=[PayoutCountry.AUSTRALIA],
-        payout_country_timezone=pytz.timezone("Australia/Melbourne"),
+        payout_country_timezone=Timezones.AUSTRALIA_MELBOURNE,
         payout_day=PayoutDay.MONDAY,
     )
     scheduler.add_job(
         func=weekly_create_transfer_aus_monday.run,
         name=weekly_create_transfer_aus_monday.job_name,
         trigger=CronTrigger(
-            day_of_week="mon",
-            hour="1, 4",
-            timezone=pytz.timezone("Australia/Melbourne"),
+            day_of_week="mon", hour="1, 4", timezone=Timezones.AUSTRALIA_MELBOURNE
         ),
     )
 
@@ -208,7 +204,7 @@ if runtime.get_bool(
         app_context=app_context,
         job_pool=job_pool,
         payout_countries=[PayoutCountry.AUSTRALIA],
-        payout_country_timezone=pytz.timezone("Australia/Melbourne"),
+        payout_country_timezone=Timezones.AUSTRALIA_MELBOURNE,
         payout_day=PayoutDay.THURSDAY,
     )
 
@@ -216,11 +212,22 @@ if runtime.get_bool(
         func=weekly_create_transfer_aus_thursday.run,
         name=weekly_create_transfer_aus_thursday.job_name,
         trigger=CronTrigger(
-            day_of_week="thu",
-            hour="1, 4",
-            timezone=pytz.timezone("Australia/Melbourne"),
+            day_of_week="thu", hour="1, 4", timezone=Timezones.AUSTRALIA_MELBOURNE
         ),
     )
+
+if runtime.get_bool(
+    "payout/feature-flags/enable_payment_service_daily_payout.bool", False
+):
+    daily_create_transfer = DailyCreateTransferJob(
+        app_context=app_context, job_pool=job_pool
+    )
+    scheduler.add_job(
+        func=daily_create_transfer.run,
+        name=daily_create_transfer.job_name,
+        trigger=CronTrigger(hour="1", timezone=Timezones.US_PACIFIC),
+    )
+
 
 scheduler.add_job(
     scheduler_heartbeat,
