@@ -41,6 +41,7 @@ class TestCartPaymentApi:
         PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND,
         PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
         PayinErrorCode.PAYMENT_METHOD_CREATE_STRIPE_ERROR,
+        PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID,
     ]
 
     @pytest.mark.parametrize(
@@ -142,6 +143,7 @@ class TestCartPaymentApi:
         PayinErrorCode.CART_PAYMENT_NOT_FOUND,
         PayinErrorCode.CART_PAYMENT_OWNER_MISMATCH,
         PayinErrorCode.PAYMENT_METHOD_GET_PAYER_PAYMENT_METHOD_MISMATCH,
+        PayinErrorCode.CART_PAYMENT_AMOUNT_INVALID,
     ]
 
     @pytest.mark.parametrize(

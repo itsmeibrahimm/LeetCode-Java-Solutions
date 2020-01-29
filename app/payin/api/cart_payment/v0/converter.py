@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from app.payin.api.cart_payment.v0.request import CreateCartPaymentLegacyRequest
 from app.payin.api.cart_payment.v0.response import CreateCartPaymentLegacyResponse
+from app.payin.api.cart_payment.validator import validate_min_amount
 from app.payin.core.cart_payment.model import CartPayment, LegacyPayment
 from app.payin.core.cart_payment.types import LegacyConsumerChargeId
 from app.payin.core.exceptions import PayinError, PayinErrorCode
@@ -14,9 +15,18 @@ from app.payin.core.types import (
 )
 
 
+def validate_cart_payment_request_v0(
+    cart_payment_request: CreateCartPaymentLegacyRequest
+):
+    validate_min_amount(
+        currency=cart_payment_request.currency, amount=cart_payment_request.amount
+    )
+
+
 def to_internal_cart_payment(
     cart_payment_request: CreateCartPaymentLegacyRequest
 ) -> CartPayment:
+    validate_cart_payment_request_v0(cart_payment_request)
     try:
         return CartPayment(
             id=uuid4(),

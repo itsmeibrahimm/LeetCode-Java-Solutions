@@ -1355,6 +1355,24 @@ class TestCartPayment:
         response = client.post("/payin/api/v1/cart_payments", json=request_body)
         assert response.status_code == 201
 
+    def test_cart_payment_creation_invalid_amount(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+        app_context: AppContext,
+    ):
+        stripe_api.enable_outbound()
+        request_body = self._get_cart_payment_create_request(
+            payer, payment_method, amount=30, delay_capture=False, split_payment=None
+        )
+        request_body["payment_country"] = "US"
+        response = client.post("/payin/api/v1/cart_payments", json=request_body)
+        assert response is not None
+        assert response.status_code == 400
+        assert response.reason == "Bad Request"
+
     def test_cart_payment_creation_cross_country_legacy(
         self,
         client: TestClient,
@@ -1718,6 +1736,16 @@ class TestCartPayment:
         )
         self._test_legacy_cart_payment_creation_error(
             client, request_body, 400, "payin_49", False
+        )
+
+        request_body = self._get_cart_payment_create_legacy_payment_request(
+            stripe_customer_id=stripe_customer.id,
+            stripe_card_id="pm_card_mastercard",
+            amount=30,
+            merchant_country=CountryCode.US,
+        )
+        self._test_legacy_cart_payment_creation_error(
+            client, request_body, 400, "payin_64", False
         )
 
     def test_legacy_payment_client_description(

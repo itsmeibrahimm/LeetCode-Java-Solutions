@@ -6,6 +6,7 @@ from app.payin.api.cart_payment.v1.request import (
     CorrelationIds,
     CreateCartPaymentRequestV1,
 )
+from app.payin.api.cart_payment.validator import validate_min_amount
 from app.payin.core.cart_payment.model import CartPayment
 from app.payin.core.exceptions import PayinError, PayinErrorCode
 
@@ -24,6 +25,9 @@ def validate_cart_payment_request_v1(cart_payment_request: CreateCartPaymentRequ
             f"payment_method_token={cart_payment_request.payment_method_token}, "
             f"dd_stripe_card_id={cart_payment_request.dd_stripe_card_id}"
         )
+    validate_min_amount(
+        currency=cart_payment_request.currency, amount=cart_payment_request.amount
+    )
 
 
 def to_internal_cart_payment(
@@ -31,7 +35,6 @@ def to_internal_cart_payment(
 ) -> CartPayment:
 
     validate_cart_payment_request_v1(cart_payment_request)
-
     try:
         return CartPayment(
             id=uuid4(),
