@@ -227,7 +227,7 @@ class TestPaymentMethodsV1:
                 is_scanned=False,
                 is_active=True,
             ),
-            # http_status=200,  # FIXME: PS should return 200 in duplication case
+            http_status=200,
         )
         assert payment_method == duplicate_payment_method
 

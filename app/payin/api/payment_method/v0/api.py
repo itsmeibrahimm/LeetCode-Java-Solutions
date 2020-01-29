@@ -1,4 +1,8 @@
+from typing import Tuple, Union
+
 from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
+from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
@@ -6,11 +10,7 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.types import CountryCode, PgpCode
 from app.payin.api.payment_method.v0.request import CreatePaymentMethodRequestV0
-from app.payin.core.payment_method.model import (
-    PaymentMethod,
-    PaymentMethodList,
-    RawPaymentMethod,
-)
+from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import (
     LegacyPaymentMethodInfo,
@@ -33,7 +33,7 @@ async def create_payment_method(
     req_body: CreatePaymentMethodRequestV0,
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
-):
+) -> Union[JSONResponse, PaymentMethod]:
     """
     Create a payment method for payer on DoorDash payments platform
 
@@ -50,7 +50,9 @@ async def create_payment_method(
     log.info("[create_payment_method] received request.", req_body=req_body)
 
     try:
-        raw_payment_method: RawPaymentMethod = await payment_method_processor.create_payment_method(
+        create_payment_method_result: Tuple[
+            PaymentMethod, bool
+        ] = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token=req_body.token,
             set_default=req_body.set_default,
@@ -64,8 +66,6 @@ async def create_payment_method(
                 payer_type=req_body.payer_type,
             ),
         )
-
-        external_payment_method: PaymentMethod = raw_payment_method.to_payment_method()
 
         log.info(
             "[create_payment_method] completed.",
@@ -83,8 +83,12 @@ async def create_payment_method(
             legacy_dd_stripe_customer_id=req_body.legacy_dd_stripe_customer_id,
         )
         raise
-
-    return external_payment_method
+    payment_method, already_exists = create_payment_method_result
+    if already_exists:
+        return JSONResponse(
+            status_code=HTTP_200_OK, content=jsonable_encoder(payment_method)
+        )
+    return payment_method
 
 
 @router.get(

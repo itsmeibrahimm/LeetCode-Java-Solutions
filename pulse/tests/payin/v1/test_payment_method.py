@@ -17,7 +17,7 @@ def test_create_payment_method_with_invalid_input():
     try:
         payment_method_v1_client.create_payment_method_with_http_info(
             create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
-                payer_id=123
+                payer_id="123"
             )
         )
     except ApiException as e:
@@ -191,3 +191,22 @@ def test_create_v1_get_delete_v0_payment_method_with_payer_id_and_stripe_payment
     assert retrieved_payment_method[1] == 200
     assert retrieved_payment_method[0] == delete_payment_method[0]
     assert retrieved_payment_method[0].deleted_at is not None
+
+
+def test_create_payment_method_duplicate_payment_method():
+    # step 1: create a payment method using payer_id
+    test_payer = PaymentUtil.create_payer()[0]
+    payment_method = payment_method_v1_client.create_payment_method_with_http_info(
+        create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
+            payer_id=test_payer.id, token="tok_mastercard"
+        )
+    )
+    assert payment_method[1] == 201
+    assert payment_method[0].deleted_at is None
+    duplicate_payment_method = payment_method_v1_client.create_payment_method_with_http_info(
+        create_payment_method_request_v1=PaymentUtil.get_payment_method_v1_request(
+            payer_id=test_payer.id, token="tok_mastercard"
+        )
+    )
+    assert duplicate_payment_method[1] == 200
+    assert duplicate_payment_method[0] == payment_method[0]

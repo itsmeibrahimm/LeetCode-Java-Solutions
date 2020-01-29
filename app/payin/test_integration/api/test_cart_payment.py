@@ -98,7 +98,7 @@ class TestCartPayment:
     ) -> Dict[str, Any]:
         request_body = self._get_payer_payment_method_request(payer, token)
         response = client.post("/payin/api/v1/payment_methods", json=request_body)
-        assert response.status_code == 201
+        assert response.status_code in (200, 201)
         payment_method = response.json()
         assert payment_method
         assert payment_method["id"]
@@ -1131,7 +1131,7 @@ class TestCartPayment:
         # payer with sc without pm.
         request_body = self._get_payer_payment_method_request(payer, "tok_visa")
         response = client.post("/payin/api/v1/payment_methods", json=request_body)
-        assert response.status_code == 201
+        assert response.status_code in (200, 201)
         payment_method = response.json()
         assert payment_method
 

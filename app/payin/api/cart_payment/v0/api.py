@@ -1,5 +1,5 @@
-from datetime import datetime
 import typing
+from datetime import datetime
 
 from fastapi import APIRouter, Depends
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED

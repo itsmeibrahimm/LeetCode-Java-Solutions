@@ -26,7 +26,12 @@ def test_create_legacy_cart_payment_with_no_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    """
+    Status code can be 200/201 depending upon if a new payment method is created or not. An old payment method can be
+    returned as we are using random ids to create Payer and we will start getting duplicate payment methods once we loop
+    through all valid payer ids.
+    """
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -60,7 +65,7 @@ def test_create_legacy_cart_payment_with_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -96,7 +101,7 @@ def test_create_legacy_cart_payment_with_invalid_request():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     create_cart_payment_legacy_request = PaymentUtil.get_create_legacy_cart_payment_request(
         amount=CART_AMOUNT,
         country="US",
@@ -136,7 +141,7 @@ def test_update_legacy_cart_payment_higher_without_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -180,7 +185,7 @@ def test_update_legacy_cart_payment_lower_without_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -224,7 +229,7 @@ def test_update_legacy_cart_payment_lower_with_invalid_amount():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -270,7 +275,7 @@ def test_update_legacy_cart_payment_higher_with_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -314,7 +319,7 @@ def test_update_legacy_cart_payment_lower_with_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -377,7 +382,7 @@ def test_cancel_legacy_cart_payment_without_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -418,7 +423,7 @@ def test_cancel_legacy_cart_payment_with_delay_capture():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -473,7 +478,7 @@ def test_get_cart_payment():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
             amount=CART_AMOUNT,
@@ -539,7 +544,7 @@ def test_list_cart_payment():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     test_client_description = str(uuid.uuid4())
     cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(
@@ -594,7 +599,7 @@ def test_list_cart_payment_with_correct_datetime_filter():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     test_client_description = str(uuid.uuid4())
     new_cart_payment = cart_payment_v0_client.create_cart_payment_with_http_info(
         create_cart_payment_legacy_request=PaymentUtil.get_create_legacy_cart_payment_request(

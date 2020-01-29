@@ -1,4 +1,5 @@
 import logging
+import random
 import uuid
 
 from payin_v1_client import ApiException
@@ -47,9 +48,10 @@ def test_create_and_get_payer_with_non_numeric_id():
 
 
 def test_create_two_payers_with_same_id():
+    payer_reference_id = str(random.randint(1, 2147483647))
     new_payer_one = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
-            payer_reference_id="123",
+            payer_reference_id=payer_reference_id,
             country="US",
             payer_reference_id_type="dd_drive_store_id",
         )
@@ -68,7 +70,7 @@ def test_create_two_payers_with_same_id():
     assert stripe_customer.description == new_payer_one[0].description
     new_payer_two = payer_v1_client.create_payer_with_http_info(
         create_payer_request=PaymentUtil.get_create_payer_request(
-            payer_reference_id="123",
+            payer_reference_id=payer_reference_id,
             country="US",
             payer_reference_id_type="dd_drive_store_id",
         )
@@ -111,7 +113,7 @@ def test_update_payer_with_payer_id():
             payer_id=new_payer[0].id, set_default=True
         )
     )
-    assert new_payment_method[1] == 201
+    assert new_payment_method[1] in (200, 201)
     update_payment_method = payer_v1_client.update_payer_default_payment_method_by_id_with_http_info(
         new_payer[0].id, {"default_payment_method": new_payment_method[0]}
     )

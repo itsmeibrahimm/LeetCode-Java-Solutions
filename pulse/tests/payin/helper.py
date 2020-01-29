@@ -56,11 +56,13 @@ def get_correlation_ids(reference_id: str, reference_id_type: str):
 
 class PaymentUtil:
     @staticmethod
-    def get_payment_method_v1_request(payer_id: uuid.UUID, set_default: bool = False):
+    def get_payment_method_v1_request(
+        payer_id: str, set_default: bool = False, token: str = "tok_visa"
+    ):
         return CreatePaymentMethodRequestV1(
             payer_id=payer_id,
             payment_gateway="stripe",
-            token="tok_visa",
+            token=token,
             is_scanned=True,
             is_active=True,
             set_default=set_default,
@@ -68,11 +70,14 @@ class PaymentUtil:
 
     @staticmethod
     def get_payment_method_v0_info(
-        stripe_customer_id, legacy_dd_stripe_customer_id: int, set_default: bool = False
+        stripe_customer_id,
+        legacy_dd_stripe_customer_id: int,
+        set_default: bool = False,
+        token: str = "tok_visa",
     ):
         return CreatePaymentMethodRequestV0(
             stripe_customer_id=stripe_customer_id,
-            token="tok_visa",
+            token=token,
             is_scanned=True,
             is_active=True,
             set_default=set_default,
@@ -101,7 +106,9 @@ class PaymentUtil:
         )
 
     @staticmethod
-    def create_payer(payer_reference_id=random.randint(1, 2147483647)):
+    def create_payer(payer_reference_id: str = None):
+        if not payer_reference_id:
+            payer_reference_id = str(random.randint(1, 2147483647))
         return payer_v1_client.create_payer_with_http_info(
             create_payer_request=PaymentUtil.get_create_payer_request(
                 payer_reference_id=payer_reference_id,

@@ -24,7 +24,7 @@ def test_create_get_delete_payment_method_with_payment_method_id():
         )
     )
     logger.info(payment_method[0])
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     assert payment_method[0].deleted_at is None
     logger.info(payment_method[0])
 
@@ -68,7 +68,7 @@ def test_create_get_delete_payment_method_with_stripe_payment_method_id():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     assert payment_method[0].deleted_at is None
 
     # step 2: get payment method using stripe_customer_id and stripe_payment_method_id
@@ -117,7 +117,7 @@ def test_create_get_delete_payment_method_with_dd_stripe_card_id():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     assert payment_method[0].deleted_at is None
 
     # step 2: get payment_method using stripe_customer_id and stripe_card_serial_id
@@ -172,7 +172,7 @@ def test_get_payment_method_with_invalid_input():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     assert payment_method[0].deleted_at is None
 
     try:
@@ -202,7 +202,7 @@ def test_create_v0_get_v1_payment_method():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     assert payment_method[0].deleted_at is None
 
     retrieved_payment_method = payment_method_v1_client.get_payment_method_with_http_info(
@@ -223,7 +223,7 @@ def test_create_v0_delete_v1_payment_method():
             legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
         )
     )
-    assert payment_method[1] == 201
+    assert payment_method[1] in (200, 201)
     assert payment_method[0].deleted_at is None
 
     delete_payment_method = payment_method_v1_client.delete_payment_method_with_http_info(
@@ -239,3 +239,29 @@ def test_create_v0_delete_v1_payment_method():
     )
     assert retrieved_payment_method[0].id == delete_payment_method[0].id
     assert retrieved_payment_method[0].deleted_at is not None
+
+
+def test_create_payment_method_duplicate_payment_method():
+    # step 1: create a payment method using payer_id
+    payer = PaymentUtil.create_payer()
+    stripe_customer_id = (
+        payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
+    )
+    payment_method = payment_method_v0_client.create_payment_method_with_http_info(
+        create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
+            stripe_customer_id=stripe_customer_id,
+            legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
+            token="tok_mastercard",
+        )
+    )
+    assert payment_method[1] in (200, 201)
+    assert payment_method[0].deleted_at is None
+    duplicate_payment_method = payment_method_v0_client.create_payment_method_with_http_info(
+        create_payment_method_request_v0=PaymentUtil.get_payment_method_v0_info(
+            stripe_customer_id=stripe_customer_id,
+            legacy_dd_stripe_customer_id=payer[0].legacy_dd_stripe_customer_id,
+            token="tok_mastercard",
+        )
+    )
+    assert duplicate_payment_method[1] == 200
+    assert duplicate_payment_method[0] == payment_method[0]

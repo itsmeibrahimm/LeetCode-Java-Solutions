@@ -68,7 +68,7 @@ def test_update_payer_with_stripe_customer_id():
         new_payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
         == new_payment_method[0].payment_gateway_provider_details.customer_id
     )
-    assert new_payment_method[1] == 201
+    assert new_payment_method[1] in (200, 201)
 
     # step 2: Update payment method for the payer
     default_payment_method = DefaultPaymentMethodV0(
@@ -129,7 +129,7 @@ def test_update_payer_with_stripe_customer_serial_id():
         new_payer[0].payment_gateway_provider_customers[0].payment_provider_customer_id
         == new_payment_method[0].payment_gateway_provider_details.customer_id
     )
-    assert new_payment_method[1] == 201
+    assert new_payment_method[1] in (200, 201)
 
     # step 2: Update payment method for the payer
     default_payment_method = DefaultPaymentMethodV0(

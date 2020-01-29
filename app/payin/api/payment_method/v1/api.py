@@ -1,8 +1,10 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
@@ -14,11 +16,7 @@ from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
 from app.payin.core.exceptions import PayinError, PayinErrorCode
 from app.payin.core.payer.model import PayerCorrelationIds
 from app.payin.core.payer.v1.processor import PayerProcessorV1
-from app.payin.core.payment_method.model import (
-    PaymentMethod,
-    PaymentMethodList,
-    RawPaymentMethod,
-)
+from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PaymentMethodSortKey
 from app.payin.core.types import PayerReferenceIdType, MixedUuidStrType
@@ -31,6 +29,7 @@ router = APIRouter()
     "/payment_methods",
     response_model=PaymentMethod,
     status_code=HTTP_201_CREATED,
+    responses={HTTP_200_OK: {"model": PaymentMethod}},
     operation_id="CreatePaymentMethod",
     tags=api_tags,
 )
@@ -39,7 +38,7 @@ async def create_payment_method(
     log: BoundLogger = Depends(get_logger_from_req),
     payment_method_processor: PaymentMethodProcessor = Depends(PaymentMethodProcessor),
     payer_processor_v1: PayerProcessorV1 = Depends(PayerProcessorV1),
-):
+) -> Union[JSONResponse, PaymentMethod]:
     """
     Create a payment method for payer on DoorDash payments platform
 
@@ -95,7 +94,9 @@ async def create_payment_method(
     )
 
     try:
-        raw_payment_method: RawPaymentMethod = await payment_method_processor.create_payment_method(
+        create_payment_method_result: Tuple[
+            PaymentMethod, bool
+        ] = await payment_method_processor.create_payment_method(
             payer_lookup_id=payer_reference_ids[0],
             payer_lookup_id_type=payer_reference_ids[1],
             pgp_code=req_body.payment_gateway,
@@ -104,12 +105,16 @@ async def create_payment_method(
             is_scanned=req_body.is_scanned,
             is_active=req_body.is_active,
         )
-        external_payment_method: PaymentMethod = raw_payment_method.to_payment_method()
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError:
         log.warn("[create_payment_method] PaymentError.", payer_id=req_body.payer_id)
         raise
-    return external_payment_method
+    payment_method, already_exists = create_payment_method_result
+    if already_exists:
+        return JSONResponse(
+            status_code=HTTP_200_OK, content=jsonable_encoder(payment_method)
+        )
+    return payment_method
 
 
 @router.get(

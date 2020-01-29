@@ -4,7 +4,6 @@ from app.commons.types import PgpCode
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
 from app.payin.core.payer.model import Payer
-from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -57,7 +56,7 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
         payer: Payer,
         payment_method_processor: PaymentMethodProcessor,
     ):
-        raw_payment_method: RawPaymentMethod = await payment_method_processor.create_payment_method(
+        payment_method, _ = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_chargeCustomerFail",
             set_default=True,
@@ -71,7 +70,7 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
             cart_payment_processor,
             cart_payment_repository,
             payer,
-            raw_payment_method.to_payment_method(),
+            payment_method,
         )
 
         # TODO: Support other failure cases, such as card declined.  Stripe has testing tokens for these cases,
