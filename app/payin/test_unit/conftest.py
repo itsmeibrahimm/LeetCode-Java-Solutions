@@ -38,6 +38,7 @@ from app.payin.core.dispute.processor import DisputeProcessor, DisputeClient
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payer.v0.processor import DeletePayerProcessor
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PgpPaymentInfo
@@ -813,6 +814,10 @@ def cart_payment_interface(cart_payment_repo, stripe_interface):
             ),
             utils.generate_legacy_payment(),
         )
+    )
+
+    cart_payment_interface.payment_method_client.get_raw_payment_method_without_payer_auth = FunctionMock(
+        return_value=create_autospec(RawPaymentMethod)
     )
 
     # Stripe functions

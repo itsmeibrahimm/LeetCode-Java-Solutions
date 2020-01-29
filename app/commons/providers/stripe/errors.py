@@ -7,7 +7,13 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.context.logger import get_logger
 
-__all__ = ["StripeErrorCode", "StripeDeclineCode", "StripeErrorParser"]
+__all__ = [
+    "StripeErrorCode",
+    "StripeDeclineCode",
+    "StripeErrorParser",
+    "StripeInvalidParam",
+    "StripeErrorType",
+]
 
 log: BoundLogger = get_logger(__name__)
 

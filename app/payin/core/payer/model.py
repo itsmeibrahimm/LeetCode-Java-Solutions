@@ -100,6 +100,10 @@ class RawPayer:
             default_payment_method_id = self.stripe_customer_entity.default_source
         return default_payment_method_id
 
+    @property
+    def payer_id(self) -> Optional[UUID]:
+        return self.payer_entity.id if self.payer_entity else None
+
     def to_payer(self):
         """
         Build Payer object.
@@ -137,7 +141,7 @@ class RawPayer:
                     ),
                 )
             payer = Payer(
-                id=self.payer_entity.id,
+                id=self.payer_id,
                 payment_gateway_provider_customers=[provider_customer],
                 country=self.payer_entity.country,
                 payer_correlation_ids=PayerCorrelationIds(

@@ -86,7 +86,6 @@ from app.payin.core.payment_method.processor import PaymentMethodClient
 from app.payin.core.payment_method.types import PgpPaymentInfo
 from app.payin.core.types import (
     PayerReferenceIdType,
-    PaymentMethodIdType,
     PgpPayerResourceId,
     PgpPaymentMethodResourceId,
 )
@@ -1618,35 +1617,11 @@ class CartPaymentInterface:
 
     async def get_pgp_payment_info_v1(
         self,
-        payer_id: uuid.UUID,
-        payment_method_id: Optional[uuid.UUID],
         legacy_country_id: int,
-        raw_payer: Optional[RawPayer] = None,
-        dd_stripe_card_id: Optional[int] = None,
+        raw_payer: RawPayer,
+        raw_payment_method: RawPaymentMethod,
     ) -> Tuple[PgpPaymentInfo, LegacyPayment]:
 
-        if not (payment_method_id or dd_stripe_card_id):
-            raise ValueError(
-                "At least one of payment_method_id and dd_stripe_card_id need to be specified"
-            )
-
-        raw_payment_method: RawPaymentMethod
-        if payment_method_id:
-            raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
-                payment_method_id=payment_method_id,
-                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
-            )
-        else:
-            raw_payment_method = await self.payment_method_client.get_raw_payment_method_without_payer_auth(
-                payment_method_id=str(not_none(dd_stripe_card_id)),
-                payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
-            )
-
-        if not raw_payer:
-            raw_payer = await self.payer_client.get_raw_payer(
-                mixed_payer_id=payer_id,
-                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
-            )
         pgp_payer_ref_id = raw_payer.pgp_payer_resource_id
         pgp_payment_method_ref_id = raw_payment_method.pgp_payment_method_resource_id
 

@@ -1,6 +1,7 @@
 import pytest
 
 from app.commons.utils import validation
+from app.commons.utils.validation import count_present
 
 
 def test_not_none():
@@ -29,3 +30,12 @@ def test_not_none():
 
     zero = 0
     assert zero is validation.not_none(zero)
+
+
+def test_count_present():
+    assert count_present() == 0
+    assert count_present(None) == 0
+    assert count_present(None, None, None) == 0
+    assert count_present(1, "abc", ["abc", 1], None, 123) == 4
+    assert count_present(["123", 1]) == 1
+    assert count_present("something") == 1

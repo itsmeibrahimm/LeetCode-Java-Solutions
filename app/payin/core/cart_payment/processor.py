@@ -1,7 +1,7 @@
 import uuid
 from asyncio import gather
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from doordash_python_stats.ddstats import doorstats_global
 from fastapi import Depends
@@ -21,7 +21,7 @@ from app.commons.utils.legacy_utils import (
     get_country_code_by_id,
     get_country_id_by_code,
 )
-from app.commons.utils.validation import not_none
+from app.commons.utils.validation import not_none, count_present
 from app.payin.core import feature_flags
 from app.payin.core.cart_payment.cart_payment_client import CartPaymentInterface
 from app.payin.core.cart_payment.legacy_cart_payment_client import (
@@ -59,8 +59,9 @@ from app.payin.core.exceptions import (
 )
 from app.payin.core.payer.model import Payer, RawPayer
 from app.payin.core.payer.payer_client import PayerClient
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.types import CartPaymentSortKey, PgpPaymentInfo
-from app.payin.core.types import PayerReferenceIdType
+from app.payin.core.types import PayerReferenceIdType, PaymentMethodIdType
 
 
 @tracing.track_breadcrumb(processor_name="cart_payment_processor", only_trackable=True)
@@ -276,11 +277,22 @@ class CartPaymentProcessor:
         )
 
         if cart_payment.payer_id:
-            assert existing_payment_intents[0].payment_method_id
+            raw_payer: RawPayer = await self.cart_payment_interface.payer_client.get_raw_payer(
+                mixed_payer_id=cart_payment.payer_id,
+                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
+            )
+
+            raw_payment_method: RawPaymentMethod = await self.cart_payment_interface.payment_method_client.get_raw_payment_method_without_payer_auth(
+                payment_method_id=not_none(
+                    existing_payment_intents[0].payment_method_id
+                ),
+                payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
+            )
+
             try:
                 pgp_payment_method, legacy_payment = await self.cart_payment_interface.get_pgp_payment_info_v1(
-                    payer_id=cart_payment.payer_id,
-                    payment_method_id=existing_payment_intents[0].payment_method_id,
+                    raw_payer=raw_payer,
+                    raw_payment_method=raw_payment_method,
                     legacy_country_id=get_country_id_by_code(
                         existing_payment_intents[0].country
                     ),
@@ -1317,49 +1329,72 @@ class CartPaymentProcessor:
             delay_capture=request_cart_payment.delay_capture,
             correlation_ids=request_cart_payment.correlation_ids,
         )
-        assert request_cart_payment.payment_method_id or dd_stripe_card_id
+        if (
+            count_present(request_cart_payment.payment_method_id, dd_stripe_card_id)
+            != 1
+        ):
+            raise ValueError(
+                f"Expected exactly 1 of payment_method_id and dd_stripe_card_id being present by found "
+                f"payment_method_id={request_cart_payment.payment_method_id}, "
+                f"dd_stripe_card_id={dd_stripe_card_id}"
+            )
+
+        if (
+            count_present(
+                request_cart_payment.payer_id,
+                request_cart_payment.payer_correlation_ids,
+            )
+            != 1
+        ):
+            raise ValueError(
+                f"Expected exactly 1 of payer_id and payer_correlation_ids being present by found "
+                f"payer_id={request_cart_payment.payer_id}, "
+                f"payer_correlation_ids={request_cart_payment.payer_correlation_ids}"
+            )
 
         # TODO: PAYIN-292 consolidate the process of fetching all required metadata to create a cart payment
-        payer_reference_id: Union[uuid.UUID, str]
-        payer_reference_id_type: PayerReferenceIdType
-
+        raw_payer: RawPayer
         if request_cart_payment.payer_id:
-            payer_reference_id = request_cart_payment.payer_id
-            payer_reference_id_type = PayerReferenceIdType.PAYER_ID
-        elif request_cart_payment.payer_correlation_ids:
-            payer_reference_id = (
-                request_cart_payment.payer_correlation_ids.payer_reference_id
+            raw_payer = await self.cart_payment_interface.payer_client.get_raw_payer(
+                mixed_payer_id=request_cart_payment.payer_id,
+                payer_reference_id_type=PayerReferenceIdType.PAYER_ID,
             )
-            payer_reference_id_type = (
-                request_cart_payment.payer_correlation_ids.payer_reference_id_type
+        else:  # request_cart_payment.payer_correlation_ids:
+            raw_payer = await self.cart_payment_interface.payer_client.get_raw_payer(
+                mixed_payer_id=not_none(
+                    request_cart_payment.payer_correlation_ids
+                ).payer_reference_id,
+                payer_reference_id_type=not_none(
+                    request_cart_payment.payer_correlation_ids
+                ).payer_reference_id_type,
             )
-        else:
-            raise ValueError(
-                "at least one of payer_id or payer_reference_id should be specified"
-            )
+            request_cart_payment.payer_id = raw_payer.payer_id
 
-        raw_payer: RawPayer = await self.cart_payment_interface.payer_client.get_raw_payer(
-            mixed_payer_id=payer_reference_id,
-            payer_reference_id_type=payer_reference_id_type,
-        )
-
-        if not request_cart_payment.payer_id:
-            request_cart_payment.payer_id = raw_payer.to_payer().id
+        raw_payment_method: RawPaymentMethod
 
         try:
-            pgp_payment_info, legacy_payment = await self.cart_payment_interface.get_pgp_payment_info_v1(
-                payer_id=not_none(request_cart_payment.payer_id),
-                payment_method_id=request_cart_payment.payment_method_id,
-                legacy_country_id=get_country_id_by_code(payment_country),
-                raw_payer=raw_payer,
-                dd_stripe_card_id=dd_stripe_card_id,
-            )
+            if request_cart_payment.payment_method_id:
+                raw_payment_method = await self.cart_payment_interface.payment_method_client.get_raw_payment_method_without_payer_auth(
+                    payment_method_id=request_cart_payment.payment_method_id,
+                    payment_method_id_type=PaymentMethodIdType.PAYMENT_METHOD_ID,
+                )
+            else:  # dd_stripe_card_id:
+                raw_payment_method = await self.cart_payment_interface.payment_method_client.get_raw_payment_method_without_payer_auth(
+                    payment_method_id=str(not_none(dd_stripe_card_id)),
+                    payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
+                )
         except PaymentMethodReadError as e:
             if e.error_code == PayinErrorCode.PAYMENT_METHOD_GET_NOT_FOUND:
                 raise CartPaymentCreateError(
                     error_code=PayinErrorCode.CART_PAYMENT_PAYMENT_METHOD_NOT_FOUND
                 ) from e
             raise
+
+        pgp_payment_info, legacy_payment = await self.cart_payment_interface.get_pgp_payment_info_v1(
+            legacy_country_id=get_country_id_by_code(payment_country),
+            raw_payer=raw_payer,
+            raw_payment_method=raw_payment_method,
+        )
 
         payer = raw_payer.to_payer()
 

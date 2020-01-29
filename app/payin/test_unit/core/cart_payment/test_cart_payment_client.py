@@ -18,6 +18,7 @@ from app.commons.providers.stripe.stripe_models import (
 )
 from app.commons.types import CountryCode, PgpCode
 from app.payin.conftest import PaymentIntentFactory, PgpPaymentIntentFactory
+from app.payin.core.cart_payment.cart_payment_client import CartPaymentInterface
 from app.payin.core.cart_payment.model import (
     CartPayment,
     PaymentCharge,
@@ -25,6 +26,7 @@ from app.payin.core.cart_payment.model import (
     PgpPaymentCharge,
     PgpPaymentIntent,
     SplitPayment,
+    LegacyPayment,
 )
 from app.payin.core.cart_payment.processor import IdempotencyKeyAction
 from app.payin.core.cart_payment.types import (
@@ -47,13 +49,16 @@ from app.payin.core.exceptions import (
     ProviderPaymentIntentUnexpectedStatusError,
     CartPaymentUpdateError,
 )
+from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.types import DeletePayerRedactingText
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.types import PgpPaymentInfo
 from app.payin.core.types import (
     PgpPayerResourceId,
     PgpPaymentMethodResourceId,
     PayerReferenceIdType,
 )
+from app.payin.repository.payer_repo import PayerDbEntity
 from app.payin.tests.utils import (
     FunctionMock,
     generate_cart_payment,
@@ -1951,3 +1956,61 @@ class TestListCartPayment(object):
         assert isinstance(cart_payments, List)
         assert len(cart_payments) == 1
         assert cart_payments[0] == cart_payment
+
+    async def test_get_pgp_payment_info_v1(self):
+
+        cart_payment_interface: CartPaymentInterface = CartPaymentInterface(
+            app_context=MagicMock(),
+            req_context=MagicMock(),
+            payment_repo=MagicMock(),
+            payer_client=MagicMock(),
+            payment_method_client=MagicMock(),
+            stripe_async_client=MagicMock(),
+        )
+
+        expected_pgp_payment_info: PgpPaymentInfo = PgpPaymentInfo(
+            pgp_payment_method_resource_id=PgpPaymentMethodResourceId(
+                "pgp_payment_method_ref_id"
+            ),
+            pgp_payer_resource_id=PgpPayerResourceId("pgp_payer_ref_id"),
+        )
+        expected_legacy_payment: LegacyPayment = LegacyPayment(
+            dd_consumer_id=123, dd_stripe_card_id=1234, dd_country_id=1
+        )
+
+        raw_payer: RawPayer = create_autospec(RawPayer)
+        payer_entity: PayerDbEntity = create_autospec(PayerDbEntity)
+        raw_payer.pgp_payer_resource_id = (
+            expected_pgp_payment_info.pgp_payer_resource_id
+        )
+        raw_payer.payer_entity = payer_entity
+        payer_entity.payer_reference_id = expected_legacy_payment.dd_consumer_id
+
+        raw_payment_method: RawPaymentMethod = create_autospec(RawPaymentMethod)
+        raw_payment_method.pgp_payment_method_resource_id = (
+            expected_pgp_payment_info.pgp_payment_method_resource_id
+        )
+        raw_payment_method.legacy_dd_stripe_card_id = (
+            expected_legacy_payment.dd_stripe_card_id
+        )
+
+        actual_pgp_payment_info, actual_legacy_payment = await cart_payment_interface.get_pgp_payment_info_v1(
+            legacy_country_id=expected_legacy_payment.dd_country_id,
+            raw_payer=raw_payer,
+            raw_payment_method=raw_payment_method,
+        )
+
+        assert actual_legacy_payment == expected_legacy_payment
+        assert actual_pgp_payment_info == expected_pgp_payment_info
+
+        raw_payer.payer_entity = None
+        with pytest.raises(CartPaymentCreateError) as exec_info:
+            await cart_payment_interface.get_pgp_payment_info_v1(
+                legacy_country_id=expected_legacy_payment.dd_country_id,
+                raw_payer=raw_payer,
+                raw_payment_method=raw_payment_method,
+            )
+        assert (
+            exec_info.value.error_code
+            == PayinErrorCode.CART_PAYMENT_CREATE_INVALID_DATA
+        )
