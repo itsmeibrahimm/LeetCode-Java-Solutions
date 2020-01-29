@@ -17,7 +17,11 @@ from doordash_python_stats.ddstats import doorstats_global
 
 from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.lock.locks import PaymentLock
-from app.commons.providers.dsj_client import DSJClient
+from app.commons.providers.dsj_client import (
+    DSJClient,
+    DSJAuthException,
+    DSJRESTCallException,
+)
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import (
     FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE,
@@ -256,13 +260,22 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                 and updated_transfer
                 and transaction_ids
             ):
-                await self.dsj_client.post(
-                    "/v1/transactions/target_metadata/",
-                    {
-                        "transfer_id": updated_transfer.id,
-                        "transaction_ids": transaction_ids,
-                    },
-                )
+                try:
+                    await self.dsj_client.post(
+                        "/v1/transactions/target_metadata/",
+                        {
+                            "transfer_id": updated_transfer.id,
+                            "transaction_ids": transaction_ids,
+                        },
+                    )
+                except DSJAuthException as e:
+                    # log for monitor purpose
+                    self.logger.info(
+                        "DSJAuthException: failed to update shift/job transfer_ids from dsj",
+                        transfer_id=updated_transfer.id,
+                        error_msg=e,
+                    )
+                    raise
 
         if self.request.submit_after_creation and updated_transfer:
             self.logger.info(
@@ -551,11 +564,20 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool",
             False,
         ):
-            response = await dsj_client.get(
-                "/v1/payment_accounts/", {"business_id": business_id}
-            )
+            try:
+                response = await dsj_client.get(
+                    "/v1/payment_accounts/", {"business_id": business_id}
+                )
+                if response:
+                    payment_account_ids = response["payment_account_ids"]
+                    return payment_account_ids
 
-            if response:
-                payment_account_ids = response["payment_account_ids"]
-                return payment_account_ids
+            except DSJRESTCallException as e:
+                # log for monitor purpose
+                self.logger.info(
+                    "DSJRESTCallException: failed to retrieve payment account ids with biz id from dsj",
+                    business_id=business_id,
+                    error_msg=e,
+                )
+                raise
         return []

@@ -3,13 +3,16 @@ from typing import Tuple, Optional
 
 import pytz
 
-from app.commons.providers.dsj_client import DSJClient
+from app.commons.context.logger import get_logger
+from app.commons.providers.dsj_client import DSJClient, DSJRESTCallException
 from app.payout.repository.maindb.model.transfer import Transfer, TransferStatus
 from app.payout.repository.maindb.stripe_transfer import (
     StripeTransferRepositoryInterface,
 )
 from app.payout.models import TransferMethodType
 from app.commons.runtime import runtime
+
+log = get_logger(__name__)
 
 
 async def determine_transfer_status_from_latest_submission(
@@ -137,16 +140,25 @@ async def get_target_metadata(
     if runtime.get_bool(
         "payout/feature-flags/enable_dsj_api_integration_for_weekly_payout.bool", False
     ):
-        response = await dsj_client.get(
-            f"/v1/payment_accounts/{payment_account_id}/tr_metadata", {}
-        )
+        try:
+            response = await dsj_client.get(
+                f"/v1/payment_accounts/{payment_account_id}/tr_metadata", {}
+            )
 
-        if response:
-            statement_descriptor = response["statement_descriptor"]
-            target_type = response["target_type"]
-            target_id = response["target_id"]
-            if "business_id" in response:
-                business_id = response["business_id"]
+            if response:
+                statement_descriptor = response["statement_descriptor"]
+                target_type = response["target_type"]
+                target_id = response["target_id"]
+                if "business_id" in response:
+                    business_id = response["business_id"]
+        except DSJRESTCallException as e:
+            # log for monitor purpose
+            log.info(
+                "DSJRESTCallException: failed to retrieve target_metadata from dsj",
+                payment_account_id=payment_account_id,
+                error_msg=e,
+            )
+            raise
     else:
         weekly_create_transfers_dict_list = runtime.get_json(
             "payout/feature-flags/enable_payment_service_weekly_create_transfers_list.json",
