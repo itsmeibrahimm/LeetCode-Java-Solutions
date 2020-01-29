@@ -58,12 +58,27 @@ class TestMarqetaTransactionRepository:
             delivery_id=delivery_id_2,
             card_acceptor="1",
             timed_out=None,
-            swiped_at=(datetime.now(timezone.utc) - timedelta(seconds=60)),
+            swiped_at=(datetime.now(timezone.utc) - timedelta(seconds=20)),
         )
         result = await marqeta_transaction_repo.get_funded_amount_by_delivery_id(
             delivery_id_2
         )
         assert result == self.TEST_AMOUNT3
+
+        delivery_id_3 = random.randint(100000, 5000000)
+        await prepare_and_insert_marqeta_transaction_data(
+            marqeta_tx_repo=marqeta_transaction_repo,
+            token=str(uuid4()),
+            amount=self.TEST_AMOUNT3,
+            delivery_id=delivery_id_3,
+            card_acceptor="3",
+            timed_out=None,
+            swiped_at=(datetime.now(timezone.utc) - timedelta(seconds=60)),
+        )
+        result = await marqeta_transaction_repo.get_funded_amount_by_delivery_id(
+            delivery_id_3
+        )
+        assert result == 0
 
     async def test_no_marqeta_transaction_associated_with_delivery(
         self, marqeta_transaction_repo

@@ -124,9 +124,9 @@ class MarqetaTransactionRepository(
             A funded amount is considered to be any approval that is one of:
 
             1. timed_out=False
-            2. timed_out=null and swipe more than 30 seconds
+            2. timed_out=null and swipe less than 30 seconds
 
-            The latter case is just in case a marqeta webhook is not processed correctly. In effect
+            The latter is required in case a marqeta webhook was not processed correctly/in time. In effect
             this assumes that any swipe within the last swipe has been approved
         """
         timeout = datetime.utcnow() - timedelta(seconds=MARQETA_WEBHOOK_TIMEOUT)
@@ -139,7 +139,7 @@ class MarqetaTransactionRepository(
                         marqeta_transactions.timed_out == False,
                         and_(
                             marqeta_transactions.timed_out == None,
-                            marqeta_transactions.swiped_at < timeout,
+                            marqeta_transactions.swiped_at > timeout,
                         ),
                     ),
                 )
