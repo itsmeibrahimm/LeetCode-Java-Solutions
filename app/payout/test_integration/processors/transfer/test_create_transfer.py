@@ -175,7 +175,6 @@ class TestCreateTransfer:
         assert response.transfer.created_by_id == created_by_id
         assert response.transfer.manual_transfer_reason == "payout unpaid transactions"
 
-        assert transaction.id == response.transaction_ids[0]
         retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
             transaction_id=transaction.id
         )
@@ -193,7 +192,6 @@ class TestCreateTransfer:
         )
         response = await create_transfer_op._execute()
         assert not response.transfer
-        assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND
 
     async def test_execute_create_transfer_scheduled_transfer_type_payment_account_entity_not_found(
@@ -207,7 +205,6 @@ class TestCreateTransfer:
         )
         response = await create_transfer_op._execute()
         assert not response.transfer
-        assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.PAYMENT_ACCOUNT_ENTITY_NOT_FOUND
 
     async def test_execute_create_transfer_scheduled_transfer_type_payout_day_not_match(
@@ -221,7 +218,6 @@ class TestCreateTransfer:
         )
         response = await create_transfer_op._execute()
         assert not response.transfer
-        assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.PAYOUT_DAY_NOT_MATCH
 
     async def test_execute_create_transfer_scheduled_transfer_type_invalid_country(
@@ -238,7 +234,6 @@ class TestCreateTransfer:
         )
         response = await create_transfer_op._execute()
         assert not response.transfer
-        assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH
 
     async def test_execute_create_transfer_scheduled_transfer_type_mx_blocked_for_payout(
@@ -290,7 +285,6 @@ class TestCreateTransfer:
 
         response = await create_transfer_op._execute()
         assert not response.transfer
-        assert len(response.transaction_ids) == 0
         assert response.error_code == PayoutErrorCode.PAYMENT_BLOCKED
 
     async def test_execute_create_transfer_scheduled_transfer_type_success(
@@ -352,7 +346,6 @@ class TestCreateTransfer:
 
         assert not response.transfer.created_by_id
         assert not response.transfer.manual_transfer_reason
-        assert transaction.id == response.transaction_ids[0]
         retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
             transaction_id=transaction.id
         )
@@ -409,7 +402,6 @@ class TestCreateTransfer:
 
         assert not response.transfer.created_by_id
         assert not response.transfer.manual_transfer_reason
-        assert transaction.id == response.transaction_ids[0]
         retrieved_transaction = await self.transaction_repo.get_transaction_by_id(
             transaction_id=transaction.id
         )

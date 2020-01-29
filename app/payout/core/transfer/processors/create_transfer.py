@@ -76,7 +76,6 @@ from app.commons.runtime import runtime
 
 class CreateTransferResponse(OperationResponse):
     transfer: Optional[Transfer]
-    transaction_ids: List[int]
     error_code: Optional[str]
 
 
@@ -165,7 +164,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     )
                     return CreateTransferResponse(
                         transfer=None,
-                        transaction_ids=[],
                         error_code=PayoutErrorCode.PAYMENT_ACCOUNT_ENTITY_NOT_FOUND,
                     )
                 account_payout_day = await self.get_payout_day(payment_account)
@@ -178,9 +176,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                         account_payout_day=account_payout_day,
                     )
                     return CreateTransferResponse(
-                        transfer=None,
-                        transaction_ids=[],
-                        error_code=PayoutErrorCode.PAYOUT_DAY_NOT_MATCH,
+                        transfer=None, error_code=PayoutErrorCode.PAYOUT_DAY_NOT_MATCH
                     )
 
             if self.request.payout_countries:
@@ -204,7 +200,6 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     )
                     return CreateTransferResponse(
                         transfer=None,
-                        transaction_ids=[],
                         error_code=PayoutErrorCode.PAYOUT_COUNTRY_NOT_MATCH,
                     )
             if not await self.should_payment_account_be_auto_paid_weekly(
@@ -215,9 +210,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
                     payment_account_id=payment_account.id,
                 )
                 return CreateTransferResponse(
-                    transfer=None,
-                    transaction_ids=[],
-                    error_code=PayoutErrorCode.PAYMENT_BLOCKED,
+                    transfer=None, error_code=PayoutErrorCode.PAYMENT_BLOCKED
                 )
 
         currency = await self._get_currency(payment_account=payment_account)
@@ -230,9 +223,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         # check transaction_ids instead of transfer directly to avoid typing issue
         if not transaction_ids:
             return CreateTransferResponse(
-                transfer=None,
-                transaction_ids=[],
-                error_code=PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND,
+                transfer=None, error_code=PayoutErrorCode.NO_UNPAID_TRANSACTION_FOUND
             )
 
         # update transfer created_by and reason if transfer type is MANUAL
@@ -311,9 +302,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
             "Finished executing create transfer for account",
             payout_account_id=payment_account.id,
         )
-        return CreateTransferResponse(
-            transfer=updated_transfer, transaction_ids=transaction_ids
-        )
+        return CreateTransferResponse(transfer=updated_transfer)
 
     def _handle_exception(
         self, dep_exec: BaseException
