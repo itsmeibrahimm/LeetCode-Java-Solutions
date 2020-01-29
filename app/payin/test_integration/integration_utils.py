@@ -236,6 +236,10 @@ def create_payment_method_v0(
     assert payment_method["card"]["exp_year"] is not None
     assert payment_method["card"]["exp_month"] is not None
     assert payment_method["card"]["fingerprint"] is not None
+    assert "is_scanned" in payment_method["card"].keys()
+    assert "checks" in payment_method["card"].keys()
+    assert "address_line1_check" in payment_method["card"]["checks"].keys()
+    assert "address_postal_code_check" in payment_method["card"]["checks"].keys()
     # assert payment_method["dd_payer_id"] is not None
     return payment_method
 
@@ -328,6 +332,10 @@ def create_payment_method_v1(
     assert payment_method["card"]["exp_month"] is not None
     assert payment_method["card"]["fingerprint"] is not None
     assert payment_method["card"]["funding_type"] is not None
+    assert "is_scanned" in payment_method["card"].keys()
+    assert "checks" in payment_method["card"].keys()
+    assert "address_line1_check" in payment_method["card"]["checks"].keys()
+    assert "address_postal_code_check" in payment_method["card"]["checks"].keys()
     # assert payment_method["dd_payer_id"] is not None
     return payment_method
 

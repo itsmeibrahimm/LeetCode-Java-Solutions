@@ -28,7 +28,9 @@ class TestPaymentMethodClient:
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card_db_entities = [
-            generate_stripe_card(stripe_id=pgp_payment_method_list[0].pgp_resource_id)
+            generate_stripe_card(
+                stripe_id=pgp_payment_method_list[0].pgp_resource_id, is_scanned=True
+            )
         ]
         payment_method_client.payment_method_repo.list_stripe_card_db_entities_by_consumer_id = FunctionMock(
             return_value=stripe_card_db_entities
@@ -48,6 +50,9 @@ class TestPaymentMethodClient:
 
         assert len(payment_method_list) == 1
         assert payment_method_list[0].dd_stripe_card_id == stripe_card_db_entities[0].id
+        assert payment_method_list[0].card.is_scanned
+        assert payment_method_list[0].card.checks.address_line1_check is None
+        assert payment_method_list[0].card.checks.address_postal_code_check is None
 
     @pytest.mark.asyncio
     async def test_get_active_only_payment_method_list_by_dd_consumer_id(
@@ -112,7 +117,12 @@ class TestPaymentMethodClient:
     ):
         pgp_payment_method_list = [generate_pgp_payment_method()]
         stripe_card_db_entities = [
-            generate_stripe_card(stripe_id=pgp_payment_method_list[0].pgp_resource_id)
+            generate_stripe_card(
+                stripe_id=pgp_payment_method_list[0].pgp_resource_id,
+                is_scanned=False,
+                address_zip_check="passed_postal_check",
+                address_line1_check="passed_line1_check",
+            )
         ]
         payment_method_client.payment_method_repo.list_stripe_card_db_entities_by_stripe_customer_id = FunctionMock(
             return_value=stripe_card_db_entities
@@ -130,7 +140,14 @@ class TestPaymentMethodClient:
             sort_by=PaymentMethodSortKey.CREATED_AT,
         )
         assert len(payment_method_list) == 1
-        assert payment_method_list[0].dd_stripe_card_id == stripe_card_db_entities[0].id
+        payment_method = payment_method_list[0]
+        assert payment_method.dd_stripe_card_id == stripe_card_db_entities[0].id
+        assert payment_method.card.is_scanned is False
+        assert (
+            payment_method.card.checks.address_postal_code_check
+            == "passed_postal_check"
+        )
+        assert payment_method.card.checks.address_line1_check == "passed_line1_check"
 
     @pytest.mark.asyncio
     async def test_get_active_only_payment_method_list_by_stripe_customer_id(

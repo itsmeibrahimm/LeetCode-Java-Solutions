@@ -364,17 +364,70 @@ class TestPaymentMethodRepository:
 
     @pytest.mark.asyncio
     async def test_insert_and_get_stripe_card(
-        self, stripe_card, payment_method_repository: PaymentMethodRepository
+        self, payment_method_repository: PaymentMethodRepository
     ):
-        ...
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            InsertStripeCardInput(
+                stripe_id=str(uuid4()),
+                consumer_id=1,
+                fingerprint="ytr667",
+                last4="4321",
+                dynamic_last4="4321",
+                exp_month="01",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id="cus_1234567",
+                funding_type="credit",
+                is_scanned=True,
+                address_line1_check="pass_line1_check",
+                address_zip_check="pass_zip_check",
+            )
+        )
+        assert stripe_card.is_scanned is True
+        assert stripe_card.address_line1_check == "pass_line1_check"
+        assert stripe_card.address_zip_check == "pass_zip_check"
+
         input = GetStripeCardByIdInput(id=stripe_card.id)
-        stripe_card = await payment_method_repository.get_stripe_card_by_id(input=input)
-        assert stripe_card.funding_type == "credit"
-        assert stripe_card.consumer_id == 1
-        assert stripe_card.last4 == "1234"
-        assert stripe_card.dynamic_last4 == "4321"
-        assert stripe_card.exp_month == "01"
-        assert stripe_card.exp_year == "2020"
-        assert stripe_card.type == "visa"
-        assert stripe_card.active is True
-        assert stripe_card.external_stripe_customer_id == "cus_1234567"
+        get_stripe_card = await payment_method_repository.get_stripe_card_by_id(
+            input=input
+        )
+        assert get_stripe_card
+        assert get_stripe_card.funding_type == "credit"
+        assert get_stripe_card.consumer_id == 1
+        assert get_stripe_card.last4 == "4321"
+        assert get_stripe_card.dynamic_last4 == "4321"
+        assert get_stripe_card.exp_month == "01"
+        assert get_stripe_card.exp_year == "2020"
+        assert get_stripe_card.type == "visa"
+        assert get_stripe_card.active is True
+        assert get_stripe_card.external_stripe_customer_id == "cus_1234567"
+        assert get_stripe_card.is_scanned is True
+        assert get_stripe_card.address_line1_check == "pass_line1_check"
+        assert get_stripe_card.address_zip_check == "pass_zip_check"
+
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            InsertStripeCardInput(
+                stripe_id=str(uuid4()),
+                consumer_id=1,
+                fingerprint="ytr667",
+                last4="4321",
+                dynamic_last4="4321",
+                exp_month="01",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id="cus_1234567",
+                funding_type="credit",
+                is_scanned=False,
+            )
+        )
+        input = GetStripeCardByIdInput(id=stripe_card.id)
+        get_stripe_card = await payment_method_repository.get_stripe_card_by_id(
+            input=input
+        )
+        assert get_stripe_card
+        assert stripe_card.id == get_stripe_card.id
+        assert get_stripe_card.is_scanned is False
+        assert get_stripe_card.address_line1_check is None
+        assert get_stripe_card.address_zip_check is None

@@ -21,6 +21,12 @@ class Wallet(BaseModel):
 
 
 @final
+class CardChecks(BaseModel):
+    address_postal_code_check: Optional[str]
+    address_line1_check: Optional[str]
+
+
+@final
 class Card(BaseModel):
     last4: str
     exp_year: str
@@ -31,6 +37,8 @@ class Card(BaseModel):
     brand: Optional[str]
     wallet: Optional[Wallet] = None
     funding_type: Optional[str]
+    is_scanned: bool = False
+    checks: CardChecks
 
 
 @final
@@ -101,7 +109,10 @@ class RawPaymentMethod:
                 type=self.stripe_card_entity.tokenization_method,
                 dynamic_last4=self.stripe_card_entity.dynamic_last4,
             )
-
+        checks: CardChecks = CardChecks(
+            address_postal_code_check=self.stripe_card_entity.address_zip_check,
+            address_line1_check=self.stripe_card_entity.address_line1_check,
+        )
         card: Card = Card(
             country=self.stripe_card_entity.country_of_origin,
             last4=self.stripe_card_entity.last4,
@@ -112,6 +123,8 @@ class RawPaymentMethod:
             brand=self.stripe_card_entity.type,
             wallet=wallet,
             funding_type=self.stripe_card_entity.funding_type,
+            is_scanned=self.stripe_card_entity.is_scanned,
+            checks=checks,
         )
 
         payment_gateway_provider_details: PaymentGatewayProviderDetails = PaymentGatewayProviderDetails(

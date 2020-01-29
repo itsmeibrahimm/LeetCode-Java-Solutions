@@ -494,7 +494,12 @@ def generate_pgp_payment_method() -> PgpPaymentMethodDbEntity:
 
 
 def generate_stripe_card(
-    active: bool = True, stripe_id: str = "VALID_STRIPE_ID", country=CountryCode.US
+    address_zip_check: str = None,
+    address_line1_check: str = None,
+    active: bool = True,
+    stripe_id: str = "VALID_STRIPE_ID",
+    country=CountryCode.US,
+    is_scanned: bool = True,
 ) -> StripeCardDbEntity:
     return StripeCardDbEntity(
         id=uuid.uuid4(),
@@ -507,6 +512,9 @@ def generate_stripe_card(
         type="Visa",
         active=active,
         country_of_origin=country,
+        is_scanned=is_scanned,
+        address_zip_check=address_zip_check,
+        address_line1_check=address_line1_check,
     )
 
 
