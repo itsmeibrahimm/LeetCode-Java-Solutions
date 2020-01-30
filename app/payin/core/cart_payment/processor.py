@@ -1401,7 +1401,7 @@ class CartPaymentProcessor:
                     payment_method_id_type=PaymentMethodIdType.DD_STRIPE_CARD_ID,
                 )
             else:  # payment_method_token
-                raw_payment_method = await self.payment_method_processor.create_payment_method(
+                raw_payment_method, _ = await self.payment_method_processor.create_payment_method(
                     pgp_code=not_none(payment_method_token).payment_gateway,
                     token=not_none(payment_method_token).token,
                     set_default=False,

@@ -57,7 +57,7 @@ async def payment_intent(
     )
 
     payment_method_processor = PaymentMethodProcessor()
-    payment_method, _ = await payment_method_processor.create_payment_method(
+    raw_payment_method, _ = await payment_method_processor.create_payment_method(
         pgp_code=PgpCode.STRIPE,
         token="tok_visa",
         payer_lookup_id=payer.id,
@@ -66,7 +66,7 @@ async def payment_intent(
         is_scanned=False,
         is_active=True,
     )
-
+    payment_method = raw_payment_method.to_payment_method()
     payment_intent = PaymentIntentFactory(
         status=IntentStatus.REQUIRES_CAPTURE.value, payment_method_id=payment_method.id
     )  # type: PaymentIntent

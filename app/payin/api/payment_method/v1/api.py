@@ -16,7 +16,11 @@ from app.payin.api.payment_method.v1.request import CreatePaymentMethodRequestV1
 from app.payin.core.exceptions import PayinError, PayinErrorCode
 from app.payin.core.payer.model import PayerCorrelationIds
 from app.payin.core.payer.v1.processor import PayerProcessorV1
-from app.payin.core.payment_method.model import PaymentMethod, PaymentMethodList
+from app.payin.core.payment_method.model import (
+    PaymentMethod,
+    PaymentMethodList,
+    RawPaymentMethod,
+)
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import PaymentMethodSortKey
 from app.payin.core.types import PayerReferenceIdType, MixedUuidStrType
@@ -95,7 +99,7 @@ async def create_payment_method(
 
     try:
         create_payment_method_result: Tuple[
-            PaymentMethod, bool
+            RawPaymentMethod, bool
         ] = await payment_method_processor.create_payment_method(
             payer_lookup_id=payer_reference_ids[0],
             payer_lookup_id_type=payer_reference_ids[1],
@@ -109,12 +113,13 @@ async def create_payment_method(
     except PaymentError:
         log.warn("[create_payment_method] PaymentError.", payer_id=req_body.payer_id)
         raise
-    payment_method, already_exists = create_payment_method_result
+    raw_payment_method, already_exists = create_payment_method_result
     if already_exists:
         return JSONResponse(
-            status_code=HTTP_200_OK, content=jsonable_encoder(payment_method)
+            status_code=HTTP_200_OK,
+            content=jsonable_encoder(raw_payment_method.to_payment_method()),
         )
-    return payment_method
+    return raw_payment_method.to_payment_method()
 
 
 @router.get(

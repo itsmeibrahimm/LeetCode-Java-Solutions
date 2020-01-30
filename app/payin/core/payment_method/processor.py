@@ -90,7 +90,7 @@ class PaymentMethodProcessor:
         payer_lookup_id: Optional[MixedUuidStrType] = None,
         payer_lookup_id_type: Optional[PayerReferenceIdType] = None,
         legacy_payment_method_info: Optional[LegacyPaymentMethodInfo] = None,
-    ) -> Tuple[PaymentMethod, bool]:
+    ) -> Tuple[RawPaymentMethod, bool]:
         """
         Create payment method and attach to payer.
 
@@ -198,7 +198,7 @@ class PaymentMethodProcessor:
                     dd_consumer_id=dd_consumer_id,
                     pgp_payment_method_res_id=stripe_payment_method.id,
                 )
-                return exist_pm.to_payment_method(), True
+                return exist_pm, True
         # step 4: attach PGP payment_method
         attach_stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_attach_payment_method(
             pgp_payment_method_res_id=stripe_payment_method.id,
@@ -253,7 +253,7 @@ class PaymentMethodProcessor:
                         payment_method_id=raw_payment_method.payment_method_id,
                     ),
                 )
-        return raw_payment_method.to_payment_method(), False
+        return raw_payment_method, False
 
     async def get_payment_method(
         self,

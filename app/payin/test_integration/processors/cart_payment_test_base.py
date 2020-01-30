@@ -562,7 +562,7 @@ class CartPaymentTest(CartPaymentTestBase):
     async def payment_method(
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
-        payment_method, _ = await payment_method_processor.create_payment_method(
+        raw_payment_method, _ = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_mastercard",
             set_default=True,
@@ -571,7 +571,7 @@ class CartPaymentTest(CartPaymentTestBase):
             payer_lookup_id=payer.id,
             payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
         )
-        return payment_method
+        return raw_payment_method.to_payment_method()
 
     async def _prepare_cart_payment(
         self,
@@ -639,7 +639,7 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
         assert payer.payment_gateway_provider_customers
-        payment_method, _ = await payment_method_processor.create_payment_method(
+        raw_payment_method, _ = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_mastercard",
             set_default=True,
@@ -653,7 +653,7 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
                 legacy_dd_stripe_customer_id=payer.legacy_dd_stripe_customer_id,
             ),
         )
-        return payment_method
+        return raw_payment_method.to_payment_method()
 
     async def _prepare_cart_payment(
         self,

@@ -56,7 +56,7 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
         payer: Payer,
         payment_method_processor: PaymentMethodProcessor,
     ):
-        payment_method, _ = await payment_method_processor.create_payment_method(
+        raw_payment_method, _ = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_chargeCustomerFail",
             set_default=True,
@@ -70,7 +70,7 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
             cart_payment_processor,
             cart_payment_repository,
             payer,
-            payment_method,
+            raw_payment_method.to_payment_method(),
         )
 
         # TODO: Support other failure cases, such as card declined.  Stripe has testing tokens for these cases,
