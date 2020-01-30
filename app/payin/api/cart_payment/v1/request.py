@@ -3,12 +3,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Schema
 
-from app.commons.types import PgpCode
 from app.payin.api.cart_payment.base.request import (
     ClientDescription,
     CreateCartPaymentBaseRequest,
     UpdateCartPaymentBaseRequest,
 )
+from app.payin.core.cart_payment.model import PaymentMethodToken
 from app.payin.core.payer.model import PayerCorrelationIds
 
 
@@ -18,16 +18,6 @@ class CorrelationIds(BaseModel):
     )
     reference_type: str = Schema(  # type: ignore
         default=..., description="client provided correlation id type"
-    )
-
-
-class PaymentMethodToken(BaseModel):
-    token: str = Schema(  # type: ignore
-        default=...,
-        description="one-time token to identify a payment method tokenized by payment gateway",
-    )
-    payment_gateway: PgpCode = Schema(  # type: ignore
-        default=..., description="payment gateway which tokenized this payment method"
     )
 
 

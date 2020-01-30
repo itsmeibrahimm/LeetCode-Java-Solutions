@@ -67,6 +67,10 @@ def _create_payer_v1_url():
     return V1_PAYERS_ENDPOINT
 
 
+def _get_payer_by_id_v1_url(payer_id: str):
+    return f"{V1_PAYERS_ENDPOINT}/{payer_id}"
+
+
 def _create_payment_method_v0_url():
     return V0_PAYMENT_METHODS_ENDPOINT
 
@@ -184,6 +188,10 @@ def create_payer_failure_v1(
     error_response: dict = response.json()
     assert error_response["error_code"] == error.error_code
     assert error_response["retryable"] == error.retryable
+
+
+def get_payer_by_id_v1(client: TestClient, payer_id: str) -> Dict[str, Any]:
+    return client.get(_get_payer_by_id_v1_url(payer_id)).json()
 
 
 def create_payment_method_v0(

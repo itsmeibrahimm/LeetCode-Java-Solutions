@@ -5,10 +5,8 @@ from uuid import uuid4, UUID
 import pytest
 
 from app.payin.api.cart_payment.v1.converter import validate_cart_payment_request_v1
-from app.payin.api.cart_payment.v1.request import (
-    CreateCartPaymentRequestV1,
-    PaymentMethodToken,
-)
+from app.payin.api.cart_payment.v1.request import CreateCartPaymentRequestV1
+from app.payin.core.cart_payment.model import PaymentMethodToken
 
 
 @pytest.mark.parametrize(

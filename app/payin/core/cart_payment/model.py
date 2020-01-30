@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Schema
 from typing_extensions import final
 
 from app.commons.types import CountryCode, Currency, PgpCode
@@ -48,6 +48,7 @@ class CartPayment(BaseModel):
     amount: int
     payer_id: Optional[UUID]
     payer_correlation_ids: Optional[PayerCorrelationIds]
+    dd_stripe_card_id: Optional[int]
     payment_method_id: Optional[UUID]
     delay_capture: bool
     correlation_ids: CorrelationIds
@@ -329,3 +330,19 @@ class LegacyStripeCharge(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
     refunded_at: Optional[datetime]
+
+
+class PaymentMethodToken(BaseModel):
+    token: str = Schema(  # type: ignore
+        default=...,
+        description="one-time token to identify a payment method tokenized by payment gateway",
+    )
+    payment_gateway: PgpCode = Schema(  # type: ignore
+        default=..., description="payment gateway which tokenized this payment method"
+    )
+
+    def __str__(self) -> str:
+        return f"token:redacted-payment_gateway:{self.payment_gateway}"
+
+    def __repr__(self) -> str:
+        return f"token:redacted-payment_gateway:{self.payment_gateway}"

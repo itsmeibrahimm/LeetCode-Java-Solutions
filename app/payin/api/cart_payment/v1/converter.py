@@ -2,10 +2,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from app.payin.api.cart_payment.v1.request import (
-    CorrelationIds,
-    CreateCartPaymentRequestV1,
-)
+from app.payin.api.cart_payment.v1.request import CreateCartPaymentRequestV1
 from app.payin.api.cart_payment.validator import validate_min_amount
 from app.payin.core.cart_payment.model import CartPayment
 from app.payin.core.exceptions import PayinError, PayinErrorCode
@@ -31,7 +28,7 @@ def validate_cart_payment_request_v1(cart_payment_request: CreateCartPaymentRequ
 
 
 def to_internal_cart_payment(
-    cart_payment_request: CreateCartPaymentRequestV1, correlation_ids: CorrelationIds
+    cart_payment_request: CreateCartPaymentRequestV1
 ) -> CartPayment:
 
     validate_cart_payment_request_v1(cart_payment_request)
@@ -42,8 +39,9 @@ def to_internal_cart_payment(
             payer_correlation_ids=cart_payment_request.payer_correlation_ids,
             amount=cart_payment_request.amount,
             payment_method_id=cart_payment_request.payment_method_id,
+            dd_stripe_card_id=cart_payment_request.dd_stripe_card_id,
             delay_capture=cart_payment_request.delay_capture,
-            correlation_ids=correlation_ids,
+            correlation_ids=cart_payment_request.correlation_ids,
             metadata=cart_payment_request.metadata,
             client_description=cart_payment_request.client_description,
             payer_statement_description=cart_payment_request.payer_statement_description,

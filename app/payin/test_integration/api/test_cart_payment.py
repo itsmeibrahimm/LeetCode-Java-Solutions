@@ -1,7 +1,7 @@
 import random
 import uuid
 from asyncio import AbstractEventLoop
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 import pytest
@@ -19,23 +19,26 @@ from app.commons.providers.stripe.stripe_models import Customer as StripeCustome
 from app.commons.types import CountryCode
 from app.commons.utils.validation import not_none
 from app.conftest import RuntimeContextManager, RuntimeSetter, StripeAPISettings
+from app.payin.core.cart_payment.cart_payment_client import CartPaymentInterface
+from app.payin.core.cart_payment.commando_mode_processor import CommandoProcessor
 
 # Since this test requires a sequence of calls to stripe in order to set up a payment intent
 # creation attempt, we need to use the actual test stripe system.  As a result this test class
 # is marked as external.  The stripe simulator does not return the correct result since it does
 # persist state.
-from app.payin.core.cart_payment.model import LegacyStripeCharge
-from app.payin.core.cart_payment.commando_mode_processor import CommandoProcessor
-from app.payin.core.cart_payment.cart_payment_client import CartPaymentInterface
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
-from app.payin.core.payment_method.types import CartPaymentSortKey, PgpPaymentInfo
+from app.payin.core.payment_method.types import (
+    CartPaymentSortKey,
+    PaymentMethodSortKey,
+    PgpPaymentInfo,
+)
 from app.payin.core.types import (
     PayerReferenceIdType,
     PgpPayerResourceId,
     PgpPaymentMethodResourceId,
 )
+from app.payin.models.maindb import stripe_charges
 from app.payin.models.paymentdb import payment_methods, pgp_payment_methods
-from app.payin.repository.cart_payment_repo import CartPaymentRepository
 from app.payin.repository.payment_method_repo import (
     GetStripeCardByStripeIdInput,
     PaymentMethodRepository,
@@ -44,6 +47,8 @@ from app.payin.repository.payment_method_repo import (
 from app.payin.test_integration.integration_utils import (
     _create_payer_v1_url,
     build_commando_processor,
+    get_payer_by_id_v1,
+    list_payment_method_v1,
 )
 from app.payin.tests import utils
 
@@ -449,9 +454,15 @@ class TestCartPayment:
         assert cart_payment["id"]
         assert cart_payment["amount"] == request_body["amount"]
         assert cart_payment["payer_id"] == payer["id"]
+        if "payment_method_token" in request_body:
+            assert cart_payment["payment_method_id"]
         if "payment_method_id" in request_body:
             assert (
                 cart_payment["payment_method_id"] == request_body["payment_method_id"]
+            )
+        if "dd_stripe_card_id" in request_body:
+            assert (
+                cart_payment["dd_stripe_card_id"] == request_body["dd_stripe_card_id"]
             )
         assert cart_payment["delay_capture"] == request_body["delay_capture"]
         assert cart_payment["correlation_ids"]
@@ -1216,6 +1227,92 @@ class TestCartPayment:
             payment_method_extractor=payment_method_extractor,
         )
 
+    @pytest.mark.parametrize("commando_mode", [True, False])
+    def test_cart_payment_creation_with_stripe_token_for_new_payer(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        runtime_setter: RuntimeSetter,
+        commando_mode: bool,
+        payer: Dict[str, Any],
+        app_context: AppContext,
+    ):
+        def payer_id_extractor(payer: Dict[str, Any]) -> Dict[str, Any]:
+            legacy_dd_stripe_customer_id = payer["legacy_dd_stripe_customer_id"]
+            payer_correlation_ids = {
+                "payer_reference_id": legacy_dd_stripe_customer_id,
+                "payer_reference_id_type": PayerReferenceIdType.LEGACY_DD_STRIPE_CUSTOMER_ID,
+            }
+            return {"payer_correlation_ids": payer_correlation_ids}
+
+        def payment_method_extractor(payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                "payment_method_token": {
+                    "token": "tok_amex",
+                    "payment_gateway": "stripe",
+                }
+            }
+
+        runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, commando_mode)
+
+        # verify the payer is a new one and there is no existing payment method associated
+        existing_pms = list_payment_method_v1(
+            client=client,
+            payer_id=payer["id"],
+            active_only=True,
+            sort_by=PaymentMethodSortKey.CREATED_AT,
+            force_update=False,
+            country=CountryCode.US,
+        )
+
+        cp_1 = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method={},
+            amount=500,
+            delay_capture=True,
+            commando_mode=commando_mode,
+            payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
+        )
+        new_pm_id = cp_1.get("payment_method_id", None)
+        assert new_pm_id
+
+        # Use same token for a second create cp call to test pm deduplication
+        cp_2 = self._test_cart_payment_creation(
+            client=client,
+            payer=payer,
+            payment_method={},
+            amount=500,
+            delay_capture=True,
+            commando_mode=commando_mode,
+            payer_id_extractor=payer_id_extractor,
+            payment_method_extractor=payment_method_extractor,
+        )
+        assert new_pm_id == cp_2["payment_method_id"]
+
+        current_pms = list_payment_method_v1(
+            client=client,
+            payer_id=payer["id"],
+            active_only=True,
+            sort_by=PaymentMethodSortKey.CREATED_AT,
+            force_update=False,
+            country=CountryCode.US,
+        )
+
+        assert "count" in current_pms
+        # there should only be at most 1 pm created given dedupe
+        assert 0 <= (current_pms["count"] - existing_pms["count"]) <= 1
+        current_pm = current_pms["data"][0]
+        assert not current_pm.get("deleted_at", None)
+        assert current_pm.get("card", None)
+        assert current_pm.get("card").get("active", False)
+
+        current_payer = get_payer_by_id_v1(client, payer["id"])
+        assert current_payer["id"] == payer["id"]
+        # there shouldn't be default pm attached here since we don't set default pm for token payment
+        assert not current_payer["default_payment_method_id"]
+
     def _test_cart_payment_creation_flows(
         self,
         stripe_api: StripeAPISettings,
@@ -1405,7 +1502,7 @@ class TestCartPayment:
         event_loop: AbstractEventLoop,
     ):
         stripe_api.enable_outbound()
-        payer = self._test_payer_creation(client=client, payer_reference_id="2")
+        payer = self._test_payer_creation(client=client, payer_reference_id="1")
         payment_method = self._test_payment_method_creation(client=client, payer=payer)
         runtime_setter.set(STRIPE_COMMANDO_MODE_BOOLEAN, False)
         # Use payer, payment method api calls to seed data into legacy table.  It would be better to
@@ -1430,6 +1527,12 @@ class TestCartPayment:
         )
 
         assert stripe_card.id
+
+        commando_processor: CommandoProcessor = build_commando_processor(
+            app_context=app_context
+        )
+
+        event_loop.run_until_complete(commando_processor.recoup())
 
         cart_payment_1 = self._test_cart_payment_legacy_payment_creation(
             client=client,
@@ -1474,21 +1577,24 @@ class TestCartPayment:
             assert cart_payment_3
 
         # Now make the stripe card we have used cannot be verified by invalid stripe charges created by this card
-        cart_payment_repo = CartPaymentRepository(app_context)
-        for cp in (cart_payment_1, cart_payment_2, cart_payment_3):
-            charge_id = int(cp["dd_charge_id"])
-            stripe_charges: List[LegacyStripeCharge] = event_loop.run_until_complete(
-                cart_payment_repo.get_legacy_stripe_charges_by_charge_id(
-                    charge_id=charge_id
-                )
-            )
-            assert len(stripe_charges) == 1
-            event_loop.run_until_complete(
-                cart_payment_repo.update_legacy_stripe_charge_status(
-                    stripe_charge_id=stripe_charges[0].stripe_id,
+        async def fail_all_stripe_charges_for_card(
+            app_context: AppContext, dd_stripe_card_id: int
+        ):
+
+            stmt = (
+                stripe_charges.table.update()
+                .where(stripe_charges.card_id == dd_stripe_card_id)
+                .values(
                     status=LegacyStripeChargeStatus.FAILED,
+                    updated_at=datetime.now(timezone.utc),
                 )
             )
+
+            await app_context.payin_maindb.master().execute(stmt)
+
+        event_loop.run_until_complete(
+            fail_all_stripe_charges_for_card(app_context, stripe_card.id)
+        )
 
         # After invalidated all previous charges to failed, this attempt should fail when we don't allow
         # commando mode on card without previous successful charges
@@ -1519,10 +1625,6 @@ class TestCartPayment:
                 commando_mode=True,
             )
             assert cart_payment_4
-
-        commando_processor: CommandoProcessor = build_commando_processor(
-            app_context=app_context
-        )
 
         total, result = event_loop.run_until_complete(commando_processor.recoup())
         assert total == 3

@@ -62,13 +62,11 @@ async def create_cart_payment(
 
     cart_payment = await cart_payment_processor.create_cart_payment_v1(
         # TODO: this should be moved above as a validation/sanitize step and not embedded in the call to processor
-        request_cart_payment=to_internal_cart_payment(
-            cart_payment_request, correlation_ids=cart_payment_request.correlation_ids
-        ),
-        dd_stripe_card_id=cart_payment_request.dd_stripe_card_id,
+        request_cart_payment=to_internal_cart_payment(cart_payment_request),
         idempotency_key=cart_payment_request.idempotency_key,
         payment_country=cart_payment_request.payment_country,
         currency=cart_payment_request.currency,
+        payment_method_token=cart_payment_request.payment_method_token,
     )
 
     log.info(
