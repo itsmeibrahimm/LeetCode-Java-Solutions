@@ -102,7 +102,7 @@ if app_config.ENVIRONMENT == "prod":
     scheduler.add_job(
         func=monitor_transfers_with_incorrect_status.run,
         name=monitor_transfers_with_incorrect_status.job_name,
-        trigger=CronTrigger(hour="1", timezone=Timezones.US_PACIFIC),
+        trigger=CronTrigger(hour="22", minute="30", timezone=Timezones.US_PACIFIC),
     )
 elif app_config.ENVIRONMENT == "staging":
     scheduler.add_job(

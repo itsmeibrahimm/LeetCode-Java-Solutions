@@ -179,7 +179,7 @@ class MonitorTransfersWithIncorrectStatus(Job):
             # Create a window of the last 7 days
             start = self._start_of_the_week(
                 date=datetime.now(timezone.utc)
-            ) - timedelta(weeks=1)
+            ) - timedelta(days=3)
             stripe_transfer_repo = StripeTransferRepository(
                 database=job_instance_cxt.app_context.payout_maindb
             )
