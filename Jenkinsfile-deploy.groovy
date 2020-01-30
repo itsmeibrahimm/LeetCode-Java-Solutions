@@ -21,10 +21,6 @@ pipeline {
   }
   stages {
     stage('Staging Deployment') {
-      when {
-        equals expected: true, actual: canDeployPipeline
-      }
-
       stages {
         stage('Deploy to Staging') {
           steps {
