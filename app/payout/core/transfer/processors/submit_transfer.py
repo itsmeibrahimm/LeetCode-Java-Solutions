@@ -956,8 +956,14 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
         target_type, target_id, statement_descriptor, target_biz_id = await get_target_metadata(
             payment_account_id=payment_account.id, dsj_client=self.dsj_client
         )
+
         create_payout_request = StripeCreatePayoutRequest(
-            statement_descriptor=statement_descriptor,
+            statement_descriptor=statement_descriptor.replace(">", "")
+            .replace("<", "")
+            .replace("'", "")
+            .replace('"', "")
+            if statement_descriptor
+            else "",
             metadata=self.get_stripe_transfer_metadata(
                 transfer_id=transfer_id,
                 payment_account=payment_account,
