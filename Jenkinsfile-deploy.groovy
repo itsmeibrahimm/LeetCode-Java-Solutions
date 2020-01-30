@@ -20,14 +20,6 @@ pipeline {
     label 'universal'
   }
   stages {
-    stage('Deploy To Staging?') {
-      steps {
-        script {
-          common = load "${WORKSPACE}/Jenkinsfile-common.groovy"
-          canDeployPipeline = common.inputDeployPipeline()
-        }
-      }
-    }
     stage('Staging Deployment') {
       when {
         equals expected: true, actual: canDeployPipeline
@@ -60,7 +52,6 @@ pipeline {
           sendSlackMessage common.getSlackChannel(), "Deploy to staging failed for ${common.getServiceName()} using sha ${params['SHA']} of branch ${params['BRANCH_NAME']}: <${BUILD_URL}|${env.JOB_NAME} [${env.BUILD_NUMBER}]>"
         }
       }
-
     }
   }
 }

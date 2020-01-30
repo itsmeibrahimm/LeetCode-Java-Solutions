@@ -137,7 +137,7 @@ module "payment-service-cron" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -180,7 +180,7 @@ module "payment-service-payout-cron" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -223,7 +223,7 @@ module "payment-service-delete-payer-cron" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -260,7 +260,7 @@ module "payment-service-admin" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -302,7 +302,7 @@ module "payment-service-payment-payout-worker" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -344,7 +344,7 @@ module "payment-service-payment-stripe-worker" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -386,7 +386,7 @@ module "payment-service-delete-payer-worker" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
@@ -430,7 +430,7 @@ module "payment-service-web-marqeta" {
   net_service_port                          = "80"
   net_service_type                          = "ClusterIP"
 
-  helm_timeout                              = "0"
+  helm_timeout                              = "3600"
 
   service_environments_variables = <<EOF
     ENVIRONMENT=prod
