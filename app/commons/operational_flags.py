@@ -18,3 +18,5 @@ ENABLED_VERIFICATION_REQUIREMENTS_RETRIEVAL = (
 ENABLED_KEY_PREFIX_LIST_FOR_CACHE = (
     "payout/feature-flags/enabled_cache_key_prefix_list.json"
 )
+
+BYPASS_IDS = "ops/bypass_ids_service_auth.bool"

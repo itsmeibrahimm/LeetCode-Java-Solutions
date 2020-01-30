@@ -6,7 +6,9 @@ import aiohttp
 from cachetools import TTLCache
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_200_OK
 
+from app.commons.operational_flags import BYPASS_IDS
 from app.commons.providers.identity_models import VerifyTokenResponse
+from app.commons.runtime import runtime
 from app.commons.tracing import track_breadcrumb
 
 CORRELATION_ID_KEY = "x-correlation-id"
@@ -150,6 +152,9 @@ class IdentityClient(IdentityClientInterface):
         :return:
         :raises HTTPException
         """
+        if runtime.get_bool(BYPASS_IDS, False):
+            pass
+
         result_from_cache = self._verify_from_cache(api_key)
         if result_from_cache:
             return result_from_cache

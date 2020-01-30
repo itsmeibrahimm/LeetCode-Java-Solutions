@@ -26,7 +26,7 @@ def create_app_config() -> AppConfig:
         API_STATSD_CONFIG=ApiStatsDConfig(
             TAGS={"service_name": "payment-service", "cluster": "prod"}
         ),
-        IDENTITY_SERVICE_HTTP_ENDPOINT="http://identity-service-web.identity-service",
+        IDENTITY_SERVICE_HTTP_ENDPOINT="http://identity-service-helm-web.prod",
         IDENTITY_SERVICE_GRPC_ENDPOINT="identity-service-web.identity-service:50051",
         PAYIN_SERVICE_ID=1631011587067518976,
         PAYOUT_SERVICE_ID=1631011587067518976,
