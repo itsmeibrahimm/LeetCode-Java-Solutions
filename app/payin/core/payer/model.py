@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Schema
 from typing_extensions import final
 
-from app.commons.types import PgpCode
+from app.commons.types import PgpCode, CountryCode
 from app.commons.utils.legacy_utils import owner_type_to_payer_reference_id_type
 from app.commons.utils.validation import not_none
 from app.payin.core.payer.types import DeletePayerRequestStatus
@@ -201,8 +201,13 @@ class DoorDashDomainRedact(BaseModel):
 
 
 # pgp domain actions
+class StripeRedactAction(RedactAction):
+    stripe_customer_id: str
+    stripe_country: CountryCode
+
+
 class StripeDomainRedact(BaseModel):
-    customer: RedactAction
+    customers: List[StripeRedactAction]
 
 
 # DeletePayerSummary

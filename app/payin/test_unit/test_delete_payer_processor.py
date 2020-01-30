@@ -16,6 +16,7 @@ from app.payin.core.payer.model import (
     DoorDashDomainRedact,
     RedactAction,
     StripeDomainRedact,
+    StripeRedactAction,
 )
 from app.payin.core.payer.types import (
     DeletePayerRequestStatus,
@@ -58,13 +59,7 @@ class TestDeletePayerProcessor:
                     status=DeletePayerRequestStatus.IN_PROGRESS,
                 ),
             ),
-            stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
-            ),
+            stripe_domain_redact=StripeDomainRedact(customers=[]),
         )
         return generate_delete_payer_request(summary=delete_payer_summary.json())
 
@@ -136,12 +131,19 @@ class TestDeletePayerProcessor:
                 ),
             ),
             stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.SUCCEEDED,
-                )
+                customers=[
+                    StripeRedactAction(
+                        data_type="pii",
+                        action="delete",
+                        status=DeletePayerRequestStatus.SUCCEEDED,
+                        stripe_customer_id=stripe_customer.id,
+                        stripe_country=CountryCode.US,
+                    )
+                ]
             ),
+        )
+        updated_delete_payer_request = generate_delete_payer_request(
+            summary=expected_summary.json()
         )
         delete_payer_processor.cart_payment_interface.update_cart_payments_remove_pii = FunctionMock(
             return_value=[cart_payment]
@@ -167,6 +169,12 @@ class TestDeletePayerProcessor:
         delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
+        delete_payer_processor.payer_client.pgp_get_customers = FunctionMock(
+            return_value=[stripe_customer]
+        )
+        delete_payer_processor.payer_client.update_delete_payer_request = FunctionMock(
+            return_value=updated_delete_payer_request
+        )
         await delete_payer_processor.delete_payer(delete_payer_request)
         mock_send_response.assert_called_once_with(
             app_context=delete_payer_processor.app_context,
@@ -176,7 +184,7 @@ class TestDeletePayerProcessor:
             status=common_pb2.StatusCode.COMPLETE,
             response=expected_summary.json(),
         )
-        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_once_with(
+        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_with(
             delete_payer_request.client_request_id,
             DeletePayerRequestStatus.SUCCEEDED,
             expected_summary.json(),
@@ -245,12 +253,19 @@ class TestDeletePayerProcessor:
                 ),
             ),
             stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.SUCCEEDED,
-                )
+                customers=[
+                    StripeRedactAction(
+                        data_type="pii",
+                        action="delete",
+                        status=DeletePayerRequestStatus.SUCCEEDED,
+                        stripe_customer_id=stripe_customer.id,
+                        stripe_country=CountryCode.US,
+                    )
+                ]
             ),
+        )
+        updated_delete_payer_request = generate_delete_payer_request(
+            summary=expected_summary.json()
         )
         delete_payer_processor.cart_payment_interface.update_cart_payments_remove_pii = FunctionMock(
             return_value=[cart_payment]
@@ -276,9 +291,15 @@ class TestDeletePayerProcessor:
         delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
+        delete_payer_processor.payer_client.pgp_get_customers = FunctionMock(
+            return_value=[stripe_customer]
+        )
+        delete_payer_processor.payer_client.update_delete_payer_request = FunctionMock(
+            return_value=updated_delete_payer_request
+        )
         await delete_payer_processor.delete_payer(delete_payer_request)
         mock_send_response.assert_not_called()
-        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_once_with(
+        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_with(
             delete_payer_request.client_request_id,
             DeletePayerRequestStatus.IN_PROGRESS,
             expected_summary.json(),
@@ -346,12 +367,19 @@ class TestDeletePayerProcessor:
                 ),
             ),
             stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.SUCCEEDED,
-                )
+                customers=[
+                    StripeRedactAction(
+                        data_type="pii",
+                        action="delete",
+                        status=DeletePayerRequestStatus.SUCCEEDED,
+                        stripe_customer_id=stripe_customer.id,
+                        stripe_country=CountryCode.US,
+                    )
+                ]
             ),
+        )
+        updated_delete_payer_request = generate_delete_payer_request(
+            summary=expected_summary.json()
         )
         delete_payer_processor.cart_payment_interface.update_cart_payments_remove_pii = FunctionMock(
             return_value=[cart_payment]
@@ -377,9 +405,15 @@ class TestDeletePayerProcessor:
         delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
+        delete_payer_processor.payer_client.pgp_get_customers = FunctionMock(
+            return_value=[stripe_customer]
+        )
+        delete_payer_processor.payer_client.update_delete_payer_request = FunctionMock(
+            return_value=updated_delete_payer_request
+        )
         await delete_payer_processor.delete_payer(delete_payer_request)
         mock_send_response.assert_not_called()
-        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_once_with(
+        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_with(
             delete_payer_request.client_request_id,
             DeletePayerRequestStatus.IN_PROGRESS,
             expected_summary.json(),
@@ -447,12 +481,19 @@ class TestDeletePayerProcessor:
                 ),
             ),
             stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.SUCCEEDED,
-                )
+                customers=[
+                    StripeRedactAction(
+                        data_type="pii",
+                        action="delete",
+                        status=DeletePayerRequestStatus.SUCCEEDED,
+                        stripe_customer_id=stripe_customer.id,
+                        stripe_country=CountryCode.US,
+                    )
+                ]
             ),
+        )
+        updated_delete_payer_request = generate_delete_payer_request(
+            summary=expected_summary.json()
         )
         delete_payer_processor.cart_payment_interface.update_cart_payments_remove_pii = FunctionMock(
             return_value=[cart_payment]
@@ -478,9 +519,15 @@ class TestDeletePayerProcessor:
         delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
+        delete_payer_processor.payer_client.pgp_get_customers = FunctionMock(
+            return_value=[stripe_customer]
+        )
+        delete_payer_processor.payer_client.update_delete_payer_request = FunctionMock(
+            return_value=updated_delete_payer_request
+        )
         await delete_payer_processor.delete_payer(delete_payer_request)
         mock_send_response.assert_not_called()
-        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_once_with(
+        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_with(
             delete_payer_request.client_request_id,
             DeletePayerRequestStatus.IN_PROGRESS,
             expected_summary.json(),
@@ -549,12 +596,19 @@ class TestDeletePayerProcessor:
                 ),
             ),
             stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
+                customers=[
+                    StripeRedactAction(
+                        data_type="pii",
+                        action="delete",
+                        status=DeletePayerRequestStatus.IN_PROGRESS,
+                        stripe_customer_id=stripe_customer.id,
+                        stripe_country=CountryCode.US,
+                    )
+                ]
             ),
+        )
+        updated_delete_payer_request = generate_delete_payer_request(
+            summary=expected_summary.json()
         )
         delete_payer_processor.cart_payment_interface.update_cart_payments_remove_pii = FunctionMock(
             return_value=[cart_payment]
@@ -580,9 +634,15 @@ class TestDeletePayerProcessor:
         delete_payer_processor.payer_client.pgp_delete_customer = FunctionMock(
             return_value=stripe_delete_customer_response
         )
+        delete_payer_processor.payer_client.pgp_get_customers = FunctionMock(
+            return_value=[stripe_customer]
+        )
+        delete_payer_processor.payer_client.update_delete_payer_request = FunctionMock(
+            return_value=updated_delete_payer_request
+        )
         await delete_payer_processor.delete_payer(delete_payer_request)
         mock_send_response.assert_not_called()
-        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_once_with(
+        delete_payer_processor.payer_client.update_delete_payer_request.assert_called_with(
             delete_payer_request.client_request_id,
             DeletePayerRequestStatus.IN_PROGRESS,
             expected_summary.json(),

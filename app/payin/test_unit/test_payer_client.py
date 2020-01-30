@@ -20,6 +20,7 @@ from app.payin.core.payer.model import (
     RedactAction,
     DoorDashDomainRedact,
     StripeDomainRedact,
+    StripeRedactAction,
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payer.types import DeletePayerRequestStatus
@@ -65,13 +66,7 @@ class TestPayerClient:
                     status=DeletePayerRequestStatus.IN_PROGRESS,
                 ),
             ),
-            stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
-            ),
+            stripe_domain_redact=StripeDomainRedact(customers=[]),
         )
 
     @pytest.mark.asyncio
@@ -253,6 +248,16 @@ class TestPayerClient:
     async def test_update_delete_payer_request(
         self, payer_client, delete_payer_summary
     ):
+        for i in range(3):
+            delete_payer_summary.stripe_domain_redact.customers.append(
+                StripeRedactAction(
+                    stripe_customer_id=f"cus_{i}",
+                    stripe_country=CountryCode.US,
+                    data_type="pii",
+                    action="obfuscate",
+                    status=DeletePayerRequestStatus.SUCCEEDED,
+                )
+            )
         delete_payer_request = generate_delete_payer_request(
             status=DeletePayerRequestStatus.SUCCEEDED,
             summary=delete_payer_summary.json(),
@@ -277,6 +282,16 @@ class TestPayerClient:
     async def test_update_delete_payer_request_errors(
         self, payer_client, delete_payer_summary
     ):
+        for i in range(3):
+            delete_payer_summary.stripe_domain_redact.customers.append(
+                StripeRedactAction(
+                    stripe_customer_id=f"cus_{i}",
+                    stripe_country=CountryCode.US,
+                    data_type="pii",
+                    action="obfuscate",
+                    status=DeletePayerRequestStatus.SUCCEEDED,
+                )
+            )
         delete_payer_request = generate_delete_payer_request(
             status=DeletePayerRequestStatus.SUCCEEDED,
             summary=delete_payer_summary.json(),

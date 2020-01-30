@@ -11,6 +11,7 @@ from app.payin.core.payer.model import (
     DoorDashDomainRedact,
     RedactAction,
     StripeDomainRedact,
+    StripeRedactAction,
 )
 from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PayerReferenceIdType
@@ -63,13 +64,7 @@ class TestPayerRepository:
                     status=DeletePayerRequestStatus.IN_PROGRESS,
                 ),
             ),
-            stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
-            ),
+            stripe_domain_redact=StripeDomainRedact(customers=[]),
         )
 
     @pytest.fixture
@@ -409,13 +404,26 @@ class TestPayerRepository:
         self, payer_repository, delete_payer_request
     ):
         now = datetime.now(timezone("UTC"))
+        delete_payer_summary = DeletePayerSummary.parse_raw(
+            delete_payer_request.summary
+        )
+        for i in range(3):
+            delete_payer_summary.stripe_domain_redact.customers.append(
+                StripeRedactAction(
+                    stripe_customer_id=f"cus_{i}",
+                    stripe_country=CountryCode.US,
+                    data_type="pii",
+                    action="obfuscate",
+                    status=DeletePayerRequestStatus.SUCCEEDED,
+                )
+            )
         result = await payer_repository.update_delete_payer_request(
             update_delete_payer_request_where_input=UpdateDeletePayerRequestWhereInput(
                 client_request_id=delete_payer_request.client_request_id
             ),
             update_delete_payer_request_set_input=UpdateDeletePayerRequestSetInput(
                 status=DeletePayerRequestStatus.SUCCEEDED.value,
-                summary=delete_payer_request.summary,
+                summary=delete_payer_summary.json(),
                 retry_count=0,
                 updated_at=now,
                 acknowledged=True,
@@ -428,7 +436,7 @@ class TestPayerRepository:
             consumer_id=delete_payer_request.consumer_id,
             payer_id=delete_payer_request.payer_id,
             status=DeletePayerRequestStatus.SUCCEEDED.value,
-            summary=delete_payer_request.summary,
+            summary=delete_payer_summary.json(),
             retry_count=0,
             created_at=delete_payer_request.created_at,
             updated_at=now,

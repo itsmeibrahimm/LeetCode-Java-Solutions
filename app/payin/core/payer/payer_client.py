@@ -774,13 +774,7 @@ class PayerClient:
                     status=DeletePayerRequestStatus.IN_PROGRESS,
                 ),
             ),
-            stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
-            ),
+            stripe_domain_redact=StripeDomainRedact(customers=[]),
         )
         try:
             return await self.payer_repo.insert_delete_payer_request(

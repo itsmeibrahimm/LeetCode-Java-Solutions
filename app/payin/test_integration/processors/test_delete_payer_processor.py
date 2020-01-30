@@ -12,6 +12,7 @@ from app.payin.core.payer.model import (
     DeletePayerSummary,
     RedactAction,
     StripeDomainRedact,
+    StripeRedactAction,
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payer.types import DeletePayerRequestStatus
@@ -60,13 +61,7 @@ class TestDeletePayerProcessor:
                     status=DeletePayerRequestStatus.IN_PROGRESS,
                 ),
             ),
-            stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
-            ),
+            stripe_domain_redact=StripeDomainRedact(customers=[]),
         )
 
     @pytest.fixture
@@ -225,11 +220,11 @@ class TestDeletePayerProcessor:
         return await stripe_async_client.create_customer(
             country=models.CountryCode.US,
             request=models.StripeCreateCustomerRequest(
-                email="john.doe@gmail.com", description="john doe", country="US"
+                email="john.law@doordash.com", description="john law", country="US"
             ),
         )
 
-    async def test_delete_payer_with_card_success(
+    async def test_delete_payer_with_one_stripe_customer(
         self,
         delete_payer_processor: DeletePayerProcessor,
         delete_payer_request: DeletePayerRequestDbEntity,
@@ -237,6 +232,7 @@ class TestDeletePayerProcessor:
         stripe_card,
         stripe_charge,
         cart_payment,
+        customer,
         payer_repository,
     ):
         await delete_payer_processor.delete_payer(delete_payer_request)
@@ -266,19 +262,26 @@ class TestDeletePayerProcessor:
             delete_payer_summary.doordash_domain_redact.cart_payments.status
             == DeletePayerRequestStatus.SUCCEEDED
         )
+        assert len(delete_payer_summary.stripe_domain_redact.customers) == 1
         assert (
-            delete_payer_summary.stripe_domain_redact.customer.status
+            delete_payer_summary.stripe_domain_redact.customers[0].status
             == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.stripe_domain_redact.customers[0].stripe_customer_id
+            == customer.id
         )
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
         assert inserted_delete_payer_requests_metadata
-        assert inserted_delete_payer_requests_metadata["email"] == "john.doe@gmail.com"
+        assert (
+            inserted_delete_payer_requests_metadata["email"] == "john.law@doordash.com"
+        )
         await payer_repository.payment_database.master().execute(
             delete_payer_requests_metadata.table.delete()
         )
 
-    async def test_delete_payer_without_card_success(
+    async def test_delete_payer_without_card(
         self,
         delete_payer_processor: DeletePayerProcessor,
         delete_payer_request: DeletePayerRequestDbEntity,
@@ -305,14 +308,11 @@ class TestDeletePayerProcessor:
             delete_payer_summary.doordash_domain_redact.cart_payments.status
             == DeletePayerRequestStatus.SUCCEEDED
         )
-        assert (
-            delete_payer_summary.stripe_domain_redact.customer.status
-            == DeletePayerRequestStatus.SUCCEEDED
-        )
+        assert not delete_payer_summary.stripe_domain_redact.customers
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
 
-    async def test_delete_payer_with_card_failure(
+    async def test_delete_payer_with_stripe_customer_already_deleted(
         self,
         delete_payer_processor: DeletePayerProcessor,
         payer_client: PayerClient,
@@ -336,13 +336,7 @@ class TestDeletePayerProcessor:
                     status=DeletePayerRequestStatus.SUCCEEDED,
                 ),
             ),
-            stripe_domain_redact=StripeDomainRedact(
-                customer=RedactAction(
-                    data_type="pii",
-                    action="delete",
-                    status=DeletePayerRequestStatus.IN_PROGRESS,
-                )
-            ),
+            stripe_domain_redact=StripeDomainRedact(customers=[]),
         )
         uuid = uuid4()
         delete_payer_request = await payer_repository.insert_delete_payer_request(
@@ -369,9 +363,7 @@ class TestDeletePayerProcessor:
         updated_delete_payer_summary = DeletePayerSummary.parse_raw(
             updated_delete_payer_request.summary
         )
-        assert (
-            updated_delete_payer_request.status == DeletePayerRequestStatus.IN_PROGRESS
-        )
+        assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert (
             updated_delete_payer_summary.doordash_domain_redact.stripe_cards.status
             == DeletePayerRequestStatus.SUCCEEDED
@@ -384,12 +376,303 @@ class TestDeletePayerProcessor:
             updated_delete_payer_summary.doordash_domain_redact.cart_payments.status
             == DeletePayerRequestStatus.SUCCEEDED
         )
-        assert (
-            updated_delete_payer_summary.stripe_domain_redact.customer.status
-            == DeletePayerRequestStatus.IN_PROGRESS
-        )
-        assert updated_delete_payer_request.acknowledged is False
+        assert not updated_delete_payer_summary.stripe_domain_redact.customers
+        assert updated_delete_payer_request.acknowledged is True
 
         await payer_repository.payment_database.master().execute(
             delete_payer_requests.table.delete().where(delete_payer_requests.id == uuid)
+        )
+
+    async def test_delete_payer_with_multiple_stripe_customers(
+        self,
+        delete_payer_processor: DeletePayerProcessor,
+        delete_payer_request: DeletePayerRequestDbEntity,
+        payer_client: PayerClient,
+        stripe_async_client,
+        stripe_card,
+        stripe_charge,
+        cart_payment,
+        customer,
+        payer_repository,
+    ):
+        list_of_stripe_customer_ids = [customer.id]
+        for i in range(5):
+            stripe_customer = await stripe_async_client.create_customer(
+                country=models.CountryCode.US,
+                request=models.StripeCreateCustomerRequest(
+                    email="john.law@doordash.com", description=f"cus_{i}"
+                ),
+            )
+            list_of_stripe_customer_ids.append(stripe_customer.id)
+        await delete_payer_processor.delete_payer(delete_payer_request)
+        updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
+            client_request_id=delete_payer_request.client_request_id
+        )
+        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
+            delete_payer_requests_metadata.table.select().where(
+                delete_payer_requests_metadata.client_request_id
+                == delete_payer_request.client_request_id
+            )
+        )
+        assert len(updated_delete_payer_requests) == 1
+        updated_delete_payer_request = updated_delete_payer_requests[0]
+        delete_payer_summary = DeletePayerSummary.parse_raw(
+            updated_delete_payer_request.summary
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_cards.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_charges.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.cart_payments.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert len(delete_payer_summary.stripe_domain_redact.customers) == 6
+        for stripe_redact_action in delete_payer_summary.stripe_domain_redact.customers:
+            assert stripe_redact_action.status == DeletePayerRequestStatus.SUCCEEDED
+            assert (
+                stripe_redact_action.stripe_customer_id in list_of_stripe_customer_ids
+            )
+        assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
+        assert updated_delete_payer_request.acknowledged is True
+        assert inserted_delete_payer_requests_metadata
+        assert (
+            inserted_delete_payer_requests_metadata["email"] == "john.law@doordash.com"
+        )
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests_metadata.table.delete()
+        )
+
+    async def test_delete_payer_with_stripe_customer_not_found(
+        self,
+        delete_payer_processor: DeletePayerProcessor,
+        delete_payer_request: DeletePayerRequestDbEntity,
+        payer_client: PayerClient,
+        payer_repository,
+        payment_method_repository,
+    ):
+        uuid = uuid4()
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            InsertPgpPaymentMethodInput(
+                id=uuid,
+                pgp_code=PgpCode.STRIPE,
+                pgp_resource_id="card_lKPdMYINpftZIxF",
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            InsertStripeCardInput(
+                stripe_id=pgp_payment_method.pgp_resource_id,
+                consumer_id=2,
+                fingerprint="fingerprint",
+                last4="1234",
+                dynamic_last4="4621",
+                exp_month="03",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id="cus_1234",
+            )
+        )
+        await delete_payer_processor.delete_payer(delete_payer_request)
+        await payment_method_repository.payment_database.master().execute(
+            pgp_payment_methods.table.delete().where(pgp_payment_methods.id == uuid)
+        )
+        await payment_method_repository.main_database.master().execute(
+            stripe_cards.table.delete().where(stripe_cards.id == stripe_card.id)
+        )
+        updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
+            client_request_id=delete_payer_request.client_request_id
+        )
+        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
+            delete_payer_requests_metadata.table.select().where(
+                delete_payer_requests_metadata.client_request_id
+                == delete_payer_request.client_request_id
+            )
+        )
+        assert len(updated_delete_payer_requests) == 1
+        updated_delete_payer_request = updated_delete_payer_requests[0]
+        delete_payer_summary = DeletePayerSummary.parse_raw(
+            updated_delete_payer_request.summary
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_cards.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_charges.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.cart_payments.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert not delete_payer_summary.stripe_domain_redact.customers
+        assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
+        assert updated_delete_payer_request.acknowledged is True
+        assert not inserted_delete_payer_requests_metadata
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests_metadata.table.delete()
+        )
+
+    async def test_delete_payer_with_stripe_customer_without_email(
+        self,
+        delete_payer_processor: DeletePayerProcessor,
+        delete_payer_request: DeletePayerRequestDbEntity,
+        payer_client: PayerClient,
+        payer_repository,
+        payment_method_repository,
+        stripe_async_client,
+    ):
+        uuid = uuid4()
+        customer = await stripe_async_client.create_customer(
+            country=models.CountryCode.US,
+            request=models.StripeCreateCustomerRequest(email="", description=""),
+        )
+        pgp_payment_method = await payment_method_repository.insert_pgp_payment_method(
+            InsertPgpPaymentMethodInput(
+                id=uuid,
+                pgp_code=PgpCode.STRIPE,
+                pgp_resource_id="card_lKPdMYINpftZIxF",
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+
+        stripe_card = await payment_method_repository.insert_stripe_card(
+            InsertStripeCardInput(
+                stripe_id=pgp_payment_method.pgp_resource_id,
+                consumer_id=2,
+                fingerprint="fingerprint",
+                last4="1234",
+                dynamic_last4="4621",
+                exp_month="03",
+                exp_year="2020",
+                type="visa",
+                active=True,
+                external_stripe_customer_id=customer.id,
+            )
+        )
+        await delete_payer_processor.delete_payer(delete_payer_request)
+        await payment_method_repository.payment_database.master().execute(
+            pgp_payment_methods.table.delete().where(pgp_payment_methods.id == uuid)
+        )
+        await payment_method_repository.main_database.master().execute(
+            stripe_cards.table.delete().where(stripe_cards.id == stripe_card.id)
+        )
+        updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
+            client_request_id=delete_payer_request.client_request_id
+        )
+        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
+            delete_payer_requests_metadata.table.select().where(
+                delete_payer_requests_metadata.client_request_id
+                == delete_payer_request.client_request_id
+            )
+        )
+        assert len(updated_delete_payer_requests) == 1
+        updated_delete_payer_request = updated_delete_payer_requests[0]
+        delete_payer_summary = DeletePayerSummary.parse_raw(
+            updated_delete_payer_request.summary
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_cards.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_charges.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.cart_payments.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert len(delete_payer_summary.stripe_domain_redact.customers) == 1
+        assert (
+            delete_payer_summary.stripe_domain_redact.customers[0].status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.stripe_domain_redact.customers[0].stripe_customer_id
+            == customer.id
+        )
+        assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
+        assert updated_delete_payer_request.acknowledged is True
+        assert not inserted_delete_payer_requests_metadata
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests_metadata.table.delete()
+        )
+
+    async def test_delete_payer_with_multiple_stripe_customers_some_already_deleted(
+        self,
+        delete_payer_processor: DeletePayerProcessor,
+        delete_payer_request: DeletePayerRequestDbEntity,
+        payer_client: PayerClient,
+        payer_repository,
+    ):
+        list_of_stripe_customer_ids = []
+        delete_payer_summary = DeletePayerSummary.parse_raw(
+            delete_payer_request.summary
+        )
+        for i in range(2):
+            delete_payer_summary.stripe_domain_redact.customers.append(
+                StripeRedactAction(
+                    stripe_customer_id=f"cus_{i}",
+                    stripe_country=CountryCode.US,
+                    data_type="pii",
+                    action="delete",
+                    status=DeletePayerRequestStatus.IN_PROGRESS,
+                )
+            )
+            list_of_stripe_customer_ids.append(f"cus_{i}")
+
+        updated_delete_payer_request = await payer_client.update_delete_payer_request(
+            delete_payer_request.client_request_id,
+            delete_payer_request.status,
+            delete_payer_summary.json(),
+            delete_payer_request.retry_count,
+            delete_payer_request.acknowledged,
+        )
+
+        await delete_payer_processor.delete_payer(updated_delete_payer_request)
+        updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
+            client_request_id=delete_payer_request.client_request_id
+        )
+        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
+            delete_payer_requests_metadata.table.select().where(
+                delete_payer_requests_metadata.client_request_id
+                == delete_payer_request.client_request_id
+            )
+        )
+        assert len(updated_delete_payer_requests) == 1
+        updated_delete_payer_request = updated_delete_payer_requests[0]
+        delete_payer_summary = DeletePayerSummary.parse_raw(
+            updated_delete_payer_request.summary
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_cards.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.stripe_charges.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert (
+            delete_payer_summary.doordash_domain_redact.cart_payments.status
+            == DeletePayerRequestStatus.SUCCEEDED
+        )
+        assert len(delete_payer_summary.stripe_domain_redact.customers) == 2
+        for stripe_redact_action in delete_payer_summary.stripe_domain_redact.customers:
+            assert stripe_redact_action.status == DeletePayerRequestStatus.SUCCEEDED
+            assert (
+                stripe_redact_action.stripe_customer_id in list_of_stripe_customer_ids
+            )
+        assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
+        assert updated_delete_payer_request.acknowledged is True
+        assert not inserted_delete_payer_requests_metadata
+        await payer_repository.payment_database.master().execute(
+            delete_payer_requests_metadata.table.delete()
         )

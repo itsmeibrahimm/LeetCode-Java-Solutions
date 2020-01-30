@@ -1,5 +1,4 @@
-from typing import Optional
-from uuid import UUID
+from typing import Optional, List, Tuple
 
 from doordash_python_stats.ddstats import doorstats_global
 from fastapi import Depends
@@ -18,11 +17,20 @@ from app.payin.core.cart_payment.processor import (
     LegacyPaymentInterface,
     CartPaymentInterface,
 )
+from app.payin.core.exceptions import (
+    PayerReadError,
+    PayinErrorCode,
+    PayerDeleteError,
+    PaymentMethodUpdateError,
+    CartPaymentUpdateError,
+    LegacyStripeChargeUpdateError,
+)
 from app.payin.core.payer.model import (
     Payer,
     RawPayer,
     PaymentGatewayProviderCustomer,
     DeletePayerSummary,
+    StripeRedactAction,
 )
 from app.payin.core.payer.payer_client import PayerClient
 from app.payin.core.payer.types import (
@@ -34,15 +42,11 @@ from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethodI
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.kafka.delete_payer_message_processor import send_response
-from app.payin.repository.payer_repo import DeletePayerRequestDbEntity
-from app.payin.core.exceptions import (
-    PayerReadError,
-    PayinErrorCode,
-    PayerDeleteError,
-    PaymentMethodUpdateError,
-    CartPaymentUpdateError,
-    LegacyStripeChargeUpdateError,
+from app.payin.repository.payer_repo import (
+    DeletePayerRequestDbEntity,
+    DeletePayerRequestMetadataDbEntity,
 )
+from app.payin.repository.payment_method_repo import StripeCardDbEntity
 
 
 class PayerProcessorV0:
@@ -272,19 +276,18 @@ class DeletePayerProcessor:
         cart_payments_status = await self.remove_pii_from_cart_payments(
             consumer_id, delete_payer_summary
         )
-        stripe_customer_status = await self.delete_stripe_customer(
-            consumer_id, delete_payer_summary, delete_payer_request.client_request_id
+        stripe_customer_status = await self.delete_stripe_customers(
+            consumer_id, delete_payer_summary, delete_payer_request
         )
 
-        self.update_delete_payer_summary(
+        self._update_delete_payer_summary(
             delete_payer_summary,
             stripe_cards_status,
             stripe_charges_status,
             cart_payments_status,
-            stripe_customer_status,
         )
 
-        pii_removal_successful = self.is_pii_removal_successfull(
+        pii_removal_successful = self._is_pii_removal_successfull(
             stripe_cards_status,
             stripe_charges_status,
             cart_payments_status,
@@ -317,12 +320,12 @@ class DeletePayerProcessor:
             retry_count += 1
 
         try:
-            await self.payer_client.update_delete_payer_request(
-                delete_payer_request.client_request_id,
-                status,
-                delete_payer_summary.json(),
-                retry_count,
-                acknowledged,
+            await self._update_delete_payer_request(
+                delete_payer_request=delete_payer_request,
+                status=status,
+                summary=delete_payer_summary.json(),
+                retry_count=retry_count,
+                acknowledged=acknowledged,
             )
         except PayerDeleteError:
             self.log.exception(
@@ -330,7 +333,6 @@ class DeletePayerProcessor:
                 consumer_id=delete_payer_request.consumer_id,
                 client_request_id=delete_payer_request.client_request_id,
             )
-            doorstats_global.incr("delete-payer.exception")
             raise
 
     async def remove_pii_from_stripe_cards(
@@ -456,105 +458,144 @@ class DeletePayerProcessor:
             )
             return False
 
-    async def delete_stripe_customer(
+    async def delete_stripe_customers(
         self,
         consumer_id: int,
         delete_payer_summary: DeletePayerSummary,
-        client_request_id: UUID,
+        delete_payer_request: DeletePayerRequestDbEntity,
     ) -> bool:
-        if (
-            delete_payer_summary.stripe_domain_redact.customer.status
-            == DeletePayerRequestStatus.SUCCEEDED
-        ):
-            return True
-
-        stripe_cards = await self.payment_method_client.get_stripe_cards_for_consumer_id(
-            consumer_id
-        )
-
         """
-            Since a consumer can be associated with multiple cards, each of which can
-            have external_stripe_customer_id present or absent. Hence we loop through
-            each card to find at least one external_stripe_customer_id which should
-            ideally be unique
+        :param consumer_id:
+        :param delete_payer_summary:
+        :param delete_payer_request:
+        :return: bool
+            Algorithm:
+                If customers list in delete_payer_summary is empty:
+                    Find cards for consumer
+                    Find stripe_customer_id for cards
+                    Find stripe_customer using stripe_customer_id
+                    Return True if stripe_customer or stripe_country not found
+                    Return True If the stripe_customer already deleted
+                    Append stripe_customer.id to list_of_stripe_customer_ids
+                    Insert delete_payer_request_metadata for temporary backwards compatibility if email present on stripe_customer
+                    Find all stripe_customers associated with stripe_customer's email if one present, and add id's from those to list_of_stripe_customer_ids
+                    Initialize and add stripe_redact_actions for each id in list_of_stripe_customer_ids to customers list in delete_payer_summary if valid stripe_country
+                    Update delete_payer_request with locally updated delete_payer_summary, and return False if update unsuccessful
+                For each stripe_redact_action in customers list in delete_payer_summary:
+                    Delete stripe customer and update status in delete_payer_summary
+                Update delete_payer_request with locally updated delete_payer_summary, and return False if update unsuccessful
+                If status of all stripe_redact_action is successful in customers list in delete_payer_summary in updated_delete_payer_request return True else return False
         """
-        stripe_customer_id = None
-        for stripe_card in stripe_cards:
-            if stripe_card.external_stripe_customer_id:
-                stripe_customer_id = stripe_card.external_stripe_customer_id
-                break
-
-        if not stripe_customer_id:
-            self.log.info(
-                "[delete_stripe_customer] No stripe customer id found for consumer",
-                consumer_id=consumer_id,
+        if not delete_payer_summary.stripe_domain_redact.customers:
+            stripe_cards = await self.payment_method_client.get_stripe_cards_for_consumer_id(
+                consumer_id
             )
-            return True
 
-        """
-            Since we don't have access to consumer table we don't know stripe country
-            for consumer, which we need to determine api key to use.
-        """
-        for country_code in CountryCode:
-            self.log.info(
-                "[delete_stripe_customer] Trying to delete stripe customer for country",
-                consumer_id=consumer_id,
-                stripe_customer_id=stripe_customer_id,
-                country_code=country_code,
-            )
-            try:
-                stripe_customer = await self.payer_client.pgp_get_customer(
-                    stripe_customer_id, country_code
-                )
-            except PayerReadError:
-                self.log.exception(
-                    "[delete_stripe_customer] Exception occurred while retrieving customer from stripe",
+            stripe_customer_id = self._get_external_stripe_customer_id(stripe_cards)
+
+            if not stripe_customer_id:
+                self.log.info(
+                    "[delete_stripe_customers] No stripe customer id found for consumer",
                     consumer_id=consumer_id,
                 )
-                continue
+                return True
 
-            if (
-                stripe_customer
-                and hasattr(stripe_customer, "email")
-                and stripe_customer.email
-            ):
+            list_of_stripe_customers, stripe_country, stripe_customer = (
+                set(),
+                None,
+                None,
+            )
+
+            stripe_customer, stripe_country = await self._pgp_get_customer(
+                consumer_id=consumer_id, stripe_customer_id=stripe_customer_id
+            )
+
+            if not stripe_customer or not stripe_country:
+                self.log.info(
+                    "[delete_stripe_customers] No stripe customer found for consumer",
+                    consumer_id=consumer_id,
+                )
+                return True
+
+            """While retrieving customer that has already been deleted a stripped down customer object with deleted field is returned"""
+            if hasattr(stripe_customer, "deleted"):
+                return True
+
+            list_of_stripe_customers.add(stripe_customer.id)
+
+            if stripe_customer.email:
                 try:
-                    delete_payer_request_metadata = await self.payer_client.insert_delete_payer_request_metadata(
-                        client_request_id,
-                        consumer_id,
-                        country_code,
-                        stripe_customer.email,
-                    )
-                    self.log.info(
-                        "[delete_stripe_customer] Delete payer request metadata insert successful",
+                    await self._insert_delete_payer_request_metadata(
                         consumer_id=consumer_id,
-                        client_request_id=delete_payer_request_metadata.client_request_id,
+                        delete_payer_request=delete_payer_request,
+                        stripe_country=stripe_country,
+                        email=stripe_customer.email,
                     )
                 except PayerDeleteError:
                     self.log.exception(
-                        "[delete_stripe_customer] Exception occurred while inserting delete payer request metadata",
+                        "[delete_stripe_customers] Exception occurred while inserting delete payer request metadata",
                         consumer_id=consumer_id,
                     )
+
+                stripe_customers = await self.payer_client.pgp_get_customers(
+                    email=stripe_customer.email, country_code=stripe_country
+                )
+                for customer in stripe_customers:
+                    list_of_stripe_customers.add(customer.id)
+
+            self._add_stripe_redact_actions_to_customers(
+                list_of_stripe_customers=list_of_stripe_customers,
+                delete_payer_summary=delete_payer_summary,
+                stripe_country=stripe_country,
+            )
+            self.log.info(
+                "[delete_stripe_customers] Added stripe customer ids to be deleted for consumer",
+                consumer_id=consumer_id,
+                client_request_id=delete_payer_request.client_request_id,
+                stripe_customer_ids=list_of_stripe_customers,
+            )
 
             try:
-                stripe_response = await self.payer_client.pgp_delete_customer(
-                    country_code, stripe_customer_id
+                await self._update_delete_payer_request(
+                    delete_payer_request=delete_payer_request,
+                    summary=delete_payer_summary.json(),
                 )
-                if stripe_response and stripe_response.deleted:
-                    """Here we return early if stripe customer delete was successful in any of the pods"""
-                    self.log.info(
-                        "[delete_stripe_customer] Customer successfully deleted from stripe",
-                        consumer_id=consumer_id,
-                    )
-                    return True
             except PayerDeleteError:
                 self.log.exception(
-                    "[delete_stripe_customer] Exception occurred while deleting customer from stripe",
-                    consumer_id=consumer_id,
+                    "[delete_stripe_customers] Database exception occurred with updating delete payer request",
+                    consumer_id=delete_payer_request.consumer_id,
+                    client_request_id=delete_payer_request.client_request_id,
                 )
-        return False
+                return False
 
-    def is_pii_removal_successfull(
+        await self._pgp_delete_customers(
+            consumer_id=consumer_id, delete_payer_summary=delete_payer_summary
+        )
+
+        try:
+            updated_delete_payer_request = await self._update_delete_payer_request(
+                delete_payer_request=delete_payer_request,
+                summary=delete_payer_summary.json(),
+            )
+        except PayerDeleteError:
+            self.log.exception(
+                "[delete_stripe_customers] Database exception occurred with updating delete payer request",
+                consumer_id=delete_payer_request.consumer_id,
+                client_request_id=delete_payer_request.client_request_id,
+            )
+            return False
+
+        updated_delete_payer_summary = DeletePayerSummary.parse_raw(
+            updated_delete_payer_request.summary
+        )
+        for (
+            stripe_redact_action
+        ) in updated_delete_payer_summary.stripe_domain_redact.customers:
+            if stripe_redact_action.status == DeletePayerRequestStatus.IN_PROGRESS:
+                return False
+        return True
+
+    def _is_pii_removal_successfull(
         self,
         stripe_cards_status: bool,
         stripe_charges_status: bool,
@@ -568,13 +609,12 @@ class DeletePayerProcessor:
             and stripe_customer_status
         )
 
-    def update_delete_payer_summary(
+    def _update_delete_payer_summary(
         self,
         delete_payer_summary: DeletePayerSummary,
         stripe_cards_status: bool,
         stripe_charges_status: bool,
         cart_payments_status: bool,
-        stripe_customer_status: bool,
     ):
         if stripe_cards_status:
             delete_payer_summary.doordash_domain_redact.stripe_cards.status = (
@@ -588,7 +628,147 @@ class DeletePayerProcessor:
             delete_payer_summary.doordash_domain_redact.cart_payments.status = (
                 DeletePayerRequestStatus.SUCCEEDED
             )
-        if stripe_customer_status:
-            delete_payer_summary.stripe_domain_redact.customer.status = (
-                DeletePayerRequestStatus.SUCCEEDED
+
+    def _get_external_stripe_customer_id(
+        self, stripe_cards: List[StripeCardDbEntity]
+    ) -> Optional[str]:
+        """
+            Since a consumer can be associated with multiple cards, each of which can
+            have external_stripe_customer_id present or absent. Hence we loop through
+            each card to find at least one external_stripe_customer_id which should
+            ideally be unique
+        """
+        for stripe_card in stripe_cards:
+            if stripe_card.external_stripe_customer_id:
+                return stripe_card.external_stripe_customer_id
+        return None
+
+    async def _update_delete_payer_request(
+        self,
+        delete_payer_request: DeletePayerRequestDbEntity,
+        status: str = None,
+        summary: str = None,
+        retry_count: int = None,
+        acknowledged: bool = None,
+    ) -> DeletePayerRequestDbEntity:
+
+        try:
+            return await self.payer_client.update_delete_payer_request(
+                delete_payer_request.client_request_id,
+                status if status else delete_payer_request.status,
+                summary if summary else delete_payer_request.summary,
+                retry_count if retry_count else delete_payer_request.retry_count,
+                acknowledged
+                if acknowledged is not None
+                else delete_payer_request.acknowledged,
             )
+        except PayerDeleteError:
+            self.log.exception(
+                "[_update_delete_payer_request] Database exception occurred with updating delete payer request",
+                consumer_id=delete_payer_request.consumer_id,
+                client_request_id=delete_payer_request.client_request_id,
+            )
+            doorstats_global.incr("delete-payer.exception")
+            raise
+
+    async def _pgp_get_customer(
+        self, consumer_id: int, stripe_customer_id: str
+    ) -> Tuple[Optional[StripeCustomer], Optional[CountryCode]]:
+        """
+            Since we don't have access to consumer table we don't know stripe country
+            for consumer, which we need to determine api key to use.
+        """
+        for country_code in CountryCode:
+            self.log.info(
+                "[_pgp_get_customer] Trying to retrieve stripe customer for country",
+                consumer_id=consumer_id,
+                stripe_customer_id=stripe_customer_id,
+                country_code=country_code,
+            )
+            try:
+                stripe_customer = await self.payer_client.pgp_get_customer(
+                    pgp_customer_id=stripe_customer_id, country=country_code
+                )
+                return stripe_customer, country_code
+            except PayerReadError:
+                self.log.exception(
+                    "[_pgp_get_customer] Exception occurred while retrieving customer from stripe",
+                    consumer_id=consumer_id,
+                )
+                continue
+        return None, None
+
+    async def _pgp_delete_customers(
+        self, consumer_id: int, delete_payer_summary: DeletePayerSummary
+    ):
+        for stripe_redact_action in delete_payer_summary.stripe_domain_redact.customers:
+            if stripe_redact_action.status == DeletePayerRequestStatus.IN_PROGRESS:
+                try:
+                    stripe_response = await self.payer_client.pgp_delete_customer(
+                        stripe_redact_action.stripe_country,
+                        stripe_redact_action.stripe_customer_id,
+                    )
+                    if stripe_response and stripe_response.deleted:
+                        self.log.info(
+                            "[_pgp_delete_customers] Customer successfully deleted from stripe",
+                            consumer_id=consumer_id,
+                            stripe_customer_id=stripe_redact_action.stripe_customer_id,
+                            stripe_country=stripe_redact_action.stripe_country,
+                        )
+                        stripe_redact_action.status = DeletePayerRequestStatus.SUCCEEDED
+                except PayerDeleteError as payer_delete_error:
+                    self.log.exception(
+                        "[_pgp_delete_customers] Exception occurred while deleting customer from stripe",
+                        consumer_id=consumer_id,
+                        stripe_customer_id=stripe_redact_action.stripe_customer_id,
+                        stripe_country=stripe_redact_action.stripe_country,
+                    )
+                    if (
+                        payer_delete_error.error_code
+                        == PayinErrorCode.PAYER_DELETE_STRIPE_ERROR_NOT_FOUND
+                    ):
+                        stripe_redact_action.status = DeletePayerRequestStatus.SUCCEEDED
+
+    def _add_stripe_redact_actions_to_customers(
+        self,
+        list_of_stripe_customers: set,
+        delete_payer_summary: DeletePayerSummary,
+        stripe_country: CountryCode,
+    ):
+        for stripe_id in list_of_stripe_customers:
+            delete_payer_summary.stripe_domain_redact.customers.append(
+                StripeRedactAction(
+                    stripe_customer_id=stripe_id,
+                    stripe_country=stripe_country,
+                    data_type="pii",
+                    action="delete",
+                    status=DeletePayerRequestStatus.IN_PROGRESS,
+                )
+            )
+
+    async def _insert_delete_payer_request_metadata(
+        self,
+        consumer_id: int,
+        delete_payer_request: DeletePayerRequestDbEntity,
+        stripe_country: CountryCode,
+        email: str,
+    ) -> DeletePayerRequestMetadataDbEntity:
+        try:
+            delete_payer_request_metadata = await self.payer_client.insert_delete_payer_request_metadata(
+                delete_payer_request.client_request_id,
+                consumer_id,
+                stripe_country,
+                email,
+            )
+            self.log.info(
+                "[_insert_delete_payer_request_metadata] Delete payer request metadata insert successful",
+                consumer_id=consumer_id,
+                client_request_id=delete_payer_request_metadata.client_request_id,
+            )
+            return delete_payer_request_metadata
+        except PayerDeleteError:
+            self.log.exception(
+                "[_insert_delete_payer_request_metadata] Exception occurred while inserting delete payer request metadata",
+                consumer_id=consumer_id,
+            )
+            raise
