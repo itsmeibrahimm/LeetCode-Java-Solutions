@@ -22,9 +22,13 @@ class TransactionProcessor:
         self.delivery_funding_repository = delivery_funding_repository
 
     async def get_funded_amount_by_delivery_id(self, delivery_id: str) -> int:
-        return await self.marqeta_repository.get_funded_amount_by_delivery_id(
+        result = await self.marqeta_repository.get_funded_amount_by_delivery_id(
             enriched_error_parse_int(delivery_id, "delivery id")
         )
+        self.logger.info(
+            "[funded amount]", delivery_id=delivery_id, funded_amount=result
+        )
+        return result
 
     async def get_fundable_amount_by_delivery_id(
         self, delivery_id: str, restaurant_total: int
