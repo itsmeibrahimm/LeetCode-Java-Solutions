@@ -142,6 +142,8 @@ class TestCartPayment:
         payment_method_extractor: Optional[
             Callable[[Dict[str, Any]], Dict[str, Any]]
         ] = None,
+        reference_id: str = "123",
+        reference_type: str = "3",
     ) -> Dict[str, Any]:
 
         if not payer_id_extractor:
@@ -169,7 +171,10 @@ class TestCartPayment:
             if not client_description
             else client_description,
             "payer_statement_description": f"{payer['id'][0:10]} statement",
-            "correlation_ids": {"reference_id": "123", "reference_type": "3"},
+            "correlation_ids": {
+                "reference_id": reference_id,
+                "reference_type": reference_type,
+            },
         }
 
         payer_id_data = payer_id_extractor(payer)
@@ -1657,6 +1662,60 @@ class TestCartPayment:
         self._test_cart_payment_creation_error(
             client, request_body, 400, "payin_43", False
         )
+
+    def test_cart_payment_upsert(
+        self,
+        stripe_api: StripeAPISettings,
+        client: TestClient,
+        payer: Dict[str, Any],
+        payment_method: Dict[str, Any],
+    ):
+        reference_id = str(random.randint(1, 1000000))
+        request_body = self._get_cart_payment_create_request(
+            payer=payer,
+            payment_method=payment_method,
+            amount=500,
+            delay_capture=True,
+            reference_id=reference_id,
+            reference_type="37",
+        )
+        response = client.post("/payin/api/v1/cart_payments/upsert", json=request_body)
+        assert response
+        assert response.status_code == 201
+        cart_payment = response.json()
+        assert cart_payment
+        assert cart_payment["id"]
+        assert cart_payment["amount"] == request_body["amount"]
+        assert cart_payment["payer_id"] == payer["id"]
+        if "payment_method_id" in request_body:
+            assert (
+                cart_payment["payment_method_id"] == request_body["payment_method_id"]
+            )
+        assert cart_payment["delay_capture"] == request_body["delay_capture"]
+        assert cart_payment["correlation_ids"]
+        assert (
+            cart_payment["correlation_ids"]["reference_id"]
+            == request_body["correlation_ids"]["reference_id"]
+        )
+        assert (
+            cart_payment["correlation_ids"]["reference_type"]
+            == request_body["correlation_ids"]["reference_type"]
+        )
+        original_amount = cart_payment["amount"]
+        request_body = self._get_cart_payment_create_request(
+            payer=payer,
+            payment_method=payment_method,
+            amount=200,
+            delay_capture=True,
+            reference_id=reference_id,
+            reference_type="37",
+        )
+        response = client.post("/payin/api/v1/cart_payments/upsert", json=request_body)
+        assert response
+        assert response.status_code == 200
+        updated_cart_payment = response.json()
+        updated_amount = updated_cart_payment["amount"]
+        assert updated_amount - original_amount == 200
 
     def test_cart_payment_validation(
         self,

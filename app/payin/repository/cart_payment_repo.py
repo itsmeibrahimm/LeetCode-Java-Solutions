@@ -130,6 +130,16 @@ class ListCartPaymentsByReferenceId(DBRequestModel):
     reference_type: str
 
 
+class GetCartPaymentsByReferenceId(DBRequestModel):
+    reference_id: str
+    reference_type: str
+
+
+class GetConsumerChargeByReferenceId(DBRequestModel):
+    target_id: int
+    target_ct_id: int
+
+
 @final
 @tracing.track_breadcrumb(repository_name="cart_payment")
 @dataclass
@@ -1510,3 +1520,32 @@ class CartPaymentRepository(PayinDBRepository):
         for row in rows:
             cart_payment_list.append(self.to_cart_payment(row))
         return cart_payment_list
+
+    async def get_most_recent_cart_payment_by_reference_id_from_primary(
+        self, input: GetCartPaymentsByReferenceId
+    ) -> Optional[CartPayment]:
+        stmt = (
+            cart_payments.table.select()
+            .where(
+                and_(
+                    cart_payments.reference_id == input.reference_id,
+                    cart_payments.reference_type == input.reference_type,
+                )
+            )
+            .order_by(cart_payments.created_at.desc())
+            .limit(1)
+        )
+        row = await self.payment_database.master().fetch_one(stmt)
+        return self.to_cart_payment(row) if row else None
+
+    async def get_legacy_consumer_charge_by_reference_id(
+        self, input: GetConsumerChargeByReferenceId
+    ) -> Optional[LegacyConsumerCharge]:
+        stmt = consumer_charges.table.select().where(
+            and_(
+                consumer_charges.target_id == input.target_id,
+                consumer_charges.target_ct_id == input.target_ct_id,
+            )
+        )
+        row = await self.main_database.replica().fetch_one(stmt)
+        return self.to_legacy_consumer_charge(row) if row else None

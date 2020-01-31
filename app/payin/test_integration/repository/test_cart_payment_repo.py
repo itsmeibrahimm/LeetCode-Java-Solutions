@@ -54,6 +54,8 @@ from app.payin.repository.cart_payment_repo import (
     UpdateLegacyStripeChargeErrorDetailsWhereInput,
     UpdateLegacyStripeChargeErrorDetailsSetInput,
     ListCartPaymentsByReferenceId,
+    GetCartPaymentsByReferenceId,
+    GetConsumerChargeByReferenceId,
 )
 from app.payin.repository.payer_repo import (
     InsertPayerInput,
@@ -1165,6 +1167,19 @@ class TestCartPayment:
         assert result == (cart_payment, expected_legacy_payment)
 
     @pytest.mark.asyncio
+    async def test_get_cart_payment_by_reference_id(
+        self, cart_payment_repository: CartPaymentRepository, cart_payment: CartPayment
+    ):
+        result = await cart_payment_repository.get_most_recent_cart_payment_by_reference_id_from_primary(
+            input=GetCartPaymentsByReferenceId(
+                reference_id=cart_payment.correlation_ids.reference_id,
+                reference_type=cart_payment.correlation_ids.reference_type,
+            )
+        )
+        assert result
+        assert result == cart_payment
+
+    @pytest.mark.asyncio
     async def test_insert_cart_payment(
         self, cart_payment_repository: CartPaymentRepository, payer: PayerDbEntity
     ):
@@ -1604,6 +1619,22 @@ class TestLegacyCharges:
             consumer_charge.id
         )
         assert result == consumer_charge
+
+    @pytest.mark.asyncio
+    async def test_get_legacy_consumer_charge_by_reference_id(
+        self,
+        cart_payment_repository: CartPaymentRepository,
+        consumer_charge: LegacyConsumerCharge,
+    ):
+        result = await cart_payment_repository.get_legacy_consumer_charge_by_reference_id(
+            input=GetConsumerChargeByReferenceId(
+                target_id=consumer_charge.target_id,
+                target_ct_id=consumer_charge.target_ct_id,
+            )
+        )
+        assert result
+        assert result.target_id == consumer_charge.target_id
+        assert result.target_ct_id == consumer_charge.target_ct_id
 
     @pytest.mark.asyncio
     async def test_get_legacy_consumer_charge_ids_by_consumer_id(

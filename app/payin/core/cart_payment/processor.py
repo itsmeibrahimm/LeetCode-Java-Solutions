@@ -39,6 +39,7 @@ from app.payin.core.cart_payment.model import (
     PgpRefund,
     Refund,
     SplitPayment,
+    LegacyConsumerCharge,
 )
 from app.payin.core.cart_payment.types import (
     IdempotencyKeyAction,
@@ -1799,3 +1800,60 @@ class CartPaymentProcessor:
         if not cart_payment:
             raise CartPaymentReadError(error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND)
         return cart_payment
+
+    async def upsert_cart_payment(
+        self,
+        reference_id: str,
+        reference_type: str,
+        idempotency_key: str,
+        request_cart_payment: CartPayment,
+        currency: Currency,
+        payment_country: CountryCode,
+        dd_stripe_card_id: Optional[int] = None,
+    ) -> Tuple[CartPayment, bool]:
+        cart_payment: Optional[
+            CartPayment
+        ] = await self.cart_payment_interface.get_cart_payment_by_reference_id(
+            reference_id=reference_id, reference_type=reference_type
+        )
+        if cart_payment:
+            self.log.info(
+                "[upsert_cart_payment] Existing cart payment found. Updating the cart payment",
+                cart_payment_id=cart_payment.id,
+                reference_id=reference_id,
+                reference_type=reference_type,
+                amount=request_cart_payment.amount,
+            )
+            updated_cart_payment = await self.update_payment(
+                idempotency_key=idempotency_key,
+                cart_payment_id=cart_payment.id,
+                amount=request_cart_payment.amount + cart_payment.amount,
+                client_description=request_cart_payment.client_description,
+                split_payment=request_cart_payment.split_payment,
+            )
+            return updated_cart_payment, True
+        else:
+            legacy_charge: Optional[
+                LegacyConsumerCharge
+            ] = await self.cart_payment_interface.get_consumer_charge_by_reference_id(
+                reference_id=reference_id, reference_type=reference_type
+            )
+            if legacy_charge:
+                self.log.error(
+                    "[upsert_cart_payment] Existing charge found for no corresponding cart payment",
+                    reference_id=reference_id,
+                    reference_type=reference_type,
+                )
+                raise CartPaymentCreateError(
+                    error_code=PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID
+                )
+            self.log.info(
+                "[upsert_cart_payment] No cart payment found. Creating a new cart payment"
+            )
+            created_cart_payment = await self.create_cart_payment_v1(
+                idempotency_key=idempotency_key,
+                payment_country=payment_country,
+                currency=currency,
+                request_cart_payment=request_cart_payment,
+            )
+            return created_cart_payment, False

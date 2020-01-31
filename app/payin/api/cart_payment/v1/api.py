@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
+from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK, HTTP_201_CREATED
 from structlog.stdlib import BoundLogger
 
@@ -204,4 +206,62 @@ async def get_cart_payment(
         cart_payment_id=cart_payment_id
     )
     log.info("Cart payment retrieved", cart_payment_id=cart_payment_id)
+    return cart_payment
+
+
+@router.post(
+    "/cart_payments/upsert",
+    response_model=CartPayment,
+    status_code=HTTP_200_OK,
+    responses={HTTP_201_CREATED: {"model": CartPayment}},
+    operation_id="UpsertCartPayment",
+    tags=api_tags,
+    dependencies=[Depends(commando_route_dependency)],
+)
+async def upsert_cart_payment(
+    cart_payment_request: CreateCartPaymentRequestV1,
+    log: BoundLogger = Depends(get_logger_from_req),
+    cart_payment_processor: CartPaymentProcessor = Depends(CartPaymentProcessor),
+) -> Union[JSONResponse, CartPayment]:
+    """
+    Create a new cart payment or update an existing cart payment by reference id.
+
+    - **payer_id**: DoorDash payer_id or stripe_customer_id
+    - **amount**: [int] amount in cents for the payment.  Must be greater than 0.
+    - **payment_country**: [string] country ISO code for where payment is happening.  Example: "US".
+    - **currency**: [string] currency for the payment.  Must be a doordash supported currency.  Example: "usd".
+    - **payment_method_id**: [string] DoorDash payment method id. For backward compatibility, payment_method_id
+                             can be either dd_payment_method_id, stripe_payment_method_id, or stripe_card_serial_id
+    - **delay_capture**: [bool] whether to capture immediately or delay
+    - **idempotency_key**: [string] idempotency key to submit the payment
+    - **client_description** [string] client description
+    - **metadata** [json object] key-value map for client specified metadata.  Not interpreted, but stored info with cart_payment.
+    - **correlation_ids** [json object] Container for referential information to store along with the payment.
+    - **correlation_ids.reference_id **- [string] Identifier of external entity this payment is for.  Currently supported: numeric order ID (pass in order ID within this string).
+    - **correlation_ids.reference_type **- [string] Type of external identifier provided.  Currently supported: numeric model type ID (pass in type ID within this string).
+    - **payer_statement_description** [string] Description that shows up for charge on customer credit card bill.  Max length 22 characters.
+    - **split_payment** [json object] information for flow of funds
+    - **split_payment.payout_account_id** [string] merchant's payout account id. Now it is stripe_managed_account_id
+    - **split_payment.application_fee_amount** [int] fees that we charge merchant on the order
+    """
+    reference_id: str = cart_payment_request.correlation_ids.reference_id
+    reference_type: str = cart_payment_request.correlation_ids.reference_type
+    upsert_cart_payment_response: Tuple[
+        CartPayment, bool
+    ] = await cart_payment_processor.upsert_cart_payment(
+        reference_id=reference_id,
+        reference_type=reference_type,
+        idempotency_key=cart_payment_request.idempotency_key,
+        request_cart_payment=to_internal_cart_payment(
+            cart_payment_request=cart_payment_request
+        ),
+        currency=cart_payment_request.currency,
+        payment_country=cart_payment_request.payment_country,
+        dd_stripe_card_id=cart_payment_request.dd_stripe_card_id,
+    )
+    cart_payment, updated = upsert_cart_payment_response
+    if not updated:
+        return JSONResponse(
+            status_code=HTTP_201_CREATED, content=jsonable_encoder(cart_payment)
+        )
     return cart_payment

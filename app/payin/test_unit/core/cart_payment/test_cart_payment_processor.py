@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Tuple
 from unittest.mock import MagicMock
 
 import pytest
@@ -1283,3 +1283,88 @@ class TestCartPaymentProcessor:
             error_message = e.error_message
         assert error_code == "payin_63"
         assert error_message == "Cart Payment data is invalid."
+
+    @pytest.mark.asyncio
+    async def test_upsert_cart_payment_create(
+        self, cart_payment_processor, request_cart_payment
+    ):
+        cart_payment = generate_cart_payment()
+        cart_payment_processor.cart_payment_interface.get_cart_payment_by_reference_id = FunctionMock(
+            return_value=None
+        )
+        cart_payment_processor.cart_payment_interface.get_consumer_charge_by_reference_id = FunctionMock(
+            return_value=None
+        )
+        cart_payment_processor.create_cart_payment_v1 = FunctionMock(
+            return_value=cart_payment
+        )
+        result = await cart_payment_processor.upsert_cart_payment(
+            reference_id=cart_payment.correlation_ids.reference_id,
+            reference_type=cart_payment.correlation_ids.reference_type,
+            idempotency_key=str(uuid.uuid4()),
+            request_cart_payment=request_cart_payment,
+            currency=Currency.USD,
+            payment_country=CountryCode.US,
+            dd_stripe_card_id=None,
+        )
+        assert isinstance(result, Tuple)
+        assert len(result) == 2
+        result_cart_payment, updated = result
+        assert isinstance(cart_payment, CartPayment)
+        assert isinstance(updated, bool)
+        assert updated is False
+        assert result_cart_payment == cart_payment
+
+    @pytest.mark.asyncio
+    async def test_upsert_cart_payment_update(
+        self, cart_payment_processor, request_cart_payment
+    ):
+        cart_payment = generate_cart_payment()
+        cart_payment_processor.cart_payment_interface.get_cart_payment_by_reference_id = FunctionMock(
+            return_value=cart_payment
+        )
+        cart_payment_processor.update_payment = FunctionMock(
+            return_value=generate_cart_payment(amount=cart_payment.amount + 200)
+        )
+        result = await cart_payment_processor.upsert_cart_payment(
+            reference_id=cart_payment.correlation_ids.reference_id,
+            reference_type=cart_payment.correlation_ids.reference_type,
+            idempotency_key=str(uuid.uuid4()),
+            request_cart_payment=request_cart_payment,
+            currency=Currency.USD,
+            payment_country=CountryCode.US,
+            dd_stripe_card_id=None,
+        )
+        assert isinstance(result, Tuple)
+        assert len(result) == 2
+        result_cart_payment, updated = result
+        assert isinstance(cart_payment, CartPayment)
+        assert isinstance(updated, bool)
+        assert updated is True
+        assert result_cart_payment.amount - cart_payment.amount == 200
+
+    @pytest.mark.asyncio
+    async def test_upsert_cart_payment_cart_payment_not_found_with_charge(
+        self, cart_payment_processor, request_cart_payment
+    ):
+        cart_payment = generate_cart_payment()
+        cart_payment_processor.cart_payment_interface.get_cart_payment_by_reference_id = FunctionMock(
+            return_value=None
+        )
+        cart_payment_processor.cart_payment_interface.get_consumer_charge_by_reference_id = FunctionMock(
+            return_value=generate_legacy_consumer_charge()
+        )
+        with pytest.raises(CartPaymentCreateError) as payment_error:
+            await cart_payment_processor.upsert_cart_payment(
+                reference_id=cart_payment.correlation_ids.reference_id,
+                reference_type=cart_payment.correlation_ids.reference_type,
+                idempotency_key=str(uuid.uuid4()),
+                request_cart_payment=request_cart_payment,
+                currency=Currency.USD,
+                payment_country=CountryCode.US,
+                dd_stripe_card_id=None,
+            )
+        assert (
+            payment_error.value.error_code
+            == PayinErrorCode.CART_PAYMENT_NOT_FOUND_FOR_CHARGE_ID
+        )

@@ -56,6 +56,7 @@ from app.payin.core.cart_payment.model import (
     PgpRefund,
     Refund,
     SplitPayment,
+    LegacyConsumerCharge,
 )
 from app.payin.core.cart_payment.types import (
     CaptureMethod,
@@ -100,6 +101,8 @@ from app.payin.repository.cart_payment_repo import (
     UpdatePaymentIntentWhereInput,
     UpdatePgpPaymentIntentSetInput,
     UpdatePgpPaymentIntentWhereInput,
+    GetCartPaymentsByReferenceId,
+    GetConsumerChargeByReferenceId,
 )
 
 
@@ -1863,4 +1866,34 @@ class CartPaymentInterface:
             )
         return await self.payment_repo.get_cart_payments_by_dd_consumer_id(
             input=GetCartPaymentsByConsumerIdInput(dd_consumer_id=consumer_id)
+        )
+
+    async def get_cart_payment_by_reference_id(
+        self, reference_id: str, reference_type: str
+    ) -> Optional[CartPayment]:
+        return await self.payment_repo.get_most_recent_cart_payment_by_reference_id_from_primary(
+            input=GetCartPaymentsByReferenceId(
+                reference_id=reference_id, reference_type=reference_type
+            )
+        )
+
+    async def get_consumer_charge_by_reference_id(
+        self, reference_id: str, reference_type: str
+    ) -> Optional[LegacyConsumerCharge]:
+        input: GetConsumerChargeByReferenceId
+        try:
+            input = GetConsumerChargeByReferenceId(
+                target_id=int(reference_id), target_ct_id=int(reference_type)
+            )
+        except ValueError:
+            self.req_context.log.exception(
+                "[get_consumer_charge_by_reference_id] Non-numeric reference_id/reference_type provided.",
+                reference_id=reference_id,
+                reference_type=reference_type,
+            )
+            raise CartPaymentReadError(
+                error_code=PayinErrorCode.CART_PAYMENT_DATA_INVALID
+            )
+        return await self.payment_repo.get_legacy_consumer_charge_by_reference_id(
+            input=input
         )

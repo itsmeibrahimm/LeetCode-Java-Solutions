@@ -48,6 +48,7 @@ from app.payin.core.exceptions import (
     ProviderError,
     ProviderPaymentIntentUnexpectedStatusError,
     CartPaymentUpdateError,
+    CartPaymentReadError,
 )
 from app.payin.core.payer.model import RawPayer
 from app.payin.core.payer.types import DeletePayerRedactingText
@@ -72,6 +73,7 @@ from app.payin.tests.utils import (
     generate_provider_refund,
     generate_refund,
     generate_raw_payer,
+    generate_legacy_consumer_charge,
 )
 
 
@@ -1663,6 +1665,43 @@ class TestCartPaymentInterface:
         assert cancelled_cart_payment.updated_at is not None
         assert isinstance(cancelled_cart_payment.updated_at, datetime)
         assert isinstance(cancelled_cart_payment.deleted_at, datetime)
+
+    @pytest.mark.asyncio
+    async def test_get_cart_payment_by_reference_id(self, cart_payment_interface):
+        cart_payment = generate_cart_payment()
+        cart_payment_interface.payment_repo.get_most_recent_cart_payment_by_reference_id_from_primary = FunctionMock(
+            return_value=cart_payment
+        )
+        result = await cart_payment_interface.get_cart_payment_by_reference_id(
+            reference_id=cart_payment.correlation_ids.reference_id,
+            reference_type=cart_payment.correlation_ids.reference_type,
+        )
+        assert result
+        assert result == cart_payment
+
+    @pytest.mark.asyncio
+    async def test_get_consumer_charge_by_reference_id(self, cart_payment_interface):
+        legacy_consumer_charge = generate_legacy_consumer_charge()
+        cart_payment_interface.payment_repo.get_legacy_consumer_charge_by_reference_id = FunctionMock(
+            return_value=legacy_consumer_charge
+        )
+        result = await cart_payment_interface.get_consumer_charge_by_reference_id(
+            reference_id="1", reference_type="1"
+        )
+        assert result
+        assert result == legacy_consumer_charge
+
+    @pytest.mark.asyncio
+    async def test_get_consumer_charge_by_reference_id_with_non_integer_id(
+        self, cart_payment_interface
+    ):
+        with pytest.raises(CartPaymentReadError) as payment_error:
+            await cart_payment_interface.get_consumer_charge_by_reference_id(
+                reference_id="NON_INTEGER", reference_type="NON_INTEGER"
+            )
+        assert (
+            payment_error.value.error_code == PayinErrorCode.CART_PAYMENT_DATA_INVALID
+        )
 
 
 class TestCapturePayment:
