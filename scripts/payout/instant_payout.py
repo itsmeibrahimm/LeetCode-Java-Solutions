@@ -192,7 +192,7 @@ async def mark_payout_as_failed_and_detach_transactions(
     if stripe_payout_request is None:
         log.warn("Can't find corresponding StripePayoutRequest record to update")
     else:
-        data = StripePayoutRequestUpdate(status=InstantPayoutStatusType.PAID)
+        data = StripePayoutRequestUpdate(status=InstantPayoutStatusType.FAILED)
         updated_stripe_payout_request = await stripe_payout_request_repo.update_stripe_payout_request_by_id(
             stripe_payout_request_id=stripe_payout_request.id, data=data
         )

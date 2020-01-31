@@ -327,6 +327,7 @@ class InstantPayoutErrorCode(str, Enum):
     CREATE_PAYOUT_ERROR = "create_payout_error"
     CARD_DECLINE_ERROR = "card_decline_error"
     CURRENCY_MISMATCH = "currency_mismatch"
+    INSUFFICIENT_FUND = "insufficient_fund"
 
 
 instant_payout_error_message_maps: Dict[str, str] = {
@@ -341,6 +342,7 @@ instant_payout_error_message_maps: Dict[str, str] = {
     InstantPayoutErrorCode.AMOUNT_BALANCE_MISMATCH: "Payout amount does not match available balance.",
     InstantPayoutErrorCode.CARD_DECLINE_ERROR: "Can not deposit instant payout due to card decline.",
     InstantPayoutErrorCode.CURRENCY_MISMATCH: "The input currency does not match PGP provider currency.",
+    InstantPayoutErrorCode.INSUFFICIENT_FUND: "Can not deposit instant payout due to insufficient fund in pgp account",
 }
 
 
@@ -390,6 +392,22 @@ class InstantPayoutCardDeclineError(InstantPayoutError):
             error_code=InstantPayoutErrorCode.CARD_DECLINE_ERROR,
             error_message=instant_payout_error_message_maps[
                 InstantPayoutErrorCode.CARD_DECLINE_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class InstantPayoutInsufficientFundError(InstantPayoutError):
+    """Instant Payout Insufficient Fund Error.
+
+    Raised when failed to perform instant payout because of insufficient fund from PGP.
+    """
+
+    def __init__(self):
+        super().__init__(
+            error_code=InstantPayoutErrorCode.INSUFFICIENT_FUND,
+            error_message=instant_payout_error_message_maps[
+                InstantPayoutErrorCode.INSUFFICIENT_FUND
             ],
             retryable=False,
         )

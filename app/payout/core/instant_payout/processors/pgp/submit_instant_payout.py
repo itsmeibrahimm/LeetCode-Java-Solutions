@@ -14,7 +14,10 @@ from app.commons.core.errors import (
 from app.commons.core.processor import AsyncOperation
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import StripeCreatePayoutRequest
-from app.payout.core.errors import InstantPayoutCardDeclineError
+from app.payout.core.errors import (
+    InstantPayoutCardDeclineError,
+    InstantPayoutInsufficientFundError,
+)
 from app.payout.core.instant_payout.models import (
     SubmitInstantPayoutRequest,
     SubmitInstantPayoutResponse,
@@ -118,11 +121,18 @@ class SubmitInstantPayout(
             status_to_update = stripe_payout.status
             stripe_payout_id = stripe_payout.id
             response = str(stripe_payout)
-        except (PGPConnectionError, PGPApiError, PGPRateLimitError) as e:
-            # Handle PGPConnectionError, PGPApiError and mark payout as error to avoid daily limit
-            # And detach transactions
+        except (
+            PGPConnectionError,
+            PGPApiError,
+            PGPRateLimitError,
+            InstantPayoutInsufficientFundError,
+        ) as e:
+            # Handle PGPConnectionError, PGPApiError, PGPRateLimitError and mark payout as *error* and detach
+            # transactions to avoid daily limit
+            # Also handle InstantPayoutInsufficientFundError here, since it's because of stripe's funding lag (DD
+            # platform account to connected account). Should mark payout as error to let client retry
             self.logger.warn(
-                "[Instant Payout Submit]: fail to submit Instant Payout due to  PGP issue, detaching transactions",
+                "[Instant Payout Submit]: fail to submit Instant Payout due to PGP issue, detaching transactions",
                 request=self.request.dict(),
             )
             status_to_update = InstantPayoutStatusType.ERROR

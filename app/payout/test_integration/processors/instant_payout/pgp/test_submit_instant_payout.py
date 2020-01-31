@@ -2,11 +2,14 @@ import uuid
 import pytest
 from asynctest import Mock, CoroutineMock
 
-from app.commons.core.errors import PGPConnectionError
+from app.commons.core.errors import PGPConnectionError, PGPApiError, PGPRateLimitError
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import Amount, Destination, Currency
 from app.commons.types import CountryCode
-from app.payout.core.errors import InstantPayoutCardDeclineError
+from app.payout.core.errors import (
+    InstantPayoutCardDeclineError,
+    InstantPayoutInsufficientFundError,
+)
 from app.payout.core.instant_payout.models import (
     SMATransferRequest,
     CheckSMABalanceRequest,
@@ -40,6 +43,13 @@ from app.payout.repository.bankdb.transaction import TransactionRepository
 class TestSubmitInstantPayout:
 
     pytestmark = [pytest.mark.asyncio, pytest.mark.external]
+
+    pgp_errors = [
+        PGPConnectionError(),
+        PGPApiError(),
+        PGPRateLimitError(),
+        InstantPayoutInsufficientFundError(),
+    ]
 
     @pytest.fixture(autouse=True)
     def setup(
@@ -278,8 +288,10 @@ class TestSubmitInstantPayout:
         # detach transaction is not called
         transaction_repo.set_transaction_payout_id_by_ids.assert_not_awaited()  # type: ignore
 
-    async def test_fail_to_submit_instant_payout_due_to_submit_payout_stripe_connection_error(
+    @pytest.mark.parametrize("pgp_error", pgp_errors)
+    async def test_fail_to_submit_instant_payout_due_to_submit_payout_pgp_errors(
         self,
+        pgp_error,
         stripe_async_client: StripeAsyncClient,
         verified_payout_account: dict,
         stripe_managed_account_transfer_repo: StripeManagedAccountTransferRepository,
@@ -343,10 +355,8 @@ class TestSubmitInstantPayout:
             idempotency_key="instant-payout-{}".format(str(uuid.uuid4())),
         )
 
-        # Mock PGPConnectionError
-        error = PGPConnectionError()
         stripe_async_client.create_payout_with_stripe_error_translation = CoroutineMock(  # type: ignore
-            side_effect=error
+            side_effect=pgp_error
         )
         transaction_repo.set_transaction_payout_id_by_ids = (  # type: ignore
             CoroutineMock()
@@ -361,14 +371,14 @@ class TestSubmitInstantPayout:
             logger=Mock(),
         )
 
-        with pytest.raises(PGPConnectionError):
+        with pytest.raises(type(pgp_error)):
             await submit_instant_payout_op.execute()
 
         # Get payout error field
         payout = await payout_repo.get_payout_by_id(payout_id=payout.id)  # type: ignore
         payout_error = payout.error
-        assert payout_error == error.__dict__
-        # Status should be error instead of failed, since it's PGPConnectionError
+        assert payout_error == pgp_error.__dict__
+        # Status should be error instead of failed, since it's pgp_error
         assert payout.status == InstantPayoutStatusType.ERROR
 
         # Get stripe payout request error field
@@ -376,7 +386,7 @@ class TestSubmitInstantPayout:
             payout_id=payout.id
         )
         assert stripe_payout_request is not None
-        # Status should be error instead of failed, since it's PGPConnectionError
+        # Status should be error instead of failed, since it's pgp_error
         assert stripe_payout_request.status == InstantPayoutStatusType.ERROR
         assert stripe_payout_request.response is None
         assert stripe_payout_request.stripe_payout_id is None

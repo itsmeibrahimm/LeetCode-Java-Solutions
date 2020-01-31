@@ -8,7 +8,10 @@ from app.commons.providers.stripe.errors import (
     StripeErrorCode,
     StripeErrorType,
 )
-from app.payout.core.errors import InstantPayoutCardDeclineError
+from app.payout.core.errors import (
+    InstantPayoutCardDeclineError,
+    InstantPayoutInsufficientFundError,
+)
 
 
 def translate_stripe_error(func):
@@ -53,5 +56,12 @@ def translate_stripe_error(func):
                 in stripe_error_parser.message
             ):
                 raise InstantPayoutCardDeclineError from e
+            # Handle stripe insufficient fund error
+            # Sample error: https://sentry.io/organizations/doordash/issues/1254851301/events/828ca0f94d6a4b7cb42f5bcfb5766c4c/?project=180553
+            if (
+                stripe_error_parser.code == StripeErrorCode.balance_insufficient
+                and stripe_error_parser.type == StripeErrorType.invalid_request_error
+            ):
+                raise InstantPayoutInsufficientFundError from e
 
     return wrapper
