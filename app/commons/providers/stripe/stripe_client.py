@@ -748,6 +748,7 @@ class StripeClient(StripeClientInterface):
         external_account = stripe.Account.create_external_account(
             request.stripe_account_id,
             external_account=request.external_account_token,
+            default_for_currency=True,
             **self.settings_for(request.country),
         )
         return external_account

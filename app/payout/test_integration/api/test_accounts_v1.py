@@ -96,6 +96,7 @@ class TestAccountV1:
     def test_add_payout_method_card(
         self, client: TestClient, verified_payout_account: dict
     ):
+        # add first debit card
         request = account_models.CreatePayoutMethod(
             token=VISA_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
         )
@@ -107,6 +108,34 @@ class TestAccountV1:
         payout_card_internal: dict = response.json()
         assert payout_card_internal["stripe_card_id"]
         assert payout_card_internal["type"] == PayoutExternalAccountType.CARD
+        assert payout_card_internal["is_default"]
+
+        # add second debit card
+        request_second_card = account_models.CreatePayoutMethod(
+            token=MASTER_CARD_DEBIT_CARD_TOKEN, type=PayoutExternalAccountType.CARD
+        )
+        response_second_card = client.post(
+            create_payout_method_url_card(verified_payout_account["id"]),
+            json=request_second_card.dict(),
+        )
+        assert response_second_card.status_code == 201
+        payout_card_internal_second_card: dict = response_second_card.json()
+        assert payout_card_internal_second_card["stripe_card_id"]
+        assert (
+            payout_card_internal_second_card["type"] == PayoutExternalAccountType.CARD
+        )
+        assert payout_card_internal_second_card["is_default"]
+
+        # get the first debit card should return is_default False
+        get_response = client.get(
+            get_payout_method_url(
+                account_id=verified_payout_account["id"],
+                payout_method_id=payout_card_internal["id"],
+            )
+        )
+        assert get_response.status_code == 200
+        get_payout_card: dict = get_response.json()
+        assert not get_payout_card["is_default"]
 
     def test_add_payout_method_bank(
         self, client: TestClient, verified_payout_account: dict

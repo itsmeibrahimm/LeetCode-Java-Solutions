@@ -488,6 +488,7 @@ class TestStripeClient:
         assert card
         assert card.object == "card"
         assert card.id.startswith("card_")
+        assert card.default_for_currency
 
     def test_create_external_account_bank_account(
         self, mode: str, stripe_test: StripeTestClient
@@ -495,7 +496,6 @@ class TestStripeClient:
         if mode == "mock":
             pytest.skip()
         account = prepare_and_validate_stripe_account(stripe_test)
-        print("here account.id = {account_id}".format(account_id=account.id))
         bank_account = stripe_test.create_external_account(
             request=models.CreateExternalAccountRequest(
                 country=CountryCode.US,
@@ -507,6 +507,7 @@ class TestStripeClient:
         assert bank_account
         assert bank_account.object == "bank_account"
         assert bank_account.id.startswith("ba_")
+        assert bank_account.default_for_currency
 
     def test_retrieve_account(self, mode: str, stripe: StripeClient):
         if mode == "mock":
