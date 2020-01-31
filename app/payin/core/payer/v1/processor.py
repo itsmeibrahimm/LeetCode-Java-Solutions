@@ -96,6 +96,54 @@ class PayerProcessorV1:
         )
         return raw_payer.to_payer(), False
 
+    async def backfill_payer(
+        self,
+        payer_reference_id: str,
+        payer_reference_id_type: PayerReferenceIdType,
+        pgp_customer_id: str,
+        country: CountryCode,
+    ) -> Tuple[Payer, bool]:
+        """
+        create a new DoorDash payer. We will create 3 models under the hood:
+            - Payer
+            - PgpCustomer
+
+        :param payer_reference_id: DoorDash client identifier (consumer_id, etc.)
+        :param payer_reference_id_type: Payment predefined values.
+        :param pgp_customer_id: gateway provider's id for this payer
+        :param country: payer country code
+        :return: Payer object
+        """
+        self.log.info(
+            "[backfill_payer] started.",
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
+            pgp_customer_id=pgp_customer_id,
+        )
+
+        existing_payer = await self.payer_client.find_existing_payer(
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
+        )
+        if existing_payer:
+            self.log.info(
+                "[backfill_payer] found existing payer and return",
+                payer_reference_id=payer_reference_id,
+                payer_reference_id_type=payer_reference_id_type,
+                pgp_customer_id=pgp_customer_id,
+            )
+            return existing_payer, True
+
+        raw_payer: RawPayer = await self.payer_client.create_raw_payer(
+            payer_reference_id=payer_reference_id,
+            payer_reference_id_type=payer_reference_id_type,
+            country=country,
+            pgp_customer_resource_id=pgp_customer_id,
+            pgp_code=PgpCode.STRIPE,
+            description=None,
+        )
+        return raw_payer.to_payer(), False
+
     async def get_payer(
         self,
         payer_lookup_id: MixedUuidStrType,
