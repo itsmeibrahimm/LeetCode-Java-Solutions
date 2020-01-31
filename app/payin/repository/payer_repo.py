@@ -111,17 +111,6 @@ class GetConsumerIdByPayerIdInput(DBRequestModel):
     payer_id: str
 
 
-class DeletePayerRequestMetadataDbEntity(DBEntity):
-    id: UUID
-    client_request_id: UUID
-    consumer_id: int
-    country_code: str
-    email: str
-    status: str
-    created_at: datetime
-    updated_at: datetime
-
-
 class DeletePayerRequestDbEntity(DBEntity):
     id: UUID
     client_request_id: UUID
@@ -133,6 +122,17 @@ class DeletePayerRequestDbEntity(DBEntity):
     created_at: datetime
     updated_at: datetime
     acknowledged: bool
+
+
+class DeletePayerRequestMetadataDbEntity(DBEntity):
+    id: UUID
+    client_request_id: UUID
+    consumer_id: int
+    country_code: str
+    email: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class UpdateDeletePayerRequestSetInput(DBRequestModel):
@@ -152,6 +152,10 @@ class GetDeletePayerRequestsByClientRequestIdInput(DBRequestModel):
 
 
 class FindDeletePayerRequestByStatusInput(DBRequestModel):
+    status: DeletePayerRequestStatus
+
+
+class FindDeletePayerRequestMetadataByStatusInput(DBRequestModel):
     status: DeletePayerRequestStatus
 
 
@@ -333,13 +337,6 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
-    async def insert_delete_payer_request_metadata(
-        self,
-        delete_payer_request_metadata_db_entity: DeletePayerRequestMetadataDbEntity,
-    ) -> DeletePayerRequestMetadataDbEntity:
-        ...
-
-    @abstractmethod
     async def insert_delete_payer_request(
         self, delete_payer_request_db_entity: DeletePayerRequestDbEntity
     ) -> DeletePayerRequestDbEntity:
@@ -357,6 +354,13 @@ class PayerRepositoryInterface:
         self,
         find_delete_payer_request_by_status_input: FindDeletePayerRequestByStatusInput,
     ) -> List[DeletePayerRequestDbEntity]:
+        ...
+
+    @abstractmethod
+    async def find_delete_payer_requests_metadata_by_status(
+        self,
+        find_delete_payer_request_metadata_by_status_input: FindDeletePayerRequestMetadataByStatusInput,
+    ) -> List[DeletePayerRequestMetadataDbEntity]:
         ...
 
     @abstractmethod
@@ -541,18 +545,6 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         row = await self.payment_database.master().fetch_one(stmt)
         return PayerDbEntity.from_row(row) if row else None
 
-    async def insert_delete_payer_request_metadata(
-        self,
-        delete_payer_request_metadata_db_entity: DeletePayerRequestMetadataDbEntity,
-    ) -> DeletePayerRequestMetadataDbEntity:
-        statement = (
-            delete_payer_requests_metadata.table.insert()
-            .values(delete_payer_request_metadata_db_entity.dict())
-            .returning(*delete_payer_requests_metadata.table.columns.values())
-        )
-        row = await self.payment_database.master().fetch_one(statement)
-        return DeletePayerRequestMetadataDbEntity.from_row(row) if row else None
-
     async def insert_delete_payer_request(
         self, delete_payer_request_db_entity: DeletePayerRequestDbEntity
     ) -> DeletePayerRequestDbEntity:
@@ -585,6 +577,17 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         results = await self.payment_database.replica().fetch_all(statement)
         return [DeletePayerRequestDbEntity.from_row(row) for row in results]
+
+    async def find_delete_payer_requests_metadata_by_status(
+        self,
+        find_delete_payer_request_metadata_by_status_input: FindDeletePayerRequestMetadataByStatusInput,
+    ) -> List[DeletePayerRequestMetadataDbEntity]:
+        statement = delete_payer_requests_metadata.table.select().where(
+            delete_payer_requests_metadata.status
+            == find_delete_payer_request_metadata_by_status_input.status
+        )
+        results = await self.payment_database.replica().fetch_all(statement)
+        return [DeletePayerRequestMetadataDbEntity.from_row(row) for row in results]
 
     async def update_delete_payer_request(
         self,

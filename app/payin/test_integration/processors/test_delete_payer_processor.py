@@ -20,7 +20,6 @@ from app.payin.core.payer.v0.processor import DeletePayerProcessor
 from app.payin.models.maindb import consumer_charges, stripe_charges, stripe_cards
 from app.payin.models.paymentdb import (
     delete_payer_requests,
-    delete_payer_requests_metadata,
     payers,
     cart_payments,
     pgp_payment_methods,
@@ -239,12 +238,6 @@ class TestDeletePayerProcessor:
         updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
             client_request_id=delete_payer_request.client_request_id
         )
-        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
-            delete_payer_requests_metadata.table.select().where(
-                delete_payer_requests_metadata.client_request_id
-                == delete_payer_request.client_request_id
-            )
-        )
         assert len(updated_delete_payer_requests) == 1
         updated_delete_payer_request = updated_delete_payer_requests[0]
         delete_payer_summary = DeletePayerSummary.parse_raw(
@@ -273,13 +266,6 @@ class TestDeletePayerProcessor:
         )
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
-        assert inserted_delete_payer_requests_metadata
-        assert (
-            inserted_delete_payer_requests_metadata["email"] == "john.law@doordash.com"
-        )
-        await payer_repository.payment_database.master().execute(
-            delete_payer_requests_metadata.table.delete()
-        )
 
     async def test_delete_payer_without_card(
         self,
@@ -408,12 +394,6 @@ class TestDeletePayerProcessor:
         updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
             client_request_id=delete_payer_request.client_request_id
         )
-        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
-            delete_payer_requests_metadata.table.select().where(
-                delete_payer_requests_metadata.client_request_id
-                == delete_payer_request.client_request_id
-            )
-        )
         assert len(updated_delete_payer_requests) == 1
         updated_delete_payer_request = updated_delete_payer_requests[0]
         delete_payer_summary = DeletePayerSummary.parse_raw(
@@ -439,13 +419,6 @@ class TestDeletePayerProcessor:
             )
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
-        assert inserted_delete_payer_requests_metadata
-        assert (
-            inserted_delete_payer_requests_metadata["email"] == "john.law@doordash.com"
-        )
-        await payer_repository.payment_database.master().execute(
-            delete_payer_requests_metadata.table.delete()
-        )
 
     async def test_delete_payer_with_stripe_customer_not_found(
         self,
@@ -489,12 +462,6 @@ class TestDeletePayerProcessor:
         updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
             client_request_id=delete_payer_request.client_request_id
         )
-        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
-            delete_payer_requests_metadata.table.select().where(
-                delete_payer_requests_metadata.client_request_id
-                == delete_payer_request.client_request_id
-            )
-        )
         assert len(updated_delete_payer_requests) == 1
         updated_delete_payer_request = updated_delete_payer_requests[0]
         delete_payer_summary = DeletePayerSummary.parse_raw(
@@ -515,10 +482,6 @@ class TestDeletePayerProcessor:
         assert not delete_payer_summary.stripe_domain_redact.customers
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
-        assert not inserted_delete_payer_requests_metadata
-        await payer_repository.payment_database.master().execute(
-            delete_payer_requests_metadata.table.delete()
-        )
 
     async def test_delete_payer_with_stripe_customer_without_email(
         self,
@@ -567,12 +530,6 @@ class TestDeletePayerProcessor:
         updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
             client_request_id=delete_payer_request.client_request_id
         )
-        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
-            delete_payer_requests_metadata.table.select().where(
-                delete_payer_requests_metadata.client_request_id
-                == delete_payer_request.client_request_id
-            )
-        )
         assert len(updated_delete_payer_requests) == 1
         updated_delete_payer_request = updated_delete_payer_requests[0]
         delete_payer_summary = DeletePayerSummary.parse_raw(
@@ -601,10 +558,6 @@ class TestDeletePayerProcessor:
         )
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
-        assert not inserted_delete_payer_requests_metadata
-        await payer_repository.payment_database.master().execute(
-            delete_payer_requests_metadata.table.delete()
-        )
 
     async def test_delete_payer_with_multiple_stripe_customers_some_already_deleted(
         self,
@@ -641,12 +594,6 @@ class TestDeletePayerProcessor:
         updated_delete_payer_requests = await payer_client.get_delete_payer_requests_by_client_request_id(
             client_request_id=delete_payer_request.client_request_id
         )
-        inserted_delete_payer_requests_metadata = await payer_repository.payment_database.replica().fetch_one(
-            delete_payer_requests_metadata.table.select().where(
-                delete_payer_requests_metadata.client_request_id
-                == delete_payer_request.client_request_id
-            )
-        )
         assert len(updated_delete_payer_requests) == 1
         updated_delete_payer_request = updated_delete_payer_requests[0]
         delete_payer_summary = DeletePayerSummary.parse_raw(
@@ -672,7 +619,3 @@ class TestDeletePayerProcessor:
             )
         assert updated_delete_payer_request.status == DeletePayerRequestStatus.SUCCEEDED
         assert updated_delete_payer_request.acknowledged is True
-        assert not inserted_delete_payer_requests_metadata
-        await payer_repository.payment_database.master().execute(
-            delete_payer_requests_metadata.table.delete()
-        )

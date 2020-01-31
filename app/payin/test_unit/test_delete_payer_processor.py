@@ -191,12 +191,6 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count,
             True,
         )
-        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
-            delete_payer_request.client_request_id,
-            delete_payer_request.consumer_id,
-            CountryCode.US,
-            stripe_customer.email,
-        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -306,12 +300,6 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
         )
-        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
-            delete_payer_request.client_request_id,
-            delete_payer_request.consumer_id,
-            CountryCode.US,
-            stripe_customer.email,
-        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -419,12 +407,6 @@ class TestDeletePayerProcessor:
             expected_summary.json(),
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
-        )
-        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
-            delete_payer_request.client_request_id,
-            delete_payer_request.consumer_id,
-            CountryCode.US,
-            stripe_customer.email,
         )
 
     @pytest.mark.asyncio
@@ -534,12 +516,6 @@ class TestDeletePayerProcessor:
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
         )
-        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
-            delete_payer_request.client_request_id,
-            delete_payer_request.consumer_id,
-            CountryCode.US,
-            stripe_customer.email,
-        )
 
     @pytest.mark.asyncio
     @patch("app.payin.core.payer.v0.processor.send_response", return_value=True)
@@ -648,10 +624,4 @@ class TestDeletePayerProcessor:
             expected_summary.json(),
             delete_payer_request.retry_count + 1,
             delete_payer_request.acknowledged,
-        )
-        delete_payer_processor.payer_client.insert_delete_payer_request_metadata.assert_called_once_with(
-            delete_payer_request.client_request_id,
-            delete_payer_request.consumer_id,
-            CountryCode.US,
-            stripe_customer.email,
         )

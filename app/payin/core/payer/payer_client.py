@@ -12,11 +12,7 @@ from app.commons.context.req_context import (
     get_logger_from_req,
     get_stripe_async_client_from_req,
 )
-from app.commons.core.errors import (
-    DBDataError,
-    DBOperationError,
-    DBIntegrityUniqueViolationError,
-)
+from app.commons.core.errors import DBDataError, DBOperationError
 from app.commons.providers.stripe.errors import StripeErrorParser, StripeErrorCode
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.commons.providers.stripe.stripe_models import (
@@ -84,7 +80,6 @@ from app.payin.repository.payer_repo import (
     UpdateDeletePayerRequestWhereInput,
     UpdateDeletePayerRequestSetInput,
     GetDeletePayerRequestsByClientRequestIdInput,
-    DeletePayerRequestMetadataDbEntity,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -696,32 +691,6 @@ class PayerClient:
         return await self.payer_repo.get_consumer_id_by_payer_id(
             input=GetConsumerIdByPayerIdInput(payer_id=payer_id)
         )
-
-    async def insert_delete_payer_request_metadata(
-        self, client_request_id: UUID, consumer_id: int, country_code: str, email: str
-    ) -> DeletePayerRequestMetadataDbEntity:
-        try:
-            return await self.payer_repo.insert_delete_payer_request_metadata(
-                DeletePayerRequestMetadataDbEntity(
-                    id=uuid4(),
-                    client_request_id=client_request_id,
-                    consumer_id=consumer_id,
-                    country_code=country_code,
-                    email=email,
-                    status=DeletePayerRequestStatus.IN_PROGRESS.value,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
-                )
-            )
-        except DBIntegrityUniqueViolationError as e:
-            self.log.exception(
-                "[insert_delete_payer_request_metadata] Error occurred with inserting delete payer request metadata",
-                consumer_id=consumer_id,
-                client_request_id=client_request_id,
-            )
-            raise PayerDeleteError(
-                error_code=PayinErrorCode.DELETE_PAYER_REQUEST_METADATA_INSERT_DB_ERROR
-            ) from e
 
     async def update_delete_payer_request(
         self,

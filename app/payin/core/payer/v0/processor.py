@@ -42,10 +42,7 @@ from app.payin.core.payment_method.model import RawPaymentMethod, PaymentMethodI
 from app.payin.core.payment_method.payment_method_client import PaymentMethodClient
 from app.payin.core.types import PayerIdType, PaymentMethodIdType
 from app.payin.kafka.delete_payer_message_processor import send_response
-from app.payin.repository.payer_repo import (
-    DeletePayerRequestDbEntity,
-    DeletePayerRequestMetadataDbEntity,
-)
+from app.payin.repository.payer_repo import DeletePayerRequestDbEntity
 from app.payin.repository.payment_method_repo import StripeCardDbEntity
 
 
@@ -477,7 +474,6 @@ class DeletePayerProcessor:
                     Return True if stripe_customer or stripe_country not found
                     Return True If the stripe_customer already deleted
                     Append stripe_customer.id to list_of_stripe_customer_ids
-                    Insert delete_payer_request_metadata for temporary backwards compatibility if email present on stripe_customer
                     Find all stripe_customers associated with stripe_customer's email if one present, and add id's from those to list_of_stripe_customer_ids
                     Initialize and add stripe_redact_actions for each id in list_of_stripe_customer_ids to customers list in delete_payer_summary if valid stripe_country
                     Update delete_payer_request with locally updated delete_payer_summary, and return False if update unsuccessful
@@ -524,19 +520,6 @@ class DeletePayerProcessor:
             list_of_stripe_customers.add(stripe_customer.id)
 
             if stripe_customer.email:
-                try:
-                    await self._insert_delete_payer_request_metadata(
-                        consumer_id=consumer_id,
-                        delete_payer_request=delete_payer_request,
-                        stripe_country=stripe_country,
-                        email=stripe_customer.email,
-                    )
-                except PayerDeleteError:
-                    self.log.exception(
-                        "[delete_stripe_customers] Exception occurred while inserting delete payer request metadata",
-                        consumer_id=consumer_id,
-                    )
-
                 stripe_customers = await self.payer_client.pgp_get_customers(
                     email=stripe_customer.email, country_code=stripe_country
                 )
@@ -745,30 +728,3 @@ class DeletePayerProcessor:
                     status=DeletePayerRequestStatus.IN_PROGRESS,
                 )
             )
-
-    async def _insert_delete_payer_request_metadata(
-        self,
-        consumer_id: int,
-        delete_payer_request: DeletePayerRequestDbEntity,
-        stripe_country: CountryCode,
-        email: str,
-    ) -> DeletePayerRequestMetadataDbEntity:
-        try:
-            delete_payer_request_metadata = await self.payer_client.insert_delete_payer_request_metadata(
-                delete_payer_request.client_request_id,
-                consumer_id,
-                stripe_country,
-                email,
-            )
-            self.log.info(
-                "[_insert_delete_payer_request_metadata] Delete payer request metadata insert successful",
-                consumer_id=consumer_id,
-                client_request_id=delete_payer_request_metadata.client_request_id,
-            )
-            return delete_payer_request_metadata
-        except PayerDeleteError:
-            self.log.exception(
-                "[_insert_delete_payer_request_metadata] Exception occurred while inserting delete payer request metadata",
-                consumer_id=consumer_id,
-            )
-            raise
