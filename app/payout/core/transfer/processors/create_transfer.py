@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta
 
 from aioredlock import Aioredlock
@@ -16,7 +17,9 @@ from app.commons.core.processor import (
 from doordash_python_stats.ddstats import doorstats_global
 
 from app.commons.async_kafka_producer import KafkaMessageProducer
+from app.commons.lock.lockable import Lockable
 from app.commons.lock.locks import PaymentLock
+from app.commons.lock.payment_db_lock import PaymentDBLock
 from app.commons.providers.dsj_client import DSJClient, DSJAuthException
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import (
@@ -33,6 +36,7 @@ from app.payout.core.account.utils import (
     get_country_shortname,
     COUNTRY_TO_CURRENCY_CODE,
 )
+from app.payout.core.feature_flags import enable_payment_db_lock_for_payout
 from app.payout.core.instant_payout.utils import get_payout_account_lock_name
 from app.payout.core.transfer.processors.submit_transfer import (
     SubmitTransferRequest,
@@ -106,6 +110,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
     kafka_producer: KafkaMessageProducer
     cache: PaymentCache
     dsj_client: DSJClient
+    payout_lock_repo: Lockable
 
     def __init__(
         self,
@@ -123,6 +128,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         cache: PaymentCache,
         dsj_client: DSJClient,
         logger: BoundLogger = None,
+        payout_lock_repo: Lockable,
     ):
         super().__init__(request, logger)
         self.request = request
@@ -137,6 +143,7 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         self.kafka_producer = kafka_producer
         self.cache = cache
         self.dsj_client = dsj_client
+        self.payout_lock_repo = payout_lock_repo
 
     async def _execute(self) -> CreateTransferResponse:
         self.logger.info(
@@ -384,15 +391,35 @@ class CreateTransfer(AsyncOperation[CreateTransferRequest, CreateTransferRespons
         currency: Optional[str],
         start_time: Optional[datetime],
     ) -> Tuple[Optional[Transfer], List[int]]:
-        # lock_name should be the same as the one for instant payout
-        lock_name = get_payout_account_lock_name(payment_account_id)
-        async with PaymentLock(lock_name, self.payment_lock_manager):
-            return await self.create_with_redis_lock(
-                payment_account_id=payment_account_id,
-                currency=currency,
-                start_time=start_time,
-                end_time=end_time,
+        if enable_payment_db_lock_for_payout(payment_account_id):
+            self.logger.info(
+                "[Weekly Transfer]: Entering PaymentDBLock to create weekly transfer",
+                payout_account_id=payment_account_id,
             )
+            hashed_payout_account = hashlib.sha256(
+                str(payment_account_id).encode("utf-8")
+            ).hexdigest()
+            async with PaymentDBLock(self.payout_lock_repo, hashed_payout_account):
+                self.logger.info(
+                    "[Weekly Transfer]: Creating weekly transfer with PaymentDBLock",
+                    payout_account_id=payment_account_id,
+                )
+                return await self.create_with_redis_lock(
+                    payment_account_id=payment_account_id,
+                    currency=currency,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+        else:
+            # lock_name should be the same as the one for instant payout
+            lock_name = get_payout_account_lock_name(payment_account_id)
+            async with PaymentLock(lock_name, self.payment_lock_manager):
+                return await self.create_with_redis_lock(
+                    payment_account_id=payment_account_id,
+                    currency=currency,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
 
     async def create_with_redis_lock(
         self,

@@ -33,6 +33,7 @@ from app.payout.repository.maindb.managed_account_transfer import (
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.repository.paymentdb.payout_lock import PayoutLockRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_and_insert_transaction,
@@ -57,6 +58,7 @@ class TestWeeklyCreateTransfer:
         managed_account_transfer_repo: ManagedAccountTransferRepository,
         app_context: AppContext,
         stripe_async_client: StripeAsyncClient,
+        payout_lock_repo: PayoutLockRepository,
     ):
         self.cache = setup_cache(app_context=app_context)
         self.dsj_client = app_context.dsj_client
@@ -80,6 +82,7 @@ class TestWeeklyCreateTransfer:
                 end_time=datetime.now(timezone.utc),
                 whitelist_payment_account_ids=[],
             ),
+            payout_lock_repo=payout_lock_repo,
         )
         self.transfer_repo = transfer_repo
         self.stripe_transfer_repo = stripe_transfer_repo
@@ -91,6 +94,7 @@ class TestWeeklyCreateTransfer:
         self.mocker = mocker
         self.stripe = stripe_async_client
         self.kafka_producer = app_context.kafka_producer
+        self.payout_lock_repo = payout_lock_repo
 
     def _construct_weekly_create_transfer_op(self):
         request = WeeklyCreateTransferRequest(
@@ -114,6 +118,7 @@ class TestWeeklyCreateTransfer:
             cache=self.cache,
             dsj_client=self.dsj_client,
             request=request,
+            payout_lock_repo=self.payout_lock_repo,
         )
         return weekly_create_transfer_op
 
@@ -379,6 +384,7 @@ class TestWeeklyCreateTransfer:
             cache=self.cache,
             dsj_client=self.dsj_client,
             request=request,
+            payout_lock_repo=self.payout_lock_repo,
         )
         await weekly_create_transfer_op._execute()
         mocked_init_create_transfer.assert_called_once_with(

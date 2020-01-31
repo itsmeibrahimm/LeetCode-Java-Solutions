@@ -13,6 +13,7 @@ from app.commons.core.processor import (
     OperationResponse,
 )
 from app.commons.async_kafka_producer import KafkaMessageProducer
+from app.commons.lock.lockable import Lockable
 from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import ENABLE_QUEUEING_MECHANISM_FOR_PAYOUT
@@ -72,6 +73,7 @@ class WeeklyCreateTransfer(
     kafka_producer: KafkaMessageProducer
     cache: PaymentCache
     dsj_client: DSJClient
+    payout_lock_repo: Lockable
 
     def __init__(
         self,
@@ -89,6 +91,7 @@ class WeeklyCreateTransfer(
         cache: PaymentCache,
         dsj_client: DSJClient,
         logger: BoundLogger = None,
+        payout_lock_repo: Lockable,
     ):
         super().__init__(request, logger)
         self.request = request
@@ -103,6 +106,7 @@ class WeeklyCreateTransfer(
         self.kafka_producer = kafka_producer
         self.cache = cache
         self.dsj_client = dsj_client
+        self.payout_lock_repo = payout_lock_repo
 
     async def _execute(self) -> WeeklyCreateTransferResponse:
         payout_day = self.request.payout_day
@@ -195,6 +199,7 @@ class WeeklyCreateTransfer(
                         kafka_producer=self.kafka_producer,
                         cache=self.cache,
                         dsj_client=self.dsj_client,
+                        payout_lock_repo=self.payout_lock_repo,
                     )
                     await create_transfer_op.execute()
             except Exception as e:

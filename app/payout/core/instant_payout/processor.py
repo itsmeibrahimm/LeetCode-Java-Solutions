@@ -1,7 +1,11 @@
+import hashlib
+
 from aioredlock import Aioredlock
 from structlog import BoundLogger
 
+from app.commons.lock.lockable import Lockable
 from app.commons.lock.locks import PaymentLock
+from app.commons.lock.payment_db_lock import PaymentDBLock
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.constants import PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT
 from app.payout.core.account.utils import COUNTRY_TO_CURRENCY_CODE
@@ -10,6 +14,7 @@ from app.payout.core.errors import (
     InstantPayoutErrorCode,
     instant_payout_error_message_maps,
 )
+from app.payout.core.feature_flags import enable_payment_db_lock_for_payout
 from app.payout.core.instant_payout.models import (
     EligibilityCheckRequest,
     InternalPaymentEligibility,
@@ -74,6 +79,7 @@ class InstantPayoutProcessors:
     stripe_payout_request_repo: StripePayoutRequestRepositoryInterface
     stripe: StripeAsyncClient
     payment_lock_manager: Aioredlock
+    payout_lock_repo: Lockable
 
     def __init__(
         self,
@@ -87,6 +93,7 @@ class InstantPayoutProcessors:
         transaction_repo: TransactionRepositoryInterface,
         stripe: StripeAsyncClient,
         payment_lock_manager: Aioredlock,
+        payout_lock_repo: Lockable,
     ):
         self.logger = logger
         self.payout_account_repo = payout_account_repo
@@ -98,6 +105,7 @@ class InstantPayoutProcessors:
         self.transaction_repo = transaction_repo
         self.stripe = stripe
         self.payment_lock_manager = payment_lock_manager
+        self.payout_lock_repo = payout_lock_repo
 
     async def create_and_submit_instant_payout(
         self, request: CreateAndSubmitInstantPayoutRequest
@@ -245,16 +253,36 @@ class InstantPayoutProcessors:
             transaction_ids=transaction_ids,
             fee=InstantPayoutFees.STANDARD_FEE,
         )
-        lock_name = get_payout_account_lock_name(request.payout_account_id)
-
-        async with PaymentLock(
-            lock_name,
-            self.payment_lock_manager,
-            lock_timeout=PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT,
-        ):
-            create_payout_response = await self.payout_repo.create_payout_and_attach_to_transactions(
-                request=create_payout_request
+        if enable_payment_db_lock_for_payout(request.payout_account_id):
+            self.logger.info(
+                "[Instant Payout Submit]: Entering PaymentDBLock to create instant payout",
+                payout_account_id=request.payout_account_id,
             )
+            hashed_payout_account = hashlib.sha256(
+                str(request.payout_account_id).encode("utf-8")
+            ).hexdigest()
+            async with PaymentDBLock(self.payout_lock_repo, hashed_payout_account):
+                self.logger.info(
+                    "[Instant Payout Submit]: Creating instant payout in PaymentDBLock",
+                    payout_account_id=request.payout_account_id,
+                )
+                create_payout_response = await self.payout_repo.create_payout_and_attach_to_transactions(
+                    request=create_payout_request
+                )
+                self.logger.info(
+                    "[Instant Payout Submit]: Created instant payout in PaymentDBLock",
+                    payout_account_id=request.payout_account_id,
+                )
+        else:
+            lock_name = get_payout_account_lock_name(request.payout_account_id)
+            async with PaymentLock(
+                lock_name,
+                self.payment_lock_manager,
+                lock_timeout=PAYOUT_ACCOUNT_LOCK_DEFAULT_TIMEOUT,
+            ):
+                create_payout_response = await self.payout_repo.create_payout_and_attach_to_transactions(
+                    request=create_payout_request
+                )
         self.logger.info(
             "[Instant Payout Submit]: Created Instant Payout",
             create_payout_request=create_payout_request.dict(),

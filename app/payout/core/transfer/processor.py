@@ -3,6 +3,7 @@ from structlog.stdlib import BoundLogger
 
 from app.commons.async_kafka_producer import KafkaMessageProducer
 from app.commons.cache.cache import PaymentCache
+from app.commons.lock.lockable import Lockable
 from app.commons.providers.dsj_client import DSJClient
 from app.commons.providers.stripe.stripe_client import StripeAsyncClient
 from app.payout.core.transfer.processors.create_transfer import (
@@ -62,6 +63,7 @@ class TransferProcessors:
     kafka_producer: KafkaMessageProducer
     cache: PaymentCache
     dsj_client: DSJClient
+    payout_lock_repo: Lockable
 
     def __init__(
         self,
@@ -77,6 +79,7 @@ class TransferProcessors:
         kafka_producer: KafkaMessageProducer,
         cache: PaymentCache,
         dsj_client: DSJClient,
+        payout_lock_repo: Lockable,
     ):
         self.logger = logger
         self.stripe = stripe
@@ -90,6 +93,7 @@ class TransferProcessors:
         self.kafka_producer = kafka_producer
         self.cache = cache
         self.dsj_client = dsj_client
+        self.payout_lock_repo = payout_lock_repo
 
     async def create_transfer(self, request: CreateTransferRequest):
         create_transfer_op = CreateTransfer(
@@ -106,6 +110,7 @@ class TransferProcessors:
             kafka_producer=self.kafka_producer,
             cache=self.cache,
             dsj_client=self.dsj_client,
+            payout_lock_repo=self.payout_lock_repo,
         )
         return await create_transfer_op.execute()
 
@@ -139,6 +144,7 @@ class TransferProcessors:
             kafka_producer=self.kafka_producer,
             cache=self.cache,
             dsj_client=self.dsj_client,
+            payout_lock_repo=self.payout_lock_repo,
         )
         return await weekly_create_transfer_op.execute()
 

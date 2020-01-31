@@ -95,6 +95,9 @@ class PayoutLockRepository(
             return LockInternal(**lock.dict())
 
     async def unlock(self, unlock_request):
+        if not unlock_request.lock_internal:
+            raise PaymentDBLockReleaseError
+
         async with self._database.master().connection().transaction() as tx:
             conn = tx.connection()
             # select for the same lock with lock_id, status, lock_timestamp and ttl_sec

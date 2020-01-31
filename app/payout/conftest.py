@@ -11,6 +11,7 @@ from asynctest import mock
 from starlette.testclient import TestClient
 
 from app.commons.config.app_config import AppConfig
+from app.commons.context.app_context import create_app_context
 from app.commons.database.infra import DB
 from app.commons.providers.stripe import stripe_models
 from app.commons.providers.stripe.stripe_client import (
@@ -65,6 +66,16 @@ from app.payout.test_integration.api import (
     create_transaction_url,
     create_transfer_url,
 )
+
+
+#####################
+# App Context
+#####################
+@pytest.fixture
+async def app_context(app_config: AppConfig):
+    context = await create_app_context(app_config)
+    yield context
+    await context.close()
 
 
 #####################
@@ -254,6 +265,14 @@ def stripe_test(stripe_api, app_config: AppConfig):
 def mock_set_lock():
     with mock.patch("aioredlock.redis.Redis.set_lock") as mock_set_lock:
         yield mock_set_lock
+
+
+@pytest.fixture
+def mock_set_db_lock():
+    with mock.patch(
+        "app.payout.repository.paymentdb.payout_lock.PayoutLockRepository.lock"
+    ) as mock_set_db_lock:
+        yield mock_set_db_lock
 
 
 @pytest.fixture

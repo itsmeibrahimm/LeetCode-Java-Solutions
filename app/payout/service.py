@@ -29,6 +29,7 @@ from app.payout.repository.maindb import (
     transfer,
     managed_account_transfer,
 )
+from app.payout.repository.paymentdb import payout_lock
 
 __all__ = [
     "create_payout_account_processors",
@@ -58,6 +59,7 @@ __all__ = [
     "RedisLockManager",
     "create_instant_payout_processors",
     "KafkaProducer",
+    "PayoutLockRepository",
 ]
 
 PaymentAccountRepositoryInterface = payment_account.PaymentAccountRepositoryInterface
@@ -98,6 +100,7 @@ class PayoutService(BaseService):
     stripe_transfers: stripe_transfer.StripeTransferRepository
     managed_account_transfers: managed_account_transfer.ManagedAccountTransferRepository
     payment_account_edit_history: payment_account_edit_history.PaymentAccountEditHistoryRepository
+    payout_locks: payout_lock.PayoutLockRepository
 
     dsj_client: DSJClient
     stripe: StripeAsyncClient
@@ -135,6 +138,10 @@ class PayoutService(BaseService):
         self.payment_account_edit_history = payment_account_edit_history.PaymentAccountEditHistoryRepository(
             bankdb
         )
+
+        # payment_db
+        paymentdb = self.app_context.payout_paymentdb
+        self.payout_locks = payout_lock.PayoutLockRepository(paymentdb)
 
         # dsj_client
         self.dsj_client = self.app_context.dsj_client
@@ -222,6 +229,12 @@ def PaymentAccountEditHistoryRepository(
     return payout_service.payment_account_edit_history
 
 
+def PayoutLockRepository(
+    payout_service: PayoutService = Depends()
+) -> payout_lock.PayoutLockRepository:
+    return payout_service.payout_locks
+
+
 def DSJClientHandle(payout_service: PayoutService = Depends()):
     return payout_service.dsj_client
 
@@ -265,6 +278,7 @@ def create_transfer_processors(payout_service: PayoutService = Depends()):
         kafka_producer=payout_service.kafka_producer,
         cache=payout_service.cache,
         dsj_client=payout_service.dsj_client,
+        payout_lock_repo=payout_service.payout_locks,
     )
 
 
@@ -290,4 +304,5 @@ def create_instant_payout_processors(payout_service: PayoutService = Depends()):
         stripe=payout_service.stripe,
         payment_lock_manager=payout_service.redis_lock_manager,
         stripe_managed_account_transfer_repo=payout_service.striped_managed_account_transfers,
+        payout_lock_repo=payout_service.payout_locks,
     )

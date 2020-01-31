@@ -21,6 +21,7 @@ from app.payout.repository.maindb.managed_account_transfer import (
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.repository.paymentdb.payout_lock import PayoutLockRepository
 
 
 class CreateTransferTask(BaseTask):
@@ -65,6 +66,7 @@ class CreateTransferTask(BaseTask):
         managed_account_transfer_repo = ManagedAccountTransferRepository(
             database=app_context.payout_maindb
         )
+        payout_lock_repo = PayoutLockRepository(database=app_context.payout_paymentdb)
 
         # convert to create transfer
         req_context = build_req_context(
@@ -93,6 +95,7 @@ class CreateTransferTask(BaseTask):
             "dsj_client": app_context.dsj_client,
             "logger": req_context.log,
             "request": CreateTransferRequest(**create_transfer_request_dict),
+            "payout_lock_repo": payout_lock_repo,
         }
         create_transfer_op = CreateTransfer(**create_transfer_op_dict)
         await create_transfer_op.execute()

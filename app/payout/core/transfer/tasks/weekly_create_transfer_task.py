@@ -21,6 +21,7 @@ from app.payout.repository.maindb.managed_account_transfer import (
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.repository.paymentdb.payout_lock import PayoutLockRepository
 
 
 class WeeklyCreateTransferTask(BaseTask):
@@ -63,6 +64,7 @@ class WeeklyCreateTransferTask(BaseTask):
         managed_account_transfer_repo = ManagedAccountTransferRepository(
             database=app_context.payout_maindb
         )
+        payout_lock_repo = PayoutLockRepository(database=app_context.payout_paymentdb)
 
         # convert to weekly create transfer
         req_context = build_req_context(
@@ -92,6 +94,7 @@ class WeeklyCreateTransferTask(BaseTask):
             "request": WeeklyCreateTransferRequest(
                 **weekly_create_transfer_request_dict
             ),
+            "payout_lock_repo": payout_lock_repo,
         }
         weekly_create_transfer_op = WeeklyCreateTransfer(
             **weekly_create_transfer_op_dict

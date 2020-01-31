@@ -75,6 +75,7 @@ from app.payout.repository.bankdb.transaction import TransactionRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.transfer import TransferRepository
 from app.commons.runtime import runtime
+from app.payout.repository.paymentdb.payout_lock import PayoutLockRepository
 
 logger = get_logger("jobs")
 
@@ -533,6 +534,9 @@ class WeeklyCreateTransferJob(Job):
         managed_account_transfer_repo = ManagedAccountTransferRepository(
             database=job_instance_cxt.app_context.payout_maindb
         )
+        payout_lock_repo = PayoutLockRepository(
+            database=job_instance_cxt.app_context.payout_paymentdb
+        )
         req_context = job_instance_cxt.build_req_context()
         cache = setup_cache(app_context=job_instance_cxt.app_context)
 
@@ -582,6 +586,7 @@ class WeeklyCreateTransferJob(Job):
                 dsj_client=job_instance_cxt.app_context.dsj_client,
                 logger=logger,
                 request=weekly_create_transfer_req,
+                payout_lock_repo=payout_lock_repo,
             )
             await job_instance_cxt.job_pool.spawn(
                 weekly_create_transfer_op.execute(), cb=job_callback

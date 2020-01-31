@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from datetime import datetime, timezone
 
 import pytest
@@ -9,7 +10,9 @@ from app.commons.cache.cache import setup_cache
 from app.commons.context.app_context import AppContext
 from aioredlock.redis import Redis
 
-from app.commons.core.errors import PaymentLockAcquireError
+from app.commons.core.errors import PaymentLockAcquireError, PaymentDBLockAcquireError
+from app.commons.lock.models import GetLockRequest, LockStatus
+from app.commons.operational_flags import ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT
 from app.conftest import RuntimeSetter
 from app.main import config
 from aioredlock import LockError
@@ -48,6 +51,7 @@ from app.payout.repository.maindb.model.transfer import TransferStatus
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
 from app.payout.repository.maindb.stripe_transfer import StripeTransferRepository
 from app.payout.repository.maindb.transfer import TransferRepository
+from app.payout.repository.paymentdb.payout_lock import PayoutLockRepository
 from app.payout.test_integration.utils import (
     prepare_and_insert_payment_account,
     prepare_and_insert_transaction,
@@ -71,6 +75,7 @@ class TestCreateTransfer:
         managed_account_transfer_repo: ManagedAccountTransferRepository,
         app_context: AppContext,
         stripe_async_client: StripeAsyncClient,
+        payout_lock_repo: PayoutLockRepository,
     ):
         self.cache = setup_cache(app_context=app_context)
         self.dsj_client = app_context.dsj_client
@@ -87,6 +92,7 @@ class TestCreateTransfer:
             kafka_producer=app_context.kafka_producer,
             cache=self.cache,
             dsj_client=self.dsj_client,
+            payout_lock_repo=payout_lock_repo,
             request=CreateTransferRequest(
                 payout_account_id=123,
                 transfer_type=TransferType.SCHEDULED,
@@ -103,6 +109,7 @@ class TestCreateTransfer:
         self.mocker = mocker
         self.stripe = stripe_async_client
         self.kafka_producer = app_context.kafka_producer
+        self.payout_lock_repo = payout_lock_repo
 
     def _construct_create_transfer_op(
         self,
@@ -127,6 +134,7 @@ class TestCreateTransfer:
             kafka_producer=self.kafka_producer,
             cache=self.cache,
             dsj_client=self.dsj_client,
+            payout_lock_repo=self.payout_lock_repo,
             request=CreateTransferRequest(
                 payout_account_id=payment_account_id,
                 transfer_type=transfer_type,
@@ -358,7 +366,7 @@ class TestCreateTransfer:
         )
 
     async def test_execute_create_transfer_scheduled_transfer_type_submit_after_creation_success(
-        self
+        self, runtime_setter: RuntimeSetter
     ):
         # there is no corresponding stripe_transfer inserted, so the final status of transfer should be NEW
         sma = await prepare_and_insert_stripe_managed_account(
@@ -379,7 +387,12 @@ class TestCreateTransfer:
         # mocked get_bool for runtime FRAUD_ENABLE_MX_PAYOUT_DELAY_AFTER_BANK_CHANGE
         # mocked get_json for runtime DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME, DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME
         self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=False)
-        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value=[])
+        runtime_setter.set(DISABLE_DASHER_PAYMENT_ACCOUNT_LIST_NAME, [])
+        runtime_setter.set(DISABLE_MERCHANT_PAYMENT_ACCOUNT_LIST_NAME, [])
+
+        # mock feature_flag to enable/disable payment db lock
+        data = {"enable_all": False, "white_list": [], "bucket": 0}
+        runtime_setter.set(ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT, data)
 
         @asyncio.coroutine
         def mock_execute_submit_transfer(*args, **kwargs):
@@ -630,6 +643,7 @@ class TestCreateTransfer:
             kafka_producer=self.kafka_producer,
             cache=self.cache,
             dsj_client=self.dsj_client,
+            payout_lock_repo=self.payout_lock_repo,
             request=CreateTransferRequest(
                 payout_account_id=111,
                 transfer_type=TransferType.SCHEDULED,
@@ -646,4 +660,131 @@ class TestCreateTransfer:
                 start_time=None,
             )
 
+        mock_create_with_redis_lock.assert_not_called()
+
+    async def test_create_transfer_for_unpaid_transactions_raise_exception_when_redis_lock_enabled(
+        self,
+        app_context: AppContext,
+        mock_set_lock,
+        mock_set_db_lock,
+        runtime_setter: RuntimeSetter,
+    ):
+        mocked_payment_account_id = 112
+        # mock feature_flag
+        data = {"enable_all": False, "white_list": [], "bucket": 0}
+        runtime_setter.set(ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT, data)
+
+        mock_create_with_redis_lock = self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.create_with_redis_lock"
+        )
+        # overwrite redis instances to some unknown address
+        app_context.redis_lock_manager.redis = Redis(
+            [("unknown_address", 1111)], config.REDIS_LOCK_DEFAULT_TIMEOUT
+        )
+        # Should raise PaymentLockAcquireError when can't connect to redis
+        mock_set_lock.side_effect = LockError
+        create_transfer_op = CreateTransfer(
+            transfer_repo=self.transfer_repo,
+            stripe_transfer_repo=self.stripe_transfer_repo,
+            payment_account_repo=self.payment_account_repo,
+            transaction_repo=self.transaction_repo,
+            payment_account_edit_history_repo=self.payment_account_edit_history_repo,
+            managed_account_transfer_repo=self.managed_account_transfer_repo,
+            payment_lock_manager=self.payment_lock_manager,
+            logger=self.mocker.Mock(),
+            stripe=self.stripe,
+            kafka_producer=self.kafka_producer,
+            cache=self.cache,
+            dsj_client=self.dsj_client,
+            payout_lock_repo=self.payout_lock_repo,
+            request=CreateTransferRequest(
+                payout_account_id=mocked_payment_account_id,
+                transfer_type=TransferType.SCHEDULED,
+                end_time=datetime.utcnow(),
+                payout_countries=None,
+                target_type=None,
+            ),
+        )
+        with pytest.raises(PaymentLockAcquireError):
+            await create_transfer_op.create_transfer_for_unpaid_transactions(
+                payment_account_id=mocked_payment_account_id,
+                end_time=datetime.utcnow(),
+                currency="usd",
+                start_time=None,
+            )
+
+        mock_create_with_redis_lock.assert_not_called()
+        mock_set_db_lock.assert_not_called()
+
+    async def test_create_transfer_for_unpaid_transactions_when_payment_db_lock_enabled(
+        self, app_context: AppContext, mock_set_lock, runtime_setter: RuntimeSetter
+    ):
+        # prepare data
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
+        )
+
+        # mock feature_flag
+        data = {"enable_all": False, "white_list": [payment_account.id], "bucket": 0}
+        runtime_setter.set(ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT, data)
+
+        created_by_id = 9999
+        create_transfer_op = self._construct_create_transfer_op(
+            payment_account_id=payment_account.id,
+            transfer_type=TransferType.MANUAL,
+            created_by_id=created_by_id,
+        )
+
+        await create_transfer_op.create_transfer_for_unpaid_transactions(
+            payment_account_id=payment_account.id,
+            end_time=datetime.utcnow(),
+            currency="usd",
+            start_time=None,
+        )
+        payment_db_lock_id = hashlib.sha256(
+            str(payment_account.id).encode("utf-8")
+        ).hexdigest()
+        lock_internal = await self.payout_lock_repo.get_lock(
+            GetLockRequest(lock_id=payment_db_lock_id)
+        )
+        assert lock_internal
+        assert lock_internal.status == LockStatus.OPEN
+
+    async def test_create_transfer_for_unpaid_transactions_raise_exception_when_payment_db_lock_enabled(
+        self, app_context: AppContext, mock_set_db_lock, runtime_setter: RuntimeSetter
+    ):
+        # prepare data
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo, payout_account_id=payment_account.id
+        )
+
+        # mock feature_flag
+        data = {"enable_all": False, "white_list": [payment_account.id], "bucket": 0}
+        runtime_setter.set(ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT, data)
+
+        mock_create_with_redis_lock = self.mocker.patch(
+            "app.payout.core.transfer.processors.create_transfer.CreateTransfer.create_with_redis_lock"
+        )
+        mock_set_db_lock.side_effect = PaymentDBLockAcquireError
+
+        created_by_id = 9999
+        create_transfer_op = self._construct_create_transfer_op(
+            payment_account_id=payment_account.id,
+            transfer_type=TransferType.MANUAL,
+            created_by_id=created_by_id,
+        )
+
+        with pytest.raises(PaymentDBLockAcquireError):
+            await create_transfer_op.create_transfer_for_unpaid_transactions(
+                payment_account_id=payment_account.id,
+                end_time=datetime.utcnow(),
+                currency="usd",
+                start_time=None,
+            )
         mock_create_with_redis_lock.assert_not_called()

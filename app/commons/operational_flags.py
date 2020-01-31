@@ -20,3 +20,9 @@ ENABLED_KEY_PREFIX_LIST_FOR_CACHE = (
 )
 
 BYPASS_IDS = "ops/bypass_ids_service_auth.bool"
+
+
+# feature flag to enable payment_db_lock for weekly transfer and instant payout
+ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT = (
+    "payout/feature-flags/enable_payment_db_lock_for_payout.json"
+)
