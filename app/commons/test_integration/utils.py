@@ -57,4 +57,5 @@ def prepare_and_validate_stripe_account(
     )
     assert account
     assert account.id.startswith("acct_")
+    assert account.settings.payouts.schedule.interval == "manual"
     return account

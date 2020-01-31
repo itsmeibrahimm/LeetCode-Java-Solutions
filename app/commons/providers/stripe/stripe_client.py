@@ -721,10 +721,13 @@ class StripeClient(StripeClientInterface):
 
     @tracing.track_breadcrumb(resource="account", action="create")
     def create_account(self, *, request: models.CreateAccountRequest) -> models.Account:
+        # NOTE: account will always have manual payout schedule to prevent double pay
+        # if other option needed from product side, update the CreateAccountRequest
         account = stripe.Account.create(
             type=request.type,
             account_token=request.account_token,
             requested_capabilities=request.requested_capabilities,
+            settings={"payouts": {"schedule": {"interval": "manual"}}},
             **self.settings_for(request.country),
         )
         return account
