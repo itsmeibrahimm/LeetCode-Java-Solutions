@@ -10,6 +10,8 @@ from app.payout.service import (
     TransferRepositoryInterface,
     StripeTransferRepositoryInterface,
     TransactionRepositoryInterface,
+    PayoutCardRepositoryInterface,
+    PayoutMethodRepositoryInterface,
 )
 from app.payout.repository.bankdb.model.payout import PayoutUpdate, Payout
 from app.payout.repository.bankdb.model.stripe_payout_request import (
@@ -208,6 +210,35 @@ async def _handle_stripe_instant_transfer_event(
                 )
 
 
+async def _handle_debit_card_deleted_event(
+    stripe_card_id: str,
+    i_payout_method: PayoutMethodRepositoryInterface,
+    i_payout_card: PayoutCardRepositoryInterface,
+    log: BoundLogger = root_logger,
+) -> Any:
+
+    payout_card = await i_payout_card.get_payout_card_by_stripe_id(
+        stripe_card_id=stripe_card_id
+    )
+    if payout_card is None:
+        log.warn(
+            "[_handle_debit_card_deleted_event] Can't find payout card by stripe card id",
+            stripe_card_id=stripe_card_id,
+        )
+        return
+    # Mark payout method as deleted
+    payout_method = await i_payout_method.update_payout_method_deleted_at_by_payout_method_id(
+        payout_method_id=payout_card.id, deleted_at=datetime.utcnow()
+    )
+    if payout_method is None:
+        log.warn(
+            "[_handle_debit_card_deleted_event] Failed to update payout method",
+            stripe_card_id=stripe_card_id,
+        )
+
+    return
+
+
 async def handle_stripe_webhook_transfer_event(
     event: Dict[str, Any], country_code: str, payout_service: PayoutService
 ) -> Any:
@@ -244,10 +275,36 @@ async def handle_stripe_webhook_transfer_event(
             raise ValueError("Not supported transfer type")
 
 
+async def handle_external_account_event(
+    event: Dict[str, Any], country_code: str, payout_service: PayoutService
+) -> Any:
+    """Handle external account events.
+
+    Entry to handle all external account events
+
+    :param event: event sent from stripe
+    :param country_code: country code of this event
+    :param payout_service: registered payout service within app context
+    :return:
+    """
+    stripe_card_id = event.get("data", {}).get("object", {}).get("id", None)
+
+    # Handle debit card deleted event, sample event from stripe:
+    # https://dashboard.stripe.com/acct_1FdJCXKLM7asK4aN/events/evt_1Fwv6HKLM7asK4aNysZCN60A
+    if stripe_card_id is not None and stripe_card_id.startswith("card_"):
+        return await _handle_debit_card_deleted_event(
+            stripe_card_id=stripe_card_id,
+            i_payout_method=payout_service.payout_methods,
+            i_payout_card=payout_service.payout_cards,
+        )
+    return
+
+
 STRIPE_WEBHOOK_EVENT_TYPE_HANDLER_MAPPING = {
     "transfer.created": handle_stripe_webhook_transfer_event,
     "transfer.failed": handle_stripe_webhook_transfer_event,
     "transfer.paid": handle_stripe_webhook_transfer_event,
     "transfer.reversed": handle_stripe_webhook_transfer_event,
     "transfer.updated": handle_stripe_webhook_transfer_event,
+    "account.external_account.deleted": handle_external_account_event,
 }

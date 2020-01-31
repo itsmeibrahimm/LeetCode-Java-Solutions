@@ -14,7 +14,6 @@ from app.payout.repository.bankdb.model import payout_method
 from app.payout.repository.bankdb.model.payout_method import (
     PayoutMethodCreate,
     PayoutMethod,
-    PayoutMethodUpdate,
 )
 from app.payout.models import PayoutExternalAccountType
 
@@ -40,8 +39,14 @@ class PayoutMethodRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def update_payout_method_deleted_at(
-        self, token: UUID, data: PayoutMethodUpdate
+    async def update_payout_method_deleted_at_by_token(
+        self, token: UUID, deleted_at: datetime
+    ) -> Optional[PayoutMethod]:
+        pass
+
+    @abstractmethod
+    async def update_payout_method_deleted_at_by_payout_method_id(
+        self, payout_method_id: int, deleted_at: datetime
     ) -> Optional[PayoutMethod]:
         pass
 
@@ -101,8 +106,8 @@ class PayoutMethodRepository(PayoutBankDBRepository, PayoutMethodRepositoryInter
         else:
             return []
 
-    async def update_payout_method_deleted_at(
-        self, token: UUID, data: PayoutMethodUpdate
+    async def update_payout_method_deleted_at_by_token(
+        self, token: UUID, deleted_at: datetime
     ) -> Optional[PayoutMethod]:
         stmt = (
             payout_method.table.update()
@@ -112,10 +117,24 @@ class PayoutMethodRepository(PayoutBankDBRepository, PayoutMethodRepositoryInter
                     payout_method.deleted_at.is_(None),
                 )
             )
-            .values(
-                data.dict_after_json_to_string(skip_defaults=True),
-                updated_at=datetime.utcnow(),
+            .values(deleted_at=deleted_at, updated_at=datetime.utcnow())
+            .returning(*payout_method.table.columns.values())
+        )
+        row = await self._database.master().fetch_one(stmt)
+        return PayoutMethod.from_row(row) if row else None
+
+    async def update_payout_method_deleted_at_by_payout_method_id(
+        self, payout_method_id: int, deleted_at: datetime
+    ) -> Optional[PayoutMethod]:
+        stmt = (
+            payout_method.table.update()
+            .where(
+                and_(
+                    payout_method.id == payout_method_id,
+                    payout_method.deleted_at.is_(None),
+                )
             )
+            .values(deleted_at=deleted_at, updated_at=datetime.utcnow())
             .returning(*payout_method.table.columns.values())
         )
         row = await self._database.master().fetch_one(stmt)

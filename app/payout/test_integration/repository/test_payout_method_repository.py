@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 
-from app.payout.repository.bankdb.model.payout_method import PayoutMethodUpdate
 from app.payout.repository.bankdb.payout_card import PayoutCardRepository
 from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.maindb.payment_account import PaymentAccountRepository
@@ -42,7 +41,7 @@ class TestPayoutMethodRepository:
             payout_method.id
         ), "retrieved payout method matches"
 
-    async def test_update_payout_method_deleted_at(
+    async def test_update_payout_method_deleted_at_by_token(
         self,
         payment_account_repo: PaymentAccountRepository,
         payout_method_repo: PayoutMethodRepository,
@@ -53,8 +52,27 @@ class TestPayoutMethodRepository:
             payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
         )
         deleted_at = datetime.utcnow()
-        updated_payout_method = await payout_method_repo.update_payout_method_deleted_at(
-            token=payout_method.token, data=PayoutMethodUpdate(deleted_at=deleted_at)
+        updated_payout_method = await payout_method_repo.update_payout_method_deleted_at_by_token(
+            token=payout_method.token, deleted_at=deleted_at
+        )
+        if updated_payout_method:
+            assert (
+                updated_payout_method.deleted_at == deleted_at
+            ), "retrieved payout method matches"
+
+    async def test_update_payout_method_deleted_at_by_payout_method_id(
+        self,
+        payment_account_repo: PaymentAccountRepository,
+        payout_method_repo: PayoutMethodRepository,
+    ):
+        payment_account = await prepare_and_insert_payment_account(payment_account_repo)
+        # prepare and insert payout_method, then validate
+        payout_method = await prepare_and_insert_payout_method(
+            payout_method_repo=payout_method_repo, payout_account_id=payment_account.id
+        )
+        deleted_at = datetime.utcnow()
+        updated_payout_method = await payout_method_repo.update_payout_method_deleted_at_by_payout_method_id(
+            payout_method_id=payout_method.id, deleted_at=deleted_at
         )
         if updated_payout_method:
             assert (

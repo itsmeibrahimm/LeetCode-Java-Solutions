@@ -1,3 +1,4 @@
+import random
 import uuid
 
 import pytest
@@ -7,10 +8,14 @@ from unittest import mock
 from app.commons.database.infra import DB
 from app.commons.types import Currency
 from app.payout.models import TransactionTargetType
+from app.payout.repository.bankdb.model.payout_card import PayoutCardCreate
+from app.payout.repository.bankdb.model.payout_method import PayoutMethodCreate
 from app.payout.repository.bankdb.model.stripe_payout_request import (
     StripePayoutRequestCreate,
 )
 from app.payout.repository.bankdb.model.transaction import TransactionCreateDBEntity
+from app.payout.repository.bankdb.payout_card import PayoutCardRepository
+from app.payout.repository.bankdb.payout_method import PayoutMethodRepository
 from app.payout.repository.bankdb.stripe_payout_request import (
     StripePayoutRequestRepository,
 )
@@ -24,6 +29,7 @@ from app.payout.repository.maindb.model.stripe_transfer import StripeTransferCre
 from app.payout.api.webhook.utils.event_handler import (
     _handle_stripe_instant_transfer_event,
     _handle_stripe_transfer_event,
+    _handle_debit_card_deleted_event,
 )
 from app.commons.providers.dsj_client import DSJClient
 from structlog.stdlib import BoundLogger
@@ -55,6 +61,14 @@ class TestWebhookUtilsEventHandler:
         return TransactionRepository(database=payout_bankdb)
 
     @pytest.fixture
+    def payout_method_repo(self, payout_bankdb: DB) -> PayoutMethodRepository:
+        return PayoutMethodRepository(database=payout_bankdb)
+
+    @pytest.fixture
+    def payout_card_repo(self, payout_bankdb: DB) -> PayoutCardRepository:
+        return PayoutCardRepository(database=payout_bankdb)
+
+    @pytest.fixture
     def dsj_client(self, mocker) -> DSJClient:
         # return DSJClient(
         #     {
@@ -79,6 +93,7 @@ class TestWebhookUtilsEventHandler:
 
         bl = BoundLogger(None, None, None)
         bl.info = MagicMock(return_value=None)
+        bl.warn = MagicMock(return_value=None)
         return bl
 
     @pytest.mark.asyncio
@@ -428,3 +443,139 @@ class TestWebhookUtilsEventHandler:
             log.info.assert_called_once_with(
                 "handle_stripe_transfer_event_enabled is off, skipping..."
             )
+
+    @pytest.mark.asyncio
+    async def test__handle_debit_card_deleted_event(
+        self,
+        payout_method_repo: PayoutMethodRepository,
+        payout_card_repo: PayoutCardRepository,
+        log: BoundLogger,
+    ):
+        stripe_card_id = "card_{}".format(str(random.randint(1, 2147483647)))
+        # Should log payout card not found warning can't find payout card in db
+        await _handle_debit_card_deleted_event(
+            stripe_card_id=stripe_card_id,
+            i_payout_method=payout_method_repo,
+            i_payout_card=payout_card_repo,
+            log=log,
+        )
+        log.warn.assert_called_once_with(
+            "[_handle_debit_card_deleted_event] Can't find payout card by stripe card id",
+            stripe_card_id=stripe_card_id,
+        )
+
+        # Insert payout card into db
+        payout_card_id = random.randint(1, 2147483647)
+        payout_card = await payout_card_repo.create_payout_card(
+            data=PayoutCardCreate(
+                id=payout_card_id,
+                stripe_card_id=stripe_card_id,
+                last4="1234",
+                brand="chase",
+                exp_month=12,
+                exp_year=2020,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        assert payout_card.id == payout_card_id
+        assert payout_card.stripe_card_id == stripe_card_id
+
+        # Should log fail to update payout method warning, since no payout method record in db
+        await _handle_debit_card_deleted_event(
+            stripe_card_id=stripe_card_id,
+            i_payout_method=payout_method_repo,
+            i_payout_card=payout_card_repo,
+            log=log,
+        )
+        log.warn.assert_called_with(
+            "[_handle_debit_card_deleted_event] Failed to update payout method",
+            stripe_card_id=stripe_card_id,
+        )
+
+        # Insert payout method (with deleted_at filed) and payout card records into db
+        payout_method = await payout_method_repo.create_payout_method(
+            data=PayoutMethodCreate(
+                type="card",
+                currency="usd",
+                country="US",
+                payment_account_id=random.randint(1, 2147483647),
+                is_default=True,
+                token=str(uuid.uuid4()),
+                deleted_at=datetime.utcnow(),
+            )
+        )
+        assert payout_method.deleted_at is not None
+
+        payout_card_id = payout_method.id
+        stripe_card_id = "card_{}".format(str(random.randint(1, 2147483647)))
+        payout_card = await payout_card_repo.create_payout_card(
+            data=PayoutCardCreate(
+                id=payout_card_id,
+                stripe_card_id=stripe_card_id,
+                last4="1234",
+                brand="chase",
+                exp_month=12,
+                exp_year=2020,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        assert payout_card.id == payout_card_id
+        assert payout_card.stripe_card_id == stripe_card_id
+
+        # Should log fail to update payout method warning, since payout method already marked as deleted
+        await _handle_debit_card_deleted_event(
+            stripe_card_id=stripe_card_id,
+            i_payout_method=payout_method_repo,
+            i_payout_card=payout_card_repo,
+            log=log,
+        )
+        log.warn.assert_called_with(
+            "[_handle_debit_card_deleted_event] Failed to update payout method",
+            stripe_card_id=stripe_card_id,
+        )
+
+        # Insert payout method (without deleted_at filed) and payout card records into db
+        payout_method = await payout_method_repo.create_payout_method(
+            data=PayoutMethodCreate(
+                type="card",
+                currency="usd",
+                country="US",
+                payment_account_id=random.randint(1, 2147483647),
+                is_default=True,
+                token=str(uuid.uuid4()),
+            )
+        )
+        assert payout_method.deleted_at is None
+
+        payout_card_id = payout_method.id
+        stripe_card_id = "card_{}".format(str(random.randint(1, 2147483647)))
+        payout_card = await payout_card_repo.create_payout_card(
+            data=PayoutCardCreate(
+                id=payout_card_id,
+                stripe_card_id=stripe_card_id,
+                last4="1234",
+                brand="chase",
+                exp_month=12,
+                exp_year=2020,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        )
+        assert payout_card.id == payout_card_id
+        assert payout_card.stripe_card_id == stripe_card_id
+
+        # Should log fail to update payout method warning, since payout method already marked as deleted
+        await _handle_debit_card_deleted_event(
+            stripe_card_id=stripe_card_id,
+            i_payout_method=payout_method_repo,
+            i_payout_card=payout_card_repo,
+            log=log,
+        )
+
+        retrieved_payout_method = await payout_method_repo.get_payout_method_by_id(
+            payout_method_id=payout_card_id
+        )
+        assert retrieved_payout_method is not None
+        assert retrieved_payout_method.deleted_at is not None
