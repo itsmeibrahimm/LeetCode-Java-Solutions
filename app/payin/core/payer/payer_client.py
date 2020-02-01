@@ -80,6 +80,10 @@ from app.payin.repository.payer_repo import (
     UpdateDeletePayerRequestWhereInput,
     UpdateDeletePayerRequestSetInput,
     GetDeletePayerRequestsByClientRequestIdInput,
+    DeletePayerRequestMetadataDbEntity,
+    FindDeletePayerRequestMetadataByStatusInput,
+    UpdateDeletePayerRequestMetadataWhereInput,
+    UpdateDeletePayerRequestMetadataSetInput,
 )
 from app.payin.repository.payment_method_repo import PaymentMethodRepository
 
@@ -779,3 +783,34 @@ class PayerClient:
             )
         )
         return delete_payer_requests
+
+    async def find_delete_payer_requests_metadata_by_status(
+        self, status: DeletePayerRequestStatus
+    ) -> List[DeletePayerRequestMetadataDbEntity]:
+        return await self.payer_repo.find_delete_payer_requests_metadata_by_status(
+            find_delete_payer_request_metadata_by_status_input=FindDeletePayerRequestMetadataByStatusInput(
+                status=status
+            )
+        )
+
+    async def update_delete_payer_request_metadata(
+        self, client_request_id: UUID, status: str, email: str
+    ) -> DeletePayerRequestMetadataDbEntity:
+        try:
+            return await self.payer_repo.update_delete_payer_request_metadata(
+                update_delete_payer_request_metadata_where_input=UpdateDeletePayerRequestMetadataWhereInput(
+                    client_request_id=client_request_id
+                ),
+                update_delete_payer_request_metadata_set_input=UpdateDeletePayerRequestMetadataSetInput(
+                    status=status, email=email
+                ),
+            )
+        except DBOperationError as e:
+            self.log.exception(
+                "[update_delete_payer_request_metadata] Error occurred with updating delete payer request metadata",
+                client_request_id=client_request_id,
+            )
+            """Reusing similar existing error code since this is temporary method"""
+            raise PayerDeleteError(
+                error_code=PayinErrorCode.DELETE_PAYER_REQUEST_UPDATE_DB_ERROR
+            ) from e

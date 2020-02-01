@@ -147,6 +147,15 @@ class UpdateDeletePayerRequestWhereInput(DBRequestModel):
     client_request_id: UUID
 
 
+class UpdateDeletePayerRequestMetadataSetInput(DBRequestModel):
+    status: str
+    email: str
+
+
+class UpdateDeletePayerRequestMetadataWhereInput(DBRequestModel):
+    client_request_id: UUID
+
+
 class GetDeletePayerRequestsByClientRequestIdInput(DBRequestModel):
     client_request_id: UUID
 
@@ -372,6 +381,14 @@ class PayerRepositoryInterface:
         ...
 
     @abstractmethod
+    async def update_delete_payer_request_metadata(
+        self,
+        update_delete_payer_request_metadata_where_input: UpdateDeletePayerRequestMetadataWhereInput,
+        update_delete_payer_request_metadata_set_input: UpdateDeletePayerRequestMetadataSetInput,
+    ) -> DeletePayerRequestMetadataDbEntity:
+        ...
+
+    @abstractmethod
     async def insert_pgp_customer(
         self, request: InsertPgpCustomerInput
     ) -> PgpCustomerDbEntity:
@@ -588,6 +605,24 @@ class PayerRepository(PayerRepositoryInterface, PayinDBRepository):
         )
         results = await self.payment_database.replica().fetch_all(statement)
         return [DeletePayerRequestMetadataDbEntity.from_row(row) for row in results]
+
+    async def update_delete_payer_request_metadata(
+        self,
+        update_delete_payer_request_metadata_where_input: UpdateDeletePayerRequestMetadataWhereInput,
+        update_delete_payer_request_metadata_set_input: UpdateDeletePayerRequestMetadataSetInput,
+    ) -> DeletePayerRequestMetadataDbEntity:
+        statement = (
+            delete_payer_requests_metadata.table.update()
+            .where(
+                delete_payer_requests_metadata.client_request_id
+                == update_delete_payer_request_metadata_where_input.client_request_id
+            )
+            .values(update_delete_payer_request_metadata_set_input.dict())
+            .returning(*delete_payer_requests_metadata.table.columns.values())
+        )
+
+        row = await self.payment_database.master().fetch_one(statement)
+        return DeletePayerRequestMetadataDbEntity.from_row(row) if row else None
 
     async def update_delete_payer_request(
         self,
