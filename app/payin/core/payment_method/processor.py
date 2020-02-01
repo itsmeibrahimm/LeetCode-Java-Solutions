@@ -13,6 +13,7 @@ from app.commons.runtime import runtime
 from app.commons.types import CountryCode, PgpCode
 from app.commons.utils.legacy_utils import payer_type_to_payer_reference_id_type
 from app.commons.utils.uuid import generate_object_uuid
+from app.commons.utils.validation import not_none
 from app.payin.core.exceptions import (
     PaymentMethodCreateError,
     PayinErrorCode,
@@ -20,7 +21,7 @@ from app.payin.core.exceptions import (
     PayerReadError,
     PaymentMethodListError,
 )
-from app.payin.core.payer.model import RawPayer
+from app.payin.core.payer.model import RawPayer, PayerCorrelationIds, Payer
 from app.payin.core.payment_method.model import (
     PaymentMethod,
     RawPaymentMethod,
@@ -90,7 +91,7 @@ class PaymentMethodProcessor:
         payer_lookup_id: Optional[MixedUuidStrType] = None,
         payer_lookup_id_type: Optional[PayerReferenceIdType] = None,
         legacy_payment_method_info: Optional[LegacyPaymentMethodInfo] = None,
-    ) -> Tuple[RawPaymentMethod, bool]:
+    ) -> Tuple[RawPaymentMethod, PayerCorrelationIds, bool]:
         """
         Create payment method and attach to payer.
 
@@ -176,6 +177,7 @@ class PaymentMethodProcessor:
             payer_reference_id_type=payer_reference_id_type,
             legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id,
         )
+        payer: Payer = not_none(raw_payer).to_payer()
 
         # step 3: de-dup same payment_method by card fingerprint
         is_dedup_card_logic_active: bool = runtime.get_bool(
@@ -198,7 +200,18 @@ class PaymentMethodProcessor:
                     dd_consumer_id=dd_consumer_id,
                     pgp_payment_method_res_id=stripe_payment_method.id,
                 )
-                return exist_pm, True
+                return (
+                    exist_pm,
+                    PayerCorrelationIds(
+                        payer_reference_id=not_none(
+                            payer.payer_correlation_ids
+                        ).payer_reference_id,
+                        payer_reference_id_type=not_none(
+                            payer.payer_correlation_ids
+                        ).payer_reference_id_type,
+                    ),
+                    True,
+                )
         # step 4: attach PGP payment_method
         attach_stripe_payment_method: StripePaymentMethod = await self.payment_method_client.pgp_attach_payment_method(
             pgp_payment_method_res_id=stripe_payment_method.id,
@@ -253,7 +266,18 @@ class PaymentMethodProcessor:
                         payment_method_id=raw_payment_method.payment_method_id,
                     ),
                 )
-        return raw_payment_method, False
+        return (
+            raw_payment_method,
+            PayerCorrelationIds(
+                payer_reference_id=not_none(
+                    payer.payer_correlation_ids
+                ).payer_reference_id,
+                payer_reference_id_type=not_none(
+                    payer.payer_correlation_ids
+                ).payer_reference_id_type,
+            ),
+            False,
+        )
 
     async def get_payment_method(
         self,
@@ -279,8 +303,29 @@ class PaymentMethodProcessor:
         )
 
         # TODO: step 2: if force_update is true, we should retrieve the payment_method from payment providers
-
-        return raw_payment_method.to_payment_method()
+        if (
+            raw_payment_method.pgp_payment_method_entity
+            and raw_payment_method.pgp_payment_method_entity.payer_id
+        ):
+            mixed_payer_id = str(raw_payment_method.pgp_payment_method_entity.payer_id)
+            payer_reference_id_type = PayerReferenceIdType.PAYER_ID
+        else:
+            mixed_payer_id = not_none(
+                raw_payment_method.stripe_card_entity.external_stripe_customer_id
+            )
+            payer_reference_id_type = PayerReferenceIdType.STRIPE_CUSTOMER_ID
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
+            mixed_payer_id=mixed_payer_id,
+            payer_reference_id_type=payer_reference_id_type,
+        )
+        payer: Payer = raw_payer.to_payer()
+        payment_method = raw_payment_method.to_payment_method(
+            payer_reference_id=not_none(payer.payer_correlation_ids).payer_reference_id,
+            payer_reference_id_type=not_none(
+                payer.payer_correlation_ids
+            ).payer_reference_id_type,
+        )
+        return payment_method
 
     async def list_payment_methods(
         self,
@@ -295,6 +340,11 @@ class PaymentMethodProcessor:
             payer_lookup_id=payer_lookup_id,
             payer_reference_id_type=payer_reference_id_type,
         )
+        raw_payer: RawPayer = await self.payer_client.get_raw_payer(
+            mixed_payer_id=payer_lookup_id,
+            payer_reference_id_type=payer_reference_id_type,
+        )
+        payer: Payer = raw_payer.to_payer()
         payment_method_list = await self.payment_method_client.get_payment_method_list_by_stripe_customer_id(
             stripe_customer_id=payer_entity.primary_pgp_payer_resource_id,
             country=payer_entity.country,
@@ -302,8 +352,12 @@ class PaymentMethodProcessor:
             force_update=force_update,
             sort_by=sort_by,
         )
-        return PaymentMethodList(
-            count=len(payment_method_list), has_more=False, data=payment_method_list
+        return self._build_payment_method_list_object(
+            payment_method_list=payment_method_list,
+            payer_reference_id=not_none(payer.payer_correlation_ids).payer_reference_id,
+            payer_reference_id_type=not_none(
+                payer.payer_correlation_ids
+            ).payer_reference_id_type,
         )
 
     async def list_payment_methods_legacy(
@@ -317,7 +371,12 @@ class PaymentMethodProcessor:
     ) -> PaymentMethodList:
 
         payment_method_list: List[PaymentMethod] = []
+        raw_payer: RawPayer
         if dd_consumer_id:
+            raw_payer = await self.payer_client.get_raw_payer(
+                mixed_payer_id=dd_consumer_id,
+                payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
+            )
             payment_method_list = await self.payment_method_client.get_payment_method_list_by_dd_consumer_id(
                 dd_consumer_id=dd_consumer_id,
                 country=country,
@@ -326,6 +385,10 @@ class PaymentMethodProcessor:
                 sort_by=sort_by,
             )
         elif stripe_customer_id:
+            raw_payer = await self.payer_client.get_raw_payer(
+                mixed_payer_id=stripe_customer_id,
+                payer_reference_id_type=PayerReferenceIdType.STRIPE_CUSTOMER_ID,
+            )
             payment_method_list = await self.payment_method_client.get_payment_method_list_by_stripe_customer_id(
                 stripe_customer_id=stripe_customer_id,
                 country=country,
@@ -337,6 +400,24 @@ class PaymentMethodProcessor:
             raise PaymentMethodListError(
                 error_code=PayinErrorCode.PAYMENT_METHOD_LIST_INVALID_PAYER_TYPE
             )
+        payer: Payer = not_none(raw_payer).to_payer()
+        return self._build_payment_method_list_object(
+            payment_method_list=payment_method_list,
+            payer_reference_id=not_none(payer.payer_correlation_ids).payer_reference_id,
+            payer_reference_id_type=not_none(
+                payer.payer_correlation_ids
+            ).payer_reference_id_type,
+        )
+
+    def _build_payment_method_list_object(
+        self,
+        payment_method_list: List[PaymentMethod],
+        payer_reference_id: str,
+        payer_reference_id_type: PayerReferenceIdType,
+    ) -> PaymentMethodList:
+        for payment_method in payment_method_list:
+            payment_method.payer_reference_id = payer_reference_id
+            payment_method.payer_reference_id_type = payer_reference_id_type
         return PaymentMethodList(
             count=len(payment_method_list), has_more=False, data=payment_method_list
         )

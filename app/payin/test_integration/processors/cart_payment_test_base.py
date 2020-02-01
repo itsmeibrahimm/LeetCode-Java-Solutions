@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID, uuid4
 
 import pytest
@@ -27,9 +27,9 @@ from app.payin.core.cart_payment.types import (
     RefundStatus,
 )
 from app.payin.core.exceptions import CartPaymentCreateError
-from app.payin.core.payer.model import Payer
+from app.payin.core.payer.model import Payer, PayerCorrelationIds
 from app.payin.core.payer.v1.processor import PayerProcessorV1
-from app.payin.core.payment_method.model import PaymentMethod
+from app.payin.core.payment_method.model import PaymentMethod, RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.payment_method.types import LegacyPaymentMethodInfo
 from app.payin.core.types import PayerReferenceIdType
@@ -562,7 +562,9 @@ class CartPaymentTest(CartPaymentTestBase):
     async def payment_method(
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
-        raw_payment_method, _ = await payment_method_processor.create_payment_method(
+        create_payment_method_result: Tuple[
+            RawPaymentMethod, PayerCorrelationIds, bool
+        ] = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_mastercard",
             set_default=True,
@@ -571,7 +573,13 @@ class CartPaymentTest(CartPaymentTestBase):
             payer_lookup_id=payer.id,
             payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
         )
-        return raw_payment_method.to_payment_method()
+        raw_payment_method, payer_correlation_ids, _ = create_payment_method_result
+        payment_method = raw_payment_method.to_payment_method()
+        payment_method.payer_reference_id = payer_correlation_ids.payer_reference_id
+        payment_method.payer_reference_id_type = (
+            payer_correlation_ids.payer_reference_id_type
+        )
+        return payment_method
 
     async def _prepare_cart_payment(
         self,
@@ -639,7 +647,9 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
         self, payment_method_processor: PaymentMethodProcessor, payer: Payer
     ) -> PaymentMethod:
         assert payer.payment_gateway_provider_customers
-        raw_payment_method, _ = await payment_method_processor.create_payment_method(
+        create_payment_method_result: Tuple[
+            RawPaymentMethod, PayerCorrelationIds, bool
+        ] = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_mastercard",
             set_default=True,
@@ -653,7 +663,13 @@ class CartPaymentLegacyTest(CartPaymentTestBase):
                 legacy_dd_stripe_customer_id=payer.legacy_dd_stripe_customer_id,
             ),
         )
-        return raw_payment_method.to_payment_method()
+        raw_payment_method, payer_correlation_ids, _ = create_payment_method_result
+        payment_method = raw_payment_method.to_payment_method()
+        payment_method.payer_reference_id = payer_correlation_ids.payer_reference_id
+        payment_method.payer_reference_id_type = (
+            payer_correlation_ids.payer_reference_id_type
+        )
+        return payment_method
 
     async def _prepare_cart_payment(
         self,

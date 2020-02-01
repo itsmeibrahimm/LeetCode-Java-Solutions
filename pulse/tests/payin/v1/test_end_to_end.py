@@ -76,7 +76,8 @@ def test_end_to_end():
         payment_method_id=payment_method[0].id
     )
     assert get_payment_method[1] == 200
-    assert get_payment_method[0] == delete_payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert get_payment_method[0].id == delete_payment_method[0].id
     assert get_payment_method[0].deleted_at is not None
 
     # Step 7: verify default_payment_method of payer

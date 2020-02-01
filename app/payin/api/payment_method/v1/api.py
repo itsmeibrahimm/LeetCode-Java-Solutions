@@ -99,7 +99,7 @@ async def create_payment_method(
 
     try:
         create_payment_method_result: Tuple[
-            RawPaymentMethod, bool
+            RawPaymentMethod, PayerCorrelationIds, bool
         ] = await payment_method_processor.create_payment_method(
             payer_lookup_id=payer_reference_ids[0],
             payer_lookup_id_type=payer_reference_ids[1],
@@ -109,17 +109,22 @@ async def create_payment_method(
             is_scanned=req_body.is_scanned,
             is_active=req_body.is_active,
         )
+        raw_payment_method, payer_correlation_ids, already_exists = (
+            create_payment_method_result
+        )
+        external_payment_method: PaymentMethod = raw_payment_method.to_payment_method(
+            payer_reference_id=payer_correlation_ids.payer_reference_id,
+            payer_reference_id_type=payer_correlation_ids.payer_reference_id_type,
+        )
         log.info("[create_payment_method] completed.", payer_id=req_body.payer_id)
     except PaymentError:
         log.warn("[create_payment_method] PaymentError.", payer_id=req_body.payer_id)
         raise
-    raw_payment_method, already_exists = create_payment_method_result
     if already_exists:
         return JSONResponse(
-            status_code=HTTP_200_OK,
-            content=jsonable_encoder(raw_payment_method.to_payment_method()),
+            status_code=HTTP_200_OK, content=jsonable_encoder(external_payment_method)
         )
-    return raw_payment_method.to_payment_method()
+    return external_payment_method
 
 
 @router.get(

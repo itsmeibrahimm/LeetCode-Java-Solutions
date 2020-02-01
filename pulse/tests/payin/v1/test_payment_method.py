@@ -101,7 +101,8 @@ def test_create_get_delete_payment_method_with_payer_id_and_payment_method_id():
         payment_method_id=payment_method[0].id
     )
     assert get_payment_method[1] == 200
-    assert get_payment_method[0] == delete_payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert get_payment_method[0].id == delete_payment_method[0].id
     assert get_payment_method[0].deleted_at is not None
 
 
@@ -189,7 +190,8 @@ def test_create_v1_get_delete_v0_payment_method_with_payer_id_and_stripe_payment
         payment_method_id_type="stripe_payment_method_id",
     )
     assert retrieved_payment_method[1] == 200
-    assert retrieved_payment_method[0] == delete_payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert retrieved_payment_method[0].id == delete_payment_method[0].id
     assert retrieved_payment_method[0].deleted_at is not None
 
 

@@ -69,6 +69,15 @@ class TestPaymentMethodsV0:
             ),
         )
 
+        assert (
+            payment_method["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
+
         # get payment_method by dd_stripe_card_id
         get_payment_method_by_card_id = _get_payment_methods_v0(
             client=client,
@@ -86,6 +95,15 @@ class TestPaymentMethodsV0:
             ],
         )
         assert get_payment_method_by_card_id == get_payment_method_by_stripe_id
+
+        assert (
+            get_payment_method_by_card_id["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            get_payment_method_by_card_id["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
         # delete payment_method
         delete_payment_methods_v0(
@@ -125,6 +143,14 @@ class TestPaymentMethodsV0:
                 legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
         )
+        assert (
+            payment_method_one["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_one["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
         payment_method_two = create_payment_method_v0(
             client=client,
             request=CreatePaymentMethodV0Request(
@@ -138,6 +164,14 @@ class TestPaymentMethodsV0:
                 is_active=False,
                 legacy_dd_stripe_customer_id=payer["legacy_dd_stripe_customer_id"],
             ),
+        )
+        assert (
+            payment_method_two["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_two["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
         )
 
         # Get all payment methods
@@ -156,6 +190,22 @@ class TestPaymentMethodsV0:
         assert payment_method_list["has_more"] is False
         assert payment_method_one in payment_method_list["data"]
         assert payment_method_two in payment_method_list["data"]
+        assert (
+            payment_method_list["data"][0]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][0]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
+        assert (
+            payment_method_list["data"][1]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][1]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
         # Get active payment methods
         payment_method_list = list_payment_method_v0(
@@ -173,3 +223,11 @@ class TestPaymentMethodsV0:
         assert payment_method_list["has_more"] is False
         assert payment_method_one in payment_method_list["data"]
         assert payment_method_two not in payment_method_list["data"]
+        assert (
+            payment_method_list["data"][0]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][0]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )

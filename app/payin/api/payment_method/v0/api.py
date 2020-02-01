@@ -10,6 +10,7 @@ from app.commons.context.req_context import get_logger_from_req
 from app.commons.core.errors import PaymentError
 from app.commons.types import CountryCode, PgpCode
 from app.payin.api.payment_method.v0.request import CreatePaymentMethodRequestV0
+from app.payin.core.payer.model import PayerCorrelationIds
 from app.payin.core.payment_method.model import (
     PaymentMethod,
     PaymentMethodList,
@@ -55,7 +56,7 @@ async def create_payment_method(
 
     try:
         create_payment_method_result: Tuple[
-            RawPaymentMethod, bool
+            RawPaymentMethod, PayerCorrelationIds, bool
         ] = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token=req_body.token,
@@ -70,7 +71,13 @@ async def create_payment_method(
                 payer_type=req_body.payer_type,
             ),
         )
-
+        raw_payment_method, payer_correlation_ids, already_exists = (
+            create_payment_method_result
+        )
+        external_payment_method: PaymentMethod = raw_payment_method.to_payment_method(
+            payer_reference_id=payer_correlation_ids.payer_reference_id,
+            payer_reference_id_type=payer_correlation_ids.payer_reference_id_type,
+        )
         log.info(
             "[create_payment_method] completed.",
             stripe_customer_id=req_body.stripe_customer_id,
@@ -87,13 +94,11 @@ async def create_payment_method(
             legacy_dd_stripe_customer_id=req_body.legacy_dd_stripe_customer_id,
         )
         raise
-    raw_payment_method, already_exists = create_payment_method_result
     if already_exists:
         return JSONResponse(
-            status_code=HTTP_200_OK,
-            content=jsonable_encoder(raw_payment_method.to_payment_method()),
+            status_code=HTTP_200_OK, content=jsonable_encoder(external_payment_method)
         )
-    return raw_payment_method.to_payment_method()
+    return external_payment_method
 
 
 @router.get(

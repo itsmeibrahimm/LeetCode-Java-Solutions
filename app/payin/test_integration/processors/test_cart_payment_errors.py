@@ -1,9 +1,12 @@
+from typing import Tuple
+
 import pytest
 
 from app.commons.types import PgpCode
 from app.payin.core.cart_payment.processor import CartPaymentProcessor
 from app.payin.core.cart_payment.types import IntentStatus, LegacyStripeChargeStatus
-from app.payin.core.payer.model import Payer
+from app.payin.core.payer.model import Payer, PayerCorrelationIds
+from app.payin.core.payment_method.model import RawPaymentMethod
 from app.payin.core.payment_method.processor import PaymentMethodProcessor
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.repository.cart_payment_repo import CartPaymentRepository
@@ -56,7 +59,9 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
         payer: Payer,
         payment_method_processor: PaymentMethodProcessor,
     ):
-        raw_payment_method, _ = await payment_method_processor.create_payment_method(
+        create_payment_method_result: Tuple[
+            RawPaymentMethod, PayerCorrelationIds, bool
+        ] = await payment_method_processor.create_payment_method(
             pgp_code=PgpCode.STRIPE,
             token="tok_chargeCustomerFail",
             set_default=True,
@@ -64,6 +69,12 @@ class CreateCartPaymentFailureBase(CartPaymentTestBase):
             is_active=True,
             payer_lookup_id=payer.id,
             payer_lookup_id_type=PayerReferenceIdType.PAYER_ID,
+        )
+        raw_payment_method, payer_correlation_ids, _ = create_payment_method_result
+        payment_method = raw_payment_method.to_payment_method()
+        payment_method.payer_reference_id = payer_correlation_ids.payer_reference_id
+        payment_method.payer_reference_id_type = (
+            payer_correlation_ids.payer_reference_id_type
         )
         await super()._test_cart_payment_creation_error(
             card_declined,

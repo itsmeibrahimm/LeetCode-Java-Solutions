@@ -74,6 +74,14 @@ class TestPaymentMethodsV1:
             client=client, payment_method_id=payment_method["id"]
         )
         assert payment_method == get_payment_method
+        assert (
+            payment_method["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
         # delete payment_method
         delete_payment_methods_v1(client=client, payment_method_id=payment_method["id"])
@@ -176,6 +184,14 @@ class TestPaymentMethodsV1:
                 is_active=True,
             ),
         )
+        assert (
+            payment_method["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
         # get payment_method
         get_payment_method = _get_payment_methods_v1(
@@ -230,6 +246,14 @@ class TestPaymentMethodsV1:
             http_status=200,
         )
         assert payment_method == duplicate_payment_method
+        assert (
+            duplicate_payment_method["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            duplicate_payment_method["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
     def test_list_payment_methods(
         self, client: TestClient, stripe_client: StripeTestClient
@@ -259,6 +283,14 @@ class TestPaymentMethodsV1:
                 is_active=True,
             ),
         )
+        assert (
+            payment_method_one["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_one["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
         payment_method_two = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
@@ -269,6 +301,14 @@ class TestPaymentMethodsV1:
                 is_scanned=False,
                 is_active=False,
             ),
+        )
+        assert (
+            payment_method_two["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_two["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
         )
 
         # List all payment methods
@@ -284,6 +324,22 @@ class TestPaymentMethodsV1:
         assert payment_method_list["has_more"] is False
         assert payment_method_one in payment_method_list["data"]
         assert payment_method_two in payment_method_list["data"]
+        assert (
+            payment_method_list["data"][0]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][1]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][0]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
+        assert (
+            payment_method_list["data"][1]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
         assert dateutil.parser.parse(
             payment_method_list["data"][0]["created_at"]
         ) < dateutil.parser.parse(payment_method_list["data"][1]["created_at"])
@@ -301,6 +357,14 @@ class TestPaymentMethodsV1:
         assert payment_method_list["has_more"] is False
         assert payment_method_one in payment_method_list["data"]
         assert payment_method_two not in payment_method_list["data"]
+        assert (
+            payment_method_list["data"][0]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][0]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
     def test_list_payment_methods_by_payer_reference_id(
         self, client: TestClient, stripe_client: StripeTestClient
@@ -330,6 +394,14 @@ class TestPaymentMethodsV1:
                 is_active=True,
             ),
         )
+        assert (
+            payment_method_one["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_one["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
         payment_method_two = create_payment_method_v1(
             client=client,
             request=CreatePaymentMethodV1Request(
@@ -340,6 +412,14 @@ class TestPaymentMethodsV1:
                 is_scanned=False,
                 is_active=False,
             ),
+        )
+        assert (
+            payment_method_two["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_two["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
         )
 
         # List all payment methods
@@ -359,6 +439,22 @@ class TestPaymentMethodsV1:
         assert dateutil.parser.parse(
             payment_method_list["data"][0]["created_at"]
         ) < dateutil.parser.parse(payment_method_list["data"][1]["created_at"])
+        assert (
+            payment_method_list["data"][0]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][1]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][0]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
+        assert (
+            payment_method_list["data"][1]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
         # List only active payment methods for payer
         payment_method_list = list_payment_method_v1(
@@ -374,6 +470,14 @@ class TestPaymentMethodsV1:
         assert payment_method_list["has_more"] is False
         assert payment_method_one in payment_method_list["data"]
         assert payment_method_two not in payment_method_list["data"]
+        assert (
+            payment_method_list["data"][0]["payer_reference_id"]
+            == payer["payer_correlation_ids"]["payer_reference_id"]
+        )
+        assert (
+            payment_method_list["data"][0]["payer_reference_id_type"]
+            == payer["payer_correlation_ids"]["payer_reference_id_type"]
+        )
 
     def test_list_payment_methods_invalid_input(
         self, client: TestClient, stripe_client: StripeTestClient

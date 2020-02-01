@@ -52,7 +52,8 @@ def test_create_get_delete_payment_method_with_payment_method_id():
         payment_method_id_type="payment_method_id",
     )
     assert get_payment_method[1] == 200
-    assert get_payment_method[0] == delete_payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert get_payment_method[0].id == delete_payment_method[0].id
     assert get_payment_method[0].deleted_at is not None
 
 
@@ -90,7 +91,8 @@ def test_create_get_delete_payment_method_with_stripe_payment_method_id():
         payment_method_id_type="stripe_payment_method_id",
     )
     assert delete_payment_method[1] == 200
-    assert delete_payment_method[0] != payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert delete_payment_method[0].id == payment_method[0].id
     assert delete_payment_method[0].deleted_at is not None
 
     # step 4: verify that payment_method has been deleted
@@ -101,7 +103,8 @@ def test_create_get_delete_payment_method_with_stripe_payment_method_id():
         payment_method_id_type="stripe_payment_method_id",
     )
     assert get_payment_method[1] == 200
-    assert get_payment_method[0] == delete_payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert get_payment_method[0].id == delete_payment_method[0].id
     assert get_payment_method[0].deleted_at is not None
 
 
@@ -145,7 +148,8 @@ def test_create_get_delete_payment_method_with_dd_stripe_card_id():
     )
     assert retrieved_payment_method[1] == 200
     assert retrieved_payment_method[0].id == payment_method[0].id
-    assert retrieved_payment_method[0] == delete_payment_method[0]
+    # Will populate fields after payer migration PAYIN-297
+    assert retrieved_payment_method[0].id == delete_payment_method[0].id
     assert retrieved_payment_method[0].deleted_at is not None
 
 
