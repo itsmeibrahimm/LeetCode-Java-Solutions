@@ -160,7 +160,7 @@ docker run --rm \
     --network host \
     -v $(pwd)/development/python-client-configs/{}.json:/python-config.json \
     -v {}:/tmp/out \
-    openapitools/openapi-generator-cli generate \
+    openapitools/openapi-generator-cli:v4.2.2 generate \
     -i {} \
     -g python \
     -c /python-config.json \
