@@ -116,7 +116,17 @@ async def delete_stripe_customer(
     all_deletes_successful = True
 
     for stripe_customer in stripe_customers:
-        if stripe_customer.created > delete_payer_request_metadata.created_at:
+        if isinstance(stripe_customer.created, int):
+            added_later = (
+                stripe_customer.created
+                > delete_payer_request_metadata.created_at.timestamp()
+            )
+        else:
+            added_later = (
+                stripe_customer.created > delete_payer_request_metadata.created_at
+            )
+
+        if added_later:
             log.info(
                 "[delete_stripe_customer] Cannot delete stripe customer since its created after previous delete payer request",
                 consumer_id=delete_payer_request_metadata.consumer_id,
@@ -162,9 +172,6 @@ async def delete_stripe_customer(
                 != PayinErrorCode.PAYER_DELETE_STRIPE_ERROR_NOT_FOUND
             ):
                 all_deletes_successful = False
-
-    if all_deletes_successful:
-        delete_payer_request_metadata.status = DeletePayerRequestStatus.SUCCEEDED
 
     try:
         await payer_client.update_delete_payer_request_metadata(
