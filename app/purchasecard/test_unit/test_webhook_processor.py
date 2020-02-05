@@ -77,7 +77,7 @@ class TestWebhookProcessor:
                 id=1,
                 amount=2,
                 delivery_id=3,
-                card_acceptor="acceptor",
+                card_acceptor='{"city": "SF"}',
                 swiped_at=datetime.now(),
             )
         )
@@ -98,7 +98,7 @@ class TestWebhookProcessor:
         )
         assert results.processed_results[0].amount == 2
         assert results.processed_results[0].delivery_id == 3
-        assert results.processed_results[0].card_acceptor == "acceptor"
+        assert results.processed_results[0].card_acceptor == {"city": "SF"}
 
         assert (
             results.processed_results[1].process_type

@@ -1,4 +1,5 @@
-from typing import List
+import json
+from typing import Any, Dict, List
 from structlog.stdlib import BoundLogger
 from app.commons.providers.dsj_client import DSJClient
 from app.purchasecard.constants import (
@@ -94,6 +95,14 @@ class WebhookProcessor:
                     )
                     doorstats_global.incr("marqeta.transaction.fail_to_update")
                     continue
+                card_acceptor_dict: Dict[str, Any] = {}
+                try:
+                    card_acceptor_dict = json.loads(updated_tx.card_acceptor)
+                except:
+                    self.logger.error(
+                        "[marqeta webhook] Fail to parse card_acceptor into dictionary",
+                        transaction_token=transaction_token,
+                    )
                 results.append(
                     TransactionProcessResult(
                         transaction_token=transaction_token,
@@ -101,7 +110,7 @@ class WebhookProcessor:
                         user_token=user_token,
                         delivery_id=updated_tx.delivery_id,
                         amount=updated_tx.amount,
-                        card_acceptor=updated_tx.card_acceptor,
+                        card_acceptor=card_acceptor_dict,
                     )
                 )
             elif self.is_jit_failure_due_to_timeout(transaction):

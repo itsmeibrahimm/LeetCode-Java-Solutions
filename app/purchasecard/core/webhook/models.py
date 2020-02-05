@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -34,7 +34,7 @@ class TransactionProcessResult(BaseModel):
     process_type: str
     delivery_id: Optional[int]
     amount: Optional[int]
-    card_acceptor: Optional[str]
+    card_acceptor: Optional[Dict[str, Any]]
 
 
 class TransactionProcessResults(BaseModel):
