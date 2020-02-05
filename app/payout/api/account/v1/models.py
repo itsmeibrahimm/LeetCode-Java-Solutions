@@ -2,6 +2,8 @@
 
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
+
 from pydantic import Schema
 
 from app.commons.api.models import PaymentRequest, PaymentResponse
@@ -189,6 +191,7 @@ class PayoutMethodCard(PayoutMethod):
     exp_month: int = Schema(default=..., description="Exp month")
     exp_year: int = Schema(default=..., description="Exp year")
     fingerprint: str = Schema(default=..., description="Card fingerprint")
+    token: UUID = Schema(default=..., description="Payout card token")
 
 
 class PayoutMethodBankAccount(PayoutMethod):

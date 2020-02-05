@@ -106,9 +106,8 @@ class TestAccountV1:
         )
         assert response.status_code == 201
         payout_card_internal: dict = response.json()
-        assert payout_card_internal["stripe_card_id"]
+        self.verify_payout_method_fields(payout_card_internal, "card")
         assert payout_card_internal["type"] == PayoutExternalAccountType.CARD
-        assert payout_card_internal["is_default"]
 
         # add second debit card
         request_second_card = account_models.CreatePayoutMethod(
@@ -148,9 +147,9 @@ class TestAccountV1:
             json=request.dict(),
         )
         assert response.status_code == 201
-        payout_card_internal: dict = response.json()
-        assert payout_card_internal["bank_name"]
-        assert payout_card_internal["type"] == PayoutExternalAccountType.BANK_ACCOUNT
+        payout_bank_internal: dict = response.json()
+        self.verify_payout_method_fields(payout_bank_internal, "bank")
+        assert payout_bank_internal["type"] == PayoutExternalAccountType.BANK_ACCOUNT
 
     def test_get_payout_method(self, client: TestClient, verified_payout_account: dict):
         request = account_models.CreatePayoutMethod(
@@ -162,7 +161,7 @@ class TestAccountV1:
         )
         assert response.status_code == 201
         created_payout_card: dict = response.json()
-        assert created_payout_card["stripe_card_id"]
+        self.verify_payout_method_fields(created_payout_card, "card")
 
         get_response = client.get(
             get_payout_method_url(
@@ -304,3 +303,27 @@ class TestAccountV1:
         )
         assert response.status_code == 200
         assert response.json() == {"id": 0}
+
+    @staticmethod
+    def verify_payout_method_fields(payout_method: dict, payout_method_type: str):
+        if payout_method_type == "card":
+            assert payout_method["id"]
+            assert payout_method["type"]
+            assert payout_method["payout_account_id"]
+            assert payout_method["country"]
+            assert payout_method["currency"]
+            assert payout_method["stripe_card_id"]
+            assert payout_method["last4"]
+            assert payout_method["brand"]
+            assert payout_method["is_default"]
+            assert payout_method["exp_month"]
+            assert payout_method["exp_year"]
+            assert payout_method["fingerprint"]
+            assert payout_method["token"]
+        elif payout_method_type == "bank":
+            assert payout_method["payout_account_id"]
+            assert payout_method["country"]
+            assert payout_method["currency"]
+            assert payout_method["bank_name"]
+            assert payout_method["bank_last4"]
+            assert payout_method["fingerprint"]
