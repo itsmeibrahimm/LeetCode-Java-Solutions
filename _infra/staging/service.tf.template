@@ -33,6 +33,11 @@ module "payment-service-web" {
   service_resource_requests_cpu             = "4096m"
   service_resource_limits_cpu               = "4096m"
 
+  service_hpa_enable                        = "true"
+  service_hpa_min_replicas                  = "4"
+  service_hpa_max_replicas                  = "8"
+  service_hpa_cpu_target_avg_util           = "50"
+
   service_readiness_probe_path              = "/health"
   service_readiness_probe_init_delay        = 30
   service_readiness_probe_period            = 5
