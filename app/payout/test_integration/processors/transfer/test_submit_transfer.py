@@ -364,6 +364,88 @@ class TestSubmitTransfer:
             == payout_error_message_maps[PayoutErrorCode.TRANSFER_PROCESSING.value]
         )
 
+    async def test_execute_submit_transfer_without_currency_success(self):
+        # mocked get_json for runtime 'payment_account_transfer_limit_overrides'
+        # mocked get_int for runtime 'default_transfer_max' and DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK
+        # mocked get_bool for runtime 'FF_CHECK_FOR_RECENT_BANK_CHANGE'
+        self.mocker.patch("app.commons.runtime.runtime.get_json", return_value={})
+        self.mocker.patch("app.commons.runtime.runtime.get_int", side_effect=[{}, 14])
+        self.mocker.patch("app.commons.runtime.runtime.get_bool", return_value=True)
+        mocked_transfer = mock_transfer()
+
+        @asyncio.coroutine
+        def mock_create_transfer(*args, **kwargs):
+            return mocked_transfer
+
+        self.mocker.patch(
+            "app.commons.providers.stripe.stripe_client.StripeAsyncClient.create_transfer",
+            side_effect=mock_create_transfer,
+        )
+
+        mocked_payout = mock_payout()
+
+        @asyncio.coroutine
+        def mock_create_payout(*args, **kwargs):
+            return mocked_payout
+
+        self.mocker.patch(
+            "app.commons.providers.stripe.stripe_client.StripeAsyncClient.create_payout",
+            side_effect=mock_create_payout,
+        )
+
+        mocked_balance = mock_balance()  # amount = 20
+
+        @asyncio.coroutine
+        def mock_retrieve_balance(*args, **kwargs):
+            return mocked_balance
+
+        self.mocker.patch(
+            "app.commons.providers.stripe.stripe_client.StripeAsyncClient.retrieve_balance",
+            side_effect=mock_retrieve_balance,
+        )
+
+        @asyncio.coroutine
+        async def mock_dsj_client(*args, **kwargs):
+            return None
+
+        self.mocker.patch(
+            "app.commons.providers.dsj_client.DSJClient.get",
+            side_effect=mock_dsj_client,
+        )
+
+        # prepare and insert stripe_managed_account
+        sma = await prepare_and_insert_stripe_managed_account(
+            payment_account_repo=self.payment_account_repo
+        )
+        payment_account = await prepare_and_insert_payment_account(
+            payment_account_repo=self.payment_account_repo, account_id=sma.id
+        )
+
+        # prepare and insert transfer to get a random id
+        transfer = await prepare_and_insert_transfer(
+            transfer_repo=self.transfer_repo,
+            payment_account_id=payment_account.id,
+            amount=1000,
+            currency=None,
+        )
+        await prepare_and_insert_transaction(
+            transaction_repo=self.transaction_repo,
+            transfer_id=transfer.id,
+            payout_account_id=payment_account.id,
+        )
+        submit_transfer_op = self._construct_submit_transfer_op(
+            transfer_id=transfer.id, retry=True, method=TransferMethodType.STRIPE
+        )
+        assert await submit_transfer_op._execute()
+        # check transfer is updated
+        retrieved_transfer = await self.transfer_repo.get_transfer_by_id(
+            transfer_id=transfer.id
+        )
+        assert retrieved_transfer
+        assert retrieved_transfer.status == TransferStatus.PENDING
+        assert retrieved_transfer.submitted_at
+        assert not retrieved_transfer.status_code
+
     async def test_execute_submit_transfer_success(self):
         # mocked get_json for runtime 'payment_account_transfer_limit_overrides'
         # mocked get_int for runtime 'default_transfer_max' and DAYS_FOR_RECENT_BANK_CHANGE_FOR_LARGE_TRANSFERS_CHECK

@@ -206,7 +206,7 @@ class SubmitTransfer(AsyncOperation[SubmitTransferRequest, SubmitTransferRespons
 
         # There is a bug where currency is not set properly; this is a temporary hack to fix it
         if not transfer.currency:
-            currency = get_country_shortname(
+            currency = await get_country_shortname(
                 payment_account=payment_account,
                 payment_account_repository=self.payment_account_repo,
             )
