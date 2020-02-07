@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import json
 import logging
@@ -156,13 +157,20 @@ class BaseTask:
                     "[BaseTask send] Sent a message.", extra={"elapsed_ms": elapsed_ms}
                 )
 
-        kafka_producer.produce(
-            self.topic_name, self.serialize().encode(), on_delivery=ack
-        )
+        loop = asyncio.get_event_loop()
+        msg_to_send = await loop.run_in_executor(None, self.serialize_and_encode)
+        kafka_producer.produce(self.topic_name, msg_to_send, on_delivery=ack)
 
     @staticmethod
     async def run(app_context: AppContext, data: dict):
         pass
+
+    @staticmethod
+    def blocking_encode(json_string: str) -> bytes:
+        return json_string.encode()
+
+    def serialize_and_encode(self):
+        return BaseTask.blocking_encode(self.serialize())
 
     def serialize(self) -> str:
         data = {
