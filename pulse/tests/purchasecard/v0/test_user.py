@@ -19,5 +19,10 @@ class TestUser:
     )
 
     def test_create_user(self):
-        response = user_client.create_marqeta_user(self.base_create_user_request)
+        try:
+            response = user_client.create_marqeta_user(self.base_create_user_request)
+        except TimeoutError:
+            # retry if connection to marqeta sandbox times out
+            response = user_client.create_marqeta_user(self.base_create_user_request)
+
         assert response.token == self.TEST_TOKEN
