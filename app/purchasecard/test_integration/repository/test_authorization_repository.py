@@ -70,7 +70,8 @@ class TestAuthorizationtMasterRepository:
             store_business_name: str
             subtotal: int
             subtotal_tax: int
-            dasher_id: str
+            external_purchasecard_user_token: str
+            expire_sec: int
 
         fake_auth_request: AnnoyingMyPyDict = {
             "auth_id": uuid.uuid4(),
@@ -82,13 +83,49 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
+            "expire_sec": 25000,
         }
         auth, auth_state = await authorization_master_repo.create_authorization(
             **fake_auth_request
         )
         assert auth.id == fake_auth_request["auth_id"]
         assert auth_state.id == fake_auth_request["state_id"]
+        assert auth.expire_sec == 25000
+
+        ids = unique_shift_delivery_store_id_generator.increment_random_id()
+
+        class AnnoyingMyPyDict2(TypedDict):
+            auth_id: uuid.UUID
+            state_id: uuid.UUID
+            shift_id: str
+            delivery_id: str
+            store_id: str
+            store_city: str
+            store_business_name: str
+            subtotal: int
+            subtotal_tax: int
+            external_purchasecard_user_token: str
+
+        fake_auth_request_2: AnnoyingMyPyDict2 = {
+            "auth_id": uuid.uuid4(),
+            "state_id": uuid.uuid4(),
+            "shift_id": str(ids[0]),
+            "delivery_id": str(ids[1]),
+            "store_id": str(ids[2]),
+            "store_city": "Mountain View",
+            "store_business_name": "jazzy jasmine tea",
+            "subtotal": 3,
+            "subtotal_tax": 5,
+            "external_purchasecard_user_token": "7",
+        }
+
+        auth_without_ttl, _ = await authorization_master_repo.create_authorization(
+            **fake_auth_request_2
+        )
+
+        assert auth_without_ttl.id == fake_auth_request_2["auth_id"]
+        assert auth_without_ttl.expire_sec == None
 
         with pytest.raises(NonValidReplicaOperation):
             await authorization_replica_repo.create_authorization(**fake_auth_request)
@@ -111,7 +148,7 @@ class TestAuthorizationtMasterRepository:
             store_business_name: str
             subtotal: int
             subtotal_tax: int
-            dasher_id: str
+            external_purchasecard_user_token: str
 
         fake_auth_request: AnnoyingMyPyDict = {
             "auth_id": uuid.uuid4(),
@@ -123,7 +160,7 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
         }
         auth, auth_state = await authorization_master_repo.create_authorization(
             **fake_auth_request
@@ -188,7 +225,7 @@ class TestAuthorizationtMasterRepository:
             store_business_name: str
             subtotal: int
             subtotal_tax: int
-            dasher_id: str
+            external_purchasecard_user_token: str
 
         fake_auth_request: AnnoyingMyPyDict = {
             "auth_id": uuid.uuid4(),
@@ -200,7 +237,7 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
         }
         auth, auth_state = await authorization_master_repo.create_authorization(
             **fake_auth_request
@@ -224,7 +261,7 @@ class TestAuthorizationtMasterRepository:
             "subtotal_tax": 24,
         }
 
-        create_auth_request_state_result = await authorization_master_repo.create_auth_request_state(
+        _, create_auth_request_state_result = await authorization_master_repo.create_auth_request_state(
             **fake_auth_state_request
         )
 
@@ -301,7 +338,7 @@ class TestAuthorizationtMasterRepository:
             store_business_name: str
             subtotal: int
             subtotal_tax: int
-            dasher_id: str
+            external_purchasecard_user_token: str
 
         fake_auth_request: AnnoyingMyPyDict = {
             "auth_id": uuid.uuid4(),
@@ -313,7 +350,7 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
         }
         auth, auth_state = await authorization_master_repo.create_authorization(
             **fake_auth_request
@@ -334,7 +371,7 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
         }
         auth_2, auth_state_2 = await authorization_master_repo.create_authorization(
             **fake_auth_request_two
@@ -361,7 +398,7 @@ class TestAuthorizationtMasterRepository:
             store_business_name: str
             subtotal: int
             subtotal_tax: int
-            dasher_id: str
+            external_purchasecard_user_token: str
 
         fake_auth_request_one: AnnoyingMyPyDict = {
             "auth_id": uuid.uuid4(),
@@ -373,7 +410,7 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
         }
 
         ids = unique_shift_delivery_store_id_generator.increment_random_id()
@@ -388,7 +425,7 @@ class TestAuthorizationtMasterRepository:
             "store_business_name": "jazzy jasmine tea",
             "subtotal": 3,
             "subtotal_tax": 5,
-            "dasher_id": "7",
+            "external_purchasecard_user_token": "7",
         }
 
         auth_one, auth_state_one = await authorization_master_repo.create_authorization(
@@ -414,7 +451,7 @@ class TestAuthorizationtMasterRepository:
             "subtotal_tax": 24,
         }
 
-        create_auth_request_state_result = await authorization_master_repo.create_auth_request_state(
+        _, create_auth_request_state_result = await authorization_master_repo.create_auth_request_state(
             **fake_auth_state_request
         )
 

@@ -61,7 +61,7 @@ async def create_auth(
             subtotal_tax=request.subtotal_tax,
             store_meta=internal_store_info,
             delivery_id=request.delivery_id,
-            delivery_requires_purchase_card=request.delivery_requires_purchase_card,
+            external_user_token=request.external_user_token,
             shift_id=request.shift_id,
             ttl=request.ttl,
         )

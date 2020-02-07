@@ -48,9 +48,9 @@ class AuthProcessor:
         subtotal_tax: int,
         store_meta: InternalStoreInfo,
         delivery_id: str,
-        delivery_requires_purchase_card: bool,
         shift_id: str,
-        ttl: Optional[int],
+        external_user_token: str,
+        ttl: Optional[int] = None,
     ) -> InternalCreateAuthResponse:
         # generate random auth_request_id
         auth_request_id = uuid4()
@@ -67,6 +67,8 @@ class AuthProcessor:
             store_business_name=store_meta.store_business_name,
             subtotal=subtotal,
             subtotal_tax=subtotal_tax,
+            external_purchasecard_user_token=external_user_token,
+            expire_sec=ttl,
         )
 
         return InternalCreateAuthResponse(
@@ -100,7 +102,7 @@ class AuthProcessor:
 
         auth_request_state_id = uuid4()
 
-        auth_request_state = await self.authorization_master_repo.create_auth_request_state(
+        _, auth_request_state = await self.authorization_master_repo.create_auth_request_state(
             state_id=auth_request_state_id,
             auth_id=auth_request.id,
             subtotal=subtotal,
@@ -141,7 +143,7 @@ class AuthProcessor:
         # may not be worth it. TBD
         auth_request_states.sort(key=sort_date, reverse=True)
 
-        created_state: AuthRequestState = await self.authorization_master_repo.create_auth_request_state(
+        _, created_state = await self.authorization_master_repo.create_auth_request_state(
             state_id=uuid4(),
             auth_id=auth_request.id,
             state=AuthRequestStateName.CLOSED_MANUAL,
@@ -180,7 +182,7 @@ class AuthProcessor:
             latest_state = AuthProcessor._get_latest_auth_request_state(relevant_states)
 
             if latest_state.state != AuthRequestStateName.CLOSED_MANUAL:
-                created_state: AuthRequestState = await self.authorization_master_repo.create_auth_request_state(
+                _, created_state = await self.authorization_master_repo.create_auth_request_state(
                     state_id=uuid4(),
                     auth_id=auth_request.id,
                     state=AuthRequestStateName.CLOSED_MANUAL,

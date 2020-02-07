@@ -51,6 +51,8 @@ class TestAuthProcessor:
         TEST_AUTH_REQUEST_STATE_ID = uuid4()
         TEST_SHIFT_ID = "TEST_SHIFT_ID"
         TEST_DELIVERY_ID = "TEST_DELIVERY_ID"
+        TEST_DASHER_ID = "TEST_DASHER_ID"
+        TEST_STORE_ID = "123"
         self.auth_processor.authorization_master_repo.create_authorization = (
             CoroutineMock()
         )
@@ -61,9 +63,11 @@ class TestAuthProcessor:
                 updated_at=utcnow(),
                 shift_id=TEST_SHIFT_ID,
                 delivery_id=TEST_DELIVERY_ID,
-                store_id="123",
+                external_purchasecard_user_token=TEST_DASHER_ID,
+                store_id=TEST_STORE_ID,
                 store_city="testcity",
                 store_business_name="testbusinessname",
+                current_state=AuthRequestStateName.ACTIVE_CREATED,
             ),
             AuthRequestState(
                 id=TEST_AUTH_REQUEST_STATE_ID,
@@ -77,7 +81,7 @@ class TestAuthProcessor:
         )
 
         test_store_info = InternalStoreInfo(
-            store_id="123",
+            store_id=TEST_STORE_ID,
             store_city="testcity",
             store_business_name="testbusinessname",
         )
@@ -87,8 +91,8 @@ class TestAuthProcessor:
             subtotal_tax=123,
             store_meta=test_store_info,
             delivery_id=TEST_DELIVERY_ID,
-            delivery_requires_purchase_card=True,
             shift_id=TEST_SHIFT_ID,
+            external_user_token=TEST_DASHER_ID,
             ttl=None,
         )
 
@@ -107,43 +111,56 @@ class TestAuthProcessor:
         )
 
         UUID_ONE = uuid4()
-        UUID_TWO = uuid4()
         UUID_THREE = uuid4()
         now = datetime.now(timezone.utc)
-        self.auth_processor.authorization_master_repo.update_auth_request_ttl.return_value = AuthRequest(
+
+        auth_request = AuthRequest(
+            id=UUID_ONE,
+            created_at=now,
+            updated_at=now + timedelta(hours=1),
+            shift_id="3",
+            delivery_id="4",
+            external_purchasecard_user_token="5",
+            store_id="2",
+            store_city="Milpitas",
+            store_business_name="In n Out",
+            expire_sec=5,
+            current_state=AuthRequestStateName.ACTIVE_CREATED,
+        )
+
+        auth_request_no_ttl = AuthRequest(
             id=UUID_ONE,
             created_at=now,
             updated_at=now,
             shift_id="3",
             delivery_id="4",
-            dasher_id=None,
+            external_purchasecard_user_token="5",
             store_id="2",
             store_city="Milpitas",
             store_business_name="In n Out",
-            expire_sec=5,
-        )
-
-        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = AuthRequest(
-            id=UUID_TWO,
-            created_at=now,
-            updated_at=now + timedelta(hours=1),
-            shift_id="4",
-            delivery_id="5",
-            dasher_id=None,
-            store_id="3",
-            store_city="Milpitas",
-            store_business_name="Burger King",
             expire_sec=None,
+            current_state=AuthRequestStateName.ACTIVE_CREATED,
         )
 
-        self.auth_processor.authorization_master_repo.create_auth_request_state.return_value = AuthRequestState(
-            id=UUID_THREE,
-            auth_request_id=UUID_ONE,
-            created_at=now,
-            updated_at=now,
-            state=AuthRequestStateName.ACTIVE_UPDATED,
-            subtotal=10,
-            subtotal_tax=20,
+        self.auth_processor.authorization_master_repo.update_auth_request_ttl.return_value = (
+            auth_request
+        )
+
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = (
+            auth_request_no_ttl
+        )
+
+        self.auth_processor.authorization_master_repo.create_auth_request_state.return_value = (
+            auth_request,
+            AuthRequestState(
+                id=UUID_THREE,
+                auth_request_id=UUID_ONE,
+                created_at=now,
+                updated_at=now,
+                state=AuthRequestStateName.ACTIVE_UPDATED,
+                subtotal=10,
+                subtotal_tax=20,
+            ),
         )
 
         result_with_ttl = await self.auth_processor.update_auth(
@@ -160,16 +177,16 @@ class TestAuthProcessor:
         result_without_ttl = await self.auth_processor.update_auth(
             subtotal=10,
             subtotal_tax=20,
-            store_id="3",
+            store_id="2",
             store_city="Milpitas",
-            store_business_name="Burger King",
-            delivery_id="5",
-            shift_id="4",
+            store_business_name="In n Out",
+            delivery_id="4",
+            shift_id="3",
             ttl=None,
         )
 
-        assert result_with_ttl.updated_at == now
-        assert result_without_ttl.updated_at == now + timedelta(hours=1)
+        assert result_without_ttl.updated_at == now
+        assert result_with_ttl.updated_at == now + timedelta(hours=1)
 
         assert result_with_ttl.state == AuthRequestStateName.ACTIVE_UPDATED
         assert result_without_ttl.state == AuthRequestStateName.ACTIVE_UPDATED
@@ -191,17 +208,22 @@ class TestAuthProcessor:
         UUID_FOUR = uuid4()
         now = datetime.now(timezone.utc)
 
-        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = AuthRequest(
+        auth_request = AuthRequest(
             id=UUID_ONE,
             created_at=now,
             updated_at=now + timedelta(hours=1),
             shift_id="4",
             delivery_id="5",
-            dasher_id=None,
+            external_purchasecard_user_token="6",
             store_id="3",
             store_city="Milpitas",
             store_business_name="Burger King",
+            current_state=AuthRequestStateName.ACTIVE_CREATED,
             expire_sec=None,
+        )
+
+        self.auth_processor.authorization_master_repo.get_auth_request_by_delivery_shift_combination.return_value = (
+            auth_request
         )
 
         self.auth_processor.authorization_master_repo.get_auth_request_state_by_auth_id.return_value = [
@@ -234,14 +256,31 @@ class TestAuthProcessor:
             ),
         ]
 
-        self.auth_processor.authorization_master_repo.create_auth_request_state.return_value = AuthRequestState(
-            id=UUID_FOUR,
-            auth_request_id=UUID_ONE,
+        auth_request_updated = AuthRequest(
+            id=UUID_ONE,
             created_at=now,
-            updated_at=now,
-            state=AuthRequestStateName.CLOSED_MANUAL,
-            subtotal=10,
-            subtotal_tax=20,
+            updated_at=now + timedelta(hours=1),
+            shift_id="4",
+            delivery_id="5",
+            external_purchasecard_user_token="6",
+            store_id="3",
+            store_city="Milpitas",
+            store_business_name="Burger King",
+            current_state=AuthRequestStateName.ACTIVE_CREATED,
+            expire_sec=None,
+        )
+
+        self.auth_processor.authorization_master_repo.create_auth_request_state.return_value = (
+            auth_request_updated,
+            AuthRequestState(
+                id=UUID_FOUR,
+                auth_request_id=UUID_ONE,
+                created_at=now + timedelta(hours=1),
+                updated_at=now + timedelta(hours=1),
+                state=AuthRequestStateName.CLOSED_MANUAL,
+                subtotal=2000,
+                subtotal_tax=17,
+            ),
         )
 
         result_state: AuthRequestStateName = await self.auth_processor.close_auth(

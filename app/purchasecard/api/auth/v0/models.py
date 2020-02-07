@@ -17,10 +17,9 @@ class CreateAuthRequest(BaseModel):
     subtotal_tax: int
     store_meta: StoreInfo
     delivery_id: str
-    delivery_requires_purchase_card: bool
     shift_id: str
     ttl: Optional[int]
-    dasher_id: Optional[str]
+    external_user_token: str
 
 
 class CreateAuthResponse(PaymentResponse):

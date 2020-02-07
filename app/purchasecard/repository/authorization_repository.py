@@ -36,7 +36,8 @@ class AuthorizationRepositoryInterface(ABC):
         store_business_name: str,
         subtotal: int,
         subtotal_tax: int,
-        dasher_id: str = None,
+        external_purchasecard_user_token: str,
+        expire_sec: Optional[int] = None,
     ) -> Tuple[AuthRequest, AuthRequestState]:
         pass
 
@@ -49,7 +50,7 @@ class AuthorizationRepositoryInterface(ABC):
         state: str,
         subtotal: int,
         subtotal_tax: int,
-    ) -> AuthRequestState:
+    ) -> Tuple[AuthRequest, AuthRequestState]:
         pass
 
     @abstractmethod
@@ -109,7 +110,8 @@ class AuthorizationMasterRepository(
         store_business_name: str,
         subtotal: int,
         subtotal_tax: int,
-        dasher_id: str = None,
+        external_purchasecard_user_token: str,
+        expire_sec: Optional[int] = None,
     ) -> Tuple[AuthRequest, AuthRequestState]:
         now = datetime.now(timezone.utc)
 
@@ -119,10 +121,12 @@ class AuthorizationMasterRepository(
             auth_request.updated_at: now,
             auth_request.shift_id: shift_id,
             auth_request.delivery_id: delivery_id,
-            auth_request.dasher_id: dasher_id,
+            auth_request.external_purchasecard_user_token: external_purchasecard_user_token,
             auth_request.store_id: store_id,
             auth_request.store_city: store_city,
             auth_request.store_business_name: store_business_name,
+            auth_request.current_state: AuthRequestStateName.ACTIVE_CREATED,
+            auth_request.expire_sec: expire_sec,
         }
 
         auth_request_state_insertion_values = {
@@ -168,7 +172,7 @@ class AuthorizationMasterRepository(
         subtotal: int,
         subtotal_tax: int,
         state: str,
-    ) -> AuthRequestState:
+    ) -> Tuple[AuthRequest, AuthRequestState]:
         now = datetime.now(timezone.utc)
 
         auth_request_state_insertion_values = {
@@ -187,11 +191,31 @@ class AuthorizationMasterRepository(
             .returning(*auth_request_state.table.columns.values())
         )
 
-        auth_request_state_result = await self._database.master().execute(
-            auth_request_state_insertion_stmt
+        auth_request_update_values = {
+            auth_request.current_state: state,
+            auth_request.updated_at: now,
+        }
+
+        auth_request_update_statement = (
+            auth_request.table.update()
+            .where(and_(auth_request.id == auth_id))
+            .values(auth_request_update_values)
+            .returning(*auth_request.table.columns.values())
         )
 
-        return AuthRequestState.from_row(auth_request_state_result[0])
+        async with self._database.master().transaction() as tx:
+            connection: DBConnection = tx.connection()
+            auth_request_state_result = await connection.execute(
+                auth_request_state_insertion_stmt
+            )
+            auth_request_update_result = await connection.execute(
+                auth_request_update_statement
+            )
+
+        return (
+            AuthRequest.from_row(auth_request_update_result[0]),
+            AuthRequestState.from_row(auth_request_state_result[0]),
+        )
 
     async def get_auth_request(self, id: UUID) -> Optional[AuthRequest]:
         stmnt = select([text("*")]).where(auth_request.id == id)
@@ -294,7 +318,8 @@ class AuthorizationReplicaRepository(
         store_business_name: str,
         subtotal: int,
         subtotal_tax: int,
-        dasher_id: str = None,
+        external_purchasecard_user_token: str,
+        expire_sec: Optional[int] = None,
     ) -> Tuple[AuthRequest, AuthRequestState]:
         raise NonValidReplicaOperation()
 
@@ -306,7 +331,7 @@ class AuthorizationReplicaRepository(
         state: str,
         subtotal: int,
         subtotal_tax: int,
-    ) -> AuthRequestState:
+    ) -> Tuple[AuthRequest, AuthRequestState]:
         raise NonValidReplicaOperation()
 
     async def get_auth_request(self, id: UUID) -> Optional[AuthRequest]:
