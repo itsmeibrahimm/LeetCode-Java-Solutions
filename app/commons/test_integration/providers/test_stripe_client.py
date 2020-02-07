@@ -1,3 +1,6 @@
+import random
+import string
+
 import pytest
 import requests
 from requests.adapters import HTTPAdapter
@@ -588,11 +591,12 @@ class TestStripePool:
     ):
         if mode == "mock":
             pytest.skip()
+        name = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
         for i in range(20):
             await stripe_async_client.create_customer(
                 country=models.CountryCode.US,
                 request=models.StripeCreateCustomerRequest(
-                    email="john.law@doordash.com", description=f"customer {i}"
+                    email=f"{name}@doordash.com", description=name
                 ),
             )
 
@@ -602,14 +606,14 @@ class TestStripePool:
             customers: Customers = await stripe_async_client.list_customers(
                 country=models.CountryCode.US,
                 request=models.StripeListCustomersRequest(
-                    email="john.law@doordash.com",
+                    email=f"{name}@doordash.com",
                     limit=10,
                     starting_after=None if has_more is None else customers.data[-1].id,
                 ),
             )
             assert len(customers.data) == 10
             for customer in customers.data:
-                assert customer.email == "john.law@doordash.com"
+                assert customer.email == f"{name}@doordash.com"
                 customer_ids_list.append(customer.id)
             has_more = customers.has_more
 

@@ -1,3 +1,5 @@
+import random
+import string
 from datetime import datetime, timezone
 from typing import cast
 from uuid import uuid4, UUID
@@ -5,6 +7,7 @@ from uuid import uuid4, UUID
 import pytest
 
 from app.commons.providers.stripe import stripe_models as models
+from app.commons.providers.stripe.stripe_models import Customer
 from app.commons.types import CountryCode, PgpCode, LegacyCountryId, Currency
 from app.payin.core.cart_payment.types import LegacyStripeChargeStatus
 from app.payin.core.payer.model import (
@@ -216,10 +219,11 @@ class TestDeletePayerProcessor:
 
     @pytest.fixture
     async def customer(self, stripe_async_client):
+        name = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
         return await stripe_async_client.create_customer(
             country=models.CountryCode.US,
             request=models.StripeCreateCustomerRequest(
-                email="john.law@doordash.com", description="john law", country="US"
+                email=f"{name}@doordash.com", description=name, country="US"
             ),
         )
 
@@ -378,7 +382,7 @@ class TestDeletePayerProcessor:
         stripe_card,
         stripe_charge,
         cart_payment,
-        customer,
+        customer: Customer,
         payer_repository,
     ):
         list_of_stripe_customer_ids = [customer.id]
@@ -386,7 +390,7 @@ class TestDeletePayerProcessor:
             stripe_customer = await stripe_async_client.create_customer(
                 country=models.CountryCode.US,
                 request=models.StripeCreateCustomerRequest(
-                    email="john.law@doordash.com", description=f"cus_{i}"
+                    email=customer.email, description=customer.description
                 ),
             )
             list_of_stripe_customer_ids.append(stripe_customer.id)

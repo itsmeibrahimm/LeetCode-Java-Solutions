@@ -1,3 +1,6 @@
+import random
+import string
+
 import pytest
 
 from typing import List
@@ -78,10 +81,11 @@ class TestStripePoolStats:
     async def test_list_customers(
         self, stripe_async_client: StripeAsyncClient, get_mock_statsd_events
     ):
+        name = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
         await stripe_async_client.create_customer(
             country=models.CountryCode.US,
             request=models.StripeCreateCustomerRequest(
-                email="jane.doe@doordash.com", description="customer name"
+                email=f"{name}@doordash.com", description=name
             ),
         )
 
