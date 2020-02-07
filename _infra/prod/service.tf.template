@@ -21,7 +21,7 @@ module "payment-service-web" {
 
   service_max_surge                         = "100%"
   service_max_unavailable                   = "0"
-  service_replica_count                     = "8"
+  service_replica_count                     = "20"
   service_container_port                    = "80"
 
   blue_green_enable                         = "true"
