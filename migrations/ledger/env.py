@@ -33,6 +33,10 @@ version_table = "alembic_version_ledger"
 config.set_main_option("sqlalchemy.url", os.environ["LEDGER_PAYMENTDB_URL"])
 
 
+# the upper-bound that each statement in every migration can take
+statement_timeout = 1000
+
+
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
 
@@ -75,6 +79,7 @@ def run_migrations_online():
         )
 
         with context.begin_transaction():
+            connection.execute(f"set statement_timeout={statement_timeout};")
             context.run_migrations()
 
 
