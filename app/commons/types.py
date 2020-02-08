@@ -8,9 +8,17 @@ class CountryCode(str, Enum):
 
 
 class LegacyCountryId:
+    """
+    select shortname, id from maindb.country
+    ID	SHORTNAME
+    2	CA
+    5	AU
+    1	US
+    """
+
     US = 1
     CA = 2
-    AU = 3
+    AU = 5
 
 
 class Currency(str, Enum):

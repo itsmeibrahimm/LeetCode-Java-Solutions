@@ -14800,7 +14800,7 @@ SELECT pg_catalog.setval('core_modelannotation_id_seq', 1, false);
 COPY country (id, name, shortname, is_active, has_fees_tax, allows_pre_tipping) FROM stdin;
 1	United States	US	t	f	\N
 2	Canada	CA	t	f	\N
-3	Australia	AU	t	f	\N
+5	Australia	AU	t	f	\N
 \.
 
 

@@ -1,5 +1,9 @@
 import sqlalchemy
 
+from app.payin.models.paymentdb.data_migration_tracking import (
+    FailedConsumerTable,
+    ConsumerBackfillTrackingTable,
+)
 from app.payin.models.paymentdb.delete_payer_requests import DeletePayerRequestsTable
 from app.payin.models.paymentdb.delete_payer_requests_metadata import (
     DeletePayerRequestsMetadataTable,
@@ -37,5 +41,10 @@ refunds = RefundTable(db_metadata=payin_paymentdb_metadata)
 pgp_refunds = PgpRefundTable(db_metadata=payin_paymentdb_metadata)
 delete_payer_requests = DeletePayerRequestsTable(db_metadata=payin_paymentdb_metadata)
 delete_payer_requests_metadata = DeletePayerRequestsMetadataTable(
+    db_metadata=payin_paymentdb_metadata
+)
+
+failed_consumers = FailedConsumerTable(db_metadata=payin_paymentdb_metadata)
+consumer_backfill_trackings = ConsumerBackfillTrackingTable(
     db_metadata=payin_paymentdb_metadata
 )

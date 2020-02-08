@@ -26,3 +26,8 @@ BYPASS_IDS = "ops/bypass_ids_service_auth.bool"
 ENABLED_PAYMENT_DB_LOCK_FOR_PAYOUT = (
     "payout/feature-flags/enable_payment_db_lock_for_payout.json"
 )
+
+ENABLE_PAYIN_CONSUMER_PAYER_MIGRATION = "ops/enable_payin_consumer_payer_migration.bool"
+PAYIN_CONSUMER_PAYER_MIGRATION_EXTRACT_PAGE_SIZE = (
+    "ops/payin_consumer_payer_migration_extract_page_size.int"
+)

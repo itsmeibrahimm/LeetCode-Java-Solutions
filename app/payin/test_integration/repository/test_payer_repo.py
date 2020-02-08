@@ -1,6 +1,7 @@
+import time
 from datetime import datetime
 from random import randint
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pytz import timezone
@@ -17,23 +18,23 @@ from app.payin.core.payer.types import DeletePayerRequestStatus
 from app.payin.core.types import PayerReferenceIdType
 from app.payin.models.paymentdb import delete_payer_requests
 from app.payin.repository.payer_repo import (
-    PayerRepository,
-    InsertPayerInput,
-    GetPayerByIdInput,
-    InsertPgpCustomerInput,
-    GetPgpCustomerInput,
-    UpdatePgpCustomerSetInput,
-    UpdatePgpCustomerWhereInput,
-    UpdatePayerSetInput,
-    UpdatePayerWhereInput,
-    GetConsumerIdByPayerIdInput,
-    UpdateDeletePayerRequestWhereInput,
-    UpdateDeletePayerRequestSetInput,
-    GetDeletePayerRequestsByClientRequestIdInput,
-    FindDeletePayerRequestByStatusInput,
     DeletePayerRequestDbEntity,
+    FindDeletePayerRequestByStatusInput,
+    GetConsumerIdByPayerIdInput,
+    GetDeletePayerRequestsByClientRequestIdInput,
+    GetPayerByIdInput,
     GetPayerByLegacyDDStripeCustomerIdInput,
     GetPayerByPayerRefIdAndTypeInput,
+    GetPgpCustomerInput,
+    InsertPayerInput,
+    InsertPgpCustomerInput,
+    PayerRepository,
+    UpdateDeletePayerRequestSetInput,
+    UpdateDeletePayerRequestWhereInput,
+    UpdatePayerSetInput,
+    UpdatePayerWhereInput,
+    UpdatePgpCustomerSetInput,
+    UpdatePgpCustomerWhereInput,
 )
 
 
@@ -107,13 +108,15 @@ class TestPayerRepository:
 
     async def test_get_payer_entity(self, payer_repository: PayerRepository):
         payer_id = uuid4()
-        legacy_dd_stripe_customer_id = 1234
-        payer_reference_id = "123"
+        legacy_dd_stripe_customer_id = int(time.time()) + 100
+        payer_reference_id = str(
+            legacy_dd_stripe_customer_id - 1
+        )  # just to make it different from above
 
         insert_payer_input = InsertPayerInput(
             id=payer_id,
             payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
-            payer_reference_id="123",
+            payer_reference_id=payer_reference_id,
             country=CountryCode.US,
             primary_pgp_code=PgpCode.STRIPE,
             primary_pgp_payer_resource_id="cus_123456",
@@ -128,13 +131,13 @@ class TestPayerRepository:
 
         payer_entity_2 = await payer_repository.get_payer_by_legacy_dd_stripe_customer_id(
             request=GetPayerByLegacyDDStripeCustomerIdInput(
-                legacy_dd_stripe_customer_id=legacy_dd_stripe_customer_id
+                legacy_dd_stripe_customer_id=str(legacy_dd_stripe_customer_id)
             )
         )
 
         payer_entity_3 = await payer_repository.get_payer_by_reference_id_and_type(
             input=GetPayerByPayerRefIdAndTypeInput(
-                payer_reference_id=payer_reference_id,
+                payer_reference_id=str(payer_reference_id),
                 payer_reference_id_type=PayerReferenceIdType.DD_CONSUMER_ID,
             )
         )
