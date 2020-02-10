@@ -1,33 +1,16 @@
 from datetime import datetime, timezone
 
-import pytest
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_201_CREATED
 from starlette.testclient import TestClient
 
 from app.purchasecard.api.transaction_event.v0.models import TransactionEvent
 from app.purchasecard.core.transaction_event.models import (
     InternalMarqetaTransactionEvent,
 )
-from app.purchasecard.core.transaction_event.processor import TransactionEventProcessor
 
 
 class TestMarqetaTransactionEvent:
-    @pytest.fixture
-    def mock_processor(
-        self,
-        mock_marqeta_transaction_repo,
-        mock_marqeta_transaction_event_repo,
-        mock_card_acceptor_repo,
-    ):
-        return TransactionEventProcessor(
-            transaction_repo=mock_marqeta_transaction_repo,
-            transaction_event_repo=mock_marqeta_transaction_event_repo,
-            card_acceptor_repo=mock_card_acceptor_repo,
-        )
-
-    def test_get_latest_marqeta_transaction_event(
-        self, mock_processor: TransactionEventProcessor, client: TestClient
-    ):
+    def test_get_latest_marqeta_transaction_event(self, client: TestClient):
         response = client.get("/purchasecard/api/v0/marqeta/transaction_event/last/0")
         assert response.status_code == HTTP_404_NOT_FOUND
 
@@ -51,3 +34,14 @@ class TestMarqetaTransactionEvent:
         )
 
         assert TransactionEvent(**mock_transaction_event.dict())
+
+    def test_record_transaction_event(self, client: TestClient):
+        test_request = {
+            "marqeta_user_token": "1",
+            "anchor_day": "2020-01-29T19:06:21.639Z",
+            "shift_id": 602829,
+        }
+        response = client.post(
+            "/purchasecard/api/v0/marqeta/transaction_event", json=test_request
+        )
+        assert response.status_code == HTTP_201_CREATED

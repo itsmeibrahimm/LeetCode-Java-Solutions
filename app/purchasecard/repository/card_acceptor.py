@@ -38,6 +38,18 @@ class CardAcceptorRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_or_create_card_acceptor(
+        self,
+        mid: str,
+        name: str,
+        city: str,
+        zip_code: str,
+        state: str,
+        should_be_examined: Optional[bool] = False,
+    ) -> CardAcceptor:
+        pass
+
+    @abstractmethod
     async def update_card_acceptor(
         self, card_acceptor_id: int, should_be_examined: bool
     ) -> CardAcceptor:
@@ -103,6 +115,29 @@ class CardAcceptorRepository(
         result = await self._database.master().fetch_one(stmt)
         assert result
         return CardAcceptor.from_row(result)
+
+    async def get_or_create_card_acceptor(
+        self,
+        mid: str,
+        name: str,
+        city: str,
+        zip_code: str,
+        state: str,
+        should_be_examined: Optional[bool] = False,
+    ):
+        card_acceptor = await self.get_card_acceptor_by_card_acceptor_info(
+            mid=mid, name=name, city=city, zip_code=zip_code, state=state
+        )
+        if not card_acceptor:
+            return self.create_card_acceptor(
+                mid=mid,
+                name=name,
+                city=city,
+                zip_code=zip_code,
+                state=state,
+                should_be_examined=should_be_examined,
+            )
+        return card_acceptor
 
     async def update_card_acceptor(
         self, card_acceptor_id: int, should_be_examined: bool

@@ -8,9 +8,8 @@ from app.commons.api.models import PaymentResponse
 
 class RecordTransactionEventsRequest(BaseModel):
     marqeta_user_token: str
-    anchor_day: str
+    anchor_day: datetime
     shift_id: str
-    dasher_id: str
 
 
 class TransactionEvent(PaymentResponse):

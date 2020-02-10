@@ -114,9 +114,12 @@ class PurchaseCardContainer:
     @property
     def transaction_event_processor(self) -> TransactionEventProcessor:
         return TransactionEventProcessor(
+            logger=self.logger,
+            marqeta_client=self.marqeta_client,
             transaction_repo=self.marqeta_transaction_repository,
             transaction_event_repo=self.marqeta_transition_event_repository,
             card_acceptor_repo=self.card_acceptor_repository,
+            card_ownership_repo=self.marqeta_card_ownership_repository,
         )
 
     @property

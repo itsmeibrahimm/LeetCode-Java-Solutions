@@ -1,9 +1,11 @@
-from typing import Optional, Any
+from datetime import datetime, timedelta
+from typing import Optional, Any, List, Dict
 
 import aiohttp
 from aiohttp import BasicAuth
 from pydantic import BaseModel
 
+from app.purchasecard.constants import MARQETA_TRANSACTION_EVENT_AUTHORIZATION_TYPE
 from app.purchasecard.marqeta_external.models import (
     MarqetaProviderCreateUserRequest,
     MarqetaProviderCreateUserResponse,
@@ -29,7 +31,6 @@ class MarqetaProviderClient:
     """
     Abstraction of marqeta api communication
 
-    TODO: Currently as a skeleton for @jasmine-tea
     """
 
     _marqeta_base_url: str
@@ -199,3 +200,31 @@ class MarqetaProviderClient:
                 raise marqeta_error.MarqetaAPIError(resp.content)
 
             return MarqetaProviderCard(**json_resp_body)
+
+    async def get_authorization_data(
+        self, user_token: str, anchor_day: datetime
+    ) -> List[Dict[str, Any]]:
+        start_date = anchor_day - timedelta(days=1)
+        end_date = anchor_day + timedelta(days=1)
+        start_date_str = start_date.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        end_date_str = end_date.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        url = self._marqeta_base_url + (
+            "transactions/?user_token={}&start_date={}&end_date={}&type={}&count={}".format(
+                user_token,
+                start_date_str,
+                end_date_str,
+                MARQETA_TRANSACTION_EVENT_AUTHORIZATION_TYPE,
+                10,
+            )
+        )
+        async with self._session.get(
+            url=url, auth=self.get_auth(), timeout=self._default_timeout
+        ) as resp:
+            json_resp_body = await resp.json()
+            await self._handle_status_get(resp.status, json_resp_body)
+            try:
+                data = json_resp_body["data"]
+                return data
+            except KeyError:
+                raise marqeta_error.MarqetaGetAuthDataInvalidResponseError()

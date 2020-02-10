@@ -54,11 +54,13 @@ class MarqetaTransactionNotFoundError(PaymentError[MarqetaTransactionErrorCode])
 
 
 class MarqetaTransactionEventErrorCode(str, Enum):
-    MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR = "marqeta_transaction_not_found_error"
+    MARQETA_TRANSACTION_EVENT_NOT_FOUND_ERROR = "marqeta_transaction_not_found_error"
+    MARQETA_AUTH_DATA_INVALID_FORMAT_ERROR = "marqeta_auth_data_invalid_format_error"
 
 
 marqeta_transaction_event_error_message_maps = {
-    MarqetaTransactionEventErrorCode.MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR: "Unable to find Marqeta transaction event for given input"
+    MarqetaTransactionEventErrorCode.MARQETA_TRANSACTION_EVENT_NOT_FOUND_ERROR: "Unable to find Marqeta transaction event for given input",
+    MarqetaTransactionEventErrorCode.MARQETA_AUTH_DATA_INVALID_FORMAT_ERROR: "Format of auth data from Marqeta is invalid",
 }
 
 
@@ -67,9 +69,20 @@ class MarqetaTransactionEventNotFoundError(
 ):
     def __init__(self):
         super().__init__(
-            error_code=MarqetaTransactionEventErrorCode.MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR,
+            error_code=MarqetaTransactionEventErrorCode.MARQETA_TRANSACTION_EVENT_NOT_FOUND_ERROR,
             error_message=marqeta_transaction_event_error_message_maps[
-                MarqetaTransactionEventErrorCode.MARQEATA_TRANSACTION_EVENT_NOT_FOUND_ERROR
+                MarqetaTransactionEventErrorCode.MARQETA_TRANSACTION_EVENT_NOT_FOUND_ERROR
+            ],
+            retryable=False,
+        )
+
+
+class MarqetaAuthDataFormatInvalidError(PaymentError[MarqetaTransactionEventErrorCode]):
+    def __init__(self):
+        super().__init__(
+            error_code=MarqetaTransactionEventErrorCode.MARQETA_AUTH_DATA_INVALID_FORMAT_ERROR,
+            error_message=marqeta_transaction_event_error_message_maps[
+                MarqetaTransactionEventErrorCode.MARQETA_AUTH_DATA_INVALID_FORMAT_ERROR
             ],
             retryable=False,
         )

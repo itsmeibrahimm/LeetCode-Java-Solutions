@@ -28,3 +28,7 @@ class MarqetaCannotMoveCardToNewCardHolderError(MarqetaAPIError):
 
 class DuplicateEmail(MarqetaUserAPIError):
     pass
+
+
+class MarqetaGetAuthDataInvalidResponseError(MarqetaAPIError):
+    pass

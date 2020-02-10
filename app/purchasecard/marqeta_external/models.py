@@ -49,3 +49,20 @@ class MarqetaProviderCard(BaseModel):
     last_four: str
     state: CardState
     state_reason: Optional[str]
+
+
+class MarqetaCardAcceptor(BaseModel):
+    name: str
+    mid: str
+    city: str
+    state: str
+    zip: str
+
+
+class MarqetaAuthData(BaseModel):
+    # minimal info needed from Marqeta auth data to record transaction event
+    token: str
+    card_token: str
+    card_acceptor: MarqetaCardAcceptor
+    type: str
+    amount: float
