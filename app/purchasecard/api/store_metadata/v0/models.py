@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 from app.commons.api.models import PaymentResponse
@@ -10,4 +12,4 @@ class LinkStoreWithMidRequest(BaseModel):
 
 
 class LinkStoreWithMidResponse(PaymentResponse):
-    updated_at: str
+    updated_at: datetime

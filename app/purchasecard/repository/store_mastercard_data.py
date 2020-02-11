@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import and_
+from sqlalchemy import and_, select, text
 from typing_extensions import final
 
 from app.commons import tracing
@@ -13,6 +13,12 @@ from app.purchasecard.repository.base import PurchaseCardMainDBRepository
 
 
 class StoreMastercardDataRepositoryInterface(ABC):
+    @abstractmethod
+    async def get_store_mastercard_data_by_store_id_and_mid(
+        self, store_id: int, mid: str
+    ) -> Optional[StoreMastercardData]:
+        pass
+
     @abstractmethod
     async def create_store_mastercard_data(
         self, store_id: int, mid: str, mname: str = None
@@ -26,9 +32,9 @@ class StoreMastercardDataRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_store_mastercard_data_id_by_store_id_and_mid(
-        self, store_id: int, mid: str
-    ) -> Optional[int]:
+    async def get_or_create_store_mastercard_data(
+        self, store_id: int, mid: str, mname: str = None
+    ) -> StoreMastercardData:
         pass
 
 
@@ -69,14 +75,27 @@ class StoreMastercardDataRepository(
         row = await self._database.master().fetch_one(stmt)
         return StoreMastercardData.from_row(row) if row else None
 
-    async def get_store_mastercard_data_id_by_store_id_and_mid(
+    async def get_store_mastercard_data_by_store_id_and_mid(
         self, store_id: int, mid: str
-    ) -> Optional[int]:
-        stmt = store_mastercard_data.table.count().where(
+    ) -> Optional[StoreMastercardData]:
+        stmt = select([text("*")]).where(
             and_(
                 store_mastercard_data.store_id == store_id,
                 store_mastercard_data.mid == mid,
             )
         )
-        result = await self._database.replica().fetch_value(stmt)
+        row = await self._database.replica().fetch_one(stmt)
+        result = StoreMastercardData.from_row(row) if row else None
         return result if result else None
+
+    async def get_or_create_store_mastercard_data(
+        self, store_id: int, mid: str, mname: str = None
+    ) -> StoreMastercardData:
+        existing_record = await self.get_store_mastercard_data_by_store_id_and_mid(
+            store_id=store_id, mid=mid
+        )
+        if existing_record:
+            return existing_record
+        return await self.create_store_mastercard_data(
+            store_id=store_id, mid=mid, mname=mname
+        )

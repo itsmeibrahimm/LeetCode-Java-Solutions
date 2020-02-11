@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends
 from starlette.status import (
     HTTP_200_OK,
     HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_404_NOT_FOUND,
     HTTP_400_BAD_REQUEST,
 )
 
@@ -13,10 +12,7 @@ from app.purchasecard.api.store_metadata.v0.models import (
     LinkStoreWithMidResponse,
 )
 from app.purchasecard.container import PurchaseCardContainer
-from app.purchasecard.core.errors import (
-    StoreMastercardDataErrorCode,
-    INPUT_PARAM_INVALID_ERROR_CODE,
-)
+from app.purchasecard.core.errors import INPUT_PARAM_INVALID_ERROR_CODE
 from app.purchasecard.core.store_metadata.models import InternalStoreCardPaymentMetadata
 from app.purchasecard.core.store_metadata.processor import CardPaymentMetadataProcessor
 
@@ -30,7 +26,7 @@ router = APIRouter()
     operation_id="LinkStoreWithMid",
     response_model=LinkStoreWithMidResponse,
     responses={
-        HTTP_404_NOT_FOUND: {"model": PaymentErrorResponseBody},
+        HTTP_400_BAD_REQUEST: {"model": PaymentErrorResponseBody},
         HTTP_500_INTERNAL_SERVER_ERROR: {"model": PaymentErrorResponseBody},
     },
     tags=api_tags,
@@ -46,12 +42,7 @@ async def link_store_with_mid(
         )
         return LinkStoreWithMidResponse(updated_at=response.updated_at)
     except PaymentError as e:
-        if (
-            e.error_code
-            == StoreMastercardDataErrorCode.STORE_MASTERCARD_DATA_NOT_FOUND_ERROR
-        ):
-            status_code = HTTP_404_NOT_FOUND
-        elif e.error_code == INPUT_PARAM_INVALID_ERROR_CODE:
+        if e.error_code == INPUT_PARAM_INVALID_ERROR_CODE:
             status_code = HTTP_400_BAD_REQUEST
         else:
             status_code = HTTP_500_INTERNAL_SERVER_ERROR
