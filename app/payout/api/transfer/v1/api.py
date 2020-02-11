@@ -174,7 +174,9 @@ async def list_transfers(
     payout_account_ids: Optional[str] = Query(
         default=None, description="Comma separated payout_account ids"
     ),
-    status: Optional[str] = Query(default=None, description="Transfer status"),
+    statuses: Optional[str] = Query(
+        default=None, description="Comma separated transfer statuses"
+    ),
     ts_start: Optional[int] = Query(
         default=None, description="Start timestamp epoch seconds (inclusive)"
     ),
@@ -199,6 +201,10 @@ async def list_transfers(
     if payout_account_ids:
         payout_account_id_list = list(set(payout_account_ids.split(",")))
 
+    status_list = None
+    if statuses:
+        status_list = list(set(statuses.split(",")))
+
     offset_to_query = 0
     limit_to_query = 50
     if offset:
@@ -221,7 +227,7 @@ async def list_transfers(
         offset=offset_to_query,
         limit=limit_to_query,
         time_range=time_range,
-        status=status,
+        statuses=status_list,
         has_positive_amount=has_positive_amount,
         is_submitted=is_submitted,
     )

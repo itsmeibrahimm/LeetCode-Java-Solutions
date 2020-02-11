@@ -26,7 +26,7 @@ class ListTransfersRequest(OperationRequest):
     has_positive_amount: Optional[bool]
     time_range: Optional[TimeRange]
     is_submitted: Optional[bool]
-    status: Optional[str]
+    statuses: Optional[List[str]]
 
 
 class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse]):
@@ -62,12 +62,12 @@ class ListTransfers(AsyncOperation[ListTransfersRequest, ListTransfersResponse])
                 offset=offset,
                 limit=limit,
             )
-        elif self.request.status:
+        elif self.request.statuses:
             has_positive_amount = False
             if self.request.has_positive_amount:
                 has_positive_amount = self.request.has_positive_amount
             transfers, count = await self.transfer_repo.get_transfers_and_count_by_status_and_time_range(
-                status=self.request.status,
+                statuses=self.request.statuses,
                 has_positive_amount=has_positive_amount,
                 offset=offset,
                 limit=limit,

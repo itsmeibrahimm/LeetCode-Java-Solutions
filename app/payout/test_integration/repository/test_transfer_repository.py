@@ -150,7 +150,7 @@ class TestTransferRepository:
         start_time = datetime.utcnow() - timedelta(days=1)
         end_time = datetime.utcnow()
         original_transfers, original_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
             offset=0,
             limit=50,
             has_positive_amount=True,
@@ -170,7 +170,7 @@ class TestTransferRepository:
 
         end_time = datetime.utcnow()
         new_transfers, new_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
             offset=0,
             limit=50,
             has_positive_amount=True,
@@ -190,7 +190,7 @@ class TestTransferRepository:
         )
 
         transfers, count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
             offset=0,
             limit=50,
             has_positive_amount=True,
@@ -207,7 +207,7 @@ class TestTransferRepository:
         start_time = datetime.utcnow() - timedelta(days=1)
         end_time = datetime.utcnow()
         original_transfers, original_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
             offset=0,
             limit=50,
             has_positive_amount=False,
@@ -227,7 +227,7 @@ class TestTransferRepository:
 
         end_time = datetime.utcnow()
         new_transfers, new_count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
             offset=0,
             limit=50,
             has_positive_amount=False,
@@ -247,7 +247,7 @@ class TestTransferRepository:
         )
 
         transfers, count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
             offset=0,
             limit=50,
             has_positive_amount=False,

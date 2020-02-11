@@ -59,7 +59,7 @@ class TransferRepositoryInterface(ABC):
         has_positive_amount: bool,
         offset: int,
         limit: int,
-        status: str,
+        statuses: List[str],
         start_time: Optional[datetime],
         end_time: Optional[datetime],
     ) -> Tuple[List[Transfer], int]:
@@ -172,11 +172,11 @@ class TransferRepository(PayoutMainDBRepository, TransferRepositoryInterface):
         has_positive_amount: bool,
         offset: int,
         limit: int,
-        status: str,
+        statuses: List[str],
         start_time: Optional[datetime],
         end_time: Optional[datetime],
     ) -> Tuple[List[Transfer], int]:
-        query = and_(transfers.status.isnot(None), transfers.status == status)
+        query = and_(transfers.status.isnot(None), transfers.status.in_(statuses))
         if has_positive_amount:
             query.clauses.append(transfers.amount.__gt__(0))
         if start_time:

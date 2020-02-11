@@ -166,14 +166,14 @@ class TestTransferV1:
         assert response_dict["count"] == 1
         assert response_dict["transfer_list"][0] == transfer
 
-    def test_create_then_list_transfers_by_status_and_amount(
+    def test_create_then_list_transfers_by_statuses_and_amount(
         self,
         client: TestClient,
         verified_payout_account: dict,
         new_transaction: dict,
         transfer: dict,
     ):
-        list_transfers_req = {"status": TransferStatus.NEW}
+        list_transfers_req = {"statuses": TransferStatus.NEW}
         response = client.get(list_transfers_url(), params=list_transfers_req)
         assert response.status_code == 200
         response_dict: dict = response.json()

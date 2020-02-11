@@ -252,7 +252,7 @@ class MonitorCreatingStatusTransfers(Job):
             )
             sixty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=60)
             transfers, count = await transfer_repo.get_transfers_and_count_by_status_and_time_range(
-                status=TransferStatus.CREATING,
+                statuses=[TransferStatus.CREATING],
                 end_time=sixty_minutes_ago,
                 has_positive_amount=False,
                 offset=0,

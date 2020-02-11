@@ -46,7 +46,7 @@ class TestListTransfers:
         has_positive_amount=None,
         time_range=None,
         is_submitted=None,
-        status=None,
+        statuses=None,
         payment_account_ids=None,
         offset=0,
         limit=50,
@@ -59,7 +59,7 @@ class TestListTransfers:
                 has_positive_amount=has_positive_amount,
                 time_range=time_range,
                 is_submitted=is_submitted,
-                status=status,
+                statuses=statuses,
                 offset=offset,
                 limit=limit,
             ),
@@ -136,7 +136,7 @@ class TestListTransfers:
         original_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             has_positive_amount=True,
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
         )._execute()
 
         transfer_a = await prepare_and_insert_transfer(
@@ -153,7 +153,7 @@ class TestListTransfers:
         new_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             has_positive_amount=True,
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
         )._execute()
 
         assert new_response.count - original_response.count == 1
@@ -170,7 +170,7 @@ class TestListTransfers:
         response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
             has_positive_amount=True,
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
         )._execute()
         assert transfer_d not in response.transfers
 
@@ -180,7 +180,7 @@ class TestListTransfers:
         end_time = datetime.now(timezone.utc)
         original_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
         )._execute()
 
         transfer_a = await prepare_and_insert_transfer(
@@ -196,7 +196,7 @@ class TestListTransfers:
         end_time = datetime.now(timezone.utc)
         new_response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
         )._execute()
 
         assert new_response.count - original_response.count == 2
@@ -212,7 +212,7 @@ class TestListTransfers:
         )
         response = await self._construct_list_transfers_op(
             time_range=TimeRange(start_time=start_time, end_time=end_time),
-            status=TransferStatus.PENDING,
+            statuses=[TransferStatus.PENDING],
         )._execute()
         assert transfer_d not in response.transfers
 
