@@ -25,9 +25,6 @@ class TransactionProcessor:
         result = await self.marqeta_repository.get_funded_amount_by_delivery_id(
             enriched_error_parse_int(delivery_id, "delivery id")
         )
-        self.logger.info(
-            "[funded amount]", delivery_id=delivery_id, funded_amount=result
-        )
         return result
 
     async def get_fundable_amount_by_delivery_id(
