@@ -19,6 +19,8 @@ class Solution {
       temp = temp > 9 ? temp % 10 : temp;
       sb.append(temp);
     }
+    
+    
     if (carry > 0) {
       sb.append(carry);
     }
